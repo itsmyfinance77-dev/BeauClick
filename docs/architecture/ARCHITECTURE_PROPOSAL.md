@@ -389,3 +389,13 @@ Broadly the sequence you proposed is sound; two adjustments: the search-index ta
 ---
 
 **Next step:** confirm or override the open questions in §28 (AI hosting/provider and B2B build-vs-buy are the two that materially change early-phase work), then I'll begin Phase 0/1 scaffolding — repo init, Laragon-based local environment, WordPress + WooCommerce + `beauclick-core` — with no design or business-logic deviation from what's documented above without flagging it first.
+
+---
+
+## Implementation Notes (deviations discovered while building)
+
+Approved 2026-08-10; implementation proceeding through all phases per this document. Real deviations found along the way, and why:
+
+- **WordPress core is not Composer-managed inside `wordpress/`.** During initial setup, installing core via `johnpbloch/wordpress-core` (a Composer package/installer) performed a full extraction over the existing `wordpress/` directory and silently deleted the hand-authored `wp-content/plugins/beauclick-*` code sitting alongside it (recovered from git; a `.gitignore` gap that had excluded one non-core file, `wordpress/bootstrap-env.php`, from that same commit meant that one file wasn't recoverable and had to be rewritten). Root cause: the installer's "wordpress-core" package type does not reliably leave unrelated files in its install directory alone on a first install. Fix: WordPress core (`wp-admin/`, `wp-includes/`, root `*.php`) is now fetched via `bin/update-wp-core.sh`, which downloads the official wordpress.org zip and copies **only** those explicit paths — it never touches `wp-content`. `wp-content/plugins/*` third-party dependencies (WooCommerce, etc.) still install cleanly through Composer + wpackagist, since that mechanism only ever writes to a package's own named subdirectory. `.gitignore`'s WordPress-core section now lists core's root files individually rather than a blanket `/wordpress/*.php`, specifically so a future hand-authored file at that path can't silently fall outside version control again.
+- **Local MySQL is a pre-existing Windows service (`MySQL80`), not started for this environment.** Starting/stopping Windows services requires administrator rights this session doesn't have; the service must be started by the user (`net start MySQL80` from an elevated prompt, or via Services.msc) before `wp core install` can run. Everything not requiring a live database (repo scaffold, all PHP module code, Composer/PHP-CLI-verified syntax, the full Node/React app-shell) proceeded without waiting on this.
+

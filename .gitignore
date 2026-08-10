@@ -3,17 +3,42 @@
 .env.*
 !.env.example
 
-# === WordPress core (installed via Composer, not committed) ===
+# === WordPress core (downloaded via bin/update-wp-core.sh, not committed) ===
+# Core is intentionally NOT composer-managed inside this tree — see
+# docs/architecture/ARCHITECTURE_PROPOSAL.md "WordPress core install" note:
+# a composer-managed core package silently wiped wp-content once during
+# setup. Ignore core's own root files individually rather than a blanket
+# `*.php`, so files we actually author at wordpress/ root (bootstrap-env.php)
+# never fall into an ignore pattern by accident again.
 /wordpress/wp-admin/
 /wordpress/wp-includes/
-/wordpress/*.php
-!/wordpress/wp-config-sample.php
+/wordpress/index.php
+/wordpress/license.txt
+/wordpress/readme.html
+/wordpress/wp-activate.php
+/wordpress/wp-blog-header.php
+/wordpress/wp-comments-post.php
+/wordpress/wp-config.php
+/wordpress/wp-cron.php
+/wordpress/wp-links-opml.php
+/wordpress/wp-load.php
+/wordpress/wp-login.php
+/wordpress/wp-mail.php
+/wordpress/wp-settings.php
+/wordpress/wp-signup.php
+/wordpress/wp-trackback.php
+/wordpress/xmlrpc.php
+/wordpress/wp-config-sample.php
 /wordpress/wp-content/uploads/
 /wordpress/wp-content/upgrade/
 /wordpress/wp-content/cache/
-/wordpress/wp-content/plugins/akismet/
-/wordpress/wp-content/plugins/hello.php
 /wordpress/wp-content/themes/twenty*/
+
+# Third-party plugins (WooCommerce, Akismet, anything pulled via wpackagist/
+# Composer) are dependencies, not our code — only beauclick-* plugins are
+# authored here and tracked.
+/wordpress/wp-content/plugins/*
+!/wordpress/wp-content/plugins/beauclick-*
 
 # === PHP / Composer ===
 vendor/
@@ -25,6 +50,8 @@ node_modules/
 dist/
 build/
 app/dist/
+app/src/design-system/tokens.generated.css
+app/src/design-system/tokens.generated.ts
 *.local
 
 # === Logs ===

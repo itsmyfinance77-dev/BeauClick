@@ -1,0 +1,93 @@
+/* BeauClick base styles: reset + typography + RTL foundation.
+   Loaded once by the app-shell entry and by the theme's own stylesheet
+   (theme copies the @font-face + reset block — see docs/design/DESIGN_HANDOFF.md
+   typography section for the source values). */
+
+@font-face {
+	font-family: 'Vazirmatn';
+	/* Self-hosted variable font — do not hotlink a font CDN in production:
+	   external CDNs are a real reliability risk for an Iran-hosted site.
+	   Place the official Vazirmatn variable woff2 (github.com/rastikerdar/vazirmatn)
+	   at this path in both the theme (wp-content/themes/beauclick/assets/fonts/)
+	   and here for the standalone dev preview. */
+	src: url('/fonts/Vazirmatn[wght].woff2') format('woff2-variations'),
+		url('/fonts/Vazirmatn[wght].woff2') format('woff2');
+	font-weight: 100 900;
+	font-display: swap;
+}
+
+*, *::before, *::after {
+	box-sizing: border-box;
+}
+
+html {
+	direction: rtl;
+}
+
+html, body {
+	margin: 0;
+	padding: 0;
+}
+
+body {
+	background: var(--bc-color-background);
+	color: var(--bc-color-ink);
+	font-family: var(--bc-font-family);
+	font-size: 15px;
+	line-height: 1.85;
+	-webkit-font-smoothing: antialiased;
+	text-rendering: optimizeLegibility;
+}
+
+/* Persian digits everywhere numeric per the token spec — see lib/format.ts
+   for the runtime formatter; this only sets the numeric rendering mode. */
+.bc-numeric {
+	font-variant-numeric: tabular-nums;
+}
+
+img, svg {
+	max-width: 100%;
+	display: block;
+}
+
+button, input, textarea, select {
+	font-family: inherit;
+	font-size: inherit;
+	color: inherit;
+}
+
+a {
+	color: inherit;
+	text-decoration: none;
+}
+
+:focus-visible {
+	outline: 2px solid var(--bc-color-primary);
+	outline-offset: 2px;
+}
+
+/* Shared "container" used by every server-rendered page and app-shell surface,
+   matching the token spec's content max-width + responsive horizontal padding. */
+.bc-container {
+	max-width: var(--bc-content-max-width, 1280px);
+	margin-inline: auto;
+	padding-inline: var(--bc-space-section-padding-mobile, 24px);
+}
+
+@media (min-width: 900px) {
+	.bc-container {
+		padding-inline: var(--bc-space-section-padding-desktop, 40px);
+	}
+}
+
+.bc-visually-hidden {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
