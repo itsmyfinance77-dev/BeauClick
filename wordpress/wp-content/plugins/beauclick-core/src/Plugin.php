@@ -122,9 +122,3 @@ final class Plugin {
 		// explicit uninstall.php, never from deactivate().
 	}
 }
-
-if ( ! function_exists( 'beauclick_core' ) ) {
-	function beauclick_core(): Plugin {
-		return Plugin::instance();
-	}
-}

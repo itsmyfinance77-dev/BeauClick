@@ -35,6 +35,7 @@ if ( ! file_exists( $beauclick_core_autoload ) ) {
 }
 
 require_once $beauclick_core_autoload;
+require_once __DIR__ . '/src/functions.php';
 
 register_activation_hook( __FILE__, [ \BeauClick\Core\Plugin::class, 'activate' ] );
 register_deactivation_hook( __FILE__, [ \BeauClick\Core\Plugin::class, 'deactivate' ] );

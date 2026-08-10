@@ -1,0 +1,14 @@
+{
+    "name": "beauclick/locations",
+    "description": "BeauClick location architecture — Iran > Province > City > District/Neighborhood.",
+    "type": "wordpress-plugin",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "BeauClick\\Locations\\": "src/"
+        }
+    }
+}
