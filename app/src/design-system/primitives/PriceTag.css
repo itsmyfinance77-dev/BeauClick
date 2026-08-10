@@ -1,0 +1,28 @@
+.bc-price {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 6px;
+	flex-wrap: wrap;
+}
+
+.bc-price__prefix {
+	font-size: 12px;
+	color: var(--bc-color-ink-faint);
+}
+
+.bc-price__amount {
+	font-size: 16px;
+	font-weight: 800;
+	color: var(--bc-color-ink);
+}
+
+.bc-price__unit {
+	font-size: 12px;
+	color: var(--bc-color-ink-faint);
+}
+
+.bc-price__old {
+	font-size: 12px;
+	color: var(--bc-color-ink-faint);
+	text-decoration: line-through;
+}

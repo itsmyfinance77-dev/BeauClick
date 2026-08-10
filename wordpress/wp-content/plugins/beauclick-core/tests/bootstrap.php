@@ -30,6 +30,17 @@ function _beauclick_manually_load_plugins(): void {
 	foreach ( glob( "{$plugins_dir}/beauclick-*/beauclick-*.php" ) as $plugin_file ) {
 		require $plugin_file;
 	}
+
+	// A plain require (above) loads each plugin's runtime hooks but does NOT
+	// fire register_activation_hook() — that only happens via WP's real
+	// activate_plugin() flow, which the test suite doesn't go through. Without
+	// this, activation-only setup (the migration ledger table, custom roles)
+	// silently never runs and every migration/role-dependent test fails on a
+	// missing-table error that has nothing to do with the code under test.
+	// Call each plugin's activation routine explicitly to simulate it.
+	if ( class_exists( \BeauClick\Core\Plugin::class ) ) {
+		\BeauClick\Core\Plugin::activate();
+	}
 }
 
 tests_add_filter( 'muplugins_loaded', '_beauclick_manually_load_plugins' );

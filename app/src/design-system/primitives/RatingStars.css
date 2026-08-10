@@ -1,0 +1,16 @@
+.bc-rating {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.bc-rating__star {
+	color: var(--bc-color-warning);
+}
+
+.bc-rating__count {
+	color: var(--bc-color-ink-faint);
+	font-weight: 400;
+}

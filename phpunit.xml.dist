@@ -30,7 +30,7 @@
             <directory>wordpress/wp-content/plugins/beauclick-ai/tests</directory>
         </testsuite>
     </testsuites>
-    <source>
+    <coverage>
         <include>
             <directory suffix=".php">wordpress/wp-content/plugins/beauclick-core/src</directory>
             <directory suffix=".php">wordpress/wp-content/plugins/beauclick-locations/src</directory>
@@ -41,5 +41,5 @@
             <directory suffix=".php">wordpress/wp-content/plugins/beauclick-chat/src</directory>
             <directory suffix=".php">wordpress/wp-content/plugins/beauclick-ai/src</directory>
         </include>
-    </source>
+    </coverage>
 </phpunit>

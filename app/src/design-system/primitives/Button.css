@@ -1,0 +1,55 @@
+.bc-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	border: none;
+	border-radius: var(--bc-radius-button, 12px);
+	font-weight: 700;
+	font-size: 14px;
+	padding-block: 12px;
+	padding-inline: 20px;
+	cursor: pointer;
+	transition: background-color 160ms ease, color 160ms ease, transform 120ms ease;
+}
+
+.bc-btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.bc-btn--primary {
+	background: var(--bc-color-primary);
+	color: white;
+}
+.bc-btn--primary:hover:not(:disabled) {
+	background: var(--bc-color-primary-hover);
+}
+
+.bc-btn--outline {
+	background: transparent;
+	color: var(--bc-color-primary);
+	border: 1.5px solid var(--bc-color-line);
+}
+.bc-btn--outline:hover:not(:disabled) {
+	background: var(--bc-color-primary-soft);
+	border-color: var(--bc-color-primary);
+}
+
+.bc-btn--light {
+	background: rgba(255, 255, 255, 0.12);
+	color: white;
+	border: 1.5px solid rgba(255, 255, 255, 0.35);
+}
+.bc-btn--light:hover:not(:disabled) {
+	background: rgba(255, 255, 255, 0.2);
+}
+
+.bc-btn--ghost {
+	background: transparent;
+	color: var(--bc-color-ink-soft);
+	padding-inline: 8px;
+}
+.bc-btn--ghost:hover:not(:disabled) {
+	color: var(--bc-color-ink);
+}

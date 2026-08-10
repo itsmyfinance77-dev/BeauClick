@@ -1,0 +1,28 @@
+.bc-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	border-radius: var(--bc-radius-pill, 999px);
+	border: 1.5px solid var(--bc-color-line);
+	background: var(--bc-color-surface);
+	color: var(--bc-color-ink-soft);
+	padding-block: 8px;
+	padding-inline: 16px;
+	font-size: 13px;
+	font-weight: 600;
+	cursor: pointer;
+	white-space: nowrap;
+	transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.bc-chip--primary.bc-chip--active {
+	background: var(--bc-color-primary-soft);
+	border-color: var(--bc-color-primary);
+	color: var(--bc-color-primary);
+}
+
+.bc-chip--accent.bc-chip--active {
+	background: var(--bc-color-accent-soft);
+	border-color: var(--bc-color-accent);
+	color: var(--bc-color-accent);
+}

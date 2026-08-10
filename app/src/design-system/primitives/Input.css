@@ -1,0 +1,28 @@
+.bc-input {
+	width: 100%;
+	border: 1.5px solid var(--bc-color-line);
+	border-radius: var(--bc-radius-row, 14px);
+	background: var(--bc-color-surface);
+	padding-block: 12px;
+	padding-inline: 16px;
+	transition: box-shadow 140ms ease, border-color 140ms ease;
+}
+
+.bc-input::placeholder {
+	color: var(--bc-color-ink-faint);
+}
+
+.bc-input:focus-visible {
+	outline: none;
+	border-color: var(--bc-color-primary);
+	box-shadow: 0 0 0 2px var(--bc-color-primary-soft);
+}
+
+.bc-input--bare {
+	border: none;
+	box-shadow: var(--bc-shadow-floating-min);
+}
+
+.bc-input--bare:focus-visible {
+	box-shadow: var(--bc-shadow-floating-min), 0 0 0 2px var(--bc-color-primary-soft);
+}

@@ -1,0 +1,12 @@
+.bc-card {
+	background: var(--bc-color-surface);
+	border: 1px solid var(--bc-color-line);
+	border-radius: var(--bc-radius-card, 18px);
+	overflow: hidden;
+	transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.bc-card--hoverable:hover {
+	transform: translateY(-3px);
+	box-shadow: var(--bc-shadow-card-hover);
+}

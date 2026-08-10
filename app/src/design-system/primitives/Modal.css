@@ -1,0 +1,45 @@
+.bc-modal-backdrop {
+	position: fixed;
+	inset: 0;
+	background: oklch(0.2 0.02 290 / 0.55);
+	backdrop-filter: blur(3px);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 1000;
+}
+
+.bc-modal {
+	background: var(--bc-color-surface);
+	box-shadow: var(--bc-shadow-floating-max);
+	max-height: 90vh;
+	overflow-y: auto;
+}
+
+.bc-modal--centered {
+	width: 520px;
+	max-width: calc(100vw - 32px);
+	border-radius: var(--bc-radius-hero, 28px);
+}
+
+.bc-modal--drawer-end {
+	position: fixed;
+	inset-block: 0;
+	inset-inline-end: 0;
+	width: 420px;
+	max-width: 100vw;
+	max-height: 100vh;
+	border-radius: 0;
+}
+
+@media (max-width: 899px) {
+	.bc-modal--centered,
+	.bc-modal--drawer-end {
+		position: fixed;
+		inset: 0;
+		width: 100vw;
+		max-width: 100vw;
+		max-height: 100vh;
+		border-radius: 0;
+	}
+}

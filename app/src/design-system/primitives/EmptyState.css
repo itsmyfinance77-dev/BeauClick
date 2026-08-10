@@ -1,0 +1,16 @@
+.bc-empty-state {
+	text-align: center;
+	color: var(--bc-color-ink-faint);
+	border: 1.5px dashed var(--bc-color-line);
+	border-radius: var(--bc-radius-card, 18px);
+	padding: 48px 24px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 16px;
+}
+
+.bc-empty-state__title {
+	font-size: 14px;
+	margin: 0;
+}

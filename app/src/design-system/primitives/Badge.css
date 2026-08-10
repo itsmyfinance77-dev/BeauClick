@@ -1,0 +1,40 @@
+.bc-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	border-radius: var(--bc-radius-pill, 999px);
+	font-size: 11px;
+	font-weight: 700;
+	padding-block: 4px;
+	padding-inline: 10px;
+}
+
+.bc-badge--verified {
+	background: var(--bc-color-primary-soft);
+	color: var(--bc-color-primary);
+}
+
+.bc-badge--discount {
+	background: var(--bc-color-accent);
+	color: white;
+}
+
+.bc-badge--recommended {
+	background: var(--bc-color-primary);
+	color: white;
+}
+
+.bc-badge--success {
+	background: var(--bc-color-success-soft);
+	color: var(--bc-color-success);
+}
+
+.bc-badge--warning {
+	background: var(--bc-color-warning-soft);
+	color: var(--bc-color-warning);
+}
+
+.bc-badge--error {
+	background: var(--bc-color-error-soft);
+	color: var(--bc-color-error);
+}

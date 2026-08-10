@@ -52,6 +52,7 @@ build/
 app/dist/
 app/src/design-system/tokens.generated.css
 app/src/design-system/tokens.generated.ts
+app/tsconfig.tsbuildinfo
 *.local
 
 # === Logs ===

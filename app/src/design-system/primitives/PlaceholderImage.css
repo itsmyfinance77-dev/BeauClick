@@ -1,0 +1,16 @@
+.bc-placeholder-image {
+	display: flex;
+	align-items: flex-end;
+	justify-content: flex-start;
+	padding: 10px;
+	width: 100%;
+}
+
+.bc-placeholder-image span {
+	font-family: ui-monospace, 'Vazirmatn', monospace;
+	font-size: 11px;
+	color: oklch(0.3 0.03 290 / 0.55);
+	background: oklch(1 0 0 / 0.5);
+	padding: 3px 8px;
+	border-radius: 999px;
+}
