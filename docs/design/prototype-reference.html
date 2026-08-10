@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" />
+<style>
+  body{margin:0;}
+  ::-webkit-scrollbar{width:10px;height:10px;}
+  ::-webkit-scrollbar-thumb{background:oklch(0.88 0.015 290);border-radius:8px;}
+  @keyframes bcPulse{0%,100%{opacity:.5;transform:scale(1);}50%{opacity:1;transform:scale(1.08);}}
+  @keyframes bcFadeIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+  @keyframes bcSlideUp{from{opacity:0;transform:translateY(24px);}to{opacity:1;transform:translateY(0);}}
+</style>
+</helmet>
+<div style="{{ rootStyle }}">
+
+<!-- ===== DESKTOP HEADER ===== -->
+<sc-if value="{{ isDesktop }}" hint-placeholder-val="{{ true }}">
+<div style="{{ headerDesktopStyle }}">
+  <div style="{{ headerLeftStyle }}">
+    <div style="{{ logoRowStyle }}" onClick="{{ goHome }}"><div style="{{ logoMarkStyle }}"></div><div style="{{ logoTextStyle }}">BeauClick</div></div>
+    <div style="{{ navRowStyle }}">
+      <sc-for list="{{ navItems }}" as="n" hint-placeholder-count="5">
+        <button style="{{ n.style }}" onClick="{{ n.onClick }}">{{ n.label }}</button>
+      </sc-for>
+    </div>
+  </div>
+  <div style="{{ headerRightStyle }}">
+    <button style="{{ searchChipStyle }}" onClick="{{ goMarketplace }}">جست‌وجوی خدمات، متخصص یا محصول...</button>
+    <button style="{{ cartChipStyle }}" onClick="{{ openCartDrawer }}">سبد خرید<sc-if value="{{ hasCartItems }}"><span style="{{ cartBadgeStyle }}">{{ cartCountFa }}</span></sc-if></button>
+    <div style="{{ avatarChipStyle }}">س</div>
+  </div>
+</div>
+</sc-if>
+
+<!-- ===== MOBILE TOP BAR ===== -->
+<sc-if value="{{ isMobile }}" hint-placeholder-val="{{ false }}">
+<div style="{{ headerMobileStyle }}">
+  <div style="{{ logoRowStyle }}" onClick="{{ goHome }}"><div style="{{ logoMarkStyle }}"></div><div style="{{ logoTextStyle }}">BeauClick</div></div>
+  <div style="{{ mobileTopActionsStyle }}">
+    <button style="{{ mobileIconBtnStyle }}" onClick="{{ goMarketplace }}">جست‌وجو</button>
+    <button style="{{ cartChipStyle }}" onClick="{{ openCartDrawer }}">سبد<sc-if value="{{ hasCartItems }}"><span style="{{ cartBadgeStyle }}">{{ cartCountFa }}</span></sc-if></button>
+  </div>
+</div>
+</sc-if>
+
+<!-- ===================== HOME ===================== -->
+<sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+<div>
+  <section style="{{ heroSectionStyle }}">
+    <div style="{{ heroGridStyle }}">
+      <div style="{{ heroTextColStyle }}">
+        <div style="{{ heroKickerStyle }}">مارکت‌پلیس هوشمند زیبایی</div>
+        <h1 style="{{ heroTitleStyle }}">پیدا کن، رزرو کن، زیبا شو</h1>
+        <p style="{{ heroSubStyle }}">بهترین متخصصان و محصولات زیبایی یزد و سراسر ایران را در یک پلتفرم پیدا کنید؛ نوبت بگیرید، آنلاین پرداخت کنید و از دستیار هوش مصنوعی BeauClick راهنمایی بگیرید.</p>
+        <div style="{{ heroSearchBoxStyle }}">
+          <input style="{{ heroSearchInputStyle }}" style-focus="{{ heroSearchInputFocusStyle }}" placeholder="مثلاً «کراتینه مو در یزد»" value="{{ heroQuery }}" onChange="{{ setHeroQuery }}" />
+          <button style="{{ heroSearchBtnStyle }}" onClick="{{ goMarketplace }}">جست‌وجو</button>
+        </div>
+        <div style="{{ heroStatsRowStyle }}">
+          <div style="{{ heroStatStyle }}"><div style="{{ heroStatNumStyle }}">۱۵,۰۰۰+</div><div style="{{ heroStatLabelStyle }}">متخصص فعال</div></div>
+          <div style="{{ heroStatStyle }}"><div style="{{ heroStatNumStyle }}">۲۰۰,۰۰۰+</div><div style="{{ heroStatLabelStyle }}">رزرو موفق</div></div>
+          <div style="{{ heroStatStyle }}"><div style="{{ heroStatNumStyle }}">۴.۸</div><div style="{{ heroStatLabelStyle }}">میانگین امتیاز</div></div>
+        </div>
+      </div>
+      <div style="{{ heroVisualColStyle }}">
+        <div style="{{ heroVisualCardStyle }}">
+          <div style="{{ heroVisualLabelStyle }}">تصویر متخصص زیبایی — ترکیب پرتره و محیط سالن</div>
+        </div>
+        <div style="{{ heroFloatCardStyle }}">
+          <div style="{{ heroFloatDotStyle }}"></div>
+          <div>نوبت شما تأیید شد — فردا ۱۶:۳۰</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section style="{{ sectionPadStyle }}">
+    <div style="{{ sectionHeadRowStyle }}"><h2 style="{{ sectionTitleStyle }}">دسته‌بندی خدمات</h2></div>
+    <div style="{{ categoryRowStyle }}">
+      <sc-for list="{{ categoryItems }}" as="c" hint-placeholder-count="7">
+        <button style="{{ c.style }}" onClick="{{ c.onClick }}">{{ c.label }}</button>
+      </sc-for>
+    </div>
+  </section>
+
+  <section style="{{ sectionPadStyle }}">
+    <div style="{{ sectionHeadRowStyle }}">
+      <h2 style="{{ sectionTitleStyle }}">متخصصان پیشنهادی</h2>
+      <button style="{{ linkBtnStyle }}" onClick="{{ goMarketplace }}">مشاهده همه ←</button>
+    </div>
+    <div style="{{ providerScrollRowStyle }}">
+      <sc-for list="{{ featuredProviders }}" as="p" hint-placeholder-count="4">
+        <div style="{{ providerCardCompactStyle }}" style-hover="{{ providerCardHoverStyle }}" onClick="{{ p.view }}">
+          <div style="{{ p.imgStyle }}">تصویر متخصص</div>
+          <div style="{{ providerCardBodyStyle }}">
+            <div style="{{ providerCardTopRowStyle }}">
+              <div style="{{ providerNameStyle }}">{{ p.name }}</div>
+              <sc-if value="{{ p.verified }}"><span style="{{ verifiedBadgeStyle }}">تأیید‌شده</span></sc-if>
+            </div>
+            <div style="{{ providerSpecialtyStyle }}">{{ p.specialty }}</div>
+            <div style="{{ providerMetaRowStyle }}">
+              <span style="{{ ratingStyle }}">★ {{ p.rating }}</span>
+              <span style="{{ metaFaintStyle }}">({{ p.reviewsFa }} نظر)</span>
+              <span style="{{ metaFaintStyle }}">{{ p.area }}</span>
+            </div>
+            <div style="{{ priceFromStyle }}">از {{ p.price }} تومان</div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <section style="{{ aiPromoSectionStyle }}">
+    <div style="{{ aiPromoInnerStyle }}">
+      <div style="{{ aiPromoGlowStyle }}"></div>
+      <div style="{{ aiPromoTextColStyle }}">
+        <div style="{{ aiKickerStyle }}">دستیار بیوتی BeauClick</div>
+        <h2 style="{{ aiPromoTitleStyle }}">نمی‌دونی چی نیاز داری؟ از AI بپرس</h2>
+        <p style="{{ aiPromoSubStyle }}">روتین پوستی، انتخاب متخصص یا محصول مناسب — دستیار هوش مصنوعی BeauClick بر اساس نیاز شما پیشنهاد می‌دهد.</p>
+        <button style="{{ aiPromoBtnStyle }}" onClick="{{ openAi }}">شروع گفتگو با دستیار AI</button>
+      </div>
+    </div>
+  </section>
+
+  <section style="{{ sectionPadStyle }}">
+    <div style="{{ sectionHeadRowStyle }}">
+      <h2 style="{{ sectionTitleStyle }}">محصولات محبوب</h2>
+      <button style="{{ linkBtnStyle }}" onClick="{{ goShop }}">مشاهده فروشگاه ←</button>
+    </div>
+    <div style="{{ productGridStyle }}">
+      <sc-for list="{{ featuredProducts }}" as="pr" hint-placeholder-count="4">
+        <div style="{{ productCardStyle }}" style-hover="{{ productCardHoverStyle }}">
+          <div style="{{ pr.imgStyle }}">تصویر محصول
+            <sc-if value="{{ pr.hasOld }}"><span style="{{ discountBadgeStyle }}">{{ pr.discountLabel }}</span></sc-if>
+            <button style="{{ pr.wishStyle }}" onClick="{{ pr.toggleWish }}">♡</button>
+          </div>
+          <div style="{{ productCardBodyStyle }}">
+            <div style="{{ productBrandStyle }}">{{ pr.brand }}</div>
+            <div style="{{ productNameStyle }}">{{ pr.name }}</div>
+            <div style="{{ productPriceRowStyle }}">
+              <span style="{{ productPriceStyle }}">{{ pr.priceLabel }} تومان</span>
+              <sc-if value="{{ pr.hasOld }}"><span style="{{ productOldPriceStyle }}">{{ pr.oldPrice }}</span></sc-if>
+            </div>
+            <button style="{{ addCartBtnStyle }}" style-hover="{{ addCartBtnHoverStyle }}" onClick="{{ pr.addToCart }}">افزودن به سبد</button>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <section style="{{ b2bBannerSectionStyle }}">
+    <div style="{{ b2bBannerInnerStyle }}">
+      <div>
+        <div style="{{ b2bKickerStyle }}">BeauClick برای کسب‌وکارها</div>
+        <h2 style="{{ b2bBannerTitleStyle }}">خرید عمده محصولات زیبایی با قیمت همکاری</h2>
+        <p style="{{ b2bBannerSubStyle }}">مخصوص سالن‌های زیبایی، کلینیک‌ها و متخصصان مستقل — تخفیف پلکانی و پیش‌فاکتور اختصاصی.</p>
+      </div>
+      <button style="{{ b2bBannerBtnStyle }}" onClick="{{ goB2B }}">مشاهده قیمت همکاری</button>
+    </div>
+  </section>
+</div>
+</sc-if>
+
+<!-- ===================== MARKETPLACE ===================== -->
+<sc-if value="{{ isMarketplace }}" hint-placeholder-val="{{ false }}">
+<div style="{{ sectionPadStyle }}">
+  <h1 style="{{ pageTitleStyle }}">پیدا کردن متخصص زیبایی</h1>
+  <p style="{{ pageSubStyle }}">{{ providerResultCountFa }} متخصص {{ marketplaceLocationLabel }}</p>
+  <div style="{{ filterRowStyle }}">
+    <sc-for list="{{ cityFilters }}" as="f" hint-placeholder-count="4">
+      <button style="{{ f.style }}" onClick="{{ f.onClick }}">{{ f.label }}</button>
+    </sc-for>
+  </div>
+  <div style="{{ filterRowStyle }}">
+    <sc-for list="{{ specialtyFilters }}" as="f" hint-placeholder-count="7">
+      <button style="{{ f.style }}" onClick="{{ f.onClick }}">{{ f.label }}</button>
+    </sc-for>
+  </div>
+  <div style="{{ marketplaceGridStyle }}">
+    <sc-for list="{{ marketplaceProviders }}" as="p" hint-placeholder-count="6">
+      <div style="{{ providerCardStyle }}" style-hover="{{ providerCardHoverStyle }}" onClick="{{ p.view }}">
+        <div style="{{ p.imgStyle }}">تصویر متخصص</div>
+        <div style="{{ providerCardBodyStyle }}">
+          <div style="{{ providerCardTopRowStyle }}">
+            <div style="{{ providerNameStyle }}">{{ p.name }}</div>
+            <sc-if value="{{ p.verified }}"><span style="{{ verifiedBadgeStyle }}">تأیید‌شده</span></sc-if>
+          </div>
+          <div style="{{ providerSpecialtyStyle }}">{{ p.specialty }}</div>
+          <div style="{{ providerMetaRowStyle }}">
+            <span style="{{ ratingStyle }}">★ {{ p.rating }}</span>
+            <span style="{{ metaFaintStyle }}">({{ p.reviewsFa }} نظر)</span>
+            <span style="{{ metaFaintStyle }}">{{ p.city }}، {{ p.area }}</span>
+          </div>
+          <div style="{{ providerCardBottomRowStyle }}">
+            <div style="{{ priceFromStyle }}">از {{ p.price }} تومان</div>
+            <button style="{{ bookNowChipStyle }}" style-hover="{{ bookNowChipHoverStyle }}" onClick="{{ p.book }}">رزرو نوبت</button>
+          </div>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+  <sc-if value="{{ marketplaceIsEmpty }}">
+    <div style="{{ emptyStateStyle }}">متخصصی با این فیلتر پیدا نشد. فیلتر دیگری را امتحان کنید.</div>
+  </sc-if>
+</div>
+</sc-if>
+
+<!-- ===================== PROFESSIONAL PROFILE ===================== -->
+<sc-if value="{{ isProfile }}" hint-placeholder-val="{{ false }}">
+<div>
+  <div style="{{ profileCoverStyle }}"></div>
+  <div style="{{ sectionPadStyle }}">
+    <div style="{{ profileHeaderGridStyle }}">
+      <div style="{{ profileAvatarStyle }}">تصویر پروفایل</div>
+      <div style="{{ profileHeaderInfoStyle }}">
+        <div style="{{ profileNameRowStyle }}">
+          <h1 style="{{ profileNameStyle }}">{{ provider.name }}</h1>
+          <sc-if value="{{ provider.verified }}"><span style="{{ verifiedBadgeStyle }}">متخصص تأیید‌شده</span></sc-if>
+        </div>
+        <div style="{{ providerSpecialtyStyle }}">{{ provider.specialty }}</div>
+        <div style="{{ providerMetaRowStyle }}">
+          <span style="{{ ratingStyle }}">★ {{ provider.rating }}</span>
+          <span style="{{ metaFaintStyle }}">({{ provider.reviewsFa }} نظر)</span>
+          <span style="{{ metaFaintStyle }}">{{ provider.city }}، {{ provider.area }}</span>
+        </div>
+      </div>
+      <div style="{{ profileCtaColStyle }}">
+        <button style="{{ primaryBtnStyle }}" style-hover="{{ primaryBtnHoverStyle }}" onClick="{{ provider.bookAny }}">رزرو نوبت</button>
+        <button style="{{ outlineBtnStyle }}" style-hover="{{ outlineBtnHoverStyle }}">پیام به متخصص</button>
+      </div>
+    </div>
+
+    <div style="{{ tabRowStyle }}">
+      <button style="{{ tabAboutStyle }}" onClick="{{ setTabAbout }}">درباره</button>
+      <button style="{{ tabPortfolioStyle }}" onClick="{{ setTabPortfolio }}">نمونه‌کار</button>
+      <button style="{{ tabServicesStyle }}" onClick="{{ setTabServices }}">خدمات</button>
+      <button style="{{ tabReviewsStyle }}" onClick="{{ setTabReviews }}">نظرات ({{ provider.reviewsFa }})</button>
+    </div>
+
+    <sc-if value="{{ tabIsAbout }}" hint-placeholder-val="{{ true }}">
+      <p style="{{ bioTextStyle }}">{{ provider.bio }}</p>
+    </sc-if>
+
+    <sc-if value="{{ tabIsPortfolio }}" hint-placeholder-val="{{ false }}">
+      <div style="{{ portfolioGridStyle }}">
+        <div style="{{ portfolioBoxStyle }}">قبل / بعد ۱</div>
+        <div style="{{ portfolioBoxStyle }}">نمونه‌کار ۲</div>
+        <div style="{{ portfolioBoxStyle }}">نمونه‌کار ۳</div>
+        <div style="{{ portfolioBoxStyle }}">قبل / بعد ۴</div>
+        <div style="{{ portfolioBoxStyle }}">نمونه‌کار ۵</div>
+        <div style="{{ portfolioBoxStyle }}">ویدیوی کار ۶</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ tabIsServices }}" hint-placeholder-val="{{ false }}">
+      <div style="{{ serviceListStyle }}">
+        <sc-for list="{{ provider.services }}" as="sv" hint-placeholder-count="3">
+          <div style="{{ serviceRowStyle }}">
+            <div>
+              <div style="{{ serviceNameStyle }}">{{ sv.name }}</div>
+              <div style="{{ metaFaintStyle }}">{{ sv.duration }}</div>
+            </div>
+            <div style="{{ serviceRightStyle }}">
+              <div style="{{ servicePriceStyle }}">{{ sv.price }} تومان</div>
+              <button style="{{ bookNowChipStyle }}" style-hover="{{ bookNowChipHoverStyle }}" onClick="{{ sv.book }}">رزرو</button>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ tabIsReviews }}" hint-placeholder-val="{{ false }}">
+      <div style="{{ reviewListStyle }}">
+        <sc-for list="{{ provider.reviewsList }}" as="rv" hint-placeholder-count="2">
+          <div style="{{ reviewRowStyle }}">
+            <div style="{{ reviewTopRowStyle }}">
+              <div style="{{ reviewNameStyle }}">{{ rv.name }}</div>
+              <div style="{{ metaFaintStyle }}">{{ rv.date }}</div>
+            </div>
+            <div style="{{ ratingStyle }}">★ {{ rv.rating }}</div>
+            <p style="{{ reviewTextStyle }}">{{ rv.text }}</p>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+  </div>
+</div>
+</sc-if>
+
+<!-- ===================== SHOP ===================== -->
+<sc-if value="{{ isShop }}" hint-placeholder-val="{{ false }}">
+<div style="{{ sectionPadStyle }}">
+  <h1 style="{{ pageTitleStyle }}">فروشگاه محصولات زیبایی</h1>
+  <div style="{{ filterRowStyle }}">
+    <sc-for list="{{ categoryFilters }}" as="f" hint-placeholder-count="5">
+      <button style="{{ f.style }}" onClick="{{ f.onClick }}">{{ f.label }}</button>
+    </sc-for>
+  </div>
+  <div style="{{ productGridStyle }}">
+    <sc-for list="{{ shopProducts }}" as="pr" hint-placeholder-count="8">
+      <div style="{{ productCardStyle }}" style-hover="{{ productCardHoverStyle }}">
+        <div style="{{ pr.imgStyle }}">تصویر محصول
+          <sc-if value="{{ pr.hasOld }}"><span style="{{ discountBadgeStyle }}">{{ pr.discountLabel }}</span></sc-if>
+          <button style="{{ pr.wishStyle }}" onClick="{{ pr.toggleWish }}">♡</button>
+        </div>
+        <div style="{{ productCardBodyStyle }}">
+          <div style="{{ productBrandStyle }}">{{ pr.brand }}</div>
+          <div style="{{ productNameStyle }}">{{ pr.name }}</div>
+          <div style="{{ metaFaintStyle }}">★ {{ pr.rating }}</div>
+          <div style="{{ productPriceRowStyle }}">
+            <span style="{{ productPriceStyle }}">{{ pr.priceLabel }} تومان</span>
+            <sc-if value="{{ pr.hasOld }}"><span style="{{ productOldPriceStyle }}">{{ pr.oldPrice }}</span></sc-if>
+          </div>
+          <button style="{{ addCartBtnStyle }}" style-hover="{{ addCartBtnHoverStyle }}" onClick="{{ pr.addToCart }}">افزودن به سبد</button>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+</div>
+</sc-if>
+
+<!-- ===================== B2B ===================== -->
+<sc-if value="{{ isB2B }}" hint-placeholder-val="{{ false }}">
+<div>
+  <section style="{{ b2bHeroStyle }}">
+    <div style="{{ b2bHeroInnerStyle }}">
+      <div style="{{ b2bKickerStyle }}">BeauClick Business</div>
+      <h1 style="{{ b2bHeroTitleStyle }}">همکاری تجاری BeauClick</h1>
+      <p style="{{ b2bHeroSubStyle }}">قیمت عمده، تخفیف پلکانی و پیش‌فاکتور اختصاصی برای سالن‌ها، کلینیک‌ها و متخصصان مستقل.</p>
+      <div style="{{ b2bHeroBtnRowStyle }}">
+        <button style="{{ primaryBtnLightStyle }}">افتتاح حساب تجاری</button>
+        <button style="{{ outlineBtnLightStyle }}">درخواست پیش‌فاکتور</button>
+      </div>
+      <div style="{{ b2bStatsRowStyle }}">
+        <div style="{{ b2bStatStyle }}"><div style="{{ b2bStatNumStyle }}">۲,۰۰۰+</div><div style="{{ b2bStatLabelStyle }}">کسب‌وکار طرف قرارداد</div></div>
+        <div style="{{ b2bStatStyle }}"><div style="{{ b2bStatNumStyle }}">۱۰,۰۰۰+</div><div style="{{ b2bStatLabelStyle }}">محصول در کاتالوگ عمده</div></div>
+        <div style="{{ b2bStatStyle }}"><div style="{{ b2bStatNumStyle }}">۹۹٪</div><div style="{{ b2bStatLabelStyle }}">رضایت مشتریان تجاری</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section style="{{ sectionPadStyle }}">
+    <h2 style="{{ sectionTitleStyle }}">تخفیف پلکانی بر اساس تعداد سفارش</h2>
+    <div style="{{ tierTableStyle }}">
+      <div style="{{ tierHeadRowStyle }}"><div>تعداد سفارش</div><div>قیمت واحد</div><div>تخفیف</div></div>
+      <sc-for list="{{ tierRows }}" as="t" hint-placeholder-count="4">
+        <div style="{{ t.rowStyle }}"><div>{{ t.range }}<sc-if value="{{ t.recommended }}"><span style="{{ recommendedBadgeStyle }}">پیشنهادی</span></sc-if></div><div>{{ t.unit }}</div><div style="{{ t.discountStyle }}">{{ t.discount }}</div></div>
+      </sc-for>
+    </div>
+  </section>
+
+  <section style="{{ sectionPadStyle }}">
+    <h2 style="{{ sectionTitleStyle }}">کاتالوگ عمده</h2>
+    <div style="{{ productGridStyle }}">
+      <sc-for list="{{ b2bProducts }}" as="pr" hint-placeholder-count="4">
+        <div style="{{ productCardStyle }}" style-hover="{{ productCardHoverStyle }}">
+          <div style="{{ pr.imgStyle }}">تصویر محصول</div>
+          <div style="{{ productCardBodyStyle }}">
+            <div style="{{ productBrandStyle }}">{{ pr.brand }}</div>
+            <div style="{{ productNameStyle }}">{{ pr.name }}</div>
+            <div style="{{ metaFaintStyle }}">حداقل سفارش: {{ pr.moqFa }} عدد</div>
+            <div style="{{ productPriceRowStyle }}"><span style="{{ productPriceStyle }}">{{ pr.wholesaleLabel }} تومان</span><span style="{{ productOldPriceStyle }}">{{ pr.priceLabel }}</span></div>
+            <button style="{{ addCartBtnStyle }}" style-hover="{{ addCartBtnHoverStyle }}" onClick="{{ pr.addToCart }}">افزودن به سفارش عمده</button>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+</div>
+</sc-if>
+
+<!-- ===================== PROFESSIONAL DASHBOARD ===================== -->
+<sc-if value="{{ isDashboard }}" hint-placeholder-val="{{ false }}">
+<div style="{{ dashboardGridStyle }}">
+  <div style="{{ dashSidebarStyle }}">
+    <sc-for list="{{ dashNavItems }}" as="d" hint-placeholder-count="10">
+      <button style="{{ d.style }}" onClick="{{ d.onClick }}">{{ d.label }}</button>
+    </sc-for>
+  </div>
+  <div style="{{ dashMainStyle }}">
+    <sc-if value="{{ dashIsOverview }}" hint-placeholder-val="{{ true }}">
+      <div>
+        <h1 style="{{ pageTitleStyle }}">سلام سارا، صبح بخیر</h1>
+        <p style="{{ pageSubStyle }}">امروز {{ dashDateFa }}</p>
+        <div style="{{ statCardRowStyle }}">
+          <div style="{{ statCardStyle }}"><div style="{{ metaFaintStyle }}">رزروهای امروز</div><div style="{{ statValueStyle }}">۸</div><div style="{{ statDeltaUpStyle }}">+۱۲٪ نسبت به هفته قبل</div></div>
+          <div style="{{ statCardStyle }}"><div style="{{ metaFaintStyle }}">درآمد این ماه</div><div style="{{ statValueStyle }}">۴۲,۵۰۰,۰۰۰</div><div style="{{ statDeltaUpStyle }}">+۸٪ نسبت به ماه قبل</div></div>
+          <div style="{{ statCardStyle }}"><div style="{{ metaFaintStyle }}">مشتریان جدید</div><div style="{{ statValueStyle }}">۱۲</div><div style="{{ statDeltaUpStyle }}">+۵ نسبت به هفته قبل</div></div>
+          <div style="{{ statCardStyle }}"><div style="{{ metaFaintStyle }}">امتیاز کلی</div><div style="{{ statValueStyle }}">۴.۹</div><div style="{{ metaFaintStyle }}">۱۸۲ نظر</div></div>
+        </div>
+        <div style="{{ dashChartRowStyle }}">
+          <div style="{{ chartCardStyle }}">
+            <div style="{{ sectionTitleSmStyle }}">رزروهای هفته اخیر</div>
+            <div style="{{ chartBarsRowStyle }}">
+              <sc-for list="{{ weekBookings }}" as="w" hint-placeholder-count="7">
+                <div style="{{ chartBarColStyle }}">
+                  <div style="{{ chartBarTrackStyle }}"><div style="{{ w.barStyle }}"></div></div>
+                  <div style="{{ metaFaintStyle }}">{{ w.day }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <div style="{{ upcomingCardStyle }}">
+            <div style="{{ sectionTitleSmStyle }}">نوبت‌های بعدی امروز</div>
+            <sc-for list="{{ upcomingToday }}" as="u" hint-placeholder-count="3">
+              <div style="{{ upcomingRowStyle }}"><div style="{{ upcomingTimeStyle }}">{{ u.time }}</div><div>{{ u.client }}<div style="{{ metaFaintStyle }}">{{ u.service }}</div></div></div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="{{ sectionTitleSmStyle }}">رزروهای اخیر</div>
+        <div style="{{ recentTableStyle }}">
+          <sc-for list="{{ recentBookings }}" as="b" hint-placeholder-count="4">
+            <div style="{{ recentRowStyle }}">
+              <div>{{ b.client }}<div style="{{ metaFaintStyle }}">{{ b.service }}</div></div>
+              <div style="{{ metaFaintStyle }}">{{ b.time }}</div>
+              <div style="{{ b.statusStyle }}">{{ b.status }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+    <sc-if value="{{ dashIsOther }}" hint-placeholder-val="{{ false }}">
+      <div style="{{ comingSoonStyle }}">این بخش در نسخه بعدی محصول تکمیل می‌شود.</div>
+    </sc-if>
+  </div>
+</div>
+</sc-if>
+
+<!-- ===================== MOBILE BOTTOM NAV ===================== -->
+<sc-if value="{{ isMobile }}" hint-placeholder-val="{{ false }}">
+<div style="{{ bottomNavStyle }}">
+  <sc-for list="{{ bottomNavItems }}" as="n" hint-placeholder-count="4">
+    <button style="{{ n.style }}" onClick="{{ n.onClick }}">{{ n.label }}<div style="{{ n.dotStyle }}"></div></button>
+  </sc-for>
+</div>
+</sc-if>
+
+<!-- ===================== AI FLOATING BUTTON ===================== -->
+<button style="{{ aiFabStyle }}" style-hover="{{ aiFabHoverStyle }}" onClick="{{ openAi }}">AI</button>
+
+<!-- ===================== AI PANEL ===================== -->
+<sc-if value="{{ aiOpen }}" hint-placeholder-val="{{ false }}">
+<div style="{{ overlayBackdropStyle }}" onClick="{{ closeAi }}"></div>
+<div style="{{ aiPanelStyle }}">
+  <div style="{{ aiPanelHeaderStyle }}">
+    <div style="{{ aiPanelTitleRowStyle }}"><div style="{{ aiPanelDotStyle }}"></div><div><div style="{{ aiPanelTitleStyle }}">دستیار بیوتی BeauClick</div><div style="{{ aiPanelSubtitleStyle }}">آنلاین · پیشنهاد شخصی‌سازی‌شده</div></div></div>
+    <button style="{{ closeBtnStyle }}" style-hover="{{ closeBtnHoverStyle }}" onClick="{{ closeAi }}">×</button>
+  </div>
+  <div style="{{ aiHeaderStripStyle }}"></div>
+  <div style="{{ aiMessagesStyle }}">
+    <sc-for list="{{ aiMessagesDisplay }}" as="m" hint-placeholder-count="1">
+      <div style="{{ m.rowStyle }}">
+      <sc-if value="{{ m.isAi }}"><div style="{{ aiAvatarDotStyle }}"></div></sc-if>
+      <div style="{{ m.bubbleStyle }}">
+        {{ m.text }}
+        <sc-if value="{{ m.hasCards }}">
+          <div style="{{ aiCardsRowStyle }}">
+            <sc-for list="{{ m.cardItemsDisplay }}" as="ci" hint-placeholder-count="2">
+              <div style="{{ aiCardStyle }}" style-hover="{{ aiCardHoverStyle }}" onClick="{{ ci.onClick }}">
+                <div style="{{ ci.imgStyle }}">{{ ci.cardKind }}</div>
+                <div style="{{ aiCardNameStyle }}">{{ ci.name }}</div>
+                <div style="{{ metaFaintStyle }}">{{ ci.cardSub }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+      </div>
+    </sc-for>
+    <sc-if value="{{ aiTyping }}">
+      <div style="{{ typingRowStyle }}">
+        <div style="{{ aiAvatarDotStyle }}"></div>
+        <div style="{{ typingBubbleStyle }}">
+          <div style="{{ typingDotStyle1 }}"></div><div style="{{ typingDotStyle2 }}"></div><div style="{{ typingDotStyle3 }}"></div>
+        </div>
+      </div>
+    </sc-if>
+  </div>
+  <div style="{{ aiChipsRowStyle }}">
+    <sc-for list="{{ aiQuickChips }}" as="qc" hint-placeholder-count="4">
+      <button style="{{ aiChipStyle }}" onClick="{{ qc.onClick }}">{{ qc.label }}</button>
+    </sc-for>
+  </div>
+  <div style="{{ aiInputRowStyle }}">
+    <input style="{{ aiInputStyle }}" style-focus="{{ aiInputFocusStyle }}" placeholder="سؤال خود را بنویسید..." value="{{ aiInput }}" onChange="{{ setAiInput }}" />
+    <button style="{{ aiSendBtnStyle }}" onClick="{{ sendAi }}">ارسال</button>
+  </div>
+</div>
+</sc-if>
+
+<!-- ===================== CART DRAWER ===================== -->
+<sc-if value="{{ cartOpen }}" hint-placeholder-val="{{ false }}">
+<div style="{{ overlayBackdropStyle }}" onClick="{{ closeCartDrawer }}"></div>
+<div style="{{ cartDrawerStyle }}">
+  <div style="{{ cartHeaderStyle }}"><div style="{{ aiPanelTitleStyle }}">سبد خرید</div><button style="{{ closeBtnStyle }}" style-hover="{{ closeBtnHoverStyle }}" onClick="{{ closeCartDrawer }}">×</button></div>
+  <sc-if value="{{ cartCheckedOut }}" hint-placeholder-val="{{ false }}">
+    <div style="{{ checkoutDoneStyle }}">
+      <div style="{{ successDotStyle }}">✓</div>
+      <div style="{{ successTitleStyle }}">سفارش شما ثبت شد</div>
+      <p style="{{ metaFaintStyle }}">کد پیگیری: BC-{{ orderCodeFa }} — پیامک تأیید برای شما ارسال شد.</p>
+      <button style="{{ primaryBtnStyle }}" style-hover="{{ primaryBtnHoverStyle }}" onClick="{{ resetCart }}">بازگشت به فروشگاه</button>
+    </div>
+  </sc-if>
+  <sc-if value="{{ cartShowingReview }}" hint-placeholder-val="{{ false }}">
+    <div style="{{ bookingBodyStyle }}">
+      <div style="{{ stepTitleSmStyle }}">آدرس ارسال</div>
+      <div style="{{ summaryCardStyle }}">
+        <div style="{{ summaryRowStyle }}"><span>گیرنده</span><span>سارا محمدی</span></div>
+        <div style="{{ summaryRowStyle }}"><span>آدرس</span><span>یزد، صفائیه، بلوار جمهوری اسلامی</span></div>
+      </div>
+      <div style="{{ stepTitleSmStyle }}">روش پرداخت</div>
+      <div style="{{ paymentRowStyle }}">
+        <sc-for list="{{ paymentOptions }}" as="pm" hint-placeholder-count="2">
+          <button style="{{ pm.style }}" onClick="{{ pm.select }}">{{ pm.label }}</button>
+        </sc-for>
+      </div>
+      <div style="{{ stepTitleSmStyle }}">خلاصه سفارش</div>
+      <div style="{{ summaryCardStyle }}">
+        <div style="{{ summaryRowStyle }}"><span>جمع کالاها</span><span>{{ cartSubtotalLabel }} تومان</span></div>
+        <div style="{{ summaryRowStyle }}"><span>ارسال</span><span>رایگان</span></div>
+        <div style="{{ summaryRowStyle }}"><span style="{{ statValueSmStyle }}">مبلغ نهایی</span><span style="{{ statValueSmStyle }}">{{ cartSubtotalLabel }} تومان</span></div>
+      </div>
+      <button style="{{ primaryBtnFullStyle }}" onClick="{{ confirmCartOrder }}">پرداخت و ثبت سفارش</button>
+      <button style="{{ linkBtnStyle }}" onClick="{{ backToCart }}">بازگشت به سبد خرید</button>
+    </div>
+  </sc-if>
+  <sc-if value="{{ cartShowingList }}" hint-placeholder-val="{{ false }}">
+    <div style="{{ cartListStyle }}">
+      <sc-for list="{{ cartItemsDisplay }}" as="c" hint-placeholder-count="2">
+        <div style="{{ cartRowStyle }}">
+          <div style="{{ c.imgStyle }}"></div>
+          <div style="{{ cartRowInfoStyle }}">
+            <div style="{{ productNameStyle }}">{{ c.name }}</div>
+            <div style="{{ metaFaintStyle }}">{{ c.priceLabel }} تومان</div>
+            <div style="{{ qtyRowStyle }}">
+              <button style="{{ qtyBtnStyle }}" onClick="{{ c.dec }}">−</button>
+              <span>{{ c.qtyFa }}</span>
+              <button style="{{ qtyBtnStyle }}" onClick="{{ c.inc }}">+</button>
+              <button style="{{ removeLinkStyle }}" onClick="{{ c.remove }}">حذف</button>
+            </div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+    <div style="{{ cartFooterStyle }}">
+      <div style="{{ cartSubtotalRowStyle }}"><span>جمع کل</span><span style="{{ statValueStyle }}">{{ cartSubtotalLabel }} تومان</span></div>
+      <button style="{{ primaryBtnStyle }}" style-hover="{{ primaryBtnHoverStyle }}" onClick="{{ checkoutCart }}">تکمیل خرید</button>
+    </div>
+  </sc-if>
+  <sc-if value="{{ cartIsEmpty }}" hint-placeholder-val="{{ false }}">
+    <div style="{{ comingSoonStyle }}">سبد خرید شما خالی است.</div>
+  </sc-if>
+</div>
+</sc-if>
+
+<!-- ===================== BOOKING MODAL ===================== -->
+<sc-if value="{{ bookingOpen }}" hint-placeholder-val="{{ false }}">
+<div style="{{ overlayBackdropStyle }}" onClick="{{ closeBooking }}"></div>
+<div style="{{ bookingModalStyle }}">
+  <div style="{{ bookingHeaderStyle }}">
+    <div style="{{ aiPanelTitleStyle }}">رزرو نوبت — {{ provider.name }}</div>
+    <button style="{{ closeBtnStyle }}" style-hover="{{ closeBtnHoverStyle }}" onClick="{{ closeBooking }}">×</button>
+  </div>
+  <div style="{{ progressRowStyle }}">
+    <sc-for list="{{ bookingSteps }}" as="st" hint-placeholder-count="5">
+      <div style="{{ st.dotStyle }}"></div>
+    </sc-for>
+  </div>
+
+  <sc-if value="{{ bStep1 }}" hint-placeholder-val="{{ true }}">
+    <div style="{{ bookingBodyStyle }}">
+      <div style="{{ stepTitleStyle }}">۱. انتخاب خدمت</div>
+      <sc-for list="{{ bookingServiceOptions }}" as="sv" hint-placeholder-count="3">
+        <div style="{{ sv.rowStyle }}" onClick="{{ sv.select }}">
+          <div><div style="{{ serviceNameStyle }}">{{ sv.name }}</div><div style="{{ metaFaintStyle }}">{{ sv.duration }}</div></div>
+          <div style="{{ servicePriceStyle }}">{{ sv.price }} تومان</div>
+        </div>
+      </sc-for>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ bStep2 }}" hint-placeholder-val="{{ false }}">
+    <div style="{{ bookingBodyStyle }}">
+      <div style="{{ stepTitleStyle }}">۲. انتخاب تاریخ</div>
+      <div style="{{ dateRowStyle }}">
+        <sc-for list="{{ bookingDates }}" as="dt" hint-placeholder-count="7">
+          <button style="{{ dt.style }}" onClick="{{ dt.select }}"><div>{{ dt.weekday }}</div><div style="{{ dateDayNumStyle }}">{{ dt.day }}</div></button>
+        </sc-for>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ bStep3 }}" hint-placeholder-val="{{ false }}">
+    <div style="{{ bookingBodyStyle }}">
+      <div style="{{ stepTitleStyle }}">۳. انتخاب ساعت</div>
+      <div style="{{ timeGridStyle }}">
+        <sc-for list="{{ bookingTimes }}" as="tm" hint-placeholder-count="6">
+          <button style="{{ tm.style }}" onClick="{{ tm.select }}" disabled="{{ tm.disabled }}">{{ tm.label }}</button>
+        </sc-for>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ bStep4 }}" hint-placeholder-val="{{ false }}">
+    <div style="{{ bookingBodyStyle }}">
+      <div style="{{ stepTitleStyle }}">۴. بررسی و پرداخت</div>
+      <div style="{{ summaryCardStyle }}">
+        <div style="{{ summaryRowStyle }}"><span>خدمت</span><span>{{ bookingSummaryService }}</span></div>
+        <div style="{{ summaryRowStyle }}"><span>متخصص</span><span>{{ provider.name }}</span></div>
+        <div style="{{ summaryRowStyle }}"><span>تاریخ و ساعت</span><span>{{ bookingSummaryDateTime }}</span></div>
+        <div style="{{ summaryRowStyle }}"><span style="{{ statValueSmStyle }}">مبلغ قابل پرداخت</span><span style="{{ statValueSmStyle }}">{{ bookingSummaryPrice }} تومان</span></div>
+      </div>
+      <div style="{{ stepTitleSmStyle }}">روش پرداخت</div>
+      <div style="{{ paymentRowStyle }}">
+        <sc-for list="{{ paymentOptions }}" as="pm" hint-placeholder-count="2">
+          <button style="{{ pm.style }}" onClick="{{ pm.select }}">{{ pm.label }}</button>
+        </sc-for>
+      </div>
+      <button style="{{ primaryBtnFullStyle }}" onClick="{{ confirmBooking }}">پرداخت و تأیید نهایی</button>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ bStep5 }}" hint-placeholder-val="{{ false }}">
+    <div style="{{ checkoutDoneStyle }}">
+      <div style="{{ successDotStyle }}">✓</div>
+      <div style="{{ successTitleStyle }}">نوبت شما با موفقیت رزرو شد</div>
+      <p style="{{ metaFaintStyle }}">{{ bookingSummaryDateTime }} نزد {{ provider.name }}</p>
+      <button style="{{ primaryBtnStyle }}" style-hover="{{ primaryBtnHoverStyle }}" onClick="{{ closeBooking }}">بازگشت به صفحه اصلی</button>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ showBookingNav }}" hint-placeholder-val="{{ false }}">
+    <div style="{{ bookingFooterStyle }}">
+      <button style="{{ outlineBtnStyle }}" style-hover="{{ outlineBtnHoverStyle }}" onClick="{{ bookingBack }}" disabled="{{ bStep1 }}">قبلی</button>
+      <button style="{{ primaryBtnStyle }}" style-hover="{{ primaryBtnHoverStyle }}" onClick="{{ bookingNext }}" disabled="{{ nextDisabled }}">بعدی</button>
+    </div>
+  </sc-if>
+</div>
+</sc-if>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;forceMobileView&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;نمایش&quot;},&quot;aiAutoOpen&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;دستیار AI&quot;},&quot;showB2BNav&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;ناوبری&quot;}}">
+const INK='oklch(0.2 0.02 290)', INK_SOFT='oklch(0.48 0.02 290)', INK_FAINT='oklch(0.6 0.02 290)';
+const LINE='oklch(0.9 0.012 290)', BG='oklch(0.985 0.006 280)', SURFACE='oklch(1 0 0)', SURFACE_TINT='oklch(0.965 0.014 290)';
+const PRIMARY='oklch(0.4 0.16 290)', PRIMARY_HOVER='oklch(0.34 0.16 290)', PRIMARY_SOFT='oklch(0.94 0.03 290)';
+const ACCENT='oklch(0.66 0.16 335)', ACCENT_SOFT='oklch(0.95 0.035 335)';
+const SUCCESS='oklch(0.5 0.13 150)', SUCCESS_SOFT='oklch(0.94 0.04 150)';
+const WARNING='oklch(0.55 0.13 70)', WARNING_SOFT='oklch(0.95 0.045 80)';
+const ERROR='oklch(0.55 0.19 25)', ERROR_SOFT='oklch(0.95 0.05 25)';
+const FONT="'Vazirmatn', sans-serif";
+
+function faDigits(v){ const map={'0':'۰','1':'۱','2':'۲','3':'۳','4':'۴','5':'۵','6':'۶','7':'۷','8':'۸','9':'۹'}; return String(v).replace(/[0-9]/g, d=>map[d]); }
+function fmtInt(n){ return faDigits(Math.round(n).toLocaleString('en-US')); }
+function phStyle(hue){ return {backgroundImage:`linear-gradient(155deg, oklch(0.95 0.035 ${hue}) 0%, oklch(0.99 0.012 ${hue}) 55%, oklch(0.96 0.03 ${hue}) 100%)`, display:'flex', alignItems:'center', justifyContent:'center', color:`oklch(0.55 0.05 ${hue})`, fontFamily:'monospace', fontSize:11, letterSpacing:'.3px', textAlign:'center', position:'relative', padding:8}; }
+
+const PROVIDERS=[
+ {id:'p1',name:'سارا احمدی',specialty:'میکاپ‌آرتیست',cat:'میکاپ',city:'یزد',area:'صفائیه',rating:'۴.۹',reviews:182,price:'۱,۲۰۰,۰۰۰',verified:true,hue:335,
+  bio:'میکاپ‌آرتیست حرفه‌ای با ۹ سال تجربه در میکاپ عروس و مراسم. متخصص در میکاپ طبیعی و ماندگار با محصولات درجه‌یک.',
+  services:[{id:'s1',name:'میکاپ عروس',price:'۳,۵۰۰,۰۰۰',duration:'۹۰ دقیقه'},{id:'s2',name:'میکاپ مجلسی',price:'۱,۲۰۰,۰۰۰',duration:'۶۰ دقیقه'},{id:'s3',name:'میکاپ روزانه',price:'۶۵۰,۰۰۰',duration:'۴۵ دقیقه'}],
+  reviewsList:[{name:'نازنین ب.',rating:'۵.۰',text:'میکاپ عروسیم فوق‌العاده شد، خیلی حرفه‌ای و دقیق بودن.',date:'۲ هفته پیش'},{name:'مهسا ک.',rating:'۵.۰',text:'ماندگاری میکاپ عالی بود، حتماً دوباره رزرو می‌کنم.',date:'۱ ماه پیش'}]},
+ {id:'p2',name:'نگار کریمی',specialty:'متخصص پوست و مو',cat:'پوست',city:'یزد',area:'فرهنگ‌شهر',rating:'۴.۸',reviews:96,price:'۸۵۰,۰۰۰',verified:true,hue:290,
+  bio:'متخصص پوست و مو با تمرکز بر درمان‌های تخصصی آکنه، روشن‌سازی پوست و کراتینه مو.',
+  services:[{id:'s4',name:'کراتینه مو',price:'۲,۸۰۰,۰۰۰',duration:'۱۸۰ دقیقه'},{id:'s5',name:'پاکسازی پوست',price:'۸۵۰,۰۰۰',duration:'۶۰ دقیقه'},{id:'s6',name:'میکرونیدلینگ',price:'۱,۵۰۰,۰۰۰',duration:'۴۵ دقیقه'}],
+  reviewsList:[{name:'سارا م.',rating:'۵.۰',text:'پوستم بعد از چند جلسه کاملاً شفاف شد.',date:'۳ هفته پیش'}]},
+ {id:'p3',name:'مریم رضایی',specialty:'ناخن‌کار',cat:'ناخن',city:'یزد',area:'میدان آزادی',rating:'۴.۷',reviews:140,price:'۳۵۰,۰۰۰',verified:false,hue:20,
+  bio:'ناخن‌کار با تخصص در کاشت ژل و طراحی ناخن با محیطی تمیز و استریل.',
+  services:[{id:'s7',name:'کاشت ژل',price:'۶۵۰,۰۰۰',duration:'۹۰ دقیقه'},{id:'s8',name:'ژلیش',price:'۳۵۰,۰۰۰',duration:'۴۵ دقیقه'}],
+  reviewsList:[{name:'الهام ر.',rating:'۴.۰',text:'کارش تمیز و دقیق بود.',date:'۱۰ روز پیش'}]},
+ {id:'p4',name:'زهرا کاظمی',specialty:'رنگ و کوتاهی مو',cat:'مو',city:'تهران',area:'شهرک غرب',rating:'۴.۹',reviews:210,price:'۶۰۰,۰۰۰',verified:true,hue:290,
+  bio:'رنگ‌کار و مدل مو با تخصص در بالیاژ و رنگ‌های فانتزی، ۱۲ سال تجربه.',
+  services:[{id:'s9',name:'بالیاژ',price:'۲,۲۰۰,۰۰۰',duration:'۱۵۰ دقیقه'},{id:'s10',name:'کوتاهی مو',price:'۶۰۰,۰۰۰',duration:'۴۵ دقیقه'}],
+  reviewsList:[{name:'نیلوفر ص.',rating:'۵.۰',text:'بهترین بالیاژی که تا حالا گرفتم.',date:'۲ ماه پیش'}]},
+ {id:'p5',name:'الناز موسوی',specialty:'متخصص ابرو',cat:'ابرو',city:'اصفهان',area:'جلفا',rating:'۴.۶',reviews:78,price:'۹۵۰,۰۰۰',verified:false,hue:75,
+  bio:'متخصص میکروبلیدینگ و فرم‌دهی ابرو با نتیجه طبیعی و متناسب با فرم صورت.',
+  services:[{id:'s11',name:'میکروبلیدینگ',price:'۲,۵۰۰,۰۰۰',duration:'۱۲۰ دقیقه'},{id:'s12',name:'فرم ابرو',price:'۹۵۰,۰۰۰',duration:'۳۰ دقیقه'}],
+  reviewsList:[{name:'پریسا ح.',rating:'۴.۰',text:'نتیجه خیلی طبیعی بود.',date:'۱ هفته پیش'}]},
+ {id:'p6',name:'هستی جعفری',specialty:'ماساژ و اسپا',cat:'ماساژ',city:'یزد',area:'صفائیه',rating:'۴.۸',reviews:65,price:'۷۵۰,۰۰۰',verified:true,hue:150,
+  bio:'متخصص ماساژ درمانی و اسپا با محیط آرام و حرفه‌ای.',
+  services:[{id:'s13',name:'ماساژ سوئدی',price:'۷۵۰,۰۰۰',duration:'۶۰ دقیقه'},{id:'s14',name:'اسپای صورت',price:'۹۵۰,۰۰۰',duration:'۷۵ دقیقه'}],
+  reviewsList:[{name:'مینا ت.',rating:'۵.۰',text:'محیط خیلی آرامش‌بخش بود.',date:'۵ روز پیش'}]}
+];
+
+const PRODUCTS=[
+ {id:'pr1',name:'سرم ویتامین C',brand:'گلبرگ',cat:'مراقبت پوست',price:485000,priceLabel:'۴۸۵,۰۰۰',oldPrice:'۵۹۰,۰۰۰',oldPriceNum:590000,rating:'۴.۷',hue:75},
+ {id:'pr2',name:'شامپو کراتینه',brand:'درماسل',cat:'مراقبت مو',price:320000,priceLabel:'۳۲۰,۰۰۰',rating:'۴.۵',hue:290},
+ {id:'pr3',name:'رژ لب مات',brand:'پرنیان بیوتی',cat:'آرایش',price:210000,priceLabel:'۲۱۰,۰۰۰',rating:'۴.۸',hue:335},
+ {id:'pr4',name:'ضدآفتاب SPF۵۰',brand:'کیمیا',cat:'مراقبت پوست',price:395000,priceLabel:'۳۹۵,۰۰۰',rating:'۴.۶',hue:75},
+ {id:'pr5',name:'ماسک مو آرگان',brand:'درماسل',cat:'مراقبت مو',price:275000,priceLabel:'۲۷۵,۰۰۰',rating:'۴.۴',hue:290},
+ {id:'pr6',name:'پالت سایه چشم',brand:'پرنیان بیوتی',cat:'آرایش',price:520000,priceLabel:'۵۲۰,۰۰۰',rating:'۴.۹',hue:335},
+ {id:'pr7',name:'روغن ناخن تقویتی',brand:'گلبرگ',cat:'ناخن',price:140000,priceLabel:'۱۴۰,۰۰۰',rating:'۴.۳',hue:20},
+ {id:'pr8',name:'تونر پوست چرب',brand:'کیمیا',cat:'مراقبت پوست',price:230000,priceLabel:'۲۳۰,۰۰۰',rating:'۴.۵',hue:75}
+];
+
+const AI_RESPONSES={
+ oily:{text:'برای پوست چرب روتین سبک و بدون‌چربی پیشنهاد می‌کنم: شست‌وشو با ژل ملایم، تونر کنترل چربی و مرطوب‌کننده سبک همراه با ضدآفتاب. این محصولات شروع خوبی هستند:', type:'products', ids:['pr8','pr4']},
+ wedding:{text:'برای مراسم عروسی معمولاً میکاپ عروس، حالت مو و کاشت ناخن با هم رزرو می‌شوند. این متخصصان امتیاز بالایی در این خدمات دارند:', type:'providers', ids:['p1','p4']},
+ color:{text:'برای رنگ مو، بر اساس امتیاز و نظرات مشتریان این متخصص گزینه خوبی است:', type:'providers', ids:['p4']},
+ damaged:{text:'برای موهای آسیب‌دیده، ترکیب شامپو و ماسک تقویتی نتیجه بهتری می‌دهد:', type:'products', ids:['pr2','pr5']}
+};
+const AI_CHIPS=[
+ {key:'oily',label:'برای پوست چرب چه روتینی پیشنهاد می‌کنی؟'},
+ {key:'wedding',label:'برای مراسم عروسی چه خدماتی نیاز دارم؟'},
+ {key:'color',label:'کدام متخصص برای رنگ مو مناسب‌تره؟'},
+ {key:'damaged',label:'برای موهای آسیب‌دیده چه پیشنهادی داری؟'}
+];
+
+const WEEK_BOOKINGS=[{day:'ش',count:5},{day:'ی',count:8},{day:'د',count:6},{day:'س',count:9},{day:'چ',count:7},{day:'پ',count:11},{day:'ج',count:4}];
+const RECENT_BOOKINGS=[
+ {client:'مریم رضایی',service:'میکاپ عروس',time:'امروز، ۱۰:۰۰',status:'تأیید‌شده',c:SUCCESS,bg:SUCCESS_SOFT},
+ {client:'زهرا کاظمی',service:'بالیاژ',time:'امروز، ۱۳:۰۰',status:'در انتظار',c:WARNING,bg:WARNING_SOFT},
+ {client:'نگار احمدی',service:'پاکسازی پوست',time:'فردا، ۱۱:۳۰',status:'تأیید‌شده',c:SUCCESS,bg:SUCCESS_SOFT},
+ {client:'الناز موسوی',service:'فرم ابرو',time:'فردا، ۱۶:۰۰',status:'لغو‌شده',c:ERROR,bg:ERROR_SOFT}
+];
+const UPCOMING_TODAY=[{time:'۱۴:۰۰',client:'ندا کریمی',service:'کراتینه مو'},{time:'۱۶:۳۰',client:'سحر یوسفی',service:'میکاپ مجلسی'},{time:'۱۸:۰۰',client:'پریسا حیدری',service:'پاکسازی پوست'}];
+const BOOKING_DATES=[{weekday:'شنبه',day:'۱۰'},{weekday:'یک‌شنبه',day:'۱۱'},{weekday:'دوشنبه',day:'۱۲'},{weekday:'سه‌شنبه',day:'۱۳'},{weekday:'چهارشنبه',day:'۱۴'},{weekday:'پنج‌شنبه',day:'۱۵'},{weekday:'جمعه',day:'۱۶'}];
+const BOOKING_TIMES=[{label:'۱۰:۰۰',disabled:false},{label:'۱۱:۳۰',disabled:true},{label:'۱۳:۰۰',disabled:false},{label:'۱۴:۳۰',disabled:false},{label:'۱۶:۰۰',disabled:true},{label:'۱۷:۳۰',disabled:false}];
+const CATEGORY_LABELS=['مو','ناخن','میکاپ','پوست','اسپا','ابرو','ماساژ'];
+const SPECIALTY_FILTERS=[{key:'all',label:'همه'},{key:'میکاپ',label:'میکاپ'},{key:'پوست',label:'پوست'},{key:'مو',label:'مو'},{key:'ناخن',label:'ناخن'},{key:'ابرو',label:'ابرو'},{key:'ماساژ',label:'ماساژ'}];
+const CITY_FILTERS=[{key:'all',label:'همه شهرها'},{key:'یزد',label:'یزد'},{key:'تهران',label:'تهران'},{key:'اصفهان',label:'اصفهان'}];
+const SHOP_CATS=[{key:'all',label:'همه'},{key:'مراقبت پوست',label:'مراقبت پوست'},{key:'مراقبت مو',label:'مراقبت مو'},{key:'آرایش',label:'آرایش'},{key:'ناخن',label:'ناخن'}];
+const DASH_NAV=[{key:'overview',label:'نمای کلی'},{key:'bookings',label:'رزروها'},{key:'calendar',label:'تقویم'},{key:'services',label:'خدمات'},{key:'customers',label:'مشتریان'},{key:'earnings',label:'درآمد'},{key:'reviews',label:'نظرات'},{key:'messages',label:'پیام‌ها'},{key:'profile',label:'پروفایل'},{key:'settings',label:'تنظیمات'}];
+
+class Component extends DCLogic {
+  state={
+    screen:'home', isMobileW:(typeof window!=='undefined'&&window.innerWidth<900),
+    heroQuery:'', selectedProviderId:'p1', profileTab:'about',
+    marketplaceSpecialty:'all', marketplaceCity:'all', shopCat:'all',
+    cart:[], cartOpen:false, cartCheckedOut:false, wishlist:{},
+    aiOpen:false, aiInput:'', aiTyping:false, aiMessages:[{from:'ai',text:'سلام! من دستیار بیوتی BeauClick هستم. چطور می‌تونم امروز کمکتون کنم؟'}],
+    cartReviewing:false,
+    bookingOpen:false, bookingStep:1, bookingServiceId:null, bookingDateIdx:null, bookingTime:null, bookingPayment:'card',
+    dashTab:'overview'
+  };
+  componentDidMount(){
+    this._onResize=()=>this.setState({isMobileW:window.innerWidth<900});
+    window.addEventListener('resize', this._onResize);
+    if(this.props.aiAutoOpen) this.setState({aiOpen:true});
+  }
+  componentWillUnmount(){ window.removeEventListener('resize', this._onResize); }
+
+  goTo(screen){ this.setState({screen, cartOpen:false}); window.scrollTo(0,0); }
+  setHeroQuery(e){ this.setState({heroQuery:e.target.value}); }
+  setAiInput(e){ this.setState({aiInput:e.target.value}); }
+
+  openAi(){ this.setState({aiOpen:true}); }
+  closeAi(){ this.setState({aiOpen:false}); }
+  openCartDrawer(){ this.setState({cartOpen:true}); }
+  closeCartDrawer(){ this.setState({cartOpen:false}); }
+
+  addToCart(product){
+    this.setState(s=>{
+      const ex=s.cart.find(c=>c.id===product.id);
+      const cart= ex? s.cart.map(c=>c.id===product.id?{...c,qty:c.qty+1}:c) : [...s.cart,{...product,qty:1}];
+      return {cart, cartOpen:true, cartCheckedOut:false};
+    });
+  }
+  changeQty(id,delta){ this.setState(s=>({cart:s.cart.map(c=>c.id===id?{...c,qty:Math.max(1,c.qty+delta)}:c)})); }
+  removeFromCart(id){ this.setState(s=>({cart:s.cart.filter(c=>c.id!==id)})); }
+  toggleWishlist(id){ this.setState(s=>({wishlist:{...s.wishlist,[id]:!s.wishlist[id]}})); }
+  checkoutCart(){ this.setState({cartReviewing:true}); }
+  confirmCartOrder(){ this.setState({cartCheckedOut:true, cartReviewing:false}); }
+  backToCart(){ this.setState({cartReviewing:false}); }
+  resetCart(){ this.setState({cart:[], cartOpen:false, cartCheckedOut:false, cartReviewing:false}); }
+
+  setProfileTab(tab){ this.setState({profileTab:tab}); }
+  viewProvider(id){ this.setState({screen:'profile', selectedProviderId:id, profileTab:'about'}); window.scrollTo(0,0); }
+
+  openBooking(providerId, serviceId){ this.setState({bookingOpen:true, selectedProviderId:providerId, bookingServiceId:serviceId||null, bookingStep: serviceId?2:1, bookingDateIdx:null, bookingTime:null}); }
+  closeBooking(){ this.setState({bookingOpen:false, bookingStep:1, bookingServiceId:null, bookingDateIdx:null, bookingTime:null}); }
+  bookingNext(){ this.setState(s=>({bookingStep:Math.min(5,s.bookingStep+1)})); }
+  bookingBack(){ this.setState(s=>({bookingStep:Math.max(1,s.bookingStep-1)})); }
+  selectBookingService(id){ this.setState({bookingServiceId:id}); }
+  selectBookingDate(idx){ this.setState({bookingDateIdx:idx}); }
+  selectBookingTime(label){ this.setState({bookingTime:label}); }
+  selectBookingPayment(m){ this.setState({bookingPayment:m}); }
+  confirmBooking(){ this.setState({bookingStep:5}); }
+
+  sendAiQuick(label, key){
+    this.setState(s=>({aiMessages:[...s.aiMessages,{from:'user',text:label}], aiTyping:true}));
+    setTimeout(()=>{
+      const r=AI_RESPONSES[key];
+      const items=(r.type==='products'? r.ids.map(id=>PRODUCTS.find(p=>p.id===id)) : r.ids.map(id=>PROVIDERS.find(p=>p.id===id)));
+      this.setState(s=>({aiMessages:[...s.aiMessages,{from:'ai',text:r.text,cardType:r.type,cardItems:items}], aiTyping:false}));
+    }, 700);
+  }
+  sendAi(){
+    const text=this.state.aiInput.trim(); if(!text) return;
+    this.setState(s=>({aiMessages:[...s.aiMessages,{from:'user',text}], aiInput:'', aiTyping:true}));
+    setTimeout(()=>{
+      this.setState(s=>({aiMessages:[...s.aiMessages,{from:'ai',text:'برای این موضوع پیشنهاد می‌کنم با یکی از متخصصان زیبایی BeauClick صحبت کنید یا دسته‌بندی مرتبط را در فروشگاه ببینید.'}], aiTyping:false}));
+    }, 700);
+  }
+
+  renderVals(){
+    const s=this.state, p=this.props;
+    const isMobile = !!p.forceMobileView || s.isMobileW;
+    const isDesktop = !isMobile;
+    const provider = PROVIDERS.find(x=>x.id===s.selectedProviderId) || PROVIDERS[0];
+    const cartCount = s.cart.reduce((a,c)=>a+c.qty,0);
+    const cartSubtotal = s.cart.reduce((a,c)=>a+c.price*c.qty,0);
+
+    const navDefs=[{key:'home',label:'خانه'},{key:'marketplace',label:'متخصصان'},{key:'shop',label:'فروشگاه'}, ...(p.showB2BNav===false?[]:[{key:'b2b',label:'همکاری تجاری'}]), {key:'dashboard',label:'داشبورد من'}];
+    const navItems = navDefs.map(n=>({...n, onClick:()=>this.goTo(n.key), style:{border:'none',background:'none',fontFamily:FONT,fontSize:15,fontWeight:s.screen===n.key?700:500,color:s.screen===n.key?PRIMARY:INK_SOFT,cursor:'pointer',paddingBottom:8,borderBottom:s.screen===n.key?`2px solid ${PRIMARY}`:'2px solid transparent'}}));
+    const bottomNavItems = navDefs.filter(n=>n.key!=='b2b').map(n=>({...n, onClick:()=>this.goTo(n.key), style:{flex:1,border:'none',background:'none',fontFamily:FONT,fontSize:12,fontWeight:s.screen===n.key?700:500,color:s.screen===n.key?PRIMARY:INK_FAINT,cursor:'pointer',padding:'8px 0',minHeight:48,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:4}, dotStyle:{width:5,height:5,borderRadius:5,background:s.screen===n.key?PRIMARY:'transparent',margin:'2px auto 0'}}));
+
+    const categoryItems = CATEGORY_LABELS.map(label=>({label, onClick:()=>{ this.setState({marketplaceSpecialty: SPECIALTY_FILTERS.find(f=>f.label===label)? label:'all'}); this.goTo('marketplace'); }, style:{padding:'12px 18px',borderRadius:14,border:`1px solid ${LINE}`,background:SURFACE,fontFamily:FONT,fontSize:14,fontWeight:600,color:INK,cursor:'pointer',whiteSpace:'nowrap'}}));
+
+    const enrichProviderCard = pr => ({...pr, reviewsFa:fmtInt(pr.reviews), imgStyle:{...phStyle(pr.hue), height:180, borderRadius:'16px 16px 0 0'}, view:()=>this.viewProvider(pr.id), book:(e)=>{e&&e.stopPropagation&&e.stopPropagation(); this.openBooking(pr.id);} });
+    const featuredProviders = PROVIDERS.slice(0,4).map(enrichProviderCard);
+    const specialtyFilters = SPECIALTY_FILTERS.map(f=>({...f, onClick:()=>this.setState({marketplaceSpecialty:f.key}), style:{padding:'8px 16px',borderRadius:20,border:`1px solid ${s.marketplaceSpecialty===f.key?PRIMARY:LINE}`,background:s.marketplaceSpecialty===f.key?PRIMARY_SOFT:SURFACE,color:s.marketplaceSpecialty===f.key?PRIMARY:INK_SOFT,fontFamily:FONT,fontSize:13,fontWeight:600,cursor:'pointer'}}));
+    const cityFilters = CITY_FILTERS.map(f=>({...f, onClick:()=>this.setState({marketplaceCity:f.key}), style:{padding:'8px 16px',borderRadius:20,border:`1px solid ${s.marketplaceCity===f.key?ACCENT:LINE}`,background:s.marketplaceCity===f.key?ACCENT_SOFT:SURFACE,color:s.marketplaceCity===f.key?ACCENT:INK_SOFT,fontFamily:FONT,fontSize:13,fontWeight:600,cursor:'pointer'}}));
+    const marketplaceProvidersRaw = PROVIDERS.filter(x=>(s.marketplaceSpecialty==='all'||x.cat===s.marketplaceSpecialty) && (s.marketplaceCity==='all'||x.city===s.marketplaceCity));
+    const marketplaceProviders = marketplaceProvidersRaw.map(enrichProviderCard);
+    const marketplaceLocationLabel = s.marketplaceCity==='all'? 'در سراسر ایران' : `در ${s.marketplaceCity}`;
+
+    const enrichProduct = pr => ({...pr, hasOld: !!pr.oldPrice, discountLabel: pr.oldPriceNum? `${fmtInt(Math.round((1-pr.price/pr.oldPriceNum)*100))}٪ تخفیف` : '', wishStyle:{position:'absolute',top:10,insetInlineEnd:10,width:32,height:32,borderRadius:16,border:'none',background:'oklch(1 0 0 / 0.85)',color:s.wishlist[pr.id]?ACCENT:INK_FAINT,fontSize:16,cursor:'pointer'}, toggleWish:()=>this.toggleWishlist(pr.id), addToCart:()=>this.addToCart(pr), imgStyle:{...phStyle(pr.hue), height:180, borderRadius:'16px 16px 0 0'}});
+    const featuredProducts = PRODUCTS.slice(0,4).map(enrichProduct);
+    const categoryFilters = SHOP_CATS.map(f=>({...f, onClick:()=>this.setState({shopCat:f.key}), style:{padding:'8px 16px',borderRadius:20,border:`1px solid ${s.shopCat===f.key?PRIMARY:LINE}`,background:s.shopCat===f.key?PRIMARY_SOFT:SURFACE,color:s.shopCat===f.key?PRIMARY:INK_SOFT,fontFamily:FONT,fontSize:13,fontWeight:600,cursor:'pointer'}}));
+    const shopProductsRaw = s.shopCat==='all'? PRODUCTS : PRODUCTS.filter(x=>x.cat===s.shopCat);
+    const shopProducts = shopProductsRaw.map(enrichProduct);
+
+    const b2bProducts = PRODUCTS.slice(0,4).map(pr=>({...pr, moqFa:fmtInt(12), wholesaleLabel:fmtInt(Math.round(pr.price*0.72)), imgStyle:{...phStyle(pr.hue), height:160, borderRadius:'16px 16px 0 0'}, addToCart:()=>this.addToCart({...pr, price:Math.round(pr.price*0.72), priceLabel:fmtInt(Math.round(pr.price*0.72))})}));
+    const tierRowBase={display:'grid',gridTemplateColumns:'1fr 1fr 1fr',padding:'14px 20px',borderTop:`1px solid ${LINE}`,fontSize:14};
+    const tierRows=[
+      {range:'۱ – ۹ عدد',unit:'قیمت پایه',discount:'—',discountStyle:{color:INK_FAINT},rowStyle:tierRowBase},
+      {range:'۱۰ – ۴۹ عدد',unit:'قیمت پایه − ۱۰٪',discount:'۱۰٪ تخفیف',discountStyle:{color:SUCCESS,fontWeight:700},rowStyle:tierRowBase},
+      {range:'۵۰ – ۹۹ عدد',unit:'قیمت پایه − ۱۸٪',discount:'۱۸٪ تخفیف',discountStyle:{color:SUCCESS,fontWeight:700},recommended:true,rowStyle:{...tierRowBase,background:PRIMARY_SOFT,borderTop:`1px solid ${PRIMARY_SOFT}`}},
+      {range:'۱۰۰+ عدد',unit:'تماس برای قیمت اختصاصی',discount:'۲۵٪+ تخفیف',discountStyle:{color:SUCCESS,fontWeight:700},rowStyle:tierRowBase}
+    ];
+
+    const bioText = provider.bio;
+    const tabAboutStyle=this._tabStyle(s.profileTab==='about'), tabPortfolioStyle=this._tabStyle(s.profileTab==='portfolio'), tabServicesStyle=this._tabStyle(s.profileTab==='services'), tabReviewsStyle=this._tabStyle(s.profileTab==='reviews');
+    const providerForProfile = {...provider, reviewsFa:fmtInt(provider.reviews), bookAny:()=>this.openBooking(provider.id), services: provider.services.map(sv=>({...sv, book:()=>this.openBooking(provider.id, sv.id)}))};
+
+    const maxWeek=Math.max(...WEEK_BOOKINGS.map(w=>w.count));
+    const weekBookings = WEEK_BOOKINGS.map(w=>({...w, barStyle:{height:`${Math.round(w.count/maxWeek*100)}%`, background:PRIMARY, borderRadius:6, width:'100%'}}));
+    const recentBookings = RECENT_BOOKINGS.map(b=>({...b, statusStyle:{color:b.c, background:b.bg, borderRadius:20, padding:'4px 12px', fontSize:12, fontWeight:700, justifySelf:'start'}}));
+    const dashNavItems = DASH_NAV.map(d=>({...d, onClick:()=>this.setState({dashTab:d.key}), style:{textAlign:'right',border:'none',background:s.dashTab===d.key?PRIMARY_SOFT:'none',color:s.dashTab===d.key?PRIMARY:INK_SOFT,fontFamily:FONT,fontSize:14,fontWeight:s.dashTab===d.key?700:500,padding:'11px 16px',borderRadius:10,cursor:'pointer'}}));
+
+    const cartItemsDisplay = s.cart.map(c=>({...c, qtyFa:fmtInt(c.qty), priceLabel:fmtInt(c.price*c.qty), imgStyle:{...phStyle(c.hue||290), width:64, height:64, borderRadius:12, flexShrink:0}, inc:()=>this.changeQty(c.id,1), dec:()=>this.changeQty(c.id,-1), remove:()=>this.removeFromCart(c.id)}));
+
+    const aiMessagesDisplay = s.aiMessages.map(m=>({...m,
+      isAi: m.from==='ai',
+      rowStyle:{display:'flex', gap:8, alignItems:'flex-end', flexDirection:m.from==='user'?'row-reverse':'row', alignSelf:m.from==='user'?'flex-end':'flex-start', maxWidth:'100%'},
+      bubbleStyle:{background:m.from==='user'?PRIMARY:SURFACE_TINT, color:m.from==='user'?'#fff':INK, borderRadius:m.from==='user'?'16px 16px 4px 16px':'16px 16px 16px 4px', padding:'12px 16px', maxWidth:'86%', fontSize:14, lineHeight:1.8, fontFamily:FONT},
+      hasCards: !!m.cardItems,
+      cardItemsDisplay: m.cardItems ? m.cardItems.map(it=> m.cardType==='products' ? {...it, cardKind:'محصول', cardSub:`${it.priceLabel} تومان`, imgStyle:{...phStyle(it.hue),height:70,borderRadius:'10px 10px 0 0'}, onClick:()=>{ this.addToCart(it); }} : {...it, cardKind:'متخصص', cardSub:`★ ${it.rating} · ${it.area}`, imgStyle:{...phStyle(it.hue),height:70,borderRadius:'10px 10px 0 0'}, onClick:()=>{ this.viewProvider(it.id); this.closeAi(); }} ) : null
+    }));
+    const aiQuickChips = AI_CHIPS.map(c=>({...c, onClick:()=>this.sendAiQuick(c.label, c.key)}));
+
+    const bookingServiceOptions = provider.services.map(sv=>({...sv, select:()=>this.selectBookingService(sv.id), rowStyle:this._pickRow(s.bookingServiceId===sv.id)}));
+    const selectedService = provider.services.find(sv=>sv.id===s.bookingServiceId) || provider.services[0];
+    const bookingDates = BOOKING_DATES.map((dt,i)=>({...dt, select:()=>this.selectBookingDate(i), style:this._dateChip(s.bookingDateIdx===i)}));
+    const bookingTimes = BOOKING_TIMES.map(tm=>({...tm, select:()=>{ if(!tm.disabled) this.selectBookingTime(tm.label); }, style:this._timeChip(tm.disabled, s.bookingTime===tm.label)}));
+    const paymentOptions=[{key:'card',label:'کارت بانکی'},{key:'wallet',label:'کیف پول BeauClick'}].map(pm=>({...pm, select:()=>this.selectBookingPayment(pm.key), style:this._pickChip(s.bookingPayment===pm.key)}));
+    const dateChosen = s.bookingDateIdx!=null ? BOOKING_DATES[s.bookingDateIdx] : null;
+
+    const bookingSteps=[1,2,3,4,5].map(n=>({dotStyle:{width:n===s.bookingStep?24:8,height:8,borderRadius:6,background:n<=s.bookingStep?PRIMARY:LINE,transition:'all .2s'}}));
+    const nextDisabled = (s.bookingStep===1 && !s.bookingServiceId) || (s.bookingStep===2 && s.bookingDateIdx==null) || (s.bookingStep===3 && !s.bookingTime);
+
+    return {
+      rootStyle:{direction:'rtl',minHeight:'100vh',background:BG,fontFamily:FONT,color:INK,paddingBottom: isMobile?76:0, position:'relative'},
+      isDesktop, isMobile,
+      isHome:s.screen==='home', isMarketplace:s.screen==='marketplace', isProfile:s.screen==='profile', isShop:s.screen==='shop', isB2B:s.screen==='b2b', isDashboard:s.screen==='dashboard',
+
+      headerDesktopStyle:{position:'sticky',top:0,zIndex:30,background:'oklch(1 0 0 / 0.92)',backdropFilter:'blur(10px)',borderBottom:`1px solid ${LINE}`,display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 40px',gap:24},
+      headerMobileStyle:{position:'sticky',top:0,zIndex:30,background:'oklch(1 0 0 / 0.95)',borderBottom:`1px solid ${LINE}`,display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 16px'},
+      headerLeftStyle:{display:'flex',alignItems:'center',gap:40}, headerRightStyle:{display:'flex',alignItems:'center',gap:12},
+      logoRowStyle:{display:'flex',alignItems:'center',gap:9,cursor:'pointer'},
+      logoMarkStyle:{width:26,height:26,borderRadius:8,background:`linear-gradient(135deg, ${PRIMARY}, ${ACCENT})`,flexShrink:0},
+      logoTextStyle:{fontWeight:800,fontSize:21,color:INK,letterSpacing:'-0.4px'},
+      primaryBtnHoverStyle:{background:PRIMARY_HOVER},
+      outlineBtnHoverStyle:{background:SURFACE_TINT,borderColor:PRIMARY},
+      addCartBtnHoverStyle:{background:PRIMARY_SOFT},
+      bookNowChipHoverStyle:{background:PRIMARY_HOVER},
+      providerCardHoverStyle:{boxShadow:'0 14px 34px oklch(0.3 0.06 290 / 0.14)',transform:'translateY(-3px)',borderColor:'oklch(0.85 0.02 290)'},
+      productCardHoverStyle:{boxShadow:'0 14px 34px oklch(0.3 0.06 290 / 0.14)',transform:'translateY(-3px)',borderColor:'oklch(0.85 0.02 290)'},
+      aiFabHoverStyle:{transform:'scale(1.06)',boxShadow:'0 14px 32px oklch(0.4 0.14 300 / 0.45)'},
+      closeBtnHoverStyle:{background:SURFACE_TINT},
+      aiCardHoverStyle:{boxShadow:'0 8px 20px oklch(0.3 0.06 290 / 0.12)'},
+      aiAvatarDotStyle:{width:26,height:26,borderRadius:13,background:`linear-gradient(135deg, ${PRIMARY}, ${ACCENT})`,flexShrink:0},
+      aiHeaderStripStyle:{height:3,background:`linear-gradient(90deg, ${PRIMARY}, ${ACCENT})`},
+      aiPanelSubtitleStyle:{fontSize:11,color:INK_FAINT,marginTop:2},
+      aiTyping:s.aiTyping,
+      typingRowStyle:{display:'flex',gap:8,alignItems:'flex-end'},
+      typingBubbleStyle:{background:SURFACE_TINT,borderRadius:'16px 16px 16px 4px',padding:'14px 16px',display:'flex',gap:4},
+      typingDotStyle1:{width:6,height:6,borderRadius:3,background:INK_FAINT,animation:'bcPulse 1s ease-in-out infinite'},
+      typingDotStyle2:{width:6,height:6,borderRadius:3,background:INK_FAINT,animation:'bcPulse 1s ease-in-out .15s infinite'},
+      typingDotStyle3:{width:6,height:6,borderRadius:3,background:INK_FAINT,animation:'bcPulse 1s ease-in-out .3s infinite'},
+      heroSearchInputFocusStyle:{boxShadow:`0 0 0 2px ${PRIMARY_SOFT}`,borderRadius:10},
+      aiInputFocusStyle:{borderColor:PRIMARY,boxShadow:`0 0 0 2px ${PRIMARY_SOFT}`},
+      emptyStateStyle:{padding:'56px 20px',textAlign:'center',color:INK_FAINT,fontSize:14,background:SURFACE,border:`1px solid ${LINE}`,borderRadius:16},
+      recommendedBadgeStyle:{background:PRIMARY,color:'#fff',fontSize:10,fontWeight:700,borderRadius:8,padding:'2px 7px',marginInlineStart:8},
+      discountBadgeStyle:{position:'absolute',top:10,insetInlineStart:10,background:ACCENT,color:'#fff',fontSize:11,fontWeight:700,borderRadius:8,padding:'3px 8px'},
+      navRowStyle:{display:'flex',alignItems:'center',gap:28},
+      navItems, bottomNavItems,
+      searchChipStyle:{border:`1px solid ${LINE}`,borderRadius:20,padding:'9px 18px',background:SURFACE,color:INK_FAINT,fontFamily:FONT,fontSize:13,cursor:'pointer',minWidth:220,textAlign:'right'},
+      cartChipStyle:{border:'none',borderRadius:20,padding:'9px 16px',background:PRIMARY_SOFT,color:PRIMARY,fontFamily:FONT,fontSize:13,fontWeight:700,cursor:'pointer',position:'relative'},
+      cartBadgeStyle:{background:ACCENT,color:'#fff',borderRadius:10,fontSize:10,padding:'1px 6px',marginInlineStart:6},
+      hasCartItems: cartCount>0, cartCountFa: fmtInt(cartCount),
+      avatarChipStyle:{width:36,height:36,borderRadius:18,background:PRIMARY,color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700,cursor:'pointer'},
+      mobileTopActionsStyle:{display:'flex',alignItems:'center',gap:8},
+      mobileIconBtnStyle:{border:`1px solid ${LINE}`,borderRadius:16,padding:'0 16px',minHeight:40,display:'flex',alignItems:'center',background:SURFACE,color:INK_SOFT,fontFamily:FONT,fontSize:12,cursor:'pointer'},
+
+      sectionPadStyle:{padding: isMobile?'24px 16px 40px':'40px 40px 56px', maxWidth:1280, margin:'0 auto'},
+      sectionHeadRowStyle:{display:'flex',alignItems:'baseline',justifyContent:'space-between',marginBottom:20,flexWrap:'wrap',gap:8},
+      sectionTitleStyle:{fontSize:isMobile?20:24,fontWeight:800,margin:0}, sectionTitleSmStyle:{fontSize:16,fontWeight:700,marginBottom:14},
+      linkBtnStyle:{border:'none',background:'none',color:PRIMARY,fontFamily:FONT,fontSize:14,fontWeight:700,cursor:'pointer'},
+      pageTitleStyle:{fontSize:isMobile?24:32,fontWeight:800,margin:'0 0 6px'}, pageSubStyle:{color:INK_SOFT,fontSize:14,margin:'0 0 24px'},
+
+      heroSectionStyle:{padding: isMobile?'32px 16px':'64px 40px 48px', background:`linear-gradient(180deg, ${PRIMARY_SOFT} 0%, ${BG} 100%)`},
+      heroGridStyle:{maxWidth:1280,margin:'0 auto',display:'grid',gridTemplateColumns: isMobile?'1fr':'1.1fr 0.9fr',gap: isMobile?32:48,alignItems:'center'},
+      heroTextColStyle:{display:'flex',flexDirection:'column',gap:16},
+      heroKickerStyle:{color:ACCENT,fontWeight:700,fontSize:13,letterSpacing:'.3px'},
+      heroTitleStyle:{fontSize: isMobile?34:52,fontWeight:800,lineHeight:1.25,margin:0},
+      heroSubStyle:{color:INK_SOFT,fontSize:16,lineHeight:1.9,margin:0,maxWidth:520},
+      heroSearchBoxStyle:{display:'flex',gap:8,background:SURFACE,borderRadius:16,padding:8,boxShadow:'0 8px 30px oklch(0.2 0.05 290 / 0.1)',flexWrap:'wrap'},
+      heroSearchInputStyle:{flex:1,minWidth:180,border:'none',outline:'none',fontFamily:FONT,fontSize:15,padding:'10px 12px',background:'transparent',color:INK,textAlign:'right'},
+      heroSearchBtnStyle:{border:'none',borderRadius:10,padding:'12px 26px',background:PRIMARY,color:'#fff',fontFamily:FONT,fontWeight:700,fontSize:14,cursor:'pointer'},
+      heroStatsRowStyle:{display:'flex',gap:32,marginTop:8,flexWrap:'wrap'},
+      heroStatStyle:{display:'flex',flexDirection:'column',gap:2}, heroStatNumStyle:{fontSize:22,fontWeight:800,color:INK,fontVariantNumeric:'tabular-nums'}, heroStatLabelStyle:{fontSize:12,color:INK_FAINT},
+      heroVisualColStyle:{position:'relative', display: isMobile?'none':'block'},
+      heroVisualCardStyle:{...phStyle(335), height:420, borderRadius:24},
+      heroVisualLabelStyle:{padding:16},
+      heroFloatCardStyle:{position:'absolute',bottom:24,insetInlineStart:-16,background:SURFACE,borderRadius:14,padding:'12px 18px',boxShadow:'0 10px 30px oklch(0.2 0.05 290 / 0.16)',display:'flex',alignItems:'center',gap:10,fontSize:13,fontWeight:600},
+      heroFloatDotStyle:{width:8,height:8,borderRadius:8,background:SUCCESS},
+
+      categoryRowStyle:{display:'flex',gap:10,overflowX:'auto',paddingBottom:4}, categoryItems,
+      providerScrollRowStyle:{display:'grid',gridTemplateColumns:`repeat(auto-fit, minmax(240px, 1fr))`,gap:18}, featuredProviders,
+      providerCardCompactStyle:{background:SURFACE,borderRadius:18,border:`1px solid ${LINE}`,overflow:'hidden',cursor:'pointer'},
+      providerCardStyle:{background:SURFACE,borderRadius:18,border:`1px solid ${LINE}`,overflow:'hidden',cursor:'pointer',display:'flex',flexDirection:'column'},
+      providerCardBodyStyle:{padding:16,display:'flex',flexDirection:'column',gap:6},
+      providerCardTopRowStyle:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8},
+      providerCardBottomRowStyle:{display:'flex',alignItems:'center',justifyContent:'space-between',marginTop:6},
+      providerNameStyle:{fontWeight:700,fontSize:15}, providerSpecialtyStyle:{color:INK_SOFT,fontSize:13},
+      providerMetaRowStyle:{display:'flex',alignItems:'center',gap:8,fontSize:12,flexWrap:'wrap'},
+      ratingStyle:{color:WARNING,fontWeight:700,fontSize:13}, metaFaintStyle:{color:INK_FAINT,fontSize:12},
+      verifiedBadgeStyle:{background:PRIMARY_SOFT,color:PRIMARY,fontSize:11,fontWeight:700,borderRadius:12,padding:'3px 9px',whiteSpace:'nowrap'},
+      priceFromStyle:{fontWeight:800,fontSize:14,fontVariantNumeric:'tabular-nums'}, bookNowChipStyle:{border:'none',borderRadius:10,padding:'8px 16px',background:PRIMARY,color:'#fff',fontFamily:FONT,fontSize:12,fontWeight:700,cursor:'pointer'},
+
+      aiPromoSectionStyle:{padding: isMobile?'8px 16px 40px':'8px 40px 56px', maxWidth:1280, margin:'0 auto'},
+      aiPromoInnerStyle:{position:'relative',overflow:'hidden',borderRadius:28,padding: isMobile?28:48,background:`linear-gradient(120deg, ${PRIMARY} 0%, ${ACCENT} 100%)`,color:'#fff',display:'flex',alignItems:'center'},
+      aiPromoGlowStyle:{position:'absolute',width:260,height:260,borderRadius:'50%',background:'oklch(1 0 0 / 0.18)',filter:'blur(10px)',top:-80,insetInlineEnd:-60,animation:'bcPulse 5s ease-in-out infinite'},
+      aiPromoTextColStyle:{position:'relative',zIndex:1,maxWidth:640,display:'flex',flexDirection:'column',gap:12},
+      aiKickerStyle:{fontSize:12,fontWeight:700,opacity:.85,letterSpacing:'.4px'},
+      aiPromoTitleStyle:{fontSize: isMobile?24:32,fontWeight:800,margin:0,lineHeight:1.4},
+      aiPromoSubStyle:{fontSize:14,opacity:.9,lineHeight:1.8,margin:0},
+      aiPromoBtnStyle:{alignSelf:'flex-start',border:'none',borderRadius:12,padding:'12px 26px',background:'#fff',color:PRIMARY,fontFamily:FONT,fontWeight:800,fontSize:14,cursor:'pointer',marginTop:8},
+
+      productGridStyle:{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))',gap:18}, featuredProducts, shopProducts, b2bProducts,
+      productCardStyle:{background:SURFACE,borderRadius:18,border:`1px solid ${LINE}`,overflow:'hidden',display:'flex',flexDirection:'column'},
+      productCardBodyStyle:{padding:14,display:'flex',flexDirection:'column',gap:6},
+      productBrandStyle:{color:INK_FAINT,fontSize:11,fontWeight:600}, productNameStyle:{fontWeight:700,fontSize:14},
+      productPriceRowStyle:{display:'flex',alignItems:'center',gap:8}, productPriceStyle:{fontWeight:800,fontSize:15,fontVariantNumeric:'tabular-nums'},
+      productOldPriceStyle:{color:INK_FAINT,fontSize:12,textDecoration:'line-through'},
+      addCartBtnStyle:{marginTop:6,border:`1px solid ${PRIMARY}`,borderRadius:10,padding:'9px 0',background:'transparent',color:PRIMARY,fontFamily:FONT,fontWeight:700,fontSize:13,cursor:'pointer'},
+
+      b2bBannerSectionStyle:{padding: isMobile?'0 16px 48px':'0 40px 64px', maxWidth:1280, margin:'0 auto'},
+      b2bBannerInnerStyle:{background:INK,color:'#fff',borderRadius:24,padding: isMobile?24:40,display:'flex',flexDirection: isMobile?'column':'row',alignItems: isMobile?'flex-start':'center',justifyContent:'space-between',gap:20},
+      b2bKickerStyle:{color:ACCENT,fontSize:12,fontWeight:700,marginBottom:8}, b2bBannerTitleStyle:{fontSize: isMobile?20:26,fontWeight:800,margin:'0 0 8px'}, b2bBannerSubStyle:{opacity:.75,fontSize:13,margin:0,maxWidth:460},
+      b2bBannerBtnStyle:{border:'none',borderRadius:12,padding:'12px 24px',background:'#fff',color:INK,fontFamily:FONT,fontWeight:800,fontSize:13,cursor:'pointer',whiteSpace:'nowrap'},
+
+      filterRowStyle:{display:'flex',gap:10,flexWrap:'wrap',marginBottom:24}, specialtyFilters, categoryFilters, cityFilters,
+      marketplaceGridStyle:{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))',gap:20}, marketplaceProviders,
+      providerResultCountFa: fmtInt(marketplaceProviders.length), marketplaceIsEmpty: marketplaceProviders.length===0, marketplaceLocationLabel,
+
+      profileCoverStyle:{...phStyle(provider.hue), height: isMobile?120:180},
+      profileHeaderGridStyle:{display:'flex',gap:20,alignItems: isMobile?'flex-start':'center',flexWrap:'wrap',marginTop:-48,marginBottom:24},
+      profileAvatarStyle:{...phStyle(provider.hue), width:96,height:96,borderRadius:20,border:`4px solid ${SURFACE}`,fontSize:11,flexShrink:0},
+      profileHeaderInfoStyle:{flex:1,minWidth:200,display:'flex',flexDirection:'column',gap:4,paddingTop:8},
+      profileNameRowStyle:{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}, profileNameStyle:{fontSize:24,fontWeight:800,margin:0},
+      profileCtaColStyle:{display:'flex',gap:10,flexWrap:'wrap'},
+      primaryBtnStyle:{border:'none',borderRadius:12,padding:'11px 22px',background:PRIMARY,color:'#fff',fontFamily:FONT,fontWeight:700,fontSize:14,cursor:'pointer'},
+      primaryBtnFullStyle:{border:'none',borderRadius:12,padding:'14px 0',width:'100%',background:PRIMARY,color:'#fff',fontFamily:FONT,fontWeight:700,fontSize:15,cursor:'pointer',marginTop:16},
+      outlineBtnStyle:{border:`1px solid ${LINE}`,borderRadius:12,padding:'11px 22px',background:SURFACE,color:INK,fontFamily:FONT,fontWeight:700,fontSize:14,cursor:'pointer'},
+      primaryBtnLightStyle:{border:'none',borderRadius:12,padding:'12px 24px',background:'#fff',color:PRIMARY,fontFamily:FONT,fontWeight:800,fontSize:14,cursor:'pointer'},
+      outlineBtnLightStyle:{border:'1px solid oklch(1 0 0 / 0.4)',borderRadius:12,padding:'12px 24px',background:'transparent',color:'#fff',fontFamily:FONT,fontWeight:700,fontSize:14,cursor:'pointer'},
+
+      tabRowStyle:{display:'flex',gap:8,borderBottom:`1px solid ${LINE}`,marginBottom:20,overflowX:'auto'},
+      tabAboutStyle, tabPortfolioStyle, tabServicesStyle, tabReviewsStyle,
+      tabIsAbout:s.profileTab==='about', tabIsPortfolio:s.profileTab==='portfolio', tabIsServices:s.profileTab==='services', tabIsReviews:s.profileTab==='reviews',
+      setTabAbout:()=>this.setProfileTab('about'), setTabPortfolio:()=>this.setProfileTab('portfolio'), setTabServices:()=>this.setProfileTab('services'), setTabReviews:()=>this.setProfileTab('reviews'),
+      bioTextStyle:{color:INK_SOFT,fontSize:15,lineHeight:2,maxWidth:680},
+      portfolioGridStyle:{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(160px,1fr))',gap:12},
+      portfolioBoxStyle:{...phStyle(provider.hue), height:160, borderRadius:14, fontSize:12},
+      serviceListStyle:{display:'flex',flexDirection:'column',gap:10},
+      serviceRowStyle:{display:'flex',alignItems:'center',justifyContent:'space-between',padding:16,background:SURFACE,border:`1px solid ${LINE}`,borderRadius:14},
+      serviceNameStyle:{fontWeight:700,fontSize:15}, serviceRightStyle:{display:'flex',alignItems:'center',gap:14}, servicePriceStyle:{fontWeight:800,fontSize:14,fontVariantNumeric:'tabular-nums'},
+      reviewListStyle:{display:'flex',flexDirection:'column',gap:14},
+      reviewRowStyle:{padding:16,background:SURFACE,border:`1px solid ${LINE}`,borderRadius:14},
+      reviewTopRowStyle:{display:'flex',justifyContent:'space-between',marginBottom:4}, reviewNameStyle:{fontWeight:700,fontSize:14}, reviewTextStyle:{color:INK_SOFT,fontSize:14,lineHeight:1.8,margin:'6px 0 0'},
+      provider:providerForProfile,
+
+      b2bHeroStyle:{background:INK,color:'#fff',padding: isMobile?'40px 16px':'64px 40px'},
+      b2bHeroInnerStyle:{maxWidth:1000,margin:'0 auto'},
+      b2bHeroTitleStyle:{fontSize:isMobile?28:40,fontWeight:800,margin:'8px 0 12px'}, b2bHeroSubStyle:{opacity:.75,fontSize:15,lineHeight:1.9,maxWidth:560,margin:0},
+      b2bHeroBtnRowStyle:{display:'flex',gap:12,marginTop:24,flexWrap:'wrap'},
+      b2bStatsRowStyle:{display:'flex',gap:36,marginTop:40,flexWrap:'wrap'}, b2bStatStyle:{display:'flex',flexDirection:'column',gap:2}, b2bStatNumStyle:{fontSize:22,fontWeight:800}, b2bStatLabelStyle:{fontSize:12,opacity:.65},
+      tierTableStyle:{border:`1px solid ${LINE}`,borderRadius:16,overflow:'hidden'},
+      tierHeadRowStyle:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',padding:'12px 20px',background:SURFACE_TINT,fontWeight:700,fontSize:13,color:INK_SOFT},
+      tierRows,
+
+      dashboardGridStyle:{display:'grid',gridTemplateColumns: isMobile?'1fr':'220px 1fr',gap:0,maxWidth:1280,margin:'0 auto'},
+      dashSidebarStyle:{display:'flex',flexDirection: isMobile?'row':'column',gap:4,padding: isMobile?'12px 16px':'32px 16px',overflowX: isMobile?'auto':'visible',borderInlineEnd: isMobile?'none':`1px solid ${LINE}`, borderBottom: isMobile?`1px solid ${LINE}`:'none'},
+      dashMainStyle:{padding: isMobile?'20px 16px 40px':'32px 40px 56px', flex:1},
+      dashNavItems, dashDateFa:'۲۰ مرداد ۱۴۰۵',
+      dashIsOverview: s.dashTab==='overview', dashIsOther: s.dashTab!=='overview',
+      statCardRowStyle:{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(180px,1fr))',gap:16,margin:'24px 0 32px'},
+      statCardStyle:{background:SURFACE,border:`1px solid ${LINE}`,borderRadius:16,padding:18,display:'flex',flexDirection:'column',gap:6},
+      statValueStyle:{fontSize:24,fontWeight:800,fontVariantNumeric:'tabular-nums'}, statValueSmStyle:{fontSize:16,fontWeight:800,fontVariantNumeric:'tabular-nums'},
+      statDeltaUpStyle:{color:SUCCESS,fontSize:12,fontWeight:700},
+      dashChartRowStyle:{display:'grid',gridTemplateColumns: isMobile?'1fr':'1.4fr 1fr',gap:16,marginBottom:32},
+      chartCardStyle:{background:SURFACE,border:`1px solid ${LINE}`,borderRadius:16,padding:20},
+      chartBarsRowStyle:{display:'flex',alignItems:'flex-end',gap:12,height:140},
+      chartBarColStyle:{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:8,height:'100%',justifyContent:'flex-end'},
+      chartBarTrackStyle:{flex:1,width:'100%',display:'flex',alignItems:'flex-end',background:SURFACE_TINT,borderRadius:6}, weekBookings,
+      upcomingCardStyle:{background:SURFACE,border:`1px solid ${LINE}`,borderRadius:16,padding:20,display:'flex',flexDirection:'column',gap:12},
+      upcomingRowStyle:{display:'flex',gap:12,alignItems:'center',fontSize:14}, upcomingTimeStyle:{fontWeight:800,color:PRIMARY,minWidth:52}, upcomingToday:UPCOMING_TODAY,
+      recentTableStyle:{background:SURFACE,border:`1px solid ${LINE}`,borderRadius:16,overflow:'hidden'},
+      recentRowStyle:{display:'grid',gridTemplateColumns:'1fr 1fr auto',alignItems:'center',padding:'14px 20px',borderBottom:`1px solid ${LINE}`,fontSize:14}, recentBookings,
+      comingSoonStyle:{padding:'60px 20px',textAlign:'center',color:INK_FAINT,fontSize:14},
+
+      bottomNavStyle:{position:'fixed',bottom:0,insetInlineStart:0,insetInlineEnd:0,background:SURFACE,borderTop:`1px solid ${LINE}`,display:'flex',zIndex:30,padding:'4px 8px'},
+      aiFabStyle:{position:'fixed',bottom: isMobile?92:28,insetInlineStart:24,width:56,height:56,borderRadius:28,border:'none',background:`linear-gradient(135deg, ${PRIMARY}, ${ACCENT})`,color:'#fff',fontWeight:800,fontSize:13,cursor:'pointer',zIndex:35,boxShadow:'0 10px 26px oklch(0.4 0.14 300 / 0.35)'},
+
+      overlayBackdropStyle:{position:'fixed',inset:0,background:'oklch(0.15 0.02 290 / 0.45)',backdropFilter:'blur(3px)',zIndex:40,animation:'bcFadeIn .2s ease'},
+      aiOpen:s.aiOpen,
+      aiPanelStyle:{position:'fixed',top:0,bottom:0,insetInlineEnd:0,width: isMobile?'100%':400,background:BG,zIndex:41,display:'flex',flexDirection:'column',boxShadow:'-10px 0 40px oklch(0.2 0.05 290 / 0.2)',animation:'bcSlideUp .25s ease'},
+      aiPanelHeaderStyle:{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'18px 20px',borderBottom:`1px solid ${LINE}`,background:SURFACE},
+      aiPanelTitleRowStyle:{display:'flex',alignItems:'center',gap:10}, aiPanelDotStyle:{width:10,height:10,borderRadius:6,background:`linear-gradient(135deg, ${PRIMARY}, ${ACCENT})`,animation:'bcPulse 2s ease-in-out infinite'},
+      aiPanelTitleStyle:{fontWeight:800,fontSize:16}, closeBtnStyle:{border:'none',background:'none',fontSize:22,color:INK_FAINT,cursor:'pointer'},
+      aiMessagesStyle:{flex:1,overflowY:'auto',padding:20,display:'flex',flexDirection:'column',gap:12}, aiMessagesDisplay,
+      aiCardsRowStyle:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginTop:10},
+      aiCardStyle:{background:SURFACE,borderRadius:12,overflow:'hidden',cursor:'pointer',border:`1px solid ${LINE}`}, aiCardNameStyle:{fontWeight:700,fontSize:12,padding:'6px 8px 0'},
+      aiChipsRowStyle:{display:'flex',flexWrap:'wrap',gap:8,padding:'0 20px 14px'}, aiQuickChips,
+      aiChipStyle:{border:`1px solid ${LINE}`,borderRadius:14,padding:'7px 12px',background:SURFACE,fontFamily:FONT,fontSize:12,color:INK_SOFT,cursor:'pointer'},
+      aiInputRowStyle:{display:'flex',gap:8,padding:16,borderTop:`1px solid ${LINE}`,background:SURFACE},
+      aiInputStyle:{flex:1,border:`1px solid ${LINE}`,borderRadius:12,padding:'11px 14px',fontFamily:FONT,fontSize:14,outline:'none',textAlign:'right'},
+      aiSendBtnStyle:{border:'none',borderRadius:12,padding:'11px 20px',background:PRIMARY,color:'#fff',fontFamily:FONT,fontWeight:700,fontSize:13,cursor:'pointer'},
+      aiInput:s.aiInput,
+
+      cartOpen:s.cartOpen, cartCheckedOut:s.cartCheckedOut, cartIsEmpty: s.cart.length===0 && !s.cartCheckedOut,
+      cartShowingList: s.cart.length>0 && !s.cartReviewing && !s.cartCheckedOut,
+      cartShowingReview: s.cartReviewing && !s.cartCheckedOut,
+      cartDrawerStyle:{position:'fixed',top:0,bottom:0,insetInlineEnd:0,width: isMobile?'100%':400,background:BG,zIndex:41,display:'flex',flexDirection:'column',boxShadow:'-10px 0 40px oklch(0.2 0.05 290 / 0.2)'},
+      cartHeaderStyle:{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'18px 20px',borderBottom:`1px solid ${LINE}`,background:SURFACE},
+      cartListStyle:{flex:1,overflowY:'auto',padding:16,display:'flex',flexDirection:'column',gap:14}, cartItemsDisplay,
+      cartRowStyle:{display:'flex',gap:12}, cartRowInfoStyle:{flex:1,display:'flex',flexDirection:'column',gap:4},
+      qtyRowStyle:{display:'flex',alignItems:'center',gap:10,marginTop:4}, qtyBtnStyle:{width:26,height:26,borderRadius:13,border:`1px solid ${LINE}`,background:SURFACE,cursor:'pointer'},
+      removeLinkStyle:{border:'none',background:'none',color:ERROR,fontSize:12,cursor:'pointer',marginInlineStart:8},
+      cartFooterStyle:{padding:18,borderTop:`1px solid ${LINE}`,background:SURFACE}, cartSubtotalRowStyle:{display:'flex',justifyContent:'space-between',marginBottom:14,fontSize:14},
+      cartSubtotalLabel: fmtInt(cartSubtotal), orderCodeFa: fmtInt(48213),
+      checkoutDoneStyle:{padding:'60px 24px',textAlign:'center',display:'flex',flexDirection:'column',alignItems:'center',gap:10},
+      successDotStyle:{width:56,height:56,borderRadius:28,background:SUCCESS_SOFT,color:SUCCESS,fontSize:26,display:'flex',alignItems:'center',justifyContent:'center',marginBottom:8},
+      successTitleStyle:{fontWeight:800,fontSize:17},
+
+      bookingOpen:s.bookingOpen,
+      bookingModalStyle:{position:'fixed',zIndex:41, background:SURFACE, ...(isMobile? {top:0,bottom:0,left:0,right:0,borderRadius:0} : {top:'6%',bottom:'6%',insetInlineStart:'50%',transform:'translateX(50%)',width:520,borderRadius:24,overflow:'hidden'}), display:'flex',flexDirection:'column'},
+      bookingHeaderStyle:{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'18px 20px',borderBottom:`1px solid ${LINE}`},
+      progressRowStyle:{display:'flex',gap:6,justifyContent:'center',padding:'14px 0'}, bookingSteps,
+      bookingBodyStyle:{padding:'0 24px 24px',overflowY:'auto',flex:1}, stepTitleStyle:{fontWeight:800,fontSize:16,margin:'4px 0 16px'}, stepTitleSmStyle:{fontWeight:700,fontSize:14,margin:'20px 0 10px'},
+      bookingServiceOptions, dateRowStyle:{display:'flex',gap:8,overflowX:'auto',paddingBottom:4}, bookingDates,
+      dateDayNumStyle:{fontWeight:800,fontSize:15,marginTop:4},
+      timeGridStyle:{display:'grid',gridTemplateColumns:'repeat(3, 1fr)',gap:10}, bookingTimes,
+      summaryCardStyle:{background:SURFACE_TINT,borderRadius:14,padding:16,display:'flex',flexDirection:'column',gap:10},
+      summaryRowStyle:{display:'flex',justifyContent:'space-between',fontSize:14},
+      bookingSummaryService: selectedService? selectedService.name : '—',
+      bookingSummaryDateTime: (dateChosen? `${dateChosen.weekday} ${dateChosen.day}` : '—') + (s.bookingTime? ` ساعت ${s.bookingTime}` : ''),
+      bookingSummaryPrice: selectedService? selectedService.price : '—',
+      paymentRowStyle:{display:'flex',gap:10}, paymentOptions,
+      bStep1:s.bookingStep===1, bStep2:s.bookingStep===2, bStep3:s.bookingStep===3, bStep4:s.bookingStep===4, bStep5:s.bookingStep===5,
+      showBookingNav: s.bookingStep<4, nextDisabled,
+      bookingFooterStyle:{display:'flex',justifyContent:'space-between',padding:'16px 24px',borderTop:`1px solid ${LINE}`},
+
+      goHome:()=>this.goTo('home'), goMarketplace:()=>this.goTo('marketplace'), goShop:()=>this.goTo('shop'), goB2B:()=>this.goTo('b2b'), goDashboard:()=>this.goTo('dashboard'),
+      openAi:()=>this.openAi(), closeAi:()=>this.closeAi(), openCartDrawer:()=>this.openCartDrawer(), closeCartDrawer:()=>this.closeCartDrawer(),
+      setHeroQuery:(e)=>this.setHeroQuery(e), setAiInput:(e)=>this.setAiInput(e), sendAi:()=>this.sendAi(),
+      heroQuery:s.heroQuery, resetCart:()=>this.resetCart(), checkoutCart:()=>this.checkoutCart(), confirmCartOrder:()=>this.confirmCartOrder(), backToCart:()=>this.backToCart(),
+      closeBooking:()=>this.closeBooking(), bookingNext:()=>this.bookingNext(), bookingBack:()=>this.bookingBack(), confirmBooking:()=>this.confirmBooking()
+    };
+  }
+
+  _tabStyle(active){ return {border:'none',background:'none',fontFamily:FONT,fontSize:14,fontWeight:active?800:600,color:active?PRIMARY:INK_FAINT,padding:'10px 6px',borderBottom:active?`2px solid ${PRIMARY}`:'2px solid transparent',cursor:'pointer',whiteSpace:'nowrap'}; }
+  _pickRow(active){ return {display:'flex',alignItems:'center',justifyContent:'space-between',padding:16,borderRadius:14,border:`1.5px solid ${active?PRIMARY:LINE}`,background:active?PRIMARY_SOFT:SURFACE,cursor:'pointer',marginBottom:10}; }
+  _dateChip(active){ return {minWidth:60,padding:'10px 6px',borderRadius:14,border:`1.5px solid ${active?PRIMARY:LINE}`,background:active?PRIMARY_SOFT:SURFACE,color:active?PRIMARY:INK,fontFamily:FONT,fontSize:12,cursor:'pointer',textAlign:'center'}; }
+  _timeChip(disabled, active){ return {padding:'10px 0',borderRadius:12,border:`1.5px solid ${active?PRIMARY:LINE}`,background: disabled?SURFACE_TINT:(active?PRIMARY_SOFT:SURFACE),color: disabled?INK_FAINT:(active?PRIMARY:INK),fontFamily:FONT,fontSize:13,cursor: disabled?'not-allowed':'pointer',opacity:disabled?0.5:1}; }
+  _pickChip(active){ return {flex:1,padding:'12px 0',borderRadius:12,border:`1.5px solid ${active?PRIMARY:LINE}`,background:active?PRIMARY_SOFT:SURFACE,color:active?PRIMARY:INK,fontFamily:FONT,fontWeight:700,fontSize:13,cursor:'pointer'}; }
+}
+</script>
+</body>
+</html>

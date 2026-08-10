@@ -1,0 +1,48 @@
+# === Environment / secrets ===
+.env
+.env.*
+!.env.example
+
+# === WordPress core (installed via Composer, not committed) ===
+/wordpress/wp-admin/
+/wordpress/wp-includes/
+/wordpress/*.php
+!/wordpress/wp-config-sample.php
+/wordpress/wp-content/uploads/
+/wordpress/wp-content/upgrade/
+/wordpress/wp-content/cache/
+/wordpress/wp-content/plugins/akismet/
+/wordpress/wp-content/plugins/hello.php
+/wordpress/wp-content/themes/twenty*/
+
+# === PHP / Composer ===
+vendor/
+composer.lock.bak
+*.phar
+
+# === Node / build output ===
+node_modules/
+dist/
+build/
+app/dist/
+*.local
+
+# === Logs ===
+*.log
+npm-debug.log*
+debug.log
+
+# === OS / editor ===
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# === Test artifacts ===
+coverage/
+.phpunit.result.cache
+
+# === Local dev DB dumps ===
+*.sql
+!database/seed/*.sql
