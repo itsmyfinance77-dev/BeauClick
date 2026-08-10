@@ -1,0 +1,14 @@
+{
+    "name": "beauclick/core",
+    "description": "BeauClick shared kernel: migration runner, roles/capabilities, REST base controller, service container, event logger, design tokens.",
+    "type": "wordpress-plugin",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "BeauClick\\Core\\": "src/"
+        }
+    }
+}

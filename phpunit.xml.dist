@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit
+    bootstrap="wordpress/wp-content/plugins/beauclick-core/tests/bootstrap.php"
+    colors="true"
+    backupGlobals="false"
+>
+    <testsuites>
+        <testsuite name="beauclick-core">
+            <directory>wordpress/wp-content/plugins/beauclick-core/tests</directory>
+        </testsuite>
+        <testsuite name="beauclick-locations">
+            <directory>wordpress/wp-content/plugins/beauclick-locations/tests</directory>
+        </testsuite>
+        <testsuite name="beauclick-marketplace">
+            <directory>wordpress/wp-content/plugins/beauclick-marketplace/tests</directory>
+        </testsuite>
+        <testsuite name="beauclick-booking">
+            <directory>wordpress/wp-content/plugins/beauclick-booking/tests</directory>
+        </testsuite>
+        <testsuite name="beauclick-b2b">
+            <directory>wordpress/wp-content/plugins/beauclick-b2b/tests</directory>
+        </testsuite>
+        <testsuite name="beauclick-reviews">
+            <directory>wordpress/wp-content/plugins/beauclick-reviews/tests</directory>
+        </testsuite>
+        <testsuite name="beauclick-chat">
+            <directory>wordpress/wp-content/plugins/beauclick-chat/tests</directory>
+        </testsuite>
+        <testsuite name="beauclick-ai">
+            <directory>wordpress/wp-content/plugins/beauclick-ai/tests</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory suffix=".php">wordpress/wp-content/plugins/beauclick-core/src</directory>
+            <directory suffix=".php">wordpress/wp-content/plugins/beauclick-locations/src</directory>
+            <directory suffix=".php">wordpress/wp-content/plugins/beauclick-marketplace/src</directory>
+            <directory suffix=".php">wordpress/wp-content/plugins/beauclick-booking/src</directory>
+            <directory suffix=".php">wordpress/wp-content/plugins/beauclick-b2b/src</directory>
+            <directory suffix=".php">wordpress/wp-content/plugins/beauclick-reviews/src</directory>
+            <directory suffix=".php">wordpress/wp-content/plugins/beauclick-chat/src</directory>
+            <directory suffix=".php">wordpress/wp-content/plugins/beauclick-ai/src</directory>
+        </include>
+    </source>
+</phpunit>

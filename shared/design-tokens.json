@@ -1,0 +1,64 @@
+{
+  "$schema": "Canonical BeauClick design tokens — single source of truth for both the PHP theme (server-rendered pages) and the React app-shell. Do not duplicate these values elsewhere; generate from this file. Source: docs/design/DESIGN_HANDOFF.md",
+  "color": {
+    "ink": { "value": "oklch(0.2 0.02 290)", "use": "primary text" },
+    "inkSoft": { "value": "oklch(0.48 0.02 290)", "use": "secondary text" },
+    "inkFaint": { "value": "oklch(0.6 0.02 290)", "use": "meta/labels" },
+    "line": { "value": "oklch(0.9 0.012 290)", "use": "borders" },
+    "background": { "value": "oklch(0.985 0.006 280)", "use": "page background" },
+    "surface": { "value": "oklch(1 0 0)", "use": "cards/panels" },
+    "surfaceTint": { "value": "oklch(0.965 0.014 290)", "use": "subtle panel bg, AI bubbles" },
+    "primary": { "value": "oklch(0.4 0.16 290)", "use": "brand, CTAs, active nav" },
+    "primaryHover": { "value": "oklch(0.34 0.16 290)", "use": "button hover" },
+    "primarySoft": { "value": "oklch(0.94 0.03 290)", "use": "chips, badges" },
+    "accent": { "value": "oklch(0.66 0.16 335)", "use": "AI identity, wishlist active, discount badge" },
+    "accentSoft": { "value": "oklch(0.95 0.035 335)", "use": "AI chip active bg" },
+    "success": { "value": "oklch(0.5 0.13 150)", "soft": "oklch(0.94 0.04 150)", "use": "confirmed states" },
+    "warning": { "value": "oklch(0.55 0.13 70)", "soft": "oklch(0.95 0.045 80)", "use": "pending states" },
+    "error": { "value": "oklch(0.55 0.19 25)", "soft": "oklch(0.95 0.05 25)", "use": "cancelled/remove" }
+  },
+  "gradient": {
+    "brand": "linear-gradient(135deg, var(--bc-color-primary), var(--bc-color-accent))"
+  },
+  "typography": {
+    "fontFamily": "'Vazirmatn', -apple-system, BlinkMacSystemFont, sans-serif",
+    "fontWeights": [400, 500, 600, 700, 800],
+    "direction": "rtl",
+    "digits": "persian",
+    "scale": {
+      "heroH1": { "mobile": "34px", "desktop": "52px", "weight": 800, "lineHeight": 1.25 },
+      "pageTitle": { "mobile": "24px", "desktop": "32px", "weight": 800 },
+      "sectionTitle": { "mobile": "20px", "desktop": "24px", "weight": 800 },
+      "body": { "min": "14px", "max": "16px", "weight": [400, 500], "lineHeight": [1.8, 1.9] },
+      "meta": { "min": "11px", "max": "12px" }
+    },
+    "numericVariant": "tabular-nums"
+  },
+  "spacing": {
+    "sectionPaddingMobile": "24px",
+    "sectionPaddingDesktop": "40px",
+    "contentMaxWidth": "1280px",
+    "cardGap": "16px",
+    "cardGapLarge": "20px",
+    "chipGap": "8px",
+    "chipGapLarge": "10px"
+  },
+  "radius": {
+    "card": "18px",
+    "row": "14px",
+    "rowLarge": "16px",
+    "avatar": "20px",
+    "hero": "28px",
+    "pill": "999px",
+    "button": "12px"
+  },
+  "shadow": {
+    "cardHover": "0 14px 34px oklch(0.3 0.06 290 / 0.14)",
+    "floatingMin": "0 8px 30px oklch(0.2 0.05 290 / 0.1)",
+    "floatingMax": "0 10px 40px oklch(0.2 0.05 290 / 0.2)",
+    "aiFab": "0 10px 26px oklch(0.4 0.14 300 / 0.35)"
+  },
+  "breakpoint": {
+    "mobile": "900px"
+  }
+}
