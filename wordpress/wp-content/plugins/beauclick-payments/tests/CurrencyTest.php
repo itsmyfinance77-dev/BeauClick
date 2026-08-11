@@ -25,6 +25,14 @@ final class CurrencyTest extends WP_UnitTestCase {
 		$this->assertSame( '0', get_option( 'woocommerce_price_num_decimals' ), 'Toman amounts are never fractional in practice.' );
 	}
 
+	public function test_ensure_configured_restricts_checkout_to_iran(): void {
+		Currency::ensure_configured();
+
+		$this->assertSame( 'IR', get_option( 'woocommerce_default_country' ), 'WooCommerce\'s stock default ("US:CA") must not survive on a nationwide-Iran platform.' );
+		$this->assertSame( 'specific', get_option( 'woocommerce_allowed_countries' ) );
+		$this->assertSame( [ 'IR' ], get_option( 'woocommerce_specific_allowed_countries' ), 'The checkout country dropdown must not offer the whole world.' );
+	}
+
 	public function test_the_irr_symbol_is_overridden_to_the_persian_toman_word(): void {
 		$currency = new Currency();
 		$this->assertSame( 'تومان', $currency->symbol( '$', 'IRR' ) );

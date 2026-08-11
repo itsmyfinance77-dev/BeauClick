@@ -196,6 +196,7 @@ final class Plugin {
 		}
 
 		Currency::ensure_configured(); // Every environment, not just non-production — unlike COD, correct currency formatting is never dev-only.
+		self::ensure_persian_page_titles();
 
 		if ( 'production' === wp_get_environment_type() ) {
 			self::ensure_store_is_reachable();
@@ -230,6 +231,42 @@ final class Plugin {
 	private static function ensure_store_is_reachable(): void {
 		if ( 'yes' === get_option( 'woocommerce_coming_soon' ) ) {
 			update_option( 'woocommerce_coming_soon', 'no' );
+		}
+	}
+
+	/**
+	 * WooCommerce auto-creates Shop/Cart/Checkout/My account with English
+	 * titles the moment it's installed, regardless of the site's locale
+	 * setting — a production-readiness audit found this was the one visible
+	 * English leftover after fixing the locale itself (Core::
+	 * ensure_site_locale()): the page CONTENT translated correctly (real
+	 * i18n via .mo files), but these titles are literal post_title data
+	 * written once at creation time, not something a locale change touches
+	 * retroactively. Only overwrites WooCommerce's own stock English
+	 * titles — never touches a title an admin already customized (matches
+	 * the array key check "is this still the untouched original value").
+	 */
+	private static function ensure_persian_page_titles(): void {
+		if ( ! function_exists( 'wc_get_page_id' ) ) {
+			return;
+		}
+
+		$desired = [
+			'shop'       => [ 'Shop', 'فروشگاه' ],
+			'cart'       => [ 'Cart', 'سبد خرید' ],
+			'checkout'   => [ 'Checkout', 'پرداخت' ],
+			'myaccount'  => [ 'My account', 'حساب کاربری' ],
+		];
+
+		foreach ( $desired as $page_slug => [ $stock_title, $persian_title ] ) {
+			$page_id = wc_get_page_id( $page_slug );
+			if ( $page_id <= 0 ) {
+				continue;
+			}
+			$page = get_post( $page_id );
+			if ( $page && $stock_title === $page->post_title ) {
+				wp_update_post( [ 'ID' => $page_id, 'post_title' => $persian_title ] );
+			}
 		}
 	}
 

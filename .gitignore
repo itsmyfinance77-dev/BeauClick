@@ -34,6 +34,13 @@
 /wordpress/wp-content/cache/
 /wordpress/wp-content/themes/twenty*/
 
+# Language packs (.mo/.po) are fetched, not authored — same reasoning as
+# WordPress core and Composer-managed plugins below. Every environment
+# runs (once): `wp language core install fa_IR --activate` and
+# `wp language plugin install woocommerce fa_IR` — see ARCHITECTURE_
+# PROPOSAL.md's Implementation Notes appendix.
+/wordpress/wp-content/languages/
+
 # Third-party plugins (WooCommerce, Akismet, anything pulled via wpackagist/
 # Composer) are dependencies, not our code — only beauclick-* plugins are
 # authored here and tracked.

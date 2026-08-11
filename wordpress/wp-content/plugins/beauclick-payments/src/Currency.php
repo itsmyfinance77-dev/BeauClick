@@ -36,14 +36,27 @@ final class Currency {
 		return strtr( $formatted_price, [ '0' => self::PERSIAN_DIGITS[0], '1' => self::PERSIAN_DIGITS[1], '2' => self::PERSIAN_DIGITS[2], '3' => self::PERSIAN_DIGITS[3], '4' => self::PERSIAN_DIGITS[4], '5' => self::PERSIAN_DIGITS[5], '6' => self::PERSIAN_DIGITS[6], '7' => self::PERSIAN_DIGITS[7], '8' => self::PERSIAN_DIGITS[8], '9' => self::PERSIAN_DIGITS[9] ] );
 	}
 
-	/** Idempotent — only writes options that differ from the desired state, safe to call on every activation. */
+	/**
+	 * Idempotent — only writes options that differ from the desired state,
+	 * safe to call on every activation. Also fixes woocommerce_default_
+	 * country/allowed_countries: a production-readiness audit found these
+	 * still on WooCommerce's stock default (worldwide, defaulting new
+	 * customers to "US:CA") — the country/state dropdown at checkout was
+	 * the full world list. Restricted to Iran-only, matching a nationwide-
+	 * Iran-only platform; the state field falls back to WooCommerce's own
+	 * (limited) Iran state list since it doesn't know about
+	 * wp_bc_provinces — a real gap, tracked separately, not fixed here.
+	 */
 	public static function ensure_configured(): void {
 		$desired = [
-			'woocommerce_currency'            => 'IRR',
-			'woocommerce_currency_pos'        => 'right_space',
-			'woocommerce_price_thousand_sep'  => '٬',
-			'woocommerce_price_decimal_sep'   => '.',
-			'woocommerce_price_num_decimals'  => '0',
+			'woocommerce_currency'                 => 'IRR',
+			'woocommerce_currency_pos'              => 'right_space',
+			'woocommerce_price_thousand_sep'        => '٬',
+			'woocommerce_price_decimal_sep'         => '.',
+			'woocommerce_price_num_decimals'        => '0',
+			'woocommerce_default_country'           => 'IR',
+			'woocommerce_allowed_countries'         => 'specific',
+			'woocommerce_specific_allowed_countries' => [ 'IR' ],
 		];
 
 		foreach ( $desired as $option => $value ) {

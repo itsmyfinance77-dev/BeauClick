@@ -124,12 +124,35 @@ final class Plugin {
 		Migrator::install_ledger();
 		RoleManager::register();
 		self::ensure_site_timezone();
+		self::ensure_site_locale();
 
 		$instance = self::instance();
 		$instance->register_services();
 		$instance->migrator()->run_group( 'beauclick-core' );
 
 		flush_rewrite_rules();
+	}
+
+	/**
+	 * A production-readiness audit found the site locale had never been
+	 * set — every page rendered its own Persian content correctly (all
+	 * hand-authored theme/plugin strings), but WordPress core's and
+	 * WooCommerce's OWN translated strings (checkout form labels,
+	 * "Place order", country/state dropdown, admin screens) were all still
+	 * in English, since WordPress defaults to en_US until told otherwise.
+	 * This only sets the *option* — it does not download the fa_IR
+	 * translation files themselves (that needs network access at a time
+	 * that may not be activation, and `wp language core install fa_IR
+	 * --activate` / `wp language plugin install woocommerce fa_IR` is the
+	 * standard, safer way to provision that once per environment); setting
+	 * WPLANG ahead of the files being present is harmless — WordPress just
+	 * falls back to English until they exist. Never overwrites a
+	 * deliberately-chosen locale.
+	 */
+	private static function ensure_site_locale(): void {
+		if ( '' === get_option( 'WPLANG' ) ) {
+			update_option( 'WPLANG', 'fa_IR' );
+		}
 	}
 
 	/**
