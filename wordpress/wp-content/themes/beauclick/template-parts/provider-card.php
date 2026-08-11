@@ -18,12 +18,16 @@ $district_name = bc_get_district_name( $provider['district_id'] ? (int) $provide
 $location  = trim( implode( '، ', array_filter( [ $city_name, $district_name ] ) ) );
 ?>
 <div class="bc-card bc-card--hoverable">
-	<div class="bc-placeholder-image" style="aspect-ratio:4/3;background:linear-gradient(135deg, oklch(0.9 0.04 290), oklch(0.8 0.06 330));">
-		<span><?php esc_html_e( 'تصویر متخصص', 'beauclick' ); ?></span>
-	</div>
+	<a href="<?php echo esc_url( bc_provider_permalink( $provider ) ); ?>" style="display:block;">
+		<div class="bc-placeholder-image" style="aspect-ratio:4/3;background:linear-gradient(135deg, oklch(0.9 0.04 290), oklch(0.8 0.06 330));">
+			<span><?php esc_html_e( 'تصویر متخصص', 'beauclick' ); ?></span>
+		</div>
+	</a>
 	<div class="bc-provider-card__body">
 		<div class="bc-provider-card__name-row">
-			<strong><?php echo esc_html( $provider['name'] ); ?></strong>
+			<a href="<?php echo esc_url( bc_provider_permalink( $provider ) ); ?>" style="color:inherit;">
+				<strong><?php echo esc_html( $provider['name'] ); ?></strong>
+			</a>
 			<?php if ( ! empty( $provider['verified'] ) ) : ?>
 				<span class="bc-badge bc-badge--verified">✓</span>
 			<?php endif; ?>
@@ -47,7 +51,7 @@ $location  = trim( implode( '، ', array_filter( [ $city_name, $district_name ] 
 					<span class="bc-price__unit"><?php esc_html_e( 'تومان', 'beauclick' ); ?></span>
 				</span>
 			<?php endif; ?>
-			<a href="<?php echo esc_url( bc_provider_permalink( $provider ) ); ?>" class="bc-btn bc-btn--outline"><?php esc_html_e( 'رزرو نوبت', 'beauclick' ); ?></a>
+			<button type="button" class="bc-btn bc-btn--outline" data-bc-book-trigger data-provider-id="<?php echo esc_attr( $provider['provider_id'] ); ?>"><?php esc_html_e( 'رزرو نوبت', 'beauclick' ); ?></button>
 		</div>
 	</div>
 </div>

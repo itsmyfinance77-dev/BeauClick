@@ -10,6 +10,7 @@
     "prebuild": "npm run tokens",
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "postbuild": "node scripts/deploy-to-theme.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",

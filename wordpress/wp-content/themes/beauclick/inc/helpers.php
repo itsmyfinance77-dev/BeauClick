@@ -41,7 +41,18 @@ function bc_get_launched_cities(): array {
 	return $rows ?: [];
 }
 
-function bc_get_city_name( ?int $city_id ): string {
+/**
+ * Accepts int|string|null rather than a strict ?int on purpose: every
+ * caller ultimately sources this from a $wpdb ARRAY_A row, and $wpdb
+ * always returns numeric columns as strings — with strict_types=1 active
+ * (every template in this theme has it), a bare `?int` parameter throws a
+ * TypeError the moment a caller forgets an explicit (int) cast, which is
+ * exactly what happened on the professional profile page. Casting once
+ * here instead of trusting every call site to remember is the fix that
+ * can't regress the same way again.
+ */
+function bc_get_city_name( int|string|null $city_id ): string {
+	$city_id = $city_id ? (int) $city_id : null;
 	if ( ! $city_id ) {
 		return '';
 	}
@@ -55,7 +66,8 @@ function bc_get_city_name( ?int $city_id ): string {
 	return $name;
 }
 
-function bc_get_district_name( ?int $district_id ): string {
+function bc_get_district_name( int|string|null $district_id ): string {
+	$district_id = $district_id ? (int) $district_id : null;
 	if ( ! $district_id ) {
 		return '';
 	}
@@ -92,6 +104,31 @@ function bc_get_specialties(): array {
 	return is_wp_error( $terms ) ? [] : $terms;
 }
 
+/** @return array<string,mixed>|null */
+function bc_get_provider_index_row( int $provider_id ): ?array {
+	global $wpdb;
+	$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}bc_provider_index WHERE provider_id = %d", $provider_id ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+	return $row ?: null;
+}
+
+/** @return list<\WP_Post> */
+function bc_get_provider_services( int $provider_id ): array {
+	return get_posts(
+		[
+			'post_type'      => 'bc_service',
+			'post_parent'    => $provider_id,
+			'post_status'    => 'publish',
+			'posts_per_page' => -1,
+			'orderby'        => 'menu_order',
+			'order'          => 'ASC',
+		]
+	);
+}
+
 function bc_provider_permalink( array $provider_row ): string {
-	return home_url( '/professional/' . (int) $provider_row['provider_id'] . '/' );
+	// get_permalink(), not a hand-built /professional/{id}/ path — WordPress
+	// already knows the right URL shape for the current permalink settings
+	// (pretty or plain), including this dev environment's plain permalinks
+	// where a hand-built pretty path 404s with no rewrite rules active.
+	return get_permalink( (int) $provider_row['provider_id'] ) ?: home_url( '/' );
 }

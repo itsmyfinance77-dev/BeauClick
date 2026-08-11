@@ -30,11 +30,20 @@ abstract class RestController {
 		register_rest_route( self::NAMESPACE, $path, $args );
 	}
 
-	protected function require_login(): bool|WP_Error {
+	/**
+	 * Public, not protected: these three are meant to be passed directly as
+	 * `permission_callback => [ $this, 'require_login' ]` etc., and WP's REST
+	 * dispatcher invokes permission_callback via call_user_func() from
+	 * outside the class — a protected method there is a fatal TypeError,
+	 * not a permission denial. Caught by booking's list_own route actually
+	 * being hit over real HTTP, not by the isolated unit tests, which never
+	 * go through the REST dispatcher's call_user_func().
+	 */
+	public function require_login(): bool|WP_Error {
 		return is_user_logged_in() ? true : new WP_Error( 'bc_unauthorized', __( 'Login required.', 'beauclick-core' ), [ 'status' => 401 ] );
 	}
 
-	protected function require_capability( string $capability ): bool|WP_Error {
+	public function require_capability( string $capability ): bool|WP_Error {
 		return current_user_can( $capability )
 			? true
 			: new WP_Error( 'bc_forbidden', __( 'You do not have permission to do this.', 'beauclick-core' ), [ 'status' => 403 ] );
@@ -48,7 +57,7 @@ abstract class RestController {
 	 * professional editing another professional's booking is rejected even
 	 * though both share the bc_manage_own_services capability.
 	 */
-	protected function require_owner_or_capability( int $owner_user_id, string $override_capability ): bool|WP_Error {
+	public function require_owner_or_capability( int $owner_user_id, string $override_capability ): bool|WP_Error {
 		$user_id = get_current_user_id();
 		if ( $user_id && $user_id === $owner_user_id ) {
 			return true;

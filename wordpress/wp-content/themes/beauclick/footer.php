@@ -13,6 +13,14 @@ declare( strict_types=1 );
 	</div>
 </footer>
 
+<?php
+// Global overlay mount points, present on every page per the design
+// handoff (booking modal, cart drawer, AI panel, chat all overlay the
+// current page rather than living on a route of their own).
+bc_enqueue_app_bundle( 'booking' );
+?>
+<div id="bc-booking-root"></div>
+
 <?php wp_footer(); ?>
 </body>
 </html>

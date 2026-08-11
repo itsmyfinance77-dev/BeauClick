@@ -1,0 +1,14 @@
+{
+    "name": "beauclick/booking",
+    "description": "BeauClick booking — availability slots, atomic slot-locking, booking lifecycle.",
+    "type": "wordpress-plugin",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "BeauClick\\Booking\\": "src/"
+        }
+    }
+}
