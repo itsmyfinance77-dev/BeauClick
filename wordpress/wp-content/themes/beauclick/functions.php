@@ -18,6 +18,7 @@ define( 'BEAUCLICK_THEME_URI', get_template_directory_uri() );
 require_once BEAUCLICK_THEME_DIR . '/inc/helpers.php';
 require_once BEAUCLICK_THEME_DIR . '/inc/app-shell.php';
 require_once BEAUCLICK_THEME_DIR . '/inc/seo.php';
+require_once BEAUCLICK_THEME_DIR . '/inc/performance.php';
 
 add_action(
 	'after_setup_theme',

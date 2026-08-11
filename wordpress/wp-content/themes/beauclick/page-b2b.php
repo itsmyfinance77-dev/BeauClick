@@ -129,14 +129,28 @@ $is_approved = $account && 'approved' === $account['approval_status'];
 					$tiers = $engine->get_tiers( $product->get_id() );
 					$moq   = $engine->moq( $product->get_id() );
 					$best  = end( $tiers );
+					// The card has exactly one action ("افزودن به سفارش عمده"),
+					// which adds $moq units — so the headline price must be
+					// what that click actually charges (price_for_quantity at
+					// $moq), not the best/highest-tier price. Showing the
+					// 100+-unit price next to a button that adds the MOQ was a
+					// real bug caught by live verification: the price shown
+					// and the price charged for the only available action
+					// could differ by the full tier spread (e.g. 30%).
+					$moq_price = $engine->price_for_quantity( $product->get_id(), $moq ) ?? $best['price'];
 					?>
 					<div class="bc-card" style="padding:16px;">
 						<strong><?php echo esc_html( $product->get_name() ); ?></strong>
 						<p class="bc-provider-card__meta"><?php echo esc_html( sprintf( __( 'حداقل سفارش: %s عدد', 'beauclick' ), bc_persian_digits( $moq ) ) ); ?></p>
 						<div style="display:flex; align-items:baseline; gap:8px; margin:8px 0;">
-							<span class="bc-price__old bc-numeric"><?php echo esc_html( bc_format_toman( (int) $product->get_regular_price() ) ); ?></span>
-							<strong class="bc-numeric" style="color:var(--bc-color-primary);"><?php echo esc_html( bc_format_toman( $best['price'] ) ); ?> <?php esc_html_e( 'تومان', 'beauclick' ); ?></strong>
+							<?php if ( $moq_price < (int) $product->get_regular_price() ) : ?>
+								<span class="bc-price__old bc-numeric"><?php echo esc_html( bc_format_toman( (int) $product->get_regular_price() ) ); ?></span>
+							<?php endif; ?>
+							<strong class="bc-numeric" style="color:var(--bc-color-primary);"><?php echo esc_html( bc_format_toman( $moq_price ) ); ?> <?php esc_html_e( 'تومان', 'beauclick' ); ?></strong>
 						</div>
+						<?php if ( $best['price'] < $moq_price ) : ?>
+							<p class="bc-provider-card__meta"><?php echo esc_html( sprintf( __( 'در سفارش‌های %1$s+ عدد: %2$s تومان', 'beauclick' ), bc_persian_digits( $best['min_qty'] ), bc_format_toman( $best['price'] ) ) ); ?></p>
+						<?php endif; ?>
 						<button type="button" class="bc-btn bc-btn--primary" style="width:100%;" data-bc-add-to-cart data-product-id="<?php echo esc_attr( $product->get_id() ); ?>" data-quantity="<?php echo esc_attr( $moq ); ?>">
 							<?php esc_html_e( 'افزودن به سفارش عمده', 'beauclick' ); ?>
 						</button>
