@@ -1,0 +1,14 @@
+{
+    "name": "beauclick/marketplace",
+    "description": "BeauClick marketplace — professional/business profiles, services, portfolio, specialty taxonomy, and the search-index table behind marketplace discovery.",
+    "type": "wordpress-plugin",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "BeauClick\\Marketplace\\": "src/"
+        }
+    }
+}

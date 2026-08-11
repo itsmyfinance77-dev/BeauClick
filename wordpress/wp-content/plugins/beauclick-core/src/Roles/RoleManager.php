@@ -32,6 +32,34 @@ final class RoleManager {
 		return [ 'bc_book_service', 'bc_write_review', 'bc_use_ai_assistant', 'bc_send_message' ];
 	}
 
+	/**
+	 * The standard WordPress meta-cap set for "can manage their own posts of
+	 * this custom post type, cannot touch anyone else's" — this is what lets
+	 * map_meta_cap (set on the CPT registration) do ownership checks for
+	 * free in wp-admin. The REST API layer does NOT rely on this — it does
+	 * its own explicit ownership checks (RestController::require_owner_or_capability)
+	 * — this set exists so wp-admin (used by support/moderator/admin) still
+	 * behaves correctly for these post types.
+	 *
+	 * @return string[]
+	 */
+	public static function cpt_owner_capabilities( string $singular, string $plural ): array {
+		return [
+			"edit_{$plural}",
+			"edit_{$singular}",
+			"edit_published_{$plural}",
+			"publish_{$plural}",
+			"delete_{$plural}",
+			"delete_{$singular}",
+			"delete_published_{$plural}",
+		];
+	}
+
+	/** Additional caps needed to manage OTHER users' posts of a CPT (admin/moderator only). @return string[] */
+	public static function cpt_admin_capabilities( string $plural ): array {
+		return [ "edit_others_{$plural}", "delete_others_{$plural}", "read_private_{$plural}" ];
+	}
+
 	/** @return string[] */
 	public static function professional_capabilities(): array {
 		return array_merge(
@@ -42,7 +70,10 @@ final class RoleManager {
 				'bc_manage_own_availability',
 				'bc_view_own_bookings',
 				'bc_respond_to_reviews',
-			]
+			],
+			self::cpt_owner_capabilities( 'bc_professional', 'bc_professionals' ),
+			self::cpt_owner_capabilities( 'bc_service', 'bc_services' ),
+			self::cpt_owner_capabilities( 'bc_portfolio_item', 'bc_portfolio_items' )
 		);
 	}
 
@@ -54,7 +85,8 @@ final class RoleManager {
 				'bc_manage_business_staff',
 				'bc_request_quote',
 				'bc_place_bulk_order',
-			]
+			],
+			self::cpt_owner_capabilities( 'bc_business_listing', 'bc_business_listings' )
 		);
 	}
 
@@ -75,6 +107,10 @@ final class RoleManager {
 				self::business_capabilities(),
 				self::support_capabilities(),
 				self::moderator_capabilities(),
+				self::cpt_admin_capabilities( 'bc_professionals' ),
+				self::cpt_admin_capabilities( 'bc_business_listings' ),
+				self::cpt_admin_capabilities( 'bc_services' ),
+				self::cpt_admin_capabilities( 'bc_portfolio_items' ),
 				[ 'bc_manage_platform' ]
 			)
 		);

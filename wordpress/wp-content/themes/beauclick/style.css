@@ -1,0 +1,12 @@
+/*
+Theme Name: BeauClick
+Theme URI: https://beauclick.ir
+Author: BeauClick
+Description: Custom BeauClick theme — server-renders SEO-critical pages (Home, Marketplace, Professional Profile, Shop, Product, B2B) using the approved design system and mounts the React app-shell for interactive surfaces. WooCommerce is used only as the commerce engine; its default templates are fully overridden.
+Version: 0.1.0
+Requires PHP: 8.2
+Text Domain: beauclick
+*/
+
+/* Actual styles are enqueued from assets/css/ — see functions.php.
+   This file exists because WordPress requires it to recognize the theme. */

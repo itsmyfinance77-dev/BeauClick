@@ -1,0 +1,428 @@
+/* BeauClick theme components — ported 1:1 from app/src/design-system/primitives/*.css
+   (plain CSS, no build step needed here) + base.css. Keep both in sync by hand until
+   a shared-package build step is worth the complexity — see README note. */
+
+/* BeauClick base styles: reset + typography + RTL foundation.
+   Loaded once by the app-shell entry and by the theme's own stylesheet
+   (theme copies the @font-face + reset block — see docs/design/DESIGN_HANDOFF.md
+   typography section for the source values). */
+
+@font-face {
+	font-family: 'Vazirmatn';
+	/* Self-hosted variable font — do not hotlink a font CDN in production:
+	   external CDNs are a real reliability risk for an Iran-hosted site.
+	   Place the official Vazirmatn variable woff2 (github.com/rastikerdar/vazirmatn)
+	   at this path in both the theme (wp-content/themes/beauclick/assets/fonts/)
+	   and here for the standalone dev preview. */
+	src: url('/fonts/Vazirmatn[wght].woff2') format('woff2-variations'),
+		url('/fonts/Vazirmatn[wght].woff2') format('woff2');
+	font-weight: 100 900;
+	font-display: swap;
+}
+
+*, *::before, *::after {
+	box-sizing: border-box;
+}
+
+html {
+	direction: rtl;
+}
+
+html, body {
+	margin: 0;
+	padding: 0;
+}
+
+body {
+	background: var(--bc-color-background);
+	color: var(--bc-color-ink);
+	font-family: var(--bc-font-family);
+	font-size: 15px;
+	line-height: 1.85;
+	-webkit-font-smoothing: antialiased;
+	text-rendering: optimizeLegibility;
+}
+
+/* Persian digits everywhere numeric per the token spec — see lib/format.ts
+   for the runtime formatter; this only sets the numeric rendering mode. */
+.bc-numeric {
+	font-variant-numeric: tabular-nums;
+}
+
+img, svg {
+	max-width: 100%;
+	display: block;
+}
+
+button, input, textarea, select {
+	font-family: inherit;
+	font-size: inherit;
+	color: inherit;
+}
+
+a {
+	color: inherit;
+	text-decoration: none;
+}
+
+:focus-visible {
+	outline: 2px solid var(--bc-color-primary);
+	outline-offset: 2px;
+}
+
+/* Shared "container" used by every server-rendered page and app-shell surface,
+   matching the token spec's content max-width + responsive horizontal padding. */
+.bc-container {
+	max-width: var(--bc-content-max-width, 1280px);
+	margin-inline: auto;
+	padding-inline: var(--bc-space-section-padding-mobile, 24px);
+}
+
+@media (min-width: 900px) {
+	.bc-container {
+		padding-inline: var(--bc-space-section-padding-desktop, 40px);
+	}
+}
+
+.bc-visually-hidden {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+.bc-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	border: none;
+	border-radius: var(--bc-radius-button, 12px);
+	font-weight: 700;
+	font-size: 14px;
+	padding-block: 12px;
+	padding-inline: 20px;
+	cursor: pointer;
+	transition: background-color 160ms ease, color 160ms ease, transform 120ms ease;
+}
+
+.bc-btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.bc-btn--primary {
+	background: var(--bc-color-primary);
+	color: white;
+}
+.bc-btn--primary:hover:not(:disabled) {
+	background: var(--bc-color-primary-hover);
+}
+
+.bc-btn--outline {
+	background: transparent;
+	color: var(--bc-color-primary);
+	border: 1.5px solid var(--bc-color-line);
+}
+.bc-btn--outline:hover:not(:disabled) {
+	background: var(--bc-color-primary-soft);
+	border-color: var(--bc-color-primary);
+}
+
+.bc-btn--light {
+	background: rgba(255, 255, 255, 0.12);
+	color: white;
+	border: 1.5px solid rgba(255, 255, 255, 0.35);
+}
+.bc-btn--light:hover:not(:disabled) {
+	background: rgba(255, 255, 255, 0.2);
+}
+
+.bc-btn--ghost {
+	background: transparent;
+	color: var(--bc-color-ink-soft);
+	padding-inline: 8px;
+}
+.bc-btn--ghost:hover:not(:disabled) {
+	color: var(--bc-color-ink);
+}
+
+.bc-card {
+	background: var(--bc-color-surface);
+	border: 1px solid var(--bc-color-line);
+	border-radius: var(--bc-radius-card, 18px);
+	overflow: hidden;
+	transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.bc-card--hoverable:hover {
+	transform: translateY(-3px);
+	box-shadow: var(--bc-shadow-card-hover);
+}
+
+.bc-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	border-radius: var(--bc-radius-pill, 999px);
+	border: 1.5px solid var(--bc-color-line);
+	background: var(--bc-color-surface);
+	color: var(--bc-color-ink-soft);
+	padding-block: 8px;
+	padding-inline: 16px;
+	font-size: 13px;
+	font-weight: 600;
+	cursor: pointer;
+	white-space: nowrap;
+	transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.bc-chip--primary.bc-chip--active {
+	background: var(--bc-color-primary-soft);
+	border-color: var(--bc-color-primary);
+	color: var(--bc-color-primary);
+}
+
+.bc-chip--accent.bc-chip--active {
+	background: var(--bc-color-accent-soft);
+	border-color: var(--bc-color-accent);
+	color: var(--bc-color-accent);
+}
+
+.bc-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	border-radius: var(--bc-radius-pill, 999px);
+	font-size: 11px;
+	font-weight: 700;
+	padding-block: 4px;
+	padding-inline: 10px;
+}
+
+.bc-badge--verified {
+	background: var(--bc-color-primary-soft);
+	color: var(--bc-color-primary);
+}
+
+.bc-badge--discount {
+	background: var(--bc-color-accent);
+	color: white;
+}
+
+.bc-badge--recommended {
+	background: var(--bc-color-primary);
+	color: white;
+}
+
+.bc-badge--success {
+	background: var(--bc-color-success-soft);
+	color: var(--bc-color-success);
+}
+
+.bc-badge--warning {
+	background: var(--bc-color-warning-soft);
+	color: var(--bc-color-warning);
+}
+
+.bc-badge--error {
+	background: var(--bc-color-error-soft);
+	color: var(--bc-color-error);
+}
+
+.bc-input {
+	width: 100%;
+	border: 1.5px solid var(--bc-color-line);
+	border-radius: var(--bc-radius-row, 14px);
+	background: var(--bc-color-surface);
+	padding-block: 12px;
+	padding-inline: 16px;
+	transition: box-shadow 140ms ease, border-color 140ms ease;
+}
+
+.bc-input::placeholder {
+	color: var(--bc-color-ink-faint);
+}
+
+.bc-input:focus-visible {
+	outline: none;
+	border-color: var(--bc-color-primary);
+	box-shadow: 0 0 0 2px var(--bc-color-primary-soft);
+}
+
+.bc-input--bare {
+	border: none;
+	box-shadow: var(--bc-shadow-floating-min);
+}
+
+.bc-input--bare:focus-visible {
+	box-shadow: var(--bc-shadow-floating-min), 0 0 0 2px var(--bc-color-primary-soft);
+}
+
+.bc-modal-backdrop {
+	position: fixed;
+	inset: 0;
+	background: oklch(0.2 0.02 290 / 0.55);
+	backdrop-filter: blur(3px);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 1000;
+}
+
+.bc-modal {
+	background: var(--bc-color-surface);
+	box-shadow: var(--bc-shadow-floating-max);
+	max-height: 90vh;
+	overflow-y: auto;
+}
+
+.bc-modal--centered {
+	width: 520px;
+	max-width: calc(100vw - 32px);
+	border-radius: var(--bc-radius-hero, 28px);
+}
+
+.bc-modal--drawer-end {
+	position: fixed;
+	inset-block: 0;
+	inset-inline-end: 0;
+	width: 420px;
+	max-width: 100vw;
+	max-height: 100vh;
+	border-radius: 0;
+}
+
+@media (max-width: 899px) {
+	.bc-modal--centered,
+	.bc-modal--drawer-end {
+		position: fixed;
+		inset: 0;
+		width: 100vw;
+		max-width: 100vw;
+		max-height: 100vh;
+		border-radius: 0;
+	}
+}
+
+.bc-placeholder-image {
+	display: flex;
+	align-items: flex-end;
+	justify-content: flex-start;
+	padding: 10px;
+	width: 100%;
+}
+
+.bc-placeholder-image span {
+	font-family: ui-monospace, 'Vazirmatn', monospace;
+	font-size: 11px;
+	color: oklch(0.3 0.03 290 / 0.55);
+	background: oklch(1 0 0 / 0.5);
+	padding: 3px 8px;
+	border-radius: 999px;
+}
+
+.bc-rating {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.bc-rating__star {
+	color: var(--bc-color-warning);
+}
+
+.bc-rating__count {
+	color: var(--bc-color-ink-faint);
+	font-weight: 400;
+}
+
+.bc-price {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 6px;
+	flex-wrap: wrap;
+}
+
+.bc-price__prefix {
+	font-size: 12px;
+	color: var(--bc-color-ink-faint);
+}
+
+.bc-price__amount {
+	font-size: 16px;
+	font-weight: 800;
+	color: var(--bc-color-ink);
+}
+
+.bc-price__unit {
+	font-size: 12px;
+	color: var(--bc-color-ink-faint);
+}
+
+.bc-price__old {
+	font-size: 12px;
+	color: var(--bc-color-ink-faint);
+	text-decoration: line-through;
+}
+
+.bc-empty-state {
+	text-align: center;
+	color: var(--bc-color-ink-faint);
+	border: 1.5px dashed var(--bc-color-line);
+	border-radius: var(--bc-radius-card, 18px);
+	padding: 48px 24px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 16px;
+}
+
+.bc-empty-state__title {
+	font-size: 14px;
+	margin: 0;
+}
+
+.bc-loading-dots {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 10px 14px;
+	background: var(--bc-color-surface-tint);
+	border-radius: var(--bc-radius-pill, 999px);
+	width: fit-content;
+}
+
+.bc-loading-dots span {
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: var(--bc-color-primary);
+	animation: bc-dot-pulse 1.1s infinite ease-in-out;
+}
+
+.bc-loading-dots span:nth-child(2) {
+	animation-delay: 0.15s;
+}
+.bc-loading-dots span:nth-child(3) {
+	animation-delay: 0.3s;
+}
+
+@keyframes bc-dot-pulse {
+	0%, 60%, 100% {
+		opacity: 0.3;
+		transform: scale(0.85);
+	}
+	30% {
+		opacity: 1;
+		transform: scale(1);
+	}
+}
+
