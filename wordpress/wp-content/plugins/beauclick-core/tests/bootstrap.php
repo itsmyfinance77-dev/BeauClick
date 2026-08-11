@@ -51,6 +51,8 @@ function _beauclick_manually_load_plugins(): void {
 		\BeauClick\B2B\Plugin::class,
 		\BeauClick\Chat\Plugin::class,
 		\BeauClick\AI\Plugin::class,
+		\BeauClick\Reviews\Plugin::class,
+		\BeauClick\Loyalty\Plugin::class,
 	];
 
 	foreach ( $activation_order as $plugin_class ) {

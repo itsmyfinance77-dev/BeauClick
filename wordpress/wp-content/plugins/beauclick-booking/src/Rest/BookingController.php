@@ -6,6 +6,7 @@ namespace BeauClick\Booking\Rest;
 use BeauClick\Booking\Booking\BookingService;
 use BeauClick\Core\Rest\RestController;
 use BeauClick\Core\Rest\Response;
+use BeauClick\Marketplace\Support\ProviderLookup;
 use WP_REST_Request;
 
 final class BookingController extends RestController {
@@ -74,12 +75,23 @@ final class BookingController extends RestController {
 		return $this->require_capability( 'bc_book_service' );
 	}
 
+	/**
+	 * `bc_bookings.provider_id` is the professional's CPT post id, not their
+	 * WP user id (see ProviderLookup) — require_owner_or_capability() can't
+	 * be used directly here the way it is elsewhere, since it compares
+	 * against get_current_user_id(), not against the current user's own
+	 * provider post id.
+	 */
 	public function can_confirm( WP_REST_Request $request ): bool|\WP_Error {
 		$booking = ( new BookingService() )->find( (int) $request->get_param( 'id' ) );
 		if ( ! $booking ) {
 			return true; // Let the handler 404 — permission isn't the interesting failure here.
 		}
-		return $this->require_owner_or_capability( (int) $booking['provider_id'], 'bc_manage_platform' );
+		$my_provider_id = ProviderLookup::for_user( get_current_user_id() );
+		if ( $my_provider_id && $my_provider_id === (int) $booking['provider_id'] ) {
+			return true;
+		}
+		return $this->require_capability( 'bc_manage_platform' );
 	}
 
 	public function availability( WP_REST_Request $request ) {
@@ -150,16 +162,24 @@ final class BookingController extends RestController {
 
 	public function list_own( WP_REST_Request $request ) {
 		global $wpdb;
-		$user_id = get_current_user_id();
+		$user_id     = get_current_user_id();
+		$provider_id = ProviderLookup::for_user( $user_id );
 
-		$rows = $wpdb->get_results(
-			$wpdb->prepare(
-				"SELECT * FROM {$wpdb->prefix}bc_bookings WHERE customer_id = %d OR provider_id = %d ORDER BY slot_start DESC", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-				$user_id,
-				$user_id
-			),
-			ARRAY_A
-		);
+		if ( $provider_id ) {
+			$rows = $wpdb->get_results(
+				$wpdb->prepare(
+					"SELECT * FROM {$wpdb->prefix}bc_bookings WHERE customer_id = %d OR provider_id = %d ORDER BY slot_start DESC", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+					$user_id,
+					$provider_id
+				),
+				ARRAY_A
+			);
+		} else {
+			$rows = $wpdb->get_results(
+				$wpdb->prepare( "SELECT * FROM {$wpdb->prefix}bc_bookings WHERE customer_id = %d ORDER BY slot_start DESC", $user_id ), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				ARRAY_A
+			);
+		}
 
 		return Response::ok( array_map( [ $this, 'format_booking' ], $rows ?: [] ) );
 	}
@@ -172,8 +192,11 @@ final class BookingController extends RestController {
 			return Response::error( 'bc_not_found', __( 'رزرو پیدا نشد.', 'beauclick-booking' ), 404 );
 		}
 
-		$user_id = get_current_user_id();
-		if ( (int) $booking['customer_id'] !== $user_id && (int) $booking['provider_id'] !== $user_id && ! current_user_can( 'bc_manage_platform' ) ) {
+		$user_id        = get_current_user_id();
+		$my_provider_id = ProviderLookup::for_user( $user_id );
+		$is_provider    = $my_provider_id && $my_provider_id === (int) $booking['provider_id'];
+
+		if ( (int) $booking['customer_id'] !== $user_id && ! $is_provider && ! current_user_can( 'bc_manage_platform' ) ) {
 			return Response::error( 'bc_forbidden', __( 'شما اجازه لغو این رزرو را ندارید.', 'beauclick-booking' ), 403 );
 		}
 

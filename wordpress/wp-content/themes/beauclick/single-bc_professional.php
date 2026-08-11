@@ -1,9 +1,8 @@
 <?php
 /**
  * Professional Profile — a personal-brand page, not a plain listing (design
- * handoff §3). Portfolio/reviews tabs render honest empty states for now —
- * beauclick-reviews doesn't exist yet (Phase 11) and portfolio-item upload
- * UI doesn't either — rather than faking content.
+ * handoff §3). Portfolio tab still renders an honest empty state (no
+ * portfolio-item upload UI yet); reviews are real as of Phase 11.
  *
  * @package BeauClick\Theme
  */
@@ -22,6 +21,14 @@ $district_name = bc_get_district_name( ! empty( $index_row['district_id'] ) ? (i
 $location    = trim( implode( '، ', array_filter( [ $city_name, $district_name ] ) ) );
 $verified    = 'verified' === get_post_meta( $provider_id, '_bc_verification_status', true );
 $owner_id    = (int) get_post_field( 'post_author', $provider_id );
+
+if ( function_exists( 'beauclick_core' ) ) {
+	beauclick_core()->events()->log( 'profile_view', 'provider', $provider_id, get_current_user_id() ?: null );
+}
+
+$reviews = class_exists( \BeauClick\Reviews\Reviews\ReviewService::class )
+	? ( new \BeauClick\Reviews\Reviews\ReviewService() )->for_provider( $provider_id )
+	: [];
 ?>
 
 <div class="bc-placeholder-image" style="aspect-ratio:16/5;background:linear-gradient(135deg, oklch(0.3 0.06 290), oklch(0.55 0.1 330));"></div>
@@ -101,7 +108,29 @@ $owner_id    = (int) get_post_field( 'post_author', $provider_id );
 
 	<div class="bc-section">
 		<h2 class="bc-section__title"><?php esc_html_e( 'نظرات', 'beauclick' ); ?></h2>
-		<div class="bc-empty-state"><p class="bc-empty-state__title"><?php esc_html_e( 'هنوز نظری ثبت نشده است.', 'beauclick' ); ?></p></div>
+		<?php if ( $reviews ) : ?>
+			<div style="display:flex; flex-direction:column; gap:12px;">
+				<?php foreach ( $reviews as $review ) : ?>
+					<div class="bc-card" style="padding:16px;">
+						<div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+							<strong><?php echo esc_html( $review['authorName'] ); ?></strong>
+							<span class="bc-rating bc-numeric"><span class="bc-rating__star" aria-hidden="true">★</span> <?php echo esc_html( bc_persian_digits( $review['rating'] ) ); ?></span>
+						</div>
+						<?php if ( $review['body'] ) : ?>
+							<p style="margin:8px 0 0; color:var(--bc-color-ink-soft);"><?php echo esc_html( $review['body'] ); ?></p>
+						<?php endif; ?>
+						<?php if ( $review['response'] ) : ?>
+							<div style="margin-top:12px; padding:12px; background:var(--bc-color-surface-tint); border-radius:12px;">
+								<strong style="font-size:13px;"><?php esc_html_e( 'پاسخ متخصص', 'beauclick' ); ?></strong>
+								<p style="margin:4px 0 0; font-size:13px; color:var(--bc-color-ink-soft);"><?php echo esc_html( $review['response'] ); ?></p>
+							</div>
+						<?php endif; ?>
+					</div>
+				<?php endforeach; ?>
+			</div>
+		<?php else : ?>
+			<div class="bc-empty-state"><p class="bc-empty-state__title"><?php esc_html_e( 'هنوز نظری ثبت نشده است.', 'beauclick' ); ?></p></div>
+		<?php endif; ?>
 	</div>
 </div>
 

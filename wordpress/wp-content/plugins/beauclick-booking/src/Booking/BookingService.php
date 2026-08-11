@@ -163,6 +163,15 @@ final class BookingService {
 				[ 'status' => 'booked', 'held_until' => null ],
 				[ 'id' => $booking['slot_id'] ]
 			);
+
+			// One of the ranking signals the business plan names explicitly
+			// (architecture doc §8's wp_bc_events comment) — how fast a
+			// provider confirms a pending booking. Logged against the
+			// provider so the future scoring algorithm can read it directly.
+			if ( function_exists( 'beauclick_core' ) ) {
+				$elapsed = max( 0, strtotime( current_time( 'mysql' ) ) - strtotime( $booking['created_at'] ) );
+				beauclick_core()->events()->log( 'response_time_seconds', 'provider', (int) $booking['provider_id'], null, [ 'seconds' => $elapsed, 'booking_id' => $booking_id ] );
+			}
 		}
 
 		return true;

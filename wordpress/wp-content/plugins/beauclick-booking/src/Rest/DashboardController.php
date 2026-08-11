@@ -5,6 +5,7 @@ namespace BeauClick\Booking\Rest;
 
 use BeauClick\Core\Rest\RestController;
 use BeauClick\Core\Rest\Response;
+use BeauClick\Marketplace\Support\ProviderLookup;
 use WP_REST_Request;
 
 /**
@@ -22,8 +23,26 @@ final class DashboardController extends RestController {
 
 	public function stats( WP_REST_Request $request ): \WP_REST_Response {
 		global $wpdb;
-		$provider_id = get_current_user_id();
-		$bookings    = $wpdb->prefix . 'bc_bookings';
+		// bc_bookings.provider_id is the owning CPT post id, not the WP user
+		// id — see ProviderLookup. A logged-in professional with no profile
+		// post yet (just registered) legitimately has all-zero stats rather
+		// than an error.
+		$provider_id = ProviderLookup::for_user( get_current_user_id() );
+		if ( ! $provider_id ) {
+			return Response::ok(
+				[
+					'todaysBookings' => 0,
+					'monthRevenue'   => 0,
+					'newClients'     => 0,
+					'rating'         => 0.0,
+					'reviewCount'    => 0,
+					'weeklyBookings' => [],
+					'todayUpcoming'  => [],
+					'recentBookings' => [],
+				]
+			);
+		}
+		$bookings = $wpdb->prefix . 'bc_bookings';
 
 		$today_start = current_time( 'Y-m-d' ) . ' 00:00:00';
 		$today_end   = current_time( 'Y-m-d' ) . ' 23:59:59';

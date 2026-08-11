@@ -7,6 +7,7 @@ use BeauClick\Core\Rest\RestController;
 use BeauClick\Core\Rest\Response;
 use BeauClick\Marketplace\PostTypes\Registrar;
 use BeauClick\Marketplace\Search\Indexer;
+use BeauClick\Marketplace\Support\ProviderLookup;
 use WP_REST_Request;
 
 /**
@@ -64,16 +65,8 @@ final class MyProfileController extends RestController {
 	}
 
 	private function my_provider_post(): ?\WP_Post {
-		$user_id = get_current_user_id();
-		$posts   = get_posts(
-			[
-				'post_type'      => [ Registrar::PROFESSIONAL, Registrar::BUSINESS ],
-				'author'         => $user_id,
-				'post_status'    => 'any',
-				'posts_per_page' => 1,
-			]
-		);
-		return $posts[0] ?? null;
+		$provider_id = ProviderLookup::for_user( get_current_user_id() );
+		return $provider_id ? get_post( $provider_id ) : null;
 	}
 
 	public function can_edit_service( WP_REST_Request $request ): bool|\WP_Error {

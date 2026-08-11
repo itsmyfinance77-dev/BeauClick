@@ -1,0 +1,14 @@
+{
+    "name": "beauclick/reviews",
+    "description": "BeauClick reviews — booking-verified provider reviews, moderation status, professional responses.",
+    "type": "wordpress-plugin",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "BeauClick\\Reviews\\": "src/"
+        }
+    }
+}

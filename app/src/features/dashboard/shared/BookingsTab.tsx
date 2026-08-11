@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { formatShortDate, formatTime } from '@/lib/format';
 import { Button, LoadingDots, EmptyState } from '@/design-system';
+import { ReviewForm } from '@/features/reviews/ReviewForm';
 
 interface FullBooking {
 	id: number;
@@ -25,6 +26,9 @@ export function BookingsTab() {
 	const [ bookings, setBookings ] = useState<FullBooking[] | null>( null );
 	const [ error, setError ] = useState<string | null>( null );
 	const [ busyId, setBusyId ] = useState<number | null>( null );
+	const [ reviewingId, setReviewingId ] = useState<number | null>( null );
+	const [ reviewedIds, setReviewedIds ] = useState<Set<number>>( new Set() );
+	const currentUserId = window.BeauClick?.currentUserId ?? 0;
 
 	function load() {
 		api.get<FullBooking[]>( '/booking/bookings' ).then( setBookings ).catch( () => setError( 'خطا در دریافت رزروها.' ) );
@@ -53,17 +57,35 @@ export function BookingsTab() {
 			<h1 style={ { fontSize: 22, marginTop: 0 } }>رزروها</h1>
 			<div style={ { display: 'flex', flexDirection: 'column', gap: 10 } }>
 				{ bookings.map( ( b ) => (
-					<div key={ b.id } className="bc-card" style={ { padding: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 } }>
-						<div>
-							<strong className="bc-numeric">
-								{ formatShortDate( new Date( b.slotStart.replace( ' ', 'T' ) ) ).weekday }، { formatTime( new Date( b.slotStart.replace( ' ', 'T' ) ) ) }
-							</strong>
-							<p style={ { margin: '4px 0 0', fontSize: 13, color: 'var(--bc-color-ink-faint)' } }>{ STATUS_LABELS[ b.status ] ?? b.status }</p>
+					<div key={ b.id }>
+						<div className="bc-card" style={ { padding: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 } }>
+							<div>
+								<strong className="bc-numeric">
+									{ formatShortDate( new Date( b.slotStart.replace( ' ', 'T' ) ) ).weekday }، { formatTime( new Date( b.slotStart.replace( ' ', 'T' ) ) ) }
+								</strong>
+								<p style={ { margin: '4px 0 0', fontSize: 13, color: 'var(--bc-color-ink-faint)' } }>{ STATUS_LABELS[ b.status ] ?? b.status }</p>
+							</div>
+							{ [ 'pending', 'confirmed' ].includes( b.status ) && (
+								<Button variant="outline" disabled={ busyId === b.id } onClick={ () => act( b.id, 'cancel' ) }>
+									لغو رزرو
+								</Button>
+							) }
+							{ 'completed' === b.status && b.customerId === currentUserId && (
+								reviewedIds.has( b.id )
+									? <span style={ { fontSize: 13, color: 'var(--bc-color-ink-faint)' } }>نظر شما ثبت شد</span>
+									: <Button variant="outline" onClick={ () => setReviewingId( reviewingId === b.id ? null : b.id ) }>
+										{ reviewingId === b.id ? 'انصراف' : 'ثبت نظر' }
+									</Button>
+							) }
 						</div>
-						{ [ 'pending', 'confirmed' ].includes( b.status ) && (
-							<Button variant="outline" disabled={ busyId === b.id } onClick={ () => act( b.id, 'cancel' ) }>
-								لغو رزرو
-							</Button>
+						{ reviewingId === b.id && (
+							<ReviewForm
+								bookingId={ b.id }
+								onSubmitted={ () => {
+									setReviewedIds( ( prev ) => new Set( prev ).add( b.id ) );
+									setReviewingId( null );
+								} }
+							/>
 						) }
 					</div>
 				) ) }

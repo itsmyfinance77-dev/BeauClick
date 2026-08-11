@@ -1,0 +1,14 @@
+{
+    "name": "beauclick/loyalty",
+    "description": "BeauClick loyalty — points ledger table + a real award()/balance() seam. Stub only, per architecture doc: no automatic point-awarding rules or UI yet.",
+    "type": "wordpress-plugin",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "BeauClick\\Loyalty\\": "src/"
+        }
+    }
+}

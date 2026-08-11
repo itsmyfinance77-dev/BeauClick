@@ -32,6 +32,9 @@
         <testsuite name="beauclick-ai">
             <directory>wordpress/wp-content/plugins/beauclick-ai/tests</directory>
         </testsuite>
+        <testsuite name="beauclick-loyalty">
+            <directory>wordpress/wp-content/plugins/beauclick-loyalty/tests</directory>
+        </testsuite>
     </testsuites>
     <coverage>
         <include>
@@ -44,6 +47,7 @@
             <directory suffix=".php">wordpress/wp-content/plugins/beauclick-reviews/src</directory>
             <directory suffix=".php">wordpress/wp-content/plugins/beauclick-chat/src</directory>
             <directory suffix=".php">wordpress/wp-content/plugins/beauclick-ai/src</directory>
+            <directory suffix=".php">wordpress/wp-content/plugins/beauclick-loyalty/src</directory>
         </include>
     </coverage>
 </phpunit>
