@@ -10,10 +10,34 @@
 }
 
 .bc-modal {
+	position: relative;
 	background: var(--bc-color-surface);
 	box-shadow: var(--bc-shadow-floating-max);
 	max-height: 90vh;
 	overflow-y: auto;
+}
+
+.bc-modal__close {
+	position: absolute;
+	inset-block-start: 12px;
+	inset-inline-end: 12px;
+	z-index: 1;
+	width: 32px;
+	height: 32px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border: none;
+	border-radius: 50%;
+	background: var(--bc-color-surface-tint, var(--bc-color-background));
+	color: var(--bc-color-ink-soft);
+	font-size: 20px;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.bc-modal__close:hover {
+	background: var(--bc-color-line);
 }
 
 .bc-modal--centered {

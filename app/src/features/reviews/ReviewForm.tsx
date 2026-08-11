@@ -47,6 +47,7 @@ export function ReviewForm( { bookingId, onSubmitted }: { bookingId: number; onS
 				) ) }
 			</div>
 			<textarea
+				aria-label="متن نظر"
 				value={ body }
 				onChange={ ( e ) => setBody( e.target.value ) }
 				placeholder="تجربه‌تون رو بنویسید (اختیاری)"
@@ -54,7 +55,7 @@ export function ReviewForm( { bookingId, onSubmitted }: { bookingId: number; onS
 				className="bc-input"
 				style={ { resize: 'vertical' } }
 			/>
-			{ error && <p style={ { color: 'var(--bc-color-error)', fontSize: 13, margin: 0 } }>{ error }</p> }
+			{ error && <p role="alert" style={ { color: 'var(--bc-color-error)', fontSize: 13, margin: 0 } }>{ error }</p> }
 			<Button variant="primary" type="submit" disabled={ sending }>{ sending ? 'در حال ثبت…' : 'ثبت نظر' }</Button>
 		</form>
 	);

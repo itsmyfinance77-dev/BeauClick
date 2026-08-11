@@ -128,6 +128,33 @@ final class ReviewService {
 		return array_map( [ $this, 'format' ], $rows ?: [] );
 	}
 
+	/**
+	 * Batch equivalent of for_provider() across several providers at once —
+	 * a production-readiness audit found ReviewsController::my_reviews()
+	 * calling for_provider() once per provider a user owns (N+1 for any
+	 * multi-listing B2B account). One query with target_id IN (...) instead,
+	 * already ordered globally so the caller no longer needs to merge-sort.
+	 *
+	 * @param array<int, int> $provider_ids
+	 * @return array<int, array<string, mixed>>
+	 */
+	public function for_providers( array $provider_ids, bool $only_approved = true ): array {
+		if ( ! $provider_ids ) {
+			return [];
+		}
+		global $wpdb;
+		$placeholders = implode( ',', array_fill( 0, count( $provider_ids ), '%d' ) );
+		$where        = $only_approved ? "AND status = 'approved'" : '';
+		$rows         = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT * FROM {$wpdb->prefix}bc_reviews WHERE target_type = 'provider' AND target_id IN ({$placeholders}) {$where} ORDER BY created_at DESC", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+				$provider_ids
+			),
+			ARRAY_A
+		);
+		return array_map( [ $this, 'format' ], $rows ?: [] );
+	}
+
 	public function find( int $review_id ): ?array {
 		global $wpdb;
 		$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}bc_reviews WHERE id = %d", $review_id ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared

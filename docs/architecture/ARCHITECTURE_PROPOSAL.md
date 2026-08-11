@@ -455,3 +455,24 @@ FUTURE ENHANCEMENT (not a defect, a reasonable next iteration):
 - A CI check that fails the build if `app/src/design-system/*.css` and the theme's `components.css` copy drift out of sync, now that they're confirmed identical — nothing currently enforces that they stay that way.
 - Realtime chat/notifications (explicitly deferred behind the `beauclick/chat/message_sent` action hook seam per architecture doc §15/§17 — polling is correct for launch scale).
 
+### Second pass: performance + accessibility (background-agent audits, fixed same session)
+
+Two more read-only audits (performance, accessibility), fixes applied and tested immediately rather than left as a report.
+
+**Performance — all four were genuine hot-path N+1s or unbounded queries, not premature-optimization territory:**
+- `DashboardController::stats()`'s month-revenue calc called `wc_get_order()` once per paid booking; switched to a single `wc_get_orders(['post__in' => $ids])` bulk fetch (works under both legacy CPT and HPOS order storage).
+- `BookingController::list_own()` had no LIMIT — a long-tenured customer's/busy professional's entire booking history returned on every load. Paginated via the same `pagination_args()`/`Response::paginated()` convention `MarketplaceController::browse()` already used; `api.get<T>()` unwraps `data` and silently drops the added `meta.pagination`, so no frontend caller needed to change.
+- `ChatController::list_conversations()` ran two extra queries (last message, unread count) per conversation on top of an unbounded list. `ConversationService` gained `last_messages_for()`/`unread_counts_for()` (one GROUP BY query each for the whole page) plus the same pagination treatment.
+- `ReviewsController::my_reviews()` called `for_provider()` once per provider a user owns (N+1 for any multi-listing B2B account), then merge-sorted in PHP. `ReviewService::for_providers()` does it as one `target_id IN (...)` query, already globally ordered.
+
+All four covered by new regression tests; full suite still green (138/138).
+
+**Accessibility — the four HIGH-severity findings, fixed; two token-level findings deliberately left as KNOWN LIMITATION rather than touched:**
+- `Modal` (shared by the AI panel, cart drawer, booking modal) had no focus trap and never moved focus on open — fixed with initial-focus-in, Tab/Shift+Tab cycling, and focus restoration to the trigger on close. Also gained a shared, labelled (`aria-label="بستن"`) close button, since none of its three callers rendered one — dismissal was backdrop-click/Escape only.
+- Every text input across the SPA relied on `placeholder` alone for its accessible name (zero `label`/`aria-label` usage anywhere in `app/src`); added `aria-label` at each real call site (search demo, AI chat composer, thread composer, service-form fields, review textarea) plus the B2B application form's three fields (`page-b2b.php`), which also gained `role="status" aria-live="polite"` on its submit-status paragraph (previously updated via `textContent` with nothing announcing the change).
+- `.bc-badge--discount` (white on accent, ≈3.37:1), `.bc-badge--warning` (≈4.30:1), and `.bc-chip--accent.bc-chip--active` (≈2.88:1) all failed WCAG AA's 4.5:1 for their text. Fixed with a local `color-mix()` darken at the point of use in `Badge.css`/`Chip.css` — the shared `--bc-color-accent`/`--bc-color-warning` tokens in `shared/design-tokens.json` (the approved Design Handoff's canonical source) were deliberately left untouched, since darkening a brand token site-wide is a visual-identity change, not a scoped bug fix.
+- Every async error paragraph (`{ error && <p>...</p> }` and the dashboard tabs' load-failure guards) gained `role="alert"`/`role="status"` so screen readers announce the state change instead of it appearing silently.
+- Left as KNOWN LIMITATION, not fixed this pass: `--bc-color-ink-faint` on white (≈3.97:1, used broadly for meta/helper text) and the dashboard tab nav's missing `role="tablist"`/`aria-selected` semantics — both are shared-token or cross-cutting changes wider than a single component's scope; flagging for a deliberate design/product pass rather than a silent tokens.json edit.
+
+**Environment note, not a code defect:** this round's live-verification pass against the actual WordPress site (`WP_HOME=http://localhost:8080`) found port 8080 already bound to an unrelated desktop app (Adobe Connect) on this machine, not a PHP/WP server — `curl -i http://localhost:8080/` returns `Server: Connect Internal WebServer` with a blank body. Live browser verification of the WordPress-rendered flows was blocked by this local port collision for the remainder of the session; the React SPA's own component-showcase build (`app/`, port 5173) was still fully verifiable and was used to confirm the Modal/focus-trap/close-button fixes above.
+

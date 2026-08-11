@@ -81,18 +81,99 @@ final class ConversationService {
 		return $user_id === $conversation['participantAId'] ? $conversation['participantBId'] : $conversation['participantAId'];
 	}
 
-	/** @return array<int, array<string, mixed>> */
-	public function list_for_user( int $user_id ): array {
+	/**
+	 * A production-readiness audit flagged this as an unbounded query — a
+	 * user with a long chat history would have every conversation ever
+	 * returned on every panel open. Capped and offset like every other list
+	 * endpoint (see MarketplaceController::browse); pair with
+	 * count_for_user() for pagination metadata.
+	 *
+	 * @return array<int, array<string, mixed>>
+	 */
+	public function list_for_user( int $user_id, int $limit = 50, int $offset = 0 ): array {
 		global $wpdb;
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT * FROM {$wpdb->prefix}bc_conversations WHERE participant_a_id = %d OR participant_b_id = %d ORDER BY last_message_at IS NULL, last_message_at DESC", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				"SELECT * FROM {$wpdb->prefix}bc_conversations WHERE participant_a_id = %d OR participant_b_id = %d ORDER BY last_message_at IS NULL, last_message_at DESC LIMIT %d OFFSET %d", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 				$user_id,
-				$user_id
+				$user_id,
+				$limit,
+				$offset
 			),
 			ARRAY_A
 		);
 		return array_map( [ $this, 'format' ], $rows ?: [] );
+	}
+
+	public function count_for_user( int $user_id ): int {
+		global $wpdb;
+		return (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM {$wpdb->prefix}bc_conversations WHERE participant_a_id = %d OR participant_b_id = %d", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$user_id,
+				$user_id
+			)
+		);
+	}
+
+	/**
+	 * Batch equivalent of "last message body" per conversation — a
+	 * production-readiness audit found list_conversations() running this as
+	 * one query per conversation (N+1). One GROUP BY query for the whole
+	 * page instead.
+	 *
+	 * @param array<int, int> $conversation_ids
+	 * @return array<int, string> conversation_id => most recent message body
+	 */
+	public function last_messages_for( array $conversation_ids ): array {
+		if ( ! $conversation_ids ) {
+			return [];
+		}
+		global $wpdb;
+		$placeholders = implode( ',', array_fill( 0, count( $conversation_ids ), '%d' ) );
+		$rows         = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT m.conversation_id, m.body FROM {$wpdb->prefix}bc_messages m
+				 INNER JOIN ( SELECT conversation_id, MAX(id) AS max_id FROM {$wpdb->prefix}bc_messages WHERE conversation_id IN ({$placeholders}) GROUP BY conversation_id ) latest
+				 ON m.conversation_id = latest.conversation_id AND m.id = latest.max_id", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+				$conversation_ids
+			),
+			ARRAY_A
+		);
+
+		$map = [];
+		foreach ( $rows as $row ) {
+			$map[ (int) $row['conversation_id'] ] = $row['body'];
+		}
+		return $map;
+	}
+
+	/**
+	 * Batch equivalent of unread_count() per conversation — same N+1 fix as
+	 * last_messages_for(), one query for the whole page.
+	 *
+	 * @param array<int, int> $conversation_ids
+	 * @return array<int, int> conversation_id => unread count for $user_id
+	 */
+	public function unread_counts_for( array $conversation_ids, int $user_id ): array {
+		if ( ! $conversation_ids ) {
+			return [];
+		}
+		global $wpdb;
+		$placeholders = implode( ',', array_fill( 0, count( $conversation_ids ), '%d' ) );
+		$rows         = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT conversation_id, COUNT(*) AS unread FROM {$wpdb->prefix}bc_messages WHERE conversation_id IN ({$placeholders}) AND sender_id != %d AND read_at IS NULL GROUP BY conversation_id", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+				array_merge( $conversation_ids, [ $user_id ] )
+			),
+			ARRAY_A
+		);
+
+		$map = [];
+		foreach ( $rows as $row ) {
+			$map[ (int) $row['conversation_id'] ] = (int) $row['unread'];
+		}
+		return $map;
 	}
 
 	/** @return array<int, array<string, mixed>> */

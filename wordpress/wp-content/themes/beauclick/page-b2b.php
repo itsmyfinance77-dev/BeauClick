@@ -69,11 +69,14 @@ $is_approved = $account && 'approved' === $account['approval_status'];
 	<div class="bc-container bc-section" id="bc-b2b-apply">
 		<h2 class="bc-section__title"><?php esc_html_e( 'ثبت‌نام به‌عنوان خریدار عمده', 'beauclick' ); ?></h2>
 		<form id="bc-b2b-apply-form" class="bc-card" style="padding:20px; max-width:480px; display:flex; flex-direction:column; gap:12px;">
-			<input class="bc-input" type="text" name="business_name" placeholder="<?php esc_attr_e( 'نام کسب‌وکار', 'beauclick' ); ?>" required>
-			<input class="bc-input" type="text" name="license" placeholder="<?php esc_attr_e( 'شماره جواز کسب (اختیاری)', 'beauclick' ); ?>">
-			<input class="bc-input" type="tel" name="phone" placeholder="<?php esc_attr_e( 'شماره تماس', 'beauclick' ); ?>">
+			<label class="bc-visually-hidden" for="bc-b2b-business-name"><?php esc_html_e( 'نام کسب‌وکار (الزامی)', 'beauclick' ); ?></label>
+			<input class="bc-input" id="bc-b2b-business-name" type="text" name="business_name" placeholder="<?php esc_attr_e( 'نام کسب‌وکار', 'beauclick' ); ?>" required>
+			<label class="bc-visually-hidden" for="bc-b2b-license"><?php esc_html_e( 'شماره جواز کسب (اختیاری)', 'beauclick' ); ?></label>
+			<input class="bc-input" id="bc-b2b-license" type="text" name="license" placeholder="<?php esc_attr_e( 'شماره جواز کسب (اختیاری)', 'beauclick' ); ?>">
+			<label class="bc-visually-hidden" for="bc-b2b-phone"><?php esc_html_e( 'شماره تماس', 'beauclick' ); ?></label>
+			<input class="bc-input" id="bc-b2b-phone" type="tel" name="phone" placeholder="<?php esc_attr_e( 'شماره تماس', 'beauclick' ); ?>">
 			<button type="submit" class="bc-btn bc-btn--primary"><?php esc_html_e( 'ارسال درخواست', 'beauclick' ); ?></button>
-			<p id="bc-b2b-apply-status" style="margin:0; font-size:13px;"></p>
+			<p id="bc-b2b-apply-status" role="status" aria-live="polite" style="margin:0; font-size:13px;"></p>
 		</form>
 	</div>
 	<script>

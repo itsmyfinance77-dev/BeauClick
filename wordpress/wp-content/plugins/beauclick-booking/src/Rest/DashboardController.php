@@ -64,9 +64,14 @@ final class DashboardController extends RestController {
 			)
 		);
 		$month_revenue = 0;
-		foreach ( $order_ids as $order_id ) {
-			$order = wc_get_order( $order_id );
-			if ( $order ) {
+		// A production-readiness audit caught this as an N+1: a wc_get_order()
+		// call per booking meant a busy professional's dashboard load did one
+		// extra DB query per paid booking that month. wc_get_orders() with
+		// post__in fetches them all in a single query regardless of whether
+		// WooCommerce is on legacy CPT or HPOS order storage.
+		if ( $order_ids && function_exists( 'wc_get_orders' ) ) {
+			$orders = wc_get_orders( [ 'post__in' => array_map( 'intval', $order_ids ), 'limit' => -1, 'return' => 'objects' ] );
+			foreach ( $orders as $order ) {
 				$month_revenue += (int) $order->get_total();
 			}
 		}

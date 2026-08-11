@@ -28,7 +28,7 @@ export function OverviewTab() {
 			.catch( () => setError( 'خطا در دریافت آمار داشبورد.' ) );
 	}, [] );
 
-	if ( error ) return <p style={ { color: 'var(--bc-color-error)', fontSize: 13 } }>{ error }</p>;
+	if ( error ) return <p role="alert" style={ { color: 'var(--bc-color-error)', fontSize: 13 } }>{ error }</p>;
 	if ( ! stats ) return <LoadingDots />;
 
 	const maxCount = Math.max( 1, ...stats.weeklyBookings.map( ( d ) => d.count ) );

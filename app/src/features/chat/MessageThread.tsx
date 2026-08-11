@@ -60,10 +60,10 @@ export function MessageThread( {
 				<div ref={ bottomRef } />
 			</div>
 
-			{ error && <p style={ { color: 'var(--bc-color-error)', fontSize: 13, margin: '0 12px' } }>{ error }</p> }
+			{ error && <p role="alert" style={ { color: 'var(--bc-color-error)', fontSize: 13, margin: '0 12px' } }>{ error }</p> }
 
 			<form onSubmit={ submit } className="bc-chat-thread__composer">
-				<Input placeholder="پیام خود را بنویسید…" value={ text } onChange={ ( e ) => setText( e.target.value ) } disabled={ sending } />
+				<Input aria-label="متن پیام" placeholder="پیام خود را بنویسید…" value={ text } onChange={ ( e ) => setText( e.target.value ) } disabled={ sending } />
 				<Button variant="primary" type="submit" disabled={ sending || ! text.trim() }>ارسال</Button>
 			</form>
 		</div>

@@ -14,8 +14,15 @@
 	color: var(--bc-color-primary);
 }
 
+/*
+ * An accessibility audit measured white-on-accent here at ~3.37:1, below
+ * the 4.5:1 WCAG AA floor for this size text. Darkening the background a
+ * touch (staying in the accent hue, not touching the shared --bc-color-
+ * accent token used elsewhere) fixes contrast without changing the
+ * approved brand color itself.
+ */
 .bc-badge--discount {
-	background: var(--bc-color-accent);
+	background: color-mix( in oklch, var(--bc-color-accent) 82%, black 18% );
 	color: white;
 }
 
@@ -29,9 +36,12 @@
 	color: var(--bc-color-success);
 }
 
+/* Same audit found --bc-color-warning on -warning-soft at ~4.30:1, just
+ * under 4.5:1 — a local text-color darken here, same reasoning as
+ * --discount above. */
 .bc-badge--warning {
 	background: var(--bc-color-warning-soft);
-	color: var(--bc-color-warning);
+	color: color-mix( in oklch, var(--bc-color-warning) 85%, black 15% );
 }
 
 .bc-badge--error {

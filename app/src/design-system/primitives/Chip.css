@@ -21,8 +21,15 @@
 	color: var(--bc-color-primary);
 }
 
+/*
+ * An accessibility audit measured accent-on-accent-soft text here at
+ * ~2.88:1, well below the 4.5:1 WCAG AA floor. border-color stays the raw
+ * accent token (a non-text UI outline only needs 3:1, and already clears
+ * it against this background); only the TEXT color is darkened, and only
+ * for this chip state — the shared --bc-color-accent token is untouched.
+ */
 .bc-chip--accent.bc-chip--active {
 	background: var(--bc-color-accent-soft);
 	border-color: var(--bc-color-accent);
-	color: var(--bc-color-accent);
+	color: color-mix( in oklch, var(--bc-color-accent) 70%, black 30% );
 }

@@ -107,6 +107,33 @@ final class BookingControllerTest extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A production-readiness audit flagged list_own() as an unbounded
+	 * query — a customer's entire booking history was returned on every
+	 * call. This asserts the per_page cap and pagination metadata actually
+	 * take effect, not just that the endpoint still returns bookings.
+	 */
+	public function test_list_own_is_capped_and_reports_pagination_metadata(): void {
+		$customer_id = self::factory()->user->create();
+		$owner_id    = self::factory()->user->create();
+		$provider_id = $this->make_provider( $owner_id );
+
+		for ( $i = 0; $i < 3; $i++ ) {
+			$slot = $this->make_open_slot( $provider_id );
+			( new BookingService() )->create_booking( $customer_id, $provider_id, $slot );
+		}
+
+		wp_set_current_user( $customer_id );
+		$request = new \WP_REST_Request( 'GET', '/beauclick/v1/booking/bookings' );
+		$request->set_param( 'per_page', 2 );
+		$response   = ( new BookingController() )->list_own( $request );
+		$bookings   = $response->get_data()['data'];
+		$pagination = $response->get_data()['meta']->pagination;
+
+		$this->assertCount( 2, $bookings, 'per_page must actually cap the returned rows.' );
+		$this->assertSame( 3, $pagination['total'], 'The true total must still be reported even though this page is capped.' );
+	}
+
+	/**
 	 * A production-readiness audit caught availability() mixing time()
 	 * (true UTC) with current_time('mysql') (site-local) for the "next 7
 	 * days" window's two ends — under Iran's UTC+3:30 offset (no DST, so

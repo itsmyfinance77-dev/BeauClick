@@ -77,6 +77,34 @@ final class ChatControllerTest extends WP_UnitTestCase {
 		$this->assertSame( 'میکاپ عروس چقدر طول می‌کشه؟', $messages[0]['body'] );
 	}
 
+	/**
+	 * A production-readiness audit found list_conversations() running two
+	 * extra per-conversation queries (N+1) on top of an unbounded list —
+	 * both were batched/paginated. This asserts the REST-shaped response
+	 * still carries the right lastMessage/unreadCount per conversation
+	 * after that rewrite, not just that it returns something.
+	 */
+	public function test_list_conversations_reports_correct_last_message_and_unread_count(): void {
+		$customer = self::factory()->user->create();
+		$pro      = self::factory()->user->create();
+		$conversation = ( new ConversationService() )->start_or_get( $customer, $pro );
+
+		wp_set_current_user( $customer );
+		$controller = new ChatController();
+		$send = new \WP_REST_Request( 'POST', "/beauclick/v1/chat/conversations/{$conversation['id']}/messages" );
+		$send->set_param( 'id', $conversation['id'] );
+		$send->set_param( 'body', 'وقت دارید؟' );
+		$controller->send_message( $send );
+
+		wp_set_current_user( $pro );
+		$response = $controller->list_conversations( new \WP_REST_Request( 'GET', '/beauclick/v1/chat/conversations' ) );
+		$data     = $response->get_data();
+
+		$this->assertSame( 1, $data['data'][0]['unreadCount'], "The professional must see 1 unread message from the customer." );
+		$this->assertSame( 'وقت دارید؟', $data['data'][0]['lastMessage'] );
+		$this->assertSame( 1, $data['meta']->pagination['total'] );
+	}
+
 	public function test_starting_a_conversation_requires_bc_send_message_capability(): void {
 		$support = self::factory()->user->create( [ 'role' => 'bc_support' ] ); // support_capabilities() intentionally omits bc_send_message — not a customer-facing sender.
 		wp_set_current_user( $support );

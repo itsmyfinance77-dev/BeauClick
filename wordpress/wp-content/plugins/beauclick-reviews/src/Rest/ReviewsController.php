@@ -82,6 +82,12 @@ final class ReviewsController extends RestController {
 		return Response::ok( $result, [], 201 );
 	}
 
+	/**
+	 * A production-readiness audit found this looping for_provider() once
+	 * per provider a user owns (N+1 for any multi-listing B2B account) then
+	 * merge-sorting in PHP — for_providers() does it as one query, already
+	 * ordered by the database.
+	 */
 	public function my_reviews(): \WP_REST_Response {
 		global $wpdb;
 		$user_id      = get_current_user_id();
@@ -93,12 +99,7 @@ final class ReviewsController extends RestController {
 			return Response::ok( [] );
 		}
 
-		$service = new ReviewService();
-		$all     = [];
-		foreach ( $provider_ids as $provider_id ) {
-			$all = array_merge( $all, $service->for_provider( (int) $provider_id, false ) );
-		}
-		usort( $all, static fn ( array $a, array $b ) => strcmp( $b['createdAt'], $a['createdAt'] ) );
+		$all = ( new ReviewService() )->for_providers( array_map( 'intval', $provider_ids ), false );
 
 		return Response::ok( $all );
 	}

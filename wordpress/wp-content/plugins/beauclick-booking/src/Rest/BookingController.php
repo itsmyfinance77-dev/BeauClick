@@ -173,28 +173,41 @@ final class BookingController extends RestController {
 		return Response::ok( $result, [], 201 );
 	}
 
+	/**
+	 * A production-readiness audit flagged this as an unbounded query — a
+	 * long-tenured customer's or busy professional's entire booking history
+	 * was returned on every dashboard load. Paginated the same way
+	 * MarketplaceController::browse() already is; api.get<T>() unwraps the
+	 * `data` array and silently drops the added `meta.pagination`, so no
+	 * frontend caller needed to change.
+	 */
 	public function list_own( WP_REST_Request $request ) {
 		global $wpdb;
+		[ $page, $per_page ] = $this->pagination_args( $request, 20, 100 );
+		$offset      = ( $page - 1 ) * $per_page;
 		$user_id     = get_current_user_id();
 		$provider_id = ProviderLookup::for_user( $user_id );
 
 		if ( $provider_id ) {
-			$rows = $wpdb->get_results(
-				$wpdb->prepare(
-					"SELECT * FROM {$wpdb->prefix}bc_bookings WHERE customer_id = %d OR provider_id = %d ORDER BY slot_start DESC", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-					$user_id,
-					$provider_id
-				),
-				ARRAY_A
-			);
+			$where  = 'customer_id = %d OR provider_id = %d';
+			$params = [ $user_id, $provider_id ];
 		} else {
-			$rows = $wpdb->get_results(
-				$wpdb->prepare( "SELECT * FROM {$wpdb->prefix}bc_bookings WHERE customer_id = %d ORDER BY slot_start DESC", $user_id ), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-				ARRAY_A
-			);
+			$where  = 'customer_id = %d';
+			$params = [ $user_id ];
 		}
 
-		return Response::ok( array_map( [ $this, 'format_booking' ], $rows ?: [] ) );
+		$total = (int) $wpdb->get_var(
+			$wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}bc_bookings WHERE {$where}", $params ) // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		);
+		$rows  = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT * FROM {$wpdb->prefix}bc_bookings WHERE {$where} ORDER BY slot_start DESC LIMIT %d OFFSET %d", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				array_merge( $params, [ $per_page, $offset ] )
+			),
+			ARRAY_A
+		);
+
+		return Response::paginated( array_map( [ $this, 'format_booking' ], $rows ?: [] ), $total, $page, $per_page );
 	}
 
 	public function cancel( WP_REST_Request $request ) {

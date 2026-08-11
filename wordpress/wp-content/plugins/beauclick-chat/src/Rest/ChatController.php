@@ -86,35 +86,46 @@ final class ChatController extends RestController {
 		return $this->require_capability( 'bc_view_all_conversations' );
 	}
 
-	public function list_conversations(): \WP_REST_Response {
-		$user_id  = get_current_user_id();
-		$service  = new ConversationService();
-		$rows     = $service->list_for_user( $user_id );
+	/**
+	 * A production-readiness audit found this running two extra queries
+	 * (last message, unread count) per conversation on top of an unbounded
+	 * list — N+1 compounding an unbounded query. Paginated via the same
+	 * convention as MarketplaceController::browse(), and both extra lookups
+	 * batched into one query each for the whole page.
+	 */
+	public function list_conversations( WP_REST_Request $request ): \WP_REST_Response {
+		$user_id = get_current_user_id();
+		$service = new ConversationService();
+		[ $page, $per_page ] = $this->pagination_args( $request, 20, 100 );
+		$offset  = ( $page - 1 ) * $per_page;
 
-		return Response::ok(
-			array_map(
-				function ( array $c ) use ( $service, $user_id ) {
-					$other_id = $service->other_participant( $c, $user_id );
-					$other    = get_userdata( $other_id );
-					global $wpdb;
-					$last_message = $wpdb->get_row(
-						$wpdb->prepare( "SELECT body FROM {$wpdb->prefix}bc_messages WHERE conversation_id = %d ORDER BY id DESC LIMIT 1", $c['id'] ), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-						ARRAY_A
-					);
+		$rows  = $service->list_for_user( $user_id, $per_page, $offset );
+		$total = $service->count_for_user( $user_id );
 
-					return [
-						'id'              => $c['id'],
-						'type'            => $c['type'],
-						'otherUserId'     => $other_id,
-						'otherUserName'   => $other ? $other->display_name : '',
-						'lastMessageAt'   => $c['lastMessageAt'],
-						'lastMessage'     => $last_message ? mb_substr( $last_message['body'], 0, 80 ) : '',
-						'unreadCount'     => $service->unread_count( $c['id'], $user_id ),
-					];
-				},
-				$rows
-			)
+		$ids           = array_column( $rows, 'id' );
+		$last_messages = $service->last_messages_for( $ids );
+		$unread_counts = $service->unread_counts_for( $ids, $user_id );
+
+		$items = array_map(
+			function ( array $c ) use ( $service, $user_id, $last_messages, $unread_counts ) {
+				$other_id = $service->other_participant( $c, $user_id );
+				$other    = get_userdata( $other_id );
+				$last     = $last_messages[ $c['id'] ] ?? '';
+
+				return [
+					'id'            => $c['id'],
+					'type'          => $c['type'],
+					'otherUserId'   => $other_id,
+					'otherUserName' => $other ? $other->display_name : '',
+					'lastMessageAt' => $c['lastMessageAt'],
+					'lastMessage'   => '' !== $last ? mb_substr( $last, 0, 80 ) : '',
+					'unreadCount'   => $unread_counts[ $c['id'] ] ?? 0,
+				];
+			},
+			$rows
 		);
+
+		return Response::paginated( $items, $total, $page, $per_page );
 	}
 
 	public function start_conversation( WP_REST_Request $request ) {

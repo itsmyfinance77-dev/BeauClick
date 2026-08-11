@@ -139,7 +139,7 @@ export function App() {
 				<Modal open={ modalOpen } onClose={ () => setModalOpen( false ) } labelledBy="demo-modal-title">
 					<div style={ { padding: 24 } }>
 						<h3 id="demo-modal-title" style={ { marginTop: 0 } }>انتخاب خدمت</h3>
-						<Input placeholder="جستجوی خدمت…" style={ { marginBottom: 16 } } />
+						<Input aria-label="جستجوی خدمت" placeholder="جستجوی خدمت…" style={ { marginBottom: 16 } } />
 						<Button variant="primary" onClick={ () => setModalOpen( false ) }>بستن</Button>
 					</div>
 				</Modal>

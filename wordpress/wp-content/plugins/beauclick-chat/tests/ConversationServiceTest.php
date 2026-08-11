@@ -100,6 +100,54 @@ final class ConversationServiceTest extends WP_UnitTestCase {
 		$this->assertSame( 0, $service->unread_count( $conversation['id'], $pro ) );
 	}
 
+	/**
+	 * A production-readiness audit found list_for_user() unbounded — this
+	 * asserts the limit/offset added to fix it actually page correctly.
+	 */
+	public function test_list_for_user_is_paginated(): void {
+		$user = self::factory()->user->create();
+		$service = new ConversationService();
+
+		for ( $i = 0; $i < 3; $i++ ) {
+			$other = self::factory()->user->create();
+			$service->start_or_get( $user, $other );
+		}
+
+		$this->assertCount( 3, $service->list_for_user( $user, 50, 0 ) );
+		$this->assertCount( 2, $service->list_for_user( $user, 2, 0 ) );
+		$this->assertCount( 1, $service->list_for_user( $user, 2, 2 ) );
+		$this->assertSame( 3, $service->count_for_user( $user ) );
+	}
+
+	/**
+	 * last_messages_for()/unread_counts_for() replaced a per-conversation
+	 * query loop (N+1) with one batch query each — this asserts the batch
+	 * queries still attribute each result to the right conversation.
+	 */
+	public function test_batch_last_messages_and_unread_counts_are_keyed_by_conversation(): void {
+		$customer = self::factory()->user->create();
+		$pro_a    = self::factory()->user->create();
+		$pro_b    = self::factory()->user->create();
+		$service  = new ConversationService();
+
+		$conv_a = $service->start_or_get( $customer, $pro_a );
+		$conv_b = $service->start_or_get( $customer, $pro_b );
+
+		$service->send_message( $conv_a['id'], $customer, 'پیام اول به آ' );
+		$service->send_message( $conv_a['id'], $pro_a, 'پاسخ آ' );
+		$service->send_message( $conv_b['id'], $customer, 'پیام به ب' );
+
+		$ids = [ $conv_a['id'], $conv_b['id'] ];
+
+		$last_messages = $service->last_messages_for( $ids );
+		$this->assertSame( 'پاسخ آ', $last_messages[ $conv_a['id'] ], 'Must return each conversation\'s OWN most recent message, not any conversation\'s.' );
+		$this->assertSame( 'پیام به ب', $last_messages[ $conv_b['id'] ] );
+
+		$unread = $service->unread_counts_for( $ids, $customer );
+		$this->assertSame( 1, $unread[ $conv_a['id'] ], 'Customer has 1 unread from the professional in conversation A.' );
+		$this->assertArrayNotHasKey( $conv_b['id'], $unread, 'A conversation with nothing unread for this user must be absent, not zero-filled, from the batch result.' );
+	}
+
 	public function test_rate_limit_blocks_a_burst_of_messages_beyond_the_cap(): void {
 		$customer = self::factory()->user->create();
 		$pro      = self::factory()->user->create();

@@ -51,7 +51,7 @@ export function CartDrawer( { open, onClose, refreshToken }: CartDrawerProps ) {
 			<div style={ { padding: 24, display: 'flex', flexDirection: 'column', height: '100%' } }>
 				<h2 id="bc-cart-title" style={ { marginTop: 0 } }>سبد خرید</h2>
 
-				{ error && <p style={ { color: 'var(--bc-color-error)', fontSize: 13 } }>{ error }</p> }
+				{ error && <p role="alert" style={ { color: 'var(--bc-color-error)', fontSize: 13 } }>{ error }</p> }
 				{ loading && <LoadingDots /> }
 
 				{ ! loading && cart && cart.items.length === 0 && (

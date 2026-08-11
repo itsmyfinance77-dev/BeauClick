@@ -76,6 +76,45 @@ final class DashboardControllerTest extends WP_UnitTestCase {
 		$this->assertSame( [], $data['recentBookings'] );
 	}
 
+	/**
+	 * A production-readiness audit found monthRevenue was computed via a
+	 * wc_get_order() call per booking (N+1) — fixed with a single bulk
+	 * wc_get_orders(post__in) call. This asserts the fix still produces the
+	 * correct sum, not just that it runs.
+	 */
+	public function test_month_revenue_sums_this_months_paid_bookings_orders(): void {
+		$owner_id    = self::factory()->user->create();
+		$provider_id = $this->make_provider( $owner_id );
+		$customer_id = self::factory()->user->create();
+
+		$slot_a = $this->make_open_slot( $provider_id );
+		$result_a = ( new BookingService() )->create_booking( $customer_id, $provider_id, $slot_a );
+		$slot_b = $this->make_open_slot( $provider_id );
+		$result_b = ( new BookingService() )->create_booking( $customer_id, $provider_id, $slot_b );
+
+		$order_a = new \WC_Order();
+		$order_a->set_customer_id( $customer_id );
+		$order_a->set_status( 'processing' );
+		$order_a->set_total( 150000 );
+		$order_a->save();
+
+		$order_b = new \WC_Order();
+		$order_b->set_customer_id( $customer_id );
+		$order_b->set_status( 'processing' );
+		$order_b->set_total( 90000 );
+		$order_b->save();
+
+		global $wpdb;
+		$wpdb->update( $wpdb->prefix . 'bc_bookings', [ 'wc_order_id' => $order_a->get_id(), 'status' => 'confirmed' ], [ 'id' => $result_a['booking_id'] ] );
+		$wpdb->update( $wpdb->prefix . 'bc_bookings', [ 'wc_order_id' => $order_b->get_id(), 'status' => 'completed' ], [ 'id' => $result_b['booking_id'] ] );
+
+		wp_set_current_user( $owner_id );
+		$response = ( new DashboardController() )->stats( new \WP_REST_Request( 'GET', '/beauclick/v1/booking/my/stats' ) );
+		$data     = $response->get_data()['data'];
+
+		$this->assertSame( 240000, $data['monthRevenue'], 'Must sum every paid, confirmed-or-completed booking this month across a single bulk order fetch.' );
+	}
+
 	public function test_stats_route_requires_login(): void {
 		wp_set_current_user( 0 );
 		$controller = new DashboardController();

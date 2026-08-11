@@ -125,7 +125,7 @@ export function BookingModal( { open, onClose, providerId, initialServiceId }: B
 					</div>
 				) }
 
-				{ error && <p style={ { color: 'var(--bc-color-error)', fontSize: 13 } }>{ error }</p> }
+				{ error && <p role="alert" style={ { color: 'var(--bc-color-error)', fontSize: 13 } }>{ error }</p> }
 
 				{ step === 1 && (
 					<section>

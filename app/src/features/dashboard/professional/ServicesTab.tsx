@@ -41,7 +41,7 @@ export function ServicesTab() {
 		}
 	}
 
-	if ( error ) return <p style={ { color: 'var(--bc-color-error)', fontSize: 13 } }>{ error }</p>;
+	if ( error ) return <p role="alert" style={ { color: 'var(--bc-color-error)', fontSize: 13 } }>{ error }</p>;
 	if ( ! services ) return <LoadingDots />;
 
 	return (
@@ -53,9 +53,9 @@ export function ServicesTab() {
 
 			{ adding && (
 				<form onSubmit={ submit } className="bc-card" style={ { padding: 16, marginBottom: 16, display: 'flex', gap: 8, flexWrap: 'wrap' } }>
-					<Input placeholder="نام خدمت" value={ form.name } onChange={ ( e ) => setForm( { ...form, name: e.target.value } ) } required style={ { flex: '1 1 160px' } } />
-					<Input placeholder="مدت (دقیقه)" type="number" value={ form.durationMinutes } onChange={ ( e ) => setForm( { ...form, durationMinutes: e.target.value } ) } style={ { flex: '1 1 120px' } } />
-					<Input placeholder="قیمت (تومان)" type="number" value={ form.price } onChange={ ( e ) => setForm( { ...form, price: e.target.value } ) } style={ { flex: '1 1 120px' } } />
+					<Input aria-label="نام خدمت (الزامی)" placeholder="نام خدمت *" value={ form.name } onChange={ ( e ) => setForm( { ...form, name: e.target.value } ) } required style={ { flex: '1 1 160px' } } />
+					<Input aria-label="مدت به دقیقه" placeholder="مدت (دقیقه)" type="number" value={ form.durationMinutes } onChange={ ( e ) => setForm( { ...form, durationMinutes: e.target.value } ) } style={ { flex: '1 1 120px' } } />
+					<Input aria-label="قیمت به تومان" placeholder="قیمت (تومان)" type="number" value={ form.price } onChange={ ( e ) => setForm( { ...form, price: e.target.value } ) } style={ { flex: '1 1 120px' } } />
 					<Button variant="primary" type="submit">ثبت</Button>
 				</form>
 			) }

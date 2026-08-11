@@ -99,7 +99,7 @@ export function AiPanel( { open, onClose }: { open: boolean; onClose: () => void
 						</div>
 					) }
 
-					{ error && <p style={ { color: 'var(--bc-color-error)', fontSize: 13 } }>{ error }</p> }
+					{ error && <p role="alert" style={ { color: 'var(--bc-color-error)', fontSize: 13 } }>{ error }</p> }
 					<div ref={ bottomRef } />
 				</div>
 
@@ -108,7 +108,7 @@ export function AiPanel( { open, onClose }: { open: boolean; onClose: () => void
 						onSubmit={ ( e ) => { e.preventDefault(); send( text ); } }
 						style={ { display: 'flex', gap: 8, padding: 16, borderTop: '1px solid var(--bc-color-line)' } }
 					>
-						<Input placeholder="بپرس چی نیاز داری…" value={ text } onChange={ ( e ) => setText( e.target.value ) } disabled={ sending } />
+						<Input aria-label="پیام به دستیار زیبایی" placeholder="بپرس چی نیاز داری…" value={ text } onChange={ ( e ) => setText( e.target.value ) } disabled={ sending } />
 						<Button variant="primary" type="submit" disabled={ sending || ! text.trim() }>ارسال</Button>
 					</form>
 				) }

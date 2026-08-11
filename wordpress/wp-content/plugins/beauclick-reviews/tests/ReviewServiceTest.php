@@ -145,6 +145,37 @@ final class ReviewServiceTest extends WP_UnitTestCase {
 		$this->assertSame( '1.00', $row['rating_avg'] );
 	}
 
+	/**
+	 * A production-readiness audit found ReviewsController::my_reviews()
+	 * calling for_provider() once per provider a user owns (N+1) — this
+	 * asserts the batch replacement returns every provider's reviews,
+	 * globally ordered by recency, in one call.
+	 */
+	public function test_for_providers_returns_every_matching_providers_reviews_ordered_by_recency(): void {
+		$owner_id     = self::factory()->user->create();
+		$provider_a   = $this->make_provider( $owner_id );
+		$provider_b   = $this->make_provider( $owner_id );
+		$customer_a   = self::factory()->user->create();
+		$customer_b   = self::factory()->user->create();
+		$booking_a    = $this->make_booking( $customer_a, $provider_a );
+		$booking_b    = $this->make_booking( $customer_b, $provider_b );
+
+		$service = new ReviewService();
+		$review_a = $service->create( $customer_a, $booking_a, 4, 'اول' );
+		sleep( 1 );
+		$review_b = $service->create( $customer_b, $booking_b, 2, 'دوم' );
+
+		$all = $service->for_providers( [ $provider_a, $provider_b ] );
+
+		$this->assertCount( 2, $all );
+		$this->assertSame( $review_b['id'], $all[0]['id'], 'Must be ordered newest-first across ALL given providers, not grouped per-provider.' );
+		$this->assertSame( $review_a['id'], $all[1]['id'] );
+	}
+
+	public function test_for_providers_with_no_ids_returns_empty_without_querying(): void {
+		$this->assertSame( [], ( new ReviewService() )->for_providers( [] ) );
+	}
+
 	public function test_moderating_rejects_an_unknown_status(): void {
 		$owner_id    = self::factory()->user->create();
 		$provider_id = $this->make_provider( $owner_id );
