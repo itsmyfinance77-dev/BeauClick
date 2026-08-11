@@ -1,6 +1,65 @@
-import { mount } from '@/lib/mount';
+import { useEffect, useState } from 'react';
+import { createRoot } from 'react-dom/client';
+import { CartDrawer } from '@/features/cart/CartDrawer';
+import { storeApi } from '@/lib/storeApi';
+import { toPersianDigits } from '@/lib/format';
 import '@/design-system/tokens.generated.css';
 
-// Full implementation lands in Phase 6 (WooCommerce integration) — cart
-// drawer (list → review → success) over the WooCommerce Store API.
-mount( 'bc-cart-root', () => <></> );
+/**
+ * Same delegated-trigger pattern as mounts/booking.tsx: any
+ * `[data-bc-cart-open]` element (the header's cart icon chip) opens the
+ * drawer, any `[data-bc-add-to-cart]` element (a product card's button)
+ * adds that product and opens the drawer to confirm — no page reload
+ * either way, matching the design handoff's "add-to-cart always opens the
+ * cart drawer" interaction rule.
+ */
+function App() {
+	const [ open, setOpen ] = useState( false );
+	const [ refreshToken, setRefreshToken ] = useState( 0 );
+	const [ pending, setPending ] = useState( false );
+
+	useEffect( () => {
+		storeApi.getCart().then( ( cart ) => updateBadge( cart.items_count ) ).catch( () => {} );
+
+		function onClick( e: MouseEvent ) {
+			const target = e.target as HTMLElement;
+
+			if ( target.closest( '[data-bc-cart-open]' ) ) {
+				setOpen( true );
+				return;
+			}
+
+			const addTrigger = target.closest<HTMLElement>( '[data-bc-add-to-cart]' );
+			if ( addTrigger && ! pending ) {
+				e.preventDefault();
+				const productId = Number( addTrigger.dataset.productId );
+				if ( ! productId ) return;
+				setPending( true );
+				storeApi.addItem( productId )
+					.then( ( cart ) => {
+						updateBadge( cart.items_count );
+						setRefreshToken( ( n ) => n + 1 );
+						setOpen( true );
+					} )
+					.finally( () => setPending( false ) );
+			}
+		}
+
+		document.addEventListener( 'click', onClick );
+		return () => document.removeEventListener( 'click', onClick );
+	}, [ pending ] );
+
+	return <CartDrawer open={ open } onClose={ () => setOpen( false ) } refreshToken={ refreshToken } />;
+}
+
+function updateBadge( count: number ): void {
+	const badge = document.getElementById( 'bc-cart-count' );
+	if ( badge ) {
+		badge.textContent = toPersianDigits( count );
+	}
+}
+
+const el = document.getElementById( 'bc-cart-root' );
+if ( el ) {
+	createRoot( el ).render( <App /> );
+}

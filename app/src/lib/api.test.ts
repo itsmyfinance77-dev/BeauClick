@@ -14,7 +14,7 @@ describe( 'api URL building', () => {
 	} );
 
 	it( 'merges query params into rest_route under plain permalinks instead of producing a second "?"', async () => {
-		window.BeauClick = { restUrl: 'http://localhost:8080/?rest_route=/beauclick/v1', nonce: 'x', isLoggedIn: true, currentUserId: 1 };
+		window.BeauClick = { restUrl: 'http://localhost:8080/?rest_route=/beauclick/v1', nonce: 'x', isLoggedIn: true, currentUserId: 1, checkoutUrl: null, cartUrl: null };
 		const { api } = await import( './api' );
 
 		await api.get( '/booking/availability?provider_id=11&date=2026-08-11' );
@@ -30,7 +30,7 @@ describe( 'api URL building', () => {
 	} );
 
 	it( 'appends cleanly to a plain path under pretty permalinks', async () => {
-		window.BeauClick = { restUrl: '/wp-json/beauclick/v1', nonce: 'x', isLoggedIn: true, currentUserId: 1 };
+		window.BeauClick = { restUrl: '/wp-json/beauclick/v1', nonce: 'x', isLoggedIn: true, currentUserId: 1, checkoutUrl: null, cartUrl: null };
 		const { api } = await import( './api' );
 
 		await api.get( '/marketplace/providers?city_id=4' );

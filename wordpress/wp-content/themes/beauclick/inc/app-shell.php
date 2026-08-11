@@ -25,6 +25,8 @@ add_action(
 			'nonce'         => wp_create_nonce( 'wp_rest' ),
 			'isLoggedIn'    => is_user_logged_in(),
 			'currentUserId' => get_current_user_id(),
+			'checkoutUrl'   => function_exists( 'wc_get_checkout_url' ) ? wc_get_checkout_url() : null,
+			'cartUrl'       => function_exists( 'wc_get_cart_url' ) ? wc_get_cart_url() : null,
 		];
 		echo '<script>window.BeauClick = ' . wp_json_encode( $config ) . ';</script>' . "\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 	},

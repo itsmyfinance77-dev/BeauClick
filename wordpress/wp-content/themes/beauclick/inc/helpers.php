@@ -21,8 +21,16 @@ const BC_PERSIAN_DIGITS = [ '۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸'
  * because one runs server-side (PHP-rendered pages) and one client-side
  * (React app-shell); kept in sync by hand since the logic is a handful of
  * lines, not worth a shared build step for.
+ *
+ * Accepts float too (not just string|int): round()/number_format()-style
+ * arithmetic on prices/percentages naturally produces floats, and
+ * strict_types=1 (used throughout this theme) won't coerce one to int at
+ * the call site — this is the same TypeError class as the earlier
+ * bc_get_city_name() fix (a $wpdb string that time, a float here), fixed
+ * the same way: widen the shared helper once instead of trusting every
+ * future call site to remember an explicit cast.
  */
-function bc_persian_digits( string|int $input ): string {
+function bc_persian_digits( string|int|float $input ): string {
 	return strtr( (string) $input, [ '0' => BC_PERSIAN_DIGITS[0], '1' => BC_PERSIAN_DIGITS[1], '2' => BC_PERSIAN_DIGITS[2], '3' => BC_PERSIAN_DIGITS[3], '4' => BC_PERSIAN_DIGITS[4], '5' => BC_PERSIAN_DIGITS[5], '6' => BC_PERSIAN_DIGITS[6], '7' => BC_PERSIAN_DIGITS[7], '8' => BC_PERSIAN_DIGITS[8], '9' => BC_PERSIAN_DIGITS[9] ] );
 }
 

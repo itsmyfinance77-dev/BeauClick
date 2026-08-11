@@ -12,6 +12,8 @@ declare global {
 			nonce: string;
 			isLoggedIn: boolean;
 			currentUserId: number;
+			checkoutUrl: string | null;
+			cartUrl: string | null;
 		};
 	}
 }
