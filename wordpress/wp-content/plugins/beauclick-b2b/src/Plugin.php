@@ -3,6 +3,7 @@ declare( strict_types=1 );
 
 namespace BeauClick\B2B;
 
+use BeauClick\B2B\Admin\AccountsAdminPage;
 use BeauClick\B2B\Database\Migrations\CreateB2BTables;
 use BeauClick\B2B\Database\Seeds\DemoTierPricingSeed;
 use BeauClick\B2B\Pricing\TierPricingEngine;
@@ -27,6 +28,8 @@ final class Plugin {
 		add_action( 'plugins_loaded', [ $this, 'register_migrations' ], 5 );
 		add_action( 'beauclick/core/register_rest_routes', [ $this, 'register_rest_routes' ] );
 		add_action( 'beauclick/seed', [ $this, 'maybe_seed' ] );
+
+		( new AccountsAdminPage() )->register();
 	}
 
 	public function register_migrations(): void {

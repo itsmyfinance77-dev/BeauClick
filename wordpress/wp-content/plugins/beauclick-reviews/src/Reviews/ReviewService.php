@@ -4,18 +4,21 @@ declare( strict_types=1 );
 namespace BeauClick\Reviews\Reviews;
 
 use BeauClick\Marketplace\Search\Indexer;
+use BeauClick\Reviews\Notifications\ReviewMailer;
 
 /**
  * New reviews auto-approve (architecture doc §8 defines pending/approved/
- * rejected/flagged, but the moderation queue UI to act on "pending" is
- * Phase 12's — auto-approving here means the feature is actually visible
- * this phase rather than silently stuck; a moderator can still demote a
- * review to rejected/flagged once that UI exists, same schema either way).
- * Spam risk is bounded by construction: a review requires a real completed
- * booking the author owns, and the UNIQUE booking_id key caps it at one
- * review per booking ever.
+ * rejected/flagged) — auto-approving on submit means the feature is
+ * visible immediately rather than stuck behind a queue nobody could act
+ * on before Phase 12's admin UI existed; moderate() (used by that UI) can
+ * still demote a review to rejected/flagged after the fact, same schema
+ * either way. Spam risk is bounded by construction: a review requires a
+ * real completed booking the author owns, and the UNIQUE booking_id key
+ * caps it at one review per booking ever.
  */
 final class ReviewService {
+
+	public const STATUSES = [ 'pending', 'approved', 'rejected', 'flagged' ];
 
 	public function __construct( private readonly Indexer $indexer = new Indexer() ) {
 	}
@@ -69,7 +72,47 @@ final class ReviewService {
 			beauclick_core()->events()->log( 'review_submitted', 'provider', (int) $booking['provider_id'], $author_id, [ 'rating' => $rating ] );
 		}
 
-		return $this->find( $review_id );
+		$review = $this->find( $review_id );
+		( new ReviewMailer() )->send_new_review( $review );
+
+		return $review;
+	}
+
+	/**
+	 * The admin moderation UI's only write path — approving/rejecting/
+	 * flagging always resyncs the provider's rating, since only 'approved'
+	 * reviews count toward it (for_provider()'s default and
+	 * resync_provider_rating() both filter on status = 'approved').
+	 */
+	public function moderate( int $review_id, string $status ): bool {
+		if ( ! in_array( $status, self::STATUSES, true ) ) {
+			return false;
+		}
+
+		global $wpdb;
+		$review = $this->find( $review_id );
+		if ( ! $review ) {
+			return false;
+		}
+
+		$wpdb->update(
+			$wpdb->prefix . 'bc_reviews',
+			[ 'status' => $status, 'updated_at' => current_time( 'mysql' ) ],
+			[ 'id' => $review_id ],
+			[ '%s', '%s' ],
+			[ '%d' ]
+		);
+
+		$this->resync_provider_rating( $review['targetId'] );
+
+		return true;
+	}
+
+	/** @return array<int, array<string, mixed>> */
+	public function all( int $limit = 100 ): array {
+		global $wpdb;
+		$rows = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}bc_reviews ORDER BY created_at DESC LIMIT %d", $limit ), ARRAY_A );
+		return array_map( [ $this, 'format' ], $rows ?: [] );
 	}
 
 	/**

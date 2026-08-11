@@ -124,4 +124,36 @@ final class ReviewServiceTest extends WP_UnitTestCase {
 
 		$this->assertFalse( $service->respond( $review['id'], $other_pro, 'این نظر مال من نیست' ) );
 	}
+
+	public function test_moderating_a_review_to_rejected_removes_it_from_the_providers_rating(): void {
+		global $wpdb;
+		$owner_id    = self::factory()->user->create();
+		$provider_id = $this->make_provider( $owner_id );
+		$customer_a  = self::factory()->user->create();
+		$customer_b  = self::factory()->user->create();
+		$booking_a   = $this->make_booking( $customer_a, $provider_id );
+		$booking_b   = $this->make_booking( $customer_b, $provider_id );
+
+		$service  = new ReviewService();
+		$review_a = $service->create( $customer_a, $booking_a, 5, 'عالی' );
+		$service->create( $customer_b, $booking_b, 1, 'بد' );
+
+		$service->moderate( $review_a['id'], 'rejected' );
+
+		$row = $wpdb->get_row( $wpdb->prepare( "SELECT rating_avg, review_count FROM {$wpdb->prefix}bc_provider_index WHERE provider_id = %d", $provider_id ), ARRAY_A );
+		$this->assertSame( 1, (int) $row['review_count'], 'A rejected review must no longer count toward the provider\'s rating.' );
+		$this->assertSame( '1.00', $row['rating_avg'] );
+	}
+
+	public function test_moderating_rejects_an_unknown_status(): void {
+		$owner_id    = self::factory()->user->create();
+		$provider_id = $this->make_provider( $owner_id );
+		$customer_id = self::factory()->user->create();
+		$booking_id  = $this->make_booking( $customer_id, $provider_id );
+
+		$service = new ReviewService();
+		$review  = $service->create( $customer_id, $booking_id, 5, 'عالی' );
+
+		$this->assertFalse( $service->moderate( $review['id'], 'not_a_real_status' ) );
+	}
 }

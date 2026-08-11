@@ -3,6 +3,7 @@ declare( strict_types=1 );
 
 namespace BeauClick\Marketplace;
 
+use BeauClick\Marketplace\Admin\VerificationMetaBox;
 use BeauClick\Marketplace\Database\Migrations\CreateProviderIndexTable;
 use BeauClick\Marketplace\Database\Seeds\DemoProvidersSeed;
 use BeauClick\Marketplace\PostTypes\Registrar;
@@ -26,6 +27,7 @@ final class Plugin {
 	public function boot(): void {
 		( new Registrar() )->register();
 		( new Indexer() )->register();
+		( new VerificationMetaBox() )->register();
 
 		add_action( 'plugins_loaded', [ $this, 'register_migrations' ], 5 );
 		add_action( 'beauclick/core/register_rest_routes', [ $this, 'register_rest_routes' ] );

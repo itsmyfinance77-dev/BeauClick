@@ -22,6 +22,16 @@ final class RoleManager {
 	public const ROLE_MODERATOR    = 'bc_moderator';
 
 	/**
+	 * Bump whenever the capability lists below change. maybe_register()
+	 * only does the (several DB-writing) work of register() when this
+	 * doesn't match the stored option — a plain `add_action('admin_init',
+	 * ...register())` would otherwise re-grant every capability on every
+	 * admin page load for every admin, which WP_Role::add_cap() persists
+	 * with its own update_option() call each time.
+	 */
+	private const CAPS_VERSION = '2026-08-11.1';
+
+	/**
 	 * Capabilities layered onto every shopper account (WooCommerce's
 	 * `customer` role, with a `subscriber` fallback if WooCommerce hasn't
 	 * loaded yet — see register()).
@@ -116,11 +126,20 @@ final class RoleManager {
 		);
 	}
 
+	/** Cheap in the common case (one autoloaded get_option() call) — see CAPS_VERSION. */
+	public static function maybe_register(): void {
+		if ( get_option( 'bc_roles_caps_version' ) === self::CAPS_VERSION ) {
+			return;
+		}
+		self::register();
+		update_option( 'bc_roles_caps_version', self::CAPS_VERSION );
+	}
+
 	public static function register(): void {
-		add_role( self::ROLE_PROFESSIONAL, __( 'Beauty Professional', 'beauclick-core' ), self::as_cap_map( self::professional_capabilities() ) );
-		add_role( self::ROLE_BUSINESS, __( 'Business', 'beauclick-core' ), self::as_cap_map( self::business_capabilities() ) );
-		add_role( self::ROLE_SUPPORT, __( 'BeauClick Support', 'beauclick-core' ), self::as_cap_map( self::support_capabilities() ) );
-		add_role( self::ROLE_MODERATOR, __( 'BeauClick Moderator', 'beauclick-core' ), self::as_cap_map( self::moderator_capabilities() ) );
+		self::ensure_role( self::ROLE_PROFESSIONAL, __( 'Beauty Professional', 'beauclick-core' ), self::professional_capabilities() );
+		self::ensure_role( self::ROLE_BUSINESS, __( 'Business', 'beauclick-core' ), self::business_capabilities() );
+		self::ensure_role( self::ROLE_SUPPORT, __( 'BeauClick Support', 'beauclick-core' ), self::support_capabilities() );
+		self::ensure_role( self::ROLE_MODERATOR, __( 'BeauClick Moderator', 'beauclick-core' ), self::moderator_capabilities() );
 
 		self::grant( 'administrator', self::admin_capabilities() );
 
@@ -129,6 +148,25 @@ final class RoleManager {
 		// Woo-less install still has a working default logged-in role.
 		self::grant( 'customer', self::customer_capabilities() );
 		self::grant( 'subscriber', self::customer_capabilities() );
+	}
+
+	/**
+	 * add_role() silently no-ops if the role already exists — a capability
+	 * added to professional_capabilities()/business_capabilities()/etc.
+	 * after a role's first creation would otherwise never reach it, even on
+	 * every subsequent register() call. grant()-ing onto the existing role
+	 * instead makes register() a true "bring capabilities up to date"
+	 * operation, safe to call repeatedly (see Plugin::boot()'s admin_init
+	 * hook, gated on CAPS_VERSION so this stays cheap in the common case).
+	 *
+	 * @param string[] $caps
+	 */
+	private static function ensure_role( string $role_name, string $display_name, array $caps ): void {
+		if ( get_role( $role_name ) ) {
+			self::grant( $role_name, $caps );
+			return;
+		}
+		add_role( $role_name, $display_name, self::as_cap_map( $caps ) );
 	}
 
 	public static function deregister(): void {

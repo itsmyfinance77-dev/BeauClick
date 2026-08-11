@@ -3,6 +3,7 @@ declare( strict_types=1 );
 
 namespace BeauClick\Core;
 
+use BeauClick\Core\Admin\AdminMenu;
 use BeauClick\Core\Database\Migrator;
 use BeauClick\Core\Database\Migrations\CreateEventsTable;
 use BeauClick\Core\Roles\RoleManager;
@@ -41,6 +42,23 @@ final class Plugin {
 		add_action( 'wp_enqueue_scripts', [ $this, 'enqueue_design_tokens' ] );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_design_tokens' ] );
 		add_action( 'rest_api_init', [ $this, 'register_rest_routes' ] );
+
+		/**
+		 * Defensive re-grant, same "re-arm on admin_init" pattern as
+		 * HoldExpiryScheduler::ensure_scheduled(). A role's capabilities are
+		 * a snapshot written to the DB at whatever point register() last
+		 * ran (normally only Plugin::activate()) — not read live from
+		 * RoleManager's code — so any capability added to RoleManager since
+		 * then silently never reaches an already-existing role. Caught
+		 * live: an admin account had bc_manage_platform but was denied
+		 * editing bc_professional posts because edit_others_bc_professionals
+		 * wasn't in the admin role's actual stored capability set.
+		 * maybe_register() keeps this cheap (CAPS_VERSION-gated) rather than
+		 * re-granting on literally every admin page load.
+		 */
+		add_action( 'admin_init', [ RoleManager::class, 'maybe_register' ] );
+
+		( new AdminMenu() )->register();
 
 		if ( defined( 'WP_CLI' ) && WP_CLI ) {
 			Commands::register( $this );

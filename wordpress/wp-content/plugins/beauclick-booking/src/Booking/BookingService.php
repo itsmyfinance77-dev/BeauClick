@@ -3,6 +3,8 @@ declare( strict_types=1 );
 
 namespace BeauClick\Booking\Booking;
 
+use BeauClick\Booking\Notifications\BookingMailer;
+
 /**
  * The one place booking business logic lives — REST controller and
  * beauclick-payments' order-status/payment-complete hooks both go through
@@ -134,9 +136,11 @@ final class BookingService {
 			[ 'id' => $booking['slot_id'] ]
 		);
 
+		$actor_id = get_current_user_id();
 		if ( function_exists( 'beauclick_core' ) ) {
-			beauclick_core()->events()->log( 'booking_cancelled', 'booking', $booking_id, get_current_user_id() ?: null, [ 'reason' => $reason ] );
+			beauclick_core()->events()->log( 'booking_cancelled', 'booking', $booking_id, $actor_id ?: null, [ 'reason' => $reason ] );
 		}
+		( new BookingMailer() )->send_cancelled( $booking, $actor_id );
 
 		return true;
 	}
@@ -172,6 +176,8 @@ final class BookingService {
 				$elapsed = max( 0, strtotime( current_time( 'mysql' ) ) - strtotime( $booking['created_at'] ) );
 				beauclick_core()->events()->log( 'response_time_seconds', 'provider', (int) $booking['provider_id'], null, [ 'seconds' => $elapsed, 'booking_id' => $booking_id ] );
 			}
+
+			( new BookingMailer() )->send_confirmed( $booking );
 		}
 
 		return true;

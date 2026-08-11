@@ -3,6 +3,7 @@ declare( strict_types=1 );
 
 namespace BeauClick\Reviews;
 
+use BeauClick\Reviews\Admin\ReviewsAdminPage;
 use BeauClick\Reviews\Database\Migrations\CreateReviewsTable;
 use BeauClick\Reviews\Rest\ReviewsController;
 
@@ -26,6 +27,8 @@ final class Plugin {
 	public function boot(): void {
 		add_action( 'plugins_loaded', [ $this, 'register_migrations' ], 5 );
 		add_action( 'beauclick/core/register_rest_routes', [ $this, 'register_rest_routes' ] );
+
+		( new ReviewsAdminPage() )->register();
 	}
 
 	public function register_migrations(): void {
