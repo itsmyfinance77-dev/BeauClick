@@ -10,9 +10,22 @@ import '@/design-system/tokens.generated.css';
  * it via a delegated click listener, passing providerId/serviceId through
  * data attributes. This lets plain PHP templates trigger the React modal
  * without each template needing to know React exists.
+ *
+ * V2.0 Step 2: an AI service recommendation deep-links here with
+ * `?book_provider=X&book_service=Y` (bc_service has no page of its own, so
+ * it links to its parent provider's real profile page) — read on mount and
+ * feed the exact same setTarget() the click-delegate uses, rather than
+ * building a second booking-trigger mechanism.
  */
 function App() {
 	const [ target, setTarget ] = useState<{ providerId: number; serviceId?: number } | null>( null );
+
+	useEffect( () => {
+		const params = new URLSearchParams( window.location.search );
+		const providerId = Number( params.get( 'book_provider' ) );
+		const serviceId = params.get( 'book_service' ) ? Number( params.get( 'book_service' ) ) : undefined;
+		if ( providerId ) setTarget( { providerId, serviceId } );
+	}, [] );
 
 	useEffect( () => {
 		function onClick( e: MouseEvent ) {

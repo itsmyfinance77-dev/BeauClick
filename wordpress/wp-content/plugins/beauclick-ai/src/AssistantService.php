@@ -168,7 +168,16 @@ final class AssistantService {
 		return null !== $owner && (int) $owner === $user_id;
 	}
 
-	/** @param array<int, array{type: string, id: int}> $recommendations */
+	/**
+	 * The one place that does DB-existence validation on every recommendation
+	 * type, regardless of which ProviderInterface implementation produced
+	 * it — architecture doc §16, "never trust the model's IDs blindly."
+	 * V2.0 Step 2 added the 'service' case; every case here is a hard
+	 * existence + eligibility check against the real domain table, never a
+	 * trust of whatever the provider claimed.
+	 *
+	 * @param array<int, array{type: string, id: int, reason?: string}> $recommendations
+	 */
 	private function validate_recommendations( array $recommendations ): array {
 		global $wpdb;
 		$valid = [];
@@ -181,8 +190,20 @@ final class AssistantService {
 				}
 			} elseif ( 'product' === $rec['type'] && function_exists( 'wc_get_product' ) ) {
 				$product = wc_get_product( $rec['id'] );
+				// is_visible() is false for catalog_visibility='hidden' —
+				// exactly what ServiceProductSync sets on every bookable
+				// service's linked product, so a booking-only product can
+				// never surface here as an ordinary Shop-style recommendation.
 				if ( $product && $product->is_visible() ) {
 					$valid[] = $rec;
+				}
+			} elseif ( 'service' === $rec['type'] ) {
+				$service = get_post( $rec['id'] );
+				if ( $service && \BeauClick\Marketplace\PostTypes\Registrar::SERVICE === $service->post_type && 'publish' === $service->post_status ) {
+					$parent = get_post( $service->post_parent );
+					if ( $parent && 'publish' === $parent->post_status ) {
+						$valid[] = $rec;
+					}
 				}
 			}
 		}
@@ -243,6 +264,8 @@ final class AssistantService {
 		};
 
 		foreach ( $recommendations as $rec ) {
+			$reason = isset( $rec['reason'] ) && is_string( $rec['reason'] ) ? $rec['reason'] : null;
+
 			if ( 'provider' === $rec['type'] ) {
 				$row = $wpdb->get_row(
 					$wpdb->prepare( "SELECT name, price_from, rating_avg, review_count FROM {$wpdb->prefix}bc_provider_index WHERE provider_id = %d", $rec['id'] ), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
@@ -260,6 +283,7 @@ final class AssistantService {
 					'priceFrom'   => null !== $row['price_from'] ? (int) $row['price_from'] : null,
 					'rating'      => (float) $row['rating_avg'],
 					'reviewCount' => (int) $row['review_count'],
+					'reason'      => $reason,
 				];
 			} elseif ( 'product' === $rec['type'] && function_exists( 'wc_get_product' ) ) {
 				$product = wc_get_product( $rec['id'] );
@@ -274,6 +298,31 @@ final class AssistantService {
 					'url'     => get_permalink( $rec['id'] ) ?: null,
 					'price'   => (int) $product->get_price(),
 					'image'   => get_the_post_thumbnail_url( $rec['id'], 'medium' ) ?: null,
+					'reason'  => $reason,
+				];
+			} elseif ( 'service' === $rec['type'] ) {
+				$service = get_post( $rec['id'] );
+				if ( ! $service ) {
+					continue;
+				}
+				$provider_id = (int) $service->post_parent;
+				$enriched[]  = [
+					'type'            => 'service',
+					'id'              => $rec['id'],
+					'eventId'         => $event_id_for( 'service', $rec['id'] ),
+					'name'            => $service->post_title,
+					// A service has no standalone page (bc_service is not
+					// publicly queryable) — it deep-links to its provider's
+					// real profile page, with query params the existing
+					// booking mount reads to pre-open the booking modal on
+					// this exact service, reusing the current architecture
+					// rather than building a new one.
+					'url'             => $provider_id ? add_query_arg( [ 'book_provider' => $provider_id, 'book_service' => $rec['id'] ], get_permalink( $provider_id ) ?: '' ) : null,
+					'price'           => (int) get_post_meta( $rec['id'], '_bc_price', true ),
+					'durationMinutes' => (int) get_post_meta( $rec['id'], '_bc_duration_minutes', true ),
+					'providerId'      => $provider_id ?: null,
+					'providerName'    => $provider_id ? get_the_title( $provider_id ) : null,
+					'reason'          => $reason,
 				];
 			}
 		}

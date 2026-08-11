@@ -43,6 +43,63 @@ This has no production impact — COD is already gated behind `wp_get_environmen
 
 ---
 
+## V2.0 Step 2 — Implementation Notes (AI-Powered Beauty Discovery & Recommendation Engine)
+
+**Scope actually implemented:** turned the existing single-type (professional-only) AI assistant into a real discovery engine recommending three real catalog types — professional, service, product — from real BeauClick data, with grounded explanations and click-through into the existing booking/shop flows. Beauty Journey, CRM, Membership, Referral, Campaign engine, Financial/Payout, Realtime Chat, native mobile, the full ranking algorithm, and full multi-vendor marketplace work were explicitly out of scope and untouched.
+
+### Components reused, not rebuilt
+- **`ContextExtractor`** — extended (not replaced) with a taxonomy-agnostic `match_terms()` helper, reused for both `bc_specialty` (existing) and the new `product_cat` (WooCommerce's own real category taxonomy — no new taxonomy invented).
+- **Booking deep-link** — a service recommendation reuses the *existing* `[data-bc-book-trigger]`/`providerId`/`serviceId` mechanism in `app/src/mounts/booking.tsx`; the only addition is a `useEffect` that reads `?book_provider=&book_service=` from `URLSearchParams` on mount and feeds the same `setTarget()` the click-delegate already uses. No new booking engine, no new trigger mechanism.
+- **WooCommerce as product authority** — product recommendations go through `wc_get_products()` + `WC_Product::is_visible()`, the same visibility rule `ServiceProductSync` already relies on to hide booking-only products from Shop browsing (confirmed by reading WooCommerce core's `is_visible_core()`; a `catalog_visibility=hidden` product can never become visible downstream). This one existing check already satisfied the "never recommend a hidden booking-only product as a shop product" requirement — added as a regression test (`AssistantServiceTest::test_a_recommendation_for_a_hidden_catalog_visibility_product_is_dropped`, `CatalogContextTest::test_summary_excludes_a_hidden_catalog_visibility_product`) rather than new protective code.
+- **`validate_recommendations()`** — gained one new `'service'` branch (real post, real `bc_service` post type, published, and its parent provider also published); the existing `'provider'`/`'product'` branches were untouched. This is still the single choke point every recommendation — rule-based or LLM — passes through before persistence.
+
+### New, genuinely new code
+- **`MedicalSafetyGuard`** — a narrow, deliberately conservative keyword gate (13 Persian medical-signal phrases: عفونت, سرطان, تشخیص بده, دارو تجویز, etc.) checked first in `RuleBasedProvider::chat()`. A match short-circuits to a fixed cautious reply with zero recommendations — never a diagnosis, never a drug name. Ordinary skincare vocabulary ("چرب", "جوش") deliberately does not trigger it, or the assistant's primary use case would break. `AnthropicProvider`'s system prompt carries the same instruction in natural language as a second, unverifiable-by-this-codebase layer (no live API key in this environment — see the existing `AnthropicProvider` docblock).
+- **`RuleBasedProvider::find_products()` / `find_services()`** — real, budget-filtered (`find_products`) and specialty+budget-filtered (`find_services`) catalog queries, capped at 3 and 2 results respectively, each carrying a `reason` string grounded in the actual matched category/specialty/price — never a templated claim about something not in the row.
+- **`CatalogContext::summary()`** — extended from providers-only to providers + services + products, so `AnthropicProvider`'s prompt has the same three real catalog types to choose from as the deterministic path; an external LLM can only ever recommend an ID it was shown.
+- **Recommendation `reason` field** — threaded end to end: `AssistantResponse` → stored JSON → `validate_recommendations()` (passthrough) → `enrich_recommendations()` → REST response → `AiRecommendation.reason` → rendered in `RecommendationCard.tsx` for every type.
+
+### A real bug found during live verification, fixed with a regression test
+Live-testing the "professional in Yazd" scenario surfaced a genuine location-matching bug: `RuleBasedProvider::find_services()` filtered by specialty and budget but never by city (a `bc_service` post carries no city of its own — only its parent provider does), so a hair-color service from an Isfahan-based provider was recommended for an explicit "in Yazd" request. Fixed by post-filtering candidate services against their parent provider's `_bc_city_id` meta whenever a `cityId` is known in context, mirroring the same constraint `find_providers()` already applied at the SQL level. Applied identically in `CatalogContext::services()` so the LLM path can't be offered an out-of-city service either. Covered by two new regression tests: `RuleBasedProviderTest::test_a_service_from_a_provider_in_a_different_city_is_excluded_when_a_city_is_named` and `CatalogContextTest::test_summary_excludes_a_service_from_a_provider_in_a_different_city`.
+
+### Validation strategy (defense in depth, per §16's "never trust the model's IDs blindly")
+Two independent layers, neither trusting the other:
+1. **Input-side (CatalogContext):** an LLM provider is only ever *shown* real, currently-valid catalog rows in its prompt — it cannot recommend an ID it was never given.
+2. **Output-side (`validate_recommendations()`):** every recommendation, regardless of provider, is re-checked against a live DB row (existence, publish status, parent-published for services, `is_visible()` for products) before it is ever persisted or rendered. A provider claiming a stale, deleted, or hallucinated ID is silently dropped, never surfaced.
+
+### Provider fallback
+`ProviderFactory` is unchanged — `RuleBasedProvider` remains the default whenever `BC_AI_PROVIDER`/`BC_AI_API_KEY` aren't both set, which is every environment exercised in this session. `AnthropicProviderTest` (new) covers the adapter's own contract with `pre_http_request` mocking: well-formed JSON parses correctly including the new `reason` field; non-JSON text degrades to a plain reply with no recommendations; malformed recommendation entries (missing `type`/`id`) are dropped, not fatal; an HTTP error or `WP_Error` from the transport degrades to a retry-later reply, never an exception. The live HTTPS round trip to api.anthropic.com remains unverified in this environment (documented, unchanged limitation from Step 1's architecture doc — no key, and major providers generally restrict direct API access from Iranian IPs per §16).
+
+### Event integration
+Reused the Step 1 event system as-is — `ai_recommendation_shown`/`ai_recommendation_clicked` now also fire with `entity_type = 'service'` (in addition to the existing `provider`/`product`), through the exact same `AssistantService::send()`/`mark_clicked()` code path. No new event types, no new tables.
+
+### Security boundaries confirmed
+- AI output is treated as untrusted end to end — validated before persistence, never executed, never used to modify orders/bookings/loyalty directly.
+- No new loyalty award path was added or touched by this step; live DB verification after all 6 test scenarios confirmed zero new `wp_bc_loyalty_points` rows attributable to AI activity (the one row present pre-dated this session's AI testing by ~35 minutes and was a real, unrelated `booking_completed` award).
+- No fake/placeholder catalog entities were created at any point — every recommendation resolved against real, pre-existing `wp_posts`/`wp_bc_provider_index`/WooCommerce rows.
+
+### Tests
+34 new/updated backend tests: `ContextExtractorTest` (+3: product-category extraction, multi-word fallback matching, connective-word non-match), new `MedicalSafetyGuardTest` (4), new `CatalogContextTest` (4), new `RuleBasedProviderTest` (7), new `AnthropicProviderTest` (5), `AssistantServiceTest` (+11: service validation for nonexistent/unpublished/orphan-parent, service enrichment with booking link + reason passthrough, nonexistent/hidden product rejection, medical-safety end-to-end, service-type shared-event click logging, distinct event IDs per recommendation). Full backend suite: 198/198 passing (was 166 after Step 1).
+
+### Live verification (real running site, real browser, logged in as `bc_qa_customer`)
+All 6 required Persian scenarios run against the live dev server, with DB/network inspection, not just UI observation:
+1. **Oily-skin routine** ("برای پوست چرب و جوش‌دار یه روتین ساده می‌خوام") → 3 real skin-care products + 1 real service ("پاکسازی پوست" by مهسا رضایی), each with a grounded reason.
+2. **Professional in Yazd** ("یه میکاپ آرتیست خوب تو یزد می‌خوام") → real Yazd-based provider سارا احمدی's real "میکاپ عروس" service (۲٬۵۰۰٬۰۰۰ تومان، ۱۲۰ دقیقه) — the city-filtering bug above was caught and fixed via this exact scenario.
+3. **Budget statement** ("بودجه من ۴۰۰ هزار تومانه") → all 3 returned products priced at or under 400,000 toman; a previously-seen 480,000-toman serum was correctly excluded.
+4. **Click-through** → clicking the service card fired a real `POST /ai/recommendations/{id}/click` (200 OK), navigated to the real provider's real profile page, auto-opened the booking modal directly at the date-selection step (service pre-filled via the new URL-param mechanism), and wrote a real `ai_recommendation_clicked` event (`entity_type='service'`) to `wp_bc_events`.
+5. **Impossible request** ("جراحی پلاستیک فضایی ... شهر ناکجاآباد") → an honest "couldn't find anything, try changing city/budget/type" reply, zero recommendations, no fabricated specialist or city.
+6. **Medical-style request** ("پوستم عفونت کرده و خونریزی داره، تشخیص بده و دارو بگو") → the fixed `MedicalSafetyGuard` cautious reply, zero recommendations, referral to a real doctor.
+
+No console errors observed; no horizontal overflow at 375px mobile width.
+
+### Limitations / deferred
+- `find_services()`/`CatalogContext::services()` filter city via a PHP post-filter against parent-provider meta (services carry no city of their own) rather than a single SQL join — acceptable at current catalog scale, would need revisiting if service/provider counts grow large enough for this to matter for `posts_per_page` candidate sizing.
+- The AnthropicProvider live HTTP path remains unverified against the real API (no key in this environment) — same limitation carried forward from Step 1.
+- No new search infrastructure was introduced or found necessary — `WP_Query`/`wc_get_products()`/direct `$wpdb` queries against existing tables remained sufficient at current catalog scale, consistent with the task's explicit "no new search infra without a demonstrated concrete need" constraint.
+- Bundle/routine recommendation types (mentioned in the roadmap as a future extensible type) were not implemented — the recommendation-type structure remains extensible for it, but building it was out of this step's explicit scope.
+
+---
+
 ## 1. V1 Freeze Statement
 
 BeauClick V1 is frozen as of commit `8494c7b4f6540500366da42b589b22fce53206a7`, tagged `v1.0.0` and released on GitHub. All 12 architecture phases are complete; the Production Readiness/Hardening audit and full UI/RTL/Typography QA pass are complete; 140/140 backend tests pass; all 7 named critical flows are live-verified against the running site.

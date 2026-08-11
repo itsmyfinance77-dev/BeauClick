@@ -13,7 +13,7 @@ namespace BeauClick\AI;
 final class AssistantResponse {
 
 	/**
-	 * @param array<int, array{type: string, id: int}> $recommendations
+	 * @param array<int, array{type: string, id: int, reason?: string}> $recommendations `reason` is optional and, when present, must be grounded in real matched data (a category/specialty name, a real price) — never a fabricated claim.
 	 * @param array<string, mixed>                      $contextUpdates Merged into the conversation's stored ai_context.
 	 */
 	public function __construct(

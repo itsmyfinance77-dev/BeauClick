@@ -63,4 +63,39 @@ final class ContextExtractorTest extends WP_UnitTestCase {
 		$extractor = new ContextExtractor();
 		$this->assertNull( $extractor->extract_budget( 'برای ۵ نفر رزرو می‌خوام' ) );
 	}
+
+	public function test_extracts_a_product_category_mentioned_by_name(): void {
+		$term = wp_insert_term( 'مراقبت پوست', 'product_cat' );
+		$extractor = new ContextExtractor();
+
+		$found = $extractor->extract_product_category_ids( 'یه کرم برای مراقبت پوست می‌خوام' );
+
+		$this->assertContains( (int) $term['term_id'], $found );
+	}
+
+	/**
+	 * V2.0 Step 2 fix: the roadmap's own primary example ("برای پوست چرب و
+	 * جوش‌دار یه روتین ساده می‌خوام") never contains a multi-word term's full
+	 * name verbatim -- a word-level fallback match is required or this
+	 * example (and any natural phrasing like it) would extract nothing.
+	 */
+	public function test_a_multiword_term_matches_via_a_significant_word_not_just_the_full_phrase(): void {
+		$term = wp_insert_term( 'پوست و مو', 'bc_specialty' );
+		$extractor = new ContextExtractor();
+
+		$found = $extractor->extract_specialty_ids( 'برای پوست چرب و جوش‌دار یه روتین ساده می‌خوام' );
+
+		$this->assertContains( (int) $term['term_id'], $found, 'A significant word from a multi-word term name must match natural phrasing that never contains the full phrase.' );
+	}
+
+	public function test_short_connective_words_do_not_false_match_a_multiword_term(): void {
+		wp_insert_term( 'رنگ و مش', 'bc_specialty' );
+		$extractor = new ContextExtractor();
+
+		// Contains "و" (a 1-character connective word inside the term name)
+		// but none of the term's real significant words -- must not match.
+		$found = $extractor->extract_specialty_ids( 'من و دوستم می‌خوایم بریم بیرون' );
+
+		$this->assertSame( [], $found );
+	}
 }

@@ -28,6 +28,27 @@ final class AssistantServiceTest extends WP_UnitTestCase {
 		return $provider_id;
 	}
 
+	private function make_service( int $provider_id, string $title, int $specialty_id, int $price, string $status = 'publish' ): int {
+		$service_id = self::factory()->post->create(
+			[ 'post_type' => Registrar::SERVICE, 'post_status' => $status, 'post_parent' => $provider_id, 'post_title' => $title ]
+		);
+		wp_set_post_terms( $service_id, [ $specialty_id ], Registrar::SPECIALTY );
+		update_post_meta( $service_id, '_bc_price', $price );
+		return $service_id;
+	}
+
+	private function fake_provider_returning( array $recommendations, string $reply = 'باشه' ): \BeauClick\AI\ProviderFactory {
+		$provider = new class( $recommendations, $reply ) implements \BeauClick\AI\ProviderInterface {
+			public function __construct( private array $recommendations, private string $reply ) {}
+			public function chat( array $history, array $context ): \BeauClick\AI\AssistantResponse {
+				return new \BeauClick\AI\AssistantResponse( $this->reply, $this->recommendations );
+			}
+		};
+		$factory = $this->createMock( \BeauClick\AI\ProviderFactory::class );
+		$factory->method( 'make' )->willReturn( $provider );
+		return $factory;
+	}
+
 	public function test_sending_a_message_with_a_matching_specialty_recommends_a_real_provider(): void {
 		$term     = wp_insert_term( 'میکاپ', 'bc_specialty' );
 		$city_id  = $this->make_city( 'یزد' );
@@ -161,5 +182,159 @@ final class AssistantServiceTest extends WP_UnitTestCase {
 			ARRAY_A
 		);
 		$this->assertNotNull( $clicked, 'ai_recommendation_clicked must be written to the shared event log.' );
+	}
+
+	/**
+	 * V2.0 Step 2: validate_recommendations() gained a 'service' branch --
+	 * these mirror the existing nonexistent-provider test for every way a
+	 * claimed service id can fail to be a real, bookable, published service.
+	 */
+	public function test_a_recommendation_for_a_nonexistent_service_id_is_dropped(): void {
+		$factory = $this->fake_provider_returning( [ [ 'type' => 'service', 'id' => 999999 ] ] );
+		$user_id = self::factory()->user->create();
+
+		$result = ( new AssistantService( $factory ) )->send( $user_id, 'سلام' );
+
+		$this->assertSame( [], $result['assistantMessage']['recommendations'] );
+	}
+
+	public function test_a_recommendation_for_an_unpublished_service_is_dropped(): void {
+		$term = wp_insert_term( 'میکاپ', 'bc_specialty' );
+		$specialty_id = (int) $term['term_id'];
+		$provider_id = $this->make_provider( 'سالن تست', $specialty_id, $this->make_city( 'یزد' ) );
+		$draft_service = $this->make_service( $provider_id, 'میکاپ عروس', $specialty_id, 2000000, 'draft' );
+
+		$factory = $this->fake_provider_returning( [ [ 'type' => 'service', 'id' => $draft_service ] ] );
+		$user_id = self::factory()->user->create();
+
+		$result = ( new AssistantService( $factory ) )->send( $user_id, 'سلام' );
+
+		$this->assertSame( [], $result['assistantMessage']['recommendations'], 'A draft/unpublished service must never be recommended.' );
+	}
+
+	public function test_a_recommendation_for_a_service_whose_parent_provider_is_unpublished_is_dropped(): void {
+		$term = wp_insert_term( 'میکاپ', 'bc_specialty' );
+		$specialty_id = (int) $term['term_id'];
+		$draft_provider = self::factory()->post->create( [ 'post_type' => Registrar::PROFESSIONAL, 'post_status' => 'draft' ] );
+		$orphan_service = $this->make_service( $draft_provider, 'میکاپ عروس', $specialty_id, 2000000 );
+
+		$factory = $this->fake_provider_returning( [ [ 'type' => 'service', 'id' => $orphan_service ] ] );
+		$user_id = self::factory()->user->create();
+
+		$result = ( new AssistantService( $factory ) )->send( $user_id, 'سلام' );
+
+		$this->assertSame( [], $result['assistantMessage']['recommendations'], 'A service whose parent provider is not published must never be recommended -- it would deep-link into a page that does not exist.' );
+	}
+
+	public function test_a_valid_service_recommendation_is_enriched_with_a_provider_prefill_booking_link(): void {
+		$term = wp_insert_term( 'میکاپ', 'bc_specialty' );
+		$specialty_id = (int) $term['term_id'];
+		$provider_id = $this->make_provider( 'سالن تست', $specialty_id, $this->make_city( 'یزد' ) );
+		$service_id = $this->make_service( $provider_id, 'میکاپ عروس', $specialty_id, 2000000 );
+
+		$factory = $this->fake_provider_returning( [ [ 'type' => 'service', 'id' => $service_id, 'reason' => 'دقیقاً همون چیزی که خواستی' ] ] );
+		$user_id = self::factory()->user->create();
+
+		$result = ( new AssistantService( $factory ) )->send( $user_id, 'سلام' );
+		$rec    = $result['assistantMessage']['recommendations'][0];
+
+		$this->assertSame( 'service', $rec['type'] );
+		$this->assertSame( $service_id, $rec['id'] );
+		$this->assertSame( $provider_id, $rec['providerId'] );
+		$this->assertStringContainsString( 'book_provider=' . $provider_id, $rec['url'] );
+		$this->assertStringContainsString( 'book_service=' . $service_id, $rec['url'] );
+		$this->assertSame( 'دقیقاً همون چیزی که خواستی', $rec['reason'], 'A provider-supplied reason must be threaded through to the enriched card, never dropped or replaced.' );
+	}
+
+	/**
+	 * Mirrors test_a_recommendation_for_a_nonexistent_provider_id_is_dropped
+	 * for the 'product' branch of validate_recommendations() -- not
+	 * previously covered on its own.
+	 */
+	public function test_a_recommendation_for_a_nonexistent_product_id_is_dropped(): void {
+		$factory = $this->fake_provider_returning( [ [ 'type' => 'product', 'id' => 999999 ] ] );
+		$user_id = self::factory()->user->create();
+
+		$result = ( new AssistantService( $factory ) )->send( $user_id, 'سلام' );
+
+		$this->assertSame( [], $result['assistantMessage']['recommendations'] );
+	}
+
+	public function test_a_recommendation_for_a_hidden_catalog_visibility_product_is_dropped(): void {
+		$product = new \WC_Product_Simple();
+		$product->set_name( 'محصول مخفی' );
+		$product->set_regular_price( '100000' );
+		$product->set_price( '100000' );
+		$product->set_catalog_visibility( 'hidden' );
+		$product->set_status( 'publish' );
+		$product->save();
+
+		$factory = $this->fake_provider_returning( [ [ 'type' => 'product', 'id' => $product->get_id() ] ] );
+		$user_id = self::factory()->user->create();
+
+		$result = ( new AssistantService( $factory ) )->send( $user_id, 'سلام' );
+
+		$this->assertSame( [], $result['assistantMessage']['recommendations'], 'A hidden booking-only product must never be recommended as an ordinary shop product.' );
+	}
+
+	/**
+	 * Runs through the REAL default provider (RuleBasedProvider, via the
+	 * default ProviderFactory) -- confirms the medical-safety short-circuit
+	 * added in RuleBasedProvider::chat() is actually wired end-to-end
+	 * through AssistantService::send(), not just unit-tested in isolation.
+	 */
+	public function test_a_medical_concern_message_never_produces_a_diagnosis_or_recommendations(): void {
+		$user_id = self::factory()->user->create();
+		$result  = ( new AssistantService() )->send( $user_id, 'پوستم عفونت کرده، تشخیص بده چیه' );
+
+		$this->assertIsArray( $result );
+		$this->assertSame( [], $result['assistantMessage']['recommendations'] );
+		$this->assertStringContainsString( 'پزشک', $result['assistantMessage']['body'] );
+	}
+
+	public function test_marking_a_service_recommendation_clicked_writes_a_shared_event_with_service_entity_type(): void {
+		global $wpdb;
+		$term = wp_insert_term( 'میکاپ', 'bc_specialty' );
+		$specialty_id = (int) $term['term_id'];
+		$provider_id = $this->make_provider( 'سالن تست', $specialty_id, $this->make_city( 'یزد' ) );
+		$service_id = $this->make_service( $provider_id, 'میکاپ عروس', $specialty_id, 2000000 );
+
+		$factory = $this->fake_provider_returning( [ [ 'type' => 'service', 'id' => $service_id ] ] );
+		$owner   = self::factory()->user->create();
+		$service = new AssistantService( $factory );
+		$result  = $service->send( $owner, 'سلام' );
+
+		$event_id = $this->first_recommendation_event_id( $result['assistantMessage']['id'] );
+		$this->assertTrue( $service->mark_clicked( $event_id, $owner ) );
+
+		$clicked = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT * FROM {$wpdb->prefix}bc_events WHERE event_type = 'ai_recommendation_clicked' AND entity_type = 'service' AND entity_id = %d",
+				$service_id
+			),
+			ARRAY_A
+		);
+		$this->assertNotNull( $clicked );
+	}
+
+	/**
+	 * Two distinct recommendations in the same reply must each get their
+	 * own event id -- clicking one must never be attributable to the other.
+	 */
+	public function test_multiple_recommendations_in_one_reply_get_distinct_event_ids(): void {
+		$term = wp_insert_term( 'میکاپ', 'bc_specialty' );
+		$specialty_id = (int) $term['term_id'];
+		$provider_id = $this->make_provider( 'سالن تست', $specialty_id, $this->make_city( 'یزد' ) );
+		$service_id = $this->make_service( $provider_id, 'میکاپ عروس', $specialty_id, 2000000 );
+
+		$factory = $this->fake_provider_returning(
+			[ [ 'type' => 'provider', 'id' => $provider_id ], [ 'type' => 'service', 'id' => $service_id ] ]
+		);
+		$user_id = self::factory()->user->create();
+		$result  = ( new AssistantService( $factory ) )->send( $user_id, 'سلام' );
+
+		$recs = $result['assistantMessage']['recommendations'];
+		$this->assertCount( 2, $recs );
+		$this->assertNotSame( $recs[0]['eventId'], $recs[1]['eventId'] );
 	}
 }

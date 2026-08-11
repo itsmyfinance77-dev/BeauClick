@@ -67,10 +67,11 @@ final class AnthropicProvider implements ProviderInterface {
 	}
 
 	private function system_prompt( array $context ): string {
-		return "شما دستیار زیبایی BeauClick هستید — توصیه‌های واقعی و مرتبط بر اساس کاتالوگ واقعی ارائه می‌دهید، هرگز نام یا شناسه‌ای که در فهرست زیر نیست پیشنهاد ندهید.\n\n"
-			. 'کاتالوگ در دسترس (JSON): ' . wp_json_encode( $this->catalog->summary( $context ) ) . "\n\n"
+		return "شما دستیار کشف زیبایی BeauClick هستید — لحنی گرم، آرام و حرفه‌ای دارید (نه رباتیک، نه بیش‌ازحد مشتاق). فقط بر اساس کاتالوگ واقعی زیر توصیه بده؛ هرگز نام، شناسه، قیمت یا موجودیتی که در فهرست نیست را نساز یا حدس نزن — اگر گزینه واقعی مناسبی نبود، صادقانه بگو و جایگزین منطقی (مثل تغییر شهر/بودجه) پیشنهاد بده.\n\n"
+			. "شما هرگز تشخیص پزشکی نمی‌دهید، قطعیت درباره یک بیماری ادعا نمی‌کنید و دارو تجویز نمی‌کنید. اگر پیام کاربر نشانه نگران‌کننده پزشکی داشت (مثل عفونت، آلرژی شدید، خونریزی، زخم عمیق)، با احتیاط پاسخ بده و او را به مراجعه به پزشک یا متخصص ارجاع بده، نه راهنمایی درمانی.\n\n"
+			. 'کاتالوگ در دسترس (JSON، هر آیتم دارای type از {provider, service, product}): ' . wp_json_encode( $this->catalog->summary( $context ) ) . "\n\n"
 			. 'زمینه شناخته‌شده کاربر (JSON): ' . wp_json_encode( $context ) . "\n\n"
-			. 'پاسخ را دقیقاً به‌صورت یک شیء JSON با کلیدهای reply (متن فارسی)، recommendations (آرایه‌ای از {type, id} فقط از کاتالوگ بالا) و context_updates (تغییرات زمینه، مثل specialtyIds/cityId/budget) بازگردانید. کلید دیگری اضافه نکنید و متن خارج از JSON ننویسید.';
+			. 'پاسخ را دقیقاً به‌صورت یک شیء JSON با کلیدهای reply (متن فارسی طبیعی)، recommendations (آرایه‌ای از {type, id, reason} فقط از کاتالوگ بالا — reason یک توضیح کوتاه و مبتنی‌بر داده واقعی است، نه ادعای ساختگی) و context_updates (تغییرات زمینه، مثل specialtyIds/productCategoryIds/cityId/budget) بازگردانید. کلید دیگری اضافه نکنید و متن خارج از JSON ننویسید.';
 	}
 
 	/** Parses the model's JSON reply leniently — a malformed/non-JSON response degrades to plain text with no recommendations, never a fatal error. */
@@ -84,7 +85,11 @@ final class AnthropicProvider implements ProviderInterface {
 		$recommendations = [];
 		foreach ( (array) ( $decoded['recommendations'] ?? [] ) as $r ) {
 			if ( isset( $r['type'], $r['id'] ) && is_string( $r['type'] ) ) {
-				$recommendations[] = [ 'type' => $r['type'], 'id' => (int) $r['id'] ];
+				$rec = [ 'type' => $r['type'], 'id' => (int) $r['id'] ];
+				if ( isset( $r['reason'] ) && is_string( $r['reason'] ) ) {
+					$rec['reason'] = $r['reason'];
+				}
+				$recommendations[] = $rec;
 			}
 		}
 

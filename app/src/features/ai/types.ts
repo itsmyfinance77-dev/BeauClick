@@ -1,5 +1,5 @@
 export interface AiRecommendation {
-	type: 'provider' | 'product';
+	type: 'provider' | 'product' | 'service';
 	id: number;
 	eventId: number | null;
 	name: string;
@@ -9,6 +9,10 @@ export interface AiRecommendation {
 	rating?: number;
 	reviewCount?: number;
 	image?: string | null;
+	durationMinutes?: number;
+	providerId?: number | null;
+	providerName?: string | null;
+	reason?: string | null;
 }
 
 export interface AiMessage {
