@@ -28,11 +28,10 @@ WordPress core itself (`wp-admin/`, `wp-includes/`, root PHP files) is **not com
 
 ## Local development setup (Windows)
 
-Recommended stack: **[Laragon](https://laragon.org/download/)** (PHP + MySQL/MariaDB + Apache/Nginx + auto virtual hosts, no Docker needed for local dev — see [architecture doc §23](docs/architecture/ARCHITECTURE_PROPOSAL.md#23-local-windows-setup) for why).
+You need PHP, MySQL, Composer, and WP-CLI available. **[Laragon](https://laragon.org/download/)** is a convenient way to get PHP + MySQL + Composer bundled on Windows with no Docker needed — but this project does **not** use Laragon's Apache/Nginx virtual-host layer. WordPress is served by **PHP's own built-in development server**, driven by the committed [`wordpress/router.php`](wordpress/router.php) (which exists specifically to make pretty permalinks work under `php -S`, since it has no `.htaccess`/`mod_rewrite` support). This keeps the whole stack to one process, matches `.env`'s `WP_HOME=http://localhost:8080` exactly, and avoids maintaining a separate vhost config. If you already have PHP + MySQL from any other source (a standalone install, WAMP/XAMPP, WSL, etc.), that works too — Laragon just needs to be running for its MySQL service, not its web server.
 
-1. Install Laragon (Full edition — bundles PHP, MySQL, Composer). Start it; enable Apache (or Nginx) + MySQL from its control panel.
-2. Point a Laragon virtual host at this repo's `wordpress/` folder, named `beauclick.test` (Laragon auto-detects folders under its `www/` root, or add one manually via Laragon → Menu → Apache/Nginx → sites-enabled).
-3. From the repo root:
+1. Get PHP + MySQL running (Laragon: install, start it, enable MySQL from its control panel — you do **not** need to enable Apache/Nginx, and you do **not** need to create a virtual host).
+2. From the repo root:
    ```bash
    # WordPress core (not committed — pulled fresh)
    cd wordpress && composer create-project johnpbloch/wordpress . --prefer-dist
@@ -47,11 +46,15 @@ Recommended stack: **[Laragon](https://laragon.org/download/)** (PHP + MySQL/Mar
    # Frontend app-shell
    cd app && npm install && npm run build
    ```
-4. Copy `.env.example` to `.env`, fill in DB credentials (Laragon default: user `root`, empty password) and generate WordPress salts from https://api.wordpress.org/secret-key/1.1/salt/.
-5. Visit `http://beauclick.test/wp-admin/install.php` to run the WordPress installer, then activate WooCommerce and every `beauclick-*` plugin, then activate the `beauclick` theme.
+3. Copy `.env.example` to `.env`, fill in DB credentials (Laragon default: user `root`, empty password) and generate WordPress salts from https://api.wordpress.org/secret-key/1.1/salt/. Leave `WP_HOME`/`WP_SITEURL` as `http://localhost:8080` unless you have a reason to change them.
+4. Start the dev server from the `wordpress/` folder:
+   ```bash
+   cd wordpress && php -S localhost:8080 router.php
+   ```
+5. Visit `http://localhost:8080/wp-admin/install.php` to run the WordPress installer, then activate WooCommerce and every `beauclick-*` plugin, then activate the `beauclick` theme.
 6. Seed reference data (Iran provinces/cities, demo professionals): `wp bc:seed` (WP-CLI command registered by `beauclick-core`).
 
-**If Laragon isn't installed yet:** everything under `app/` builds and runs standalone right now with only Node.js (`cd app && npm install && npm run dev`) — useful for design-system/UI work without a PHP environment. The WordPress/plugin code is complete and ready to run the moment PHP + MySQL are available; it just can't be executed or migrated until then.
+**If PHP/MySQL aren't available yet:** everything under `app/` builds and runs standalone right now with only Node.js (`cd app && npm install && npm run dev`) — useful for design-system/UI work without a PHP environment. The WordPress/plugin code is complete and ready to run the moment PHP + MySQL are available; it just can't be executed or migrated until then.
 
 ## Frontend-only preview (no PHP required)
 
