@@ -1,0 +1,14 @@
+{
+    "name": "beauclick/b2b",
+    "description": "BeauClick B2B — business accounts, tiered wholesale pricing, MOQ, and quotes. Custom (not a third-party plugin) after review: the free tiers of the popular WooCommerce wholesale plugins don't include tiered quantity pricing or MOQ (paywalled add-ons), and this environment has no way to purchase/license one. Built directly on WooCommerce's own pricing hooks, same pattern any of those plugins would use internally.",
+    "type": "wordpress-plugin",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "BeauClick\\B2B\\": "src/"
+        }
+    }
+}

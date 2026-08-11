@@ -34,8 +34,13 @@ function App() {
 				e.preventDefault();
 				const productId = Number( addTrigger.dataset.productId );
 				if ( ! productId ) return;
+				// Wholesale ("افزودن به سفارش عمده") triggers carry the
+				// product's MOQ so the first add already meets it — adding
+				// qty=1 to a wholesale-only product would otherwise
+				// immediately trip TierPricingEngine::validate_moq() server-side.
+				const quantity = addTrigger.dataset.quantity ? Number( addTrigger.dataset.quantity ) : 1;
 				setPending( true );
-				storeApi.addItem( productId )
+				storeApi.addItem( productId, quantity )
 					.then( ( cart ) => {
 						updateBadge( cart.items_count );
 						setRefreshToken( ( n ) => n + 1 );
