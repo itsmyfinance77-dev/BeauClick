@@ -310,3 +310,31 @@
 	color: var(--bc-color-ink-faint);
 	font-size: 13px;
 }
+
+/* Dashboard — sticky sidebar+content on desktop; below 899px there's no
+   room for a fixed sidebar, so the nav collapses into the same horizontal
+   scroll-strip pattern as .bc-chip-row and the content stacks under it
+   full-width. */
+.bc-dashboard-nav {
+	flex-direction: column;
+	width: 220px;
+	flex-shrink: 0;
+	position: sticky;
+	top: 88px;
+}
+
+@media (max-width: 899px) {
+	.bc-dashboard-layout {
+		flex-direction: column;
+	}
+	.bc-dashboard-nav {
+		position: static;
+		flex-direction: row;
+		width: 100%;
+		overflow-x: auto;
+		padding-bottom: 4px;
+	}
+	.bc-dashboard-nav button {
+		flex-shrink: 0;
+	}
+}

@@ -7,6 +7,7 @@ use BeauClick\Booking\Booking\BookingService;
 use BeauClick\Payments\Booking\BookingOrderBridge;
 use BeauClick\Payments\Database\Seeds\DemoProductsSeed;
 use BeauClick\Payments\Product\ServiceProductSync;
+use BeauClick\Payments\Rest\MyOrdersController;
 
 final class Plugin {
 
@@ -44,6 +45,11 @@ final class Plugin {
 
 		add_filter( 'beauclick/booking/after_create', [ $this, 'attach_order_to_booking_result' ], 10, 2 );
 		add_action( 'beauclick/seed', [ $this, 'maybe_seed' ] );
+		add_action( 'beauclick/core/register_rest_routes', [ $this, 'register_rest_routes' ] );
+	}
+
+	public function register_rest_routes(): void {
+		( new MyOrdersController() )->register_routes();
 	}
 
 	public function maybe_seed( ?string $only ): void {

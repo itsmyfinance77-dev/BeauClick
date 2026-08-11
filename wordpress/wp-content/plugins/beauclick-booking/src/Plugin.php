@@ -8,6 +8,7 @@ use BeauClick\Booking\Database\Migrations\AddHoldExpiryColumns;
 use BeauClick\Booking\Database\Migrations\CreateBookingTables;
 use BeauClick\Booking\Database\Seeds\DemoAvailabilitySeed;
 use BeauClick\Booking\Rest\BookingController;
+use BeauClick\Booking\Rest\DashboardController;
 
 final class Plugin {
 
@@ -45,6 +46,7 @@ final class Plugin {
 
 	public function register_rest_routes(): void {
 		( new BookingController() )->register_routes();
+		( new DashboardController() )->register_routes();
 	}
 
 	public function maybe_seed( ?string $only ): void {
