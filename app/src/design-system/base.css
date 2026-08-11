@@ -5,13 +5,19 @@
 
 @font-face {
 	font-family: 'Vazirmatn';
-	/* Self-hosted variable font — do not hotlink a font CDN in production:
-	   external CDNs are a real reliability risk for an Iran-hosted site.
-	   Place the official Vazirmatn variable woff2 (github.com/rastikerdar/vazirmatn)
-	   at this path in both the theme (wp-content/themes/beauclick/assets/fonts/)
-	   and here for the standalone dev preview. */
-	src: url('/fonts/Vazirmatn[wght].woff2') format('woff2-variations'),
-		url('/fonts/Vazirmatn[wght].woff2') format('woff2');
+	/* Self-hosted variable font (github.com/rastikerdar/vazirmatn) — do not
+	   hotlink a font CDN in production: external CDNs are a real
+	   reliability risk for an Iran-hosted site. A relative url(), not an
+	   absolute `/fonts/...` one, is what makes this portable: Vite resolves
+	   it against this file's own location (src/assets/fonts/), copies the
+	   font into the hashed build output, and rewrites the reference
+	   automatically — the previous absolute-path version only happened to
+	   work when the dev server's docroot was the site root, and 404'd
+	   everywhere else (the font was also never actually committed, so it
+	   was 404ing regardless — see the theme's components.css for the same
+	   fix applied to the plain-CSS copy). */
+	src: url('../assets/fonts/Vazirmatn[wght].woff2') format('woff2-variations'),
+		url('../assets/fonts/Vazirmatn[wght].woff2') format('woff2');
 	font-weight: 100 900;
 	font-display: swap;
 }

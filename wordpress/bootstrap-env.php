@@ -35,6 +35,21 @@ if ( ! defined( 'BC_ENV' ) ) {
 }
 
 /**
+ * Wires .env's WP_ENV onto WordPress's own WP_ENVIRONMENT_TYPE constant —
+ * done here (not in the untracked, per-environment wp-config.php) so it
+ * takes effect automatically on every environment that has a .env, with
+ * nothing to remember to re-wire when wp-config.php gets regenerated.
+ * wp_get_environment_type() defaults to 'production' when this is unset
+ * or not one of WordPress's four recognized values — the safe direction,
+ * since beauclick-payments gates enabling the local-only Cash on Delivery
+ * gateway on this being anything other than 'production'.
+ */
+if ( ! defined( 'WP_ENVIRONMENT_TYPE' ) ) {
+	$bc_wp_env = BC_ENV['WP_ENV'] ?? 'production';
+	define( 'WP_ENVIRONMENT_TYPE', in_array( $bc_wp_env, [ 'local', 'development', 'staging', 'production' ], true ) ? $bc_wp_env : 'production' );
+}
+
+/**
  * @param string $key
  * @param string $default
  */

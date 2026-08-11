@@ -72,10 +72,19 @@ final class QuoteService {
 	/**
 	 * Converts an accepted quote into a real WooCommerce order — the buyer
 	 * then pays through the normal checkout flow, same as any other order.
+	 *
+	 * $business_account_id must be the CALLER's own business account
+	 * (resolved by the controller via BusinessAccountService::find_by_user()),
+	 * checked against the quote's owner here — without it, any approved B2B
+	 * account could accept any OTHER business's negotiated quote, since
+	 * require_approved_business() (the route's permission_callback) only
+	 * verifies the caller is *a* approved business, not that they're *this*
+	 * quote's business. Same ownership-in-the-service-layer shape as
+	 * ReviewService::create() checking booking ownership.
 	 */
-	public function accept( int $quote_id, int $customer_user_id ): ?\WC_Order {
+	public function accept( int $quote_id, int $business_account_id, int $customer_user_id ): ?\WC_Order {
 		$quote = $this->find( $quote_id );
-		if ( ! $quote || self::STATUS_QUOTED !== $quote['status'] ) {
+		if ( ! $quote || self::STATUS_QUOTED !== $quote['status'] || (int) $quote['business_account_id'] !== $business_account_id ) {
 			return null;
 		}
 

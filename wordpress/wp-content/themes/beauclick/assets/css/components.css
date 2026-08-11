@@ -9,13 +9,16 @@
 
 @font-face {
 	font-family: 'Vazirmatn';
-	/* Self-hosted variable font — do not hotlink a font CDN in production:
-	   external CDNs are a real reliability risk for an Iran-hosted site.
-	   Place the official Vazirmatn variable woff2 (github.com/rastikerdar/vazirmatn)
-	   at this path in both the theme (wp-content/themes/beauclick/assets/fonts/)
-	   and here for the standalone dev preview. */
-	src: url('/fonts/Vazirmatn[wght].woff2') format('woff2-variations'),
-		url('/fonts/Vazirmatn[wght].woff2') format('woff2');
+	/* Self-hosted variable font (github.com/rastikerdar/vazirmatn) — do not
+	   hotlink a font CDN in production: external CDNs are a real
+	   reliability risk for an Iran-hosted site. Relative to this file
+	   (assets/css/components.css), so it resolves correctly regardless of
+	   where WordPress itself is installed (subdirectory, different domain,
+	   etc.) — an absolute `/fonts/...` path only happened to work when the
+	   site's docroot was also the WP install root, and the font was never
+	   actually committed here either way, so this was 404ing everywhere. */
+	src: url('../fonts/Vazirmatn[wght].woff2') format('woff2-variations'),
+		url('../fonts/Vazirmatn[wght].woff2') format('woff2');
 	font-weight: 100 900;
 	font-display: swap;
 }

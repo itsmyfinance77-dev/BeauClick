@@ -123,12 +123,31 @@ final class Plugin {
 	public static function activate(): void {
 		Migrator::install_ledger();
 		RoleManager::register();
+		self::ensure_site_timezone();
 
 		$instance = self::instance();
 		$instance->register_services();
 		$instance->migrator()->run_group( 'beauclick-core' );
 
 		flush_rewrite_rules();
+	}
+
+	/**
+	 * Not the same thing as the architecture doc's "never hard-code Tehran"
+	 * rule — that rule is about not defaulting *business* data (a user's
+	 * city, search results, demo content) to one launch city. A timezone is
+	 * a genuine platform-wide setting: Iran has a single zone nationwide
+	 * (UTC+3:30, no DST), so "Asia/Tehran" is correct for every city
+	 * BeauClick ever launches in, not a Tehran-specific assumption. Left
+	 * unset, WordPress defaults to UTC, which a production-readiness audit
+	 * found several booking-availability date comparisons silently assumed
+	 * was already correct. Only sets it if still WordPress's own blank
+	 * default — never overwrites a value an admin deliberately changed.
+	 */
+	private static function ensure_site_timezone(): void {
+		if ( '' === get_option( 'timezone_string' ) && 0.0 === (float) get_option( 'gmt_offset' ) ) {
+			update_option( 'timezone_string', 'Asia/Tehran' );
+		}
 	}
 
 	public static function deactivate(): void {

@@ -178,9 +178,24 @@ final class Plugin {
 	 * swapping in a real Iranian gateway later is enabling that gateway's
 	 * own plugin, zero changes to this bridge). Idempotent: only touches
 	 * settings that differ from the desired state, safe to call repeatedly.
+	 *
+	 * Gated on wp_get_environment_type() — a production-readiness audit
+	 * flagged that the "local development only" label was UI text only,
+	 * with no actual mechanism stopping a production activation (or
+	 * reactivation, e.g. during a redeploy) from silently turning on an
+	 * unauthenticated "payment succeeded" path with no real money
+	 * verification behind it. wp_get_environment_type() defaults to
+	 * 'production' when WP_ENVIRONMENT_TYPE isn't set (see
+	 * bootstrap-env.php), so a production deploy is safe by default even
+	 * if nobody remembers to configure this explicitly.
 	 */
 	public static function activate(): void {
 		if ( ! class_exists( 'WC_Payment_Gateways' ) ) {
+			return;
+		}
+		if ( 'production' === wp_get_environment_type() ) {
+			self::ensure_store_is_reachable();
+			self::ensure_classic_checkout();
 			return;
 		}
 

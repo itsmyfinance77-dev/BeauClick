@@ -98,16 +98,26 @@ final class BookingController extends RestController {
 		global $wpdb;
 		$provider_id = (int) $request->get_param( 'provider_id' );
 		$date        = $request->get_param( 'date' );
+		$now         = current_time( 'mysql' ); // Site-local — see the note below on why the 7-day upper bound must derive from this, not time().
 
 		$where  = [ 'provider_id = %d', "status = 'open'", 'start_at >= %s' ];
-		$params = [ $provider_id, $date ? "{$date} 00:00:00" : current_time( 'mysql' ) ];
+		$params = [ $provider_id, $date ? "{$date} 00:00:00" : $now ];
 
 		if ( $date ) {
 			$where[]  = 'start_at < %s';
 			$params[] = gmdate( 'Y-m-d', strtotime( $date ) + DAY_IN_SECONDS ) . ' 00:00:00';
 		} else {
+			// A production-readiness audit caught this mixing time() (true
+			// UTC) with current_time('mysql') (site-local) as the lower
+			// bound above — once the site timezone is set away from UTC
+			// (Iran is UTC+3:30), the two bounds of this "next 7 days"
+			// window would be offset from each other by exactly that much,
+			// clipping or extending the window unpredictably right at its
+			// edges. Deriving both from the same $now (naive site-local
+			// arithmetic, the idiom used everywhere else in this module —
+			// see BookingService) keeps them consistent.
 			$where[]  = 'start_at < %s';
-			$params[] = gmdate( 'Y-m-d H:i:s', time() + 7 * DAY_IN_SECONDS );
+			$params[] = gmdate( 'Y-m-d H:i:s', strtotime( $now ) + 7 * DAY_IN_SECONDS );
 		}
 
 		$sql  = 'SELECT id, service_id, start_at, end_at FROM ' . $wpdb->prefix . 'bc_availability_slots WHERE ' . implode( ' AND ', $where ) . ' ORDER BY start_at ASC';
@@ -133,6 +143,9 @@ final class BookingController extends RestController {
 
 		$result = ( new BookingService() )->create_booking( $customer_id, $provider_id, (int) $request->get_param( 'slot_id' ), $service_id );
 
+		if ( false === $result ) {
+			return Response::error( 'bc_too_many_holds', __( 'شما چند رزرو در انتظار پرداخت دارید — ابتدا آن‌ها را تکمیل یا لغو کنید.', 'beauclick-booking' ), 429 );
+		}
 		if ( null === $result ) {
 			return Response::error( 'bc_slot_unavailable', __( 'این زمان دیگر در دسترس نیست — لطفاً زمان دیگری انتخاب کنید.', 'beauclick-booking' ), 409 );
 		}

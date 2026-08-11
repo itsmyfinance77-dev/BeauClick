@@ -259,4 +259,46 @@ final class BookingServiceTest extends WP_UnitTestCase {
 		$slot_status = $wpdb->get_var( $wpdb->prepare( "SELECT status FROM {$wpdb->prefix}bc_availability_slots WHERE id = %d", $slot_id ) );
 		$this->assertSame( 'held', $slot_status, "The reclaimer's active hold must survive the sweep triggered by the original abandoner's stale booking record." );
 	}
+
+	/**
+	 * The abuse case a production-readiness audit flagged: nothing
+	 * previously stopped one customer from holding an unlimited number of
+	 * slots simultaneously (each hold locks a slot for HOLD_MINUTES),
+	 * which — spread across a popular provider's whole calendar — could
+	 * starve real customers out of ever finding an open slot.
+	 */
+	public function test_a_customer_cannot_hold_more_than_the_concurrent_hold_cap(): void {
+		$provider_id = self::factory()->user->create();
+		$customer_id = self::factory()->user->create();
+		$service     = new BookingService();
+
+		for ( $i = 0; $i < BookingService::MAX_CONCURRENT_HOLDS_PER_CUSTOMER; $i++ ) {
+			$slot_id = $this->make_open_slot( $provider_id );
+			$result  = $service->create_booking( $customer_id, $provider_id, $slot_id );
+			$this->assertIsArray( $result, "Hold {$i} should still be within the cap." );
+		}
+
+		$one_more_slot = $this->make_open_slot( $provider_id );
+		$blocked       = $service->create_booking( $customer_id, $provider_id, $one_more_slot );
+
+		$this->assertFalse( $blocked, "A customer must be blocked from holding more than MAX_CONCURRENT_HOLDS_PER_CUSTOMER slots at once, distinct from a plain slot-unavailable null." );
+	}
+
+	public function test_confirming_a_hold_frees_up_room_under_the_concurrent_hold_cap(): void {
+		$provider_id = self::factory()->user->create();
+		$customer_id = self::factory()->user->create();
+		$service     = new BookingService();
+
+		$bookings = [];
+		for ( $i = 0; $i < BookingService::MAX_CONCURRENT_HOLDS_PER_CUSTOMER; $i++ ) {
+			$slot_id    = $this->make_open_slot( $provider_id );
+			$bookings[] = $service->create_booking( $customer_id, $provider_id, $slot_id );
+		}
+
+		// Confirming moves one out of 'pending', freeing a slot under the cap.
+		$service->confirm_booking( $bookings[0]['booking_id'] );
+
+		$another_slot = $this->make_open_slot( $provider_id );
+		$this->assertIsArray( $service->create_booking( $customer_id, $provider_id, $another_slot ), 'Once a hold is confirmed (no longer pending), the customer must be able to hold a new slot again.' );
+	}
 }

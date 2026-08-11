@@ -105,4 +105,39 @@ final class BookingControllerTest extends WP_UnitTestCase {
 
 		$this->assertCount( 1, $bookings );
 	}
+
+	/**
+	 * A production-readiness audit caught availability() mixing time()
+	 * (true UTC) with current_time('mysql') (site-local) for the "next 7
+	 * days" window's two ends — under Iran's UTC+3:30 offset (no DST, so
+	 * this never self-corrects), that skewed the window by 3.5 hours at
+	 * each edge. A slot exactly at "now + 7 days" in site-local time must
+	 * be excluded either way (open interval), but the point of this test
+	 * is that the window's actual width is a clean 7×24h span from
+	 * site-local "now" — not from a different, UTC-based "now".
+	 */
+	public function test_availability_window_uses_a_consistent_time_base_under_a_non_utc_site_timezone(): void {
+		update_option( 'gmt_offset', 3.5 ); // Iran Standard Time, no DST.
+		global $wpdb;
+
+		$provider_id = self::factory()->user->create();
+
+		$just_inside  = gmdate( 'Y-m-d H:i:s', strtotime( current_time( 'mysql' ) ) + 7 * DAY_IN_SECONDS - HOUR_IN_SECONDS );
+		$just_outside = gmdate( 'Y-m-d H:i:s', strtotime( current_time( 'mysql' ) ) + 7 * DAY_IN_SECONDS + HOUR_IN_SECONDS );
+
+		foreach ( [ 'inside' => $just_inside, 'outside' => $just_outside ] as $label => $start ) {
+			$wpdb->insert(
+				$wpdb->prefix . 'bc_availability_slots',
+				[ 'provider_id' => $provider_id, 'start_at' => $start, 'end_at' => $start, 'status' => 'open', 'created_at' => current_time( 'mysql' ) ]
+			);
+		}
+
+		$request = new \WP_REST_Request( 'GET', '/beauclick/v1/booking/availability' );
+		$request->set_param( 'provider_id', $provider_id );
+		$slots = ( new BookingController() )->availability( $request )->get_data()['data'];
+
+		$starts = array_column( $slots, 'startAt' );
+		$this->assertContains( $just_inside, $starts, 'A slot 1 hour inside the 7-day window (measured from site-local now) must be included.' );
+		$this->assertNotContains( $just_outside, $starts, 'A slot 1 hour beyond the 7-day window must be excluded — if the two bounds used different time bases, this could wrongly include it.' );
+	}
 }

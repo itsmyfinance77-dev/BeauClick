@@ -29,6 +29,19 @@ final class BookingService {
 	public const HOLD_MINUTES = 15;
 
 	/**
+	 * A production-readiness audit flagged that booking creation had no
+	 * abuse guard: since every self-registered customer account gets
+	 * bc_book_service automatically, a scripted account could repeatedly
+	 * hold slots (each hold locks one for HOLD_MINUTES, re-claiming it the
+	 * instant it's about to expire) and starve real customers out of a
+	 * popular provider's availability — a pure request-rate limit alone
+	 * wouldn't stop this, since the attack is about *accumulating*
+	 * concurrent holds, not the request rate. Capping how many holds one
+	 * customer can have open at once addresses the actual threat directly.
+	 */
+	public const MAX_CONCURRENT_HOLDS_PER_CUSTOMER = 5;
+
+	/**
 	 * Atomically claims a slot (open, OR held by an expired hold nobody
 	 * confirmed) and creates the booking in one operation. Concurrency
 	 * safety comes from a single `UPDATE ... WHERE (...)` — MySQL row-locks
@@ -44,10 +57,22 @@ final class BookingService {
 	 * it and cancelling the abandoned booking record — a customer is never
 	 * blocked by cron timing, only by an *active* hold.
 	 *
-	 * @return array{booking_id:int}|null Null means the slot was not available.
+	 * @return array{booking_id:int}|null|false Null means the slot was not
+	 * available; false means the customer already has too many concurrent
+	 * pending holds (see MAX_CONCURRENT_HOLDS_PER_CUSTOMER) — distinct
+	 * outcomes the REST controller maps to 409 vs 429 respectively, same
+	 * three-way-return shape as ConversationService::send_message() and
+	 * AssistantService::send().
 	 */
-	public function create_booking( int $customer_id, int $provider_id, int $slot_id, ?int $service_id = null ): ?array {
+	public function create_booking( int $customer_id, int $provider_id, int $slot_id, ?int $service_id = null ): array|null|false {
 		global $wpdb;
+
+		$active_holds = (int) $wpdb->get_var(
+			$wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}bc_bookings WHERE customer_id = %d AND status = %s", $customer_id, self::STATUS_PENDING ) // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		);
+		if ( $active_holds >= self::MAX_CONCURRENT_HOLDS_PER_CUSTOMER ) {
+			return false;
+		}
 
 		$slots_table = $wpdb->prefix . 'bc_availability_slots';
 		$now         = current_time( 'mysql' );

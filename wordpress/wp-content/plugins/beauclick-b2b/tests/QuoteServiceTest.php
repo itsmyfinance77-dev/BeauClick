@@ -33,7 +33,7 @@ final class QuoteServiceTest extends WP_UnitTestCase {
 		$quotes   = new QuoteService();
 		$quote_id = $quotes->request( $account_id, [ [ 'product_id' => $product_id, 'quantity' => 30 ] ] );
 
-		$this->assertNull( $quotes->accept( $quote_id, $user_id ), 'A quote still in "requested" status (not yet priced by an admin) must not be acceptable.' );
+		$this->assertNull( $quotes->accept( $quote_id, $account_id, $user_id ), 'A quote still in "requested" status (not yet priced by an admin) must not be acceptable.' );
 	}
 
 	public function test_pricing_then_accepting_creates_a_real_order_with_the_quoted_price(): void {
@@ -45,7 +45,7 @@ final class QuoteServiceTest extends WP_UnitTestCase {
 
 		$quotes->submit_quote_prices( $quote_id, [ [ 'product_id' => $product_id, 'quantity' => 30, 'price' => 82000 ] ] );
 
-		$order = $quotes->accept( $quote_id, $user_id );
+		$order = $quotes->accept( $quote_id, $account_id, $user_id );
 
 		$this->assertNotNull( $order );
 		$this->assertSame( 82000.0 * 30, (float) $order->get_total() );
@@ -64,8 +64,8 @@ final class QuoteServiceTest extends WP_UnitTestCase {
 		$quote_id = $quotes->request( $account_id, [ [ 'product_id' => $product_id, 'quantity' => 10 ] ] );
 		$quotes->submit_quote_prices( $quote_id, [ [ 'product_id' => $product_id, 'quantity' => 10, 'price' => 90000 ] ] );
 
-		$first  = $quotes->accept( $quote_id, $user_id );
-		$second = $quotes->accept( $quote_id, $user_id );
+		$first  = $quotes->accept( $quote_id, $account_id, $user_id );
+		$second = $quotes->accept( $quote_id, $account_id, $user_id );
 
 		$this->assertNotNull( $first );
 		$this->assertNull( $second, 'An already-accepted quote must not be acceptable again (would create a duplicate order).' );
@@ -79,6 +79,30 @@ final class QuoteServiceTest extends WP_UnitTestCase {
 		$quote_id = $quotes->request( $account_id, [ [ 'product_id' => $product_id, 'quantity' => 10 ] ] );
 		$quotes->submit_quote_prices( $quote_id, [ [ 'product_id' => $product_id, 'quantity' => 10, 'price' => 90000 ] ], gmdate( 'Y-m-d H:i:s', time() - HOUR_IN_SECONDS ) );
 
-		$this->assertNull( $quotes->accept( $quote_id, $user_id ) );
+		$this->assertNull( $quotes->accept( $quote_id, $account_id, $user_id ) );
+	}
+
+	/**
+	 * The critical IDOR a production-readiness audit caught: the route's
+	 * permission_callback (require_approved_business()) only verifies the
+	 * caller is *a* approved business, not that they own *this* quote.
+	 * Without QuoteService::accept() checking business_account_id itself,
+	 * any approved B2B account could accept any other business's
+	 * negotiated wholesale price and create an order under their own name
+	 * — while marking the real owner's quote consumed.
+	 */
+	public function test_a_business_cannot_accept_another_businesss_quote(): void {
+		[ , $owner_account_id ]    = $this->make_business_account();
+		[ $attacker_id, $attacker_account_id ] = $this->make_business_account();
+		$product_id = $this->make_product();
+
+		$quotes   = new QuoteService();
+		$quote_id = $quotes->request( $owner_account_id, [ [ 'product_id' => $product_id, 'quantity' => 10 ] ] );
+		$quotes->submit_quote_prices( $quote_id, [ [ 'product_id' => $product_id, 'quantity' => 10, 'price' => 90000 ] ] );
+
+		$stolen = $quotes->accept( $quote_id, $attacker_account_id, $attacker_id );
+
+		$this->assertNull( $stolen, "A business must never be able to accept another business's quote." );
+		$this->assertSame( QuoteService::STATUS_QUOTED, $quotes->find( $quote_id )['status'], "The real owner's quote must remain acceptable by them, not consumed by the attacker's failed attempt." );
 	}
 }

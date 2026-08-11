@@ -148,7 +148,12 @@ final class B2BController extends RestController {
 	}
 
 	public function accept_quote( WP_REST_Request $request ): \WP_REST_Response {
-		$order = ( new QuoteService() )->accept( (int) $request->get_param( 'id' ), get_current_user_id() );
+		$account = ( new BusinessAccountService() )->find_by_user( get_current_user_id() );
+		if ( ! $account ) {
+			return Response::error( 'bc_quote_not_acceptable', __( 'این پیش‌فاکتور دیگر قابل تأیید نیست.', 'beauclick-b2b' ), 409 );
+		}
+
+		$order = ( new QuoteService() )->accept( (int) $request->get_param( 'id' ), (int) $account['id'], get_current_user_id() );
 		if ( ! $order ) {
 			return Response::error( 'bc_quote_not_acceptable', __( 'این پیش‌فاکتور دیگر قابل تأیید نیست.', 'beauclick-b2b' ), 409 );
 		}
