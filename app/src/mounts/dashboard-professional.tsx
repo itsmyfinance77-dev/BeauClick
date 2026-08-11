@@ -4,15 +4,16 @@ import { DashboardLayout, type NavItem } from '@/features/dashboard/shared/Dashb
 import { OverviewTab } from '@/features/dashboard/professional/OverviewTab';
 import { BookingsTab } from '@/features/dashboard/shared/BookingsTab';
 import { ServicesTab } from '@/features/dashboard/professional/ServicesTab';
+import { ChatPanel } from '@/features/chat/ChatPanel';
 import { EmptyState } from '@/design-system';
 import '@/design-system/tokens.generated.css';
 
 /**
- * Overview/Bookings/Services are real and data-backed. The remaining seven
- * items keep the design handoff's approved 10-item nav intact but render
- * its own documented placeholder copy — Calendar/Reviews need Phase 11,
- * Messages needs Phase 9 (chat), the rest are deeper cuts of data this
- * dashboard already fetches rather than new capability.
+ * Overview/Bookings/Services/Messages are real and data-backed. The
+ * remaining six items keep the design handoff's approved 10-item nav
+ * intact but render its own documented placeholder copy — Calendar/
+ * Reviews need Phase 11, the rest are deeper cuts of data this dashboard
+ * already fetches rather than new capability.
  */
 const NAV_ITEMS: NavItem[] = [
 	{ id: 'overview', label: 'نمای کلی', ready: true },
@@ -22,7 +23,7 @@ const NAV_ITEMS: NavItem[] = [
 	{ id: 'customers', label: 'مشتریان', ready: false },
 	{ id: 'revenue', label: 'درآمد', ready: false },
 	{ id: 'reviews', label: 'نظرات', ready: false },
-	{ id: 'messages', label: 'پیام‌ها', ready: false },
+	{ id: 'messages', label: 'پیام‌ها', ready: true },
 	{ id: 'profile', label: 'پروفایل', ready: false },
 	{ id: 'settings', label: 'تنظیمات', ready: false },
 ];
@@ -35,7 +36,8 @@ function App() {
 			{ tab === 'overview' && <OverviewTab /> }
 			{ tab === 'bookings' && <BookingsTab /> }
 			{ tab === 'services' && <ServicesTab /> }
-			{ ! [ 'overview', 'bookings', 'services' ].includes( tab ) && (
+			{ tab === 'messages' && <ChatPanel /> }
+			{ ! [ 'overview', 'bookings', 'services', 'messages' ].includes( tab ) && (
 				<EmptyState title="این بخش در نسخه بعدی محصول تکمیل می‌شود." />
 			) }
 		</DashboardLayout>

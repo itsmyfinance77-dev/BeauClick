@@ -141,6 +141,7 @@ final class MarketplaceController extends RestController {
 				'id'          => $post->ID,
 				'type'        => $post->post_type,
 				'name'        => $post->post_title,
+				'ownerUserId' => (int) $post->post_author,
 				'bio'         => $post->post_content,
 				'cityId'      => (int) get_post_meta( $id, '_bc_city_id', true ) ?: null,
 				'districtId'  => (int) get_post_meta( $id, '_bc_district_id', true ) ?: null,

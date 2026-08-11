@@ -21,6 +21,7 @@ $city_name   = bc_get_city_name( ! empty( $index_row['city_id'] ) ? (int) $index
 $district_name = bc_get_district_name( ! empty( $index_row['district_id'] ) ? (int) $index_row['district_id'] : null );
 $location    = trim( implode( '، ', array_filter( [ $city_name, $district_name ] ) ) );
 $verified    = 'verified' === get_post_meta( $provider_id, '_bc_verification_status', true );
+$owner_id    = (int) get_post_field( 'post_author', $provider_id );
 ?>
 
 <div class="bc-placeholder-image" style="aspect-ratio:16/5;background:linear-gradient(135deg, oklch(0.3 0.06 290), oklch(0.55 0.1 330));"></div>
@@ -49,7 +50,11 @@ $verified    = 'verified' === get_post_meta( $provider_id, '_bc_verification_sta
 
 		<div style="display:flex; gap:8px; padding-top:8px;">
 			<button type="button" class="bc-btn bc-btn--primary" data-bc-book-trigger data-provider-id="<?php echo esc_attr( $provider_id ); ?>"><?php esc_html_e( 'رزرو نوبت', 'beauclick' ); ?></button>
-			<button type="button" class="bc-btn bc-btn--outline" disabled title="<?php esc_attr_e( 'در نسخه بعدی محصول تکمیل می‌شود', 'beauclick' ); ?>"><?php esc_html_e( 'پیام', 'beauclick' ); ?></button>
+			<?php if ( is_user_logged_in() && get_current_user_id() !== $owner_id ) : ?>
+				<button type="button" class="bc-btn bc-btn--outline" data-bc-chat-open data-counterpart-id="<?php echo esc_attr( $owner_id ); ?>"><?php esc_html_e( 'پیام', 'beauclick' ); ?></button>
+			<?php elseif ( ! is_user_logged_in() ) : ?>
+				<a href="<?php echo esc_url( wp_login_url( get_permalink() ) ); ?>" class="bc-btn bc-btn--outline"><?php esc_html_e( 'پیام', 'beauclick' ); ?></a>
+			<?php endif; ?>
 		</div>
 	</div>
 

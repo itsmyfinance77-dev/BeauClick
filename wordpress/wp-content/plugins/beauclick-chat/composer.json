@@ -1,0 +1,14 @@
+{
+    "name": "beauclick/chat",
+    "description": "BeauClick chat — conversations/messages between customers and professionals/businesses, polling-based for v1.",
+    "type": "wordpress-plugin",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "BeauClick\\Chat\\": "src/"
+        }
+    }
+}
