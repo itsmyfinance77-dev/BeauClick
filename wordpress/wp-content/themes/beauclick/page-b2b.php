@@ -49,9 +49,9 @@ $is_approved = $account && 'approved' === $account['approval_status'];
 			</thead>
 			<tbody>
 				<tr style="border-bottom:1px solid var(--bc-color-line);"><td style="padding:12px 16px;" class="bc-numeric">۱ – ۹</td><td style="padding:12px 16px;"><?php esc_html_e( 'قیمت پایه', 'beauclick' ); ?></td></tr>
-				<tr style="border-bottom:1px solid var(--bc-color-line);"><td style="padding:12px 16px;" class="bc-numeric">۱۰ – ۴۹</td><td style="padding:12px 16px;">۱۰٪</td></tr>
-				<tr style="border-bottom:1px solid var(--bc-color-line); background:var(--bc-color-primary-soft);"><td style="padding:12px 16px;" class="bc-numeric">۵۰ – ۹۹ <span class="bc-badge bc-badge--recommended"><?php esc_html_e( 'پیشنهادی', 'beauclick' ); ?></span></td><td style="padding:12px 16px;">۲۰٪</td></tr>
-				<tr><td style="padding:12px 16px;" class="bc-numeric">۱۰۰+</td><td style="padding:12px 16px;">۳۰٪</td></tr>
+				<tr style="border-bottom:1px solid var(--bc-color-line);"><td style="padding:12px 16px;" class="bc-numeric">۱۰ – ۴۹</td><td style="padding:12px 16px;" class="bc-numeric">۱۰٪</td></tr>
+				<tr style="border-bottom:1px solid var(--bc-color-line); background:var(--bc-color-primary-soft);"><td style="padding:12px 16px;" class="bc-numeric">۵۰ – ۹۹ <span class="bc-badge bc-badge--recommended"><?php esc_html_e( 'پیشنهادی', 'beauclick' ); ?></span></td><td style="padding:12px 16px;" class="bc-numeric">۲۰٪</td></tr>
+				<tr><td style="padding:12px 16px;" class="bc-numeric">۱۰۰+</td><td style="padding:12px 16px;" class="bc-numeric">۳۰٪</td></tr>
 			</tbody>
 		</table>
 	</div>

@@ -41,7 +41,7 @@ export function ServicesTab() {
 		}
 	}
 
-	if ( error ) return <p style={ { color: 'var(--bc-color-error)' } }>{ error }</p>;
+	if ( error ) return <p style={ { color: 'var(--bc-color-error)', fontSize: 13 } }>{ error }</p>;
 	if ( ! services ) return <LoadingDots />;
 
 	return (

@@ -412,8 +412,19 @@
 	gap: 8px;
 }
 
+/* align-self on a column flex container resolves along the inline (cross)
+   axis, which IS direction-aware — under direction:rtl, flex-start is the
+   inline-start edge (visual right), not visual left. A production
+   readiness audit caught these swapped: "my" messages were rendering on
+   the physical left and the other party's on the right, opposite of the
+   design handoff's "user bubbles right-aligned, AI/other bubbles
+   left-aligned" (§9) and opposite of the RTL messaging-app convention
+   (Telegram/WhatsApp Farsi keep your own messages on the right). The
+   border-radius "tail" pinch on each variant was already authored for its
+   correct final side (mine's pinch is bottom-right, the other's is
+   bottom-left) — only align-self needed to flip to match. */
 .bc-chat-bubble {
-	align-self: flex-start;
+	align-self: flex-end;
 	max-width: 75%;
 	background: var(--bc-color-surface-tint);
 	border-radius: 14px 14px 14px 4px;
@@ -424,7 +435,7 @@
 }
 
 .bc-chat-bubble--mine {
-	align-self: flex-end;
+	align-self: flex-start;
 	background: var(--bc-color-primary);
 	color: white;
 	border-radius: 14px 14px 4px 14px;
@@ -498,5 +509,21 @@
 @media (max-width: 899px) {
 	.bc-ai-fab {
 		inset-block-end: 84px;
+	}
+}
+
+/* Professional dashboard Overview's chart+today's-list row — was a fixed
+   inline grid-template-columns with no mobile handling at all (a
+   production-readiness audit's one real gap in an otherwise consistently
+   responsive dashboard): a 7-bar weekly chart squeezed into ~180px on a
+   375px viewport. Stacks to one column below the same 899px breakpoint
+   used everywhere else in this stylesheet. */
+.bc-overview-grid {
+	grid-template-columns: 1.2fr 1fr;
+}
+
+@media (max-width: 899px) {
+	.bc-overview-grid {
+		grid-template-columns: 1fr;
 	}
 }

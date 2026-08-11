@@ -48,7 +48,7 @@ export function BookingsTab() {
 		}
 	}
 
-	if ( error ) return <p style={ { color: 'var(--bc-color-error)' } }>{ error }</p>;
+	if ( error ) return <p style={ { color: 'var(--bc-color-error)', fontSize: 13 } }>{ error }</p>;
 	if ( ! bookings ) return <LoadingDots />;
 	if ( bookings.length === 0 ) return <EmptyState title="هنوز رزروی ثبت نشده است." />;
 

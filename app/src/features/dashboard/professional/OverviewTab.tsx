@@ -28,7 +28,7 @@ export function OverviewTab() {
 			.catch( () => setError( 'خطا در دریافت آمار داشبورد.' ) );
 	}, [] );
 
-	if ( error ) return <p style={ { color: 'var(--bc-color-error)' } }>{ error }</p>;
+	if ( error ) return <p style={ { color: 'var(--bc-color-error)', fontSize: 13 } }>{ error }</p>;
 	if ( ! stats ) return <LoadingDots />;
 
 	const maxCount = Math.max( 1, ...stats.weeklyBookings.map( ( d ) => d.count ) );
@@ -44,7 +44,7 @@ export function OverviewTab() {
 				<StatCard label="امتیاز کلی" value={ `${ formatRating( stats.rating ) } (${ toPersianDigits( stats.reviewCount ) })` } />
 			</div>
 
-			<div style={ { display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 16, marginBottom: 24 } }>
+			<div className="bc-overview-grid" style={ { display: 'grid', gap: 16, marginBottom: 24 } }>
 				<div className="bc-card" style={ { padding: 16 } }>
 					<h3 style={ { marginTop: 0, fontSize: 15 } }>نوبت‌های هفته</h3>
 					<div style={ { display: 'flex', alignItems: 'flex-end', gap: 8, height: 100 } }>

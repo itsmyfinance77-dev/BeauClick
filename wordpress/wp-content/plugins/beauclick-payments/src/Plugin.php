@@ -22,6 +22,7 @@ final class Plugin {
 
 	public function boot(): void {
 		( new ServiceProductSync() )->register();
+		( new Currency() )->register();
 
 		/**
 		 * woocommerce_payment_complete fires specifically when a gateway
@@ -193,6 +194,9 @@ final class Plugin {
 		if ( ! class_exists( 'WC_Payment_Gateways' ) ) {
 			return;
 		}
+
+		Currency::ensure_configured(); // Every environment, not just non-production — unlike COD, correct currency formatting is never dev-only.
+
 		if ( 'production' === wp_get_environment_type() ) {
 			self::ensure_store_is_reachable();
 			self::ensure_classic_checkout();

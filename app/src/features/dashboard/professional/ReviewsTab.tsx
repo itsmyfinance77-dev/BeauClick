@@ -39,7 +39,7 @@ export function ReviewsTab() {
 		}
 	}
 
-	if ( error ) return <p style={ { color: 'var(--bc-color-error)' } }>{ error }</p>;
+	if ( error ) return <p style={ { color: 'var(--bc-color-error)', fontSize: 13 } }>{ error }</p>;
 	if ( ! reviews ) return <LoadingDots />;
 	if ( reviews.length === 0 ) return <EmptyState title="هنوز نظری ثبت نشده است." />;
 

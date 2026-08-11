@@ -22,7 +22,7 @@ export function OrdersTab() {
 		api.get<MyOrder[]>( '/payments/my/orders' ).then( setOrders ).catch( () => setError( 'خطا در دریافت سفارش‌ها.' ) );
 	}, [] );
 
-	if ( error ) return <p style={ { color: 'var(--bc-color-error)' } }>{ error }</p>;
+	if ( error ) return <p style={ { color: 'var(--bc-color-error)', fontSize: 13 } }>{ error }</p>;
 	if ( ! orders ) return <LoadingDots />;
 	if ( orders.length === 0 ) return <EmptyState title="هنوز سفارشی ثبت نشده است." />;
 

@@ -55,6 +55,19 @@
 	box-shadow: 0 0 0 2px var(--bc-color-primary-soft);
 }
 
+/* Email/phone/card-number content is always LTR regardless of the page's
+   own RTL direction — without this, digits and @ symbols in these native
+   WooCommerce checkout fields render with cursor/punctuation placement
+   that reads wrong while typing (a common WooCommerce-in-RTL complaint),
+   even though the fields still submit the correct value either way. */
+.woocommerce form .form-row input[type="email"],
+.woocommerce form .form-row input[type="tel"],
+.woocommerce form .form-row input#billing_email,
+.woocommerce form .form-row input#billing_phone {
+	direction: ltr;
+	text-align: right;
+}
+
 .woocommerce a.button,
 .woocommerce button.button,
 .woocommerce input.button,

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Modal, Button, Chip, Input, LoadingDots } from '@/design-system';
+import { Modal, Button, Chip, Input, LoadingDots, EmptyState } from '@/design-system';
 import { api, ApiError } from '@/lib/api';
 import { RecommendationCard } from './RecommendationCard';
 import type { AiMessage } from './types';
@@ -57,10 +57,10 @@ export function AiPanel( { open, onClose }: { open: boolean; onClose: () => void
 
 				<div style={ { flex: 1, overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 12 } }>
 					{ ! isLoggedIn && (
-						<div className="bc-empty-state">
-							<p className="bc-empty-state__title">برای گفتگو با دستیار هوشمند ابتدا وارد حساب کاربری خود شوید.</p>
-							<a href={ `/wp-login.php?redirect_to=${ encodeURIComponent( window.location.href ) }` } className="bc-btn bc-btn--primary">ورود</a>
-						</div>
+						<EmptyState
+							title="برای گفتگو با دستیار هوشمند ابتدا وارد حساب کاربری خود شوید."
+							action={ <a href={ `/wp-login.php?redirect_to=${ encodeURIComponent( window.location.href ) }` } className="bc-btn bc-btn--primary">ورود</a> }
+						/>
 					) }
 
 					{ isLoggedIn && ! messages && <LoadingDots /> }

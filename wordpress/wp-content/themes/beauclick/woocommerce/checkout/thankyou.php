@@ -47,7 +47,7 @@ defined( 'ABSPATH' ) || exit;
 					</div>
 					<div class="bc-provider-card__footer">
 						<span class="bc-provider-card__meta"><?php esc_html_e( 'تاریخ', 'beauclick' ); ?></span>
-						<strong><?php echo esc_html( bc_persian_digits( wc_format_datetime( $order->get_date_created() ) ) ); ?></strong>
+						<strong class="bc-numeric"><?php echo esc_html( bc_persian_digits( wc_format_datetime( $order->get_date_created() ) ) ); ?></strong>
 					</div>
 					<div class="bc-provider-card__footer">
 						<span class="bc-provider-card__meta"><?php esc_html_e( 'مبلغ کل', 'beauclick' ); ?></span>
