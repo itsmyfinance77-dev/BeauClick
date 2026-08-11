@@ -9,7 +9,13 @@
 
 $path = urldecode( parse_url( $_SERVER['REQUEST_URI'], PHP_URL_PATH ) );
 
-if ( '/' !== $path && is_file( __DIR__ . $path ) ) {
+// is_dir() matters as much as is_file() here: a request for /wp-admin/
+// (or any other real directory with its own index.php, e.g. wp-admin
+// itself) must be handed back to PHP's built-in server so IT resolves
+// the directory's index.php — checking is_file() alone made every
+// directory request fall through to the site's own front-end index.php
+// instead, silently bouncing wp-admin to the homepage.
+if ( '/' !== $path && ( is_file( __DIR__ . $path ) || is_dir( __DIR__ . $path ) ) ) {
 	return false;
 }
 

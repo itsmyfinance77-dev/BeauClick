@@ -15,7 +15,13 @@ namespace BeauClick\Core\Admin;
 final class AdminMenu {
 
 	public function register(): void {
-		add_action( 'admin_menu', [ $this, 'add_menu' ] );
+		// Priority 5, ahead of every other beauclick-* module's own
+		// admin_menu-hooked add_submenu_page( 'beauclick', ... ) call (all at
+		// the default 10) — this parent's self-referencing submenu (below)
+		// must be the FIRST item registered under 'beauclick', or WordPress
+		// promotes whichever submenu got there first instead, regardless of
+		// plugin activation order.
+		add_action( 'admin_menu', [ $this, 'add_menu' ], 5 );
 	}
 
 	public function add_menu(): void {
@@ -27,6 +33,31 @@ final class AdminMenu {
 			[ $this, 'render' ],
 			'dashicons-store',
 			30
+		);
+
+		/**
+		 * Without this, WordPress's own menu-building (wp-admin/includes/
+		 * menu.php) auto-promotes whichever OTHER module's submenu happens to
+		 * register first under 'beauclick' (B2B accounts, review moderation,
+		 * ...) into this parent's effective landing page — silently
+		 * rewriting the parent slug everywhere. That rewrite happens only
+		 * for menu *rendering*, but the promoted page's actual permission
+		 * hook was registered against the ORIGINAL 'beauclick' parent, so
+		 * user_can_access_admin_page() looks up a hookname that was never
+		 * registered and denies access outright — for an admin who does
+		 * have the capability. A live verification pass caught this as a
+		 * real 403 on whichever submenu happened to load first. The fix WP
+		 * core itself documents for this exact case: explicitly register a
+		 * submenu with the SAME slug as the parent, so WordPress never needs
+		 * to guess a landing page.
+		 */
+		add_submenu_page(
+			'beauclick',
+			__( 'BeauClick', 'beauclick-core' ),
+			__( 'نمای کلی', 'beauclick-core' ),
+			'bc_manage_platform',
+			'beauclick',
+			[ $this, 'render' ]
 		);
 	}
 
