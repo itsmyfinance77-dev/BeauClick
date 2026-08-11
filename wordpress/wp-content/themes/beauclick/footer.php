@@ -19,12 +19,14 @@ declare( strict_types=1 );
 // current page rather than living on a route of their own).
 bc_enqueue_app_bundle( 'booking' );
 bc_enqueue_app_bundle( 'cart' );
+bc_enqueue_app_bundle( 'ai-assistant' );
 if ( is_user_logged_in() ) {
 	bc_enqueue_app_bundle( 'chat' );
 }
 ?>
 <div id="bc-booking-root"></div>
 <div id="bc-cart-root"></div>
+<div id="bc-ai-assistant-root"></div>
 <?php if ( is_user_logged_in() ) : ?>
 	<div id="bc-chat-root"></div>
 <?php endif; ?>

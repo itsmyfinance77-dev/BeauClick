@@ -1,0 +1,14 @@
+{
+    "name": "beauclick/ai",
+    "description": "BeauClick AI Beauty Assistant — provider-agnostic conversational recommendations, server-side proxied.",
+    "type": "wordpress-plugin",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "BeauClick\\AI\\": "src/"
+        }
+    }
+}

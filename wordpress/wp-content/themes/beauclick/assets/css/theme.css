@@ -469,3 +469,34 @@
 		display: none;
 	}
 }
+
+/* AI FAB — floating gradient button, bottom-inline-start corner, present on
+   every screen (design handoff §9); repositions above the mobile bottom
+   nav (which is 48px min-height + 6px block padding + safe margin ≈ 76px). */
+.bc-ai-fab {
+	position: fixed;
+	inset-block-end: 20px;
+	inset-inline-start: 20px;
+	z-index: 900;
+	width: 56px;
+	height: 56px;
+	border-radius: 50%;
+	border: none;
+	background: var(--bc-gradient-brand);
+	color: white;
+	font-weight: 800;
+	font-size: 14px;
+	cursor: pointer;
+	box-shadow: var(--bc-shadow-floating-max, 0 10px 26px oklch(0.4 0.14 300 / 0.35));
+	transition: transform 160ms ease;
+}
+
+.bc-ai-fab:hover {
+	transform: scale(1.06);
+}
+
+@media (max-width: 899px) {
+	.bc-ai-fab {
+		inset-block-end: 84px;
+	}
+}
