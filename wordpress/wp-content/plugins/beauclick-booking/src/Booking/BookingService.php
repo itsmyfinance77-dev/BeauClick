@@ -209,7 +209,19 @@ final class BookingService {
 	}
 
 	public function complete_booking( int $booking_id ): bool {
-		return $this->transition( $booking_id, self::STATUS_COMPLETED, [ self::STATUS_CONFIRMED ], 'booking_completed' );
+		$completed = $this->transition( $booking_id, self::STATUS_COMPLETED, [ self::STATUS_CONFIRMED ], 'booking_completed' );
+
+		if ( $completed ) {
+			// V2.0 Step 1's loyalty-earning hook seam (see beauclick-loyalty\
+			// EarningRules) — booking-plugin code deliberately doesn't know
+			// loyalty exists, same one-way dependency direction as every
+			// other cross-plugin hook in this codebase. transition() only
+			// returns true on the single real confirmed->completed flip, so
+			// this fires at most once per booking.
+			do_action( 'beauclick/booking/completed', $booking_id );
+		}
+
+		return $completed;
 	}
 
 	/**

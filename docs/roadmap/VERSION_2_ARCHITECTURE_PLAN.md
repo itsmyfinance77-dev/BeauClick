@@ -8,6 +8,41 @@ This document does not prescribe exact tickets. It establishes what already exis
 
 ---
 
+## V2.0 Step 1 — Implementation Notes (Event Instrumentation + Loyalty Ledger Wiring)
+
+**Correction to §2.2/§4.9 above, found during implementation, not just planning:** the assessment above (written from three parallel research-agent passes) claimed `wp_bc_events` had "zero actual call sites" outside `beauclick-core`. That was wrong. Direct inspection at implementation time found `booking_created`, `booking_confirmed`, `booking_cancelled`, `booking_completed`, `booking_expired`, `response_time_seconds`, `review_submitted`, `message_sent`, `ai_recommendation_shown`, `ai_recommendation_clicked`, and four B2B event types already wired into their respective services (`BookingService`, `ReviewService`, `ConversationService`, `AssistantService`, `BusinessAccountService`/`QuoteService`) — the research agents' grep tooling produced a false negative. `LoyaltyLedger::award()` genuinely did have zero call sites, confirmed independently via a second search tool — that half of the original assessment was accurate. The real gap was much narrower than assumed: only `profile_view`, `order_completed`, and `order_refunded` were genuinely missing from event instrumentation.
+
+### Events added
+- **`profile_view`** — `MarketplaceController::detail()`, entity_type = the CPT post type (`bc_professional`/`bc_business`), actor_id nullable for guests. No idempotency guard: every real page view is a distinct event, intentionally not deduplicated.
+- **`order_completed`** — `beauclick-payments\Plugin::on_payment_complete()` (the existing `woocommerce_payment_complete` hook), fires for every paid order, booking-linked or not. Guarded with a new `EventLogger::has_logged()` check, since — unlike the booking status transitions elsewhere in this codebase — `woocommerce_payment_complete` has no atomic single-fire guarantee of its own (WooCommerce's own core explicitly no-ops a repeat call once an order has already left the "payment pending" status family, but a duplicated webhook delivery for a still-pending order could in principle re-fire it).
+- **`order_refunded`** — `beauclick-payments\Plugin::on_order_dead()` (the existing `woocommerce_order_status_refunded`/`_cancelled`/`_failed` hook), scoped to the genuinely `refunded` status only. Same `has_logged()` guard.
+
+### Loyalty earning rules activated
+V1 never defined real point values (`LoyaltyLedger`'s own docblock said so explicitly). Rather than invent a business rule, three deliberately simple, flat, equal-weighted-per-event point values were centralized in one new class (`beauclick-loyalty\EarningRules`), clearly marked as a provisional placeholder policy:
+
+| Event | Points | Trigger |
+|---|---|---|
+| `booking_completed` | 10 | New `do_action('beauclick/booking/completed', $booking_id)`, fired from `BookingService::complete_booking()` only when its own atomic status transition actually succeeds |
+| `review_submitted` | 5 | New `do_action('beauclick/reviews/submitted', $review_id, $author_id, $booking_id)`, fired from `ReviewService::create()` only after a genuine insert |
+| `order_completed` (non-booking order only) | 10 | New `do_action('beauclick/payments/shop_order_completed', $order_id, $customer_id)`, fired from `on_payment_complete()` only when the order has no `_bc_booking_id` meta |
+
+A booking's own linked WooCommerce order paying does **not** separately award `shop_order_completed` points — that would double-count one real transaction (the payment is what unlocks `booking_completed`'s award later, once the service is actually delivered). This is asserted directly by `EarningRulesTest::test_a_bookings_own_linked_order_does_not_separately_award_shop_order_points`.
+
+### Idempotency strategy
+Two layers, matching how strict the requirement is for each system:
+1. **Loyalty (hard requirement — "must never award twice"):** `LoyaltyLedger::has_awarded(reference_type, reference_id, reason)` as a fast-path check, backed by a real `UNIQUE KEY (reference_type, reference_id, reason)` added via a new additive migration (`AddLoyaltyReferenceUniqueIndex`, following the same "new migration, never edit a shipped one" convention as `beauclick-booking`'s `AddHoldExpiryColumns`). MySQL/InnoDB treats each `NULL` as distinct under a `UNIQUE` index, so reference-less awards (e.g. a future manual admin adjustment) are never blocked. This makes a genuine concurrent double-award a database-level impossibility, not just an application-level best-effort check — verified directly by `LoyaltyLedgerTest::test_a_duplicate_reference_and_reason_is_rejected_at_the_database_layer`.
+2. **Events (softer requirement):** `booking_*`/`review_submitted`/`message_sent`/`ai_recommendation_*` events all log from inside an already-atomic status transition or insert-guard that only ever succeeds once per real state change — no new guard needed. `order_completed`/`order_refunded` have no such upstream guarantee, so they use the new `EventLogger::has_logged()` check. `profile_view` is intentionally never deduplicated.
+
+### Test coverage
+26 new tests across `beauclick-core` (`EventLoggerTest`), `beauclick-loyalty` (`LoyaltyLedgerTest` additions, new `EarningRulesTest`), `beauclick-booking`, `beauclick-reviews`, `beauclick-chat`, `beauclick-ai`, `beauclick-marketplace` (new `MarketplaceControllerTest`), and `beauclick-payments` (`PluginTest` additions). 166/166 backend tests passing (140 baseline + 26 new).
+
+### A real, pre-existing V1 characteristic discovered during live verification — not a bug, not fixed
+Live-verifying the booking→payment→confirmation path end to end (a real browser checkout, not a direct service call) found that the local-only Cash on Delivery gateway never actually confirms a booking or awards `order_completed`/`shop_order_completed` loyalty points under a real checkout submission. Root-caused to WooCommerce core's own `WC_Gateway_COD::process_payment()`: for any order with a total greater than zero, COD deliberately calls `$order->update_status(...)`, never `$order->payment_complete()` — "payment won't be taken until delivery" is COD's own documented design, not a bug in this codebase. `WC_Order::payment_complete()` additionally no-ops entirely once an order has left the pending/on-hold/failed/cancelled status family, confirmed directly in WooCommerce core source. Both are correct, intentional WooCommerce behavior.
+
+This has no production impact — COD is already gated behind `wp_get_environment_type() !== 'production'`, and a real Iranian payment gateway calls `payment_complete()` immediately upon verified payment, which is the whole point of an online gateway versus pay-on-delivery. It does mean the dev-only COD shortcut can't exercise the booking-confirmation or shop-order-loyalty code paths through a real checkout click — those were verified instead by driving `BookingService::confirm_booking()`/`complete_booking()` directly against the real booking a live browser session created (exercising the exact same methods a real gateway's `payment_complete()` hook already calls, per the existing, passing `BookingOrderBridgeTest`), and by the automated `PluginTest`/`EarningRulesTest` cases that construct a fresh `WC_Order` in the state `payment_complete()` actually processes. No V1 code was changed for this — per the standing rule, it isn't a security, data-integrity, payment-correctness, authorization, or functional bug, just a characteristic of a dev-only testing shortcut.
+
+---
+
 ## 1. V1 Freeze Statement
 
 BeauClick V1 is frozen as of commit `8494c7b4f6540500366da42b589b22fce53206a7`, tagged `v1.0.0` and released on GitHub. All 12 architecture phases are complete; the Production Readiness/Hardening audit and full UI/RTL/Typography QA pass are complete; 140/140 backend tests pass; all 7 named critical flows are live-verified against the running site.

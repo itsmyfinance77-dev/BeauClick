@@ -124,4 +124,42 @@ final class AssistantServiceTest extends WP_UnitTestCase {
 		global $wpdb;
 		return (int) $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$wpdb->prefix}bc_ai_recommendation_events WHERE message_id = %d LIMIT 1", $message_id ) );
 	}
+
+	/**
+	 * V2.0 Step 1: AssistantService already logged these two into
+	 * wp_bc_events before this task started -- closes the gap that nothing
+	 * previously asserted the shared event log, only the separate,
+	 * AI-specific wp_bc_ai_recommendation_events table.
+	 */
+	public function test_a_shown_and_clicked_recommendation_both_write_shared_events(): void {
+		global $wpdb;
+		$term        = wp_insert_term( 'میکاپ', 'bc_specialty' );
+		$city_id     = $this->make_city( 'یزد' );
+		$provider_id = $this->make_provider( 'سالن تست', (int) $term['term_id'], $city_id );
+
+		$owner   = self::factory()->user->create();
+		$service = new AssistantService();
+		$result  = $service->send( $owner, 'دنبال میکاپ در یزد هستم' );
+
+		$shown = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT * FROM {$wpdb->prefix}bc_events WHERE event_type = 'ai_recommendation_shown' AND entity_type = 'provider' AND entity_id = %d",
+				$provider_id
+			),
+			ARRAY_A
+		);
+		$this->assertNotNull( $shown, 'ai_recommendation_shown must be written to the shared event log.' );
+
+		$event_id = $this->first_recommendation_event_id( $result['assistantMessage']['id'] );
+		$service->mark_clicked( $event_id, $owner );
+
+		$clicked = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT * FROM {$wpdb->prefix}bc_events WHERE event_type = 'ai_recommendation_clicked' AND entity_type = 'provider' AND entity_id = %d",
+				$provider_id
+			),
+			ARRAY_A
+		);
+		$this->assertNotNull( $clicked, 'ai_recommendation_clicked must be written to the shared event log.' );
+	}
 }

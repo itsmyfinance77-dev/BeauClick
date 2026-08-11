@@ -105,9 +105,29 @@ final class Plugin {
 			return;
 		}
 
+		$customer_id = (int) $order->get_customer_id() ?: null;
+
+		// V2.0 Step 1: order_completed applies to every paid order (booking
+		// or a real Shop/B2B purchase alike) — genuinely useful analytics
+		// either way. Guarded with has_logged() because, unlike the booking
+		// status transitions elsewhere in this file, woocommerce_payment_
+		// complete has no atomic single-fire guarantee of its own — some
+		// gateway/webhook-retry paths can re-fire it for the same order.
+		if ( function_exists( 'beauclick_core' ) && ! beauclick_core()->events()->has_logged( 'order_completed', 'order', $order_id ) ) {
+			beauclick_core()->events()->log( 'order_completed', 'order', $order_id, $customer_id, [ 'total' => (float) $order->get_total() ] );
+		}
+
 		$booking_id = ( new BookingOrderBridge() )->find_booking_id_for_order( $order );
+
 		if ( ! $booking_id ) {
-			return; // Not a booking-originated order.
+			// Not a booking-originated order — a real Shop/B2B purchase, and
+			// the loyalty-earning hook seam for it (see beauclick-loyalty\
+			// EarningRules). Deliberately not fired for a booking's own
+			// linked order: that payment is what unlocks booking_completed's
+			// award later once the service is actually delivered, and
+			// awarding both would double-count one real transaction.
+			do_action( 'beauclick/payments/shop_order_completed', $order_id, (int) $order->get_customer_id() );
+			return;
 		}
 
 		if ( ( new BookingService() )->confirm_booking( $booking_id ) ) {
@@ -121,6 +141,15 @@ final class Plugin {
 		$order = wc_get_order( $order_id );
 		if ( ! $order ) {
 			return;
+		}
+
+		// V2.0 Step 1: order_refunded, scoped to the genuinely-refunded
+		// status only (this handler also covers cancelled/failed, which
+		// aren't refund events). Same has_logged() guard as order_completed
+		// above, for the same reason — no atomic single-fire guarantee
+		// upstream.
+		if ( 'refunded' === $order->get_status() && function_exists( 'beauclick_core' ) && ! beauclick_core()->events()->has_logged( 'order_refunded', 'order', $order_id ) ) {
+			beauclick_core()->events()->log( 'order_refunded', 'order', $order_id, (int) $order->get_customer_id() ?: null, [ 'total' => (float) $order->get_total() ] );
 		}
 
 		$booking_id = ( new BookingOrderBridge() )->find_booking_id_for_order( $order );

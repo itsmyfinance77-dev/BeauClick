@@ -34,6 +34,27 @@ final class LoyaltyLedger {
 		return (int) $wpdb->get_var( $wpdb->prepare( "SELECT COALESCE(SUM(points), 0) FROM {$wpdb->prefix}bc_loyalty_points WHERE user_id = %d", $user_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 	}
 
+	/**
+	 * V2.0 Step 1's idempotency check: whether a given (reference_type,
+	 * reference_id, reason) triple has already been awarded, so a caller
+	 * can skip re-awarding before ever attempting the insert. This is the
+	 * fast-path half of the guarantee — the hard half is the UNIQUE index
+	 * added by AddLoyaltyReferenceUniqueIndex, which makes a genuine
+	 * concurrent double-award a DB-level impossibility even if two
+	 * requests both pass this check before either inserts.
+	 */
+	public function has_awarded( string $reference_type, int $reference_id, string $reason ): bool {
+		global $wpdb;
+		return (bool) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT 1 FROM {$wpdb->prefix}bc_loyalty_points WHERE reference_type = %s AND reference_id = %d AND reason = %s LIMIT 1", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$reference_type,
+				$reference_id,
+				$reason
+			)
+		);
+	}
+
 	/** @return array<int, array{points: int, reason: string, createdAt: string}> */
 	public function history( int $user_id, int $limit = 50 ): array {
 		global $wpdb;

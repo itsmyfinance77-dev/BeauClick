@@ -176,6 +176,36 @@ final class ReviewServiceTest extends WP_UnitTestCase {
 		$this->assertSame( [], ( new ReviewService() )->for_providers( [] ) );
 	}
 
+	/**
+	 * V2.0 Step 1: review_submitted was already logged to wp_bc_events
+	 * before this task started -- this closes the gap that nothing
+	 * previously asserted the event row. The new beauclick/reviews/submitted
+	 * action hook (loyalty's earning seam) is asserted separately.
+	 */
+	public function test_a_review_writes_a_review_submitted_event_and_fires_the_loyalty_hook(): void {
+		global $wpdb;
+		$owner_id    = self::factory()->user->create();
+		$provider_id = $this->make_provider( $owner_id );
+		$customer_id = self::factory()->user->create();
+		$booking_id  = $this->make_booking( $customer_id, $provider_id );
+
+		$fired = false;
+		add_action( 'beauclick/reviews/submitted', function () use ( &$fired ) { $fired = true; } );
+
+		( new ReviewService() )->create( $customer_id, $booking_id, 5, 'عالی بود' );
+
+		$this->assertTrue( $fired, "create() must fire beauclick/reviews/submitted -- loyalty's earning hook seam." );
+
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT * FROM {$wpdb->prefix}bc_events WHERE event_type = 'review_submitted' AND entity_type = 'provider' AND entity_id = %d",
+				$provider_id
+			),
+			ARRAY_A
+		);
+		$this->assertNotNull( $row, 'A real wp_bc_events row must exist for review_submitted.' );
+	}
+
 	public function test_moderating_rejects_an_unknown_status(): void {
 		$owner_id    = self::factory()->user->create();
 		$provider_id = $this->make_provider( $owner_id );

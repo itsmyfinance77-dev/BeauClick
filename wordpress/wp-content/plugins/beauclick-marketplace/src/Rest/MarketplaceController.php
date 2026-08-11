@@ -118,6 +118,14 @@ final class MarketplaceController extends RestController {
 			return Response::error( 'bc_not_found', __( 'Provider not found.', 'beauclick-marketplace' ), 404 );
 		}
 
+		// V2.0 Step 1: profile_view was already a documented event type
+		// (EventLogger's own docblock) that nothing ever actually logged.
+		// Intentionally no idempotency guard — every real page view is a
+		// distinct, legitimate event, not a duplicate to suppress.
+		if ( function_exists( 'beauclick_core' ) ) {
+			beauclick_core()->events()->log( 'profile_view', $post->post_type, $id, get_current_user_id() ?: null );
+		}
+
 		$services = get_posts(
 			[
 				'post_type'      => Registrar::SERVICE,

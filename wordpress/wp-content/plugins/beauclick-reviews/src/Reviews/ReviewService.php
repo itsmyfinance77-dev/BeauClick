@@ -72,6 +72,13 @@ final class ReviewService {
 			beauclick_core()->events()->log( 'review_submitted', 'provider', (int) $booking['provider_id'], $author_id, [ 'rating' => $rating ] );
 		}
 
+		// V2.0 Step 1's loyalty-earning hook seam (see beauclick-loyalty\
+		// EarningRules) — only reachable via a genuine insert above; a
+		// booking already reviewed is rejected earlier by both the
+		// already-reviewed check and bc_reviews.booking_id's UNIQUE key, so
+		// this can't fire twice for the same booking.
+		do_action( 'beauclick/reviews/submitted', $review_id, $author_id, $booking_id );
+
 		$review = $this->find( $review_id );
 		( new ReviewMailer() )->send_new_review( $review );
 

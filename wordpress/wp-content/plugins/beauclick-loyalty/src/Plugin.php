@@ -3,6 +3,7 @@ declare( strict_types=1 );
 
 namespace BeauClick\Loyalty;
 
+use BeauClick\Loyalty\Database\Migrations\AddLoyaltyReferenceUniqueIndex;
 use BeauClick\Loyalty\Database\Migrations\CreateLoyaltyPointsTable;
 
 final class Plugin {
@@ -25,11 +26,12 @@ final class Plugin {
 	}
 
 	private function migrations(): array {
-		return [ new CreateLoyaltyPointsTable() ];
+		return [ new CreateLoyaltyPointsTable(), new AddLoyaltyReferenceUniqueIndex() ];
 	}
 
 	public function boot(): void {
 		add_action( 'plugins_loaded', [ $this, 'register_migrations' ], 5 );
+		( new EarningRules() )->register();
 	}
 
 	public function ledger(): LoyaltyLedger {

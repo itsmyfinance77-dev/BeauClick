@@ -284,6 +284,50 @@ final class BookingServiceTest extends WP_UnitTestCase {
 		$this->assertFalse( $blocked, "A customer must be blocked from holding more than MAX_CONCURRENT_HOLDS_PER_CUSTOMER slots at once, distinct from a plain slot-unavailable null." );
 	}
 
+	/**
+	 * V2.0 Step 1: these four events were already logged by BookingService
+	 * before this task started (create_booking/cancel_booking/transition())
+	 * -- closes the gap that nothing previously asserted the wp_bc_events
+	 * rows through a real lifecycle.
+	 */
+	public function test_a_full_booking_lifecycle_writes_all_four_events(): void {
+		global $wpdb;
+		$provider_id = self::factory()->user->create();
+		$customer_id = self::factory()->user->create();
+		$slot_id     = $this->make_open_slot( $provider_id );
+
+		$service = new BookingService();
+		$booking = $service->create_booking( $customer_id, $provider_id, $slot_id );
+		$service->confirm_booking( $booking['booking_id'] );
+		$service->complete_booking( $booking['booking_id'] );
+
+		foreach ( [ 'booking_created', 'booking_confirmed', 'booking_completed' ] as $event_type ) {
+			$found = $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT id FROM {$wpdb->prefix}bc_events WHERE event_type = %s AND entity_type = 'booking' AND entity_id = %d",
+					$event_type,
+					$booking['booking_id']
+				)
+			);
+			$this->assertNotNull( $found, "A wp_bc_events row for {$event_type} must exist." );
+		}
+
+		// Cancellation is tested against a second, independent booking --
+		// a completed booking can't itself be cancelled (see the
+		// "a completed booking cannot be cancelled" test above).
+		$second_slot = $this->make_open_slot( $provider_id );
+		$to_cancel   = $service->create_booking( $customer_id, $provider_id, $second_slot );
+		$service->cancel_booking( $to_cancel['booking_id'], 'مشتری منصرف شد' );
+
+		$cancelled_event = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT id FROM {$wpdb->prefix}bc_events WHERE event_type = 'booking_cancelled' AND entity_type = 'booking' AND entity_id = %d",
+				$to_cancel['booking_id']
+			)
+		);
+		$this->assertNotNull( $cancelled_event, 'A wp_bc_events row for booking_cancelled must exist.' );
+	}
+
 	public function test_confirming_a_hold_frees_up_room_under_the_concurrent_hold_cap(): void {
 		$provider_id = self::factory()->user->create();
 		$customer_id = self::factory()->user->create();

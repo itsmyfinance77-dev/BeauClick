@@ -63,6 +63,33 @@ final class ConversationServiceTest extends WP_UnitTestCase {
 		$this->assertNotNull( $refreshed['lastMessageAt'] );
 	}
 
+	/**
+	 * V2.0 Step 1: send_message() already logged this event before this
+	 * task started (see EventLogger) -- this closes the gap that nothing
+	 * previously asserted the wp_bc_events row itself, only the separate
+	 * beauclick/chat/message_sent action hook above.
+	 */
+	public function test_sending_a_message_writes_a_message_sent_event(): void {
+		global $wpdb;
+		$customer = self::factory()->user->create();
+		$pro      = self::factory()->user->create();
+		$service  = new ConversationService();
+		$conversation = $service->start_or_get( $customer, $pro );
+
+		$service->send_message( $conversation['id'], $customer, 'سلام' );
+
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT * FROM {$wpdb->prefix}bc_events WHERE event_type = %s AND entity_type = 'conversation' AND entity_id = %d",
+				'message_sent',
+				$conversation['id']
+			),
+			ARRAY_A
+		);
+		$this->assertNotNull( $row, 'A real wp_bc_events row must exist for message_sent, not just the action hook.' );
+		$this->assertSame( (string) $customer, $row['actor_id'] );
+	}
+
 	public function test_sending_a_blank_message_is_rejected_without_side_effects(): void {
 		$customer = self::factory()->user->create();
 		$pro      = self::factory()->user->create();
