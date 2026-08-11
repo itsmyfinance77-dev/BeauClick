@@ -77,11 +77,26 @@ export function BookingModal( { open, onClose, providerId, initialServiceId }: B
 		setLoading( true );
 		setError( null );
 		try {
-			await api.post( '/booking/bookings', {
+			const result = await api.post<{ bookingId: number; payUrl?: string }>( '/booking/bookings', {
 				provider_id: providerId,
 				slot_id: selectedSlot.id,
 				service_id: selectedService?.id,
 			} );
+
+			if ( result.payUrl ) {
+				// A real WooCommerce order was created (beauclick-payments
+				// active) — the actual payment happens on WooCommerce's own
+				// pay-for-order page (real gateways are redirect-based; there
+				// is no same-page "success" to show until that round trip
+				// completes and the order is paid). Step 5 here would be
+				// misleading — the booking is still just 'pending'.
+				window.location.href = result.payUrl;
+				return;
+			}
+
+			// No payments module active (e.g. local testing without
+			// WooCommerce wired up) — the booking still exists as 'pending',
+			// shown here as a reasonable terminal state for that case.
 			setStep( 5 );
 		} catch ( e ) {
 			setError( e instanceof ApiError && e.status === 409 ? e.message : 'رزرو با خطا مواجه شد. لطفاً دوباره تلاش کنید.' );

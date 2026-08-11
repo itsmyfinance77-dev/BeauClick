@@ -17,6 +17,9 @@
         <testsuite name="beauclick-booking">
             <directory>wordpress/wp-content/plugins/beauclick-booking/tests</directory>
         </testsuite>
+        <testsuite name="beauclick-payments">
+            <directory>wordpress/wp-content/plugins/beauclick-payments/tests</directory>
+        </testsuite>
         <testsuite name="beauclick-b2b">
             <directory>wordpress/wp-content/plugins/beauclick-b2b/tests</directory>
         </testsuite>
@@ -36,6 +39,7 @@
             <directory suffix=".php">wordpress/wp-content/plugins/beauclick-locations/src</directory>
             <directory suffix=".php">wordpress/wp-content/plugins/beauclick-marketplace/src</directory>
             <directory suffix=".php">wordpress/wp-content/plugins/beauclick-booking/src</directory>
+            <directory suffix=".php">wordpress/wp-content/plugins/beauclick-payments/src</directory>
             <directory suffix=".php">wordpress/wp-content/plugins/beauclick-b2b/src</directory>
             <directory suffix=".php">wordpress/wp-content/plugins/beauclick-reviews/src</directory>
             <directory suffix=".php">wordpress/wp-content/plugins/beauclick-chat/src</directory>

@@ -37,5 +37,6 @@ if ( ! file_exists( $beauclick_booking_autoload ) ) {
 require_once $beauclick_booking_autoload;
 
 register_activation_hook( __FILE__, [ \BeauClick\Booking\Plugin::class, 'activate' ] );
+register_deactivation_hook( __FILE__, [ \BeauClick\Booking\Plugin::class, 'deactivate' ] );
 
 \BeauClick\Booking\Plugin::instance()->boot();

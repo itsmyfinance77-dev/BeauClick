@@ -115,16 +115,35 @@ final class BookingController extends RestController {
 	}
 
 	public function create( WP_REST_Request $request ) {
-		$result = ( new BookingService() )->create_booking(
-			get_current_user_id(),
-			(int) $request->get_param( 'provider_id' ),
-			(int) $request->get_param( 'slot_id' ),
-			$request->get_param( 'service_id' ) ? (int) $request->get_param( 'service_id' ) : null
-		);
+		$customer_id = get_current_user_id();
+		$provider_id = (int) $request->get_param( 'provider_id' );
+		$service_id  = $request->get_param( 'service_id' ) ? (int) $request->get_param( 'service_id' ) : null;
+
+		$result = ( new BookingService() )->create_booking( $customer_id, $provider_id, (int) $request->get_param( 'slot_id' ), $service_id );
 
 		if ( null === $result ) {
 			return Response::error( 'bc_slot_unavailable', __( 'این زمان دیگر در دسترس نیست — لطفاً زمان دیگری انتخاب کنید.', 'beauclick-booking' ), 409 );
 		}
+
+		/**
+		 * Lets beauclick-payments attach a WooCommerce order + payUrl to the
+		 * response without beauclick-booking needing to know WooCommerce (or
+		 * even beauclick-payments) exists — the dependency points one way
+		 * (payments depends on booking), same as every other cross-module
+		 * seam in this codebase. If beauclick-payments isn't active, $result
+		 * passes through unchanged and the booking is simply created without
+		 * a payment step (useful for local testing without Woo configured).
+		 */
+		$result = apply_filters(
+			'beauclick/booking/after_create',
+			$result,
+			[
+				'booking_id'  => $result['booking_id'],
+				'customer_id' => $customer_id,
+				'provider_id' => $provider_id,
+				'service_id'  => $service_id,
+			]
+		);
 
 		return Response::ok( $result, [], 201 );
 	}

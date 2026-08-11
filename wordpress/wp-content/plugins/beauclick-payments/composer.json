@@ -1,0 +1,14 @@
+{
+    "name": "beauclick/payments",
+    "description": "Bridges booking lifecycle <-> WooCommerce order lifecycle. No custom payment abstraction — WooCommerce's own gateway system already is one (architecture doc §14).",
+    "type": "wordpress-plugin",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "BeauClick\\Payments\\": "src/"
+        }
+    }
+}

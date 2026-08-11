@@ -1,0 +1,120 @@
+/* Restyles WooCommerce's own cart/checkout/my-account markup with
+   BeauClick's design tokens — a CSS-only override rather than replacing
+   every WooCommerce template, which stays correct across WooCommerce
+   core updates far more reliably than re-implementing its forms/tables
+   from scratch (review point #6: feel like BeauClick, not default Woo,
+   while still using Woo's real checkout engine underneath). */
+
+.woocommerce table.shop_table,
+.woocommerce-cart table.cart,
+.woocommerce-checkout table.shop_table {
+	border-collapse: collapse;
+	width: 100%;
+	border: 1px solid var(--bc-color-line);
+	border-radius: var(--bc-radius-row, 14px);
+	overflow: hidden;
+}
+
+.woocommerce table.shop_table th,
+.woocommerce table.shop_table td {
+	padding: 14px 16px;
+	border-bottom: 1px solid var(--bc-color-line);
+	font-size: 14px;
+}
+
+.woocommerce table.shop_table th {
+	background: var(--bc-color-surface-tint);
+	font-weight: 700;
+	text-align: start;
+}
+
+.woocommerce form .form-row input.input-text,
+.woocommerce form .form-row textarea,
+.woocommerce form .form-row select,
+.woocommerce-checkout #payment,
+.woocommerce-additional-fields {
+	font-family: var(--bc-font-family);
+}
+
+.woocommerce form .form-row input.input-text,
+.woocommerce form .form-row textarea,
+.woocommerce form .form-row select,
+.select2-selection {
+	border: 1.5px solid var(--bc-color-line) !important;
+	border-radius: var(--bc-radius-row, 14px) !important;
+	padding: 12px 16px !important;
+	background: var(--bc-color-surface) !important;
+	font-size: 14px !important;
+	width: 100%;
+}
+
+.woocommerce form .form-row input.input-text:focus,
+.woocommerce form .form-row textarea:focus {
+	outline: none;
+	border-color: var(--bc-color-primary) !important;
+	box-shadow: 0 0 0 2px var(--bc-color-primary-soft);
+}
+
+.woocommerce a.button,
+.woocommerce button.button,
+.woocommerce input.button,
+.woocommerce #respond input#submit,
+.woocommerce-checkout #payment #place_order,
+.woocommerce a.checkout-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	background: var(--bc-color-primary) !important;
+	color: white !important;
+	border: none !important;
+	border-radius: var(--bc-radius-button, 12px) !important;
+	font-weight: 700 !important;
+	font-size: 14px !important;
+	padding: 12px 20px !important;
+	cursor: pointer;
+	transition: background-color 160ms ease;
+}
+
+.woocommerce a.button:hover,
+.woocommerce button.button:hover,
+.woocommerce-checkout #payment #place_order:hover {
+	background: var(--bc-color-primary-hover) !important;
+}
+
+.woocommerce a.button.alt,
+.woocommerce-checkout #payment #place_order {
+	background: var(--bc-color-primary) !important;
+}
+
+.woocommerce-Price-amount {
+	font-variant-numeric: tabular-nums;
+	font-weight: 700;
+}
+
+.woocommerce-checkout #payment ul.payment_methods,
+.woocommerce ul.payment_methods {
+	list-style: none;
+	margin: 0 0 16px;
+	padding: 0;
+	border: none;
+}
+
+.woocommerce-checkout #payment ul.payment_methods li,
+.woocommerce ul.payment_methods li {
+	border: 1.5px solid var(--bc-color-line);
+	border-radius: var(--bc-radius-row, 14px);
+	padding: 14px 16px;
+	margin-bottom: 8px;
+}
+
+.woocommerce-info,
+.woocommerce-message,
+.woocommerce-error {
+	border-top-color: var(--bc-color-primary) !important;
+	border-radius: var(--bc-radius-row, 14px);
+	background: var(--bc-color-surface-tint) !important;
+}
+
+.woocommerce-error {
+	border-top-color: var(--bc-color-error) !important;
+}

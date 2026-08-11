@@ -53,6 +53,10 @@ add_action(
 		// 'beauclick-tokens' (enqueued on the same hook, core loads first).
 		wp_enqueue_style( 'beauclick-theme-components', BEAUCLICK_THEME_URI . '/assets/css/components.css', [ 'beauclick-tokens' ], BEAUCLICK_THEME_VERSION );
 		wp_enqueue_style( 'beauclick-theme', BEAUCLICK_THEME_URI . '/assets/css/theme.css', [ 'beauclick-theme-components' ], BEAUCLICK_THEME_VERSION );
+
+		if ( function_exists( 'is_woocommerce' ) && ( is_woocommerce() || is_cart() || is_checkout() || is_account_page() ) ) {
+			wp_enqueue_style( 'beauclick-woocommerce', BEAUCLICK_THEME_URI . '/assets/css/woocommerce.css', [ 'beauclick-theme' ], BEAUCLICK_THEME_VERSION );
+		}
 	},
 	20
 );

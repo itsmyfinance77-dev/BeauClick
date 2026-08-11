@@ -47,6 +47,7 @@ function _beauclick_manually_load_plugins(): void {
 		\BeauClick\Locations\Plugin::class,
 		\BeauClick\Marketplace\Plugin::class,
 		\BeauClick\Booking\Plugin::class,
+		\BeauClick\Payments\Plugin::class,
 	];
 
 	foreach ( $activation_order as $plugin_class ) {
