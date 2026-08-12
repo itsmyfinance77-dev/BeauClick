@@ -75,7 +75,12 @@ final class Plugin {
 			$product
 		);
 
-		$result['payUrl'] = $order->get_checkout_payment_url();
+		$result['payUrl']  = $order->get_checkout_payment_url();
+		// V2.1 Step 9: exposes the real order id to any later callback on
+		// this same filter (e.g. beauclick-loyalty's MembershipDiscount,
+		// which runs at a later priority) without that callback needing to
+		// re-derive it from wp_bc_bookings itself.
+		$result['orderId'] = $order->get_id();
 
 		return $result;
 	}

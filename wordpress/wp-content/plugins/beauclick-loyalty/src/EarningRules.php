@@ -97,6 +97,23 @@ final class EarningRules {
 		if ( $ledger->has_awarded( $reference_type, $reference_id, $reason ) ) {
 			return;
 		}
+
+		/**
+		 * V2.1 Step 9: a single, well-defined extension point for a
+		 * tier/membership bonus-points-multiplier benefit, rather than this
+		 * class reaching into beauclick-loyalty's own tier/benefit classes
+		 * directly (they already depend on EarningRules' award path
+		 * conceptually; a direct dependency the other way would be
+		 * circular). Defaults to 1.0 (no change) when no filter is
+		 * registered or no benefit applies.
+		 */
+		$points = (int) round( $points * (float) apply_filters( 'beauclick/loyalty/points_multiplier', 1.0, $user_id, $reason ) );
+
 		$ledger->award( $user_id, $points, $reason, $reference_type, $reference_id );
+
+		// V2.1 Step 9: lets TierMembershipSync react only when points
+		// genuinely changed (a real award just happened), never on every
+		// page load.
+		do_action( 'beauclick/loyalty/points_awarded', $user_id );
 	}
 }

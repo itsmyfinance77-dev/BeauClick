@@ -50,3 +50,65 @@ export interface TimelineEntry {
 	meta: Record<string, unknown>;
 	createdAt: string;
 }
+
+export interface LoyaltyTier {
+	id: number;
+	slug: string;
+	name: string;
+	thresholdPoints: number;
+	isActive: boolean;
+}
+
+export interface LoyaltyBenefit {
+	id: number;
+	sourceType: 'tier' | 'membership_plan';
+	sourceId: number;
+	benefitType: 'bonus_points_multiplier' | 'discount_percentage' | 'descriptive';
+	label: string;
+	config: Record<string, unknown>;
+	isActive: boolean;
+}
+
+export interface MembershipPlan {
+	id: number;
+	slug: string;
+	name: string;
+	tierId: number | null;
+	isPaid: boolean;
+	price: number | null;
+	billingPeriodDays: number | null;
+	isActive: boolean;
+}
+
+export interface Membership {
+	id: number;
+	planId: number;
+	plan: MembershipPlan | null;
+	status: 'active' | 'expired' | 'cancelled';
+	activationSource: string;
+	startedAt: string;
+	expiresAt: string | null;
+}
+
+export interface TierProgress {
+	lifetimePoints: number;
+	currentTier: LoyaltyTier | null;
+	nextTier: LoyaltyTier | null;
+	pointsToNext: number | null;
+	percentToNext: number | null;
+}
+
+export interface LoyaltyHistoryEntry {
+	points: number;
+	reason: string;
+	createdAt: string;
+}
+
+export interface LoyaltySummary {
+	balance: number;
+	lifetimeEarned: number;
+	progress: TierProgress;
+	membership: Membership | null;
+	benefits: LoyaltyBenefit[];
+	history: LoyaltyHistoryEntry[];
+}

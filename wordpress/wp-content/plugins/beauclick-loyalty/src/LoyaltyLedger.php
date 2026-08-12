@@ -35,6 +35,26 @@ final class LoyaltyLedger {
 	}
 
 	/**
+	 * V2.1 Step 9 — tier qualification uses LIFETIME EARNED points (the sum
+	 * of every positive award ever made), never the spendable `balance()`.
+	 * A future redemption (a negative row) must never demote a customer's
+	 * tier -- "how much have you earned" is the qualification question,
+	 * "how much can you still spend" is a completely different one. This is
+	 * a deliberate, documented choice (not a silently-invented business
+	 * rule): the alternative models the task raised -- rolling-period or
+	 * annual re-qualification -- are NOT implemented here and remain
+	 * NEEDS_BUSINESS_DECISION; see the Step 9 architecture notes. Additive
+	 * to LoyaltyLedger, not a second balance -- still one query against the
+	 * same, single ledger table.
+	 */
+	public function lifetime_earned( int $user_id ): int {
+		global $wpdb;
+		return (int) $wpdb->get_var(
+			$wpdb->prepare( "SELECT COALESCE(SUM(points), 0) FROM {$wpdb->prefix}bc_loyalty_points WHERE user_id = %d AND points > 0", $user_id ) // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		);
+	}
+
+	/**
 	 * V2.0 Step 1's idempotency check: whether a given (reference_type,
 	 * reference_id, reason) triple has already been awarded, so a caller
 	 * can skip re-awarding before ever attempting the insert. This is the

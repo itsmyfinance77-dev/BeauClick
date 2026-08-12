@@ -129,7 +129,7 @@ ID format: `<AREA>-<NN>`. Every row has Status / Severity / Target version per �
 | COM-02 | Refund/cancellation hook correctness | `order_refunded` event wired, tested (V2.0 Step 1) | IMPLEMENTED | — | — | |
 | COM-03 | No coupons currently configured | `wp_posts` query confirms zero `shop_coupon` rows | NEEDS_BUSINESS_DECISION | LOW | Post-launch | Not a defect — matches the V1 audit's own "no rates specified" finding, still true |
 | COM-04 | No order invoice/receipt PDF | No matching code; only WooCommerce's own HTML order-received page | MISSING | MEDIUM | V2.2 | |
-| COM-05 | Future price-hook stacking risk | Not a current bug — a documented, real risk once Loyalty/Membership/Campaigns each want to modify cart totals (already flagged explicitly in the V2 architecture plan §13) | FUTURE_ENHANCEMENT (risk) | MEDIUM | V2.2/V2.3 design concern | Design one deliberate hook-ordering contract before the second price-modifying feature ships |
+| COM-05 | Future price-hook stacking risk | **Addressed in V2.1 Step 9** for the Loyalty/Membership case specifically — resolved by structural separation rather than a shared hook-ordering contract: booking orders never touch the WooCommerce cart at all (`BookingOrderBridge` calls `wc_create_order()`+`add_product()` directly), so the new membership discount (an order-level fee) and B2B's `TierPricingEngine` (a cart filter) are structurally disjoint, verified live and by test that neither can ever fire against the other's order/cart. The underlying general risk (a *third* price-modifying feature, e.g. Campaigns, wanting the cart too) is not fully closed — still needs the "one deliberate hook-ordering contract" design if/when that happens | **PARTIALLY_IMPLEMENTED** (Loyalty/Membership case resolved; Campaigns case remains open) | MEDIUM | V2.1 Step 9 (Loyalty) ✅ / V2.2-V2.3 (Campaigns, if it also needs the cart) | Design a shared contract only if/when a feature actually needs to modify the WooCommerce cart itself — Step 9 avoided needing one by not using the cart at all |
 | COM-06 | Legal commerce pages (refund policy) | See LEGAL-02 below — drafted, not published | NEEDS_LEGAL_REVIEW | **BLOCKING** | Pre-launch | |
 
 ### F. Booking
@@ -447,3 +447,20 @@ No other gap in this register changed status. §7 (Prioritization), §22–§27 
 **Known limitation, not a Step 8 regression:** a handful of pre-existing demo-seed professionals (`DemoProvidersSeed`, predating this step) have `_bc_verification_status` set directly via raw postmeta (e.g. one demo professional seeded as `pending`) with no corresponding `wp_bc_verification_requests` row, since they were never submitted through the new workflow. Such a record does not appear in the new admin review queue (which queries the requests table) — there is nothing to review, since no evidence was ever attached. This is a data-provenance artifact of legacy demo seeding, not a defect in the Step 8 code path; every professional created going forward starts `unverified` with no such gap.
 
 The rest of §7 (Prioritization), §22–§27 (recommendations, closing note), and §29–§30 (Step 6/7 completion) above remain the accurate historical record and are preserved exactly as written.
+
+---
+
+## 32. V2.1 Step 9 Completion Note
+
+**Step 9 — Loyalty Tiers + Membership is complete.** The "Loyalty tiers, Membership benefits/entitlements" line item (§28) now has a real, tested, live-verified implementation; COM-05's price-hook stacking risk is **partially resolved** — closed specifically for the Loyalty/Membership case, still open for a hypothetical future Campaigns-needs-the-cart-too scenario:
+
+| Item | Disposition |
+|---|---|
+| Loyalty tiers | **IMPLEMENTED** — configurable tiers (`wp_bc_loyalty_tiers`), deterministic lifetime-points qualification (never cached, never a second balance), live-verified crossing two real thresholds via 12 real bookings. |
+| Membership | **IMPLEMENTED** — plans, active/expired/cancelled state, tier-linked auto-activation, admin manual grant/cancel. Real recurring **billing** is explicitly **not** implemented (no payment/subscription gateway connected) — manual admin grant is the only activation path today, documented on the admin screen itself, not hidden. |
+| Benefits/entitlements | **IMPLEMENTED** — a real, typed model (`wp_bc_loyalty_benefits`), two functional types (bonus points multiplier, booking-order discount) plus a descriptive type; live-verified both applying correctly. |
+| COM-05 (price-hook stacking risk) | **PARTIALLY_IMPLEMENTED** — see the updated §6 row above. Resolved for Loyalty vs. B2B by structural separation (booking orders never touch the WooCommerce cart), not by building the general "shared hook-ordering contract" originally recommended; that general contract remains a real, open design question only if a *future* feature (e.g. Campaigns) also needs to modify the cart. |
+
+**Business decisions this step deliberately left open, not silently invented:** tier thresholds and names, benefit values (multiplier/discount size), membership pricing and billing period, points expiration policy, and redemption rules. Every value used during this step's own live verification is explicitly test/demo configuration entered through the real admin screen, not a shipped default — see `docs/roadmap/VERSION_2_ARCHITECTURE_PLAN.md`'s Step 9 notes for the full list.
+
+The rest of §7 (Prioritization), §22–§27 (recommendations, closing note), and §29–§31 (Step 6/7/8 completion) above remain the accurate historical record and are preserved exactly as written.

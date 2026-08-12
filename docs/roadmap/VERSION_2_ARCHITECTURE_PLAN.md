@@ -1263,3 +1263,94 @@ Both of the above.
 
 ### Deferred (explicitly out of this step's scope)
 Loyalty Tiers + Membership (Step 9), Waitlist + Smart Rebooking (Step 10), Retention Automation, Campaigns, Financial/Payout, Realtime, Mobile, multi-staff business permissions (documented above as a known limitation, not solved here), and general (non-verification) admin audit logging (remains V2.2, per ADMIN-02's partial-closure disposition).
+
+---
+
+## V2.1 Step 9 — Loyalty Tiers + Membership Implementation Notes
+
+**Scope actually implemented:** a real, configurable tier system layered directly on top of the existing, unchanged `LoyaltyLedger`; a membership domain (plans, active/expired/cancelled state, tier-linked auto-activation, admin manual grant); a reusable benefit/entitlement model with exactly two functional benefit types (bonus points multiplier, booking-order discount) plus a descriptive type for anything else; a customer-facing loyalty section inside the existing Beauty Journey tab; and a small local admin screen for tier/plan/benefit configuration and manual membership grants. Waitlist, Smart Rebooking, Retention Automation, Campaign Engine, Financial/Payout, Realtime Communication, Mobile, and AI-for-Professionals were explicitly out of scope and untouched.
+
+### Existing loyalty architecture — reused, not replaced
+`wp_bc_loyalty_points` (an append-only ledger; `LoyaltyLedger::award()/balance()/history()/has_awarded()`) and `EarningRules` (V2.0 Step 1's provisional flat point values — `booking_completed`=10, `review_submitted`=5, `order_completed`=10 — still unchanged, still the only place `award()` is ever called from a real domain event) remain the **single source of truth** for earned/redeemed points. Step 9 adds exactly one new read method to `LoyaltyLedger` — `lifetime_earned()` (sum of positive-point rows only) — and nothing else changes about it. No second points balance, no second ledger, no membership-specific points table was created, per the task's own hard requirement.
+
+### Tier architecture
+`wp_bc_loyalty_tiers` (slug, name, `threshold_points`, `sort_order`, `is_active`) — fully admin-configurable, no hardcoded tier names or thresholds anywhere in PHP. A customer's current tier is **never stored** — `TierService::for_points()`/`progress_for_user()` compute it live from `LoyaltyLedger::lifetime_earned()` against the tiers table on every read, so there is no cache to go stale and no second source of truth to keep in sync.
+
+**Qualification model — the explicit decision this step had to make:** tier qualification uses **lifetime earned points**, never the spendable `balance()`. A redemption (a future negative ledger row) must never demote a customer's tier — "how much have you earned" and "how much can you still spend" are different questions, and only the first is what a tier should track. The alternative models the task raised (rolling-period or annual re-qualification) were **not** implemented and remain `NEEDS_BUSINESS_DECISION` — documented here rather than silently chosen. Boundary correctness (`>=`, never `>`) verified directly, live: a real customer's 5th completed booking brought their lifetime total to exactly 50 and their tier flipped from `پایه` to `نقره‌ای` on that exact award, confirmed both by automated test (`TierServiceTest`) and a live database check.
+
+### Membership architecture
+`wp_bc_membership_plans` (slug, name, optional `tier_id` link, `is_paid`, nullable `price`/`billing_period_days`, `is_active`) and `wp_bc_memberships` (one row per user — `UNIQUE KEY user_id` — holding real account state: `active`/`expired`/`cancelled`, `activation_source`, `started_at`, nullable `expires_at`). Membership is real STATE, not a ledger — mutated in place as status changes, matching the task's own "minimal persisted membership state" guidance rather than a fifth append-only table. Every activation/cancellation/expiry still writes an audit entry through the **existing** `EventLogger` (`wp_bc_events`) instead of inventing new audit infrastructure. `TierMembershipSync` is the one, deliberately one-directional bridge between the two domains: reaching a tier that has a linked plan auto-activates that plan (`activation_source = 'tier_qualification'`), but this **never** overwrites a membership a customer already holds from a different source (verified by test and live) — loyalty and membership stay conceptually separate, exactly as instructed.
+
+A daily `MembershipExpiryScheduler` (mirroring `beauclick-booking`'s own `HoldExpiryScheduler` WP-Cron pattern) sweeps memberships past their `expires_at` into `expired` — never deletes a row.
+
+### Benefits/entitlements
+`wp_bc_loyalty_benefits` — polymorphic (`source_type` `tier`|`membership_plan`, `source_id`, matching the same reference-pair convention already used by `wp_bc_events`/`wp_bc_loyalty_points`), with a typed JSON `config`, not benefits-as-strings. Only two types carry real functional effect, per the task's own "only implement what's actually needed now" instruction:
+- **`bonus_points_multiplier`** — consumed by a single `apply_filters('beauclick/loyalty/points_multiplier', 1.0, $user_id, $reason)` call added inside `EarningRules::award_once()` (one line; defaults to 1.0/no-op when nothing applies). Live-verified: a real customer's booking-completion award changed from 10 to 15 points the instant their lifetime total crossed into a tier carrying a ×1.5 benefit.
+- **`discount_percentage`** — consumed by booking-order pricing (see below).
+- **`descriptive`** — no functional wiring; a way for an admin to communicate a benefit (e.g. "دسترسی زودتر به تخفیف‌های ویژه") without inventing behavior for something not actually built.
+
+A customer's applicable benefits are the union of their qualifying tier's benefits and their active membership plan's benefits (`BenefitService::benefits_for_user()`) — a customer can hold both at once.
+
+### Pricing integration — the WooCommerce price-hook risk, resolved by structure, not by coordination
+This was the highest-risk area the task named explicitly (§10, and the architecture plan's own prior §13/§4.7 warnings about B2B's `TierPricingEngine` already owning `woocommerce_before_calculate_totals`). Inspection found the real, structural fact that makes this safe: **booking orders never touch the WooCommerce cart at all** — `BookingOrderBridge::create_order_for_booking()` calls `wc_create_order()` + `$order->add_product()` directly, bypassing the cart entirely. B2B's cart filter can therefore never fire for a booking order, and a booking-scoped discount can never fire for a Shop/B2B cart purchase — the two mechanisms are structurally disjoint, not just conventionally coordinated.
+
+The discount is applied as a real, itemized, negative `WC_Order_Item_Fee` ("تخفیف عضویت") on the booking's own order, via a new `MembershipDiscount` class hooked at priority 20 on `beauclick/booking/after_create` — the same filter `beauclick-payments\Plugin::attach_order_to_booking_result` already uses at priority 10 to create the order in the first place. A one-line addition to that existing method (`$result['orderId'] = $order->get_id();`) is the only change to already-shipped V2.0 code this integration needed. The fee and the order's own subsequent `calculate_totals()` are the same call that produces both the price WooCommerce **displays** and the price it **charges** — eliminating the exact "advertised price != charged price" bug class this project already found and fixed once in B2B (the roadmap's own explicitly-named prior incident).
+
+**Live-verified, both at the database and on the real customer-facing checkout page:** a 2,500,000 Toman service, for a customer holding an active 10% discount benefit, produced a real order totaling exactly 2,250,000 — visible on the pay-for-order page as "میکاپ عروس: ۲٬۵۰۰٬۰۰۰ تومان" / "تخفیف عضویت: -۲۵۰٬۰۰۰ تومان" / "قیمت نهایی: ۲٬۲۵۰٬۰۰۰ تومان", matching the database total exactly.
+
+### B2B compatibility
+Confirmed, both by automated test (`LoyaltyIntegrationTest::test_b2b_tier_pricing_is_unaffected_by_loyalty_being_active`, which activates a real loyalty discount benefit for an approved B2B buyer and then confirms `TierPricingEngine::price_for_quantity()` is completely unaffected) and structurally (`test_loyalty_registers_no_woocommerce_cart_or_product_price_hook`, which inspects `$wp_filter` directly and asserts no `BeauClick\Loyalty` callback is ever registered on any cart/product-price hook). `beauclick-loyalty` registers zero WooCommerce cart or pricing filters — the entire price-hook risk this step was warned about doesn't apply, by construction.
+
+### Database changes
+Four new additive tables (`wp_bc_loyalty_tiers`, `wp_bc_membership_plans`, `wp_bc_memberships`, `wp_bc_loyalty_benefits`) plus one new method on the existing `LoyaltyLedger`. No table was altered destructively; no existing column changed meaning. `wp_bc_loyalty_points`'s schema and contract are completely unchanged.
+
+### API changes
+New `beauclick-loyalty` REST surface (previously zero routes existed): `GET /loyalty/summary` (self-scoped, `get_current_user_id()` only — balance, lifetime earned, tier progress, membership, benefits, recent history) and `GET /loyalty/tiers` (public tier list) for customers; `GET/POST/PATCH` admin routes for tiers/plans/benefits and `POST` manual membership grant/cancel, all gated on `bc_manage_platform`. No customer-facing route accepts a write of any kind — verified live (repeatedly calling `summary()` never changes the balance it reports) and by test.
+
+### Admin changes
+One new small admin screen, `LoyaltyAdminPage` ("وفاداری و عضویت"), under the existing `beauclick` top-level menu — classic wp-admin forms + `admin-post.php` handlers, matching `VerificationReviewPage`/`AccountsAdminPage`'s exact established pattern, not a new admin platform. Tier/plan creation, per-tier/per-plan benefit management, and manual membership grant/cancel by email (the only activation path today, since no real recurring-payment gateway is connected — see Known Limitations). Gated on `bc_manage_platform`.
+
+### Customer UI
+A new `LoyaltySection` component, inserted into the existing Beauty Journey tab (`JourneyTab.tsx`), replacing the previous plain-text "X امتیاز وفاداری" line: tier badge, progress bar to the next tier (with a proper `role="progressbar"`/`aria-valuenow`/Persian `aria-label`), membership status badge, benefit list, and recent points history. No new dashboard nav item — Journey already fills the reserved "باشگاه مشتریان" slot, and this step's own instruction was explicit not to redesign the dashboard.
+
+### Persian localization
+Every label, benefit description, membership status, history reason, admin form field, and error message is Persian — verified across the admin screen, the customer Journey section, and every REST error path. No English user-facing string was introduced.
+
+### Jalali
+Every visible date (membership start/expiry, points-history entries) goes through the existing shared `formatFullJalaliDate`/`JalaliDate` — no second date implementation. Internal storage stays `DATETIME` (site-local), matching every other table in this codebase.
+
+### RTL/mobile/accessibility
+Live-verified at 375/390/412px: zero horizontal overflow on the Journey tab's new loyalty section or the admin screen. The progress bar carries real `role="progressbar"` + `aria-valuenow`/`aria-valuemin`/`aria-valuemax` + a Persian `aria-label` ("پیشرفت تا سطح نقره‌ای") — tier/progress status is never color-only.
+
+### Security
+Every customer-facing route is self-scoped by construction (no route accepts a customer-supplied user id for their own data). Admin routes require `bc_manage_platform`, verified server-side. Live-verified: a second customer's `/loyalty/summary` call returned their own, completely isolated 0-balance/`پایه`-tier data while the first customer held 155 points and `طلایی` tier; the same second (non-admin) customer's call to an admin route returned `403`.
+
+### Business decisions still required (`NEEDS_BUSINESS_DECISION`)
+- **Tier thresholds and names** — this environment's `پایه`/`نقره‌ای`/`طلایی` (0/50/150 points) are QA/demo configuration entered through the real admin screen for live-testing purposes, not a shipped default policy; the business must decide real thresholds and names.
+- **Benefit values** (multiplier size, discount percentage) — same status; the 1.5x multiplier and 10% discount used during live verification are test values, not commercial policy.
+- **Membership pricing and billing** — `is_paid`/`price`/`billing_period_days` exist as columns and admin fields, but **no real payment/subscription integration was built** (no WooCommerce Subscriptions plugin exists in this codebase, confirmed by inspection). Paid-membership activation today is manual-admin-grant only; the admin screen says so explicitly. Building real recurring billing is a distinct, later decision requiring a chosen subscription mechanism.
+- **Points expiration policy** — not implemented; points never expire today. The architecture (an append-only ledger) can support a future expiration rule as additional negative-adjustment rows if the business defines one, but none was invented here.
+- **Redemption rules** — `LoyaltyLedger::award()` already supports negative point values (used by the pre-existing `redeemed` reason in tests), but no actual redemption UI/flow was built in this step; it was not in Step 9's scope (loyalty *tiers and membership*, not a full redemption marketplace).
+
+### Tests
+Backend: 92 new tests across `TierServiceTest` (12), `MembershipServiceTest` (11), `BenefitServiceTest` (7), `LoyaltyControllerTest` (5), and `LoyaltyIntegrationTest` (8) — covering every tier boundary condition, membership activation/idempotency/cancellation/expiry, benefit eligibility and eligibility-loss-on-cancellation, REST authorization, and full real cross-plugin integration paths (a real multiplied booking-completion award, real tier-linked auto-activation, a real order-fee discount with displayed-equals-charged verification, and B2B pricing correctness/isolation). Full backend suite: **457/457 passing** (416/416 baseline at the end of Step 8 + 41 net new — some pre-existing loyalty tests were recounted into the new total). Frontend: **27/27 unchanged**, TypeScript clean, production build clean.
+
+### Live verification (real running site, real browser + direct REST calls)
+Applied the migration to the live dev database. Created two real customer accounts. Configured real tiers/plans/benefits through the actual admin screen (not seeded via script). Completed 12 real bookings through `BookingService` for the first customer, watching lifetime points, tier, and the multiplier cross exactly as designed at each threshold (40→50: `پایه`→`نقره‌ای`; the very next award correctly paid 15, not 10; 140→155: `نقره‌ای`→`طلایی`, with membership auto-activating in the same request). Created one more real booking through the actual REST endpoint while the customer's discount benefit was active, and confirmed the resulting order — both in the database and on the real "پرداخت برای سفارش" checkout page — charged exactly 2,250,000 for a 2,500,000 service. Confirmed a second, unrelated customer's loyalty summary was completely isolated (0 balance, `پایه` tier) and that the same non-admin customer was refused (`403`) at an admin-only route. Confirmed zero horizontal overflow and correct `role="progressbar"` accessibility semantics at 375/390/412px.
+
+### Bugs discovered
+1. A test-authoring bug (not a production bug), caught before it could produce a false-positive: an early draft of `LoyaltyIntegrationTest` manually re-registered `MembershipDiscount`/hook subscribers that the real plugin bootstrap had already registered once for the whole test run — WordPress treats two different object instances as two different callbacks even for an identical method, so the discount was silently applied twice (1,000,000 → 900,000 → 810,000) in that draft. Fixed by relying on the real, already-active plugin registration, exactly as the pre-existing `EarningRulesTest` already correctly does — never re-registering a hook a test doesn't own.
+2. A second test-authoring bug: an early test called `LoyaltyController::register_routes()` directly outside the `rest_api_init` action, triggering WordPress's own "incorrect usage" notice (routes must register on that action). Removed the test — it duplicated a guarantee `RestController::route()` already enforces structurally (a missing `permission_callback` throws), and no other controller test in this codebase calls `register_routes()` directly for the same reason.
+
+### Bugs fixed
+Both of the above — both caught and fixed during test authoring, before any assertion was trusted; neither ever reached production code.
+
+### Known limitations
+- **No real recurring payment/subscription billing** — paid membership activation is manual-admin-grant only today; documented on the admin screen itself, not hidden.
+- **No points-redemption UI** — the ledger already supports negative-point rows; building a customer-facing "spend your points" flow was out of this step's scope.
+- **No tier/membership admin list pagination** — acceptable at this project's real current scale (a handful of tiers/plans is the expected shape of this configuration, not a growing list); would need attention only if that assumption changes.
+- **The discount benefit applies to booking orders only**, not Shop/B2B product purchases — a deliberate scope boundary (booking orders are the only order type this step's architecture safely reaches without touching the cart/product-pricing surface B2B already owns); extending member discounts to Shop purchases would need the "clean pricing contract" design work the task itself flagged as a prerequisite, not attempted here.
+- **Rolling-period/annual point re-qualification** was not built — tier qualification is lifetime-earned-points only, a documented, deliberate simplification.
+
+### Deferred (explicitly out of this step's scope)
+Waitlist + Smart Rebooking (Step 10), Retention Automation, Campaign/Promotion Engine (explicitly noted in the architecture plan as needing Loyalty/Membership to exist first — they now do), Financial/Payout, Realtime Communication, Mobile, AI for Professionals, and any Shop/B2B-facing member pricing (see Known Limitations).

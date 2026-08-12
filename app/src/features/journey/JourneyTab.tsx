@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { Button, Card, LoadingDots, EmptyState } from '@/design-system';
-import { formatToman, formatFullJalaliDate, toPersianDigits } from '@/lib/format';
+import { formatToman, formatFullJalaliDate } from '@/lib/format';
 import { RecommendationCard } from '@/features/ai/RecommendationCard';
 import { GoalForm } from './GoalForm';
+import { LoyaltySection } from './LoyaltySection';
 import type { BeautyGoal, JourneySummary, TimelineEntry } from './types';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -66,11 +67,14 @@ export function JourneyTab() {
 		<div style={ { display: 'flex', flexDirection: 'column', gap: 28 } }>
 			<div>
 				<h1 style={ { fontSize: 22, marginTop: 0, marginBottom: 4 } }>مسیر زیبایی من</h1>
-				<p style={ { margin: 0, fontSize: 13, color: 'var(--bc-color-ink-faint)' } }>
-					{ summary.memberSince && `عضو از ${ fmtDate( summary.memberSince ) } · ` }
-					{ null != summary.loyaltyBalance && `${ toPersianDigits( summary.loyaltyBalance ) } امتیاز وفاداری` }
-				</p>
+				{ summary.memberSince && (
+					<p style={ { margin: 0, fontSize: 13, color: 'var(--bc-color-ink-faint)' } }>
+						عضو از { fmtDate( summary.memberSince ) }
+					</p>
+				) }
 			</div>
+
+			<LoyaltySection />
 
 			{ ! hasAnyContent && (
 				<EmptyState title="مسیر زیبایی‌ات هنوز خالیه — یه هدف تعریف کن تا شروع کنیم." />
