@@ -40,13 +40,13 @@ abstract class RestController {
 	 * go through the REST dispatcher's call_user_func().
 	 */
 	public function require_login(): bool|WP_Error {
-		return is_user_logged_in() ? true : new WP_Error( 'bc_unauthorized', __( 'Login required.', 'beauclick-core' ), [ 'status' => 401 ] );
+		return is_user_logged_in() ? true : new WP_Error( 'bc_unauthorized', __( 'برای ادامه، ابتدا وارد حساب کاربری خود شوید.', 'beauclick-core' ), [ 'status' => 401 ] );
 	}
 
 	public function require_capability( string $capability ): bool|WP_Error {
 		return current_user_can( $capability )
 			? true
-			: new WP_Error( 'bc_forbidden', __( 'You do not have permission to do this.', 'beauclick-core' ), [ 'status' => 403 ] );
+			: new WP_Error( 'bc_forbidden', __( 'شما اجازه انجام این کار را ندارید.', 'beauclick-core' ), [ 'status' => 403 ] );
 	}
 
 	/**

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import { formatToman, formatShortDate, toPersianDigits } from '@/lib/format';
+import { formatToman, formatFullJalaliDate, toPersianDigits } from '@/lib/format';
 import { LoadingDots, EmptyState } from '@/design-system';
 import type { MyOrder } from './types';
 
@@ -35,7 +35,7 @@ export function OrdersTab() {
 						<div>
 							<strong className="bc-numeric">#{ toPersianDigits( o.number ) }</strong>
 							<p style={ { margin: '4px 0 0', fontSize: 13, color: 'var(--bc-color-ink-faint)' } }>
-								{ o.date ? formatShortDate( new Date( o.date.replace( ' ', 'T' ) ) ).weekday : '' } · { toPersianDigits( o.itemCount ) } کالا
+								{ o.date ? formatFullJalaliDate( new Date( o.date.replace( ' ', 'T' ) ) ) : '' } · { toPersianDigits( o.itemCount ) } کالا
 							</p>
 						</div>
 						<div style={ { textAlign: 'end' } }>

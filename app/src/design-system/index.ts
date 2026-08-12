@@ -15,3 +15,5 @@ export { RatingStars } from './primitives/RatingStars';
 export { PriceTag } from './primitives/PriceTag';
 export { EmptyState } from './primitives/EmptyState';
 export { LoadingDots } from './primitives/LoadingDots';
+export { JalaliDateInput } from './primitives/JalaliDateInput';
+export type { JalaliDateInputProps } from './primitives/JalaliDateInput';

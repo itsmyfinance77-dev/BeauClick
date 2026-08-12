@@ -1,4 +1,4 @@
-import { formatShortDate, formatTime, toPersianDigits } from '@/lib/format';
+import { formatFullJalaliDate, formatTime, toPersianDigits } from '@/lib/format';
 import { EmptyState, LoadingDots } from '@/design-system';
 import type { ConversationSummary } from './types';
 
@@ -31,7 +31,7 @@ export function ConversationList( {
 						<div style={ { flex: 1, minWidth: 0, textAlign: 'start' } }>
 							<div style={ { display: 'flex', justifyContent: 'space-between', gap: 8 } }>
 								<strong style={ { fontSize: 14 } }>{ c.otherUserName || 'کاربر' }</strong>
-								{ date && <span className="bc-numeric" style={ { fontSize: 11, color: 'var(--bc-color-ink-faint)', flexShrink: 0 } }>{ formatShortDate( date ).weekday }، { formatTime( date ) }</span> }
+								{ date && <span className="bc-numeric" style={ { fontSize: 11, color: 'var(--bc-color-ink-faint)', flexShrink: 0 } }>{ formatFullJalaliDate( date ) }، { formatTime( date ) }</span> }
 							</div>
 							<p style={ { margin: '2px 0 0', fontSize: 13, color: 'var(--bc-color-ink-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }>{ c.lastMessage || '—' }</p>
 						</div>

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Modal, Button, Chip, PriceTag, LoadingDots } from '@/design-system';
 import { api, ApiError } from '@/lib/api';
-import { formatShortDate, formatTime } from '@/lib/format';
+import { formatShortDate, formatFullJalaliDate, formatTime } from '@/lib/format';
 import type { AvailabilitySlot, ProviderDetail, ProviderService } from './types';
 
 export interface BookingModalProps {
@@ -162,12 +162,12 @@ export function BookingModal( { open, onClose, providerId, initialServiceId }: B
 						<h3 id="bc-booking-title" style={ { marginTop: 0 } }>۲. انتخاب تاریخ</h3>
 						<div style={ { display: 'flex', gap: 8, overflowX: 'auto' } }>
 							{ NEXT_7_DAYS.map( ( d, i ) => {
-								const { weekday, day } = formatShortDate( d );
+								const { weekday, day, month } = formatShortDate( d );
 								return (
 									<Chip key={ i } active={ selectedDateIdx === i } onClick={ () => setSelectedDateIdx( i ) }>
 										<span style={ { display: 'flex', flexDirection: 'column', alignItems: 'center' } }>
 											<span>{ weekday }</span>
-											<span className="bc-numeric">{ day }</span>
+											<span className="bc-numeric">{ day } { month }</span>
 										</span>
 									</Chip>
 								);
@@ -197,7 +197,7 @@ export function BookingModal( { open, onClose, providerId, initialServiceId }: B
 						<div style={ { background: 'var(--bc-color-surface-tint)', borderRadius: 14, padding: 16, marginBottom: 16 } }>
 							<p style={ { margin: '0 0 4px', fontWeight: 700 } }>{ selectedService.name }</p>
 							<p style={ { margin: '0 0 4px', fontSize: 13, color: 'var(--bc-color-ink-soft)' } }>
-								{ formatShortDate( NEXT_7_DAYS[ selectedDateIdx ] ).weekday }، { formatTime( new Date( selectedSlot.startAt.replace( ' ', 'T' ) ) ) }
+								{ formatFullJalaliDate( NEXT_7_DAYS[ selectedDateIdx ] ) }، { formatTime( new Date( selectedSlot.startAt.replace( ' ', 'T' ) ) ) }
 							</p>
 							<PriceTag amount={ selectedService.price } />
 						</div>

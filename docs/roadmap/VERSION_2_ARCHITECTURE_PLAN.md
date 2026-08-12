@@ -257,6 +257,60 @@ None requiring a V1 fix. One implementation bug caught by the tests themselves b
 
 ---
 
+## Cross-Cutting Standard — Persian/Jalali Date & Error Localization
+
+**Not a V2 step — this is a permanent engineering standard applying to both V1 and V2**, added after a focused audit found BeauClick's dates were Gregorian everywhere (Persian *digit glyphs* on a Gregorian calendar, not an actual Jalali calendar) and a handful of genuine English-string leaks in otherwise fully-Persian-localized error paths. Every future V2 capability must follow the rules below; V1 was touched only where required to fix this specific, cross-cutting defect (per the standing V1-protection rule).
+
+### What was found
+- **No Jalali/Shamsi conversion existed anywhere** in this codebase, PHP or TypeScript. The only "Persian" date-adjacent helper was `bc_persian_digits()`/`toPersianDigits()` — pure digit-glyph substitution (`2026` → `۲۰۲۶`), never calendar conversion. Every dashboard table, the booking date-chip picker, chat timestamps, order/review dates, and the WooCommerce order thank-you page were all genuinely Gregorian dates wearing Persian digits.
+- A concrete, representative bug: the WooCommerce thank-you page rendered `bc_persian_digits(wc_format_datetime($order->get_date_created()))` — Persian-looking digits on a date that was, and remained, Gregorian.
+- Backend REST `format()` methods across booking/chat/ai/reviews/journey/b2b/payments already return raw, unformatted MySQL datetime strings — this turned out to be the *correct* half of the architecture (the conversion boundary, see below), since the frontend already owns final display formatting; only the frontend's formatter itself was wrong.
+- A real (not merely theoretical) timezone off-by-one risk: `beauclick-core\Plugin::activate()` sets the site timezone to `Asia/Tehran` (UTC+03:30, confirmed by the existing `TimezoneTest`) — a naive `strtotime()`+`gmdate()` round trip on a site-local datetime string re-interprets it through that offset and back to UTC, shifting the calendar date near midnight. Found and fixed before it shipped (see JalaliDate's own docblock) and caught again independently in a dashboard weekly-chart date-only string (`new Date('2026-08-12')` parses as UTC midnight in JS, not local midnight).
+- English-string leaks: `RestController::require_login()`/`require_capability()` (the base permission check nearly every protected route in every plugin uses) and one `MarketplaceController` 404 message were the genuine English outliers among ~40+ otherwise-correct Persian error strings. A frontend fallback path (`ApiError.message ?? res.statusText`) could surface a raw English HTTP reason phrase ("Not Found", "Internal Server Error") whenever a response didn't match the expected JSON envelope. Live verification also found WooCommerce's checkout privacy-policy notice frozen in English — a literal option value written once at install time, never re-translated on read, invisible to normal `.mo`-file localization.
+
+### Global date standard
+BeauClick is Persian-first/RTL-first: **every user-facing date uses the Jalali (Solar Hijri) calendar** — booking dates, availability, dashboards, orders, reviews, chat, journey timeline, AI-surfaced dates, forms, tables, empty/error/success states. Gregorian dates/digits must never reach a normal user. Internal storage stays exactly as it already was (MySQL `DATETIME`, site-local wall-clock, no schema change) — this audit changed *presentation and input*, not storage or domain logic.
+
+### Conversion boundary (explicit, per this task's own instruction)
+```
+User input/display  <-->  Jalali/Persian   (JalaliDateInput, format.ts's formatShortDate/formatFullJalaliDate)
+Application/domain logic  -->  normalized internal representation  (Gregorian y/m/d, unchanged)
+Database  -->  existing storage format  (MySQL DATETIME, site-local, unchanged)
+```
+REST APIs continue returning raw Gregorian datetime strings — this is correct, not a gap: the frontend already owned final display formatting before this audit, so fixing the *formatter* (not the API contract) was the minimal, correct change. The one exception is genuinely server-rendered, PHP-only surfaces with no frontend involved (transactional emails, the WooCommerce thank-you page) — those call the shared `JalaliDate` class directly.
+
+### Shared date abstraction
+One conversion algorithm, ported by hand into both runtimes (no new dependency in either — a small, self-contained, well-known public-domain calculation, not infrastructure):
+- **`app/src/lib/jalali.ts`** — `toJalali()`/`toGregorian()`/`isJalaliLeapYear()`/`jalaliMonthLength()`/`JALALI_MONTHS`. `app/src/lib/format.ts`'s `formatShortDate()`/`formatFullJalaliDate()` are the presentation layer built on top — every dashboard/table/list already importing `format.ts` needed zero structural changes, only its output became calendar-correct.
+- **`beauclick-core\Support\JalaliDate`** — `toJalali()`/`toGregorian()`/`isLeapYear()`/`format()`, the one PHP implementation every plugin depends on (same "shared abstraction in the base layer" reasoning as `EventLogger`/`Migrator`/V2.0 Step 3's `RankingPresenter`). `format()` parses date components directly out of the datetime string rather than round-tripping through `strtotime()`/`gmdate()`, specifically to avoid the Asia/Tehran timezone-shift bug described above.
+- **`JalaliDateInput`** (new design-system primitive) — three `<select>`s (day/month/year), not a calendar-grid widget or a new npm dependency; stores/emits a plain Gregorian `YYYY-MM-DD` (the same internal representation every date on its endpoint already uses), displays only Jalali. Replaces native `<input type="date">` (Gregorian-only in every mainstream browser) wherever a customer picks a date — currently the Beauty Journey goal form; the shared component exists precisely so no future feature re-introduces a Gregorian date input.
+- **Correctness**: both implementations verified against the same well-known golden reference point (1979-02-11 Gregorian = 1357-11-22 Jalali, Iranian Revolution Day) plus zero-mismatch round-trip testing across a 65-year range (1970-2035) and explicit leap-year/end-of-month/Nowruz-boundary assertions. If either side is ever modified, the other must be updated identically — they are deliberately parallel, not shared source (PHP and TypeScript can't literally share one file).
+
+### Error localization standard
+- Every user-facing error, empty state, and status message is Persian, in this codebase's existing natural register (not machine-translated, not childish) — this was already true for the overwhelming majority of strings; the fix here closed the remaining gaps rather than establishing a new convention.
+- `RestController::require_login()`/`require_capability()` (the two highest-blast-radius messages — nearly every protected endpoint in every plugin funnels through them) and `MarketplaceController`'s one English 404 are now Persian.
+- Frontend: `api.ts`'s `request()` now (a) never lets a raw `res.statusText` or a caught network `TypeError` reach the UI — both degrade to one shared, natural Persian fallback string, and (b) correctly reads BOTH error shapes that can reach it — the app's own `{data,meta,error:{code,message}}` envelope AND WordPress core's native `{code,message,data}` shape (which is what a rejected `permission_callback` actually returns, before the request ever reaches a beauclick controller's own envelope-wrapping code) — previously only the first shape was checked, silently discarding an already-correct Persian message from the second.
+- `storeApi.ts` (WooCommerce Store API wrapper) no longer falls back to raw `res.statusText` either.
+- WooCommerce's checkout privacy-policy notice — a literal, install-time-frozen option value invisible to normal `.mo` translation — is now corrected on plugin activation (`beauclick-payments\Plugin::ensure_persian_checkout_privacy_text()`), following the exact same "only touch it if it's still the untouched stock default, never overwrite an admin's own customization" discipline `ensure_persian_page_titles()` already established for the same class of problem.
+- No general-purpose error-message translation *catalog* was built — this codebase's existing, working convention is a Persian literal as the string itself (no `.mo` file for any `beauclick-*` text domain), which the audit found already correctly applied almost everywhere; the gaps were specific missed spots, not a missing mechanism.
+
+### Testing
+17 new PHP tests (`JalaliDateTest`, `PluginTest` additions) + 21 new frontend tests (`jalali.test.ts`, `format.test.ts`, `api.test.ts` additions) covering: the golden reference point, Nowruz/year-boundary conversion, leap-year detection (1403 leap/1402 not), end-of-month round-trips for every month of several years, a 65-year zero-mismatch round-trip sweep, the timezone-shift regression guard, Persian month-name/weekday correctness, and both error-message-shape parsing paths plus the "never a raw English fallback" guarantee.
+
+### V1 compatibility notes
+Touched only what was strictly required: `beauclick-booking\Notifications\BookingMailer` (transactional email dates), the theme's `woocommerce/checkout/thankyou.php` override (order date display), `beauclick-core\Rest\RestController`'s two error messages, one `beauclick-marketplace\Rest\MarketplaceController` message, and `beauclick-payments\Plugin`'s new checkout-privacy-text activation step. No V1 database schema changed, no V1 business logic changed, no V1 booking/availability/payment behavior changed — every fix is presentation-layer (a date's calendar system, an error message's language) or a one-time WooCommerce option correction, never a functional change. `v1.0.0` tag untouched.
+
+### V2 development requirement
+Every future V2 capability **must** use `JalaliDate`/`jalali.ts`/`JalaliDateInput`/`format.ts`'s date helpers for any date it displays or accepts, and must never introduce a second Jalali conversion implementation, a native `<input type="date">` for customer-facing input, or a hardcoded English error/status string. This is now the standing convention, the same way the append-only ledger pattern and the plugin-per-domain architecture already are.
+
+### Known limitations / deferred
+- `beauclick-b2b`'s quote `expires_at` field (admin/business-side quote management) has no frontend UI at all yet in this codebase — nothing to convert to Jalali until a UI is built for it; noted, not fixed speculatively.
+- The footer copyright year (`gmdate('Y')`) was deliberately left Gregorian — a copyright year is a widely-understood international convention even on Persian-first sites, not a "date" in the sense this audit's scope (bookings, schedules, orders, dashboards) was concerned with.
+- No admin-facing (wp-admin) strings were translated — English CPT labels, role names, and menu labels in wp-admin are seen only by administrators/moderators, not customers/professionals/businesses, and were explicitly out of this audit's user-facing scope.
+- Frontend error messages fall back to one shared generic Persian string when no specific translated message is available from either known API error shape — this is correct and sufficient (never raw/English), but a small number of edge-case failures (e.g. a truly malformed response) will read as generic rather than maximally specific; acceptable given how rarely that path is actually reached in normal use.
+
+---
+
 ## 1. V1 Freeze Statement
 
 BeauClick V1 is frozen as of commit `8494c7b4f6540500366da42b589b22fce53206a7`, tagged `v1.0.0` and released on GitHub. All 12 architecture phases are complete; the Production Readiness/Hardening audit and full UI/RTL/Typography QA pass are complete; 140/140 backend tests pass; all 7 named critical flows are live-verified against the running site.

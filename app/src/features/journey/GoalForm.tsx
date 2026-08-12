@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Input } from '@/design-system';
+import { Button, Input, JalaliDateInput } from '@/design-system';
 import { api, ApiError } from '@/lib/api';
 import type { BeautyGoal } from './types';
 
@@ -49,10 +49,15 @@ export function GoalForm( { specialties, onCreated, onCancel }: { specialties: S
 				{ specialties.map( ( s ) => <option key={ s.id } value={ s.id }>{ s.name }</option> ) }
 			</select>
 
-			<div style={ { display: 'flex', gap: 8 } }>
-				<Input aria-label="بودجه (تومان)" placeholder="بودجه (تومان)" type="number" value={ budget } onChange={ ( e ) => setBudget( e.target.value ) } />
-				<Input aria-label="تاریخ هدف" type="date" value={ targetDate } onChange={ ( e ) => setTargetDate( e.target.value ) } />
-			</div>
+			<Input aria-label="بودجه (تومان)" placeholder="بودجه (تومان)" type="number" value={ budget } onChange={ ( e ) => setBudget( e.target.value ) } />
+
+			{ /* BeauClick is Jalali-first: this renders day/month/year as Persian
+			     Jalali selects, but still stores/sends a plain Gregorian
+			     YYYY-MM-DD (targetDate) -- the same internal representation the
+			     API and every other date on this endpoint already uses. Native
+			     <input type="date"> was deliberately NOT used here since every
+			     mainstream browser only ever renders it as a Gregorian picker. */ }
+			<JalaliDateInput ariaLabel="تاریخ هدف" value={ targetDate } onChange={ setTargetDate } />
 
 			{ error && <p role="alert" style={ { color: 'var(--bc-color-error)', fontSize: 13, margin: 0 } }>{ error }</p> }
 

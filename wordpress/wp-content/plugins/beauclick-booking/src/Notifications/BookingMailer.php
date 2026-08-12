@@ -3,6 +3,8 @@ declare( strict_types=1 );
 
 namespace BeauClick\Booking\Notifications;
 
+use BeauClick\Core\Support\JalaliDate;
+
 /**
  * Real transactional email via wp_mail() — no new infra, matching the
  * .env scaffold's BC_MAIL_FROM_ADDRESS/BC_MAIL_FROM_NAME (present since
@@ -79,8 +81,14 @@ final class BookingMailer {
 		}
 	}
 
+	/**
+	 * BeauClick is Jalali-first -- a Gregorian date_i18n() string in a
+	 * transactional email is exactly the class of bug this project's
+	 * global date audit exists to fix. slot_start is already a site-local
+	 * wall-clock MySQL datetime (never raw UTC), which is what
+	 * JalaliDate::format() expects.
+	 */
 	private function format_when( string $mysql_datetime ): string {
-		$timestamp = strtotime( $mysql_datetime );
-		return $timestamp ? date_i18n( 'Y-m-d H:i', $timestamp ) : $mysql_datetime;
+		return JalaliDate::format( $mysql_datetime, true );
 	}
 }

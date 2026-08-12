@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import { formatToman, formatRating, formatShortDate, formatTime, toPersianDigits } from '@/lib/format';
+import { formatToman, formatRating, formatShortDate, formatFullJalaliDate, formatTime, toPersianDigits } from '@/lib/format';
 import { LoadingDots } from '@/design-system';
 import { StatCard } from '../shared/StatCard';
 import type { DashboardStats } from './types';
@@ -59,7 +59,14 @@ export function OverviewTab() {
 									} }
 									title={ String( d.count ) }
 								/>
-								<span className="bc-numeric" style={ { fontSize: 11, color: 'var(--bc-color-ink-faint)' } }>{ formatShortDate( new Date( d.date ) ).day }</span>
+								{ /* d.date is a bare YYYY-MM-DD site-local calendar date, not a UTC
+								     instant -- new Date('2026-08-12') parses as UTC midnight, which
+								     shifts to the previous local day in any timezone behind UTC. The
+								     y/m/d-argument Date constructor treats its inputs as local time,
+								     avoiding that off-by-one. */ }
+								<span className="bc-numeric" style={ { fontSize: 11, color: 'var(--bc-color-ink-faint)' } }>
+									{ ( () => { const [ y, m, dd ] = d.date.split( '-' ).map( Number ); return formatShortDate( new Date( y, m - 1, dd ) ).day; } )() }
+								</span>
 							</div>
 						) ) }
 					</div>
@@ -92,7 +99,7 @@ export function OverviewTab() {
 							{ stats.recentBookings.map( ( b ) => (
 								<tr key={ b.id } style={ { borderTop: '1px solid var(--bc-color-line)' } }>
 									<td style={ { padding: '8px 4px' } }>{ b.customerName }</td>
-									<td style={ { padding: '8px 4px' } } className="bc-numeric">{ formatShortDate( new Date( b.slotStart.replace( ' ', 'T' ) ) ).weekday }، { formatTime( new Date( b.slotStart.replace( ' ', 'T' ) ) ) }</td>
+									<td style={ { padding: '8px 4px' } } className="bc-numeric">{ formatFullJalaliDate( new Date( b.slotStart.replace( ' ', 'T' ) ) ) }، { formatTime( new Date( b.slotStart.replace( ' ', 'T' ) ) ) }</td>
 									<td style={ { padding: '8px 4px' } }><StatusPill status={ b.status } /></td>
 								</tr>
 							) ) }

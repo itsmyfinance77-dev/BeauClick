@@ -18,6 +18,8 @@
 declare( strict_types=1 );
 
 defined( 'ABSPATH' ) || exit;
+
+use BeauClick\Core\Support\JalaliDate;
 ?>
 
 <div class="bc-order-received">
@@ -47,7 +49,15 @@ defined( 'ABSPATH' ) || exit;
 					</div>
 					<div class="bc-provider-card__footer">
 						<span class="bc-provider-card__meta"><?php esc_html_e( 'تاریخ', 'beauclick' ); ?></span>
-						<strong class="bc-numeric"><?php echo esc_html( bc_persian_digits( wc_format_datetime( $order->get_date_created() ) ) ); ?></strong>
+						<?php
+						// bc_persian_digits(wc_format_datetime(...)) used to just
+						// swap digit glyphs on a Gregorian date -- the calendar
+						// itself was still wrong for a Persian-first product. This
+						// project's global date audit requires real Jalali
+						// conversion, not a digit-glyph illusion of one.
+						$order_date = $order->get_date_created() ? $order->get_date_created()->date( 'Y-m-d H:i' ) : '';
+						?>
+						<strong class="bc-numeric"><?php echo esc_html( $order_date ? JalaliDate::format( $order_date, true ) : '' ); ?></strong>
 					</div>
 					<div class="bc-provider-card__footer">
 						<span class="bc-provider-card__meta"><?php esc_html_e( 'مبلغ کل', 'beauclick' ); ?></span>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { Button, Card, LoadingDots, EmptyState } from '@/design-system';
-import { formatToman, formatShortDate, toPersianDigits } from '@/lib/format';
+import { formatToman, formatFullJalaliDate, toPersianDigits } from '@/lib/format';
 import { RecommendationCard } from '@/features/ai/RecommendationCard';
 import { GoalForm } from './GoalForm';
 import type { BeautyGoal, JourneySummary, TimelineEntry } from './types';
@@ -14,10 +14,21 @@ const STATUS_LABELS: Record<string, string> = {
 
 function fmtDate( iso: string ): string {
 	try {
-		return formatShortDate( new Date( iso.replace( ' ', 'T' ) ) ).weekday;
+		return formatFullJalaliDate( new Date( iso.replace( ' ', 'T' ) ) );
 	} catch {
 		return iso;
 	}
+}
+
+/** goal.targetDate is stored as a plain Gregorian YYYY-MM-DD (the internal/
+ * API representation -- see GoalDateInput's own docblock for why storage
+ * stays Gregorian while input/display is Jalali). Parsed as a local
+ * calendar date (not through the UTC-midnight-parsing Date(string) path)
+ * before formatting. */
+function fmtJalaliDateOnly( isoDate: string ): string {
+	const [ y, m, d ] = isoDate.split( '-' ).map( Number );
+	if ( [ y, m, d ].some( Number.isNaN ) ) return isoDate;
+	return formatFullJalaliDate( new Date( y, m - 1, d ) ).replace( /^.+، /, '' ); // drop the weekday prefix -- a target date is a plain date, not tied to "this specific weekday matters"
 }
 
 export function JourneyTab() {
@@ -93,7 +104,7 @@ export function JourneyTab() {
 								<p style={ { margin: '4px 0 0', fontSize: 12, color: 'var(--bc-color-ink-faint)' } }>
 									{ STATUS_LABELS[ g.status ] ?? g.status }
 									{ null != g.budget && ` · بودجه ${ formatToman( g.budget ) } تومان` }
-									{ g.targetDate && ` · تا ${ toPersianDigits( g.targetDate ) }` }
+									{ g.targetDate && ` · تا ${ fmtJalaliDateOnly( g.targetDate ) }` }
 								</p>
 							</div>
 							{ 'active' === g.status && (
