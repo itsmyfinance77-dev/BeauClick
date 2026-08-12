@@ -345,3 +345,51 @@ This is a recommendation for the product owner to weigh, not a decision made uni
 ## 27. Closing Note
 
 Per the audit's own explicit instruction not to hide or minimize discoveries: the registration gap (AUTH-01) and the unpublished/missing legal pages (LEGAL-01/02/03) are both more significant than anything else in this register, and both went unnoticed through V1, V2.0, and V2.1 Step 5 because every prior verification session already had test accounts to work with and never needed to use the pages a real first-time visitor would need. This is not a criticism of any prior step's own scope — each was correctly and thoroughly delivered against what it was asked to do — it is exactly the kind of gap this audit exists to surface.
+
+---
+
+## 28. V2.1 Step Assignments (Post-Roadmap-Update)
+
+Following the roadmap/architecture-plan reprioritization (`docs/roadmap/VERSION_2_ARCHITECTURE_PLAN.md`'s "Post-Audit V2.1 Reprioritization" section, and the corresponding update to `BeauClick_Version_2_Roadmap.md`), every gap with genuine, assignable product-development scope now has a concrete home. This section is the authoritative mapping; the `Target` column values inside the §6 tables above remain as originally written (mostly generic `V2.1`/`V2.2` labels) and should be read together with this table rather than edited row-by-row, to avoid the two ever silently drifting apart.
+
+| ID | Item | Assigned to | Disposition |
+|---|---|---|---|
+| AUTH-01 | No customer self-registration path | **V2.1 Step 6** | Product development |
+| AUTH-02 | No branded BeauClick auth UI | **V2.1 Step 6** | Product development |
+| AUTH-03 | No phone/OTP authentication | **V2.1 Step 6** | Product development |
+| AUTH-04 | No SMS gateway integration | **V2.1 Step 6** (consumer) | `EXTERNAL_CONFIGURATION` — provider/credentials decision precedes the integration layer Step 6 builds against it |
+| AUTH-05 / SEC-02 | No login rate limiting/brute-force protection | **V2.1 Step 6** | Product development |
+| AUTH-06 | No email verification on signup | **V2.1 Step 6** | Product development |
+| AUTH-07 / PRIV-02 | No self-service account deletion | V2.2 | Product development (unchanged) |
+| AUTH-08 / PRIV-03 | No self-service data export | V2.2 | Product development (unchanged) |
+| AUTH-09 | Password reset not BeauClick-branded | **V2.1 Step 6** | Product development (bundled with AUTH-02) |
+| AUTH-10 | No duplicate-phone/account-merge handling | **V2.1 Step 6** (design), implementation may extend into V2.2 if complexity warrants | Product development |
+| LEGAL-01 | Terms of Service doesn't exist | **V2.1 Step 7** (page framework); content is `NEEDS_BUSINESS_DECISION` + `NEEDS_LEGAL_REVIEW` | Split: engineering + business/legal |
+| LEGAL-02 | Privacy Policy unpublished draft | **V2.1 Step 7** (publish + link); content review is `NEEDS_LEGAL_REVIEW` | Split |
+| LEGAL-03 | Refund Policy unpublished draft | **V2.1 Step 7** (publish + link); content review is `NEEDS_LEGAL_REVIEW` | Split |
+| LEGAL-04 | No cookie/consent notice | **V2.1 Step 7** (consent-hook framework); the policy itself is `NEEDS_LEGAL_REVIEW` | Split |
+| LEGAL-05 | No FAQ/Contact/About pages | **V2.1 Step 7** (page framework); content ownership is `NEEDS_BUSINESS_DECISION` | Split |
+| LEGAL-06 | Commission/payout terms undefined | Deferred alongside Financial/Payout (V2.3) | `NEEDS_BUSINESS_DECISION` |
+| LEGAL-07 | No published review-moderation policy | **V2.1 Step 7** | `NEEDS_BUSINESS_DECISION` |
+| LEGAL-08 / PRIV-04 | Data retention policy undefined | **V2.1 Step 7** (preference storage); the policy itself is `NEEDS_BUSINESS_DECISION` | Split |
+| COM-06 | Refund policy publication (commerce-facing) | **V2.1 Step 7** | Same item as LEGAL-03, cross-referenced |
+| PROF-04 | No professional-verification evidence trail | **V2.1 Step 8** | Product development |
+| ADMIN-03 | Verification workflow has no audit trail | **V2.1 Step 8** | Product development |
+| SEC-04 | File upload validation (needed once evidence upload exists) | **V2.1 Step 8** | Product development |
+| ADMIN-02 | No admin audit log | **V2.1 Step 8** (scoped to verification actions), broader admin audit logging remains V2.2 | Product development |
+| PROF-05 | No multi-staff business permission model | V2.2 (unchanged — explicitly documented as a limitation, not solved by CRM or by Step 8) | Product development |
+| Loyalty tiers, Membership benefits/entitlements | Not individually ID'd in §6 (predates this register; carried from the original architecture plan §4.6) | **V2.1 Step 9** | Product development |
+| BOOK-06 | Waitlist | **V2.1 Step 10** | Product development |
+| BOOK-03 | Rescheduling | V2.2 (may be pulled into Step 10 if found to share infrastructure with waitlist during design) | Product development |
+| BOOK-04 | No-show state transition never triggered | V2.1/V2.2 (small, may ride along with Step 8 or 10 depending on where the professional-facing "mark as no-show" action naturally lands) | Product development |
+| BOOK-05 / DATE-03 | No booking reminders | **V2.1 Step 10** | Product development |
+| NOTIF-03 | Central notification service | **V2.1 Step 10** (prerequisite work within the step, per the architecture plan's own already-identified dependency) | Product development |
+| NOTIF-04 | In-app notification center | V2.2 (Step 10 covers the service; a full in-app UI may extend beyond it) | Product development |
+| NOTIF-05 | SMS notifications | **V2.1 Step 10** (consumer), same `EXTERNAL_CONFIGURATION` SMS-provider dependency as AUTH-04 | Split |
+| NOTIF-06 / PROF-02 | Notification preferences/opt-out | **V2.1 Step 10** | Product development |
+| SEC-01, SEC-03, SEC-05, SEC-06, PRIV-01, PRIV-05, OPS-01, LOC-01/02, DATE-01, MKT-01/03/04, COM-01/02, BOOK-01/02, AI-01/04, A11Y-01/02/04, ANLYT-01 | Already `IMPLEMENTED` | — | No action; unaffected by this reprioritization |
+| LOC-04 | `نوبت`/`رزرو` terminology inconsistency | V2.1 (opportunistic — recommend folding into Step 6/7's own UI work rather than a standalone pass) | Product development |
+| OPS-02, OPS-03, OPS-04, OPS-05 | Backup, health check, error monitoring, real system cron | Production setup, ahead of public launch | `EXTERNAL_CONFIGURATION` — not assigned to any V2.1 step; these are hosting/infrastructure decisions independent of feature sequencing |
+| SEO-01–04, ANLYT-02–05, COM-03/04/05, A11Y-03, ADMIN-01, ADMIN-04, PRO-02/03/04, AI-02/03/05, MKT-02 | Various | V2.2/V2.3, per their existing entries in §6/§7 | Unchanged by this update |
+
+**Note on external configuration:** per this task's explicit instruction, SMS/SMTP/monitoring/backup are deliberately **not** turned into their own product-development steps. Where a step's functionality depends on one (Step 6 and Step 10 both depend on an SMS provider decision; every step depends on SMTP for any email it sends), the dependency is named inline above, but the external service itself remains an operational/business decision to make before or alongside the relevant step, not a line item inside it.

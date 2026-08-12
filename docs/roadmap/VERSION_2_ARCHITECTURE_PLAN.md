@@ -968,3 +968,59 @@ None required.
 
 ### Deferred CRM capabilities (explicitly out of this step, per the task's own scope boundary)
 Customer segmentation/tagging beyond the six derived filters, campaign targeting, follow-up reminder automation, inactive-customer retention triggers, CRM-aware AI ("which customers haven't returned"), analytics dashboards, and any multi-staff business permission model. All are named in the roadmap as later V2.1+/V2.2+ capabilities that can consume this step's `CrmService` once they exist — nothing here needs to be rebuilt to support them.
+
+---
+
+## Post-Audit V2.1 Reprioritization
+
+**This section documents a sequencing change, not an implementation.** No code, migration, or UI changed as part of this update — only the planned order of not-yet-built V2.1 steps. The historical record above (Steps 1–4, the V1.0.1/V2.0.0/Step-5-CRM implementation notes and their live-verification results) is unmodified and remains the accurate account of what actually shipped and when.
+
+### Why the sequence changed
+
+The original V2.1 sequence (§6 above, written before any Step 5 work began) assumed CRM would be followed directly by Loyalty tiers/Membership — a reasonable plan given what was known at the time, built entirely from the roadmap's own stated priorities and this document's own §4 capability assessment. It did not, and could not, account for gaps nobody had gone looking for yet.
+
+The Master Product Completeness & Gap Discovery Audit (`docs/roadmap/PRODUCT_GAP_REGISTER.md`, dated 2026-08-12, auditing commit `af4b8d7`) found, by direct database inspection rather than assumption, that **`users_can_register` is `0` and both WooCommerce self-registration switches are `no` — there is currently no way for a new customer to create an account on this platform at all.** Every account exercised across every V1, V2.0, and V2.1 verification session in this project's history was created directly via `wp-cli`, never through a real signup flow, because no real signup flow exists. The same audit found the site's Privacy Policy and Refund Policy exist only as unpublished WordPress drafts, and no Terms of Service, FAQ, Contact, or About page exists at all.
+
+Continuing straight to Membership — a feature whose entire value proposition depends on real, self-registered customers accumulating tiered status over time — on top of a platform that cannot yet onboard a real customer, or disclose terms to one, would have compounded the gap rather than closed it. The revised sequence below exists specifically to close AUTH-01 and LEGAL-01/02/03 (the two `BLOCKING`-severity findings in the Gap Register that are genuine product-development work, as opposed to `EXTERNAL_CONFIGURATION` or `NEEDS_BUSINESS_DECISION` items no engineering step can resolve on its own) before building anything that presumes they're already solved.
+
+### Why Authentication is now P0
+
+Per the Gap Register's own prioritization (§7 of that document): AUTH-01 (no registration path) and the LEGAL-01/02/03 unpublished-pages findings are the two highest-consequence discoveries of the entire 15-category audit, specifically because they are *silent* — every other gap in the register (no reschedule UI, no waitlist, no invoice PDF, etc.) degrades one feature's usefulness, while a missing registration path blocks the entire product from acquiring a single new real user, and missing legal disclosure blocks responsible operation of a live commerce site regardless of feature completeness elsewhere. Authentication is placed first among the two because it is pure engineering work with no external content dependency, while Legal/Trust's actual page *text* needs product/legal ownership that can proceed in parallel rather than gating Step 6.
+
+### Why Legal/Trust is a prerequisite to wider release
+
+Not because any single legal document is technically complex to render — `docs/roadmap/PRODUCT_GAP_REGISTER.md` §22 classifies the actual page *content* as `NEEDS_BUSINESS_DECISION`/`NEEDS_LEGAL_REVIEW`, explicitly not an engineering deliverable — but because a real commerce platform accepting real payments from real, newly-registered customers (which Step 6 makes possible for the first time) without a published, linked Privacy Policy, Terms of Service, or Refund Policy is a materially different risk posture than the same gap existing today, when no real customer can register at all. Step 7's engineering scope (page structure, routing, localization, consent-preference storage, linking from checkout/authentication) is deliberately separated from the legal-content question it depends on, matching the Gap Register's own instruction not to draft legal language as though it were legally approved.
+
+### Why Verification Evidence should precede broader marketplace expansion
+
+PROF-04/ADMIN-03 in the Gap Register found that professional "verification" today is an admin flipping a status field with no attached evidence — a fact that was already true and already tolerable at this project's current, small, known-provider scale (the same handful of demo professionals verified throughout every prior audit). It stops being tolerable the moment Step 6 makes public registration possible: a marketplace that can suddenly onboard professionals nobody has personally vetted needs a real evidence trail before it can meaningfully grow past that point, not after. Placing it as Step 8 — after registration and legal disclosure exist, before Membership — follows directly from that dependency, not from an arbitrary reordering.
+
+### Why Membership now follows these foundational capabilities
+
+Unchanged in substance from the original assessment (§4.6: "Membership = a real recurring-revenue lever," high business value) — only its position moved. Tiered membership status accumulates over a customer relationship that, until Step 6, could not begin for a real user, and Step 9's own price-hook interaction with WooCommerce (already flagged as this roadmap's highest-recurring-risk integration pattern, §13 point 2) is safer to build against a platform that already has real registered customers and real published pricing/refund terms to test against, not a hypothetical one.
+
+### How this relates to the existing architecture
+
+Nothing about the underlying architecture changes. Authentication (Step 6) is additive to the existing cookie+nonce web session model (§17's own "stays exactly as-is; token auth is additive for mobile only" principle extends naturally to "a branded UI in front of the same session mechanism, not a replacement for it"). Legal/Trust (Step 7) is page content plus the existing `wp_posts`/theme-template rendering pattern already used for every other public page — no new rendering architecture. Verification Evidence (Step 8) extends the existing `VerificationMetaBox`/admin-capability pattern additively, per this document's own standing "extend, never rewrite" principle (§1, §17). Membership (Step 9) and Waitlist/Rebooking (Step 10) are unchanged from the original §4.6/§4.8 assessments — only their position in the sequence moved, not their design.
+
+### Revised V2.1 sequence
+
+| Step | Capability | Status |
+|---|---|---|
+| 5 | Professional CRM | **Complete** (`af4b8d7`) |
+| 6 | BeauClick Authentication & Registration | Planned — P0 |
+| 7 | Legal & Trust Foundation | Planned — P0 (engineering scope only; content is `NEEDS_BUSINESS_DECISION`/`NEEDS_LEGAL_REVIEW`) |
+| 8 | Professional Verification Evidence & Trust | Planned — P1 |
+| 9 | Loyalty Tiers + Membership | Planned — carried forward from the original sequence, now after 6–8 |
+| 10 | Waitlist + Smart Rebooking + Retention Automation | Planned — carried forward from the original sequence |
+
+V2.2/V2.3 capabilities named in the original roadmap and this document's earlier §6 (CRM's remaining deferred items, Campaign/Promotion Engine, AI-for-Professionals, Financial/Payout, and the explicitly-deferred V2.4 platform-expansion items — Realtime Chat, Multi-Sided Marketplace, Native Mobile) are unchanged and not renumbered; this reprioritization only reorders what happens inside V2.1.
+
+### Cross-cutting standards remain unchanged and apply to every step above
+Every V2.1 step (6 through 10) is bound by the same standing, cross-cutting requirements already established for all of V1 and V2.0 — restated here because they apply with equal force to genuinely new surfaces like a branded login screen or a legal-pages framework, not only to features that extend existing UI:
+
+- **Persian-first, RTL-first, Jalali-first, Persian-error-first, Persian-number-aware.** No new authentication, legal, verification, membership, or waitlist surface may introduce an English string where a natural Persian equivalent exists, a Gregorian date where a user-facing date is shown, or a numeral not rendered in Persian digits where one already would be.
+- **Reuse the existing shared Jalali infrastructure** (`JalaliDate.php`, `jalali.ts`, `format.ts`, `JalaliDateInput`) for any date any of these five steps displays or accepts — verification dates, membership period boundaries, waitlist/reminder timestamps included. No second Jalali implementation.
+- **No unnecessary English UI** anywhere a Persian equivalent exists, matching the standard already enforced and audited twice (V1.0.1, V2.0 final audit) and re-verified a third time during Step 5.
+
+These are not restated as a new Step — they are the same permanent engineering standard documented in the "Cross-Cutting Standard — Persian/Jalali Date & Error Localization" section above, carried forward unchanged.
