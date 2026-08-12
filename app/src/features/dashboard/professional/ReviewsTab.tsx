@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
-import { formatShortDate, toPersianDigits } from '@/lib/format';
+import { formatFullJalaliDate, toPersianDigits } from '@/lib/format';
 import { Button, LoadingDots, EmptyState } from '@/design-system';
 
 interface MyReview {
@@ -54,7 +54,7 @@ export function ReviewsTab() {
 							<span className="bc-rating bc-numeric"><span className="bc-rating__star" aria-hidden="true">★</span> { toPersianDigits( r.rating ) }</span>
 						</div>
 						<p style={ { margin: '4px 0 0', fontSize: 11, color: 'var(--bc-color-ink-faint)' } } className="bc-numeric">
-							{ formatShortDate( new Date( r.createdAt.replace( ' ', 'T' ) ) ).weekday }
+							{ formatFullJalaliDate( new Date( r.createdAt.replace( ' ', 'T' ) ) ) }
 						</p>
 						{ r.body && <p style={ { margin: '8px 0 0', color: 'var(--bc-color-ink-soft)' } }>{ r.body }</p> }
 

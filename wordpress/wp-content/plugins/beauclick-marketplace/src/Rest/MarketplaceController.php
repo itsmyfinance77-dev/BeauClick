@@ -115,7 +115,7 @@ final class MarketplaceController extends RestController {
 		$post = get_post( $id );
 
 		if ( ! $post || ! in_array( $post->post_type, [ Registrar::PROFESSIONAL, Registrar::BUSINESS ], true ) || 'publish' !== $post->post_status ) {
-			return Response::error( 'bc_not_found', __( 'Provider not found.', 'beauclick-marketplace' ), 404 );
+			return Response::error( 'bc_not_found', __( 'این پروفایل پیدا نشد.', 'beauclick-marketplace' ), 404 );
 		}
 
 		$services = get_posts(

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
-import { formatShortDate, formatTime } from '@/lib/format';
+import { formatFullJalaliDate, formatTime } from '@/lib/format';
 import { Button, LoadingDots, EmptyState } from '@/design-system';
 import { ReviewForm } from '@/features/reviews/ReviewForm';
 
@@ -61,7 +61,7 @@ export function BookingsTab() {
 						<div className="bc-card" style={ { padding: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 } }>
 							<div>
 								<strong className="bc-numeric">
-									{ formatShortDate( new Date( b.slotStart.replace( ' ', 'T' ) ) ).weekday }، { formatTime( new Date( b.slotStart.replace( ' ', 'T' ) ) ) }
+									{ formatFullJalaliDate( new Date( b.slotStart.replace( ' ', 'T' ) ) ) }، { formatTime( new Date( b.slotStart.replace( ' ', 'T' ) ) ) }
 								</strong>
 								<p style={ { margin: '4px 0 0', fontSize: 13, color: 'var(--bc-color-ink-faint)' } }>{ STATUS_LABELS[ b.status ] ?? b.status }</p>
 							</div>

@@ -48,7 +48,12 @@ async function storeRequest<T>( path: string, options: RequestInit = {} ): Promi
 
 	if ( ! res.ok ) {
 		const body = await res.json().catch( () => ( {} ) );
-		throw new Error( body?.message ?? res.statusText );
+		// body?.message is WooCommerce's own (already-localized, fa_IR) Store
+		// API error text when present; res.statusText is a raw browser/HTTP
+		// reason phrase ("Not Found", "Internal Server Error") and must never
+		// reach the user directly -- fall back to a natural Persian message
+		// instead of a technical English one.
+		throw new Error( body?.message ?? 'در ارتباط با فروشگاه مشکلی پیش آمد. لطفاً دوباره تلاش کنید.' );
 	}
 
 	return res.json();

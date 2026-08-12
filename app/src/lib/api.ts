@@ -62,24 +62,58 @@ function buildUrl( path: string ): string {
 	return base.toString();
 }
 
+/**
+ * Generic Persian fallback for whenever a real, translated error message
+ * isn't available — a raw HTTP reason phrase (res.statusText, always
+ * English: "Not Found", "Internal Server Error") or a browser network
+ * error must never reach the user directly. Every caller that renders
+ * ApiError.message to the UI relies on this never being an English string.
+ */
+const GENERIC_REQUEST_ERROR = 'در انجام این درخواست مشکلی پیش آمد. لطفاً دوباره تلاش کنید.';
+
 async function request<T>( path: string, options: RequestInit = {} ): Promise<T> {
-	const res = await fetch( buildUrl( path ), {
-		...options,
-		headers: {
-			'Content-Type': 'application/json',
-			...( window.BeauClick?.nonce ? { 'X-WP-Nonce': window.BeauClick.nonce } : {} ),
-			...options.headers,
-		},
-		credentials: 'same-origin',
-	} );
-
-	const body: ApiEnvelope<T> = await res.json();
-
-	if ( ! res.ok || body.error ) {
-		throw new ApiError( body.error?.code ?? 'bc_unknown_error', body.error?.message ?? res.statusText, res.status );
+	let res: Response;
+	try {
+		res = await fetch( buildUrl( path ), {
+			...options,
+			headers: {
+				'Content-Type': 'application/json',
+				...( window.BeauClick?.nonce ? { 'X-WP-Nonce': window.BeauClick.nonce } : {} ),
+				...options.headers,
+			},
+			credentials: 'same-origin',
+		} );
+	} catch {
+		// A real network failure (offline, DNS, CORS) never even reaches a
+		// response — there is no res.statusText to (correctly) avoid here,
+		// but the browser's own TypeError message would be just as raw and
+		// English if allowed through unwrapped.
+		throw new ApiError( 'bc_network_error', GENERIC_REQUEST_ERROR, 0 );
 	}
 
-	return body.data;
+	// A non-JSON response (a PHP fatal producing an HTML error page, a
+	// proxy/WAF block page, a route that doesn't exist) must degrade to the
+	// same generic Persian message, not an unhandled JSON-parse exception.
+	const body: Partial<ApiEnvelope<T>> & { code?: string; message?: string } = await res.json().catch( () => ( {} ) );
+
+	if ( ! res.ok || body.error ) {
+		// Two different error shapes reach this point: the app's own
+		// {data,meta,error:{code,message}} envelope (Response::error() in
+		// every beauclick controller), and WordPress core's native
+		// {code,message,data} shape -- the latter happens whenever a route's
+		// permission_callback rejects the request (e.g. require_login()'s
+		// WP_Error), since that's handled by WP_REST_Server itself before
+		// the request ever reaches the controller that would wrap it in the
+		// app's own envelope. Both carry a real, already-Persian message
+		// today; check both before falling back to the generic string.
+		throw new ApiError(
+			body.error?.code ?? body.code ?? 'bc_unknown_error',
+			body.error?.message ?? body.message ?? GENERIC_REQUEST_ERROR,
+			res.status
+		);
+	}
+
+	return body.data as T;
 }
 
 export const api = {

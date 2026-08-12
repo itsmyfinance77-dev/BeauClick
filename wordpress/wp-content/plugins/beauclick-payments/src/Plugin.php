@@ -197,6 +197,7 @@ final class Plugin {
 
 		Currency::ensure_configured(); // Every environment, not just non-production — unlike COD, correct currency formatting is never dev-only.
 		self::ensure_persian_page_titles();
+		self::ensure_persian_checkout_privacy_text();
 
 		if ( 'production' === wp_get_environment_type() ) {
 			self::ensure_store_is_reachable();
@@ -268,6 +269,41 @@ final class Plugin {
 				wp_update_post( [ 'ID' => $page_id, 'post_title' => $persian_title ] );
 			}
 		}
+	}
+
+	/**
+	 * Global date/error localization audit: WooCommerce's checkout privacy
+	 * notice ("Your personal data will be used to process your order...")
+	 * is stored as a literal option value at install time
+	 * (`woocommerce_checkout_privacy_policy_text`), not translated live via
+	 * .mo files the way most WooCommerce strings are — so it stays in
+	 * English forever regardless of the site locale unless something
+	 * explicitly rewrites it, exactly the class of leak found on the real
+	 * "pay for order" page during this audit's live verification. Same
+	 * "only touch it if it's still the untouched stock default" discipline
+	 * as ensure_persian_page_titles() — an admin who already customized
+	 * this text is never overwritten.
+	 */
+	private static function ensure_persian_checkout_privacy_text(): void {
+		// Deliberately the raw English literal, NOT __('...', 'woocommerce')
+		// -- this site's locale is already fa_IR, so calling __() here would
+		// itself return the *translated* string (WooCommerce's fa_IR.mo does
+		// cover it) and could never match the stored option's literal
+		// English text, which was written once at install/setup-wizard time
+		// (before/independent of the active locale) and never re-translated
+		// on read. Comparing against the raw literal is the only way to
+		// actually detect "still the untouched stock default."
+		$stock_default = 'Your personal data will be used to process your order, support your experience throughout this website, and for other purposes described in our [privacy_policy].';
+
+		$current = get_option( 'woocommerce_checkout_privacy_policy_text', $stock_default );
+		if ( $current !== $stock_default ) {
+			return; // Already customized (by an admin, or a prior real translation) — never overwrite.
+		}
+
+		update_option(
+			'woocommerce_checkout_privacy_policy_text',
+			__( 'اطلاعات شخصی شما برای پردازش سفارش، بهبود تجربه شما در این وبسایت، و سایر مواردی که در [privacy_policy] توضیح داده شده استفاده خواهد شد.', 'beauclick-payments' )
+		);
 	}
 
 	/**

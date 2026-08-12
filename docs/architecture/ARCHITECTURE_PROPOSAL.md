@@ -492,3 +492,31 @@ Two more apparent bugs surfaced during this pass turned out to be tooling artifa
 
 **Environment note, not a code defect (resolved):** this round's live-verification pass initially found port 8080 bound to an unrelated desktop app (Adobe Connect) on this machine instead of a PHP/WP server — `curl -i http://localhost:8080/` returned `Server: Connect Internal WebServer` with a blank body. Once that app was closed, the actual documented dev server (`php -S localhost:8080 router.php`, see §23) started cleanly against the existing verified PHP 8.5.9 + MySQL setup and served the real site correctly — no reinstall or stack change was needed, just starting the process that was already the right one for this project. Live WordPress verification resumed from there.
 
+---
+
+## V1.0.1 Patch — Persian/Jalali Date & Error Localization
+
+**Released as tag `v1.0.1`, a normal V1 patch release — `v1.0.0` remains the immutable original baseline.** A cross-cutting audit (performed after V2 development had already begun on `master`, then extracted back onto this V1 baseline as a clean patch, excluding every V2 capability) found BeauClick's dates were Gregorian everywhere — Persian *digit glyphs* on a Gregorian calendar, never an actual Jalali (Solar Hijri) conversion — plus a handful of genuine English-string leaks in an otherwise fully-Persian-localized product.
+
+### What was found
+- No Jalali/Shamsi conversion existed anywhere, PHP or TypeScript. `bc_persian_digits()`/`toPersianDigits()` only ever swapped digit characters (`2026` → `۲۰۲۶`) — the calendar itself stayed Gregorian everywhere it was used: the booking date-chip picker, every dashboard/table date, the WooCommerce order thank-you page, transactional booking emails.
+- A concrete example: the thank-you page rendered `bc_persian_digits(wc_format_datetime($order->get_date_created()))` — Persian-looking digits on a date that remained Gregorian.
+- A real timezone off-by-one risk: this site's configured timezone is `Asia/Tehran` (UTC+03:30, set by `Core::ensure_site_locale()` on activation — see `TimezoneTest`). A naive `strtotime()`+`gmdate()` round trip on a site-local datetime string re-interprets it through that offset and back to UTC, silently shifting the calendar date near midnight. Found and fixed before it shipped.
+- Two genuine English-string leaks among ~40+ already-correct Persian error messages: `RestController::require_login()`/`require_capability()` (the base permission check nearly every protected REST route in every plugin uses) and one `MarketplaceController` 404 message.
+- A frontend fallback path (`ApiError.message ?? res.statusText`) could surface a raw English HTTP reason phrase whenever a response didn't match the app's own JSON envelope — including WordPress core's own native `{code,message,data}` shape (what a rejected `permission_callback` actually returns), which was previously not even checked.
+- WooCommerce's checkout privacy-policy notice was frozen in English — a literal option value written once at install time, invisible to normal `.mo`-file translation, found live on the real "pay for order" page.
+
+### What changed
+- **`app/src/lib/jalali.ts`** (new) / **`beauclick-core\Support\JalaliDate`** (new) — one Gregorian↔Jalali conversion algorithm (the standard, well-known 2820-year-cycle calculation, no new dependency), hand-ported to both runtimes and verified against the well-known 1979-02-11/1357-11-22 golden reference (Iranian Revolution Day) plus a zero-mismatch round-trip sweep across 1970–2035 and explicit leap-year/Nowruz-boundary tests.
+- **`format.ts`'s `formatShortDate()`/new `formatFullJalaliDate()`** are now genuinely Jalali — every existing caller (booking date-chip picker, professional/customer dashboards, orders, reviews, chat) needed no structural change, only its date output became calendar-correct.
+- **`JalaliDate::format()`** parses date components directly out of the datetime string rather than round-tripping through `strtotime()`/`gmdate()`, specifically avoiding the Asia/Tehran timezone-shift bug above. Used by `BookingMailer` (transactional emails) and the theme's `woocommerce/checkout/thankyou.php` override.
+- `RestController::require_login()`/`require_capability()` and one `MarketplaceController` message are now Persian.
+- `api.ts` never lets a raw `res.statusText` or a caught network error reach the UI, and now correctly reads both error shapes that can reach it (the app's own envelope and WordPress core's native shape). `storeApi.ts` (WooCommerce Store API wrapper) no longer falls back to raw `res.statusText` either.
+- `beauclick-payments\Plugin::ensure_persian_checkout_privacy_text()` (new, called on activation) corrects WooCommerce's checkout privacy notice — only if it's still the untouched stock English default, exactly the same discipline `ensure_persian_page_titles()` already established for the same class of problem.
+
+### Explicitly excluded from this patch
+This patch was extracted from `master` at commit `38191b6` back onto the `v1.0.0` baseline, deliberately **excluding** everything from V2 development: event instrumentation, AI-powered beauty discovery/recommendations, the advanced ranking engine, and the entire Beauty Journey capability (including the `beauclick-journey` plugin and the `JalaliDateInput` component built specifically for its goal-target-date field, which has no caller once Journey is excluded). V2 development continues independently on `master` and is not part of this tag.
+
+### Tests
+154/154 backend tests passing (140 V1 baseline + 14 new: `JalaliDateTest`, `PluginTest` additions) — the same V1-only test suite this project has always run, no V2 test suites added. 27/27 frontend vitest tests passing, build clean.
+
