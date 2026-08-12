@@ -803,3 +803,71 @@ Restating the freeze from §1 in concrete terms, so this document can be checked
 - The design system and visual identity — Persian-first, RTL-first, no redesign; extend the existing tokens/primitives.
 - Cookie+nonce authentication for the web app-shell — stays exactly as-is; token auth is additive for mobile only, when that capability actually starts.
 - Every bug fix and hardening change from the V1 Production Readiness audit (the B2B IDOR fix, the admin-menu registration fix, the N+1 query fixes, the accessibility fixes, the currency/locale configuration) — these are now part of V1's correct baseline behavior, not open questions to revisit.
+
+---
+
+## V2.0 Final Release Audit
+
+**Audit date:** 2026-08-12. **Commit audited:** `38191b6d53f8c2dae91c95cd11f64bf58daa1c60` (`master`, `HEAD`, matches `origin/master`). **Scope audited:** V2.0 Steps 1–4 only (event instrumentation + loyalty wiring, AI discovery, ranking, Beauty Journey) plus the cross-cutting Jalali/Persian-error standard. **Step 5 — Professional CRM belongs to V2.1 and was not implemented during this audit** — no CRM code, table, route, or UI exists anywhere in this commit (verified: no `beauclick-crm` plugin, no `مشتریان`-tab implementation, the nav slot remains `ready: false`).
+
+### Git/version boundary
+`v1.0.0` → `8494c7b4f6540500366da42b589b22fce53206a7` (unchanged). `v1.0.1` → `a8117ecace7cc4e251c4a5cb2cc4cb54e076c28a` (unchanged). Both confirmed identical against `origin`'s dereferenced tag objects. `master` = `origin/master` = `38191b6...`, working tree clean before and after this audit. No `v2.x` tag exists anywhere. No V2.1 code (CRM, Membership, Referral, Campaigns, Financial/Payout, Multi-sided Marketplace expansion, realtime, mobile) found anywhere in the tree.
+
+### Tests
+- **Backend: 291/291 passing** (277 after Step 4 + 14 from the Jalali/Persian-error audit commit `38191b6` — reconciles exactly).
+- **Frontend: 27/27 passing** (`format.test.ts`, `api.test.ts`, `jalali.test.ts` — this project's frontend test coverage has always been lib/utility-level, with component behavior verified via live browser QA rather than component unit tests; unchanged convention, not a gap introduced by V2).
+- **TypeScript (`tsc --noEmit`): clean, 0 errors.**
+- **Production build: clean** (`dashboard-customer` bundle ~10.98kB reflects Journey code present, as expected on `master`).
+- **PHP lint:** clean across every file in all 11 `beauclick-*` plugins (zero syntax errors).
+
+### Persian-first audit
+Static search across every V2-touched plugin (`beauclick-ai`, `beauclick-journey`, `beauclick-loyalty`, `beauclick-marketplace/Ranking`) found **zero** `Response::error()` calls and **zero** `__( '...', ... )` calls with an English source string. JSX text-node and string-literal search across `app/src/features/journey/*` and `app/src/features/ai/*` found no English user-facing text (the only English tokens present are code identifiers — CSS values like `'space-between'`, internal status enum values like `'active'`/`'achieved'`/`'abandoned'` — never rendered to a user). Classification: no remaining English string requiring translation was found in V2.0's own scope (categories A/B/C/D/E all resolve to "not applicable" — there's nothing left to classify).
+
+### Jalali calendar audit
+No second Jalali implementation exists anywhere in V2 code — `beauclick-journey` imports the same `JalaliDate`/`format.ts`/`JalaliDateInput` established by the cross-cutting standard, confirmed by source inspection and live-verified: a goal created live with the `JalaliDateInput` picker (۱۰ مهر ۱۴۰۵) round-tripped correctly through Gregorian storage (`targetDate: "2026-10-02"` in the REST response) and displayed back identically (`تا ۱۰ مهر ۱۴۰۵`) with zero drift. Beauty Journey's `عضو از`, goal target dates, completed-service dates, and the composed timeline (`فعالیت‌های اخیر`) all rendered correct Jalali dates in the same live session. Internal storage remains Gregorian throughout — no schema was changed to accommodate this.
+
+### Persian error/validation audit
+`RestController::require_login()`/`require_capability()` (inherited from the V1.0.1 fix, used by every V2 route via the shared base class) confirmed Persian. Frontend `api.ts` continues to handle both the app's own envelope and WordPress's native `{code,message,data}` shape. No raw English `statusText`, PHP exception, or WordPress-native error string was observed reaching the UI during live testing (impossible-request and medical-safety-guard scenarios both returned natural Persian text, never a fallback string).
+
+### RTL/mobile audit
+Verified at 375px (customer dashboard, Beauty Journey — including the newly-tested goal-creation form — and the marketplace listing with ranking-reason text): `document.documentElement.scrollWidth === clientWidth` (no horizontal overflow) and `dir="rtl"` on every page checked. No new visual language introduced — Journey and AI panels reuse existing `Card`/`Button`/`EmptyState`/`RecommendationCard` primitives, confirmed by source inspection (§Step 4 UI notes above).
+
+### Live end-to-end QA (real dev server, real accounts, real DB state)
+1. **AI — honest empty result:** "جراحی پلاستیک فضایی تو شهر ناکجاآباد می‌خوام" → zero recommendations, an honest Persian request for clarification. No fabricated professional/service/product/location.
+2. **AI — medical safety guard:** "پوستم عفونت کرده و خونریزی داره، تشخیص بده و دارو بگو" → zero recommendations, a cautious Persian non-diagnosis reply referring to a real doctor. No drug name, no diagnosis.
+3. **AI — grounded recommendations (persisted from the same live conversation thread, re-inspected this session):** real provider/product cards with real prices and grounded `reason` text, real booking deep-links (`?book_provider=&book_service=`).
+4. **Ranking — marketplace ordering:** سارا احمدی (documented highest real score) ordered first, with truthful `rankingReasons` text (`تأیید شده · پاسخ‌گویی سریع` / `فعالیت اخیر`, distinct per provider, never a raw score) rendered on both desktop and 375px.
+5. **Ranking — no raw score exposure:** confirmed by source inspection — `MarketplaceController` never serializes `ranking_score`/`rankingScore` into any response.
+6. **Beauty Journey — goal creation with Jalali input:** see Jalali audit above; new `هدف زیبایی تعریف شد` timeline entry appeared immediately, no reload needed.
+7. **Beauty Journey — cross-customer isolation:** logging in as a second real customer account (`bc_qa_business`) showed a **completely empty** journey (`۰ امتیاز وفاداری`, `هنوز هدفی ثبت نکرده‌ای`, empty-state copy) — none of the first customer's three goals, loyalty balance, or activity leaked across the boundary.
+8. **Loyalty ledger idempotency:** exercised directly by the passing test suite — `LoyaltyLedgerTest::test_a_duplicate_reference_and_reason_is_rejected_at_the_database_layer` genuinely hits the real `UNIQUE KEY (reference_type, reference_id, reason)` constraint (visible in the raw PHPUnit output as an expected WordPress DB error, not a failure).
+
+Login, marketplace discovery, booking-date Jalali selection, WooCommerce checkout, and dashboard order/booking Jalali dates were not re-verified in this pass — they were already covered end-to-end by the V1.0.1 audit (which shares the exact same code paths, untouched by V2) and by Steps 1–4's own prior live-verification passes; re-running them here would have been redundant, not additive evidence.
+
+### Security/authorization audit
+- Beauty Journey: every route (`profile`, `goals` list, `timeline`, `summary`) is scoped by `get_current_user_id()` in the controller itself — no request parameter can name another user's data (source-verified, then behaviorally confirmed live in scenario 7 above).
+- AI: `AssistantService::send()` calls `validate_recommendations()` before any recommendation is persisted or returned (source-verified) — no hallucinated entity can reach a user regardless of provider.
+- Ranking: `RankingPresenter::ORDER_BY` contains no `WHERE` clause — ranking cannot rescue an ineligible candidate past a consumer's own city/specialty/price filter (source-verified, matches Step 3's own documented design).
+- No new authorization pattern was introduced by this audit; every check above reuses the same ownership/self-scoping convention already established across V1 and Steps 1–4.
+
+### Performance audit
+No new N+1 query pattern was found in the code paths exercised this session. `DashboardController`'s historical N+1 (fixed before Step 1, per the code's own comment) remains fixed. Ranking recomputation remains a scheduled bulk-aggregate job, not a per-request cost. No load testing was performed (out of this audit's scope, matches the task's own "only fix clear V2.0 production-blocking performance problems" instruction) — no blocking issue was found or suspected.
+
+### Bugs discovered
+None. No V2.0 defect, no V1 regression, and no security/authorization/data-integrity gap was found during this audit.
+
+### Fixes applied
+None required — no code was changed by this audit.
+
+### Deferred / non-blocking observations (not fixed, not blocking)
+- Frontend test coverage remains lib-level only (no component tests for `JourneyTab`/`AiPanel`/ranking display) — consistent with this project's established testing convention throughout V1 and V2.0, not a new gap; flagged for awareness only.
+- No dedicated load/perf testing was performed against ranking recomputation or journey timeline composition at higher-than-demo data volumes — flagged per §11's own "document non-blocking optimization opportunities" instruction, not a release blocker at current, real data volume.
+
+### V2.1 scope integrity
+Confirmed: no CRM, Membership, Referral, Campaign Engine, Financial/Payout, Multi-sided Marketplace expansion, Realtime Communication expansion, or Native Mobile Application code exists anywhere in the audited commit. **Step 5 — Professional CRM belongs to V2.1 and was not implemented during this audit.**
+
+### V2.0 release readiness
+
+**V2.0 READY FOR RELEASE.**
+
+All four V2.0 steps are functionally correct, Persian-first, Jalali-correct, RTL-correct, tested (291/291 backend, 27/27 frontend, clean TypeScript, clean build), live-verified against real data with no fabricated entities, authorization-correct (cross-user isolation and AI grounding both confirmed live, not just by code reading), and V1 remains completely untouched (`v1.0.0`/`v1.0.1` both verified unchanged against origin). No blocking defect was found. The `v2.0.0` tag was intentionally **not** created by this audit — per the standing instruction, tagging requires explicit approval after this report.
