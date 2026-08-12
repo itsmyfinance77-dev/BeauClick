@@ -4,29 +4,22 @@ declare( strict_types=1 );
 namespace BeauClick\Marketplace\Admin;
 
 use BeauClick\Marketplace\PostTypes\Registrar;
-use BeauClick\Marketplace\Search\Indexer;
 
 /**
  * `_bc_verification_status` (the "تایید‌شده" badge shown everywhere on the
- * frontend) has driven real UI since Phase 4, but nothing has ever let an
- * admin actually change it — WordPress hides underscore-prefixed meta keys
- * from the default Custom Fields box, so this was a real dead end, not
- * just missing polish. Resyncing the search index on save is what makes a
- * status change actually show up in marketplace search results/filtering,
- * not just on the profile page.
+ * frontend) has driven real UI since Phase 4. As of V2.1 Step 8 this box is
+ * deliberately READ-ONLY: the direct-edit `<select>` + raw `update_post_meta()`
+ * save this box used to perform has been removed, because it let an admin
+ * bypass VerificationService's audited state machine entirely (no history
+ * row, no transition validation, no reviewer/reason captured). The one and
+ * only way this status now changes is VerificationReviewPage's admin-post
+ * handlers, which go through VerificationService -- this box just displays
+ * the result and links there.
  */
 final class VerificationMetaBox {
 
-	private const STATUSES = [
-		'pending'  => 'در انتظار بررسی',
-		'verified' => 'تایید‌شده',
-		'rejected' => 'رد‌شده',
-	];
-
 	public function register(): void {
 		add_action( 'add_meta_boxes', [ $this, 'add_box' ] );
-		add_action( 'save_post_' . Registrar::PROFESSIONAL, [ $this, 'save' ] );
-		add_action( 'save_post_' . Registrar::BUSINESS, [ $this, 'save' ] );
 	}
 
 	public function add_box(): void {
@@ -42,44 +35,9 @@ final class VerificationMetaBox {
 	}
 
 	public function render( \WP_Post $post ): void {
-		$current = get_post_meta( $post->ID, '_bc_verification_status', true ) ?: 'pending';
+		$current = get_post_meta( $post->ID, '_bc_verification_status', true ) ?: 'unverified';
 
-		if ( ! current_user_can( 'bc_manage_platform' ) ) {
-			echo '<p>' . esc_html( self::STATUSES[ $current ] ?? $current ) . '</p>';
-			return;
-		}
-
-		wp_nonce_field( 'bc_verification_' . $post->ID, 'bc_verification_nonce' );
-		?>
-		<select name="bc_verification_status" style="width:100%;">
-			<?php foreach ( self::STATUSES as $value => $label ) : ?>
-				<option value="<?php echo esc_attr( $value ); ?>" <?php selected( $current, $value ); ?>><?php echo esc_html( $label ); ?></option>
-			<?php endforeach; ?>
-		</select>
-		<?php
-	}
-
-	public function save( int $post_id ): void {
-		if ( ! isset( $_POST['bc_verification_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['bc_verification_nonce'] ) ), 'bc_verification_' . $post_id ) ) {
-			return;
-		}
-		if ( ! current_user_can( 'bc_manage_platform' ) ) {
-			return;
-		}
-		if ( ! isset( $_POST['bc_verification_status'] ) ) {
-			return;
-		}
-
-		$status = sanitize_key( wp_unslash( $_POST['bc_verification_status'] ) );
-		if ( ! array_key_exists( $status, self::STATUSES ) ) {
-			return;
-		}
-
-		update_post_meta( $post_id, '_bc_verification_status', $status );
-
-		$post = get_post( $post_id );
-		if ( $post ) {
-			( new Indexer() )->sync( $post_id, $post->post_type );
-		}
+		echo '<p>' . esc_html( VerificationReviewPage::status_label( $current ) ) . '</p>';
+		echo '<p><a href="' . esc_url( admin_url( 'admin.php?page=beauclick-verification' ) ) . '">' . esc_html__( 'مدیریت در صفحه تأیید متخصصان', 'beauclick-marketplace' ) . '</a></p>';
 	}
 }

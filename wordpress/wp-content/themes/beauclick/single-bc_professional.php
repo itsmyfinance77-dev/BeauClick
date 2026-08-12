@@ -40,7 +40,7 @@ $reviews = class_exists( \BeauClick\Reviews\Reviews\ReviewService::class )
 		<div style="flex:1; min-width:240px; padding-top:8px;">
 			<div style="display:flex; align-items:center; gap:8px;">
 				<h1 style="margin:0; font-size:24px;"><?php the_title(); ?></h1>
-				<?php if ( $verified ) : ?><span class="bc-badge bc-badge--verified">تایید‌شده</span><?php endif; ?>
+				<?php if ( $verified ) : ?><span class="bc-badge bc-badge--verified" title="<?php esc_attr_e( 'این پروفایل توسط BeauClick بررسی و تأیید شده است.', 'beauclick' ); ?>">تایید‌شده</span><?php endif; ?>
 			</div>
 			<p class="bc-provider-card__meta">
 				<?php echo esc_html( implode( ' · ', $specialties ) ); ?>

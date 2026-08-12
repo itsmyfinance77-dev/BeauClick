@@ -116,9 +116,58 @@ async function request<T>( path: string, options: RequestInit = {} ): Promise<T>
 	return body.data as T;
 }
 
+/**
+ * Multipart upload (verification evidence). Deliberately bypasses
+ * request()'s JSON Content-Type/body handling -- a FormData body needs the
+ * browser to set its own `multipart/form-data; boundary=...` header, which
+ * only happens if Content-Type is left unset entirely.
+ */
+async function upload<T>( path: string, formData: FormData ): Promise<T> {
+	let res: Response;
+	try {
+		res = await fetch( buildUrl( path ), {
+			method: 'POST',
+			body: formData,
+			headers: window.BeauClick?.nonce ? { 'X-WP-Nonce': window.BeauClick.nonce } : {},
+			credentials: 'same-origin',
+		} );
+	} catch {
+		throw new ApiError( 'bc_network_error', GENERIC_REQUEST_ERROR, 0 );
+	}
+
+	const body: Partial<ApiEnvelope<T>> & { code?: string; message?: string } = await res.json().catch( () => ( {} ) );
+
+	if ( ! res.ok || body.error ) {
+		throw new ApiError(
+			body.error?.code ?? body.code ?? 'bc_unknown_error',
+			body.error?.message ?? body.message ?? GENERIC_REQUEST_ERROR,
+			res.status
+		);
+	}
+
+	return body.data as T;
+}
+
+/**
+ * Full request URL for a path, with the REST nonce appended as `_wpnonce` --
+ * for the rare case (a plain `<a href>`/`window.open`, not a fetch() call)
+ * where a request needs cookie+nonce auth but can't carry an X-WP-Nonce
+ * header, e.g. downloading verification evidence inline. WordPress's own
+ * REST cookie-auth layer accepts the nonce via this query param exactly as
+ * it does via the header.
+ */
+function urlWithNonce( path: string ): string {
+	const [ pathPart, queryPart ] = path.split( '?' );
+	const params = new URLSearchParams( queryPart );
+	if ( window.BeauClick?.nonce ) params.set( '_wpnonce', window.BeauClick.nonce );
+	return buildUrl( `${ pathPart }?${ params.toString() }` );
+}
+
 export const api = {
 	get: <T,>( path: string ) => request<T>( path ),
 	post: <T,>( path: string, payload?: unknown ) => request<T>( path, { method: 'POST', body: payload ? JSON.stringify( payload ) : undefined } ),
 	patch: <T,>( path: string, payload?: unknown ) => request<T>( path, { method: 'PATCH', body: payload ? JSON.stringify( payload ) : undefined } ),
 	del: <T,>( path: string ) => request<T>( path, { method: 'DELETE' } ),
+	upload,
+	urlWithNonce,
 };

@@ -1187,3 +1187,79 @@ Both of the above.
 
 ### Deferred (explicitly out of this step's scope)
 Professional Verification Evidence (Step 8), Loyalty Tiers + Membership (Step 9), Waitlist + Smart Rebooking (Step 10), the full V2.2 SEO system, an admin-branded shell, and any consent-management infrastructure beyond the honest disclosure already published (no evidence exists today that one is needed).
+
+---
+
+## V2.1 Step 8 — Professional Verification Evidence & Trust Implementation Notes
+
+**Scope actually implemented:** a full professional/business verification lifecycle — onboarding → verification request → evidence submission → admin review → approve/reject → verification history → public verified state → suspension/revocation → re-application — replacing `VerificationMetaBox`'s raw, unaudited postmeta dropdown with an audited state machine. Closes PROF-04, ADMIN-03, and SEC-04, and partially closes ADMIN-02 (scoped to verification actions only). Loyalty/Membership, Waitlist, Retention Automation, Campaigns, Financial/Payout, Realtime, and Mobile remain untouched, per this step's own explicit boundary.
+
+### What existed before, and what was actually wrong with it
+`_bc_verification_status` postmeta has driven the public "تایید‌شده" badge since Phase 4, but the only way to change it was `VerificationMetaBox`'s raw `<select>` — a direct `update_post_meta()` call gated on `bc_manage_platform`, with no evidence, no reason, no history, and no way for a professional to request review or see why they were or weren't verified. `bc_moderate_verification` existed in `RoleManager::moderator_capabilities()` with **zero usages anywhere** before this step — a previously dormant, correctly-scoped capability, adopted here rather than inventing a new one or continuing to overload `bc_manage_platform`.
+
+### State machine
+```
+unverified → pending
+pending    → verified | rejected
+rejected   → pending
+verified   → suspended | revoked
+suspended  → verified | revoked
+revoked    → pending
+```
+Enforced centrally in `VerificationService::can_transition()` — every write path (`submit_request()`, `decide()`, `suspend()`, `revoke()`, `reinstate()`) validates against this table before touching postmeta; there is no code path that sets `_bc_verification_status` directly anymore outside this one service.
+
+### Database design — three tables, not four
+- `wp_bc_verification_requests` — one row per submission; `decided_by`/`decided_at`/`decision_reason` live inline (a 1:1 relationship with the request makes a separate "decision" table redundant).
+- `wp_bc_verification_evidence` — one row per uploaded file; `storage_key` is the only pointer to the physical file, never the `original_filename`.
+- `wp_bc_verification_history` — **append-only**; every transition (professional-submitted or admin-decided) inserts a new row (`from_status`/`to_status`/`actor_user_id`/`reason`/`created_at`/`request_id`). No application code ever updates or deletes a row here.
+
+All three are additive migrations (`CreateVerificationTables`, registered alongside the existing marketplace migrations); the V1 professional/business CPTs and the existing `_bc_verification_status` postmeta contract are untouched. `_bc_verification_status` remains the **single source of truth** every existing consumer (`MarketplaceController`, `MyProfileController`, `Indexer::sync()` → `wp_bc_provider_index.verified` → ranking) already reads; the new tables are the audited record of *how* it changes, not a second status field.
+
+### Evidence storage — the decision this step had to make
+WordPress's Media Library (already correctly used for public profile *images*) was deliberately **not** reused for verification evidence: Media Library attachments get predictable, indexable, hotlinkable public URLs, which is exactly wrong for identity documents, certificates, or licenses. Evidence instead lives in a protected `wp-content/uploads/bc-verification-evidence/` directory — a real, necessary filesystem location (PHP uploads need somewhere writable), hardened with an `index.php` stub and a `.htaccess` `Deny from all`/`Require all denied` as production defense-in-depth. The **actual, environment-independent security boundary** is that no code path anywhere places a stored file's path or a predictable URL in any UI or API response — the only way to read a file back is `VerificationController::download_evidence()`, which re-checks ownership-or-moderator-capability on every single request before streaming a byte. (The `.htaccess` is honestly not enforced by this project's own PHP built-in dev server — documented rather than silently assumed; the REST-layer check is what actually makes local dev safe too.)
+
+### File upload security (SEC-04)
+`EvidenceStorage::store()`: real, content-sniffed MIME detection (`finfo_file(FILEINFO_MIME_TYPE, ...)`, never the client-supplied `$file['type']` — trivially spoofable — and never a bare extension check, since a renamed `.php` can claim any extension) against an explicit whitelist (`image/jpeg`, `image/png`, `image/webp`, `application/pdf`); an 8MB size cap; `is_uploaded_file()` checked before `move_uploaded_file()` (guards against a crafted `$_FILES`-shaped array pointing at an arbitrary local path); and a `bin2hex(random_bytes(24))` storage filename, never derived from the original name. Live-verified: a plain-text file and a PHP-source file renamed to `.jpg` (claiming `image/jpeg`) are both rejected with `bc_invalid_file_type`; a genuine PNG/PDF is accepted and stored under a random name.
+
+### Admin workflow
+`VerificationReviewPage` — a real admin screen under the existing `beauclick` top-level menu (`ReviewsAdminPage`'s own structural pattern: `add_submenu_page` + `admin-post.php` handlers + `check_admin_referer()`, not a raw metabox and not a second React SPA mounted into wp-admin, which this project's admin surface has never done anywhere else). Shows the pending queue, per-request evidence (linked via the REST download route with a `_wpnonce` query param — the standard WordPress mechanism for a plain hyperlink that still needs cookie+nonce REST auth), and approve/reject/suspend/revoke/reinstate actions, each nonce-protected and reason-capturing where the state machine requires one (rejecting or suspending without a reason is refused with a 422, live-verified). Gated on `bc_moderate_verification`, not `bc_manage_platform`.
+
+### Professional-facing workflow
+`VerificationCard` (a status banner on the Overview tab, not an 11th fixed nav item — the professional dashboard's nav list was already fixed by design) opens `VerificationModal` (reusing the CRM feature's own `Modal`-based detail-view pattern): current status, submission/decision dates (Jalali), rejection/suspension/revocation reason, an evidence upload form (evidence type + file, queued client-side before one combined submit) when `canSubmit` is true, the professional's own evidence list with a self-service download link, and a reverse-chronological history — **never** an admin's identity or internal notes beyond the reason field itself (the history array `VerificationService::summary()` returns deliberately omits `actor_user_id`).
+
+### Public trust UX
+The public marketplace/profile templates (`single-bc_professional.php`, `provider-card.php`) already read the same `_bc_verification_status` postmeta and render a plain "تایید‌شده"/"✓" badge — truthful, and required **zero code changes** for the new state machine to work correctly (any status other than exactly `verified`, including the new `suspended`/`revoked` values, already renders no badge). Added a `title` tooltip to both badge instances: *"این پروفایل توسط BeauClick بررسی و تأیید شده است."* — the task's own explicitly-acceptable phrasing; no claim about document legality or identity verification was added.
+
+### Ranking/search integration
+No changes to `Indexer.php`, `RankingPresenter`, or `SignalCollector` — `Indexer::sync()`'s existing `'verified' === get_post_meta(...) ? 1 : 0` mapping already correctly treats every non-`'verified'` string (including the two new values this step introduces) as not-verified. Live-verified: approving a request flips `wp_bc_provider_index.verified` to `1`; suspending that same provider flips it back to `0`.
+
+### AI/privacy integration
+No changes to `beauclick-ai`. `CatalogContext.php` was confirmed (by direct inspection) to contain zero references to verification status, so the AI already cannot describe a professional as verified and structurally never receives evidence — no code path exists that could pass either to it.
+
+### Permissions and ownership
+`ProviderLookup::for_user()` resolves the caller's own provider for every self-service route (`me`, `submit`) — never a request-supplied provider id. `download_evidence()` allows the resource owner **or** a `bc_moderate_verification` holder, nobody else. Admin routes (`queue`, `decide`, `suspend`, `revoke`, `reinstate`) require `bc_moderate_verification`, verified server-side via `RestController::require_capability()` — never a "can reach wp-admin" check, and never a hardcoded user id.
+
+### Persian localization / Jalali / RTL / accessibility
+Every status label, button, upload instruction, validation message, and history entry is natural Persian (professional-facing and admin-facing labels kept in sync but written separately, matching this codebase's existing per-surface `STATUS_LABELS` convention rather than a shared i18n layer). Every visible date (submitted/decided/history) goes through the existing shared `formatFullJalaliDate`/`JalaliDate::format()` — no second date implementation; internal storage stays `DATETIME` (site-local, matching every other table in this codebase). `VerificationModal` reuses the shared `Modal` component (built-in focus trap, Escape-to-close, labelled dialog). Live-verified at 375/390/412px: zero horizontal overflow on the status card, modal, upload form, or evidence/history lists.
+
+### Tests
+35 new backend tests: `EvidenceStorageTest` (8 — valid PNG/PDF acceptance, content-sniffed rejection of a PHP file disguised as `.jpg` and of plain text, oversized-file rejection, invalid-evidence-type rejection, upload-error-code rejection, randomized-filename verification), `VerificationServiceTest` (13 — full state-machine matrix, submit/decide/suspend/revoke/reinstate lifecycle, double-decide immutability, append-only/chronological history, ranking-index correctness before/after verify/suspend), `VerificationControllerTest` (14 — own-view, own-submit, no-profile rejection, self-moderation denial, unauthorized-admin denial, authorized-admin approval, reason-required validation for reject/suspend, invalid-decision rejection, cross-professional evidence-download denial, unrelated-user evidence-download denial, nonexistent-evidence 404, and a direct assertion that the public marketplace response never exposes evidence/history/decision-reason). A test-only namespaced override of `is_uploaded_file()`/`move_uploaded_file()` (`tests/support/upload-test-overrides.php`) was needed to exercise `EvidenceStorage::store()` outside a genuine browser upload — documented inline, zero production code changes. Full backend suite: **416/416 passing** (381/381 baseline + 35 new). Frontend: **27/27 unchanged**, TypeScript clean, production build clean (also fixed a real PHP 8.5 deprecation — `finfo_close()` — discovered by the test run, not assumed).
+
+### Live verification (real running site, real browser + direct REST calls)
+Applied the migration to the live dev database (`Migrator::run_all()`, idempotent — safe to re-run). A fresh professional account, real dashboard submit flow (a real multipart upload via the authenticated browser's own `fetch()`, evidence stored under a randomized filename alongside `.htaccess`/`index.php`) → pending → admin review queue (Jalali submission date, evidence link resolving via nonce-authenticated REST download, real image bytes streamed back) → approve → verified (ranking index `verified=1`, public profile badge with tooltip appears) → suspend with a reason (ranking index `verified=0`, public badge disappears, professional dashboard shows the reason) → reinstate → verified again. Security: logged in as a second, unrelated professional and confirmed both a `403 bc_forbidden` on the first professional's evidence-download endpoint and a `403` on the admin queue endpoint. All Persian throughout; no English strings encountered.
+
+### Bugs discovered
+1. A dead-code ternary in `VerificationService::summary()`'s `canSubmit` field (self-caught while writing the class, before any test existed) — replaced with a direct `can_transition()` call.
+2. `finfo_close()` is deprecated in PHP 8.5 (surfaced by the live test run's deprecation warning, not assumed) — finfo resources are now freed automatically.
+
+### Bugs fixed
+Both of the above.
+
+### Known limitations
+- **Legacy demo-seed verification statuses have no matching request row.** A handful of pre-existing demo professionals (`DemoProvidersSeed`, predating this step) had `_bc_verification_status` set directly via raw postmeta (including one seeded as `pending`) with no corresponding `wp_bc_verification_requests` row. Such a record does not appear in the new admin review queue (which queries the requests table, correctly, since no evidence was ever actually submitted for it) — a data-provenance artifact of legacy seeding, not a defect in this step's own code path. Every professional created going forward starts `unverified` with no such gap.
+- **The "reason" field is shared between an internal decision note and the professional-facing rejection/suspension explanation** — there is no separate private-admin-notes field. This is a deliberate simplification (the task's own "these are conceptual requirements, not mandatory table names" instruction), consistent with admins being expected to write a reason meant for the professional to read; if a genuinely private internal-notes field is ever needed, it would be a small additive column, not a redesign.
+- **Business-account verification is not distinguished from professional verification** at the data-model level beyond the CPT type already carried by `ProviderLookup` — both post types share the same `_bc_verification_status` contract, matching the existing one-user-per-business model. No separate business-verification architecture was built, per the task's own explicit instruction not to invent one.
+- **No re-verification reminder/expiry** — a `verified` status does not expire on a timer; re-review only happens via an explicit admin suspend/revoke action. Not required by this step's spec, and no evidence exists today that time-boxed re-verification is a real product need.
+
+### Deferred (explicitly out of this step's scope)
+Loyalty Tiers + Membership (Step 9), Waitlist + Smart Rebooking (Step 10), Retention Automation, Campaigns, Financial/Payout, Realtime, Mobile, multi-staff business permissions (documented above as a known limitation, not solved here), and general (non-verification) admin audit logging (remains V2.2, per ADMIN-02's partial-closure disposition).

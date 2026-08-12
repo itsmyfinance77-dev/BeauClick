@@ -36,7 +36,7 @@ $ranking_reasons = ! empty( $provider['ranking_signals'] ) && class_exists( \Bea
 				<strong><?php echo esc_html( $provider['name'] ); ?></strong>
 			</a>
 			<?php if ( ! empty( $provider['verified'] ) ) : ?>
-				<span class="bc-badge bc-badge--verified">✓</span>
+				<span class="bc-badge bc-badge--verified" title="<?php esc_attr_e( 'این پروفایل توسط BeauClick بررسی و تأیید شده است.', 'beauclick' ); ?>">✓</span>
 			<?php endif; ?>
 		</div>
 

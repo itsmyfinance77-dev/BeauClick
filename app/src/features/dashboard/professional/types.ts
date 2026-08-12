@@ -23,3 +23,35 @@ export interface MyService {
 	durationMinutes: number;
 	price: number;
 }
+
+export interface VerificationRequestSummary {
+	id: number;
+	status: string;
+	submittedAt: string;
+	decidedAt: string | null;
+	decisionReason: string | null;
+}
+
+export interface VerificationEvidenceItem {
+	id: number;
+	evidenceType: string;
+	originalFilename: string;
+	mimeType: string;
+	sizeBytes: number;
+	uploadedAt: string;
+}
+
+export interface VerificationHistoryItem {
+	fromStatus: string;
+	toStatus: string;
+	reason: string | null;
+	createdAt: string;
+}
+
+export interface VerificationSummary {
+	status: string;
+	canSubmit: boolean;
+	latestRequest: VerificationRequestSummary | null;
+	evidence: VerificationEvidenceItem[];
+	history: VerificationHistoryItem[];
+}

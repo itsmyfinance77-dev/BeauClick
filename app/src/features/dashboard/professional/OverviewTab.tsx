@@ -3,6 +3,7 @@ import { api } from '@/lib/api';
 import { formatToman, formatRating, formatShortDate, formatFullJalaliDate, formatTime, toPersianDigits } from '@/lib/format';
 import { LoadingDots } from '@/design-system';
 import { StatCard } from '../shared/StatCard';
+import { VerificationCard } from './VerificationCard';
 import type { DashboardStats } from './types';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -36,6 +37,8 @@ export function OverviewTab() {
 	return (
 		<div>
 			<h1 style={ { fontSize: 22, marginTop: 0 } }>سلام 👋</h1>
+
+			<VerificationCard />
 
 			<div style={ { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 16, marginBottom: 24 } }>
 				<StatCard label="نوبت‌های امروز" value={ toPersianDigits( stats.todaysBookings ) } />
