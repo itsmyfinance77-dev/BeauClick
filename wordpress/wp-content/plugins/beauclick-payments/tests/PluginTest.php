@@ -138,4 +138,55 @@ final class PluginTest extends WP_UnitTestCase {
 		);
 		$this->assertSame( 0, $count, 'on_order_dead() also handles cancelled/failed -- only a genuinely refunded status must write order_refunded.' );
 	}
+
+	/**
+	 * V2.1 Step 7 -- WooCommerce's own built-in checkout "I agree to the
+	 * terms" checkbox only appears once `woocommerce_terms_page_id` points
+	 * at a real, published page. beauclick-core's LegalPages deliberately
+	 * creates the Terms page as a draft (its legal clauses aren't reviewed
+	 * yet), so activation must not wire the option while that remains true.
+	 */
+	public function test_activation_does_not_configure_the_terms_checkbox_while_the_terms_page_is_still_a_draft(): void {
+		self::factory()->post->create( [ 'post_type' => 'page', 'post_name' => 'terms', 'post_status' => 'draft' ] );
+		update_option( 'woocommerce_terms_page_id', 0 );
+
+		Plugin::activate();
+
+		$this->assertSame( 0, (int) get_option( 'woocommerce_terms_page_id' ), 'Must never point the checkout consent checkbox at an unreviewed draft.' );
+	}
+
+	public function test_activation_configures_the_terms_checkbox_once_the_terms_page_is_published(): void {
+		$id = self::factory()->post->create( [ 'post_type' => 'page', 'post_name' => 'terms', 'post_status' => 'publish' ] );
+		update_option( 'woocommerce_terms_page_id', 0 );
+
+		Plugin::activate();
+
+		$this->assertSame( $id, (int) get_option( 'woocommerce_terms_page_id' ) );
+	}
+
+	public function test_activation_never_overwrites_an_already_configured_terms_page(): void {
+		self::factory()->post->create( [ 'post_type' => 'page', 'post_name' => 'terms', 'post_status' => 'publish' ] );
+		$other_id = self::factory()->post->create( [ 'post_type' => 'page' ] );
+		update_option( 'woocommerce_terms_page_id', $other_id );
+
+		Plugin::activate();
+
+		$this->assertSame( $other_id, (int) get_option( 'woocommerce_terms_page_id' ), 'An admin who already configured a different terms page must not be overridden.' );
+	}
+
+	public function test_refund_policy_link_renders_only_once_the_refund_page_is_published(): void {
+		self::factory()->post->create( [ 'post_type' => 'page', 'post_name' => 'refund_returns', 'post_status' => 'draft' ] );
+
+		ob_start();
+		Plugin::render_refund_policy_link();
+		$this->assertSame( '', ob_get_clean(), 'Must never link to a draft/unpublished refund policy from checkout.' );
+
+		wp_update_post( [ 'ID' => get_page_by_path( 'refund_returns' )->ID, 'post_status' => 'publish' ] );
+
+		ob_start();
+		Plugin::render_refund_policy_link();
+		$output = ob_get_clean();
+		$this->assertStringContainsString( '<a href=', $output );
+		$this->assertStringContainsString( 'قوانین لغو و بازگشت وجه', $output );
+	}
 }

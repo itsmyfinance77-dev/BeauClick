@@ -47,6 +47,7 @@ final class Plugin {
 		add_filter( 'beauclick/booking/after_create', [ $this, 'attach_order_to_booking_result' ], 10, 2 );
 		add_action( 'beauclick/seed', [ $this, 'maybe_seed' ] );
 		add_action( 'beauclick/core/register_rest_routes', [ $this, 'register_rest_routes' ] );
+		add_action( 'woocommerce_review_order_before_submit', [ self::class, 'render_refund_policy_link' ] );
 	}
 
 	public function register_rest_routes(): void {
@@ -227,6 +228,7 @@ final class Plugin {
 		Currency::ensure_configured(); // Every environment, not just non-production — unlike COD, correct currency formatting is never dev-only.
 		self::ensure_persian_page_titles();
 		self::ensure_persian_checkout_privacy_text();
+		self::ensure_terms_page_configured();
 
 		if ( 'production' === wp_get_environment_type() ) {
 			self::ensure_store_is_reachable();
@@ -332,6 +334,50 @@ final class Plugin {
 		update_option(
 			'woocommerce_checkout_privacy_policy_text',
 			__( 'اطلاعات شخصی شما برای پردازش سفارش، بهبود تجربه شما در این وبسایت، و سایر مواردی که در [privacy_policy] توضیح داده شده استفاده خواهد شد.', 'beauclick-payments' )
+		);
+	}
+
+	/**
+	 * V2.1 Step 7 — WooCommerce only ever renders its own built-in
+	 * "I have read and agree to the terms and conditions" checkout
+	 * checkbox when `woocommerce_terms_page_id` points at a genuinely
+	 * *published* page (`wc_terms_and_conditions_page_id()` internally
+	 * checks post_status) — reusing this native mechanism is exactly what
+	 * the task asks for ("do not override WooCommerce checkout
+	 * unnecessarily... use stable hooks and filters") instead of building
+	 * a second, custom consent checkbox.
+	 *
+	 * Deliberately a no-op today: `LegalPages::ensure()` (beauclick-core)
+	 * creates the Terms page as a draft on purpose — its binding legal
+	 * clauses are not yet reviewed (see that class's own docblock) — so
+	 * this intentionally does not wire the option until a real admin
+	 * publishes that page. Never points the option at a draft.
+	 */
+	private static function ensure_terms_page_configured(): void {
+		$page = get_page_by_path( 'terms', OBJECT, 'page' );
+		if ( ! $page || 'publish' !== $page->post_status ) {
+			return;
+		}
+		if ( (int) get_option( 'woocommerce_terms_page_id' ) === 0 ) {
+			update_option( 'woocommerce_terms_page_id', $page->ID );
+		}
+	}
+
+	/**
+	 * A real, honest refund-policy link at the one point in checkout a
+	 * customer is about to commit to a payment — `woocommerce_review_order_before_submit`
+	 * is WooCommerce's own stable hook for exactly this, right above the
+	 * "Place order" button, so no template override is needed.
+	 */
+	public static function render_refund_policy_link(): void {
+		$page = get_page_by_path( 'refund_returns', OBJECT, 'page' );
+		if ( ! $page || 'publish' !== $page->post_status ) {
+			return;
+		}
+		printf(
+			'<p class="bc-checkout-refund-link" style="font-size:12px;margin:8px 0;"><a href="%1$s">%2$s</a></p>',
+			esc_url( get_permalink( $page ) ),
+			esc_html__( 'قوانین لغو و بازگشت وجه را بخوانید', 'beauclick-payments' )
 		);
 	}
 

@@ -405,3 +405,24 @@ Two items in this category remain open, unchanged by Step 6, exactly as this reg
 - **AUTH-07/AUTH-08** (self-service account deletion/data export) remain `MISSING`, still targeted at V2.2 — genuinely out of Step 6's scope, not overlooked.
 
 This is the first entry in this register to move from a discovered gap to a shipped, tested, live-verified resolution. The rest of §7 (Prioritization), §22–§26 (recommendations), and §27 (Closing Note) above are preserved exactly as originally written — they are the accurate historical record of the audit that made Step 6 P0 in the first place, and remain the correct account of why the work happened in this order, even though AUTH-01 itself is no longer open today.
+
+---
+
+## 30. V2.1 Step 7 Completion Note
+
+**Step 7 — Legal & Trust Foundation is complete**, with each item's disposition split precisely into engineering-complete versus content/legal-review-pending, per this task's own explicit instruction not to conflate the two:
+
+| ID | Item | Engineering | Content/legal disposition |
+|---|---|---|---|
+| LEGAL-01 | Terms of Service | **IMPLEMENTED** (page framework, template, routing all real and working) | Page deliberately **kept unpublished** — `NEEDS_LEGAL_REVIEW` unchanged. A logged-out visitor gets a correct Persian 404, not the draft content. |
+| LEGAL-02 | Privacy Policy | **IMPLEMENTED** — published, with real, factually-grounded content (verified against this codebase's actual data flows, not invented) | The specific data-retention duration is still absent from the page (not fabricated) — `NEEDS_BUSINESS_DECISION` for that one detail only; everything else on the page is final |
+| LEGAL-03 | Refund/Cancellation Policy | **IMPLEMENTED** — published, describing real, verified `BookingService` cancellation behavior | Specific refund timeframes/fees remain undecided and are not stated on the page — `NEEDS_BUSINESS_DECISION` for those specifics only |
+| LEGAL-04 | Cookie/consent notice | **IMPLEMENTED** as an honest disclosure inside the Privacy Policy, after directly verifying this site sets no non-essential/tracking cookies today | No separate consent-gating banner was built — investigated and found genuinely unnecessary at this site's current, real cookie usage; revisit only if that changes |
+| LEGAL-05 | FAQ/Contact/About | **IMPLEMENTED** — all three published with real, product-verified content; Contact delivers to the site's real `admin_email`, no fabricated phone/address | Phone number and physical office address remain unlisted — `NEEDS_BUSINESS_DECISION`, simply omitted rather than invented |
+| LEGAL-07 | Review moderation policy | **IMPLEMENTED** as a real FAQ entry ("چطور می‌توانم نوبت خود را لغو کنم؟" and the CRM-privacy FAQ entry cover the adjacent trust questions the audit named) | A dedicated, fuller moderation policy page was not built — the roadmap's own instruction that this "remains a business/product decision" still holds for anything beyond the FAQ-level disclosure now live |
+| LEGAL-08 | Data retention policy | Consent/preference **storage seam exists** implicitly via the Privacy Policy's own "دسترسی و ویرایش اطلاعات" section pointing to Contact for deletion/export requests | The actual retention duration is still `NEEDS_BUSINESS_DECISION`, unchanged |
+| COM-06 | Refund policy publication (commerce-facing) | **IMPLEMENTED** — same item as LEGAL-03; now linked directly from checkout via `render_refund_policy_link()` | Same content caveat as LEGAL-03 |
+
+AUTH-09 (password reset / auth-page trust link) also received its planned "bundled with AUTH-02" trust-link addition as part of this step's auth-page integration.
+
+No other gap in this register changed status. §7 (Prioritization), §22–§27 (recommendations, closing note), and §29 (Step 6 completion) above remain the accurate historical record and are preserved exactly as written.

@@ -4,6 +4,8 @@ declare( strict_types=1 );
 namespace BeauClick\Core;
 
 use BeauClick\Core\Admin\AdminMenu;
+use BeauClick\Core\Content\ContactFormHandler;
+use BeauClick\Core\Content\LegalPages;
 use BeauClick\Core\Database\Migrator;
 use BeauClick\Core\Database\Migrations\CreateEventsTable;
 use BeauClick\Core\Roles\RoleManager;
@@ -57,8 +59,10 @@ final class Plugin {
 		 * re-granting on literally every admin page load.
 		 */
 		add_action( 'admin_init', [ RoleManager::class, 'maybe_register' ] );
+		add_action( 'admin_init', [ LegalPages::class, 'maybe_ensure' ] );
 
 		( new AdminMenu() )->register();
+		ContactFormHandler::register();
 
 		if ( defined( 'WP_CLI' ) && WP_CLI ) {
 			Commands::register( $this );

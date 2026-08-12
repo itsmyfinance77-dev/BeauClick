@@ -3,6 +3,7 @@ declare( strict_types=1 );
 
 namespace BeauClick\Core\Cli;
 
+use BeauClick\Core\Content\LegalPages;
 use BeauClick\Core\Plugin;
 use WP_CLI;
 
@@ -37,6 +38,17 @@ final class Commands {
 				WP_CLI::success( $only ? "Seeded: {$only}" : 'Seed complete for all registered seeders.' );
 			},
 			[ 'shortdesc' => 'Seed reference/demo data. Optional arg limits to one group, e.g. `wp bc:seed locations`.' ]
+		);
+
+		WP_CLI::add_command(
+			'bc:ensure-content',
+			static function (): void {
+				LegalPages::ensure();
+				WP_CLI::success( 'Legal/trust pages ensured (created or left alone if already customized).' );
+			},
+			[
+				'shortdesc' => 'Idempotently provision the trust/legal pages (Privacy, Refund, Terms draft, FAQ, Contact, About) — same "never overwrite a real edit" discipline as Plugin::activate(), safe to re-run on an already-active install after an update.',
+			]
 		);
 	}
 }

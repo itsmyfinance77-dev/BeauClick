@@ -109,6 +109,10 @@ export function AuthFlow() {
 					<Button type="submit" variant="primary" disabled={ sending } style={ { width: '100%' } }>
 						{ sending ? 'در حال ارسال…' : 'دریافت کد تأیید' }
 					</Button>
+					<p style={ { margin: 0, fontSize: 12, color: 'var(--bc-color-ink-faint)', textAlign: 'center' } }>
+						با ادامه، از نحوه استفاده BeauClick از اطلاعات شما در{ ' ' }
+						<a href="/privacy-policy/" style={ { color: 'var(--bc-color-primary)' } }>حریم خصوصی</a> مطلع می‌شوید.
+					</p>
 				</form>
 			) }
 

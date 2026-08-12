@@ -1,0 +1,154 @@
+/*
+ * V2.1 Step 7 — Legal & Trust Foundation.
+ * Long-form Persian prose typography, FAQ accordion, and the contact
+ * form — loaded only on the pages that use page.php/page-faq.php/
+ * page-contact.php (per-surface loading, matching the JS bundle
+ * convention this theme already uses), not globally.
+ */
+
+.bc-legal {
+	max-width: 720px;
+	margin-inline: auto;
+	padding-block: 40px 64px;
+}
+
+.bc-legal__header {
+	margin-bottom: 24px;
+	border-bottom: 1px solid var(--bc-color-line);
+	padding-bottom: 16px;
+}
+
+.bc-legal__header h1 {
+	margin: 0 0 8px;
+	font-size: 28px;
+}
+
+.bc-legal__updated {
+	margin: 0;
+	font-size: 13px;
+	color: var(--bc-color-ink-faint);
+}
+
+.bc-legal__body {
+	font-size: 16px;
+	line-height: 1.9;
+	color: var(--bc-color-ink-soft);
+}
+
+.bc-legal__body h2 {
+	margin-top: 32px;
+	margin-bottom: 12px;
+	font-size: 19px;
+	color: var(--bc-color-ink);
+}
+
+.bc-legal__body p {
+	margin: 0 0 16px;
+}
+
+.bc-legal__body ul {
+	margin: 0 0 16px;
+	padding-inline-start: 24px;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.bc-legal__body a {
+	color: var(--bc-color-primary);
+}
+
+/* FAQ accordion — native <details>/<summary>, zero JS. */
+.bc-faq {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.bc-faq__item {
+	border: 1px solid var(--bc-color-line);
+	border-radius: 14px;
+	padding: 14px 18px;
+	background: var(--bc-color-surface);
+}
+
+.bc-faq__question {
+	cursor: pointer;
+	font-weight: 600;
+	font-size: 15px;
+	list-style: none;
+}
+
+.bc-faq__question::-webkit-details-marker {
+	display: none;
+}
+
+.bc-faq__question::after {
+	content: '+';
+	float: inline-start;
+	margin-inline-end: 10px;
+	color: var(--bc-color-primary);
+}
+
+.bc-faq__item[open] .bc-faq__question::after {
+	content: '−';
+}
+
+.bc-faq__answer {
+	margin: 12px 0 0;
+	font-size: 14px;
+	line-height: 1.8;
+	color: var(--bc-color-ink-soft);
+}
+
+/* Contact form */
+.bc-contact-form {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+	margin-top: 24px;
+	max-width: 480px;
+}
+
+.bc-contact-form .bc-field {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	font-size: 13px;
+	color: var(--bc-color-ink-soft);
+}
+
+.bc-contact-form__honeypot {
+	position: absolute;
+	inset-inline-start: -9999px;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+}
+
+.bc-form-notice {
+	padding: 12px 16px;
+	border-radius: 12px;
+	font-size: 14px;
+	margin-bottom: 16px;
+}
+
+.bc-form-notice--success {
+	background: var(--bc-color-success-soft);
+	color: var(--bc-color-success);
+}
+
+.bc-form-notice--error {
+	background: var(--bc-color-error-soft);
+	color: var(--bc-color-error);
+}
+
+@media (max-width: 480px) {
+	.bc-legal {
+		padding-inline: 4px;
+	}
+
+	.bc-legal__header h1 {
+		font-size: 22px;
+	}
+}

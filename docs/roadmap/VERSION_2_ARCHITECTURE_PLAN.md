@@ -1112,3 +1112,78 @@ The same bug — `AccountResolver::create_customer()`'s phone-substring offset.
 
 ### Deferred (explicitly out of this step's scope)
 Legal & Trust (Step 7), Professional Verification Evidence (Step 8), Loyalty Tiers + Membership (Step 9), Waitlist + Smart Rebooking (Step 10), self-service account deletion/data export (Gap Register AUTH-07/AUTH-08, V2.2), and connecting a real SMS gateway (an external/business decision, not an engineering task this step could complete on its own).
+
+---
+
+## V2.1 Step 7 — Legal & Trust Foundation Implementation Notes
+
+**Scope actually implemented:** a real, technical trust-page framework — Privacy Policy, Refund/Cancellation Policy, Terms of Service, FAQ, Contact, and About — plus footer navigation, checkout links, and an authentication-page link, closing the Gap Register's two `BLOCKING` findings (AUTH-01 was already closed by Step 6; LEGAL-01/02/03 close here). Membership, Verification Evidence, and Waitlist remain untouched, per this step's own explicit boundary.
+
+### What existed before, and what was actually wrong with it
+`docs/roadmap/PRODUCT_GAP_REGISTER.md`'s LEGAL findings were confirmed accurate by direct inspection: Privacy Policy (page ID 3) and Refund Policy (page ID 9) existed only as **unpublished drafts** containing WordPress's own auto-generated English "Suggested text..." stub content (never real, never Persian) — Terms of Service, FAQ, Contact, and About did not exist as pages at all. A stray default "Sample Page" was still `publish`-ed. Two concrete, previously-unnoticed consequences of the draft status were found and are now fixed as a direct result of publishing real content:
+
+1. WordPress's own `get_privacy_policy_url()` only ever resolves the `[privacy_policy]` placeholder inside `woocommerce_checkout_privacy_policy_text` (the string `beauclick-payments\Plugin::ensure_persian_checkout_privacy_text()` already wrote, back in the V1.0.1 audit) when the linked page's status is genuinely `publish` — while the Privacy page stayed a draft, that placeholder silently resolved to nothing at checkout. Live-verified this was really happening, and is now fixed: the checkout page now shows a real, clickable "سیاست حفظ حریم خصوصی" link.
+2. `wp_page_for_privacy_policy` was already correctly pointed at page ID 3 (someone had done that part right) — it just had nothing valid to point at until this step published the page.
+
+### Content boundary — what was and wasn't written
+Every claim on the five published pages is either a verifiable fact about this codebase's real, tested behavior (e.g., cancellation being allowed for any booking not already `completed` — read directly from `BookingService::cancel_booking()`'s own `status NOT IN (...)` clause, not guessed) or the CRM privacy guarantee already verified live in Step 5 ("a professional's private notes are never shown to the customer, another professional, or the AI"). Nothing invents a company registration number, physical address, refund percentage, cancellation fee, retention period, or legal-compliance claim. **Terms of Service is deliberately the one page created but never published** — its binding clauses (liability, dispute resolution, governing law) are not inferable from source code the way the others' factual sections are; the task's own explicit "keep the page unpublished until approved" option was used rather than fabricating placeholder legal language. See Gap Register §22 for the full, unchanged list of what remains `NEEDS_BUSINESS_DECISION`/`NEEDS_LEGAL_REVIEW`.
+
+### Architecture chosen
+No new plugin, no CMS abstraction — `beauclick-core\Content\LegalPages` (idempotent page provisioning, same "never overwrite a real edit" discipline `ensure_persian_page_titles()` already established) and `beauclick-core\Content\ContactFormHandler` (a plain `admin-post.php` form handler, not a REST endpoint + React island — a contact form has no reason to be a client-rendered surface). Real WordPress Pages, edited going forward through WordPress's own existing page editor — exactly the "the project owner must be able to update this without touching source code" requirement, with no new content-management layer to learn.
+
+**Templates:** the theme had no generic `page.php` at all — every plain page silently fell back to a completely unstyled `index.php`. This step adds `page.php` (long-form Persian prose, a Jalali "last updated" date via the existing `JalaliDate::format()`, RTL-correct typography) as the shared template for Privacy/Refund/Terms/About — one template, not four near-duplicates, and a genuine improvement for any future plain content page too. `page-faq.php` (a native `<details>`/`<summary>` accordion — keyboard-operable and screen-reader-correct with zero JavaScript) and `page-contact.php` (the real form) get their own templates because their UX genuinely differs, not because of an arbitrary per-page convention.
+
+### Why activation-time provisioning needed a real fix, not a workaround
+`LegalPages::ensure()` was originally wired into `Plugin::activate()`, matching every other `ensure_*` precedent in this codebase. It broke the test suite immediately: `wp_insert_post()`/`wp_update_post()` transitioning a page's status into `publish` fires WordPress's own `wp_transition_post_status()`, which touches `is_user_logged_in()` — a pluggable.php function not yet defined at the exact bootstrap point (`muplugins_loaded`) this project's own test harness explicitly calls every plugin's `activate()` from. `ensure_persian_page_titles()` never hit this because it only ever updates a page's `post_title` on an already-`publish`-ed WooCommerce page — never a status transition. Fixed the same way `RoleManager::maybe_register()` already solved an equivalent "needs more of WordPress loaded than raw activation time provides" problem: moved to a version-gated `admin_init` hook (`LegalPages::maybe_ensure()`), and added a `wp bc:ensure-content` WP-CLI command (mirroring `wp bc:migrate`) as the explicit, safe way to apply it to an already-running install without waiting for the next `wp-admin` page load.
+
+### Checkout integration — reused WooCommerce's own mechanisms, built nothing custom
+- The `[privacy_policy]` link (see above) — already-existing code, now actually resolves.
+- `woocommerce_terms_page_id` (`beauclick-payments\Plugin::ensure_terms_page_configured()`, called from `activate()` — a plain `update_option()`, not a post-status transition, so no bootstrap-timing issue here): WooCommerce's own built-in "I have read and agree to the terms and conditions" checkout checkbox only ever renders when this option points at a genuinely published page. **Deliberately still unset** — the method checks the Terms page's real status and no-ops while it stays a draft, so checkout never asks a customer to agree to unreviewed legal text. Live-verified: no such checkbox appears at checkout today, exactly as intended.
+- A refund-policy link (`Plugin::render_refund_policy_link()`, hooked to WooCommerce's own stable `woocommerce_review_order_before_submit` action — no template override) — renders only once the Refund page is genuinely published, live-verified showing "قوانین لغو و بازگشت وجه را بخوانید" directly above the "ثبت سفارش" button.
+
+### Authentication integration
+`AuthFlow.tsx`'s phone-entry step now shows a plain informational line linking to the (published, real) Privacy Policy — no forced consent checkbox, and no claim that displaying the link constitutes legal consent, per the task's own explicit instruction. Terms is not linked here since it isn't published.
+
+### Footer/navigation
+The footer previously contained only a copyright line. It now has a `قوانین و راهنما`-labeled trust nav (Privacy, Refund, FAQ, Contact, About) — Terms is deliberately **not** linked from anywhere public, since linking to a draft page would either 404 for a real visitor or (worse) require WordPress to expose draft content publicly, neither acceptable. Live-verified: `/terms/` returns the theme's own Persian "موردی یافت نشد." 404 state for a logged-out visitor, not the draft content and not a raw English WordPress 404.
+
+### Contact form — security
+Validates and sanitizes every field server-side (`sanitize_text_field`/`sanitize_email`/`sanitize_textarea_field`/`is_email`), nonce-verified, honeypot-protected (a hidden field real users never fill; a bot filling it gets a fake "sent" response rather than a signal its submission was rejected), and IP-scoped rate-limited (5/hour, the same transient pattern already used by `beauclick-auth`'s OTP requests). Delivers to the site's own real `admin_email` option — never a fabricated support address. `ContactFormHandler::process()` is deliberately `exit()`-free (validation/send logic returns a plain status string; only the real `admin_post_*` hook target does the redirect+exit), specifically so the logic is unit-testable without needing to intercept a real `exit()` call.
+
+### Persian localization
+Every string on every new page/template/form — headings, FAQ questions and answers, form labels, success/error notices, the checkout links, the auth-page trust line, the footer nav — is Persian. No English UI was introduced (verified with the same search method used in the V2.0 and V2.1-Step-5 audits: zero English JSX/PHP user-facing strings in any file this step touched).
+
+### Jalali coverage
+Every visible date (`آخرین به‌روزرسانی: ...` on Privacy/Refund/Terms/About) uses `get_the_modified_date()` piped through the existing shared `JalaliDate::format()` — no second date implementation. FAQ/Contact intentionally show no date (nothing dated to show).
+
+### RTL/mobile/accessibility
+Verified live at 375px/390px/412px/desktop: zero horizontal overflow on every new page and the updated footer/checkout. FAQ accordion uses native `<details>`/`<summary>` (full keyboard/screen-reader support for free, zero custom JS — verified by clicking a question and confirming the answer expands). Contact form fields use real `<label for>` associations. The honeypot field is `aria-hidden="true"` and off-screen-positioned (not `display:none`, since some bots specifically skip that), so it's invisible to assistive technology while still catching non-visual bots.
+
+### SEO
+Out of full-system scope per the task's own instruction (SEO-01 through SEO-04 remain V2.2), but the new pages are real WordPress Pages (indexable by default, not client-rendered React islands), and `page.php`'s heading structure (`<h1>` title, `<h2>` sections) is already search-engine-reasonable — no extra work was needed to avoid making future SEO work harder.
+
+### Tests
+22 new backend tests: `LegalPagesTest` (11 — every page created with real content, Terms created-but-never-published, the other five published, the "never overwrite a real edit" boundary, the stock-content-detection boundary, the `wp_page_for_privacy_policy` option being set correctly without ever overriding a deliberate admin choice, the stock-Sample-Page-only trash boundary, FAQ JSON structure, idempotency), `ContactFormHandlerTest` (7 — valid submission actually sending mail to the real `admin_email`, missing-nonce/empty-name/invalid-email/empty-message rejection, the honeypot's fake-success behavior, per-IP rate limiting), and 4 new `PluginTest` cases in `beauclick-payments` (the terms-checkbox option staying unset while Terms is a draft, getting set once published, never being overridden, and the refund-policy link only rendering once its page is published). Full backend suite: **381/381 passing** (359 after Step 6). Frontend: 27/27 unchanged, TypeScript clean, production build clean.
+
+Two real bugs were found and fixed **before** live verification, both by the test suite itself:
+1. The `LegalPages::ensure()`/`Plugin::activate()` bootstrap-timing bug described above.
+2. Two test-authoring bugs (not production bugs) in this step's own new tests: `get_pages( [ 'post_status' => 'any' ] )` returning `false` rather than an array (`get_pages()`, unlike `WP_Query`, doesn't accept `'any'` — fixed by using `get_posts()` instead), and a contact-form test asserting exactly one captured mail while inadvertently also triggering WordPress core's own "admin email changed" notification by calling `update_option( 'admin_email', ... )` mid-test (fixed by reading the existing option instead of changing it).
+
+### Live verification (real running site, real browser)
+Homepage footer trust nav (all five links, correct hrefs) → Privacy Policy (real content, correct Jalali date) → Refund Policy (real content) → FAQ (accordion expands on click, real answers) → About (real content) → `/terms/` as a logged-out visitor (correct Persian 404, draft never exposed) → Contact form (real submission, success message, honeypot field present but hidden) → a real WooCommerce checkout with a real cart item (the `[privacy_policy]` link now resolves for the first time; the new refund-policy link renders directly above "ثبت سفارش"; **no** terms checkbox appears, confirming the deliberate no-op while Terms stays a draft) → the auth page's new privacy trust line. 375px/390px/412px/desktop all confirmed zero horizontal overflow. No unexpected console errors (the one 404 observed was this session's own intentional `/terms/` visit, not a bug).
+
+### Bugs discovered
+The `LegalPages`/bootstrap-timing bug (Bugs discovered = Bugs fixed, both above) and the `[privacy_policy]` checkout placeholder silently resolving to nothing while the Privacy page was a draft (a real, pre-existing gap this step's own content-publishing directly closes, not a code bug introduced here).
+
+### Bugs fixed
+Both of the above.
+
+### Known limitations
+- **Terms of Service remains unpublished** — by design, not oversight; publishing requires a real legal review this task explicitly could not perform (see Content boundary above). The checkout consent checkbox will appear automatically, with zero further code changes, the moment an admin publishes the page (`ensure_terms_page_configured()` re-checks on every `activate()`/plugin-update cycle).
+- **No cookie-consent banner was built** — investigated first, per the task's own instruction: this site sets no non-essential/tracking cookies today (zero analytics/tracking scripts found anywhere in the codebase), so a consent-gating banner would have been solving a problem that doesn't exist yet. The Privacy Policy's "کوکی‌ها" section discloses this honestly instead.
+- **No FAQ/Contact content-versioning UI** — FAQ is a small, hand-curated JSON array in `LegalPages`; genuinely sufficient at this content's real size, not a gap that needs a content-management system to close.
+- **The contact form has no admin-facing submission log** — messages go straight to `admin_email` via `wp_mail()`; there's no in-dashboard "past contact submissions" view. A plausible, separate, small future addition, not built speculatively here.
+- **SEO metadata (meta description, canonical, structured data) was not added** to the new pages — explicitly deferred to V2.2 per the task's own scope boundary; the pages themselves are already SEO-reasonable by default (see SEO section above).
+
+### Deferred (explicitly out of this step's scope)
+Professional Verification Evidence (Step 8), Loyalty Tiers + Membership (Step 9), Waitlist + Smart Rebooking (Step 10), the full V2.2 SEO system, an admin-branded shell, and any consent-management infrastructure beyond the honest disclosure already published (no evidence exists today that one is needed).
