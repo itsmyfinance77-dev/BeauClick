@@ -871,3 +871,100 @@ Confirmed: no CRM, Membership, Referral, Campaign Engine, Financial/Payout, Mult
 **V2.0 READY FOR RELEASE.**
 
 All four V2.0 steps are functionally correct, Persian-first, Jalali-correct, RTL-correct, tested (291/291 backend, 27/27 frontend, clean TypeScript, clean build), live-verified against real data with no fabricated entities, authorization-correct (cross-user isolation and AI grounding both confirmed live, not just by code reading), and V1 remains completely untouched (`v1.0.0`/`v1.0.1` both verified unchanged against origin). No blocking defect was found. The `v2.0.0` tag was intentionally **not** created by this audit — per the standing instruction, tagging requires explicit approval after this report.
+
+---
+
+## V2.1 Step 5 — Professional CRM Implementation Notes
+
+**Scope actually implemented:** a real, operational customer-relationship workspace for professionals/businesses — searchable/filterable customer list, a customer detail view (overview, booking history, reviews, conversation summary, private notes), and professional-authored notes — built entirely as a read/aggregation layer over data that already existed, plus one genuinely new table (`wp_bc_crm_notes`). Membership, Referral, Campaign Engine, Financial/Payout, Multi-sided Marketplace expansion, Realtime Chat, Native Mobile, AI-for-professionals, and any complex segmentation/marketing-automation engine were explicitly out of scope and untouched.
+
+### Where this lives, and why
+§4.5's own assessment concluded CRM should be "folded into `beauclick-booking`'s `DashboardController` as a natural extension… avoids creating an eleventh plugin." Direct inspection confirmed this holds: `wp_bc_bookings` (owned by `beauclick-booking`) is the one table every CRM concept — who is a customer, when did they last visit, when is their next visit — derives from, and `DashboardController`/`ReviewsController::for_providers()` already established the exact bulk-aggregation query shape this needed. CRM was built as a new `Crm` namespace and `CrmController` **inside `beauclick-booking`**, not a new plugin — the same reasoning V2.0 Step 3 already used to place `Ranking` there instead of `beauclick-marketplace`.
+
+### Ownership model — the actual finding, not an assumption
+The task asked to determine ownership from real code before designing access control. `ProviderLookup::for_user( $user_id )` — the one place in this codebase that resolves "which `bc_professional`/`bc_business` CPT post does this WP user own" — already treats **independent professionals and businesses identically**: `post_author = $user_id`, one post, no distinction by type. Separately, `wp_bc_business_accounts` (owned by `beauclick-b2b`) is a **different, unrelated concept** — a B2B wholesale-purchasing account, also `UNIQUE KEY user_id`, with no staff/multi-user structure of its own. Conclusion, confirmed by inspection rather than assumed: **this codebase has no granular staff-permission system today**, for either professionals or businesses. A "business" CRM user is, today, exactly the single WP user who authored that business's CPT post — identical in shape to a professional. Per the task's own instruction ("if the current system does not yet have sufficiently granular staff permissions, document the limitation rather than building the entire future permission system inside Step 5"), this is documented as a known limitation below, not solved here.
+
+Every CRM read/write is scoped by `$provider_id = ProviderLookup::for_user( get_current_user_id() )`, resolved server-side inside `CrmController` — never accepted from a request parameter. Every customer-scoped operation then re-checks `CrmService::is_customer_of( $provider_id, $customer_id )` (a real `EXISTS` query against `wp_bc_bookings`) before returning or writing anything — not merely at the controller layer, but again inside `CrmService::add_note()` itself, since that is the actual boundary the database enforces. A `customer_id` that doesn't genuinely belong to the caller's own provider is treated identically to one that doesn't exist — the 404 response never distinguishes "not yours" from "doesn't exist," so no endpoint can be used to enumerate another provider's real customers by id.
+
+### Database
+One new, additive migration (`CreateCrmNotesTable`, registered in `beauclick-booking\Plugin::migrations()` alongside the existing `CreateBookingTables`/`AddHoldExpiryColumns`):
+
+```sql
+CREATE TABLE wp_bc_crm_notes (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  provider_id BIGINT UNSIGNED NOT NULL,
+  customer_id BIGINT UNSIGNED NOT NULL,
+  author_user_id BIGINT UNSIGNED NOT NULL,
+  note VARCHAR(2000) NOT NULL,
+  created_at DATETIME NOT NULL,
+  updated_at DATETIME NOT NULL,
+  PRIMARY KEY (id),
+  KEY provider_customer (provider_id, customer_id, created_at)
+);
+```
+
+Keyed by `provider_id` — not `author_user_id` — matching every other ownership boundary in this codebase (bookings/reviews are both keyed by `provider_id`). `author_user_id` is recorded for display/audit ("who on this team wrote this") but is never the access-control field. No cross-plugin foreign keys, matching every other table here. Nothing else was added: customer identity comes from `wp_users`, phone from WooCommerce's own standard `_billing_phone` usermeta (the same field this site's checkout form already writes to — confirmed live during the V1.0.1 audit), bookings/reviews/conversations are read directly from their existing owning tables. No customer history was duplicated anywhere.
+
+### API
+Three routes on `CrmController`, following the existing `RestController`/`Response` conventions exactly (same envelope, same `pagination_args()`, same `require_login` gate):
+
+- `GET /booking/crm/customers?search=&filter=&page=&per_page=` — paginated, scoped list.
+- `GET /booking/crm/customers/{id}` — full detail bundle (overview + bookings + reviews + conversation summary + notes) in one request, matching Beauty Journey's own "one request instead of five-plus" performance convention rather than forcing the frontend to make five separate calls.
+- `POST /booking/crm/customers/{id}/notes` — create a note.
+
+No `PATCH`/`DELETE` for notes in this step — deliberately, matching the task's own "keep the first implementation simple" instruction and mirroring Beauty Journey's own precedent of deferring goal deletion (§Step 4 above). Notes are effectively append-only for now; documented as deferred, not forgotten.
+
+### Search and filters
+Server-side, and scoped by construction (search/filter apply only within the already-provider-scoped result set — there is no way to search across another provider's customers). `list_customers()` does its aggregation in five fixed, bulk `GROUP BY`/`IN (...)` queries — one for the booking-derived stats (count, completed count, last visit, next booking, all computed with conditional `SUM`/`MAX`/`MIN` in one pass), one for `wp_users`, one for phone meta, one for review counts, one for note counts — regardless of how many customers a provider has, never one query per customer. Search and the six derived filters (`new`/`returning`/`upcoming`/`has_review`/`inactive`/`all`) then run in PHP over that already-small, already-fetched result set: a single provider's own customer list is bounded by that provider's own real booking history (this project's own stated realistic scale — low hundreds, not millions), so this is the simplest-viable-architecture choice, consistent with the task's own "use MySQL/indexed queries… do not build external search infrastructure" instruction, not a shortcut that needs revisiting at the scale this product actually operates at. Search normalizes Persian and Arabic-Indic digits to ASCII before matching, so a phone number typed in Persian numerals still finds the ASCII-stored value — verified directly by test and live (`۰۹۱۲۱۲۳۴۵۶۷` matched a customer whose phone is stored as `09121234567`).
+
+### Customer detail
+Overview (first visit, last visit, next booking, completed/total count), booking history (status labels reuse the exact same `STATUS_LABELS` map `BookingsTab.tsx` already uses — no second status vocabulary), reviews the customer wrote for this specific provider (`wp_bc_reviews` filtered by `target_type='provider'`, `target_id=$provider_id`, `author_id=$customer_id` — never another provider's reviews of this same customer), a conversation summary (exists/last-message-at/unread-count, read directly from `wp_bc_conversations`/`wp_bc_messages` — deliberately **not** `ConversationService::start_or_get()`, which creates a conversation on a miss; a CRM detail view must never have that side effect, and message *content* is never duplicated here, only enough to point a professional at the real chat panel), and private notes.
+
+### Notes — privacy
+Notes are provider-scoped, never customer-visible (no customer-facing endpoint reads `wp_bc_crm_notes` at all — the table is only ever reached through `CrmController`, which is gated by `ProviderLookup::for_user()` resolving to a real provider, something a plain customer account never has), never AI-visible (no code path in `beauclick-ai`, `JourneyContextProvider`, or anywhere else reads this table — confirmed by inspection: nothing outside `CrmService`/`CrmController` references `bc_crm_notes`), and never cross-provider-visible (re-verified live: two real professionals each see only their own notes on a shared real customer). Plain `VARCHAR(2000)` text, no rich-text/attachment system — per the task's own "keep the first implementation simple… do not create a complex rich-text medical/clinical notes system" instruction.
+
+### Persian localization
+Every user-facing string — nav label, filter chips, empty states, error messages, section headings, the "private, not visible to the customer" disclaimer, the save button and its loading state — is Persian. REST errors (`این مشتری پیدا نشد یا در اختیار شما نیست.` for both "not owned" and "doesn't exist," `متن یادداشت نمی‌تواند خالی باشد.` for empty input) follow the exact same pattern `RestController`'s base errors already established. No English string was introduced anywhere in this step's own code (verified by the same search method used in the V2.0 audit — zero English JSX text, zero English `Response::error()`/`__()` calls in the new files).
+
+### Jalali coverage
+Every date shown — first visit, last visit, next booking, each booking-history row, each note's timestamp — goes through the existing `formatFullJalaliDate()` from `app/src/lib/format.ts`, the same shared abstraction every other V1.0.1/V2.0 surface uses. No second Jalali implementation was created. Counts (booking count, review count, note count) use the existing `toPersianDigits()`. Internal storage remains exactly as it already was — `DATETIME` columns, no schema change to accommodate presentation.
+
+### RTL/mobile
+No new visual language — the customer list reuses the exact `bc-card` styling `ReviewsTab`/`BookingsTab` already establish, filters reuse the existing `Chip` primitive, the detail view reuses the existing `Modal` (which already has a focus trap, Escape handling, and a close button — no new accessibility work needed there), notes reuse the existing `textarea.bc-input`/`Button` pattern from `ReviewsTab`'s own respond-to-review form. Verified live at 375px, 390px, 412px, and desktop: no horizontal overflow (`scrollWidth === clientWidth` at every width, including with the detail modal open), `dir="rtl"` throughout. The list is a stack of full-width cards, not a dense table forced onto mobile — matching the task's own explicit instruction.
+
+### Security — verified live, not only by code
+- A stranger professional (`bc_demo_niloofar_kermani`, a real account with zero real bookings) opened `مشتریان` and saw a genuinely empty list — none of a different real professional's (`bc_demo_sara_ahmadi`) real customers or the note added during this session's testing leaked across.
+- A direct, unauthenticated-by-relationship REST call (`GET /booking/crm/customers/8` as the stranger professional, `8` being a real customer id known from a different provider's relationship) returned `404` with the Persian not-found/not-yours message — confirmed at the network layer, not just the UI.
+- A plain customer account has no `ProviderLookup` result at all, so every CRM route returns the same empty/404 response a stranger professional gets — CRM has no customer-facing surface whatsoever (asserted directly by `CrmControllerTest::test_a_customer_account_itself_has_no_provider_and_cannot_reach_crm`).
+
+### Performance
+`list_customers()` is a fixed 5-query operation regardless of customer count (asserted directly by `CrmServiceTest::test_customer_list_avoids_n_plus_one_queries`, which fails if the query count ever creeps toward one-per-customer). `get_customer_detail()` is a fixed handful of queries per open (overview, bookings, reviews, phone lookup, conversation, notes) — acceptable for a single-record detail view opened one at a time, not a list-rendering path.
+
+### AI boundary
+Nothing in this step touches `beauclick-ai`. No CRM data (notes, phone, booking history) is read into any AI context-assembly path — confirmed by inspection (zero references to `bc_crm_notes` or `CrmService` anywhere outside `beauclick-booking`'s own `Crm`/`Rest` directories). This deliberately leaves the door open for a future, explicitly-scoped V2.3 "AI for Professionals" step to query `CrmService` the same way `JourneyContextProvider` already lets AI consume Beauty Journey data — but that consumption does not exist yet, and building it was out of this step's scope.
+
+### Tests
+24 new backend tests: `CrmServiceTest` (15 — provider-scoping, booking-count/last-visit/next-booking correctness, Persian-digit phone search, all six filters, pagination, empty state, the real ownership boundary, customer-detail composition, note creation/rejection, cross-provider note isolation, the N+1 regression guard) and `CrmControllerTest` (9 — login requirement, no-provider-profile empty state, the live cross-professional-denial scenario, owning-professional success, the customer-account-has-no-CRM-access case, unowned-customer note rejection, empty-note Persian validation, note creation end-to-end through to detail, pagination params). Full backend suite: **315/315 passing** (was 291 after the V2.0 final audit). Frontend: **27/27 passing** (unchanged — this project's established convention is lib-level frontend tests only; `CustomersTab` was verified via live browser QA, matching how every other dashboard tab in this codebase has been verified). TypeScript clean, production build clean (`dashboard-professional` bundle grew from ~9.57kB to ~16.23kB, reflecting the new tab).
+
+### Live verification (real running site, real professional accounts, real booking/review data)
+1. Logged in as `bc_demo_sara_ahmadi` (a real professional with real prior bookings/reviews from earlier V1/V2 verification sessions) → `مشتریان` → real customer list (`admin`, `bc_qa_customer`) with correct Jalali last-visit dates and correct completed/review counts.
+2. Opened a real customer's detail → correct first-visit/last-visit/next-booking Jalali dates, correct `۱ از ۲ نوبت انجام‌شده`, real booking history with correct status labels, a real conversation summary (last message + unread count, sourced from the real `wp_bc_conversations`/`wp_bc_messages` tables), empty reviews section (this specific customer hadn't reviewed this specific provider — correct, not a bug).
+3. Added a real note ("این مشتری همیشه دیر میاد…") → appeared immediately with the correct author name and Jalali timestamp, no reload needed.
+4. Logged in as a second real professional (`bc_demo_niloofar_kermani`) → empty CRM, confirmed both via the UI and a direct unauthorized REST call (see Security above).
+5. Verified at 375px/390px/412px/desktop — no overflow, RTL correct, modal usable on mobile.
+6. Checked browser console and network tab — no unexpected errors; the only 404/403 entries observed were from the intentional unauthorized-access test itself.
+
+### Bugs discovered
+None.
+
+### Bugs fixed
+None required.
+
+### Known limitations
+- **No granular staff-permission model** — a "business" CRM account is, today, exactly the single WP user who authored that business's CPT post (see Ownership model above). If BeauClick later needs multiple staff members under one business to share CRM access, that is new authorization infrastructure this step deliberately did not build, per the task's own explicit instruction to document rather than build it now.
+- **No note editing or deletion** — notes are effectively append-only in this first version; a small, additive extension if a real "fix a typo in my note" need emerges.
+- **No frontend pagination UI** — `app/src/lib/api.ts`'s `request()` already discards `meta.pagination` for every existing caller in this codebase (not something this step changed), so `CustomersTab` fetches a generous `per_page=50` and relies on search/filters to narrow further rather than a page control; the backend API already supports real pagination (verified by test) for whenever the frontend wrapper is extended to expose it.
+- **No component-level frontend test** for `CustomersTab` — matches this project's established convention (lib-level tests + live QA), not a new gap.
+
+### Deferred CRM capabilities (explicitly out of this step, per the task's own scope boundary)
+Customer segmentation/tagging beyond the six derived filters, campaign targeting, follow-up reminder automation, inactive-customer retention triggers, CRM-aware AI ("which customers haven't returned"), analytics dashboards, and any multi-staff business permission model. All are named in the roadmap as later V2.1+/V2.2+ capabilities that can consume this step's `CrmService` once they exist — nothing here needs to be rebuilt to support them.

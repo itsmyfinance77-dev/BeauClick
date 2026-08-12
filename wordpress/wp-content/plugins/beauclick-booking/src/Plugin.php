@@ -8,9 +8,11 @@ use BeauClick\Booking\Cron\HoldExpiryScheduler;
 use BeauClick\Booking\Cron\RankingScheduler;
 use BeauClick\Booking\Database\Migrations\AddHoldExpiryColumns;
 use BeauClick\Booking\Database\Migrations\CreateBookingTables;
+use BeauClick\Booking\Database\Migrations\CreateCrmNotesTable;
 use BeauClick\Booking\Database\Seeds\DemoAvailabilitySeed;
 use BeauClick\Booking\Ranking\RankingEngine;
 use BeauClick\Booking\Rest\BookingController;
+use BeauClick\Booking\Rest\CrmController;
 use BeauClick\Booking\Rest\DashboardController;
 
 final class Plugin {
@@ -27,7 +29,7 @@ final class Plugin {
 	}
 
 	private function migrations(): array {
-		return [ new CreateBookingTables(), new AddHoldExpiryColumns() ];
+		return [ new CreateBookingTables(), new AddHoldExpiryColumns(), new CreateCrmNotesTable() ];
 	}
 
 	public function boot(): void {
@@ -96,6 +98,7 @@ final class Plugin {
 	public function register_rest_routes(): void {
 		( new BookingController() )->register_routes();
 		( new DashboardController() )->register_routes();
+		( new CrmController() )->register_routes();
 	}
 
 	public function maybe_seed( ?string $only ): void {
