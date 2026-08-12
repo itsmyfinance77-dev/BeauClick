@@ -142,4 +142,39 @@ final class RuleBasedProviderTest extends WP_UnitTestCase {
 
 		$this->assertSame( [], $response->recommendations );
 	}
+
+	/**
+	 * V2.0 Step 3: AI must consume the shared ranking engine, not duplicate
+	 * its own popularity logic (task's explicit "one ranking domain,
+	 * multiple consumers" requirement). find_providers() now orders by
+	 * RankingPresenter::ORDER_BY -- a provider with a real, manually-set
+	 * higher ranking_score must be recommended ahead of one with a better
+	 * raw rating but a lower computed score.
+	 */
+	public function test_provider_recommendations_are_ordered_by_the_real_ranking_score(): void {
+		global $wpdb;
+		$specialty    = wp_insert_term( 'میکاپ', 'bc_specialty' );
+		$specialty_id = (int) $specialty['term_id'];
+
+		$owner_id   = self::factory()->user->create();
+		$low_score  = self::factory()->post->create( [ 'post_type' => Registrar::PROFESSIONAL, 'post_status' => 'publish', 'post_author' => $owner_id ] );
+		wp_set_post_terms( $low_score, [ $specialty_id ], Registrar::SPECIALTY );
+		( new \BeauClick\Marketplace\Search\Indexer() )->sync( $low_score, Registrar::PROFESSIONAL );
+
+		$high_score = self::factory()->post->create( [ 'post_type' => Registrar::PROFESSIONAL, 'post_status' => 'publish', 'post_author' => $owner_id ] );
+		wp_set_post_terms( $high_score, [ $specialty_id ], Registrar::SPECIALTY );
+		( new \BeauClick\Marketplace\Search\Indexer() )->sync( $high_score, Registrar::PROFESSIONAL );
+
+		$wpdb->update( $wpdb->prefix . 'bc_provider_index', [ 'ranking_score' => 15.0, 'rating_avg' => 5.0 ], [ 'provider_id' => $low_score ] );
+		$wpdb->update( $wpdb->prefix . 'bc_provider_index', [ 'ranking_score' => 95.0, 'rating_avg' => 2.0 ], [ 'provider_id' => $high_score ] );
+
+		$provider = new RuleBasedProvider();
+		$response = $provider->chat( [ [ 'role' => 'user', 'content' => 'دنبال میکاپ هستم' ] ], [ 'specialtyIds' => [ $specialty_id ] ] );
+
+		$provider_ids = array_column(
+			array_filter( $response->recommendations, static fn ( array $r ) => 'provider' === $r['type'] ),
+			'id'
+		);
+		$this->assertSame( $high_score, $provider_ids[0] ?? null, 'The provider with the real higher ranking_score must be recommended first, regardless of raw rating.' );
+	}
 }

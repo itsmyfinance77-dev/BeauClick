@@ -4,6 +4,7 @@ declare( strict_types=1 );
 namespace BeauClick\Marketplace;
 
 use BeauClick\Marketplace\Admin\VerificationMetaBox;
+use BeauClick\Marketplace\Database\Migrations\AddProviderRankingSignalsColumn;
 use BeauClick\Marketplace\Database\Migrations\CreateProviderIndexTable;
 use BeauClick\Marketplace\Database\Seeds\DemoProvidersSeed;
 use BeauClick\Marketplace\PostTypes\Registrar;
@@ -34,11 +35,15 @@ final class Plugin {
 		add_action( 'beauclick/seed', [ $this, 'maybe_seed' ] );
 	}
 
+	private function migrations(): array {
+		return [ new CreateProviderIndexTable(), new AddProviderRankingSignalsColumn() ];
+	}
+
 	public function register_migrations(): void {
 		if ( ! function_exists( 'beauclick_core' ) ) {
 			return;
 		}
-		beauclick_core()->migrator()->register( self::GROUP, [ new CreateProviderIndexTable() ] );
+		beauclick_core()->migrator()->register( self::GROUP, $this->migrations() );
 	}
 
 	public function register_rest_routes(): void {
@@ -57,7 +62,7 @@ final class Plugin {
 		if ( ! function_exists( 'beauclick_core' ) ) {
 			return;
 		}
-		beauclick_core()->migrator()->register( self::GROUP, [ new CreateProviderIndexTable() ] );
+		beauclick_core()->migrator()->register( self::GROUP, self::instance()->migrations() );
 		beauclick_core()->migrator()->run_group( self::GROUP );
 	}
 }

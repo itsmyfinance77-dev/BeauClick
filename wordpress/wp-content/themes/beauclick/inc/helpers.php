@@ -100,7 +100,18 @@ function bc_get_providers( array $args = [] ): array {
 	}
 
 	$limit = (int) ( $args['limit'] ?? 12 );
-	$sql   = "SELECT * FROM {$table} WHERE " . implode( ' AND ', $where ) . ' ORDER BY verified DESC, rating_avg DESC LIMIT %d';
+	// V2.0 Step 3: same ORDER BY every ranking consumer in the codebase now
+	// shares (REST API, AI recommendations, this SSR helper) — see
+	// \BeauClick\Marketplace\Ranking\RankingPresenter's own docblock. The
+	// theme referencing a plugin class directly is new here but not a new
+	// pattern in kind: PHP's autoloader is process-wide once any plugin
+	// registers it (beauclick-ai already calls marketplace classes the same
+	// way), and duplicating this ORDER BY as a fourth hand-copied string was
+	// the exact drift this step exists to remove.
+	$order = class_exists( \BeauClick\Marketplace\Ranking\RankingPresenter::class )
+		? \BeauClick\Marketplace\Ranking\RankingPresenter::ORDER_BY
+		: 'verified DESC, rating_avg DESC';
+	$sql   = "SELECT * FROM {$table} WHERE " . implode( ' AND ', $where ) . " ORDER BY {$order} LIMIT %d"; // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 	$sql   = $wpdb->prepare( $sql, array_merge( $params, [ $limit ] ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 
 	return $wpdb->get_results( $sql, ARRAY_A ) ?: [];

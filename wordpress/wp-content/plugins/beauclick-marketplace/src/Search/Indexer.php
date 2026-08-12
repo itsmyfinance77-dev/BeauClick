@@ -95,6 +95,21 @@ final class Indexer {
 				'updated_at'     => current_time( 'mysql' ),
 			]
 		);
+
+		// V2.0 Step 3: the one new seam ranking needs. beauclick-booking's
+		// Ranking module (see its own docblock for why the compute side
+		// lives there, not here) subscribes to this to recompute one
+		// provider's ranking_score right after its index row changes —
+		// same hook-based, one-way, source-fires/consumer-subscribes
+		// convention as every other cross-plugin seam in this codebase
+		// (beauclick/booking/completed, beauclick/reviews/submitted), not a
+		// new pattern. Fired unconditionally on every sync(), including
+		// edits — a single-provider recompute is a handful of indexed
+		// queries, cheap enough to run on every profile/service edit at
+		// this project's realistic provider-count scale (see
+		// RankingEngine::recompute_one()'s own docblock for the "why now,
+		// why not later" note if that stops being true).
+		do_action( 'beauclick/marketplace/provider_indexed', $post_id, $post_type );
 	}
 
 	public function update_rating( int $provider_id, string $provider_type, float $rating_avg, int $review_count ): void {
@@ -102,6 +117,27 @@ final class Indexer {
 		$wpdb->update(
 			$wpdb->prefix . 'bc_provider_index',
 			[ 'rating_avg' => $rating_avg, 'review_count' => $review_count, 'updated_at' => current_time( 'mysql' ) ],
+			[ 'provider_id' => $provider_id, 'provider_type' => $provider_type ]
+		);
+	}
+
+	/**
+	 * V2.0 Step 3 — the one write path for ranking output, called by
+	 * beauclick-booking's RankingEngine after it computes a score. Mirrors
+	 * update_rating()'s exact shape: a plugin that doesn't own this table
+	 * writes into it through a method marketplace itself owns, not raw SQL
+	 * reaching across the plugin boundary.
+	 *
+	 * @param array<int, string> $signalKeys
+	 */
+	public function update_ranking( int $provider_id, string $provider_type, float $score, array $signalKeys ): void {
+		global $wpdb;
+		$wpdb->update(
+			$wpdb->prefix . 'bc_provider_index',
+			[
+				'ranking_score'   => round( $score, 4 ),
+				'ranking_signals' => $signalKeys ? wp_json_encode( array_values( $signalKeys ) ) : null,
+			],
 			[ 'provider_id' => $provider_id, 'provider_type' => $provider_type ]
 		);
 	}

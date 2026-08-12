@@ -4,6 +4,7 @@ declare( strict_types=1 );
 namespace BeauClick\AI;
 
 use BeauClick\Marketplace\PostTypes\Registrar;
+use BeauClick\Marketplace\Ranking\RankingPresenter;
 
 /**
  * Feeds a slice of the REAL catalog into the LLM prompt so it only ever
@@ -52,7 +53,7 @@ final class CatalogContext {
 
 		$sql = 'SELECT provider_id, name, city_id, price_from, rating_avg FROM ' . $wpdb->prefix . "bc_provider_index WHERE {$where[0]}"
 			. ( count( $where ) > 1 ? ' AND ' . implode( ' AND ', array_slice( $where, 1 ) ) : '' )
-			. ' ORDER BY verified DESC, rating_avg DESC LIMIT %d';
+			. ' ORDER BY ' . RankingPresenter::ORDER_BY . ' LIMIT %d'; // V2.0 Step 3 — see RankingPresenter's docblock.
 		$params[] = $limit;
 		$sql      = $wpdb->prepare( $sql, $params ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 

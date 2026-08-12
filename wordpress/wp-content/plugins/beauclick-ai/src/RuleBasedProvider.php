@@ -4,6 +4,7 @@ declare( strict_types=1 );
 namespace BeauClick\AI;
 
 use BeauClick\Marketplace\PostTypes\Registrar;
+use BeauClick\Marketplace\Ranking\RankingPresenter;
 
 /**
  * Default provider when BC_AI_API_KEY isn't configured (every local/dev
@@ -271,7 +272,12 @@ final class RuleBasedProvider implements ProviderInterface {
 			$params[] = (int) $context['budget'];
 		}
 
-		$sql = 'SELECT provider_id, name, rating_avg, review_count FROM ' . $wpdb->prefix . 'bc_provider_index WHERE ' . implode( ' AND ', $where ) . ' ORDER BY verified DESC, rating_avg DESC LIMIT 3';
+		// V2.0 Step 3: same shared ORDER BY every ranking consumer in the
+		// codebase now uses (see RankingPresenter's own docblock) — AI still
+		// owns candidate eligibility (the WHERE built above from
+		// specialty/city/budget context), ranking only decides order among
+		// those already-eligible candidates.
+		$sql = 'SELECT provider_id, name, rating_avg, review_count FROM ' . $wpdb->prefix . 'bc_provider_index WHERE ' . implode( ' AND ', $where ) . ' ORDER BY ' . RankingPresenter::ORDER_BY . ' LIMIT 3';
 		$sql = $params ? $wpdb->prepare( $sql, $params ) : $sql; // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 
 		$rows = $wpdb->get_results( $sql, ARRAY_A );

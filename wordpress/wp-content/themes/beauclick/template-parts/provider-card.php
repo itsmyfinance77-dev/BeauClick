@@ -16,6 +16,13 @@ if ( ! $provider ) {
 $city_name = bc_get_city_name( $provider['city_id'] ? (int) $provider['city_id'] : null );
 $district_name = bc_get_district_name( $provider['district_id'] ? (int) $provider['district_id'] : null );
 $location  = trim( implode( '، ', array_filter( [ $city_name, $district_name ] ) ) );
+
+// V2.0 Step 3: truthful, pre-computed explanation phrases only -- never the
+// raw internal ranking_score. At most 2, kept as plain small text (not a
+// row of badges) per the roadmap's own "do not overdo badges" guidance.
+$ranking_reasons = ! empty( $provider['ranking_signals'] ) && class_exists( \BeauClick\Marketplace\Ranking\RankingPresenter::class )
+	? array_slice( \BeauClick\Marketplace\Ranking\RankingPresenter::explain( (array) json_decode( (string) $provider['ranking_signals'], true ) ), 0, 2 )
+	: [];
 ?>
 <div class="bc-card bc-card--hoverable">
 	<a href="<?php echo esc_url( bc_provider_permalink( $provider ) ); ?>" style="display:block;">
@@ -42,6 +49,10 @@ $location  = trim( implode( '، ', array_filter( [ $city_name, $district_name ] 
 			<span><?php echo esc_html( bc_format_rating( (float) $provider['rating_avg'] ) ); ?></span>
 			<span class="bc-rating__count">(<?php echo esc_html( bc_persian_digits( (int) $provider['review_count'] ) ); ?>)</span>
 		</span>
+
+		<?php if ( $ranking_reasons ) : ?>
+			<p class="bc-provider-card__meta"><?php echo esc_html( implode( ' · ', $ranking_reasons ) ); ?></p>
+		<?php endif; ?>
 
 		<div class="bc-provider-card__footer">
 			<?php if ( $provider['price_from'] ) : ?>

@@ -6,6 +6,7 @@ namespace BeauClick\Marketplace\Rest;
 use BeauClick\Core\Rest\RestController;
 use BeauClick\Core\Rest\Response;
 use BeauClick\Marketplace\PostTypes\Registrar;
+use BeauClick\Marketplace\Ranking\RankingPresenter;
 use WP_REST_Request;
 
 /**
@@ -91,22 +92,30 @@ final class MarketplaceController extends RestController {
 			'price_asc'  => 'price_from ASC',
 			'price_desc' => 'price_from DESC',
 			'rating'     => 'rating_avg DESC, review_count DESC',
-			default      => 'verified DESC, rating_avg DESC', // "recommended" — real ranking_score lands in Phase 11.
+			// V2.0 Step 3: "recommended" — the real ranking engine this
+			// comment used to point at as a future Phase 11. RankingPresenter
+			// is the single shared ORDER_BY every ranking consumer in this
+			// codebase now uses (see its own docblock).
+			default      => RankingPresenter::ORDER_BY,
 		};
 	}
 
 	private function format_index_row( array $row ): array {
 		return [
-			'id'           => (int) $row['provider_id'],
-			'type'         => $row['provider_type'],
-			'name'         => $row['name'],
-			'city_id'      => $row['city_id'] ? (int) $row['city_id'] : null,
-			'district_id'  => $row['district_id'] ? (int) $row['district_id'] : null,
-			'specialtyIds' => $row['specialty_ids'] ? array_map( 'intval', explode( ',', $row['specialty_ids'] ) ) : [],
-			'priceFrom'    => null !== $row['price_from'] ? (int) $row['price_from'] : null,
-			'rating'       => (float) $row['rating_avg'],
-			'reviewCount'  => (int) $row['review_count'],
-			'verified'     => (bool) $row['verified'],
+			'id'             => (int) $row['provider_id'],
+			'type'           => $row['provider_type'],
+			'name'           => $row['name'],
+			'city_id'        => $row['city_id'] ? (int) $row['city_id'] : null,
+			'district_id'    => $row['district_id'] ? (int) $row['district_id'] : null,
+			'specialtyIds'   => $row['specialty_ids'] ? array_map( 'intval', explode( ',', $row['specialty_ids'] ) ) : [],
+			'priceFrom'      => null !== $row['price_from'] ? (int) $row['price_from'] : null,
+			'rating'         => (float) $row['rating_avg'],
+			'reviewCount'    => (int) $row['review_count'],
+			'verified'       => (bool) $row['verified'],
+			// V2.0 Step 3: truthful, pre-computed explanation phrases only —
+			// never the raw internal ranking_score itself (roadmap's own
+			// "do not expose meaningless scores" requirement).
+			'rankingReasons' => RankingPresenter::explain( $row['ranking_signals'] ? (array) json_decode( (string) $row['ranking_signals'], true ) : [] ),
 		];
 	}
 

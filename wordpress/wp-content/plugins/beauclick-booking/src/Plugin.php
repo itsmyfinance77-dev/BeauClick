@@ -3,10 +3,13 @@ declare( strict_types=1 );
 
 namespace BeauClick\Booking;
 
+use BeauClick\Booking\Booking\BookingService;
 use BeauClick\Booking\Cron\HoldExpiryScheduler;
+use BeauClick\Booking\Cron\RankingScheduler;
 use BeauClick\Booking\Database\Migrations\AddHoldExpiryColumns;
 use BeauClick\Booking\Database\Migrations\CreateBookingTables;
 use BeauClick\Booking\Database\Seeds\DemoAvailabilitySeed;
+use BeauClick\Booking\Ranking\RankingEngine;
 use BeauClick\Booking\Rest\BookingController;
 use BeauClick\Booking\Rest\DashboardController;
 
@@ -35,6 +38,52 @@ final class Plugin {
 		$scheduler = new HoldExpiryScheduler();
 		$scheduler->register();
 		add_action( 'admin_init', [ $scheduler, 'ensure_scheduled' ] ); // Cheap idempotent check; re-arms the event if it was ever cleared without needing a manual reactivation.
+
+		$ranking_scheduler = new RankingScheduler();
+		$ranking_scheduler->register();
+		add_action( 'admin_init', [ $ranking_scheduler, 'ensure_scheduled' ] );
+
+		// V2.0 Step 3: real-time single-provider ranking recompute, one hook
+		// per "something that could move this provider's score just
+		// happened" — same hook-based, source-fires/consumer-subscribes
+		// convention as every other cross-plugin seam in this codebase.
+		// beauclick/marketplace/provider_indexed fires (post_id, post_type)
+		// directly matching recompute_one()'s signature; the other two only
+		// carry a booking/review id, so a tiny lookup resolves provider_id
+		// first — see recompute_for_booking() below.
+		add_action( 'beauclick/marketplace/provider_indexed', [ $this, 'recompute_ranking_for_post' ], 10, 2 );
+		add_action( 'beauclick/booking/completed', [ $this, 'recompute_ranking_for_booking' ] );
+		add_action( 'beauclick/reviews/submitted', [ $this, 'recompute_ranking_for_review' ], 10, 3 );
+	}
+
+	public function recompute_ranking_for_post( int $postId, string $postType ): void {
+		( new RankingEngine() )->recompute_one( $postId, $postType );
+	}
+
+	public function recompute_ranking_for_booking( int $bookingId ): void {
+		$this->recompute_for_booking( $bookingId );
+	}
+
+	public function recompute_ranking_for_review( int $reviewId, int $authorId, int $bookingId ): void {
+		$this->recompute_for_booking( $bookingId );
+	}
+
+	/**
+	 * Both booking-completion and review-submission hooks only carry a
+	 * booking id, not a provider id/type — booking already owns
+	 * wp_bc_bookings, so resolving provider_id here is a same-plugin lookup,
+	 * not a new cross-plugin read.
+	 */
+	private function recompute_for_booking( int $bookingId ): void {
+		$booking = ( new BookingService() )->find( $bookingId );
+		if ( ! $booking ) {
+			return;
+		}
+		$provider_id   = (int) $booking['provider_id'];
+		$provider_type = get_post_type( $provider_id );
+		if ( $provider_type ) {
+			( new RankingEngine() )->recompute_one( $provider_id, $provider_type );
+		}
 	}
 
 	public function register_migrations(): void {
@@ -64,9 +113,11 @@ final class Plugin {
 		beauclick_core()->migrator()->run_group( self::GROUP );
 
 		( new HoldExpiryScheduler() )->ensure_scheduled();
+		( new RankingScheduler() )->ensure_scheduled();
 	}
 
 	public static function deactivate(): void {
 		( new HoldExpiryScheduler() )->unschedule();
+		( new RankingScheduler() )->unschedule();
 	}
 }

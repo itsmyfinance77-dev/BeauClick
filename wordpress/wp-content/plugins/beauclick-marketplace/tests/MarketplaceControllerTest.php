@@ -50,4 +50,50 @@ final class MarketplaceControllerTest extends WP_UnitTestCase {
 		$count = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}bc_events WHERE event_type = 'profile_view'" );
 		$this->assertSame( 0, $count, 'A 404 profile lookup must never write a profile_view event.' );
 	}
+
+	/**
+	 * V2.0 Step 3: the default "recommended" browse sort now orders by the
+	 * real ranking_score (via RankingPresenter::ORDER_BY) instead of the old
+	 * hardcoded 'verified DESC, rating_avg DESC' -- a provider with a
+	 * manually-set HIGHER ranking_score but a WORSE raw rating must still
+	 * come first, proving the real column drives ordering, not the old
+	 * fallback fields alone (verified DESC, rating_avg DESC are still the
+	 * tiebreak chain, but must not be able to override a real score gap).
+	 */
+	public function test_the_default_browse_sort_orders_by_real_ranking_score(): void {
+		global $wpdb;
+		$owner_id = self::factory()->user->create();
+		$low_score  = self::factory()->post->create( [ 'post_type' => Registrar::PROFESSIONAL, 'post_status' => 'publish', 'post_author' => $owner_id, 'post_title' => 'Low Score' ] );
+		$high_score = self::factory()->post->create( [ 'post_type' => Registrar::PROFESSIONAL, 'post_status' => 'publish', 'post_author' => $owner_id, 'post_title' => 'High Score' ] );
+
+		$wpdb->update( $wpdb->prefix . 'bc_provider_index', [ 'ranking_score' => 20.0, 'rating_avg' => 5.0, 'verified' => 1 ], [ 'provider_id' => $low_score ] );
+		$wpdb->update( $wpdb->prefix . 'bc_provider_index', [ 'ranking_score' => 90.0, 'rating_avg' => 3.0, 'verified' => 0 ], [ 'provider_id' => $high_score ] );
+
+		$controller = new MarketplaceController();
+		$request    = new \WP_REST_Request( 'GET', '/beauclick/v1/marketplace/providers' );
+		$data       = $controller->browse( $request )->get_data()['data'];
+
+		$ids = array_column( $data, 'id' );
+		$this->assertLessThan( array_search( $low_score, $ids, true ), array_search( $high_score, $ids, true ), 'A real, higher ranking_score must place a provider ahead of one with a higher raw rating/verified flag but a lower computed score.' );
+	}
+
+	public function test_ranking_reasons_only_include_truthfully_earned_labels(): void {
+		global $wpdb;
+		$owner_id    = self::factory()->user->create();
+		$provider_id = self::factory()->post->create( [ 'post_type' => Registrar::PROFESSIONAL, 'post_status' => 'publish', 'post_author' => $owner_id ] );
+		$wpdb->update(
+			$wpdb->prefix . 'bc_provider_index',
+			[ 'ranking_signals' => wp_json_encode( [ 'verified', 'high_rating', 'some_unknown_future_key' ] ) ],
+			[ 'provider_id' => $provider_id ]
+		);
+
+		$controller = new MarketplaceController();
+		$request    = new \WP_REST_Request( 'GET', '/beauclick/v1/marketplace/providers' );
+		$data       = $controller->browse( $request )->get_data()['data'];
+
+		$row = current( array_filter( $data, static fn ( array $r ) => $r['id'] === $provider_id ) );
+		$this->assertContains( 'تأیید شده', $row['rankingReasons'] );
+		$this->assertContains( 'امتیاز بالا', $row['rankingReasons'] );
+		$this->assertCount( 2, $row['rankingReasons'], 'An unrecognized/unknown signal key must never be surfaced raw to the user -- only known, truthful labels are shown.' );
+	}
 }
