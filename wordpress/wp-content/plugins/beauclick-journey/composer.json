@@ -1,0 +1,14 @@
+{
+    "name": "beauclick/journey",
+    "description": "BeauClick Beauty Journey — customer goals/preferences, timeline composed from existing booking/review/order/AI events, and authorized journey context for the AI assistant.",
+    "type": "wordpress-plugin",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "BeauClick\\Journey\\": "src/"
+        }
+    }
+}

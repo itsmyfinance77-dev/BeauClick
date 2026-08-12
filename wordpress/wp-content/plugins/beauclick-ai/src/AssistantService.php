@@ -86,7 +86,20 @@ final class AssistantService {
 			$this->messages( $conversation['id'], 20 )
 		);
 
-		$response = $this->providerFactory->make()->chat( $history, $conversation['aiContext'] );
+		// V2.0 Step 4: Beauty Journey provides context, AI remains solely
+		// responsible for recommendation reasoning (task's own explicit
+		// domain boundary) -- a customer's stored preferences/active goal
+		// only ever fill gaps the CURRENT conversation hasn't already stated
+		// (merge order: journey defaults first, conversation's own
+		// accumulated context second, so an explicit signal always wins).
+		// Optional dependency: AI must keep working with zero journey data,
+		// exactly as it did before this plugin existed.
+		$context = $conversation['aiContext'];
+		if ( class_exists( \BeauClick\Journey\Context\JourneyContextProvider::class ) ) {
+			$context = array_merge( ( new \BeauClick\Journey\Context\JourneyContextProvider() )->infer_ai_defaults( $user_id ), $context );
+		}
+
+		$response = $this->providerFactory->make()->chat( $history, $context );
 
 		$valid_recommendations = $this->validate_recommendations( $response->recommendations );
 		$merged_context        = array_merge( $conversation['aiContext'], $response->contextUpdates );

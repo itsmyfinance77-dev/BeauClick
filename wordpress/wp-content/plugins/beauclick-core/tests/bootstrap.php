@@ -53,6 +53,7 @@ function _beauclick_manually_load_plugins(): void {
 		\BeauClick\AI\Plugin::class,
 		\BeauClick\Reviews\Plugin::class,
 		\BeauClick\Loyalty\Plugin::class,
+		\BeauClick\Journey\Plugin::class,
 	];
 
 	foreach ( $activation_order as $plugin_class ) {

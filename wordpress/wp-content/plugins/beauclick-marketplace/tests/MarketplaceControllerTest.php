@@ -96,4 +96,13 @@ final class MarketplaceControllerTest extends WP_UnitTestCase {
 		$this->assertContains( 'امتیاز بالا', $row['rankingReasons'] );
 		$this->assertCount( 2, $row['rankingReasons'], 'An unrecognized/unknown signal key must never be surfaced raw to the user -- only known, truthful labels are shown.' );
 	}
+
+	public function test_specialties_endpoint_returns_real_taxonomy_terms(): void {
+		$term = wp_insert_term( 'میکاپ تست', 'bc_specialty' );
+
+		$response = ( new MarketplaceController() )->specialties();
+		$names    = array_column( $response->get_data()['data'], 'name' );
+
+		$this->assertContains( 'میکاپ تست', $names );
+	}
 }

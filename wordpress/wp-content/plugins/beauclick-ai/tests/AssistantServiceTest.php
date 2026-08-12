@@ -318,6 +318,77 @@ final class AssistantServiceTest extends WP_UnitTestCase {
 	}
 
 	/**
+	 * V2.0 Step 4: Beauty Journey provides context, AI remains solely
+	 * responsible for recommendation reasoning -- verified here by
+	 * inspecting the actual $context a provider receives, not by re-testing
+	 * RuleBasedProvider's own matching logic (already covered elsewhere).
+	 */
+	public function test_a_stored_beauty_profile_preference_reaches_the_provider_as_default_context(): void {
+		if ( ! class_exists( \BeauClick\Journey\Profile\BeautyProfileService::class ) ) {
+			$this->markTestSkipped( 'beauclick-journey not active.' );
+		}
+
+		$user_id = self::factory()->user->create();
+		( new \BeauClick\Journey\Profile\BeautyProfileService() )->update( $user_id, [ 'preferredCityId' => 37, 'budgetMax' => 2000000 ] );
+
+		$provider = new class implements \BeauClick\AI\ProviderInterface {
+			public array $captured = [];
+			public function chat( array $history, array $context ): \BeauClick\AI\AssistantResponse {
+				$this->captured = $context;
+				return new \BeauClick\AI\AssistantResponse( 'باشه' );
+			}
+		};
+		$factory = $this->createMock( \BeauClick\AI\ProviderFactory::class );
+		$factory->method( 'make' )->willReturn( $provider );
+
+		( new AssistantService( $factory ) )->send( $user_id, 'سلام' );
+
+		$this->assertSame( 37, $provider->captured['cityId'] ?? null );
+		$this->assertSame( 2000000, $provider->captured['budget'] ?? null );
+	}
+
+	/**
+	 * A conversation's OWN explicit signal (already extracted into
+	 * ai_context from a previous turn) must win over the journey's general
+	 * default -- the merge order is journey-defaults-first, conversation-
+	 * context-second.
+	 */
+	public function test_an_explicit_conversation_signal_overrides_the_journey_default(): void {
+		if ( ! class_exists( \BeauClick\Journey\Profile\BeautyProfileService::class ) ) {
+			$this->markTestSkipped( 'beauclick-journey not active.' );
+		}
+
+		$user_id = self::factory()->user->create();
+		( new \BeauClick\Journey\Profile\BeautyProfileService() )->update( $user_id, [ 'preferredCityId' => 37 ] );
+
+		// Seed the conversation's own ai_context with a conflicting city --
+		// simulating a prior turn that already stated a different city.
+		global $wpdb;
+		$service      = new AssistantService();
+		$conversation = $service->get_or_create_conversation( $user_id );
+		$wpdb->update(
+			$wpdb->prefix . 'bc_ai_conversations',
+			[ 'ai_context' => wp_json_encode( [ 'cityId' => 10 ] ) ],
+			[ 'id' => $conversation['id'] ]
+		);
+
+		$captured_context = [];
+		$provider = new class( $captured_context ) implements \BeauClick\AI\ProviderInterface {
+			public array $captured = [];
+			public function chat( array $history, array $context ): \BeauClick\AI\AssistantResponse {
+				$this->captured = $context;
+				return new \BeauClick\AI\AssistantResponse( 'باشه' );
+			}
+		};
+		$factory = $this->createMock( \BeauClick\AI\ProviderFactory::class );
+		$factory->method( 'make' )->willReturn( $provider );
+
+		( new AssistantService( $factory ) )->send( $user_id, 'سلام دوباره' );
+
+		$this->assertSame( 10, $provider->captured['cityId'], "The conversation's own already-stated city must win over the journey profile's general default." );
+	}
+
+	/**
 	 * Two distinct recommendations in the same reply must each get their
 	 * own event id -- clicking one must never be attributable to the other.
 	 */

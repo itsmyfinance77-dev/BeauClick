@@ -14,7 +14,8 @@ namespace BeauClick\Core\Support;
  * response_time_seconds, message_sent, review_submitted,
  * ai_recommendation_shown, ai_recommendation_clicked, b2b_account_applied,
  * b2b_account_{status}, b2b_quote_requested, b2b_quote_accepted,
- * booking_confirm_after_expiry_conflict, order_completed, order_refunded.
+ * booking_confirm_after_expiry_conflict, order_completed, order_refunded,
+ * goal_created (V2.0 Step 4, entity_type='goal', actor_id=the customer).
  *
  * A production-readiness pass found booking_created/_confirmed/_cancelled/
  * _completed, review_submitted, message_sent, and the AI/B2B events already

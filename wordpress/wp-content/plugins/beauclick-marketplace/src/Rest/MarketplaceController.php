@@ -38,6 +38,30 @@ final class MarketplaceController extends RestController {
 				],
 			]
 		);
+
+		// V2.0 Step 4: Beauty Journey's goal/profile forms need a real
+		// specialty picker (so a goal's specialtyId can genuinely feed AI
+		// context -- see beauclick-journey\Context\JourneyContextProvider).
+		// bc_specialty is show_in_rest=true, but that exposes it under
+		// wp/v2, a different envelope shape (no {data,meta,error}) the
+		// frontend's api.ts wrapper doesn't parse -- same read-only,
+		// public, reference-data pattern as LocationsController's own
+		// get_provinces(), just in the beauclick/v1 namespace this app
+		// shell already speaks.
+		$this->route( '/marketplace/specialties', [ 'methods' => 'GET', 'callback' => [ $this, 'specialties' ], 'permission_callback' => '__return_true' ] );
+	}
+
+	public function specialties(): \WP_REST_Response {
+		$terms = get_terms( [ 'taxonomy' => Registrar::SPECIALTY, 'hide_empty' => false ] );
+		if ( is_wp_error( $terms ) ) {
+			return Response::ok( [] );
+		}
+		return Response::ok(
+			array_map(
+				static fn ( \WP_Term $t ) => [ 'id' => $t->term_id, 'name' => $t->name ],
+				$terms
+			)
+		);
 	}
 
 	public function browse( WP_REST_Request $request ) {
