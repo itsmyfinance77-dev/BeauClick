@@ -61,7 +61,7 @@ $is_approved = $account && 'approved' === $account['approval_status'];
 	<div class="bc-container bc-section">
 		<div class="bc-empty-state">
 			<p class="bc-empty-state__title"><?php esc_html_e( 'برای درخواست همکاری تجاری ابتدا وارد حساب کاربری خود شوید.', 'beauclick' ); ?></p>
-			<a href="<?php echo esc_url( wp_login_url( get_permalink() ) ); ?>" class="bc-btn bc-btn--primary"><?php esc_html_e( 'ورود', 'beauclick' ); ?></a>
+			<a href="<?php echo esc_url( home_url( '/auth/' ) ); ?>" class="bc-btn bc-btn--primary"><?php esc_html_e( 'ورود', 'beauclick' ); ?></a>
 		</div>
 	</div>
 

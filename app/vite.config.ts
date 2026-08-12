@@ -27,6 +27,7 @@ export default defineConfig( {
 				chat: path.resolve( __dirname, 'src/mounts/chat.tsx' ),
 				'dashboard-professional': path.resolve( __dirname, 'src/mounts/dashboard-professional.tsx' ),
 				'dashboard-customer': path.resolve( __dirname, 'src/mounts/dashboard-customer.tsx' ),
+				auth: path.resolve( __dirname, 'src/mounts/auth.tsx' ),
 			},
 		},
 	},

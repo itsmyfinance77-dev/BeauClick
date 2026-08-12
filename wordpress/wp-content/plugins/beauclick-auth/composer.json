@@ -1,0 +1,14 @@
+{
+    "name": "beauclick/auth",
+    "description": "BeauClick Authentication -- phone/OTP sign-in and registration, provider-agnostic SMS abstraction.",
+    "type": "wordpress-plugin",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "BeauClick\\Auth\\": "src/"
+        }
+    }
+}

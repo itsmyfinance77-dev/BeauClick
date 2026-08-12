@@ -41,7 +41,7 @@ declare( strict_types=1 );
 					<?php echo esc_html( mb_substr( wp_get_current_user()->display_name ?: 'B', 0, 1 ) ); ?>
 				</a>
 			<?php else : ?>
-				<a href="<?php echo esc_url( wp_login_url() ); ?>" class="bc-icon-chip" aria-label="<?php esc_attr_e( 'ورود', 'beauclick' ); ?>">↪</a>
+				<a href="<?php echo esc_url( home_url( '/auth/' ) ); ?>" class="bc-icon-chip" aria-label="<?php esc_attr_e( 'ورود', 'beauclick' ); ?>">↪</a>
 			<?php endif; ?>
 		</div>
 	</div>

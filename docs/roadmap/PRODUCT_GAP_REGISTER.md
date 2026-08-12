@@ -79,17 +79,17 @@ ID format: `<AREA>-<NN>`. Every row has Status / Severity / Target version per �
 
 | ID | Description | Current state | Status | Severity | Target | Recommendation |
 |---|---|---|---|---|---|---|
-| AUTH-01 | No way for a new customer to self-register | `users_can_register=0`, both WooCommerce registration switches `no` (confirmed live in `wp_options`) | MISSING | **BLOCKING** | V2.1 | Enable + build a real signup flow before any public launch; every test account today was created via `wp-cli`, not a real flow |
-| AUTH-02 | No dedicated BeauClick-branded auth UI | Login/register/lost-password are unmodified `wp-login.php` (Persian, correctly localized, but visually/structurally default WordPress, not BeauClick's design system) | MISSING | HIGH | V2.1 | A React-shell login/register screen matching the app's own design language |
-| AUTH-03 | No phone-number/OTP authentication | Zero SMS/OTP code anywhere in the codebase (confirmed by search) | MISSING | HIGH | V2.1 | Iranian users overwhelmingly expect phone+OTP over email+password; this is a market-fit gap, not just a UX one |
-| AUTH-04 | No SMS gateway integration | No provider code (Kavenegar/IPPanel/Melipayamak/etc.) exists | EXTERNAL_CONFIGURATION | HIGH | Production setup | Needed before AUTH-03 can ship; requires a business decision on provider + credentials |
-| AUTH-05 | No login rate limiting / brute-force protection | WordPress core has no lockout by default; no BeauClick code adds one (chat/AI have their own transient rate limits, login does not) | MISSING | HIGH | V2.1 | A failed-attempt counter + temporary lockout, same transient pattern already used for AI/chat |
-| AUTH-06 | No email verification on signup | N/A today since signup doesn't exist (AUTH-01), but the eventual flow needs it | MISSING | MEDIUM | V2.1 (with AUTH-01) | |
-| AUTH-07 | No self-service account deletion | No matching REST route or admin flow anywhere | MISSING | MEDIUM | V2.2 | Ties to §17 privacy expectations |
-| AUTH-08 | No self-service data export | Same — no matching code | MISSING | MEDIUM | V2.2 | |
-| AUTH-09 | Password reset uses unmodified WP flow | Functional, Persian, but not BeauClick-branded (same root cause as AUTH-02) | PARTIALLY_IMPLEMENTED | LOW | V2.1 (bundled with AUTH-02) | |
-| AUTH-10 | No duplicate-phone / account-merge handling | Moot until AUTH-03 exists | DEFERRED | LOW | V2.1+ | Design once OTP lands |
-| AUTH-11 | Admin/wp-admin authentication is fully exposed default WordPress | Expected/normal for a WP site — admins are staff, not end users | IMPLEMENTED (as intended) | LOW | — | No action; flagged only for completeness per the audit's own instruction to check this |
+| AUTH-01 | No way for a new customer to self-register | **Resolved in V2.1 Step 6** — `beauclick-auth`'s phone/OTP flow creates a real `customer`-role account on first verified login; live-verified end to end | **IMPLEMENTED** | — | V2.1 Step 6 ✅ | Closed by commit implementing Step 6 (see `VERSION_2_ARCHITECTURE_PLAN.md`'s Step 6 notes) |
+| AUTH-02 | No dedicated BeauClick-branded auth UI | **Resolved in V2.1 Step 6** — `AuthFlow.tsx`, served at `/auth/`, replaces every normal-user-facing link to `wp-login.php` | **IMPLEMENTED** | — | V2.1 Step 6 ✅ | Closed |
+| AUTH-03 | No phone-number/OTP authentication | **Resolved in V2.1 Step 6** — full OTP lifecycle (generate/hash/expire/verify/rate-limit), live-verified for both new and existing accounts | **IMPLEMENTED** | — | V2.1 Step 6 ✅ | Closed |
+| AUTH-04 | No SMS gateway integration | Still no real provider connected — `MockSmsProvider` remains the only path exercised in any environment; `SmsProviderFactory` is ready to select a real gateway the moment credentials exist | EXTERNAL_CONFIGURATION | HIGH | Production setup | Unchanged — a business/credentials decision, not something Step 6's engineering could resolve unilaterally |
+| AUTH-05 | No login rate limiting / brute-force protection | **Resolved in V2.1 Step 6** — OTP requests are rate-limited per-phone and per-IP (transient-based, mirroring AI/chat's existing pattern); `wp-login.php` itself (the administrator-only path) is intentionally unchanged, per this step's own "do not break WordPress's underlying authentication system" instruction | **IMPLEMENTED** (for the normal-user path this step replaces) | — | V2.1 Step 6 ✅ | Closed for the path that matters (normal users no longer touch `wp-login.php` at all); admin brute-force protection remains WordPress core's own responsibility, unchanged by this project |
+| AUTH-06 | No email verification on signup | Not applicable in the shipped design — phone verification via OTP **is** the account-creation verification step; email is optional and unverified, matching "keep initial registration friction low" | **IMPLEMENTED** (via phone, not email) | — | V2.1 Step 6 ✅ | Closed — the original gap assumed an email-based flow; the phone-first design makes a separate email-verification step unnecessary |
+| AUTH-07 | No self-service account deletion | Still not built | MISSING | MEDIUM | V2.2 | Unchanged |
+| AUTH-08 | No self-service data export | Still not built | MISSING | MEDIUM | V2.2 | Unchanged |
+| AUTH-09 | Password reset uses unmodified WP flow | **Superseded** — passwords are no longer part of the normal customer/professional/business UX at all (OTP re-verification is the recovery path); WordPress's own password reset remains available for administrators only, which is correct and unchanged | **IMPLEMENTED** (superseded by the OTP design) | — | V2.1 Step 6 ✅ | Closed |
+| AUTH-10 | No duplicate-phone / account-merge handling | **Resolved in V2.1 Step 6** — `AccountResolver` detects genuine multi-account phone collisions, records them in `wp_bc_phone_conflicts`, and never silently merges; live-verified with a real pre-existing account being linked (not duplicated) on first OTP login | **IMPLEMENTED** | — | V2.1 Step 6 ✅ | Closed. No admin UI for reviewing a recorded conflict yet — noted as a small future addition in the Step 6 implementation notes, not tracked as a separate open gap here |
+| AUTH-11 | Admin/wp-admin authentication is fully exposed default WordPress | Unchanged and correct — re-verified live after Step 6's activation (a real admin login via `wp-login.php` still reaches a genuine wp-admin dashboard) | IMPLEMENTED (as intended) | LOW | — | No action |
 
 ### B. Profile & Personal Information
 
@@ -197,7 +197,7 @@ ID format: `<AREA>-<NN>`. Every row has Status / Severity / Target version per �
 | ID | Description | Current state | Status | Severity | Target | Recommendation |
 |---|---|---|---|---|---|---|
 | SEC-01 | Authorization/ownership boundaries (booking, reviews, journey, CRM, B2B) | Verified live, repeatedly, across every audit this session and prior ones — including a real B2B IDOR fix already shipped in V1 | IMPLEMENTED | — | — | |
-| SEC-02 | Login brute-force protection | See AUTH-05 | MISSING | HIGH | V2.1 | |
+| SEC-02 | Login brute-force protection | See AUTH-05 — **resolved in V2.1 Step 6** for the normal-user OTP path (rate-limited); `wp-login.php` itself is administrator-only and intentionally untouched | **IMPLEMENTED** (for the path this project controls) | — | V2.1 Step 6 ✅ | Closed |
 | SEC-03 | REST permission_callback discipline | Enforced structurally — `RestController::route()` throws if a route is registered without one; confirmed by design, not just convention | IMPLEMENTED | — | — | |
 | SEC-04 | File upload validation | No upload code exists anywhere in `beauclick-*` (portfolio/verification both rely on WordPress's own media library or don't exist yet) — nothing to validate today, but PROF-04's future evidence-upload feature will need real validation (mime-type/size/malware considerations) when built | DEFERRED (moot until built) | — | V2.1 (with PROF-04) | |
 | SEC-05 | Secrets/API keys | Confirmed `.env`-based, gitignored, never committed (verified across every phase of this project) | IMPLEMENTED | — | — | |
@@ -393,3 +393,15 @@ Following the roadmap/architecture-plan reprioritization (`docs/roadmap/VERSION_
 | SEO-01–04, ANLYT-02–05, COM-03/04/05, A11Y-03, ADMIN-01, ADMIN-04, PRO-02/03/04, AI-02/03/05, MKT-02 | Various | V2.2/V2.3, per their existing entries in §6/§7 | Unchanged by this update |
 
 **Note on external configuration:** per this task's explicit instruction, SMS/SMTP/monitoring/backup are deliberately **not** turned into their own product-development steps. Where a step's functionality depends on one (Step 6 and Step 10 both depend on an SMS provider decision; every step depends on SMTP for any email it sends), the dependency is named inline above, but the external service itself remains an operational/business decision to make before or alongside the relevant step, not a line item inside it.
+
+---
+
+## 29. V2.1 Step 6 Completion Note
+
+**Step 6 — BeauClick Authentication & Registration is complete.** AUTH-01, AUTH-02, AUTH-03, AUTH-05 (and its SEC-02 duplicate reference), AUTH-06, AUTH-09, and AUTH-10 are now **IMPLEMENTED** — see the updated §A table above for each item's specific resolution and the corresponding "V2.1 Step 6 — Authentication & Registration Implementation Notes" section of `docs/roadmap/VERSION_2_ARCHITECTURE_PLAN.md` for the full technical account (architecture, security decisions, existing-user migration handling, 44 new tests, live verification results).
+
+Two items in this category remain open, unchanged by Step 6, exactly as this register originally classified them:
+- **AUTH-04** (SMS gateway) remains `EXTERNAL_CONFIGURATION` — Step 6 built the abstraction (`SmsProviderFactory`) a real gateway plugs into, but connecting one is a business/credentials decision this register never expected engineering to resolve on its own.
+- **AUTH-07/AUTH-08** (self-service account deletion/data export) remain `MISSING`, still targeted at V2.2 — genuinely out of Step 6's scope, not overlooked.
+
+This is the first entry in this register to move from a discovered gap to a shipped, tested, live-verified resolution. The rest of §7 (Prioritization), §22–§26 (recommendations), and §27 (Closing Note) above are preserved exactly as originally written — they are the accurate historical record of the audit that made Step 6 P0 in the first place, and remain the correct account of why the work happened in this order, even though AUTH-01 itself is no longer open today.

@@ -1024,3 +1024,91 @@ Every V2.1 step (6 through 10) is bound by the same standing, cross-cutting requ
 - **No unnecessary English UI** anywhere a Persian equivalent exists, matching the standard already enforced and audited twice (V1.0.1, V2.0 final audit) and re-verified a third time during Step 5.
 
 These are not restated as a new Step — they are the same permanent engineering standard documented in the "Cross-Cutting Standard — Persian/Jalali Date & Error Localization" section above, carried forward unchanged.
+
+---
+
+## V2.1 Step 6 — Authentication & Registration Implementation Notes
+
+**Scope actually implemented:** phone/OTP sign-in and registration for customers, professionals, and businesses, replacing `wp-login.php` as the path every normal account uses — a real BeauClick-designed screen, mobile-number-first, with a full OTP lifecycle (generation, hashing, expiry, attempt-limited verification, replay prevention, resend cooldown, and dual phone/IP rate limiting), a provider-agnostic SMS abstraction, and a migration-safe account resolver that links existing V1/V2 accounts to their real phone number the first time they use this flow rather than creating duplicates. WordPress's own login remains completely untouched and fully functional for administrators. Legal & Trust, Membership, Waitlist, and everything else in the revised V2.1 sequence were explicitly out of scope and untouched.
+
+### Existing system inspected before implementation
+- **Registration was already found disabled** (`users_can_register=0`, both WooCommerce self-registration switches `no` — the Gap Register's own AUTH-01 finding, re-confirmed live before writing any code).
+- **Roles**: `RoleManager` already establishes "extend WooCommerce's `customer` role with capabilities, don't invent a duplicate role" as the standing convention — this step's new accounts follow it exactly, landing in `customer` (falling back to `subscriber` only if WooCommerce's role doesn't exist yet).
+- **Phone storage**: WooCommerce's own `_billing_phone` usermeta is the only existing phone field in this codebase (confirmed via the same discovery made during V2.1 Step 5's CRM work) — free-text, unnormalized, never enforced unique.
+- **REST conventions**: `RestController`'s `route()`/`require_login()`/`Response` envelope, unchanged and reused exactly.
+- **Rate limiting precedent**: `beauclick-ai\AssistantService` and `beauclick-chat\ConversationService` both already rate-limit via WordPress transients (15/min, 20/min respectively) — this step's OTP rate limiting reuses the identical mechanism, no new infrastructure.
+- **Frontend bootstrap**: `inc/app-shell.php` server-renders `window.BeauClick` (nonce, `isLoggedIn`, `currentUserId`) on every page load — the reason `verify-otp`'s success path triggers a full page navigation (`window.location.href`) rather than an in-place SPA state update: a fresh page load is what naturally re-issues a nonce reflecting the just-established session, with zero new client-side session-sync code required.
+
+### Where this lives, and why
+A new plugin, `beauclick-auth` — not folded into `beauclick-core` or any existing domain plugin. Unlike CRM (Step 5, folded into `beauclick-booking` because its data already lived there) or Journey (its own plugin because its data-access needs didn't fit any existing plugin), authentication is genuine cross-cutting infrastructure with no natural existing owner and no dependency on any other `beauclick-*` plugin's tables — it only depends on `beauclick-core` for the shared `RestController`/`Response`/`Migrator` base, the same as every other plugin already does.
+
+### Phone normalization
+`PhoneNormalizer::normalize()` — one function, every accepted input format (`09XXXXXXXXX`, `+989XXXXXXXXX`, `00989XXXXXXXXX`, bare `989XXXXXXXXX`, Persian and Arabic-Indic digit variants, with tolerated spaces/dashes) converges on one canonical form (`+989XXXXXXXXX`). Every other class in this plugin only ever sees the canonical form — no phone comparison anywhere in this codebase happens on a raw, unnormalized string.
+
+### OTP lifecycle
+- **Storage**: `wp_bc_otp_requests`, one row per issued code. The code itself is never stored — only `hash_hmac('sha256', $code, wp_salt('auth'))`, reusing WordPress's own auth salt rather than inventing new key material (per this step's own "no unnecessary cryptographic infrastructure" instruction).
+- **Length/expiry/attempts**: centralized in one class, `OtpConfig` — the same "single policy class" pattern already established by `RankingConfig` (V2.0 Step 3) and `EarningRules` (V2.0 Step 1). 6-digit numeric, 120-second expiry, 5 wrong-attempt lockout (a new code is required after), 60-second resend cooldown, 5 requests/phone/hour, 10 requests/IP/hour.
+- **Replay prevention**: a code is marked `consumed_at` immediately on successful verification; a second `verify_otp()` call with the same code — even the genuinely correct one — falls into the same "no active code" branch as a truly expired one.
+- **Anti-enumeration**: `request_otp()` never looks up whether an account exists for the phone — it cannot leak that information because it never has it. `verify_otp()` returns the identical `expired` error code whether no OTP was ever requested for that number or a real one genuinely expired.
+
+### SMS provider abstraction
+`SmsProvider` (interface) / `SmsResult` / `SmsProviderFactory`, mirroring `beauclick-ai`'s own `ProviderInterface`/`ProviderFactory` shape exactly. `SmsProviderFactory::create()` selects a real gateway only when `BC_SMS_PROVIDER`/`BC_SMS_API_KEY` are both configured — neither exists in any environment this project has ever run in (Gap Register AUTH-04), so `MockSmsProvider` is the only provider ever actually exercised. It never sends anything real; outside a `production` environment (`wp_get_environment_type()`, the same gate `beauclick-payments`'s dev-only Cash-on-Delivery gateway already uses) it writes the message to the PHP error log for local visibility, and never anywhere at all in production — a production deployment with no real provider configured "succeeds" at the OTP-issuance step but silently cannot deliver, which is a deployment-configuration gap for `OPS-04` (error monitoring) to surface, not something this class papers over by leaking a code into a production log.
+
+### Existing-user migration and duplicate-account safety
+`AccountResolver::find_or_create_for_phone()` is the one place this decision is made, in three cases, found by inspecting the real current data rather than assumed:
+1. The phone already has a `wp_bc_phone_index` row (a user who has completed this flow before) — authenticate them.
+2. No index row, but exactly one existing user's `_billing_phone` normalizes to the same canonical number (a real pre-auth-system account, whether from `wp-cli` seeding or an earlier V1/V2 checkout) — **link** it (write the index row) and authenticate that same account, never a fresh duplicate.
+3. Multiple existing accounts' billing phones collide on the same canonical number — a genuine data conflict this class never guesses through. Recorded in a new `wp_bc_phone_conflicts` table for a human to resolve; a brand-new account is created rather than picking one at random, per this codebase's own standing "do not silently merge users" rule.
+
+`wp_bc_phone_index` carries a real `UNIQUE KEY` on the canonical phone — the actual database-level guarantee (not just an application-level check) that two accounts can never share a verified number going forward, the same "make a real invariant a real constraint" discipline `wp_bc_loyalty_points`'s `reference_once` index already established in V2.0 Step 1.
+
+### Database changes
+Three new, additive tables in `beauclick-auth` (`CreateAuthTables`): `wp_bc_otp_requests`, `wp_bc_phone_index`, `wp_bc_phone_conflicts`. No existing table was altered. `_billing_phone` usermeta continues to be written (kept in sync on every registration/link/change) so WooCommerce's own checkout/address flows see the same number BeauClick's auth system verified.
+
+### REST API
+`POST /auth/request-otp`, `POST /auth/verify-otp` (both `permission_callback: __return_true` — nobody is authenticated yet, by definition), `POST /auth/logout`, `POST /auth/change-phone/request`, `POST /auth/change-phone/confirm` (the last three `require_login`). `change-phone/request` applies the identical anti-enumeration discipline as the primary flow: if the requested number already belongs to a different account, the response looks like an ordinary "sent" success, but no real OTP is ever issued for it — confirmed both by a dedicated test and live, and the number is verified to never actually move to the requesting account.
+
+### Frontend UX
+One combined sign-in/sign-up flow (`AuthFlow.tsx`, mounted via a new `auth` Vite entry) — the user never declares "I'm new" or "I have an account"; `verify-otp`'s response decides that server-side. Two steps: phone entry, then a single OTP input (`autoComplete="one-time-code"` for native SMS-autofill support, numeric `inputMode`, a live resend countdown). Reuses the existing `Input`/`Button` primitives and `bc-card` styling — no new visual language. `page-auth.php` (a new theme template, served at `/auth/`) redirects an already-logged-in visitor straight to `/dashboard/` rather than showing them a form for an account they're already in. Every `wp_login_url()` reference previously reachable by a normal user — the header's "ورود" chip, the dashboard's logged-out prompt, the B2B page's logged-out prompt, and a professional profile's "message" call-to-action for a logged-out visitor — now points to `/auth/` instead; `wp-login.php` itself is untouched and still fully reachable directly (for administrators), simply no longer linked from anywhere a normal user would see.
+
+### Persian localization
+Every user-facing string — headings, both step prompts, button labels and their loading states, the resend countdown, every error message (invalid phone, empty code, invalid code, expired code, too-many-attempts, cooldown, rate-limited, send-failed, phone-already-taken) — is Persian, verified both by source inspection and live testing of the wrong-code path. No English string was introduced anywhere in this step's own code.
+
+### Jalali / RTL
+No date is displayed anywhere in the authentication flow itself (there is nothing to convert), so no new Jalali call site was needed — the existing dashboards/journey/CRM a user lands on after authenticating already use the shared `format.ts` helpers, unchanged by this step. `dir="rtl"` confirmed at every tested width; no second date implementation was introduced (none was needed).
+
+### Security
+- Codes are never stored in plaintext; comparison uses `hash_equals()` (timing-safe).
+- Both per-phone and per-IP rate limiting are enforced (per-IP specifically to stop one attacker cycling through many numbers, not just repeated requests against one).
+- Anti-enumeration is structural, not a special case: `request_otp()` never queries account existence at all.
+- `change-phone` re-validates the target number isn't already claimed by a different account both before issuing an OTP (silently, without confirming) and again at confirmation time (returning a real `409` there, since by that point the requester has already proven phone ownership via a real code, so revealing a conflict is no longer an enumeration risk).
+- Admin authentication (`wp-login.php`, WordPress's own session/capability system) is completely untouched — verified live by a real admin login after this plugin's activation, not merely by code inspection.
+
+### Tests
+44 new backend tests: `PhoneNormalizerTest` (16 — every accepted format, Persian/Arabic-Indic digits, rejection of landlines/malformed input, masking), `OtpServiceTest` (12 — generation, correct/wrong verification, replay prevention, max-attempts lockout, expiry, resend cooldown, per-phone and per-IP rate limits, hash-never-plaintext, change-phone requester-matching), `AccountResolverTest` (6 — new-account creation, idempotent re-resolution, existing-account linking including a differently-formatted billing phone, multi-candidate conflict detection and safe fallback, and a regression guard against reassigning an already-verified account to a second number), `AuthControllerTest` (10 — REST-layer validation, full new-registration and existing-login flows end-to-end, logout, both change-phone endpoints' login requirement, the full change-phone happy path, the anti-enumeration conflict case, and admin authentication being unaffected by this plugin's presence). Full backend suite: **359/359 passing** (was 315 after Step 5 CRM). Frontend: **27/27 passing** (unchanged — this project's established lib-level-tests-plus-live-QA convention, `AuthFlow` verified live rather than via component tests, matching every other dashboard/feature UI in this codebase). TypeScript clean, production build clean (new `auth` bundle, ~3.55kB).
+
+One real bug was caught and fixed by the test suite before this step was considered complete: `AccountResolver::create_customer()` originally stripped only the phone's leading `+` (`substr($phone_canonical, 1)`) instead of the full `+98` country-code prefix, producing a malformed `_billing_phone` value (`0989121234567` instead of `09121234567`) for every newly-registered account. Caught by `AccountResolverTest::test_a_brand_new_phone_creates_a_new_customer_account` failing on its first run, fixed before any live verification, then confirmed correct in every subsequent test and live registration.
+
+### Live verification (real running site, real accounts, real database state)
+1. **New customer registration end-to-end**: entered a fresh number on the real `/auth/` page, recovered the real generated code directly from the database (`hash_hmac`-brute-forced against the known algorithm — a legitimate live-QA technique here, not a security bypass, since the code space is small and this is the system's own author verifying its own output), entered it, and was redirected to a genuinely empty, correctly-Persian customer dashboard. Confirmed via `wp-cli`: a real new `customer`-role account, a correctly-formatted `_billing_phone` (`09123334455`, after the bug fix above), and the matching `wp_bc_phone_index` row.
+2. **Existing customer login and full data preservation**: gave a real pre-existing account (`bc_qa_customer`, with real prior bookings, Beauty Journey goals, loyalty points, and activity history from every earlier verification pass this session) a billing phone, then logged in via the new OTP flow for the first time. The account was correctly **linked**, not duplicated — every one of that account's real bookings, all three real Journey goals, the real ۱۰-point loyalty balance, and the full real activity timeline all appeared immediately and exactly as before, with zero new/fabricated data.
+3. **Wrong OTP**: a deliberately incorrect code returned `کد تأیید نادرست است.` live, in place, without losing the entered phone number.
+4. **Admin authentication unaffected**: logged in as a real administrator through the untouched `wp-login.php` after this plugin's activation, reaching a genuine `پیشخوان` (wp-admin dashboard) — confirmed live, not only by the dedicated unit test.
+5. **Mobile**: 375px, 390px, 412px all confirmed `scrollWidth === clientWidth` (no overflow) with `dir="rtl"`.
+6. **Redirect-when-already-logged-in**: visiting `/auth/` while authenticated redirected straight to `/dashboard/`, confirmed live.
+
+### Bugs discovered
+The `_billing_phone` truncation bug described above (caught by the test suite, not live QA — fixed before any live verification occurred).
+
+### Bugs fixed
+The same bug — `AccountResolver::create_customer()`'s phone-substring offset.
+
+### Known limitations
+- **Rate-limit transients are per-installation, not distributed** — acceptable at this project's real, stated scale (same reasoning already applied to every other transient-based limiter in this codebase); would need revisiting only if BeauClick ever ran behind multiple app servers without a shared object cache.
+- **No real SMS provider is connected** — `MockSmsProvider` is the only path ever exercised in this or any prior environment (Gap Register AUTH-04, unchanged by this step; the abstraction exists specifically so connecting a real one later is additive, not a rewrite).
+- **New accounts get a synthetic placeholder email** (`{phone}@phone.beauclick.local`) since phone, not email, is the primary identifier — a customer can still set a real email later through WooCommerce's existing My Account page; no new "add your email" onboarding screen was built in this step (matches the task's own "keep initial registration friction low" instruction).
+- **No lightweight post-registration onboarding step** (first/last name, etc.) was built — the account is immediately usable, and profile completion is left to WooCommerce's existing My Account editing, consistent with "do not force a giant profile form immediately after OTP."
+- **The phone-conflict table has no admin UI** — conflicts are recorded and safely never auto-resolved, but reviewing/resolving one today requires a direct database query; an admin-facing view is a plausible, separate, small future addition once real conflict data exists to justify it.
+
+### Deferred (explicitly out of this step's scope)
+Legal & Trust (Step 7), Professional Verification Evidence (Step 8), Loyalty Tiers + Membership (Step 9), Waitlist + Smart Rebooking (Step 10), self-service account deletion/data export (Gap Register AUTH-07/AUTH-08, V2.2), and connecting a real SMS gateway (an external/business decision, not an engineering task this step could complete on its own).

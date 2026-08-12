@@ -22,7 +22,7 @@ $is_provider = $user->exists() && array_intersect( [ 'bc_professional', 'bc_busi
 	<?php if ( ! $user->exists() ) : ?>
 		<div class="bc-empty-state">
 			<p class="bc-empty-state__title"><?php esc_html_e( 'برای مشاهده داشبورد ابتدا وارد حساب کاربری خود شوید.', 'beauclick' ); ?></p>
-			<a href="<?php echo esc_url( wp_login_url( get_permalink() ) ); ?>" class="bc-btn bc-btn--primary"><?php esc_html_e( 'ورود', 'beauclick' ); ?></a>
+			<a href="<?php echo esc_url( home_url( '/auth/' ) ); ?>" class="bc-btn bc-btn--primary"><?php esc_html_e( 'ورود', 'beauclick' ); ?></a>
 		</div>
 	<?php elseif ( $is_provider ) : ?>
 		<?php bc_enqueue_app_bundle( 'dashboard-professional' ); ?>

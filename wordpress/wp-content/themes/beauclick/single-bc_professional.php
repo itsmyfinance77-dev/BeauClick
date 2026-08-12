@@ -60,7 +60,7 @@ $reviews = class_exists( \BeauClick\Reviews\Reviews\ReviewService::class )
 			<?php if ( is_user_logged_in() && get_current_user_id() !== $owner_id ) : ?>
 				<button type="button" class="bc-btn bc-btn--outline" data-bc-chat-open data-counterpart-id="<?php echo esc_attr( $owner_id ); ?>"><?php esc_html_e( 'پیام', 'beauclick' ); ?></button>
 			<?php elseif ( ! is_user_logged_in() ) : ?>
-				<a href="<?php echo esc_url( wp_login_url( get_permalink() ) ); ?>" class="bc-btn bc-btn--outline"><?php esc_html_e( 'پیام', 'beauclick' ); ?></a>
+				<a href="<?php echo esc_url( home_url( '/auth/' ) ); ?>" class="bc-btn bc-btn--outline"><?php esc_html_e( 'پیام', 'beauclick' ); ?></a>
 			<?php endif; ?>
 		</div>
 	</div>
