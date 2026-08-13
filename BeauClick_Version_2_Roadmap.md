@@ -39,7 +39,7 @@ The net effect: V2.1 ended up completing almost the entire original V2.0–V2.2 
 | 13 | Admin Platform & Operations Maturity | Give operations real cross-cutting tools for the operational load V2.1's five new subsystems now generate. |
 | 14 | Account Privacy & Data Control | Close the gap between what the (now-published) Privacy Policy promises and what the product actually lets a user do. |
 | 15 | Booking Evolution: Rescheduling + Receipts | The one remaining low-risk, well-scoped booking gap, plus a small commerce-completeness item. |
-| 16 | Professional/Business Platform Completion | Multi-staff permissions, CRM polish, and the profile/portfolio sections reserved since V1 but never finished. |
+| 16 | Professional/Business Platform Completion | Multi-staff permissions, CRM polish, the profile/portfolio sections reserved since V1 but never finished, and a role-scoped Professional/Business Analytics Dashboard consuming Step 11's analytics foundation. |
 
 Full detail — dependencies, database/API/UI impact, risk, complexity, definition of done for each step — lives in `VERSION_2_ARCHITECTURE_PLAN.md`'s "V2.2 Strategic Roadmap & Architecture Plan" section.
 
