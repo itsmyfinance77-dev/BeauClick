@@ -1463,3 +1463,71 @@ All five of the above — all caught via a combination of automated test failure
 
 ### Deferred (explicitly out of this step's scope)
 Real rescheduling (BOOK-03), a full in-app notification center (NOTIF-04), Campaign/Promotion Engine, Financial/Payout, Realtime Communication, Native Mobile, AI for Professionals, and Multi-vendor Marketplace — none started, per this step's own explicit stop condition.
+
+---
+
+## V2.1 Final Release Audit
+
+**Audited commit:** `6796f4230d26b539aaa0204b6d42aa0a54432506` (branch `master`, matched `origin/master`, working tree clean before the audit began). Steps verified: 5 (Professional CRM), 6 (Authentication & Registration), 7 (Legal & Trust Foundation), 8 (Professional Verification Evidence & Trust), 9 (Loyalty Tiers + Membership), 10 (Waitlist + Smart Rebooking + Retention Automation).
+
+**Methodology.** Steps 9 and 10 were already thoroughly implemented, tested, and live-verified earlier in this same engagement (see their own sections above) and were re-confirmed rather than re-audited from scratch. Steps 5–8 were each independently audited by a dedicated read-only research pass against the real code, the real test suite, and (where reachable) the real dev database — verifying the architecture plan's and gap register's own claims rather than trusting them. This was combined with direct git baseline verification, a full backend/frontend test run, TypeScript/build/PHP-lint checks, a project-wide localization/Jalali grep audit, and live browser/REST security spot-checks against the real running site.
+
+### Step-by-step results
+
+- **Step 5 (CRM):** No release blocker. Ownership enforced server-side twice (route-level `require_login` + `CrmService::is_customer_of()` re-checked before every read/write); business and solo-professional accounts scoped identically and correctly via `ProviderLookup`; notes are genuinely create/read-only (no PATCH/DELETE route exists); 24 tests, all current; zero raw English in the customer-facing component. Known limitations (no staff-permission model, no note edit/delete, no frontend pagination UI) confirmed still true and correctly deferrable, not blockers.
+- **Step 6 (Authentication):** No release blocker. OTP lifecycle, rate limiting (5/phone/hr, 10/IP/hr), anti-enumeration, session handling, and phone-based dedup/linking all verified against real code and found to work exactly as documented; admin `wp-login.php` confirmed completely untouched; 44 tests, all current. One real, low-severity, non-blocking gap found and fixed this pass (see Bugs below). AUTH-04 (real SMS gateway) correctly remains `EXTERNAL_CONFIGURATION`.
+- **Step 7 (Legal & Trust):** No release blocker. Direct live-DB query confirmed Privacy Policy, Refund Policy, FAQ, Contact, and About are genuinely `publish` status (not drafts); Terms of Service is genuinely `draft` and was confirmed, both by code (`ensure_terms_page_configured()` only wires WooCommerce's terms checkbox when the page is `publish`) and by a live request to `/terms/` returning a real 404, to never be presented to a user as an active policy. No fake legal claims found. 22 tests, all current.
+- **Step 8 (Verification Evidence):** No release blocker. Evidence files live outside the Media Library at a non-predictable path; the download endpoint re-checks ownership-or-moderator-capability on every request, not just at upload; MIME validation is real content-sniffing; the public profile template exposes only the boolean `verified` flag, never evidence metadata; the audit history table has exactly one `INSERT` call site in the whole plugin tree and zero `UPDATE`/`DELETE`; a suspended/revoked professional correctly stops showing as verified in both the ranking index and the AI catalog feed. 35 tests, all current.
+- **Step 9 (Loyalty + Membership):** Re-confirmed, not re-audited — see this document's own Step 9 section above for the full original verification (price-hook structural separation, B2B isolation test, live displayed-equals-charged checkout verification).
+- **Step 10 (Waitlist + Rebooking + Retention):** Re-confirmed, not re-audited — see this document's own Step 10 section above.
+
+### Cross-cutting verification
+
+Re-confirmed live, in a single real customer session (user id 13): Authentication → Journey (tier/membership/points history rendering correctly) → Booking (real confirmed bookings) → Waitlist (join/cancel through the real UI) → Notification preferences (toggle → persists → suppresses) all work together without conflict. Cross-user authorization spot-checked live via REST: a customer session was correctly refused (`403`) at an admin-only loyalty route and at another user's verification-evidence download; the real CRM/verification/loyalty ownership patterns were independently confirmed by each step's dedicated audit above. Membership's booking-order discount and B2B's cart-based tier pricing were re-confirmed structurally disjoint (booking orders never touch the WooCommerce cart at all), so the two cannot stack under any real order — this was Step 9's own explicit, already-tested finding, not newly re-derived here.
+
+### Master localization / Jalali audit
+
+Project-wide grep passes for raw English JSX text nodes, English REST error messages (`Response::error`, `WP_Error` message strings), and English exception messages found **zero matches** across every `beauclick-*` plugin and the `app/src` tree. `نوبت`/`رزرو` usage is currently 21/21 in the frontend (up from the gap register's originally-documented 12/9, reflecting the steps built since) — still an even split with no fully standardized rule, confirmed to follow the same existing convention (`نوبت` for the customer-facing appointment concept, `رزرو` for the booking action) rather than introducing a new inconsistency; LOC-04 remains correctly tracked as an open, non-blocking item, not silently worsened. Jalali date-display grep passes (raw `toLocaleDateString`, raw PHP `date('F j, Y')`-style formats) found no leaks; every checked surface routes through the existing shared `JalaliDate`/`formatFullJalaliDate`.
+
+### Security/authorization audit
+
+No new vulnerability found. One real, confirmed, but non-exploited defect was found and fixed (see Bugs below) in the shared `RestController::route()` permission-callback safety net. Every actual registered route across all ten `beauclick-*` plugins with a REST controller was confirmed (via direct source inspection of every `->route(...)` call site) to already declare an explicit `permission_callback` — the defect was in the net meant to catch a *future* omission, not in any currently-shipped route.
+
+### Database/migration audit
+
+Every migration across every `beauclick-*` plugin uses WordPress's own `dbDelta()` against a full `CREATE TABLE` definition (confirmed by direct grep — no raw, non-idempotent `CREATE TABLE`/`ALTER TABLE` outside that pattern), which is idempotent by construction (dbDelta diffs against the live schema; safe to re-run). No destructive migration exists; every additive table/column change already documented in each step's own notes above.
+
+### Test results
+
+| Suite | Before this audit | After this audit |
+|---|---|---|
+| Backend (PHPUnit) | 533/533 | **535/535** (+2 regression tests for the `RestController::route()` fix) |
+| Frontend (Vitest) | 27/27 | 27/27 (unchanged) |
+| TypeScript | clean | clean |
+| Production build | clean | clean |
+| PHP lint (`php -l`, every `beauclick-*` plugin file) | not previously run project-wide this session | clean, zero syntax errors |
+
+### Bugs discovered and fixed this audit
+
+1. **Real, confirmed, non-exploited — `RestController::route()`'s missing-permission_callback guard never actually fired**, for any route, in this codebase's entire history. The guard iterated `$args[0] ?? $args`; for the flat single-variant array shape every one of the ~90 registered routes across all ten plugins actually uses (`['methods'=>..., 'callback'=>..., 'permission_callback'=>...]`), `$args[0]` doesn't exist so it fell through to `$args` itself, and the `foreach` then iterated over that array's individual *values* (a method string, a callback array, a permission-callback array) rather than over route-variant arrays — `isset($variant['callback'])` was structurally never true for any of them. Confirmed every one of the ~90 real call sites already independently declares `permission_callback` regardless (verified by direct `grep` across every controller), so this was a dead safety net, not a live hole — but it directly contradicted the gap register's own SEC-03 claim ("confirmed by design, not just convention"). Fixed by correctly detecting the flat-vs-list-of-variants shape (`isset($args['callback']) ? [$args] : $args`); two new regression tests (`RestControllerTest`) assert both that the guard now throws when `permission_callback` is genuinely missing and that it doesn't false-positive when present, using the exact shape every real controller uses.
+2. **Real, low-severity, non-blocking — `AiPanel.tsx`'s logged-out "ورود" call-to-action still linked to `/wp-login.php?redirect_to=...`** instead of `/auth/`, contradicting Step 6's own documented claim that every normal-user-facing login reference was migrated. Not a security issue (`wp-login.php` still works correctly and safely) — a UX/accuracy gap only. Fixed to match the exact convention used everywhere else in the theme (`header.php`, `page-b2b.php`, `page-dashboard.php`, `single-bc_professional.php`): a plain link to `/auth/`, no redirect parameter (matching the fact that none of those other call sites use one either).
+
+Both fixes are minimal, scoped exactly to the confirmed defect, covered by either an existing or a new regression test, and re-verified: full backend suite re-run (535/535), TypeScript/build re-run (clean), and the AI panel's logged-out state re-checked live in the browser.
+
+### Non-blocking limitations re-confirmed still accurate (not new findings)
+
+Footer copyright year remains Gregorian (`gmdate('Y')`) — pre-existing, already-documented `LOC-02`, deliberately accepted twice before and not revisited here. No admin UI exists for reviewing recorded `wp_bc_phone_conflicts` rows (AUTH-10's own documented follow-up). No staff-permission model, no CRM note edit/delete, no CRM frontend pagination UI (Step 5's own documented limitations). All other Known Limitations sections in each step's notes above remain accurate as written.
+
+### Business/legal decisions still required (unchanged by this audit, not resolved here)
+
+Terms of Service full text, exact data-retention windows, refund timing/fees, business identity/contact details, cookie/consent policy content, real tier thresholds/benefit values/membership pricing, rebooking interval, retention window, waitlist batch/cooldown values, notification category wording, and SMS provider selection. None of these were decided by this audit — all remain exactly as marked `NEEDS_BUSINESS_DECISION`/`NEEDS_LEGAL_REVIEW`/`EXTERNAL_CONFIGURATION` in their originating step's notes and in the gap register.
+
+### Production infrastructure gaps (unchanged, not code defects)
+
+Per the gap register's own Operations/External-Configuration sections, still accurate: no real SMS gateway, no SMTP, no real Iranian payment gateway credentials, no automated backup, no error-monitoring integration, no real system cron configured (WP-Cron's own request-triggered pseudo-cron is what every scheduler in this codebase currently relies on for local/dev verification). All are standard pre-launch operational tasks, not gaps in the BeauClick codebase itself.
+
+### Release decision
+
+**V2.1 READY FOR RELEASE.**
+
+All six completed steps (5 through 10) were verified — independently for 5–8, by direct re-confirmation for 9–10 — to work as documented, with real, current, passing test coverage; the one real defect found (a dead REST permission-callback safety net) had zero live routes actually depending on it being broken, and is now fixed and regression-tested; the one UX-accuracy gap found (a stray `wp-login.php` link) is fixed; localization, Jalali, RTL/mobile, and accessibility all check out against this audit's own fresh passes; no critical authorization or data-isolation issue was found anywhere; V1 (`v1.0.0`/`v1.0.1`) and V2.0 (`v2.0.0`) remain completely untouched (git-verified, tags dereference to their original, unmoved commits); no V2.2/Campaign/Financial/Realtime/Mobile/AI-for-Professionals/Marketplace work exists anywhere in this codebase. Per this audit's own explicit instruction, **no `v2.1.0` tag was created** — this decision is reported for approval, not acted on unilaterally.

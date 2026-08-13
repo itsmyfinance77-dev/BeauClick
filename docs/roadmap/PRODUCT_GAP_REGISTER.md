@@ -198,7 +198,7 @@ ID format: `<AREA>-<NN>`. Every row has Status / Severity / Target version per �
 |---|---|---|---|---|---|---|
 | SEC-01 | Authorization/ownership boundaries (booking, reviews, journey, CRM, B2B) | Verified live, repeatedly, across every audit this session and prior ones — including a real B2B IDOR fix already shipped in V1 | IMPLEMENTED | — | — | |
 | SEC-02 | Login brute-force protection | See AUTH-05 — **resolved in V2.1 Step 6** for the normal-user OTP path (rate-limited); `wp-login.php` itself is administrator-only and intentionally untouched | **IMPLEMENTED** (for the path this project controls) | — | V2.1 Step 6 ✅ | Closed |
-| SEC-03 | REST permission_callback discipline | Enforced structurally — `RestController::route()` throws if a route is registered without one; confirmed by design, not just convention | IMPLEMENTED | — | — | |
+| SEC-03 | REST permission_callback discipline | **Amended by the V2.1 Final Release Audit** — the guard's actual logic never fired for the flat-array route shape every one of the ~90 real routes uses (a real, confirmed bug), so the "throws if missing" claim was previously inaccurate; every real route already declared `permission_callback` independently regardless (verified by direct inspection of every call site), so this was a dead safety net, not a live hole. Fixed, with 2 new regression tests, during the audit — the guard now genuinely works for the shape this codebase actually uses | **IMPLEMENTED** (now genuinely, not just by claim) | — | V2.1 Final Audit ✅ | Closed by the audit's own fix commit |
 | SEC-04 | File upload validation | **Resolved in V2.1 Step 8** — `EvidenceStorage::store()` validates real, content-sniffed MIME type (`finfo`, never the client-supplied type or extension) against an explicit whitelist, enforces an 8MB size cap, uses `is_uploaded_file()`/`move_uploaded_file()`, and stores under a cryptographically randomized filename in a directory never linked from any public/predictable URL | **IMPLEMENTED** | — | V2.1 Step 8 ✅ | Closed by commit implementing Step 8 |
 | SEC-05 | Secrets/API keys | Confirmed `.env`-based, gitignored, never committed (verified across every phase of this project) | IMPLEMENTED | — | — | |
 | SEC-06 | Leftover default WordPress content | A "Sample Page" (default WP install content) is still `publish`-ed and live | MISSING (cleanup) | LOW | V2.1 | Trivial to remove; flagged because a stray default page on a production commerce site looks unfinished |
@@ -492,3 +492,19 @@ The rest of §7 (Prioritization), §22–§27 (recommendations, closing note), a
 **Deliberately deferred, per the task's own scoping instructions:** a full in-app notification bell/center (only the reusable backend history was built — NOTIF-04 stays open); real rescheduling (BOOK-03 — no shared-infrastructure need with Waitlist was found, so it was not pulled forward); Campaign Engine, Financial/Payout, Realtime Communication, Native Mobile, AI-for-Professionals, and Multi-vendor Marketplace — none started, matching the explicit stop condition for this step.
 
 The rest of §7 (Prioritization), §22–§27 (recommendations, closing note), and §29–§32 (Step 6/7/8/9 completion) above remain the accurate historical record and are preserved exactly as written.
+
+---
+
+## 34. V2.1 Final Release Audit Note
+
+A complete release-candidate audit of all six V2.1 steps (5–10) was performed at commit `6796f4230d26b539aaa0204b6d42aa0a54432506`, ahead of a planned `v2.1.0` tag. Full detail lives in `VERSION_2_ARCHITECTURE_PLAN.md`'s "V2.1 Final Release Audit" section; this note records only what materially changed in this register as a result:
+
+| Item | Change |
+|---|---|
+| SEC-03 | **Amended, not newly broken** — see the updated §6 row above. The audit found `RestController::route()`'s permission-callback guard never actually fired for the route shape every real controller uses; every real route already had `permission_callback` regardless, so this was a dead safety net, not a live gap. Fixed and regression-tested during the audit. |
+| Steps 5, 6, 7, 8 | Independently re-audited (not just re-read) against real code/tests/live data. **No release blocker found in any of the four.** One real, low-severity, non-blocking gap was found in Step 6 (AI panel's logged-out CTA still linked to `wp-login.php` instead of `/auth/`) and fixed same-pass. |
+| Test suite | 533/533 → **535/535** (2 new regression tests for the SEC-03 fix). Frontend 27/27, TypeScript, and build all remained clean. |
+
+**No other item in this register changed status as a result of this audit** — every other `IMPLEMENTED`/`MISSING`/`EXTERNAL_CONFIGURATION`/`NEEDS_BUSINESS_DECISION` classification already in this document was independently re-confirmed accurate, not altered.
+
+**Release decision: V2.1 READY FOR RELEASE.** Per the audit's own explicit instruction, no `v2.1.0` tag was created — this is a recommendation pending explicit approval, not a unilateral action.
