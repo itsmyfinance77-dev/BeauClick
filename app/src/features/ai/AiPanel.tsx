@@ -59,7 +59,7 @@ export function AiPanel( { open, onClose }: { open: boolean; onClose: () => void
 					{ ! isLoggedIn && (
 						<EmptyState
 							title="برای گفتگو با دستیار هوشمند ابتدا وارد حساب کاربری خود شوید."
-							action={ <a href={ `/wp-login.php?redirect_to=${ encodeURIComponent( window.location.href ) }` } className="bc-btn bc-btn--primary">ورود</a> }
+							action={ <a href="/auth/" className="bc-btn bc-btn--primary">ورود</a> }
 						/>
 					) }
 

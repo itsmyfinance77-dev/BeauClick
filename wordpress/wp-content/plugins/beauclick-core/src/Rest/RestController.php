@@ -22,8 +22,14 @@ abstract class RestController {
 	 * @param array<string, mixed> $args register_rest_route() args, minus namespace/route.
 	 */
 	protected function route( string $path, array $args ): void {
-		foreach ( (array) ( $args[0] ?? $args ) as $variant ) {
-			if ( isset( $variant['callback'] ) && ! isset( $variant['permission_callback'] ) ) {
+		// register_rest_route() accepts either one flat args array (the
+		// shape every controller in this codebase actually uses) or an
+		// array of several such variant arrays (one per HTTP method). A
+		// flat array is distinguished from a list-of-variants by having its
+		// own 'callback' key directly on $args, not on $args[0].
+		$variants = isset( $args['callback'] ) ? [ $args ] : $args;
+		foreach ( $variants as $variant ) {
+			if ( is_array( $variant ) && isset( $variant['callback'] ) && ! isset( $variant['permission_callback'] ) ) {
 				throw new \LogicException( sprintf( 'REST route "%s" is missing an explicit permission_callback.', $path ) );
 			}
 		}

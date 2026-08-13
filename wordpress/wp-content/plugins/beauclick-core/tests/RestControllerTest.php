@@ -31,4 +31,48 @@ final class RestControllerTest extends WP_UnitTestCase {
 			);
 		}
 	}
+
+	/**
+	 * Regression test for a real, confirmed bug found during the V2.1 final
+	 * release audit: route()'s missing-permission_callback guard iterated
+	 * `$args[0] ?? $args`, which for the flat single-variant array shape
+	 * every controller in this codebase actually uses (e.g.
+	 * `['methods'=>'POST','callback'=>...,'permission_callback'=>...]`)
+	 * falls through to `$args` itself and then iterates over each of ITS
+	 * top-level *values* (the string 'POST', the callback array, the
+	 * permission_callback array) rather than over route-variant arrays —
+	 * `isset($variant['callback'])` was never true for any of those, so the
+	 * guard never actually threw, for any route, ever. Every real route
+	 * already happened to declare permission_callback, so this was a dead
+	 * safety net, not a live hole — but SEC-03 in the gap register claims
+	 * this exact mechanism as the structural enforcement, so it needed to
+	 * actually work.
+	 */
+	public function test_route_throws_when_the_flat_single_variant_shape_omits_permission_callback(): void {
+		$controller = new class() extends RestController {
+			public function register_routes(): void {}
+			public function call_route( string $path, array $args ): void {
+				( new \ReflectionMethod( RestController::class, 'route' ) )->invoke( $this, $path, $args );
+			}
+		};
+
+		$this->expectException( \LogicException::class );
+		$controller->call_route( '/test/missing-permission', [ 'methods' => 'POST', 'callback' => '__return_true' ] );
+	}
+
+	public function test_route_does_not_throw_when_the_flat_single_variant_shape_has_permission_callback(): void {
+		$controller = new class() extends RestController {
+			public function register_routes(): void {}
+			public function call_route( string $path, array $args ): void {
+				( new \ReflectionMethod( RestController::class, 'route' ) )->invoke( $this, $path, $args );
+			}
+		};
+
+		// register_rest_route() itself (called after the guard passes)
+		// legitimately warns when invoked outside rest_api_init -- expected
+		// and irrelevant to what this test is verifying (the guard logic).
+		$this->setExpectedIncorrectUsage( 'register_rest_route' );
+		$controller->call_route( '/test/has-permission', [ 'methods' => 'POST', 'callback' => '__return_true', 'permission_callback' => '__return_true' ] );
+		$this->assertTrue( true, 'route() must not throw when permission_callback is present on the flat args shape.' );
+	}
 }
