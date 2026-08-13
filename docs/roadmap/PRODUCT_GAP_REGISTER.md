@@ -246,10 +246,10 @@ ID format: `<AREA>-<NN>`. Every row has Status / Severity / Target version per �
 | ID | Description | Current state | Status | Severity | Target | Recommendation |
 |---|---|---|---|---|---|---|
 | ANLYT-01 | Booking/AI/loyalty/journey event logging | Real, append-only, used for real ranking/loyalty computation (confirmed both by source and live DB inspection this session) | IMPLEMENTED | — | — | |
-| ANLYT-02 | Search events | No `search` event is logged anywhere when a marketplace search is performed | MISSING | MEDIUM | V2.2 | Named explicitly in the roadmap's own §18 list; confirmed absent |
-| ANLYT-03 | Checkout-funnel events (cart add, checkout started) | Only `order_completed`/`order_refunded` exist; no earlier funnel stage is logged | MISSING | MEDIUM | V2.2 | |
-| ANLYT-04 | Admin-facing analytics dashboard | None — all analysis today requires a direct database query | MISSING | MEDIUM | V2.2/V2.3 | |
-| ANLYT-05 | CRM/Journey usage measurement | No events logged when a professional opens the CRM or a customer opens their Journey | MISSING | LOW | V2.2 | |
+| ANLYT-02 | Search events | **Resolved in V2.2 Step 11** — `search_performed` logged directly inside `MarketplaceController::browse()` (the platform's real search/discovery entry point), with result count and filter-usage metadata; live-verified against real requests | **IMPLEMENTED** | — | V2.2 Step 11 ✅ | Closed |
+| ANLYT-03 | Checkout-funnel events (cart add, checkout started) | **Resolved in V2.2 Step 11** — `product_view`/`cart_add`/`checkout_started` added via `beauclick-analytics`'s `CommerceTracker`, hooked to genuine WooCommerce cart-lifecycle actions; explicitly scoped to shop/B2B purchases only (booking orders bypass the cart entirely, so they were never in scope for these specific events — the booking funnel already had its own events since V2.0 Step 1) | **IMPLEMENTED** | — | V2.2 Step 11 ✅ | Closed |
+| ANLYT-04 | Admin-facing analytics dashboard | **Resolved in V2.2 Step 11** — a real platform-admin dashboard (`AnalyticsDashboardPage`) computing funnel/commerce/search/AI/retention/usage/marketplace metrics live from `wp_bc_events` and existing domain tables, with Jalali date-range presets; live-verified against real seeded data | **IMPLEMENTED** | — | V2.2 Step 11 ✅ | Closed. No professional/business-facing "my own analytics" view was built — explicitly deferred, not part of this step's scope |
+| ANLYT-05 | CRM/Journey usage measurement | **Resolved in V2.2 Step 11** — `crm_opened`/`journey_opened` UI-visibility pings (via `POST /analytics/track`, strictly allow-listed, actor always the current user) | **IMPLEMENTED** | — | V2.2 Step 11 ✅ | Closed |
 
 ---
 
@@ -552,3 +552,15 @@ Full rationale for every decision below lives in `VERSION_2_ARCHITECTURE_PLAN.md
 **No item in this table was pulled into V2.2 merely because an old document listed it there** — every assignment above traces to either a still-open, currently-verified gap-register row or a genuinely new item discovered during this planning pass (Referral, the CRM polish items), per this task's own explicit "challenge the existing roadmap" instruction.
 
 **Business decisions this table deliberately leaves open, not silently resolved:** referral reward structure, exact data-retention windows/anonymization policy, rescheduling limits/cutoff windows, and multi-staff permission granularity. All are named explicitly in the architecture plan's own V2.2 section, not invented as engineering defaults.
+
+---
+
+## 36. V2.2 Step 11 Completion Note
+
+**Step 11 — Analytics & BI Foundation is complete.** ANLYT-02, ANLYT-03, ANLYT-04, and ANLYT-05 (§6/§35 rows updated above) now have real, tested, live-verified implementations. Full technical detail — event/metric definitions and sources, database decision (deliberately zero new tables), API shape, admin dashboard, security, performance, tests, live verification, and the one real bug found and fixed (a mobile horizontal-overflow issue in the date-range picker) — lives in `VERSION_2_ARCHITECTURE_PLAN.md`'s "V2.2 Step 11 — Analytics & BI Foundation Implementation Notes" section.
+
+**What this step deliberately did not build, and why:** a professional/business-facing "my own analytics" view (out of this step's own scope per its task's §21 — a platform-admin foundation, not a full BI product; a natural candidate for a later step once this foundation shows what's actually useful), a pre-aggregated daily-metrics cache table (current event volume doesn't justify one — see the architecture plan's own reasoning), and any new infrastructure (no Redis/Kafka/Elasticsearch/data warehouse — matching this task's own explicit "no infrastructure overreach" instruction and the architecture plan's pre-existing "no architecture evolution required for V2.2" conclusion).
+
+**A genuinely new, pre-existing documentation-drift finding, not a Step 11 defect:** `waitlist_joined` and `membership_activated` were found already logged as real events in the live database (Steps 9/10), despite not being listed in `EventLogger`'s own docblock comment. Not fixed here — out of this step's own scope — but recorded so it isn't mistaken for something Step 11 broke or missed.
+
+**No other item in this register changed status as a result of this step** — every other classification already in this document was left exactly as written. The rest of §7 (Prioritization), §22–§27 (recommendations, closing note), §28–§35 (V2.1/V2.2 assignment tables and completion notes) above remain the accurate historical record and are preserved exactly as written.

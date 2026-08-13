@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Modal, Button, Chip, Input, LoadingDots, EmptyState } from '@/design-system';
 import { api, ApiError } from '@/lib/api';
+import { track } from '@/lib/analytics';
 import { RecommendationCard } from './RecommendationCard';
 import type { AiMessage } from './types';
 
@@ -24,6 +25,7 @@ export function AiPanel( { open, onClose }: { open: boolean; onClose: () => void
 
 	useEffect( () => {
 		if ( ! open || ! isLoggedIn ) return;
+		track( 'ai_assistant_opened' );
 		api.get<AiMessage[]>( '/ai/messages' ).then( setMessages ).catch( () => setError( 'خطا در دریافت گفتگو.' ) );
 	}, [ open, isLoggedIn ] );
 

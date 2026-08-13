@@ -1707,3 +1707,89 @@ None of Steps 11–16 introduce a new external dependency. Existing ones (SMS ga
 ### V2.2 Definition of Done
 
 Every V2.2 step (11 through 16) must satisfy, in addition to its own step-specific Definition of Done above, the same standing bar already applied throughout V1/V2.0/V2.1: real business logic, real permissions/ownership enforcement (server-side, never frontend-trusted), real validation, loading/empty/error states, complete Persian RTL UI with correct Jalali dates via the existing shared implementation (no second date system, no unnecessary English string where a Persian equivalent exists, Persian digits where already used elsewhere), verified desktop and mobile (375/390/412) behavior, real test coverage for every new ownership boundary and concurrency-sensitive path, live browser verification where applicable, a security review, updated documentation, and a real git commit — and the feature must integrate correctly with the V2.1 domains it touches (Analytics with the existing event log; Growth/Referral with Auth/Legal/Journey; Admin Platform with the existing admin-page pattern; Privacy with every domain holding user data; Booking Evolution with the existing atomic-claim discipline; Professional Platform with CRM/`ProviderLookup`), not just in isolation.
+
+---
+
+## V2.2 Step 11 — Analytics & BI Foundation Implementation Notes
+
+### What existed before, and what was actually missing
+
+Event instrumentation itself was already strong — `wp_bc_events` (V2.0 Step 1) was already being written to by booking, review, message, B2B, and AI code paths, and read by the ranking engine and Beauty Journey's timeline. What was genuinely missing, confirmed by direct inspection rather than assumed from the Gap Register alone: no `search`/checkout-funnel/UI-usage events existed anywhere (ANLYT-02/03/05), and there was no read/aggregation layer at all — every existing consumer of `wp_bc_events` (`SignalCollector`, `TimelineComposer`) queries it for its own narrow purpose, not as a general metrics API. `waitlist_joined` and `membership_activated` event types were found already logged in the live database despite not being listed in `EventLogger`'s own docblock — a small pre-existing documentation drift (Steps 9/10 wired them without updating the central comment), not a Step 11 defect; not fixed here to stay within this step's own scope.
+
+### New plugin, not new code inside an existing one
+
+`beauclick-analytics` — a thin, self-contained plugin (no other plugin depends on it, matching `beauclick-notifications`'s own "new domain, new plugin" precedent) that:
+1. Adds exactly three new WooCommerce-hook-driven events (`product_view`, `cart_add`, `checkout_started`, via `Tracking\CommerceTracker`) plus one directly-added event (`search_performed`, inside `MarketplaceController::browse()` — the platform's real, existing search/discovery entry point, not a new free-text search feature).
+2. Adds one strictly allow-listed UI-visibility ping endpoint (`POST /analytics/track`, for `ai_assistant_opened`/`crm_opened`/`journey_opened` — the three cases where the server cannot otherwise reliably observe a panel/tab being opened).
+3. Reads everything — old and new events, plus `wp_bc_bookings`, `wp_bc_waitlist_entries`, `wp_bc_notifications`, `wp_users`, `wp_posts` — live, through `Metrics\MetricsService`, and renders one admin-only dashboard page.
+
+Every write goes through the existing `EventLogger` into the existing `wp_bc_events` table. No second event-log mechanism, no new event schema.
+
+### Database
+
+**Zero new tables.** This was a deliberate architecture decision, not an oversight — see `MetricsService`'s own docblock. At this project's real, directly-inspected event volume (thousands of rows, not millions), an indexed `COUNT`/`SUM`/`GROUP BY` over a date-bounded range is fast with no caching layer needed. A pre-aggregated `wp_bc_analytics_daily_metrics` cache table, computed nightly via WP-Cron, is the documented next step if real usage ever makes live aggregation measurably too slow — not built now because there is no evidence it's needed, matching this step's own explicit "no infrastructure overreach" instruction.
+
+### API
+
+Two routes only, both under `beauclick/v1`:
+- `GET /analytics/overview` — admin-only (`bc_manage_platform`), returns eight sections (overview, funnel, commerce, search, ai, retention, usage, marketplace) for a `from`/`to` range (defaults to the last 30 days, clamped to at most 366 days).
+- `POST /analytics/track` — any logged-in user, strictly allow-listed to the three UI-visibility events named above; the actor is always the current user, never client-supplied — this is deliberately not a general "log any event" endpoint.
+
+### Metric definitions and sources (per this step's own "every metric must have an explicit source" instruction)
+
+- **Booking funnel** (`started`/`confirmed`/`completed`/`cancelled`/`expired`/`noShow`, `conversionRate = completed / started`) — source: existing `booking_*` events, already logged by `BookingService`'s own atomic transitions; no new events added.
+- **Commerce funnel** (`productViews`/`cartAdds`/`checkoutStarted`/`ordersCompleted`/`ordersRefunded`, `checkoutConversionRate`) — source: the three new `CommerceTracker` events plus `order_completed`/`order_refunded`, **explicitly filtered to exclude any order linked to a booking** (via `wp_bc_bookings.wc_order_id`) so this funnel isn't distorted by orders that never went through `checkout_started` in the first place — booking orders bypass the WooCommerce cart entirely (`BookingOrderBridge`), so this exclusion is a correctness fix, not an approximation.
+- **Platform overview** (`ordersCompletedAllTypes`, `grossRevenueAllTypes`, etc.) — deliberately the un-filtered version of the same events, for a genuine whole-platform total; the label makes the difference from the commerce section explicit.
+- **Search** (`totalSearches`, `uniqueSearchers`, `zeroResultRate`, filter-usage counts) — source: the new `search_performed` event, logged directly inside the existing filtered-browse endpoint (there is no separate free-text search feature — see MKT-02 for that distinct, deferred gap). Deliberately stores only bounded counts and filter-usage booleans, never raw query text (there is no free-text query param to begin with).
+- **AI** (`assistantOpened`, `recommendationsShown/Clicked`, `clickThroughRate`) — `assistantOpened` is new (a UI ping); shown/clicked already existed (`beauclick-ai`'s `AssistantService`) and are only read here.
+- **Retention** — waitlist and notification-delivery counts are read directly from `wp_bc_waitlist_entries`/`wp_bc_notifications` (already the authoritative source for those subsystems, per this step's own "event vs. database fact" instruction); the one new inference, `recoveredBookings`, is an explicit 14-day time-correlation approximation between a sent rebooking/retention notification and the same customer's next `booking_created` event — labeled in the API response itself as a correlation, not a verified click-through, since no click-tracking mechanism was built for it.
+- **Usage** (`crmOpened`, `journeyOpened`) — the two remaining new UI-visibility pings. Loyalty/membership viewing was deliberately **not** made a separate tracked event — `LoyaltySection` always renders as part of the Journey tab, not a distinct navigation destination, so a second ping there would double-count the same tab visit.
+- **Marketplace** — `professionalSupply` is a current snapshot (not range-bound); `profileViews` reuses the pre-existing `profile_view` event (V2.0 Step 1).
+
+### Admin dashboard
+
+One page (`Admin\AnalyticsDashboardPage`) under the existing shared `beauclick` wp-admin menu — raw PHP/HTML, `wp-list-table`-styled tables, no React mount, matching every other BeauClick admin screen's own convention. Jalali-labeled range presets (امروز/۷ روز اخیر/۳۰ روز اخیر/این ماه شمسی — the last computed via `JalaliDate::toGregorian`/`toJalali`, no separate calendar library), plus a manual Gregorian from/to override. States plainly in its own header that every number is computed live on every page load, not cached — satisfying this step's own "don't leave freshness ambiguous" instruction by being unambiguous in the direction that's actually true. No professional/business-facing analytics view was built — explicitly deferred and documented (§21 of this step's own task), since Step 11's own scope boundary is a platform-admin foundation, not a full BI product.
+
+### Persian localization / Jalali / RTL / mobile / accessibility
+
+Every label, section title, and value is Persian; all numbers and percentages render in Persian digits. `dir="rtl"` on the page root. The date-range picker form initially overflowed horizontally at 375px width (`display:flex` with no wrap on two `<label>`+`<input type="date">` pairs) — found during live verification, fixed with `flex-wrap:wrap` (see Bugs below). No chart/canvas visualization exists anywhere on this page — every number lives in a real `<table>`, which trivially satisfies the "provide a textual/table equivalent" accessibility requirement by never needing one.
+
+### Security
+
+`GET /analytics/overview` is gated on `bc_manage_platform` (platform admin only) — analytics can reveal real business volume/revenue, so this is deliberately not a customer- or professional-facing endpoint. `POST /analytics/track` requires login and only accepts the three allow-listed event names; the actor is always `get_current_user_id()`, never a request parameter, so a logged-in user can only ever report their own view of their own session, never forge activity for another user or an arbitrary event name.
+
+### Performance
+
+Every query is bounded to the requested date range (clamped to at most 366 days by `MetricsService::normalize_range()`), uses the existing indexes on `wp_bc_events` (`event_type, created_at`), and runs once per admin page load — there is no per-request cost on any customer- or professional-facing page beyond the three new lightweight WooCommerce-hook/REST writes.
+
+### Tests
+
+17 new backend PHPUnit tests (`MetricsServiceTest`, `AnalyticsControllerTest`, `CommerceTrackerTest`) covering: range normalization (defaults, reversed-range swap, absurd-window clamp), funnel conversion-rate math including the zero-denominator case, the booking-vs-shop order exclusion (the one real correctness-sensitive query in this step), search zero-result/filter-usage detection from JSON meta, AI click-through rate, usage-event counting, REST authorization (admin-only overview, allow-list enforcement on track, actor-is-always-current-user), and CommerceTracker's own no-op guards (outside a product page, empty cart). Backend suite: **552/552** (535 pre-existing + 17 new), unchanged elsewhere. Frontend: **27/27**, unchanged (no new frontend unit tests — the three new `track()` call sites are one-line, side-effect-only instrumentation calls with no branching logic of their own to unit-test; they were verified live instead — see below). TypeScript and production build both clean.
+
+### Live verification (real running site, real seeded database, real HTTP requests)
+
+Performed against the actual local dev server (`php -S localhost:8080`, WordPress 6.9.6, the real `beauclick` database) after activating the new plugin (`activate_plugin()` — it does not load automatically, unlike PHPUnit's bootstrap which force-loads every `beauclick-*` plugin regardless of real activation state; this was itself a real finding, not assumed):
+- **Search**: three real requests to the public `/marketplace/providers` endpoint (no filter, a nonexistent specialty, a city filter) produced three real `search_performed` rows in `wp_bc_events` with correct `resultCount`/filter-usage metadata, confirmed by direct database query.
+- **Security**: an unauthenticated `GET /analytics/overview` returns real HTTP `403 bc_forbidden`; an unauthenticated `POST /analytics/track` returns real HTTP `401 bc_unauthorized` — both over genuine HTTP, not simulated.
+- **Admin dashboard, real data**: rendered via WordPress's own `wp_set_current_user()` against the real admin account (a standard, credential-free WordPress testing technique — this session's sandbox correctly declined an attempt to reset the admin password for an interactive browser login, and that decision was respected rather than worked around) — every section's numbers matched the database's real, independently-verified event counts exactly (e.g. `bookingsCompleted: 15`, `funnel.conversionRate: 0.6` = 15/25, `ai.recommendationsShown: 32`, `search.zeroResultRate: 0.6667` = 2/3 from the three real searches just performed).
+- **Mobile (375px)**: found and fixed a real horizontal-overflow bug in the range-picker form (see Bugs below); re-verified clean afterward.
+- **Public site regression check**: the homepage and marketplace REST endpoints were confirmed still serving correctly after all changes.
+
+### Bugs discovered
+
+The date-range picker's custom `<form>` (`display:flex`, no wrap) overflowed horizontally at a 375px mobile viewport by ~55px, violating this step's own "no page-level horizontal overflow" requirement.
+
+### Bugs fixed
+
+Added `flex-wrap:wrap` to the range-picker form's inline style; re-verified via a live 375px-viewport DOM measurement (`scrollWidth === clientWidth` afterward) that the overflow is gone.
+
+### Known limitations
+
+- No professional/business-facing "my own analytics" view — platform-admin-only in this step, explicitly deferred (documented above).
+- `recoveredBookings` is a 14-day time-correlation approximation, not verified click-through attribution — no new click-tracking mechanism was built for it, and the API/UI both label it as such rather than presenting it as more precise than it is.
+- `checkout_started` is deduplicated per WooCommerce session where a session is available, but degrades to logging every page view (rather than failing) when `WC()->session` isn't present — a graceful-degradation choice, not a defect, but worth noting as a source of possible minor over-counting in an environment where WC sessions are unavailable.
+- Live aggregation only, no daily-cache table — see Database section above for why, and what the natural next step is if it's ever needed.
+
+### Deferred (explicitly out of this step's scope, per the task's own stop condition)
+
+SEO, Referral, Admin Platform redesign, Account deletion/export, Rescheduling, Invoice PDFs, Professional/Business Platform Completion, Campaign Engine, Financial/Payout, Realtime, Native Mobile, AI for Professionals — none started. Step 12 was not started.

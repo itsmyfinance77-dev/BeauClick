@@ -7,6 +7,13 @@
       "runtimeArgs": ["run", "dev", "--", "--port", "5173"],
       "port": 5173,
       "cwd": "app"
+    },
+    {
+      "name": "beauclick-wordpress",
+      "runtimeExecutable": "php",
+      "runtimeArgs": ["-S", "localhost:8080", "router.php"],
+      "port": 8080,
+      "cwd": "wordpress"
     }
   ]
 }

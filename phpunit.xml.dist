@@ -44,6 +44,9 @@
         <testsuite name="beauclick-notifications">
             <directory>wordpress/wp-content/plugins/beauclick-notifications/tests</directory>
         </testsuite>
+        <testsuite name="beauclick-analytics">
+            <directory>wordpress/wp-content/plugins/beauclick-analytics/tests</directory>
+        </testsuite>
     </testsuites>
     <coverage>
         <include>
@@ -60,6 +63,7 @@
             <directory suffix=".php">wordpress/wp-content/plugins/beauclick-journey/src</directory>
             <directory suffix=".php">wordpress/wp-content/plugins/beauclick-auth/src</directory>
             <directory suffix=".php">wordpress/wp-content/plugins/beauclick-notifications/src</directory>
+            <directory suffix=".php">wordpress/wp-content/plugins/beauclick-analytics/src</directory>
         </include>
     </coverage>
 </phpunit>

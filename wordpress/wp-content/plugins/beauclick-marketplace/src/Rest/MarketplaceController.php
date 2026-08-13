@@ -108,6 +108,28 @@ final class MarketplaceController extends RestController {
 
 		$rows = $wpdb->get_results( $select_sql, ARRAY_A );
 
+		// V2.2 Step 11 (ANLYT-02): this filtered browse is the platform's
+		// real search/discovery entry point today (there is no separate
+		// free-text search endpoint — see MKT-02 in the gap register for
+		// that distinct, deferred gap). No idempotency guard, same
+		// reasoning as profile_view below: every real search is a distinct,
+		// legitimate event. Deliberately logs only bounded counts and
+		// filter-usage booleans, never raw query text — there is no
+		// free-text query param on this endpoint to begin with.
+		if ( function_exists( 'beauclick_core' ) ) {
+			beauclick_core()->events()->log(
+				'search_performed',
+				'search',
+				0,
+				get_current_user_id() ?: null,
+				[
+					'resultCount'     => $total,
+					'specialtyFilter' => (bool) $specialty_id,
+					'locationFilter'  => (bool) ( $city_id || $district_id ),
+				]
+			);
+		}
+
 		return Response::paginated( array_map( [ $this, 'format_index_row' ], $rows ), $total, $page, $per_page );
 	}
 

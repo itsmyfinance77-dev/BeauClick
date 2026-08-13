@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
+import { track } from '@/lib/analytics';
 import { formatFullJalaliDate, toPersianDigits } from '@/lib/format';
 import { Button, Chip, Input, Modal, Badge, EmptyState, LoadingDots } from '@/design-system';
 
@@ -74,6 +75,11 @@ export function CustomersTab() {
 	const [ search, setSearch ] = useState( '' );
 	const [ filter, setFilter ] = useState( 'all' );
 	const [ openCustomerId, setOpenCustomerId ] = useState<number | null>( null );
+
+	// V2.2 Step 11 (ANLYT-05): fires once per tab visit, not on every
+	// search/filter change -- a separate effect with empty deps, deliberately
+	// not merged into the debounced search effect below.
+	useEffect( () => { track( 'crm_opened' ); }, [] );
 
 	useEffect( () => {
 		const timeout = setTimeout( () => {

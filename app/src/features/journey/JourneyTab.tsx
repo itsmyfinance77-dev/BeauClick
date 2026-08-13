@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
+import { track } from '@/lib/analytics';
 import { Button, Card, LoadingDots, EmptyState } from '@/design-system';
 import { formatToman, formatFullJalaliDate } from '@/lib/format';
 import { RecommendationCard } from '@/features/ai/RecommendationCard';
@@ -49,6 +50,11 @@ export function JourneyTab() {
 	}
 
 	useEffect( loadAll, [] );
+
+	// V2.2 Step 11 (ANLYT-05): a separate one-shot effect, not folded into
+	// loadAll -- loadAll also re-runs after markGoal() mutates a goal, which
+	// must not count as a second "opened Journey" visit.
+	useEffect( () => { track( 'journey_opened' ); }, [] );
 
 	async function markGoal( id: number, status: 'achieved' | 'abandoned' ) {
 		try {

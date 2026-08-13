@@ -1,0 +1,14 @@
+{
+    "name": "beauclick/analytics",
+    "description": "BeauClick Analytics & BI Foundation (V2.2 Step 11) — funnel/commerce/AI/retention/usage metrics computed live from the existing wp_bc_events log and domain tables, plus a platform-admin dashboard.",
+    "type": "wordpress-plugin",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "BeauClick\\Analytics\\": "src/"
+        }
+    }
+}
