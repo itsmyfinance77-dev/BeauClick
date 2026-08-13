@@ -1531,3 +1531,179 @@ Per the gap register's own Operations/External-Configuration sections, still acc
 **V2.1 READY FOR RELEASE.**
 
 All six completed steps (5 through 10) were verified — independently for 5–8, by direct re-confirmation for 9–10 — to work as documented, with real, current, passing test coverage; the one real defect found (a dead REST permission-callback safety net) had zero live routes actually depending on it being broken, and is now fixed and regression-tested; the one UX-accuracy gap found (a stray `wp-login.php` link) is fixed; localization, Jalali, RTL/mobile, and accessibility all check out against this audit's own fresh passes; no critical authorization or data-isolation issue was found anywhere; V1 (`v1.0.0`/`v1.0.1`) and V2.0 (`v2.0.0`) remain completely untouched (git-verified, tags dereference to their original, unmoved commits); no V2.2/Campaign/Financial/Realtime/Mobile/AI-for-Professionals/Marketplace work exists anywhere in this codebase. Per this audit's own explicit instruction, **no `v2.1.0` tag was created** — this decision is reported for approval, not acted on unilaterally.
+
+**Post-report update:** `v2.1.0` was subsequently tagged (annotated, pointing to `d1445092977ab6a9f95bd50221e43ef761ac2b91`) and released on GitHub after explicit approval. V1 and V2.0 tags confirmed unmoved at tagging time.
+
+---
+
+## V2.2 Strategic Roadmap & Architecture Plan
+
+**Planning-only document. No V2.2 code, migration, or UI exists as of this writing.** Audited state: `master` at `v2.1.0` (`d1445092977ab6a9f95bd50221e43ef761ac2b91`), V1/V2.0 frozen and unmoved. This section defines what V2.2 should build and in what order — built from the actual current codebase and `PRODUCT_GAP_REGISTER.md`'s current state, not from blindly continuing the very first V2 planning document's now-partly-overtaken sequence (see immediately below for why).
+
+### Why V2.2 cannot simply continue the original sequence
+
+The original V2 plan (§3–§17 above) proposed a four-wave sequence: V2.0 (intelligence/signal foundation), V2.1 (personal/professional relationship layer — Journey, CRM, Loyalty tiers/Membership), V2.2 (retention/growth — a Notifications service, Waitlist, Smart Rebooking, retention automation, Referral), V2.3 (monetization/professional tools — Campaign Engine, AI-for-Professionals, Financial/Payout), V2.4 (platform expansion — Realtime, Multi-vendor, Mobile).
+
+What actually shipped diverged in two ways, both already documented above ("Post-Audit V2.1 Reprioritization"): first, the V2.1 Product Gap Discovery Audit found genuinely blocking, previously-unknown gaps (no registration path, no published legal pages, no verification evidence trail) that pulled three entirely new capabilities — Authentication & Registration, Legal & Trust Foundation, Professional Verification Evidence — into V2.1 ahead of Membership. Second, once Loyalty/Membership (Step 9) was underway, the dependency chain for the original plan's own "V2.2" (Waitlist/Rebooking/Retention, gated on a Notifications-service prerequisite the original plan itself flagged as missing) turned out to share no meaningful release boundary with what came after it — it was pulled forward and delivered as V2.1 Step 10, Notifications service included.
+
+**Net effect: V2.1 already delivered almost the entire original V2.0–V2.2 arc**, plus three capabilities the original plan never named. Only **Referral** (originally bundled into Step 9/Loyalty, explicitly deferred — see Step 9's own Known Limitations) was left genuinely undone from that whole arc. Everything else still open today comes from two other sources: (a) the original plan's own V2.3/V2.4 wave (Campaign Engine, Financial/Payout, AI-for-Professionals, Realtime, Multi-vendor, Mobile — all still correctly unbuilt, per that section's own risk analysis, which this document re-affirms below rather than re-deriving from scratch), and (b) items the Product Gap Register discovered along the way that never got their own step at all — SEO, analytics/funnel instrumentation, a general admin audit log, account privacy/deletion/export, booking rescheduling, invoice/receipts, multi-staff business permissions, and the professional profile/portfolio sections reserved since V1 but never finished.
+
+**V2.2, as defined below, is built from that actual remaining set** — not a renumbering of the old plan's "V2.2," and not a blind continuation of "whatever came next in the list."
+
+### Post-V2.1 product state
+
+The core value loop (discovery → AI → booking → payment → review → loyalty → journey → CRM → waitlist/rebooking/retention) is real, tested, and live-verified end to end. Ten domain plugins around `beauclick-core`, all following the same `RestController`/`Response`/`dbDelta`/WP-Cron/ownership-check conventions established since V1. A real, append-only event log (`wp_bc_events`) now has genuine writers (booking lifecycle, reviews, loyalty, ranking, and — per V2.1 Step 10 — notification delivery), but still only the events those specific systems needed; no funnel-stage events (search, checkout-started) exist. A real central notification pipeline exists and is reused correctly by four features; nothing about it needs rebuilding. Real registered customers can now exist for the first time in this project's history, real legal pages are published, and real professional verification with an evidence trail exists — which is exactly what makes SEO-driven and referral-driven acquisition newly *meaningful* (before Step 6, there was nowhere for an organically-arriving visitor to actually register).
+
+### Gap Register analysis — what's actually still open
+
+Cross-referencing `PRODUCT_GAP_REGISTER.md`'s current state (post V2.1 audit) against every non-`IMPLEMENTED` row, filtered to items with genuine, assignable product-development scope (excluding pure `EXTERNAL_CONFIGURATION`/`NEEDS_BUSINESS_DECISION`/`NEEDS_LEGAL_REVIEW` items no engineering step can resolve unilaterally):
+
+| Category | Items | Disposition |
+|---|---|---|
+| SEO (SEO-01/02/03/04) | Meta/OG tags, sitemap, structured data, canonical URLs — all `MISSING`, all confirmed still true | **V2.2** — see Step 12 |
+| Analytics (ANLYT-02/03/04/05) | Search events, checkout-funnel events, admin dashboard, CRM/Journey usage measurement — all `MISSING` | **V2.2** — see Step 11 |
+| Admin (ADMIN-01/02) | General admin shell polish, admin audit log beyond verification's own | **V2.2** — see Step 13 |
+| Notification center (NOTIF-04) | Full bell/unread-count UI — backend history already exists (V2.1 Step 10) | **Evidence-gated, not V2.2** — see rationale below |
+| Privacy (AUTH-07/08, PRIV-02/03/04) | Self-service account deletion, data export, retention/anonymization policy | **V2.2** — see Step 14 |
+| Booking (BOOK-03) | Rescheduling — `MISSING`, confirmed not pulled into Step 10 | **V2.2** — see Step 15 |
+| Commerce (COM-04) | Order/booking invoice/receipt PDF | **V2.2** — see Step 15 |
+| Accessibility (A11Y-03) | Automated a11y testing (axe-core/Lighthouse CI) | **V2.2, opportunistic** — folded into Step 13's tooling work, not a standalone step |
+| Marketplace (MKT-02, referenced in the register's own P3 list) | Fuzzy/typo-tolerant search | **Deferred past V2.2** — no evidence of a real query-quality problem; matches the original architecture doc's own "MySQL indexing is sufficient until measured otherwise" stance |
+| Professional (PROF-05) | Multi-staff business permission model | **V2.2** — see Step 16 |
+| Professional (PROF-03, partial) | Portfolio section still a V1-era placeholder | **V2.2** — see Step 16 |
+| CRM (deferred from Step 5) | Note edit/delete, frontend pagination UI | **V2.2** — see Step 16 |
+| Loyalty (deferred from Step 9) | Referral | **V2.2** — see Step 12 |
+| AI (AI-03) | Cost/usage visibility | **V2.3** — only matters once a real paid provider is configured; bundle with whichever V2.3 step first touches real-provider configuration |
+| Commerce (COM-05, partially open) | Price-hook stacking risk for a *third* price-modifying feature | **Addressed as a V2.3 prerequisite, not a V2.2 step** — see the Pricing Orchestration analysis below |
+| Campaign/Promotion Engine, AI-for-Professionals, Financial/Payout | Zero-to-weak foundation, high risk, real business/gateway decisions pending | **V2.3** — unchanged from the original plan's own risk analysis, re-affirmed below |
+| Realtime, Multi-Sided Marketplace, Native Mobile | No evidence of real need | **V2.4+, evidence-gated** — unchanged |
+
+### Notification center — why it's evidence-gated, not a V2.2 step
+
+The task's own instruction is to determine "the smallest useful evolution," not to rebuild the notification system by default. V2.1 Step 10 already built the reusable backend (`NotificationService::for_user()`) and a simple read-only recent-activity list — a full bell/unread-count/read-state UI was deliberately scoped out at the time as unnecessary until real usage data says otherwise. V2.2's own Analytics step (11) is positioned specifically to be able to answer that question with real data (are customers engaging with the existing simple list? are notification-driven rebooking/retention conversions measurable?) before a heavier UI is justified. Recommendation: **do not build a full notification center in V2.2**; revisit once Step 11's analytics exist to inform whether it would actually move a real metric.
+
+### Pricing orchestration — the question this task explicitly asks
+
+COM-05 (the WooCommerce price-hook stacking risk) is **partially resolved** as of V2.1 Step 9: booking-order membership discounts and B2B tier pricing are structurally disjoint (the former is an order-level fee, never touching the cart the latter filters), so today's two live price-modifying features cannot conflict. The open risk is a hypothetical *third* feature — Campaign Engine — that would want to modify the cart too. **V2.2 does not need to build a central pricing/discount orchestration layer**, because nothing in V2.2's own scope (Steps 11–16 below) touches WooCommerce pricing or the cart at all — building that layer now, with nothing yet to validate it against, would be exactly the kind of premature infrastructure this project's own standing discipline warns against. **Recommendation: design the orchestration layer as the first, explicit sub-step of V2.3's Campaign Engine work** — the moment a real third price-modifying feature is about to exist is the correct moment to decide hook ordering and combination rules, informed by two real, working examples (B2B, Loyalty/Membership) rather than a hypothetical third one.
+
+### Notification architecture evolution for V2.2
+
+No rebuild. The one addition worth making, folded into Step 11 (Analytics) rather than given its own step: extend event logging so notification delivery outcomes (already logged, per V2.1 Step 10) feed the same funnel/aggregation views Step 11 builds — e.g., "did a rebooking notification actually lead to a booking within N days" as a real, queryable metric, not a new delivery mechanism.
+
+### Analytics — event taxonomy and aggregation model for V2.2
+
+Per the task's own instruction to define, not build: the missing event types are `search` (query, filters applied, result count), `checkout_started` (cart contents, entry point), `cart_add`/`cart_remove`, and lightweight `crm_opened`/`journey_opened` usage pings — all following the exact shape `wp_bc_events` already establishes (`event_type`, `entity_type`, `entity_id`, `actor_id`, `meta` JSON, `created_at`), no schema change needed, only new writer call sites (the same "activate dormant infrastructure" motion that made V2.0 Step 1's event instrumentation and loyalty-ledger wiring a near-zero-risk first move). Aggregation should be periodic, admin-page-rendered summary queries (matching every existing admin page's own pattern) — **not** a dedicated analytics warehouse or a new BI tool; this project's real current scale doesn't justify one, and the task's own instruction is explicit about not building analytics infrastructure speculatively. Privacy implication worth flagging explicitly: aggregation must stay aggregate-only in anything admin-visible across users (no raw per-customer event stream surfaced anywhere new), matching the same data-minimization principle already applied to AI context assembly.
+
+### SEO — should BeauClick own this layer
+
+Yes. No SEO plugin should be introduced — the existing per-page-type meta-description/Open-Graph pattern already partially exists (`inc/seo.php`, added during V1's Production Readiness pass for professional/product/front pages) and should simply be extended to marketplace listing, city, and specialty pages, plus a real XML sitemap (WordPress core's own `wp-sitemap.php` is very likely sufficient — verify against BeauClick's actual CPT registration before assuming a custom sitemap generator is needed) and `LocalBusiness`/`Service` structured data for professional profiles (`Product` schema already exists for shop products via WooCommerce, per the existing `Currency.php` comment). This is page-template and metadata work within the existing theme, not a new subsystem.
+
+### Architecture evolution required for V2.2
+
+**None.** Every one of Steps 11–16 below extends an already-established pattern: `wp_bc_events` (analytics), the existing admin-page convention (admin platform), the existing REST/`RestController`/ownership pattern (privacy/data-control endpoints), the existing atomic-slot-claim discipline (rescheduling), the existing CRM/profile tables (professional platform completion). No new database technology, no new caching layer, no new job-queue system, no new search engine, no Redis/Kafka/RabbitMQ/Elasticsearch/microservices — none of V2.2's own scope produces a "why now" case for any of them, matching this document's own standing "prefer incremental evolution" principle (§7 above, re-affirmed, not re-litigated).
+
+### V2.2 recommended Steps
+
+#### Step 11 — Analytics & Business Intelligence Foundation
+- **Objective:** Instrument the missing funnel events and build a lightweight admin aggregation view, so every subsequent V2.2 step (and V2.1's own already-shipped retention automation) can be measured against real data instead of assumption.
+- **Dependencies:** None blocking — `wp_bc_events` and its writer pattern already exist and are proven (V2.0 Step 1, V2.1 Step 10).
+- **Database impact:** None — new writer call sites into the existing table only.
+- **API impact:** New admin-only aggregation endpoints (reusing `RestController`'s existing admin-capability gate).
+- **UI impact:** One new admin summary page (existing admin-page pattern), no customer/professional-facing UI.
+- **Expected value:** High leverage, low cost — every future product decision (including whether Step-11-adjacent features like a notification center are worth building) becomes measurable instead of guessed.
+- **Complexity:** Low.
+- **Major risks:** None structural; the only real risk is under-scoping the event taxonomy and having to add more writer call sites later — acceptable, since adding an event type is additive and low-cost by design.
+- **Explicitly excluded:** A dedicated analytics warehouse, third-party BI tool, or per-user behavioral dashboards.
+- **Definition of done:** New funnel events logged from real user actions (search, cart add, checkout start); an admin summary page rendering real aggregate numbers (not a mock); zero raw per-customer event stream exposed anywhere new; full Persian/RTL; tests for every new writer call site and the aggregation queries.
+
+#### Step 12 — Growth & Public Discovery (SEO + Referral)
+- **Objective:** Turn on organic (SEO) and referral-driven customer acquisition — both structurally meaningless before V2.1 (no registration path existed) and both now unblocked.
+- **Dependencies:** Authentication (done, V2.1 Step 6), Legal pages (done, V2.1 Step 7) — a referral program pointing at a platform with no registration or published terms would have been building on sand; both prerequisites are now real.
+- **Database impact:** SEO — none (metadata only). Referral — new `wp_bc_referrals` table (referrer_id, referred_id, status, reward_issued_at, created_at), unique-constrained against self-referral and duplicate attribution, following the existing append-only-ledger-adjacent convention.
+- **API impact:** SEO — none (server-rendered template changes only). Referral — new endpoints for code generation/redemption, self-scoped.
+- **UI impact:** SEO — none visible to users directly (meta/structured-data only). Referral — a small share/redeem UI, natural fit inside the Beauty Journey tab (an existing, already-built customer-dashboard surface).
+- **Security impact:** Referral fraud prevention (self-referral, duplicate attribution, eligibility windows) needs real server-side enforcement — the single genuine engineering risk in this step, already flagged as such by the original architecture assessment (§4.6) and unchanged.
+- **Expected value:** High — this is the first V2.2 capability with a direct, measurable effect on top-of-funnel acquisition, and Step 11's analytics work lets that effect actually be measured.
+- **Complexity:** Low (SEO) to medium (referral fraud prevention).
+- **Explicitly excluded:** Paid SEO tooling/plugins, any campaign/promotion-style referral reward beyond a simple, fixed, documented incentive (campaign-grade audience targeting stays in V2.3).
+- **Definition of done:** Every marketplace/profile/service/product/city/specialty page has correct meta description, Open Graph tags, and canonical URL; a working sitemap; structured data validated against Google's own testing tool; a working referral code flow with server-enforced fraud prevention and full test coverage; full Persian/RTL.
+
+#### Step 13 — Admin Platform & Operations Maturity
+- **Objective:** Give operations real cross-cutting tools for the load V2.1's five new subsystems (verification queue, notification delivery, loyalty grants, waitlist, retention sweeps) now generate day to day.
+- **Dependencies:** None blocking; benefits from Step 11's aggregation patterns but isn't gated on them.
+- **Database impact:** Small — extend the existing verification-scoped audit-history pattern to a general-purpose admin action log (same append-only shape, new `action_type`/`entity_type` values, not a new architecture).
+- **API/UI impact:** A small admin-home surface aggregating cross-plugin operational status (verification queue depth, notification failure rate, waitlist backlog) — reusing every existing admin page's own rendering pattern, explicitly **not** a redesign of wp-admin itself.
+- **Expected value:** Medium-high — directly reduces operational risk now that real users, real professionals, and real automated retention messaging all exist simultaneously for the first time.
+- **Complexity:** Low-medium.
+- **Explicitly excluded:** A general observability platform, a full admin-UI redesign, real-time monitoring/alerting (that's OPS-04's `EXTERNAL_CONFIGURATION` territory — a Sentry-class tool, not something this codebase should reimplement).
+- **Definition of done:** A general admin audit log covering actions beyond verification; a small ops-status admin page; opportunistically, automated accessibility testing (axe-core or equivalent) wired into the existing test pipeline (A11Y-03) — folded in here since it's tooling maturity of the same kind, not a product feature deserving its own step; full Persian/RTL for every new admin surface.
+
+#### Step 14 — Account Privacy & Data Control
+- **Objective:** Close the gap between what the now-published Privacy Policy (V2.1 Step 7) promises and what the product actually lets a real user do — self-service deletion and data export.
+- **Dependencies:** Legal pages (done — the policy text this step must actually honor), and every domain that holds user data (Auth, CRM, Journey, Chat, AI, Loyalty, Membership, Waitlist, Notifications — all already built).
+- **Database impact:** None structural — deletion/anonymization logic operates across existing tables; no new domain table required, though a small `wp_bc_data_requests` audit table (request type, status, requested_at, completed_at) is worth adding for compliance traceability, matching the same append-only-audit convention used elsewhere.
+- **API impact:** New self-scoped endpoints (`request account deletion`, `request data export`) — admin-reviewed for deletion (not instant, irreversible self-execution) given the cross-domain blast radius, matching this project's own "no ordinary-user write path to anything requiring careful handling" discipline (the same principle already applied to financial-record safety in §8 above).
+- **UI impact:** New Account-tab controls (existing customer-dashboard surface).
+- **Security impact:** The core engineering challenge of this step — safe anonymization semantics that don't corrupt referential data other customers/professionals still legitimately need (e.g. a deleted customer's historical review should very likely be anonymized, not silently deleted out from under a professional's own rating history).
+- **Expected value:** High trust-integrity value — a live Privacy Policy without real deletion/export capability is itself a credibility and (jurisdiction-dependent) compliance risk once real users exist, which V2.1 just made possible for the first time.
+- **Complexity:** Medium — the individual deletions are straightforward; getting anonymization-vs-deletion semantics right across nine domains is the real work.
+- **Explicitly excluded:** Automatic time-based data retention/purging (PRIV-04's broader retention *policy* remains `NEEDS_BUSINESS_DECISION` — this step builds the mechanism a policy would use, not the policy itself).
+- **Definition of done:** A real, tested, admin-reviewed account-deletion flow with defined anonymization semantics per domain; a real data-export flow producing a genuine, complete export of a user's own data; full Persian/RTL; explicit test coverage proving one user's deletion never corrupts another user's legitimately-retained data (e.g. reviews, CRM notes another professional holds).
+
+#### Step 15 — Booking Evolution: Rescheduling + Receipts
+- **Objective:** Close the one remaining well-scoped, low-risk booking gap (rescheduling) and a small commerce-completeness item (receipts), without touching booking's core atomic-claim architecture.
+- **Dependencies:** None — the booking engine (hold/expiry, atomic slot claim, cancellation, no-show) is stable and unchanged since V2.1 Step 10.
+- **Database impact:** None new for rescheduling — reuses the exact atomic `UPDATE ... WHERE status='open'` discipline booking already uses (a reschedule is, structurally, a cancel-and-atomic-reclaim on the same booking row, not a new concurrency primitive). Receipts need no new table — rendered on demand from existing `wp_bc_bookings`/WooCommerce order data.
+- **API impact:** New `POST /booking/bookings/{id}/reschedule` (reusing the exact ownership gate `/confirm`/`/no-show` already established); a receipt-download endpoint.
+- **UI impact:** A reschedule action in the existing bookings UI; a "دانلود رسید" action alongside existing booking/order views.
+- **Expected value:** Medium — closes a real, named customer-facing gap (today's only path is cancel-and-rebook, which loses the original slot to anyone else) with contained, low-risk engineering.
+- **Complexity:** Low-medium.
+- **Explicitly excluded:** A visual drag-and-drop professional calendar (that's Step 16/professional-platform territory if ever pursued, not bundled here); invoicing for B2B wholesale orders beyond what WooCommerce's own order system already provides.
+- **Definition of done:** A real reschedule flow with the same concurrency safety already proven for booking/cancellation, a dedicated race-condition test; a real receipt document (PDF or print-ready HTML) for both booking and B2B orders; full Persian/RTL/Jalali on every new surface.
+
+#### Step 16 — Professional/Business Platform Completion
+- **Objective:** Finish what V1's own design explicitly reserved but never built — the professional dashboard's remaining placeholder sections and the multi-staff business model flagged as a known limitation since V2.1 Step 5.
+- **Dependencies:** CRM (done, V2.1 Step 5 — staff permissions extend its existing ownership model), Authentication (done — a real account model to extend to multiple staff members per business).
+- **Database impact:** New — a `wp_bc_business_staff` table (business_id, user_id, role/permission set, invited_at, status), extending rather than replacing `ProviderLookup`'s existing "one owner per provider post" resolution (a business's staff resolve to the same provider post, with a permission subset, not a second provider identity).
+- **API impact:** New staff-invite/manage endpoints; extend CRM's note model to support edit/delete (already flagged as deferred in Step 5); add the pagination the CRM API already structurally supports but the frontend never consumed.
+- **UI impact:** New business-staff management screen; portfolio-upload UI (closing V1's own "این بخش در نسخه بعدی محصول تکمیل می‌شود" placeholder — real file upload through `wp_handle_upload()` with the same MIME/size discipline Step 8's evidence storage already established, though portfolio images, unlike verification evidence, correctly belong in the Media Library since they're meant to be public).
+- **Security impact:** Staff permission boundaries need the same ownership rigor as everywhere else — a staff member must never be able to act as if they own the business, only within their granted permission subset; explicit test coverage required.
+- **Expected value:** Medium-high for the (currently small but real) subset of business accounts that are actually salons/clinics with multiple staff, not solo professionals; also removes a visible, long-standing "coming soon" placeholder from the product.
+- **Complexity:** Medium.
+- **Explicitly excluded:** A full HR/scheduling system for staff (shift management, staff-level availability) — staff permissions here mean "can this person act on the business's CRM/bookings," not a staffing/rostering product.
+- **Definition of done:** A real staff-invite-and-permission flow with test-covered ownership boundaries; real portfolio upload replacing the V1 placeholder; CRM note edit/delete plus real frontend pagination; full Persian/RTL/Jalali.
+
+### V2.3 boundary — what's explicitly deferred and why
+
+**Campaign/Promotion Engine, Financial/Payout, AI for Professionals & Businesses** — all re-affirmed as V2.3, unchanged from the original assessment's own risk analysis (§4.4/§4.7/§4.10 above), because nothing about V2.1's actual delivery weakens that reasoning:
+
+- **Campaign Engine** needs (a) the pricing-orchestration decision this document places at the *start* of this step, not before it, and (b) real audience-segmentation data — which Step 11's analytics work (V2.2) is what will make campaign targeting meaningful rather than speculative. Sequencing it after V2.2's analytics foundation, not before, is a genuine dependency, not just risk-aversion.
+- **Financial/Payout** remains the single highest-risk, zero-existing-foundation capability in the entire roadmap — real money, real audit requirements, and a real payment-gateway decision (still open, per V1's own architecture doc) that should land before a payout/settlement model is built around it. Unchanged business-decision flag: if monetization urgency outweighs this risk, that's a legitimate reason to pull it earlier, but it's a call for the product owner, not an engineering default.
+- **AI for Professionals** reuses CRM+event-instrumentation, both of which now exist (CRM since V2.1 Step 5, events real since V2.0 Step 1) — technically startable earlier, but grouped with Campaign/Financial in V2.3 because it shares their "premium/monetizable professional tooling" character and because getting the authorization-boundary engineering right (a professional's AI must never assemble another professional's data) deserves dedicated, unhurried attention rather than being squeezed alongside V2.2's operational-maturity focus.
+
+### V2.4 boundary — unchanged
+
+**Realtime Communication, Multi-Sided Marketplace, Native Mobile** — all remain evidence-gated exactly as the original assessment specified (§4.11/§4.3/§4.12, §14 above): revisit only when real chat-volume complaints, real seller-side demand beyond BeauClick's own wholesale catalog, or real mobile-specific user demand actually materializes. Nothing discovered during V2.1 or this planning pass changes that calculus — restating it here rather than re-deriving it, per this document's own standing principle of not building ahead of evidence.
+
+### Business decisions still required for V2.2 (not resolved by this plan)
+
+- **Referral reward structure** (Step 12) — what the actual incentive is (fixed credit, percentage, loyalty points) is a business decision; the engineering plan above builds the mechanism, not the value.
+- **Data retention/anonymization policy specifics** (Step 14) — this step builds the *mechanism*; exact retention windows and what counts as "anonymized enough" remains `NEEDS_BUSINESS_DECISION`/`NEEDS_LEGAL_REVIEW`, same as it's been since the original Legal audit.
+- **Rescheduling policy** (Step 15) — how many times a booking may be rescheduled, and any cutoff window before the appointment, needs a real business rule, not an engineering default.
+- **Multi-staff permission granularity** (Step 16) — what a staff member is and isn't allowed to do is a product decision; the engineering plan builds a permission-set mechanism, not the specific role definitions.
+
+### External configuration relevant to V2.2
+
+None of Steps 11–16 introduce a new external dependency. Existing ones (SMS gateway, SMTP, real payment gateway, backup, monitoring) remain exactly as documented in the V2.1 Final Release Audit — still required before production launch, still not a V2.2 code gap.
+
+### Risks
+
+1. **Analytics scope creep** — the temptation to build a "real" BI platform instead of the lightweight aggregation this plan specifies; the task's own instruction and this project's own anti-premature-infrastructure discipline both argue against it.
+2. **Referral fraud** — the one genuine security-engineering risk in Step 12; needs the same rigor as any other financial-adjacent feature in this codebase.
+3. **Privacy/deletion anonymization correctness** — the one genuine data-integrity risk in Step 14; a bug here either fails to actually delete what a user asked to delete, or corrupts another user's legitimately-retained data — both are real failure modes needing explicit adversarial test coverage, not just happy-path verification.
+4. **Staff-permission boundary bugs** (Step 16) — the same class of risk as every other ownership boundary in this codebase; needs the same explicit test discipline already established for CRM/verification/loyalty ownership.
+5. **Under-scoping SEO** — shipping metadata without verifying it against Google's actual structured-data testing tools risks looking done without being effective; verification, not just implementation, belongs in this step's Definition of Done.
+
+### V2.2 Definition of Done
+
+Every V2.2 step (11 through 16) must satisfy, in addition to its own step-specific Definition of Done above, the same standing bar already applied throughout V1/V2.0/V2.1: real business logic, real permissions/ownership enforcement (server-side, never frontend-trusted), real validation, loading/empty/error states, complete Persian RTL UI with correct Jalali dates via the existing shared implementation (no second date system, no unnecessary English string where a Persian equivalent exists, Persian digits where already used elsewhere), verified desktop and mobile (375/390/412) behavior, real test coverage for every new ownership boundary and concurrency-sensitive path, live browser verification where applicable, a security review, updated documentation, and a real git commit — and the feature must integrate correctly with the V2.1 domains it touches (Analytics with the existing event log; Growth/Referral with Auth/Legal/Journey; Admin Platform with the existing admin-page pattern; Privacy with every domain holding user data; Booking Evolution with the existing atomic-claim discipline; Professional Platform with CRM/`ProviderLookup`), not just in isolation.

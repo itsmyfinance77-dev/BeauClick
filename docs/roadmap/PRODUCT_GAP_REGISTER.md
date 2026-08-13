@@ -390,7 +390,7 @@ Following the roadmap/architecture-plan reprioritization (`docs/roadmap/VERSION_
 | SEC-01, SEC-03, SEC-05, SEC-06, PRIV-01, PRIV-05, OPS-01, LOC-01/02, DATE-01, MKT-01/03/04, COM-01/02, BOOK-01/02, AI-01/04, A11Y-01/02/04, ANLYT-01 | Already `IMPLEMENTED` | — | No action; unaffected by this reprioritization |
 | LOC-04 | `نوبت`/`رزرو` terminology inconsistency | V2.1 (opportunistic — recommend folding into Step 6/7's own UI work rather than a standalone pass) | Product development |
 | OPS-02, OPS-03, OPS-04, OPS-05 | Backup, health check, error monitoring, real system cron | Production setup, ahead of public launch | `EXTERNAL_CONFIGURATION` — not assigned to any V2.1 step; these are hosting/infrastructure decisions independent of feature sequencing |
-| SEO-01–04, ANLYT-02–05, COM-03/04/05, A11Y-03, ADMIN-01, ADMIN-04, PRO-02/03/04, AI-02/03/05, MKT-02 | Various | V2.2/V2.3, per their existing entries in §6/§7 | Unchanged by this update |
+| SEO-01–04, ANLYT-02–05, COM-03/04/05, A11Y-03, ADMIN-01, ADMIN-04, PRO-02/03/04, AI-02/03/05, MKT-02 | Various | **Superseded — see §35 "V2.2 Roadmap Assignments" for the concrete, per-Step assignment of every one of these** | This placeholder row is intentionally left in place as the historical record of what this table said before §35 existed; §35 is now authoritative for these IDs |
 
 **Note on external configuration:** per this task's explicit instruction, SMS/SMTP/monitoring/backup are deliberately **not** turned into their own product-development steps. Where a step's functionality depends on one (Step 6 and Step 10 both depend on an SMS provider decision; every step depends on SMTP for any email it sends), the dependency is named inline above, but the external service itself remains an operational/business decision to make before or alongside the relevant step, not a line item inside it.
 
@@ -508,3 +508,47 @@ A complete release-candidate audit of all six V2.1 steps (5–10) was performed 
 **No other item in this register changed status as a result of this audit** — every other `IMPLEMENTED`/`MISSING`/`EXTERNAL_CONFIGURATION`/`NEEDS_BUSINESS_DECISION` classification already in this document was independently re-confirmed accurate, not altered.
 
 **Release decision: V2.1 READY FOR RELEASE.** Per the audit's own explicit instruction, no `v2.1.0` tag was created — this is a recommendation pending explicit approval, not a unilateral action.
+
+**Post-report update:** `v2.1.0` was subsequently tagged and released on GitHub, pointing to commit `d1445092977ab6a9f95bd50221e43ef761ac2b91`, after explicit approval.
+
+---
+
+## 35. V2.2 Roadmap Assignments
+
+Full rationale for every decision below lives in `VERSION_2_ARCHITECTURE_PLAN.md`'s "V2.2 Strategic Roadmap & Architecture Plan" section. This table is the authoritative per-ID assignment, following the same convention §28 established for V2.1: the `Target` column inside the §6 tables above stays as originally written and should be read together with this table, not edited row-by-row.
+
+**Important context this table depends on:** the original V2 planning document's own "V2.2" (a central Notifications service + Waitlist + Smart Rebooking + Retention automation) was actually delivered inside **V2.1 Step 10**, not V2.2 — see that document's own "Post-Audit V2.1 Reprioritization" and new "V2.2 Strategic Roadmap" sections for why. Every ID below reflects the *real* remaining gap set, not a renumbering of the original plan.
+
+| ID | Item | Assigned to | Disposition |
+|---|---|---|---|
+| ANLYT-02 | Search events not logged | **V2.2 Step 11** (Analytics & BI Foundation) | Product development |
+| ANLYT-03 | Checkout-funnel events not logged | **V2.2 Step 11** | Product development |
+| ANLYT-04 | No admin-facing analytics dashboard | **V2.2 Step 11** | Product development |
+| ANLYT-05 | No CRM/Journey usage measurement | **V2.2 Step 11** | Product development |
+| SEO-01 | No meta description/OG tags on marketplace/profile/product pages | **V2.2 Step 12** (Growth & Public Discovery) | Product development |
+| SEO-02 | No XML sitemap | **V2.2 Step 12** | Product development |
+| SEO-03 | No structured data (LocalBusiness/Service schema) | **V2.2 Step 12** | Product development |
+| SEO-04 | No canonical URLs | **V2.2 Step 12** | Product development |
+| Referral | No referral code/reward mechanism (deferred from V2.1 Step 9, not previously its own register ID) | **V2.2 Step 12** | Product development — reward structure itself is `NEEDS_BUSINESS_DECISION` |
+| ADMIN-01 | General admin shell/branding polish | **V2.2 Step 13** (Admin Platform & Operations Maturity) | Product development |
+| ADMIN-02 | Admin audit log scoped to verification only | **V2.2 Step 13** (extend to general-purpose) | Product development |
+| ADMIN-04 | (Referenced in §7 P2 alongside ADMIN-01; no dedicated §6 row exists — folded into the general admin-platform assessment) | **V2.2 Step 13** | Product development |
+| A11Y-03 | No automated accessibility testing (axe-core/Lighthouse CI) | **V2.2 Step 13** (opportunistic, folded into tooling maturity work) | Product development |
+| AUTH-07 / PRIV-02 | No self-service account deletion | **V2.2 Step 14** (Account Privacy & Data Control) | Product development |
+| AUTH-08 / PRIV-03 | No self-service data export | **V2.2 Step 14** | Product development |
+| PRIV-04 / LEGAL-08 | Data retention/anonymization policy undefined | **V2.2 Step 14 builds the mechanism**; the policy itself remains `NEEDS_BUSINESS_DECISION` | Split |
+| BOOK-03 | Rescheduling — no reschedule action exists | **V2.2 Step 15** (Booking Evolution: Rescheduling + Receipts) | Product development |
+| COM-04 | No order/booking invoice or receipt PDF | **V2.2 Step 15** | Product development |
+| PROF-05 | No multi-staff business permission model | **V2.2 Step 16** (Professional/Business Platform Completion) | Product development |
+| PROF-03 | Professional portfolio section still a V1-era placeholder | **V2.2 Step 16** | Product development |
+| — (deferred from V2.1 Step 5, no dedicated register ID) | CRM note edit/delete, frontend pagination UI | **V2.2 Step 16** | Product development |
+| NOTIF-04 | In-app notification center (full bell/unread UI) | **Evidence-gated — not assigned to V2.2.** Backend history already exists (V2.1 Step 10); revisit once V2.2 Step 11's analytics can show whether the existing simple list already serves the real need | Deferred pending evidence |
+| MKT-02 | Search typo tolerance / fuzzy matching | **Deferred past V2.2** — no evidence of a real query-quality problem; matches the architecture plan's own "no Elasticsearch/Meilisearch without measured evidence" stance | Deferred pending evidence |
+| AI-03 | AI cost/usage visibility | **V2.3** — only matters once a real paid AI provider is configured; bundle with whichever V2.3 step first does that | Deferred to V2.3 |
+| COM-05 | Price-hook stacking risk for a future third price-modifying feature | **Addressed as the first sub-step of V2.3's Campaign Engine work**, not a standalone V2.2 step — see the architecture plan's "Pricing Orchestration" analysis for why building it in V2.2 would be premature (nothing in V2.2 touches pricing) | Deferred to V2.3, scoped |
+| Campaign/Promotion Engine, AI-for-Professionals (AI-05), Financial/Payout | Zero-to-weak foundation, real business/gateway decisions pending | **V2.3**, unchanged from the original architecture assessment's own risk analysis | Product development, V2.3 |
+| Realtime Communication, Multi-Sided Marketplace, Native Mobile | No evidence of real need | **V2.4+, evidence-gated** — unchanged | Deferred pending evidence |
+
+**No item in this table was pulled into V2.2 merely because an old document listed it there** — every assignment above traces to either a still-open, currently-verified gap-register row or a genuinely new item discovered during this planning pass (Referral, the CRM polish items), per this task's own explicit "challenge the existing roadmap" instruction.
+
+**Business decisions this table deliberately leaves open, not silently resolved:** referral reward structure, exact data-retention windows/anonymization policy, rescheduling limits/cutoff windows, and multi-staff permission granularity. All are named explicitly in the architecture plan's own V2.2 section, not invented as engineering defaults.
