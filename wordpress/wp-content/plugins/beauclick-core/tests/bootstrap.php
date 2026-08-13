@@ -57,6 +57,7 @@ function _beauclick_manually_load_plugins(): void {
 		\BeauClick\Auth\Plugin::class,
 		\BeauClick\Notifications\Plugin::class,
 		\BeauClick\Analytics\Plugin::class,
+		\BeauClick\Referral\Plugin::class,
 	];
 
 	foreach ( $activation_order as $plugin_class ) {

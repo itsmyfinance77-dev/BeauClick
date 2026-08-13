@@ -103,6 +103,7 @@ final class AnalyticsDashboardPage {
 			'ai'          => $service->ai( $from, $to ),
 			'retention'   => $service->retention( $from, $to ),
 			'usage'       => $service->usage( $from, $to ),
+			'referral'    => $service->referral( $from, $to ),
 			'marketplace' => $service->marketplace( $from, $to ),
 		];
 
@@ -194,6 +195,18 @@ final class AnalyticsDashboardPage {
 			]
 		);
 		echo '<p style="font-size:12px;color:#888;max-width:640px;">' . esc_html( $data['retention']['recoveredBookingsCaveat'] ) . '</p>';
+
+		$this->render_section(
+			__( 'معرفی به دوستان (Referral)', 'beauclick-analytics' ),
+			[
+				__( 'اشتراک‌گذاری لینک معرفی', 'beauclick-analytics' )    => $this->num( $data['referral']['linkShared'] ),
+				__( 'ثبت‌نام با معرفی', 'beauclick-analytics' )           => $this->num( $data['referral']['signupsAttributed'] ),
+				__( 'واجد شرایط شده', 'beauclick-analytics' )             => $this->num( $data['referral']['qualified'] ),
+				__( 'پاداش داده‌شده', 'beauclick-analytics' )             => $this->num( $data['referral']['rewarded'] ),
+				__( 'نرخ واجد شرایط شدن', 'beauclick-analytics' )         => $this->pct( $data['referral']['qualificationRate'] ),
+				__( 'مجموع امتیاز پاداش صادرشده', 'beauclick-analytics' ) => $this->num( $data['referral']['rewardPointsIssued'] ),
+			]
+		);
 
 		$this->render_section(
 			__( 'استفاده از پنل حرفه‌ای‌ها و باشگاه مشتریان', 'beauclick-analytics' ),

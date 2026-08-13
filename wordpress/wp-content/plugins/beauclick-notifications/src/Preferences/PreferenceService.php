@@ -24,15 +24,16 @@ final class PreferenceService {
 	public const CATEGORY_WAITLIST   = 'waitlist';
 	public const CATEGORY_REBOOKING  = 'rebooking';
 	public const CATEGORY_RETENTION  = 'retention';
+	public const CATEGORY_REFERRAL   = 'referral';
 
-	public const CATEGORIES = [ self::CATEGORY_REMINDER, self::CATEGORY_WAITLIST, self::CATEGORY_REBOOKING, self::CATEGORY_RETENTION ];
+	public const CATEGORIES = [ self::CATEGORY_REMINDER, self::CATEGORY_WAITLIST, self::CATEGORY_REBOOKING, self::CATEGORY_RETENTION, self::CATEGORY_REFERRAL ];
 
-	/** reminder/waitlist/rebooking are tied to something the customer explicitly did (booked, joined a waitlist, completed a visit) -- "transactional" in spirit though still user-togglable per the task's own §12 instruction. retention is the one genuinely unprompted, promotional category. */
+	/** reminder/waitlist/rebooking are tied to something the customer explicitly did (booked, joined a waitlist, completed a visit) -- "transactional" in spirit though still user-togglable per the task's own §12 instruction. retention and referral (V2.2 Step 12) are the genuinely unprompted, promotional categories -- a referral reward notification is good news, but nobody asked to receive it the way they asked for a booking reminder. */
 	public const KIND_TRANSACTIONAL = 'transactional';
 	public const KIND_PROMOTIONAL   = 'promotional';
 
 	public function kind_of( string $category ): string {
-		return self::CATEGORY_RETENTION === $category ? self::KIND_PROMOTIONAL : self::KIND_TRANSACTIONAL;
+		return in_array( $category, [ self::CATEGORY_RETENTION, self::CATEGORY_REFERRAL ], true ) ? self::KIND_PROMOTIONAL : self::KIND_TRANSACTIONAL;
 	}
 
 	public function is_enabled( int $user_id, string $category ): bool {

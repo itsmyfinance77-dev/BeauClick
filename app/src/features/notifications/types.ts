@@ -1,4 +1,4 @@
-export type NotificationCategory = 'reminder' | 'waitlist' | 'rebooking' | 'retention';
+export type NotificationCategory = 'reminder' | 'waitlist' | 'rebooking' | 'retention' | 'referral';
 
 export type NotificationPreferences = Record<NotificationCategory, boolean>;
 

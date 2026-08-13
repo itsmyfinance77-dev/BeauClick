@@ -144,4 +144,35 @@ final class MetricsServiceTest extends WP_UnitTestCase {
 		$this->assertSame( 1, $usage['crmOpened'] );
 		$this->assertSame( 2, $usage['journeyOpened'] );
 	}
+
+	// 10. referral() reads real referral-domain events + the loyalty
+	// ledger's referral-specific reasons (V2.2 Step 12), reusing this same
+	// live-aggregation architecture rather than a second analytics engine.
+	public function test_referral_reports_counts_and_qualification_rate(): void {
+		global $wpdb;
+
+		$this->log( 'referral_link_shared', 'ui', 0, 1 );
+		$this->log( 'referral_signup_attributed', 'referral', 1, 2 );
+		$this->log( 'referral_signup_attributed', 'referral', 2, 3 );
+		$this->log( 'referral_qualified', 'referral', 1, 2 );
+		$this->log( 'referral_rewarded', 'referral', 1, null );
+
+		$wpdb->insert(
+			$wpdb->prefix . 'bc_loyalty_points',
+			[ 'user_id' => 1, 'points' => 50, 'reason' => 'referral_referrer_reward', 'reference_type' => 'referral', 'reference_id' => 1, 'created_at' => current_time( 'mysql' ) ]
+		);
+		$wpdb->insert(
+			$wpdb->prefix . 'bc_loyalty_points',
+			[ 'user_id' => 2, 'points' => 50, 'reason' => 'referral_referee_reward', 'reference_type' => 'referral', 'reference_id' => 1, 'created_at' => current_time( 'mysql' ) ]
+		);
+
+		$referral = ( new MetricsService() )->referral( $this->today(), $this->today() );
+
+		$this->assertSame( 1, $referral['linkShared'] );
+		$this->assertSame( 2, $referral['signupsAttributed'] );
+		$this->assertSame( 1, $referral['qualified'] );
+		$this->assertSame( 1, $referral['rewarded'] );
+		$this->assertSame( 0.5, $referral['qualificationRate'] );
+		$this->assertSame( 100, $referral['rewardPointsIssued'] );
+	}
 }

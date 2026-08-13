@@ -368,6 +368,41 @@ final class MetricsService {
 	}
 
 	/**
+	 * Referral (V2.2 Step 12) — reuses this same live-aggregation
+	 * architecture rather than building a second analytics engine, exactly
+	 * as that step's own "reuse Step 11, don't duplicate it" instruction
+	 * requires. `linkShared`/`signupsAttributed`/`qualified`/`rewarded`
+	 * read straight from wp_bc_events (the referral domain logs each stage
+	 * through the same EventLogger every other module uses); `rewardPoints`
+	 * sums the two referral-specific loyalty reasons directly from
+	 * wp_bc_loyalty_points — the loyalty ledger, not a duplicate balance.
+	 */
+	public function referral( string $from, string $to ): array {
+		global $wpdb;
+		[ $start, $end ] = self::bounds( $from, $to );
+
+		$attributed = $this->count_events( 'referral_signup_attributed', $from, $to );
+		$qualified  = $this->count_events( 'referral_qualified', $from, $to );
+
+		$reward_points = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COALESCE(SUM(points), 0) FROM {$wpdb->prefix}bc_loyalty_points WHERE reason IN ('referral_referrer_reward','referral_referee_reward') AND created_at BETWEEN %s AND %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$start,
+				$end
+			)
+		);
+
+		return [
+			'linkShared'         => $this->count_events( 'referral_link_shared', $from, $to ),
+			'signupsAttributed'  => $attributed,
+			'qualified'          => $qualified,
+			'rewarded'           => $this->count_events( 'referral_rewarded', $from, $to ),
+			'qualificationRate'  => self::ratio( $qualified, $attributed ),
+			'rewardPointsIssued' => $reward_points,
+		];
+	}
+
+	/**
 	 * Marketplace — professional supply is a current snapshot (not
 	 * range-bound; "how many professionals are live right now" doesn't have
 	 * a meaningful date-range reading), profile views are range-bound and

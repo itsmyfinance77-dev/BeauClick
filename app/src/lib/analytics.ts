@@ -12,7 +12,7 @@
 
 import { api } from './api';
 
-export type TrackableEvent = 'ai_assistant_opened' | 'crm_opened' | 'journey_opened';
+export type TrackableEvent = 'ai_assistant_opened' | 'crm_opened' | 'journey_opened' | 'referral_link_shared';
 
 export function track( event: TrackableEvent ): void {
 	if ( ! window.BeauClick?.isLoggedIn ) return;

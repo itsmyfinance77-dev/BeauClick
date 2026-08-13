@@ -227,10 +227,10 @@ ID format: `<AREA>-<NN>`. Every row has Status / Severity / Target version per �
 
 | ID | Description | Current state | Status | Severity | Target | Recommendation |
 |---|---|---|---|---|---|---|
-| SEO-01 | Meta description/OG tags on marketplace/profile/product pages | No matching code found anywhere (confirmed by direct search — the only related mentions are unrelated code comments) | MISSING | MEDIUM | V2.2 | |
-| SEO-02 | XML sitemap | None (no sitemap-generation code, no SEO plugin dependency found) | MISSING | MEDIUM | V2.2 | |
-| SEO-03 | Structured data (LocalBusiness/Service/Product schema for professional profiles) | None for BeauClick's own CPTs (WooCommerce's own product schema.org output exists for shop products only, per Currency.php's own comment) | MISSING | MEDIUM | V2.2 | |
-| SEO-04 | Canonical URLs | None found | MISSING | LOW | V2.2 | |
+| SEO-01 | Meta description/OG tags on marketplace/profile/product pages | **Resolved in V2.2 Step 12** — `inc/seo.php` extended: the real `<title>` tag (previously left completely static — a genuine bug caught during this step's live verification, since only `og:title` was ever dynamic) and meta description are now city/specialty-aware for the marketplace and content-aware for professional/business profiles | **IMPLEMENTED** | — | V2.2 Step 12 ✅ | Closed |
+| SEO-02 | XML sitemap | **Resolved in V2.2 Step 12** — WP core's own `wp-sitemap.xml` already covers `bc_professional`/`bc_business` (public CPTs); a new custom provider (`inc/sitemap.php`) adds the city/specialty marketplace URLs core can't discover on its own, bounded to launched cities and real-content combinations only | **IMPLEMENTED** | — | V2.2 Step 12 ✅ | Closed |
+| SEO-03 | Structured data (LocalBusiness/Service/Product schema for professional profiles) | **Resolved in V2.2 Step 12** — real `LocalBusiness`/`Service`/`BreadcrumbList` JSON-LD on professional/business profiles (only fields with real data — no fabricated ratings/hours/prices), `WebSite`/`Organization` on the homepage; WooCommerce's own Product/BreadcrumbList JSON-LD on shop pages is unchanged, not duplicated | **IMPLEMENTED** | — | V2.2 Step 12 ✅ | Closed |
+| SEO-04 | Canonical URLs | **Resolved in V2.2 Step 12** — explicit canonical for every page type (WP core only auto-adds one on singular views); marketplace canonical is self-referencing for a real city/specialty combination, collapses to the plain root for a thin/zero-result one | **IMPLEMENTED** | — | V2.2 Step 12 ✅ | Closed. Deliberately kept the existing `?city_id=`/`?specialty_id=` query-string URL scheme rather than introducing new pretty paths — see the architecture plan's own reasoning (avoids a rewrite-rule flush/activation-timing risk for a URL-structure change this task's own instructions warned against doing "casually") |
 
 ### P. Accessibility
 
@@ -526,11 +526,11 @@ Full rationale for every decision below lives in `VERSION_2_ARCHITECTURE_PLAN.md
 | ANLYT-03 | Checkout-funnel events not logged | **V2.2 Step 11** | Product development |
 | ANLYT-04 | No admin-facing analytics dashboard | **V2.2 Step 11** | Product development |
 | ANLYT-05 | No CRM/Journey usage measurement | **V2.2 Step 11** | Product development |
-| SEO-01 | No meta description/OG tags on marketplace/profile/product pages | **V2.2 Step 12** (Growth & Public Discovery) | Product development |
-| SEO-02 | No XML sitemap | **V2.2 Step 12** | Product development |
-| SEO-03 | No structured data (LocalBusiness/Service schema) | **V2.2 Step 12** | Product development |
-| SEO-04 | No canonical URLs | **V2.2 Step 12** | Product development |
-| Referral | No referral code/reward mechanism (deferred from V2.1 Step 9, not previously its own register ID) | **V2.2 Step 12** | Product development — reward structure itself is `NEEDS_BUSINESS_DECISION` |
+| SEO-01 | No meta description/OG tags on marketplace/profile/product pages | **V2.2 Step 12 ✅ Done** | Product development |
+| SEO-02 | No XML sitemap | **V2.2 Step 12 ✅ Done** | Product development |
+| SEO-03 | No structured data (LocalBusiness/Service schema) | **V2.2 Step 12 ✅ Done** | Product development |
+| SEO-04 | No canonical URLs | **V2.2 Step 12 ✅ Done** | Product development |
+| Referral | No referral code/reward mechanism (deferred from V2.1 Step 9, not previously its own register ID) | **V2.2 Step 12 ✅ Done** | Product development — reward structure itself remains `NEEDS_BUSINESS_DECISION` (see §37); a provisional, filterable engineering default was used, not a final policy |
 | ADMIN-01 | General admin shell/branding polish | **V2.2 Step 13** (Admin Platform & Operations Maturity) | Product development |
 | ADMIN-02 | Admin audit log scoped to verification only | **V2.2 Step 13** (extend to general-purpose) | Product development |
 | ADMIN-04 | (Referenced in §7 P2 alongside ADMIN-01; no dedicated §6 row exists — folded into the general admin-platform assessment) | **V2.2 Step 13** | Product development |
@@ -566,3 +566,15 @@ Full rationale for every decision below lives in `VERSION_2_ARCHITECTURE_PLAN.md
 **A genuinely new, pre-existing documentation-drift finding, not a Step 11 defect:** `waitlist_joined` and `membership_activated` were found already logged as real events in the live database (Steps 9/10), despite not being listed in `EventLogger`'s own docblock comment. Not fixed here — out of this step's own scope — but recorded so it isn't mistaken for something Step 11 broke or missed.
 
 **No other item in this register changed status as a result of this step** — every other classification already in this document was left exactly as written. The rest of §7 (Prioritization), §22–§27 (recommendations, closing note), §28–§35 (V2.1/V2.2 assignment tables and completion notes) above remain the accurate historical record and are preserved exactly as written.
+
+---
+
+## 37. V2.2 Step 12 Completion Note
+
+**Step 12 — Growth & Public Discovery (SEO + Referral) is complete.** SEO-01, SEO-02, SEO-03, SEO-04, and the Referral line item (§6/§35 rows updated above) now have real, tested, live-verified implementations. Full technical detail lives in `VERSION_2_ARCHITECTURE_PLAN.md`'s "V2.2 Step 12 — Growth & Public Discovery Implementation Notes" section — including three real bugs found and fixed during this step's own live verification (a duplicate `<link rel="canonical">` tag, the real `<title>` tag never actually being dynamic despite `og:title` already being correct, and a marketplace-canonical branch-ordering bug that silently discarded every city/specialty combination's own canonical) and two WordPress-core sitemap-routing gotchas (the correct registration hook is `wp_sitemaps_init`, not `init`; a provider name may not contain a hyphen under core's own single-segment sitemap rewrite rule).
+
+**Business decision still required, not silently invented:** the referral reward amount (`ReferralConfig::DEFAULT_REFERRER_REWARD_POINTS` / `DEFAULT_REFEREE_REWARD_POINTS`, both 50 points, both filterable via `beauclick/referral/referrer_reward_points`/`referee_reward_points`) is an explicitly provisional engineering default in the same style as `beauclick-loyalty`'s own `EarningRules::POINTS_*` constants — `NEEDS_BUSINESS_DECISION`, unchanged from how this register already classified "referral reward structure" since V2.1 Step 9 first deferred it.
+
+**What this step deliberately did not build, and why:** new pretty URLs for city/specialty pages (the existing query-string marketplace filtering already supports correct canonical/sitemap/structured-data treatment; adding rewrite rules would add an activation-flush-timing risk for a URL-structure change with no functional SEO benefit over what was actually built — see the architecture plan's own reasoning), a referral reward-amount decision (provisional default only, per above), a hard cap on referral volume per user or any additional anti-fraud heuristics beyond self-referral prevention (structural) and single-attribution-ever (`UNIQUE` constraint) — the task's own "do not build a sophisticated fraud platform" instruction, and reward-on-genuine-qualifying-transaction-only already limits low-effort abuse — and automatic reward clawback on a later refund of the qualifying order (documented as a known limitation, not attempted).
+
+**No other item in this register changed status as a result of this step** — every other classification already in this document was left exactly as written. The rest of §7 (Prioritization), §22–§27 (recommendations, closing note), §28–§36 (V2.1/V2.2 assignment tables and completion notes) above remain the accurate historical record and are preserved exactly as written.

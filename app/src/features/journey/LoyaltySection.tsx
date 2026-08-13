@@ -10,6 +10,8 @@ const REASON_LABELS: Record<string, string> = {
 	order_completed: 'خرید از فروشگاه',
 	manual_adjustment: 'اصلاح دستی',
 	redeemed: 'استفاده از امتیاز',
+	referral_referrer_reward: 'معرفی موفق یک دوست',
+	referral_referee_reward: 'ثبت‌نام با لینک معرفی',
 };
 
 const MEMBERSHIP_STATUS_LABELS: Record<string, string> = {

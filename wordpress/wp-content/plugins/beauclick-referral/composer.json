@@ -1,0 +1,14 @@
+{
+    "name": "beauclick/referral",
+    "description": "BeauClick customer referral domain — codes, attribution, qualification, reward via the existing loyalty ledger.",
+    "type": "wordpress-plugin",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "BeauClick\\Referral\\": "src/"
+        }
+    }
+}

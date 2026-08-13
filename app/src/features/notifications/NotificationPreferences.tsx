@@ -8,6 +8,7 @@ const CATEGORY_LABELS: Record<NotificationCategory, string> = {
 	waitlist: 'اطلاع‌رسانی لیست انتظار',
 	rebooking: 'پیشنهاد رزرو دوباره',
 	retention: 'یادآوری بازگشت (تبلیغاتی)',
+	referral: 'پاداش معرفی دوستان (تبلیغاتی)',
 };
 
 const CATEGORY_HINTS: Record<NotificationCategory, string> = {
@@ -15,6 +16,7 @@ const CATEGORY_HINTS: Record<NotificationCategory, string> = {
 	waitlist: 'وقتی زمان درخواستی شما در لیست انتظار باز شود، به شما اطلاع می‌دهیم.',
 	rebooking: 'پیشنهاد رزرو دوباره پس از گذشت مدتی از آخرین نوبت شما.',
 	retention: 'یادآوری دوستانه اگر مدتی است از BeauClick استفاده نکرده‌اید.',
+	referral: 'اطلاع وقتی امتیاز معرفی دوستان به حساب شما واریز می‌شود.',
 };
 
 /**

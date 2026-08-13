@@ -31,7 +31,7 @@ use WP_REST_Request;
  */
 final class AnalyticsController extends RestController {
 
-	private const TRACKABLE_EVENTS = [ 'ai_assistant_opened', 'crm_opened', 'journey_opened' ];
+	private const TRACKABLE_EVENTS = [ 'ai_assistant_opened', 'crm_opened', 'journey_opened', 'referral_link_shared' ];
 
 	public function register_routes(): void {
 		$this->route(
@@ -75,6 +75,7 @@ final class AnalyticsController extends RestController {
 				'ai'          => $service->ai( $from, $to ),
 				'retention'   => $service->retention( $from, $to ),
 				'usage'       => $service->usage( $from, $to ),
+				'referral'    => $service->referral( $from, $to ),
 				'marketplace' => $service->marketplace( $from, $to ),
 			]
 		);

@@ -77,7 +77,7 @@ final class AnalyticsControllerTest extends WP_UnitTestCase {
 		$response = ( new AnalyticsController() )->overview( $request );
 		$data     = $response->get_data()['data'];
 
-		foreach ( [ 'overview', 'funnel', 'commerce', 'search', 'ai', 'retention', 'usage', 'marketplace' ] as $section ) {
+		foreach ( [ 'overview', 'funnel', 'commerce', 'search', 'ai', 'retention', 'usage', 'referral', 'marketplace' ] as $section ) {
 			$this->assertArrayHasKey( $section, $data );
 		}
 	}

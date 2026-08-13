@@ -68,6 +68,13 @@ final class AuthController extends RestController {
 		wp_set_auth_cookie( $account['userId'], true );
 		do_action( 'wp_login', get_userdata( $account['userId'] )->user_login, get_userdata( $account['userId'] ) );
 
+		// V2.2 Step 12: a plain extension seam for anything that needs to
+		// react to a new/returning account being established (currently
+		// beauclick-referral's own attribution listener) -- matches the
+		// existing beauclick/payments/shop_order_completed convention rather
+		// than beauclick-referral reaching into this controller directly.
+		do_action( 'beauclick/auth/account_registered', $account['userId'], $account['isNew'] );
+
 		return Response::ok(
 			[
 				'isNewAccount' => $account['isNew'],

@@ -6,6 +6,7 @@ import { formatToman, formatFullJalaliDate } from '@/lib/format';
 import { RecommendationCard } from '@/features/ai/RecommendationCard';
 import { GoalForm } from './GoalForm';
 import { LoyaltySection } from './LoyaltySection';
+import { ReferralCard } from './ReferralCard';
 import { WaitlistSection } from './WaitlistSection';
 import type { BeautyGoal, JourneySummary, TimelineEntry } from './types';
 
@@ -82,6 +83,8 @@ export function JourneyTab() {
 			</div>
 
 			<LoyaltySection />
+
+			<ReferralCard />
 
 			{ ! hasAnyContent && (
 				<EmptyState title="مسیر زیبایی‌ات هنوز خالیه — یه هدف تعریف کن تا شروع کنیم." />

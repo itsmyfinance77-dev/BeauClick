@@ -1813,3 +1813,123 @@ Added `flex-wrap:wrap` to the range-picker form's inline style; re-verified via 
 ### Deferred (explicitly out of this step's scope, per the task's own stop condition)
 
 SEO, Referral, Admin Platform redesign, Account deletion/export, Rescheduling, Invoice PDFs, Professional/Business Platform Completion, Campaign Engine, Financial/Payout, Realtime, Native Mobile, AI for Professionals — none started. Step 12 was not started.
+
+---
+
+## V2.2 Step 12 — Growth & Public Discovery (SEO + Referral) Implementation Notes
+
+### Two connected halves, one shared theme
+
+SEO makes the public product discoverable; Referral turns an existing customer into a growth channel. Both were explicitly scoped to reuse everything V2.1/V2.2 Step 11 already built — no second event system, no second analytics engine, no second points ledger, no second notification system, no new URL structure.
+
+### Public information architecture inspected before implementation
+
+The theme (`wordpress/wp-content/themes/beauclick/`) already server-renders public pages (homepage, marketplace, professional/business profile) with React "islands" mounted into specific containers — there is no client-side router. `inc/seo.php` already existed (V1 Production Readiness) with meta description/OpenGraph tags, but: the marketplace's title/description were static regardless of which city/specialty was being filtered (the single largest named gap — the architecture proposal's own flagship example query, "میکاپ عروس در یزد," could never rank when every `/marketplace/` variant shared identical metadata); no canonical URLs beyond WP core's own singular-only default; no structured data for BeauClick's own CPTs (WooCommerce's own Product/BreadcrumbList JSON-LD on shop pages was correctly left untouched, not duplicated); no custom sitemap entries for anything beyond what WP core's `wp-sitemap.xml` auto-discovers.
+
+**A permalink-structure correction made mid-step:** an initial reading of `bc_provider_permalink()`'s own docblock comment suggested this environment runs Plain permalinks. Direct verification (`permalink_structure` option, a real redirect-to-pretty-URL observed live) proved otherwise — this environment runs a real `/%postname%/` structure with working rewrite rules. The engineering decision to keep the marketplace's existing `?city_id=`/`?specialty_id=` query-string filtering rather than add new pretty city/specialty paths was kept anyway, on its own merits (avoids a rewrite-flush-timing risk for a URL-structure change this task's own instructions warn against doing "casually," for no functional SEO benefit over what correct canonical/sitemap/structured-data treatment on the existing URLs already delivers) — not because pretty URLs would have 404'd, which was the original (incorrect) assumption. The stale claim was corrected in `inc/seo.php`'s own docblock rather than left to mislead the next reader.
+
+### SEO metadata (SEO-01)
+
+`inc/seo.php` extended: `bc_seo_title_and_description()`'s marketplace branch now reads `city_id`/`specialty_id` and produces a real, specific title/description per combination (`"میکاپ در یزد | BeauClick"`, not a static string). Every professional/business profile page's title/description already existed and was reused, not rebuilt.
+
+**A real bug found during live verification, not assumed fixed:** the actual `<title>` tag — what a search result's clickable headline actually is — was completely static on every page type, because nothing had ever fed `bc_seo_title_and_description()`'s output into it; only `og:title` was ever dynamic. Fixed via the `document_title_parts` filter (the documented WP core hook `add_theme_support('title-tag')` relies on), clearing the auto-appended site name/tagline parts since this codebase's own title strings already include "BeauClick" consistently.
+
+### Canonical URLs (SEO-04)
+
+`bc_seo_canonical_url()`: explicit canonical for every page type. Marketplace canonical is self-referencing (including `city_id`/`specialty_id`) for a real, content-bearing combination, and collapses to the plain `/marketplace/` root for an unrecognized id or a zero-result combination — shared logic (`bc_get_meaningful_marketplace_filters()`) between the meta tags, canonical, robots, and structured-data functions, so all four always agree on what counts as "real."
+
+**A real bug found during live verification:** `bc_seo_canonical_url()`'s `is_singular()` branch was checked before the more specific `is_page('marketplace')` branch — a WP Page satisfies `is_singular()` too, so the marketplace branch was unreachable dead code, and every filtered marketplace URL silently canonicalized to the bare root, discarding its own real content's canonical. Fixed by reordering the branches (specific before generic). Caught only by an actual live HTTP request with real query parameters — every other consumer of `bc_get_meaningful_marketplace_filters()` (meta description, structured-data breadcrumb) happened to be structured so the bug didn't affect them, which is exactly why isolated live verification of each output, not just one, mattered here.
+
+**A second real bug, also fixed:** WP core's own `wp_head` adds a second, plain `rel_canonical()` on every singular view by default — with this file now emitting a correct one for every page type, core's own needed to be explicitly removed (`remove_action('wp_head', 'rel_canonical')`) to avoid two `<link rel="canonical">` tags on the same page.
+
+### Structured data (SEO-03)
+
+`bc_render_structured_data()`: `LocalBusiness` + `Service` (via `makesOffer`) + `BreadcrumbList` JSON-LD on professional/business profile pages; `WebSite` + `Organization` on the homepage; `BreadcrumbList` on a meaningful marketplace filter combination. Every field comes from real, already-rendered page data — `aggregateRating` is only emitted when `review_count > 0` (never a fabricated default for a brand-new professional with zero real reviews), `address` is a real `PostalAddress` with only `addressLocality` (no street address is ever collected, so none is invented). Live-verified against a real seeded professional (real rating, real specialty, real city) — see this step's own Live Verification section below.
+
+### Sitemap (SEO-02)
+
+A new custom sitemap provider (`inc/sitemap.php`) supplies the one thing WP core's default post-type sitemap structurally cannot: query-string marketplace URLs. Bounded and real-content-gated by construction — only `is_launched` cities, and only city×specialty pairs with at least one real matching row in `wp_bc_provider_index` today (§11/§12's own "avoid generating thousands of empty thin pages" instruction). `bc_service`/`bc_portfolio_item` are explicitly excluded from core's own post-type sitemap (defense in depth on top of their existing `public => false`).
+
+**Two real WordPress-core routing gotchas found during live verification, both fixed:**
+1. The correct, documented hook for `wp_register_sitemap_provider()` is `wp_sitemaps_init` (fired from inside the sitemaps server's own bootstrap), not the generic `init` this step's code first used — hooking `init` ran too early relative to the sitemaps registry's own construction, so the custom sitemap URL silently fell through to the front page (HTTP 200, wrong content, no error at all) instead of ever rendering.
+2. WP core's own single-segment sitemap rewrite rule is `^wp-sitemap-([a-z]+?)-(\d+?)\.xml$` — the provider-name capture group is pure `[a-z]+`, with no hyphens, digits, or underscores allowed. The first, more descriptive provider name (`bc-marketplace-locations`) registered successfully but could never be reached by URL; renamed to `bclocations`.
+Both were only caught because this step's own live verification actually fetched the resulting sitemap URL and read its content, rather than confirming only that provider registration didn't error.
+
+### Indexability control
+
+A `wp_robots` filter: `/dashboard/` and `/auth/` (account-only surfaces with no public search value, and — confirmed by inspection — the only two BeauClick-owned pages with no indexing protection at all; WooCommerce already protects its own cart/checkout/account pages via its own `wc_page_no_robots()`) get `noindex,nofollow`; a marketplace URL with a `city_id`/`specialty_id` that resolves to "not real" (unrecognized id, unlaunched city, or zero matching providers) gets `noindex` (not `nofollow` — a crawler should still follow its links back to pages that are worth indexing).
+
+### Referral domain (new `beauclick-referral` plugin)
+
+A new, self-contained plugin — "new domain, new plugin," the same precedent V2.1 Step 10 established for `beauclick-notifications` — depending on and reusing `beauclick-core` (events), `beauclick-loyalty` (the reward ledger), and `beauclick-notifications` (delivery), never duplicating any of the three.
+
+**Database — two tables, deliberately separate concerns:** `wp_bc_referral_codes` (one stable code per user, generated lazily on first request, `UNIQUE(user_id)` + `UNIQUE(code)`); `wp_bc_referrals` (one row per successful referred *signup*, not per share — `UNIQUE(referee_user_id)` is the real anti-replay guarantee: a given account can only ever be someone's referee once, ever, enforced at the database layer, not just application logic that could be raced).
+
+**Attribution:** a plain first-party `bc_ref` cookie (`inc/referral.php`, theme-level, set on `init` for any `?ref=CODE` request, first-touch — never overwrites an existing cookie), not a JS/`sessionStorage` mechanism — there is no single app-shell bundle mounted on every page (each page enqueues only the specific bundle(s) it needs), so a visitor landing on a professional's profile via a referral link and only later navigating to `/auth/` themselves needs attribution to survive that navigation with zero JS. `beauclick-auth`'s `AuthController::verify_otp()` gained one new extension-point action, `do_action('beauclick/auth/account_registered', $userId, $isNew)` — mirroring the existing `beauclick/payments/shop_order_completed` convention exactly — which `beauclick-referral`'s `AttributionListener` consumes, reading `$_COOKIE['bc_ref']` itself rather than the cookie value being threaded through the action or any REST request body. The cookie is consumed (cleared) after use regardless of outcome, so a browser shared across multiple real signups doesn't keep re-attempting a stale code.
+
+**Self-referral is prevented by construction, not merely a runtime check:** a code only exists for an account that already exists, and attribution only ever runs for a brand-new account (`$isNew === true`) — an existing user can never apply their own code to themselves, because they never go through account creation again. The runtime guard (`referrer_id === referee_id`) exists anyway and is unit-tested directly, not trusted by construction alone.
+
+**Qualification:** mirrors `beauclick-loyalty`'s own `EarningRules` hook pair exactly — `beauclick/booking/completed` and `beauclick/payments/shop_order_completed` — rather than re-hooking WooCommerce directly. "First real completed booking OR first real completed shop/B2B order, whichever happens first" is the qualifying action (registration alone was deliberately not treated as sufficient, per this step's own task instruction). `ReferralService::qualify()` is itself idempotent — a status-guarded `UPDATE ... WHERE status = 'pending'` — so both hooks can safely fire for the same referee over their lifetime without a second reward.
+
+**Reward:** "give one, get one" — both referrer and referee are rewarded, exclusively through `beauclick_loyalty()->ledger()->award()` (no second points system), guarded by the ledger's own `has_awarded()` pre-check plus its existing `UNIQUE(reference_type, reference_id, reason)` index. Reward amounts (`ReferralConfig::DEFAULT_REFERRER_REWARD_POINTS`/`DEFAULT_REFEREE_REWARD_POINTS`, both 50) are explicitly provisional, filterable defaults in the same style as `EarningRules::POINTS_*` — `NEEDS_BUSINESS_DECISION`, not invented as final policy.
+
+### Notification integration
+
+A new `referral` preference category added to `beauclick-notifications`' `PreferenceService::CATEGORIES` (classified promotional, like `retention` — a reward notification is good news but nobody explicitly asked for it the way they asked for a booking reminder), and one new template, `REFERRAL_REWARDED`, in `TemplateRegistry`. No second notification system.
+
+### Analytics integration
+
+`beauclick-analytics`'s `MetricsService` gained one new method, `referral()`, reading `referral_signup_attributed`/`referral_qualified`/`referral_rewarded`/`referral_link_shared` events (the same `count_events()` helper every other metric already uses) plus a direct sum over the loyalty ledger's two referral-specific reasons — no second analytics engine. `AnalyticsController::TRACKABLE_EVENTS` gained `referral_link_shared` (a genuine UI-visibility event — the server cannot observe a share/copy button being pressed). The platform admin dashboard (`AnalyticsDashboardPage`) gained one new "معرفی به دوستان" section. `beauclick-referral`'s own admin page (`ReferralAdminPage`) is deliberately a small, read-only operational list (recent referrals, status, dates) for support/ops — not a second metrics dashboard.
+
+### REST API
+
+Two routes: `GET /referrals/summary` (self-scoped only — no route accepts a customer-supplied user id, matching `LoyaltyController::summary()`'s own pattern exactly — returns the code, share URL, and real counts), `GET /referrals/admin/list` (admin-only, matching `NotificationsController::admin_list()`'s own shape).
+
+### Frontend
+
+Referral capture is server-side only (see Attribution above — a plain cookie, no JS involved). The one frontend addition is `app/src/features/journey/ReferralCard.tsx`, rendered as a sibling of `LoyaltySection` inside the Journey tab (not a new nav destination — the same precedent `LoyaltySection`'s own docblock already established for loyalty-adjacent features). Copy-to-clipboard and `navigator.share()` (with a copy fallback), an `aria-live="polite"` status region for the copy/share result (§30's own "accessible copy/share feedback, not color alone" requirement), Persian throughout, Persian digits for all counts. `NotificationPreferences.tsx`'s category list is data-driven off the shared `NotificationCategory` type, so adding `referral` there was a two-line addition, not a rewrite.
+
+### Security
+
+`GET /referrals/summary` requires login only, self-scoped. `GET /referrals/admin/list` requires `bc_manage_platform`. `POST /analytics/track`'s existing allow-list discipline covers the one new client-facing event. No route anywhere accepts a client-supplied referrer/referee user id — attribution always resolves the referrer from the code server-side, and the referee is always `get_current_user_id()` at the moment of registration.
+
+### Performance
+
+Every referral query is a single indexed lookup (`user_id`/`code`/`referee_user_id`, all indexed per the migration). The sitemap provider's own city×specialty scan is bounded by launched-city count × specialty count (realistically low tens to low hundreds of combinations for this product) and computed once per sitemap request — no caching layer introduced, consistent with this project's standing "don't introduce infrastructure without evidence it's needed" position.
+
+### Tests
+
+19 new backend tests for `beauclick-referral` (code stability, attribution creation/rejection/self-referral/replay-prevention, qualification via both hooks and its idempotency, summary counts, REST authorization) plus one new test for `MetricsService::referral()` and an updated section-list assertion in `AnalyticsControllerTest`. Backend suite: **572/572** (552 pre-existing + 20 new), unchanged elsewhere. Frontend: **27/27**, unchanged (the new `ReferralCard`/preference-list changes are presentational, verified live rather than with new unit tests, matching this step's own Step 11 precedent for one-line instrumentation additions). SEO/theme code has no dedicated PHPUnit coverage — consistent with this codebase's existing convention (no theme template has ever had PHPUnit tests; `phpunit.xml.dist` only scans plugin directories) — and was instead verified entirely through live HTTP requests, documented below. TypeScript and production build both clean.
+
+### Live verification (real running site, real seeded database, real HTTP requests)
+
+Performed against the real local dev server after activating the new plugin (not automatic, same finding as Step 11):
+- **SEO metadata**: a real Yazd/makeup professional's profile page — correct dynamic `<title>`, single canonical, real `LocalBusiness`/`BreadcrumbList` JSON-LD with real rating/specialty/city data. The marketplace's real flagship combination (`city_id=37&specialty_id=16`, i.e. "میکاپ در یزد") — correct dynamic title/description, correct self-referencing canonical (after the ordering-bug fix), correct `BreadcrumbList`. A zero-result combination — correctly collapsed to the plain canonical and `noindex`.
+- **Sitemap**: `/wp-sitemap.xml` correctly lists the new `bclocations` provider (after both routing fixes); its own XML correctly contains only real, launched-city/real-content combinations.
+- **Security**: unauthenticated `GET /referrals/summary` → real HTTP `401`; unauthenticated `GET /referrals/admin/list` → real HTTP `403`.
+- **Referral end-to-end, no fabricated database state**: a real referral code generated for a real account → a real `?ref=CODE` request correctly set the `bc_ref` cookie → a real OTP registration flow (phone requested, code read from the dev environment's own mock-SMS log, verified) correctly attributed a `pending` referral and cleared the cookie → firing the real `beauclick/booking/completed` hook against a real inserted booking correctly transitioned the referral to `qualified` then `rewarded`, correctly credited both the referrer (+50) and referee (+50, plus their own independent +10 booking-completion loyalty award — two legitimate, separate awards, not a double-count of one) via the real loyalty ledger, and correctly attempted real notifications to both (SMS succeeded for the referee, who has a real phone from OTP registration; the referrer test account's SMS and both accounts' email attempts failed — explained, not a defect: the test referrer account was created without a phone number as a test-setup artifact, and this dev environment has no SMTP configured at all, already documented as `EXTERNAL_CONFIGURATION` in the V2.1 state-recovery report). `MetricsService::referral()` correctly reflected the real numbers afterward (1 attributed, 1 qualified, 1 rewarded, 100% qualification rate, 100 points issued).
+- **Mobile (375px)**: the real marketplace page (server-rendered, reachable without login) — no horizontal overflow, correct dynamic title, correct Persian content. The authenticated `ReferralCard`/`JourneyTab` UI could not be visually verified in a real logged-in browser session in this pass — this sandbox's safety controls correctly declined an attempt to set a test password for interactive login (the same boundary already respected during Step 11's own live verification), and that decision was respected rather than worked around. Verified instead via: TypeScript/build success, and the component reusing the exact same `flex-wrap`/`Button`/`Chip` primitives already proven overflow-safe at 375px elsewhere in this codebase (including the Step 11 bug this very document fixed).
+
+### Bugs discovered
+
+1. The real `<title>` tag was static on every page — only `og:title` was ever dynamic.
+2. `bc_seo_canonical_url()`'s branch ordering made the marketplace-specific canonical logic unreachable dead code.
+3. WP core's own default canonical (`rel_canonical`) duplicated this step's new one.
+4. The custom sitemap provider was registered on the wrong hook (`init` instead of `wp_sitemaps_init`), silently falling through to the front page.
+5. The custom sitemap provider's original name contained a hyphen, which WP core's own single-segment sitemap rewrite rule cannot match.
+
+### Bugs fixed
+
+All five, above — each confirmed fixed by re-running the exact live request that first exposed it, not merely by code inspection.
+
+### Known limitations
+
+- No pretty city/specialty URLs — a deliberate scope decision, not an oversight; see the architecture reasoning above.
+- `recoveredBookings`-style click attribution doesn't exist for referral — `referral_link_shared` is a UI-visibility ping, not proof a specific click led to a specific signup; attribution instead comes from the cookie, which is the real, reliable signal.
+- No automatic reward clawback if a qualifying order is later refunded — documented, not attempted, matching this task's own "do not build a sophisticated fraud platform" instruction; the reward fires once, at genuine payment-complete time.
+- No hard cap on referrals per user — a `NEEDS_BUSINESS_DECISION` candidate for later if real abuse patterns are ever observed, not invented as an engineering default now.
+- The Referral admin ops page and email notification delivery were live-verified against real application logic but not against a real SMTP/SMS provider (none configured in this environment — pre-existing, already-documented `EXTERNAL_CONFIGURATION` gap, not new to this step).
+
+### Deferred (explicitly out of this step's scope, per the task's own stop condition)
+
+Admin Platform & Operations Maturity, Account Privacy & Data Control, Booking Evolution, Professional/Business Platform Completion, Campaign Engine, Financial/Payout, Realtime, Native Mobile, AI for Professionals — none started. Step 13 was not started.

@@ -19,6 +19,7 @@ final class TemplateRegistry {
 	public const WAITLIST_SLOT_AVAILABLE  = 'waitlist_slot_available';
 	public const REBOOKING_SUGGESTION     = 'rebooking_suggestion';
 	public const RETENTION_NUDGE          = 'retention_nudge';
+	public const REFERRAL_REWARDED        = 'referral_rewarded';
 
 	/** @return array{subject:string, sms:string, email:string}|null */
 	public static function render( string $key, array $vars ): ?array {
@@ -56,6 +57,11 @@ final class TemplateRegistry {
 				'subject' => __( 'دلمان برایت تنگ شده — BeauClick', 'beauclick-notifications' ),
 				'sms'     => __( 'BeauClick: مدتی است سراغمان نیامده‌ای! برای رزرو نوبت جدید: {{bookingUrl}}', 'beauclick-notifications' ),
 				'email'   => __( "سلام {{customerName}}،\n\nمدتی است نوبتی با BeauClick نداشته‌ای. هر وقت دلت خواست، منتظرتیم.\n\n{{bookingUrl}}\n\nBeauClick", 'beauclick-notifications' ),
+			],
+			self::REFERRAL_REWARDED => [
+				'subject' => __( 'امتیاز معرفی شما واریز شد — BeauClick', 'beauclick-notifications' ),
+				'sms'     => __( 'BeauClick: {{points}} امتیاز بابت معرفی موفق به حساب وفاداری شما اضافه شد.', 'beauclick-notifications' ),
+				'email'   => __( "سلام،\n\nخبر خوب! {{points}} امتیاز بابت معرفی موفق به حساب وفاداری شما اضافه شد.\n\nBeauClick", 'beauclick-notifications' ),
 			],
 		];
 	}
