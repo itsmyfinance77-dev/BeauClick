@@ -5,6 +5,7 @@ import { formatToman, formatFullJalaliDate } from '@/lib/format';
 import { RecommendationCard } from '@/features/ai/RecommendationCard';
 import { GoalForm } from './GoalForm';
 import { LoyaltySection } from './LoyaltySection';
+import { WaitlistSection } from './WaitlistSection';
 import type { BeautyGoal, JourneySummary, TimelineEntry } from './types';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -121,6 +122,8 @@ export function JourneyTab() {
 					) ) }
 				</div>
 			</section>
+
+			<WaitlistSection />
 
 			{ summary.upcomingBookings.length > 0 && (
 				<section>

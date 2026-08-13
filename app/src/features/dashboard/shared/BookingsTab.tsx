@@ -36,7 +36,7 @@ export function BookingsTab() {
 
 	useEffect( load, [] );
 
-	async function act( id: number, action: 'cancel' ) {
+	async function act( id: number, action: 'cancel' | 'no-show' ) {
 		setBusyId( id );
 		try {
 			await api.post( `/booking/bookings/${ id }/${ action }` );
@@ -65,11 +65,21 @@ export function BookingsTab() {
 								</strong>
 								<p style={ { margin: '4px 0 0', fontSize: 13, color: 'var(--bc-color-ink-faint)' } }>{ STATUS_LABELS[ b.status ] ?? b.status }</p>
 							</div>
-							{ [ 'pending', 'confirmed' ].includes( b.status ) && (
-								<Button variant="outline" disabled={ busyId === b.id } onClick={ () => act( b.id, 'cancel' ) }>
-									لغو رزرو
-								</Button>
-							) }
+							<div style={ { display: 'flex', gap: 8 } }>
+								{ [ 'pending', 'confirmed' ].includes( b.status ) && (
+									<Button variant="outline" disabled={ busyId === b.id } onClick={ () => act( b.id, 'cancel' ) }>
+										لغو رزرو
+									</Button>
+								) }
+								{ /* Provider-only: this list only ever contains bookings the current
+								     user owns one way or the other (customer OR provider) -- if it's
+								     not their own customerId, they must be the provider. */ }
+								{ 'confirmed' === b.status && b.customerId !== currentUserId && new Date( b.slotEnd.replace( ' ', 'T' ) ) < new Date() && (
+									<Button variant="outline" disabled={ busyId === b.id } onClick={ () => act( b.id, 'no-show' ) }>
+										ثبت عدم حضور مشتری
+									</Button>
+								) }
+							</div>
 							{ 'completed' === b.status && b.customerId === currentUserId && (
 								reviewedIds.has( b.id )
 									? <span style={ { fontSize: 13, color: 'var(--bc-color-ink-faint)' } }>نظر شما ثبت شد</span>

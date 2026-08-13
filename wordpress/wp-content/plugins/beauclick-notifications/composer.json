@@ -1,0 +1,14 @@
+{
+    "name": "beauclick/notifications",
+    "description": "BeauClick central notification service — event/trigger -> template -> recipient -> channel -> delivery, reused by Waitlist, Reminders, Rebooking, Retention, and future Campaigns. Reuses beauclick-auth's SMS abstraction and wp_mail() rather than duplicating delivery logic.",
+    "type": "wordpress-plugin",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "BeauClick\\Notifications\\": "src/"
+        }
+    }
+}

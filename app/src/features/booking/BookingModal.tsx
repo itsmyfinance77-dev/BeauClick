@@ -20,6 +20,17 @@ const NEXT_7_DAYS = Array.from( { length: 7 }, ( _, i ) => {
 	return d;
 } );
 
+/** `Date.toISOString().slice(0,10)` converts to UTC first -- wrong near
+ * local midnight in a UTC+3:30 timezone (Iran), the exact off-by-one class
+ * of bug already documented and avoided elsewhere in this codebase (see
+ * OverviewTab.tsx). Reads the Date object's own local y/m/d fields instead. */
+function localDateString( d: Date ): string {
+	const y = d.getFullYear();
+	const m = String( d.getMonth() + 1 ).padStart( 2, '0' );
+	const day = String( d.getDate() ).padStart( 2, '0' );
+	return `${ y }-${ m }-${ day }`;
+}
+
 /**
  * Service -> date -> time -> review & confirm -> success, per the design
  * handoff's 5-step booking flow. Step 4 is "review & confirm" rather than
@@ -38,6 +49,9 @@ export function BookingModal( { open, onClose, providerId, initialServiceId }: B
 	const [ selectedSlot, setSelectedSlot ] = useState<AvailabilitySlot | null>( null );
 	const [ loading, setLoading ] = useState( false );
 	const [ error, setError ] = useState<string | null>( null );
+	const [ waitlistJoining, setWaitlistJoining ] = useState( false );
+	const [ waitlistJoined, setWaitlistJoined ] = useState( false );
+	const [ waitlistError, setWaitlistError ] = useState<string | null>( null );
 
 	useEffect( () => {
 		if ( ! open ) return;
@@ -58,13 +72,32 @@ export function BookingModal( { open, onClose, providerId, initialServiceId }: B
 
 	useEffect( () => {
 		if ( step !== 3 ) return;
-		const date = NEXT_7_DAYS[ selectedDateIdx ].toISOString().slice( 0, 10 );
+		setWaitlistJoined( false );
+		setWaitlistError( null );
+		const date = localDateString( NEXT_7_DAYS[ selectedDateIdx ] );
 		setLoading( true );
 		api.get<AvailabilitySlot[]>( `/booking/availability?provider_id=${ providerId }&date=${ date }` )
 			.then( setSlots )
 			.catch( () => setError( 'خطا در دریافت زمان‌های آزاد.' ) )
 			.finally( () => setLoading( false ) );
 	}, [ step, selectedDateIdx, providerId ] );
+
+	async function joinWaitlist() {
+		setWaitlistJoining( true );
+		setWaitlistError( null );
+		try {
+			await api.post( '/booking/waitlist', {
+				provider_id: providerId,
+				service_id: selectedService?.id,
+				preferred_date: localDateString( NEXT_7_DAYS[ selectedDateIdx ] ),
+			} );
+			setWaitlistJoined( true );
+		} catch ( e ) {
+			setWaitlistError( e instanceof ApiError ? e.message : 'ثبت در لیست انتظار ناموفق بود.' );
+		} finally {
+			setWaitlistJoining( false );
+		}
+	}
 
 	const canGoNext = useMemo( () => {
 		if ( step === 1 ) return !! selectedService;
@@ -180,7 +213,21 @@ export function BookingModal( { open, onClose, providerId, initialServiceId }: B
 					<section>
 						<h3 id="bc-booking-title" style={ { marginTop: 0 } }>۳. انتخاب ساعت</h3>
 						{ loading && <LoadingDots /> }
-						{ ! loading && slots.length === 0 && <p style={ { color: 'var(--bc-color-ink-faint)' } }>زمان آزادی در این روز وجود ندارد.</p> }
+						{ ! loading && slots.length === 0 && (
+							<div>
+								<p style={ { color: 'var(--bc-color-ink-faint)' } }>زمان آزادی در این روز وجود ندارد.</p>
+								{ waitlistJoined ? (
+									<p style={ { color: 'var(--bc-color-success)', fontSize: 13 } }>ثبت شد! به‌محض باز شدن زمانی مناسب، به شما اطلاع می‌دهیم.</p>
+								) : (
+									<>
+										<Button variant="outline" disabled={ waitlistJoining } onClick={ joinWaitlist }>
+											{ waitlistJoining ? 'در حال ثبت…' : 'به من اطلاع بده' }
+										</Button>
+										{ waitlistError && <p role="alert" style={ { color: 'var(--bc-color-error)', fontSize: 12, marginTop: 6 } }>{ waitlistError }</p> }
+									</>
+								) }
+							</div>
+						) }
 						<div style={ { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 } }>
 							{ slots.map( ( slot ) => (
 								<Chip key={ slot.id } active={ selectedSlot?.id === slot.id } onClick={ () => setSelectedSlot( slot ) }>

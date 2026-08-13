@@ -9,11 +9,18 @@ use BeauClick\Booking\Cron\RankingScheduler;
 use BeauClick\Booking\Database\Migrations\AddHoldExpiryColumns;
 use BeauClick\Booking\Database\Migrations\CreateBookingTables;
 use BeauClick\Booking\Database\Migrations\CreateCrmNotesTable;
+use BeauClick\Booking\Database\Migrations\CreateWaitlistTable;
 use BeauClick\Booking\Database\Seeds\DemoAvailabilitySeed;
 use BeauClick\Booking\Ranking\RankingEngine;
+use BeauClick\Booking\Rebooking\RebookingScheduler;
+use BeauClick\Booking\Reminders\ReminderScheduler;
+use BeauClick\Booking\Retention\RetentionScheduler;
 use BeauClick\Booking\Rest\BookingController;
 use BeauClick\Booking\Rest\CrmController;
 use BeauClick\Booking\Rest\DashboardController;
+use BeauClick\Booking\Rest\WaitlistController;
+use BeauClick\Booking\Waitlist\WaitlistExpiryScheduler;
+use BeauClick\Booking\Waitlist\WaitlistMatcher;
 
 final class Plugin {
 
@@ -29,7 +36,7 @@ final class Plugin {
 	}
 
 	private function migrations(): array {
-		return [ new CreateBookingTables(), new AddHoldExpiryColumns(), new CreateCrmNotesTable() ];
+		return [ new CreateBookingTables(), new AddHoldExpiryColumns(), new CreateCrmNotesTable(), new CreateWaitlistTable() ];
 	}
 
 	public function boot(): void {
@@ -44,6 +51,17 @@ final class Plugin {
 		$ranking_scheduler = new RankingScheduler();
 		$ranking_scheduler->register();
 		add_action( 'admin_init', [ $ranking_scheduler, 'ensure_scheduled' ] );
+
+		// V2.1 Step 10 -- Waitlist reacts to the authoritative
+		// beauclick/booking/slot_opened event fired from cancel_booking()/
+		// expire_stale_holds() (see BookingService); never a second lock,
+		// the existing atomic create_booking() claim stays authoritative.
+		( new WaitlistMatcher() )->register();
+
+		foreach ( [ new ReminderScheduler(), new RebookingScheduler(), new RetentionScheduler(), new WaitlistExpiryScheduler() ] as $step10_scheduler ) {
+			$step10_scheduler->register();
+			add_action( 'admin_init', [ $step10_scheduler, 'ensure_scheduled' ] );
+		}
 
 		// V2.0 Step 3: real-time single-provider ranking recompute, one hook
 		// per "something that could move this provider's score just
@@ -99,6 +117,7 @@ final class Plugin {
 		( new BookingController() )->register_routes();
 		( new DashboardController() )->register_routes();
 		( new CrmController() )->register_routes();
+		( new WaitlistController() )->register_routes();
 	}
 
 	public function maybe_seed( ?string $only ): void {
@@ -117,10 +136,18 @@ final class Plugin {
 
 		( new HoldExpiryScheduler() )->ensure_scheduled();
 		( new RankingScheduler() )->ensure_scheduled();
+		( new ReminderScheduler() )->ensure_scheduled();
+		( new RebookingScheduler() )->ensure_scheduled();
+		( new RetentionScheduler() )->ensure_scheduled();
+		( new WaitlistExpiryScheduler() )->ensure_scheduled();
 	}
 
 	public static function deactivate(): void {
 		( new HoldExpiryScheduler() )->unschedule();
 		( new RankingScheduler() )->unschedule();
+		( new ReminderScheduler() )->unschedule();
+		( new RebookingScheduler() )->unschedule();
+		( new RetentionScheduler() )->unschedule();
+		( new WaitlistExpiryScheduler() )->unschedule();
 	}
 }

@@ -69,6 +69,17 @@ final class BookingController extends RestController {
 				'args'                => [ 'id' => [ 'type' => 'integer', 'required' => true ] ],
 			]
 		);
+
+		$this->route(
+			'/booking/bookings/(?P<id>\d+)/no-show',
+			[
+				'methods'             => 'POST',
+				'callback'            => [ $this, 'no_show' ],
+				// Same ownership gate as confirm() -- the owning provider or an admin/platform capability, never an arbitrary customer.
+				'permission_callback' => [ $this, 'can_confirm' ],
+				'args'                => [ 'id' => [ 'type' => 'integer', 'required' => true ] ],
+			]
+		);
 	}
 
 	public function can_book(): bool|\WP_Error {
@@ -238,6 +249,13 @@ final class BookingController extends RestController {
 		return $ok
 			? Response::ok( [ 'confirmed' => true ] )
 			: Response::error( 'bc_cannot_confirm', __( 'این رزرو در وضعیت قابل تأیید نیست.', 'beauclick-booking' ), 409 );
+	}
+
+	public function no_show( WP_REST_Request $request ) {
+		$ok = ( new BookingService() )->mark_no_show( (int) $request->get_param( 'id' ) );
+		return $ok
+			? Response::ok( [ 'noShow' => true ] )
+			: Response::error( 'bc_cannot_mark_no_show', __( 'این رزرو در وضعیت قابل ثبت به‌عنوان عدم حضور نیست.', 'beauclick-booking' ), 409 );
 	}
 
 	private function format_booking( array $row ): array {

@@ -167,6 +167,15 @@ final class BookingService {
 		}
 		( new BookingMailer() )->send_cancelled( $booking, $actor_id );
 
+		// V2.1 Step 10 -- the authoritative "a slot just became newly
+		// available" moment (this method already only reaches here on a
+		// real, atomic pending/confirmed -> cancelled transition that
+		// genuinely freed the slot). beauclick-booking deliberately doesn't
+		// know Waitlist exists — same one-way hook-based dependency
+		// direction as every other cross-plugin seam in this codebase (see
+		// beauclick/booking/completed).
+		do_action( 'beauclick/booking/slot_opened', (int) $booking['slot_id'], (int) $booking['provider_id'], $booking['service_id'] ? (int) $booking['service_id'] : null, substr( (string) $booking['slot_start'], 0, 10 ) );
+
 		return true;
 	}
 
@@ -208,6 +217,28 @@ final class BookingService {
 		return true;
 	}
 
+	/**
+	 * V2.1 Step 10 (BOOK-04) -- a small, properly scoped professional
+	 * action, not an attendance system. Only ever transitions a booking
+	 * whose slot has actually already passed (never lets a provider mark a
+	 * future booking as a no-show pre-emptively) and only from `confirmed`
+	 * -- a booking already completed/cancelled/no-show is left alone, same
+	 * compare-and-swap discipline as every other transition here.
+	 * Deliberately does not notify the customer (a no-show mark is
+	 * internal professional bookkeeping, not something to actively push to
+	 * the person who didn't show up).
+	 */
+	public function mark_no_show( int $booking_id ): bool {
+		$booking = $this->find( $booking_id );
+		if ( ! $booking ) {
+			return false;
+		}
+		if ( strtotime( (string) $booking['slot_end'] ) > strtotime( current_time( 'mysql' ) ) ) {
+			return false; // Slot hasn't even ended yet -- too early to call this a no-show.
+		}
+		return $this->transition( $booking_id, self::STATUS_NO_SHOW, [ self::STATUS_CONFIRMED ], 'booking_no_show' );
+	}
+
 	public function complete_booking( int $booking_id ): bool {
 		$completed = $this->transition( $booking_id, self::STATUS_COMPLETED, [ self::STATUS_CONFIRMED ], 'booking_completed' );
 
@@ -242,7 +273,7 @@ final class BookingService {
 
 		$stale = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT id, slot_id FROM {$wpdb->prefix}bc_bookings
+				"SELECT id, slot_id, provider_id, service_id, slot_start FROM {$wpdb->prefix}bc_bookings
 				 WHERE status = %s AND expires_at IS NOT NULL AND expires_at < %s
 				 LIMIT 100", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 				self::STATUS_PENDING,
@@ -279,6 +310,12 @@ final class BookingService {
 			if ( function_exists( 'beauclick_core' ) ) {
 				beauclick_core()->events()->log( 'booking_expired', 'booking', (int) $row['id'] );
 			}
+
+			// Same authoritative "slot newly available" moment as
+			// cancel_booking() above — an abandoned, expired hold releasing
+			// the slot is exactly as real an availability event as an
+			// explicit cancellation.
+			do_action( 'beauclick/booking/slot_opened', (int) $row['slot_id'], (int) $row['provider_id'], $row['service_id'] ? (int) $row['service_id'] : null, substr( (string) $row['slot_start'], 0, 10 ) );
 
 			++$expired_count;
 		}

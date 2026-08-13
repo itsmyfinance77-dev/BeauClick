@@ -96,7 +96,7 @@ ID format: `<AREA>-<NN>`. Every row has Status / Severity / Target version per �
 | ID | Description | Current state | Status | Severity | Target | Recommendation |
 |---|---|---|---|---|---|---|
 | PROF-01 | Customer address/profile editing | WooCommerce's native My Account pages — verified fully Persian, functional, correctly isolated per-user (V1.0.1 audit) | IMPLEMENTED | — | — | |
-| PROF-02 | Customer notification preferences | No preference storage or UI exists anywhere | MISSING | MEDIUM | V2.2 | Needed before any retention-automation/notification work (already flagged as a prerequisite in the V2 architecture plan) |
+| PROF-02 | Customer notification preferences | **Resolved in V2.1 Step 10** — `wp_bc_notification_preferences` (4 togglable categories: reminder/waitlist/rebooking/retention), opt-out model, real UI in the Account tab, live-verified toggle → persists → suppresses delivery end to end | **IMPLEMENTED** | — | V2.1 Step 10 ✅ | Closed by commit implementing Step 10 |
 | PROF-03 | Professional profile/portfolio | CPT-backed, editable via `MyProfileController`; portfolio *section* exists in UI but explicitly reads "این بخش در نسخه بعدی محصول تکمیل می‌شود" (V2.0 audit confirmed this live) | PARTIALLY_IMPLEMENTED | MEDIUM | V2.1/V2.2 | |
 | PROF-04 | Professional verification evidence | **Resolved in V2.1 Step 8** — a real request→evidence→review→decision lifecycle (`VerificationService`, `wp_bc_verification_requests`/`_evidence`/`_history`) now backs `_bc_verification_status`; evidence is securely stored and only ever readable through an ownership/moderator-checked download endpoint | **IMPLEMENTED** | — | V2.1 Step 8 ✅ | Closed by commit implementing Step 8 (see `VERSION_2_ARCHITECTURE_PLAN.md`'s Step 8 notes) |
 | PROF-05 | Business staff/permissions | Confirmed (Step 5 CRM audit) — a "business" account is 1:1 with one WP user; no multi-staff model exists anywhere | MISSING | MEDIUM | V2.1/V2.2 | Already documented as a known limitation in the CRM implementation notes; repeated here since it affects more than CRM |
@@ -119,7 +119,7 @@ ID format: `<AREA>-<NN>`. Every row has Status / Severity / Target version per �
 |---|---|---|---|---|---|---|
 | DATE-01 | Every user-facing date across V1/V2.0/V2.1 | Confirmed Jalali via three separate audits (V1.0.1, V2.0, V2.1-CRM), live-verified with real round-trip data each time | IMPLEMENTED | — | — | |
 | DATE-02 | B2B quote `expires_at` has no frontend UI | No UI exists to display it at all yet (not a Jalali bug — nothing to convert) | DEFERRED | LOW | V2.1/V2.2 | Already noted in the cross-cutting standard doc; repeated for completeness |
-| DATE-03 | Notification/reminder scheduling | No reminder system exists yet (ties to §14/Notifications and §H waitlist below) | MISSING | MEDIUM | V2.2 | |
+| DATE-03 | Notification/reminder scheduling | **Resolved in V2.1 Step 10** — `ReminderScheduler` (hourly WP-Cron, 23–25h window), `RebookingScheduler` and `RetentionScheduler` (daily), all idempotent via `NotificationService`'s own key, all Jalali on the customer-facing side, canonical `current_time('mysql')` internally | **IMPLEMENTED** | — | V2.1 Step 10 ✅ | Closed by commit implementing Step 10 |
 
 ### E. Commerce/WooCommerce
 
@@ -138,10 +138,10 @@ ID format: `<AREA>-<NN>`. Every row has Status / Severity / Target version per �
 |---|---|---|---|---|---|---|
 | BOOK-01 | Full discovery→hold→checkout→confirm→complete→review lifecycle | Live-verified repeatedly across three separate audit passes; atomic hold/expiry, no double-booking (existing concurrency-safe `UPDATE ... WHERE status='open'`) | IMPLEMENTED | — | — | |
 | BOOK-02 | Cancellation | Implemented, tested, Persian | IMPLEMENTED | — | — | |
-| BOOK-03 | Rescheduling | No reschedule action exists — only cancel-and-rebook | MISSING | MEDIUM | V2.2 | |
-| BOOK-04 | No-show handling | `no_show` status exists in the enum but no code path ever sets it (no professional-facing "mark as no-show" action found) | PARTIALLY_IMPLEMENTED | MEDIUM | V2.1/V2.2 | |
-| BOOK-05 | Booking reminders | No reminder scheduling exists (ties to DATE-03/Notifications) | MISSING | MEDIUM | V2.2 | |
-| BOOK-06 | Waitlist | Confirmed still not built — matches the roadmap's own stated deferral, verified again this session | DEFERRED | LOW | V2.2 (per existing sequence) | No change to existing plan |
+| BOOK-03 | Rescheduling | Still not built — Step 10 deliberately scoped to Waitlist/Rebooking/Reminders/Retention/No-show only, per its own task boundary; a true reschedule action (vs. cancel-and-rebook) remains a distinct feature | MISSING | MEDIUM | V2.2 | Not pulled into Step 10 — no shared infrastructure need was found; waitlist/rebooking do not require a reschedule primitive |
+| BOOK-04 | No-show handling | **Resolved in V2.1 Step 10** — `BookingService::mark_no_show()` (confirmed→no_show, only after `slot_end` has passed), owning-professional-only REST route reusing the existing `/confirm` ownership gate, event logged, deliberately no customer notification (internal bookkeeping only) | **IMPLEMENTED** | — | V2.1 Step 10 ✅ | Closed by commit implementing Step 10 |
+| BOOK-05 | Booking reminders | **Resolved in V2.1 Step 10** — see DATE-03 | **IMPLEMENTED** | — | V2.1 Step 10 ✅ | Closed by commit implementing Step 10 |
+| BOOK-06 | Waitlist | **Resolved in V2.1 Step 10** — real waitlist domain (`wp_bc_waitlist_entries`), server-validated against real published providers/services, owner-only REST (create/list-own/cancel), FIFO matching on the authoritative `slot_opened` event (fired from both `cancel_booking()` and `expire_stale_holds()`), booking's own atomic claim remains the sole source of truth — a waitlisted customer still has to win the real race, live-verified | **IMPLEMENTED** | — | V2.1 Step 10 ✅ | Closed by commit implementing Step 10 |
 
 ### G. Marketplace
 
@@ -177,10 +177,10 @@ ID format: `<AREA>-<NN>`. Every row has Status / Severity / Target version per �
 |---|---|---|---|---|---|---|
 | NOTIF-01 | Booking confirmation/cancellation email | Real, Jalali-correct, Persian (`BookingMailer`) | IMPLEMENTED | — | — | |
 | NOTIF-02 | Review notification email | Real (`ReviewMailer`) | IMPLEMENTED | — | — | |
-| NOTIF-03 | Central notification service | Confirmed still not built — the architecture plan's own already-identified prerequisite for Waitlist/Retention (§V2.2 in that doc) remains exactly as documented, re-verified this session | MISSING | HIGH | V2.2 (per existing plan) | Not a new finding — re-confirmed still accurate |
-| NOTIF-04 | In-app notification center/bell | No matching code anywhere | MISSING | MEDIUM | V2.2 | |
-| NOTIF-05 | SMS notifications | None — ties directly to AUTH-03/AUTH-04 | MISSING | HIGH | V2.1/V2.2 | |
-| NOTIF-06 | Notification preferences/opt-out | None — ties to PROF-02 | MISSING | MEDIUM | V2.2 | |
+| NOTIF-03 | Central notification service | **Resolved in V2.1 Step 10** — new `beauclick-notifications` plugin: single `NotificationService::notify()` dispatch point (Event/Trigger → Template → Recipient → Channel → Delivery → Delivery status), reused by Waitlist/Reminders/Rebooking/Retention rather than each building its own logic; insert-then-dispatch idempotency via a UNIQUE `idempotency_key`, honest delivery states (pending/sent/failed/suppressed/duplicate), bounded transient-only retry | **IMPLEMENTED** | — | V2.1 Step 10 ✅ | Closed by commit implementing Step 10 |
+| NOTIF-04 | In-app notification center/bell | Deliberately **not** built as a full bell/center in Step 10 — only a lean backend history (`NotificationService::for_user()`) and a simple read-only "اعلان‌های اخیر" list in the Account tab exist; per the task's own scoping guidance, a full notification center belongs in a later step if needed | PARTIALLY_IMPLEMENTED | MEDIUM | V2.2 (if a full center is needed) | The reusable backend history already exists; a real bell/unread-count UI can be layered on later without new backend work |
+| NOTIF-05 | SMS notifications | **Resolved in V2.1 Step 10** for the transactional-notification consumer side — Step 10 reuses Step 6's existing `SmsProvider`/`SmsProviderFactory`/`MockSmsProvider` abstraction verbatim (no second SMS interface built); still gated on a real SMS provider being configured in production (`BC_SMS_PROVIDER`/`BC_SMS_API_KEY`), same `EXTERNAL_CONFIGURATION` dependency already tracked under AUTH-04 | **IMPLEMENTED** (consumer) / EXTERNAL_CONFIGURATION (real provider) | — | V2.1 Step 10 ✅ (consumer) | Provider credentials remain an operational/production setup task, not a code gap |
+| NOTIF-06 | Notification preferences/opt-out | **Resolved in V2.1 Step 10** — see PROF-02; transactional-vs-promotional distinction preserved (`retention` is the only promotional category; booking confirm/cancel stays outside the preference system entirely, never disableable) | **IMPLEMENTED** | — | V2.1 Step 10 ✅ | Closed by commit implementing Step 10 |
 
 ### K. AI
 
@@ -379,14 +379,14 @@ Following the roadmap/architecture-plan reprioritization (`docs/roadmap/VERSION_
 | ADMIN-02 | No admin audit log | **V2.1 Step 8** (scoped to verification actions), broader admin audit logging remains V2.2 | Product development |
 | PROF-05 | No multi-staff business permission model | V2.2 (unchanged — explicitly documented as a limitation, not solved by CRM or by Step 8) | Product development |
 | Loyalty tiers, Membership benefits/entitlements | Not individually ID'd in §6 (predates this register; carried from the original architecture plan §4.6) | **V2.1 Step 9** | Product development |
-| BOOK-06 | Waitlist | **V2.1 Step 10** | Product development |
-| BOOK-03 | Rescheduling | V2.2 (may be pulled into Step 10 if found to share infrastructure with waitlist during design) | Product development |
-| BOOK-04 | No-show state transition never triggered | V2.1/V2.2 (small, may ride along with Step 8 or 10 depending on where the professional-facing "mark as no-show" action naturally lands) | Product development |
-| BOOK-05 / DATE-03 | No booking reminders | **V2.1 Step 10** | Product development |
-| NOTIF-03 | Central notification service | **V2.1 Step 10** (prerequisite work within the step, per the architecture plan's own already-identified dependency) | Product development |
-| NOTIF-04 | In-app notification center | V2.2 (Step 10 covers the service; a full in-app UI may extend beyond it) | Product development |
-| NOTIF-05 | SMS notifications | **V2.1 Step 10** (consumer), same `EXTERNAL_CONFIGURATION` SMS-provider dependency as AUTH-04 | Split |
-| NOTIF-06 / PROF-02 | Notification preferences/opt-out | **V2.1 Step 10** | Product development |
+| BOOK-06 | Waitlist | **V2.1 Step 10 ✅ Done** | Product development |
+| BOOK-03 | Rescheduling | Not pulled into Step 10 — no shared infrastructure need was found during implementation; remains V2.2 | Product development |
+| BOOK-04 | No-show state transition never triggered | **V2.1 Step 10 ✅ Done** — landed alongside Waitlist, not Step 8 | Product development |
+| BOOK-05 / DATE-03 | No booking reminders | **V2.1 Step 10 ✅ Done** | Product development |
+| NOTIF-03 | Central notification service | **V2.1 Step 10 ✅ Done** (prerequisite work within the step, per the architecture plan's own already-identified dependency) | Product development |
+| NOTIF-04 | In-app notification center | Deliberately deferred — Step 10 built the reusable backend history only, not a full bell/center UI; remains V2.2 if a full center is needed | Product development |
+| NOTIF-05 | SMS notifications | **V2.1 Step 10 ✅ Done** (consumer), same `EXTERNAL_CONFIGURATION` SMS-provider dependency as AUTH-04 | Split |
+| NOTIF-06 / PROF-02 | Notification preferences/opt-out | **V2.1 Step 10 ✅ Done** | Product development |
 | SEC-01, SEC-03, SEC-05, SEC-06, PRIV-01, PRIV-05, OPS-01, LOC-01/02, DATE-01, MKT-01/03/04, COM-01/02, BOOK-01/02, AI-01/04, A11Y-01/02/04, ANLYT-01 | Already `IMPLEMENTED` | — | No action; unaffected by this reprioritization |
 | LOC-04 | `نوبت`/`رزرو` terminology inconsistency | V2.1 (opportunistic — recommend folding into Step 6/7's own UI work rather than a standalone pass) | Product development |
 | OPS-02, OPS-03, OPS-04, OPS-05 | Backup, health check, error monitoring, real system cron | Production setup, ahead of public launch | `EXTERNAL_CONFIGURATION` — not assigned to any V2.1 step; these are hosting/infrastructure decisions independent of feature sequencing |
@@ -463,4 +463,32 @@ The rest of §7 (Prioritization), §22–§27 (recommendations, closing note), a
 
 **Business decisions this step deliberately left open, not silently invented:** tier thresholds and names, benefit values (multiplier/discount size), membership pricing and billing period, points expiration policy, and redemption rules. Every value used during this step's own live verification is explicitly test/demo configuration entered through the real admin screen, not a shipped default — see `docs/roadmap/VERSION_2_ARCHITECTURE_PLAN.md`'s Step 9 notes for the full list.
 
-The rest of §7 (Prioritization), §22–§27 (recommendations, closing note), and §29–§31 (Step 6/7/8 completion) above remain the accurate historical record and are preserved exactly as written.
+The rest of §7 (Prioritization), §22–§27 (recommendations, closing note), and §29–§32 (Step 6/7/8/9 completion) above remain the accurate historical record and are preserved exactly as written.
+
+---
+
+## 33. V2.1 Step 10 Completion Note
+
+**Step 10 — Waitlist + Smart Rebooking + Retention Automation is complete.** BOOK-06, BOOK-04, BOOK-05, DATE-03, NOTIF-03, NOTIF-05 (consumer side), NOTIF-06, and PROF-02 (§6/§28 rows updated above) all now have real, tested, live-verified implementations:
+
+| Item | Disposition |
+|---|---|
+| NOTIF-03 — Central notification service | **IMPLEMENTED** — new `beauclick-notifications` plugin; every notification-producing feature this step built (Waitlist, Reminders, Rebooking, Retention) goes through one `NotificationService::notify()` dispatch point instead of independent per-feature logic, exactly as the architecture plan's own prerequisite required. Reuses Step 6's SMS abstraction and existing `wp_mail()`/mailer infrastructure verbatim — no second SMS or email system was built. |
+| BOOK-06 — Waitlist | **IMPLEMENTED** — `wp_bc_waitlist_entries`, server-validated against real published providers/services, owner-scoped REST (create/list-own/cancel, never trusting a client-supplied id), FIFO deterministic matching (no AI), reacting to a new `beauclick/booking/slot_opened` event fired from the two authoritative "slot became newly available" moments (`cancel_booking()`, `expire_stale_holds()`). The existing atomic `create_booking()` claim remains the sole source of truth — waitlist only ever offers, never reserves; live-verified with a real third, non-waitlisted customer winning a reopened slot ahead of the waitlisted one. |
+| BOOK-05 / DATE-03 — Booking reminders | **IMPLEMENTED** — hourly `ReminderScheduler`, 23–25h matching window, no new table (relies entirely on `NotificationService`'s own idempotency), structurally excludes cancelled/completed/pending bookings via its own `status='confirmed'` filter. Live-verified: correct recipient, correct channel, correct Jalali-displayed timing, no duplicate on a second sweep. |
+| Smart rebooking | **IMPLEMENTED** — daily `RebookingScheduler`, deterministic eligibility (days since last completed visit vs. a configurable interval, no upcoming booking with that provider), per-service interval override via postmeta/filter, platform default clearly marked `NEEDS_BUSINESS_DECISION`. Live-verified: eligible customer notified, ineligible/has-upcoming-booking customer correctly skipped, no duplicate across repeated sweeps. |
+| Retention automation | **IMPLEMENTED** — daily `RetentionScheduler`, one bounded aggregate query (not a per-customer scan), configurable inactivity window (`NEEDS_BUSINESS_DECISION` default), capped to at most once per calendar month per customer via the idempotency key itself. Live-verified: genuinely inactive customer nudged, customer with any upcoming booking never a false positive, preference-disabled customer's notification correctly suppressed (row created as `suppressed`, never actually delivered). |
+| BOOK-04 — No-show handling | **IMPLEMENTED** — `BookingService::mark_no_show()`, confirmed→no_show only after the slot has genuinely ended, reuses the exact same owning-professional-or-admin gate `/confirm` already established, event logged, deliberately zero customer notification (internal bookkeeping, not customer-facing). Live-verified end to end through the real REST controller as the owning professional. |
+| NOTIF-05 / NOTIF-06 / PROF-02 — SMS + preferences | **IMPLEMENTED** — 4 togglable categories (reminder/waitlist/rebooking/retention), opt-out model, transactional-vs-promotional distinction preserved (`retention` is the only promotional category; real booking confirm/cancel mail stays outside the preference system entirely, never disableable). Live-verified: toggling a category off in the real Account-tab UI persists across reload and provably suppresses delivery (`PreferenceService::is_enabled()` confirmed `false` server-side). |
+| Race-condition safety | **Verified, not just designed** — a dedicated live test proved a non-waitlisted customer can still claim a reopened slot ahead of a waitlisted one; the waitlist system never introduces a second locking model alongside the booking engine's existing atomic claim. |
+| Notification idempotency | **Verified, not just designed** — every scheduler re-run (reminder, rebooking, retention) produced zero duplicate rows, backed by a real `UNIQUE (idempotency_key)` constraint (insert-before-dispatch, not dispatch-then-record). |
+
+**A real, self-caught bug fixed during this step (not present in the shipped final state):** `sent_at` was briefly stored as MySQL's zero-date (`0000-00-00 00:00:00`) instead of a genuine SQL `NULL` for failed deliveries — passing PHP `null` through a `%s` `$wpdb->prepare()` placeholder for a nullable `DATETIME` column does not reliably produce a real `NULL`. Fixed by only including `sent_at` in the `UPDATE` at all on an actual `'sent'` status; verified both by the notifications test suite and a fresh live `notify()` call.
+
+**A second polish fix, caught live during QA:** the idempotency mechanism's expected, frequent "duplicate — already handled" path (a `$wpdb->insert()` hitting the `UNIQUE (idempotency_key)` constraint on purpose) was printing raw MySQL duplicate-key errors on every hit, since this is a routine, successfully-handled outcome rather than a real error. Fixed by wrapping that specific insert in `$wpdb->suppress_errors()`/restore; re-verified the full 533-test backend suite still passes and a repeated scheduler run remains silent and correctly duplicate-free.
+
+**Business decisions this step deliberately left open, not silently invented:** rebooking interval (default 30 days, `NEEDS_BUSINESS_DECISION`, overridable per-service and globally via filter), retention inactivity window (default 60 days, same status), waitlist notification batch size/cooldown (5 entries, 30 minutes — engineering defaults chosen for a testable, bounded policy, not commercial policy), and notification category set/wording. Every value is clearly marked in code and documented here, not presented as final policy.
+
+**Deliberately deferred, per the task's own scoping instructions:** a full in-app notification bell/center (only the reusable backend history was built — NOTIF-04 stays open); real rescheduling (BOOK-03 — no shared-infrastructure need with Waitlist was found, so it was not pulled forward); Campaign Engine, Financial/Payout, Realtime Communication, Native Mobile, AI-for-Professionals, and Multi-vendor Marketplace — none started, matching the explicit stop condition for this step.
+
+The rest of §7 (Prioritization), §22–§27 (recommendations, closing note), and §29–§32 (Step 6/7/8/9 completion) above remain the accurate historical record and are preserved exactly as written.
