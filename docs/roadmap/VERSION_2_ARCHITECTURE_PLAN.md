@@ -2155,3 +2155,105 @@ Performed against the real local dev server after activating the new plugin and 
 ### Deferred (explicitly out of this step's scope, per the task's own stop condition)
 
 Booking Rescheduling, Invoice/Receipt system (V2.2 Step 15), Professional/Business Platform Completion (Step 16), Campaign Engine, Financial/Payout, AI for Professionals, Realtime, Native Mobile, Multi-vendor Marketplace — none started. Step 15 was not started.
+
+---
+
+## V2.2 Step 15 — Booking Evolution: Rescheduling + Receipts Implementation Notes
+
+### What existed before, and what was actually missing
+
+Confirmed by direct source inspection (not the older architecture doc's own aspirational text — see the discrepancy noted below): `wp_bc_bookings.status` has exactly five real values (`pending/confirmed/completed/cancelled/no_show`); no `rescheduled` status, no reschedule method, and no history/status-trail table existed anywhere in the codebase. `docs/architecture/ARCHITECTURE_PROPOSAL.md` §8 claims the status enum includes `rescheduled` and that "reschedule creates a status trail rather than mutating history away" — this was **never implemented**; that text describes original design intent, not shipped behavior, and is left uncorrected in that document per this project's own "don't rewrite history, note the deviation" convention (see this doc's own top-level "Implementation Notes" precedent). The atomic slot-claim discipline (`UPDATE ... WHERE status='open' OR (status='held' AND held_until < now)`), the booking↔order bridge (`BookingOrderBridge`), and the notification/waitlist/analytics infrastructure (V2.1 Step 10, V2.2 Step 11) were all real, stable, and reused verbatim — no architecture evolution required, confirmed by this step's own research pass before writing any code.
+
+### Scope decision: minimum safe scope, per the task's own §10
+
+Reschedule is scoped to **same booking + same provider + same service, different slot only**. Service change, provider change, and any price-change/cancellation-fee interaction are explicitly **not built** — `NEEDS_BUSINESS_DECISION`, not invented. Because price never changes in this scope, `wp_bc_bookings.wc_order_id` is simply carried over untouched; no new WooCommerce order is ever created by a reschedule, and no refund logic was needed.
+
+### `RescheduleService` — the atomic reschedule algorithm
+
+New class, `beauclick-booking/src/Booking/RescheduleService.php`, structurally "reserve new slot → move booking → release old slot" (task §9), reusing existing primitives rather than inventing a new concurrency model:
+1. Reserve the **new** slot with the exact same atomic `UPDATE ... WHERE (status='open' OR expired-held)` claim `BookingService::create_booking()` already uses. A failure here (slot taken/held by someone else) leaves the original booking **completely untouched** — verified by a dedicated race test.
+2. Move the booking row with a compare-and-swap `UPDATE ... WHERE status = <the status read at step 0>` — if this fails (booking cancelled or already rescheduled concurrently), the just-claimed new slot is rolled back to `open` and the operation fails as `conflict`, never stranding a held slot.
+3. If the booking was already `confirmed`, flip the new slot to `booked` (mirrors `confirm_booking()`); if still `pending`, the new slot stays `held` and the booking's `expires_at` is reset to the new hold's expiry — without this, a still-pending reschedule would be swept away on the OLD hold's original timer regardless of which slot it now points to (a real correctness gap caught during design, not left as a known limitation).
+4. Release the OLD slot to `open`.
+5. Record one append-only row in the new `wp_bc_booking_reschedules` table (booking id, old/new slot+times, actor id/role, reason, timestamp) — `reschedule_count` for eligibility is a plain `COUNT(*)` against this table, no redundant counter column.
+6. Fire `beauclick/booking/slot_opened` for the freed OLD slot, with the pre-move values captured before mutation — exactly mirroring `cancel_booking()`'s own call shape, so Waitlist (V2.1 Step 10) picks it up with **zero new integration code**.
+7. Invalidate the stale booking-reminder notification record (see below) and send a transactional reschedule-confirmation mail.
+8. Log `booking_reschedule_requested`/`_succeeded`/`_failed` analytics events via the existing `EventLogger`.
+
+Eligibility (`RescheduleService::eligibility()`): booking must be `pending`/`confirmed`; reschedule count must be under a configurable max (provisional default **2**, filter `beauclick/booking/max_reschedules`); the booking's current slot must be at least a configurable minimum hours out (provisional default **6h**, filter `beauclick/booking/reschedule_min_hours_before`) — both explicitly labelled provisional/`NEEDS_BUSINESS_DECISION` per the task's own §5/§13, not presented as final policy.
+
+### A real fragility found and fixed: reminder idempotency across a reschedule
+
+`ReminderScheduler`'s idempotency key (`booking_reminder:booking:{id}:{user}:{channel}`) has no time component — found during research, before any code was written, by reading `NotificationService::dispatch_one()`'s key construction directly. Left alone, a reminder already sent for a booking's OLD slot_start would silently suppress the genuinely new reminder needed for the NEW slot_start as a false "duplicate". Fixed by adding `NotificationService::invalidate(template_key, entity_type, entity_id, user_id, channels)` — deletes the exact, already-known idempotency key row(s), never a wildcard scan — called from `RescheduleService` on every successful reschedule. Verified by a dedicated test: a reminder fires for the old time, the booking is rescheduled, and exactly one fresh reminder fires once the new time enters the reminder window — not zero (falsely suppressed) and not two.
+
+### Receipts (COM-04)
+
+New `ReceiptPresenter` (`beauclick-payments/src/Receipt/ReceiptPresenter.php`) — pure presentation, reads every money figure from the linked `WC_Order`/order items, **never** from `bc_service`'s own separately-mutable current price (confirmed during research as the one real "second financial calculation system" risk to avoid — `bc_service._bc_price` can change after a booking is made; the order is the frozen, authoritative snapshot). No new table. `ReceiptController` (`beauclick-payments/src/Rest/ReceiptController.php`) exposes two endpoints:
+- `GET /payments/bookings/{id}/receipt` — booking + appointment context + linked order (ownership: customer, owning professional, or platform admin — the exact three-way gate `BookingController` already uses for confirm/cancel).
+- `GET /payments/orders/{id}/receipt` — plain WooCommerce order receipt (covers B2B/shop orders), scoped to the order's own customer or a platform admin.
+
+Format is printable HTML rendered in the existing React app-shell (`ReceiptView.tsx`) with a scoped `@media print` stylesheet and a `window.print()` button — no PDF library introduced, matching the task's own "do not automatically introduce PDF infrastructure if printable HTML solves the need" instruction.
+
+### Database
+
+One new table, `wp_bc_booking_reschedules` (append-only history). No new table for receipts (rendered on demand from existing data, per the original plan). No existing table's schema changed.
+
+### REST API
+
+`beauclick-booking`: `GET .../reschedule-eligibility`, `POST .../reschedule` (`new_slot_id`, optional `reason`), `GET .../reschedule-history` — all behind a new `BookingController::can_manage_booking()` permission callback (customer OR owning provider OR `bc_manage_platform`), extracted as a reusable method rather than a third copy of `cancel()`'s inline ownership logic. `format_booking()` gained `slotId`, `wcOrderId`, `rescheduleCount` fields; `list_own()` bulk-fetches reschedule counts via `RescheduleService::counts_for()` (one `GROUP BY` query) rather than a per-row `COUNT(*)` — deliberately avoiding the exact N+1 pattern a prior production-readiness audit already found and fixed elsewhere in this codebase (Dashboard/Chat/Reviews controllers). `beauclick-payments`: the two receipt routes above.
+
+### UI
+
+Customer/professional dashboards share one `BookingsTab.tsx` (unchanged convention) — gained "جابه‌جایی نوبت" (reschedule) and "مشاهده رسید" (view receipt) actions, plus a "جابه‌جا‌شده (N)" badge when `rescheduleCount > 0`, visible to both parties automatically since it's the same component. New `RescheduleModal.tsx` reuses `BookingModal`'s own date-chip/time-chip picker shape and `localDateString()` UTC-midnight-safe date derivation rather than building a second slot-selection widget; shows the configured limits (`رزرو ... از ...`) and a plain-language ineligibility reason when blocked. New `ReceiptView.tsx` renders the printable receipt; `OrdersTab.tsx` gained a receipt link per order (B2B/shop coverage) without disturbing its existing click-through-to-WooCommerce card behavior. Admin: one additive stat card ("جابه‌جایی نوبت (این ماه)") on the existing `AdminMenu` landing page, reading a bounded `COUNT(*)` — deliberately not a dedicated Booking Operations screen, matching ADMIN-04's own already-documented scope boundary (WooCommerce's native order admin remains authoritative).
+
+### Security
+
+Every new/extended route enforces ownership server-side via `can_manage_booking()`/`can_view_booking_receipt()`/`can_view_order_receipt()` — never trusting a client-supplied booking/customer/provider id. Live-verified over real HTTP: an unrelated customer's reschedule attempt on another customer's booking returns a real `403 bc_forbidden`; the owning customer, owning professional, and platform admin all correctly succeed.
+
+### Persian/Jalali/RTL/mobile/accessibility
+
+Every new string is Persian; every date goes through the existing shared `JalaliDate` (PHP) / `jalali.ts`+`format.ts` (React) — no second date system. Verified live at 375/390/412px: zero horizontal overflow on the bookings list, the reschedule modal (14-day chip picker), or the receipt modal. The reschedule/receipt modals reuse the existing, already-audited `Modal` primitive (focus trap, Escape, labelled close button) with no modification needed.
+
+### Performance
+
+`list_own()`'s reschedule-count lookup is a single bulk `GROUP BY` query, not per-row. Reschedule's own writes are a bounded, fixed number of statements per call (no loops, no N+1). No new caching or infrastructure.
+
+### Tests
+
+**28 new backend PHPUnit tests**: `RescheduleServiceTest` (eligibility × 5, slot safety/concurrency × 4, payment/order integrity × 1, history/audit × 2, waitlist interaction × 2, analytics × 2, notification/reminder correction × 2) plus `BookingControllerTest` additions (ownership × 3, error-code mapping, eligibility endpoint, N+1-free list) and a new `beauclick-payments` `ReceiptControllerTest` (6 tests: total-matches-order, self-scoped access × 3, no-order-yet shape, admin access). Full backend suite: **680/680** (652 pre-existing + 28 new), zero regressions. **2 new frontend tests** (`RescheduleModal.test.tsx`: ineligible-reason display, eligible pick-and-confirm flow) — full frontend suite **34/34**. TypeScript build and production `vite build` both clean; ESLint clean.
+
+### Live verification (real running site, real seeded database, real HTTP requests, no fabricated DB rows used to claim success)
+
+Performed against the real local dev server after applying the new migration and seeding real fixtures onto the existing `bc_qa_customer`/`bc_qa_test_pro` QA accounts (this project's own established convention — several `bc_qa_*` fixture accounts already existed from prior steps):
+- **Scenario A (successful reschedule)**: real browser click-through — opened the reschedule modal on a real confirmed booking with a linked, paid WooCommerce order, selected a new date/slot, confirmed. Verified directly against the database afterward: booking's `slot_id`/`slot_start` moved, `wc_order_id` (and the real order's total/status) **untouched**, old slot released to `open`, one history row recorded with the correct actor role, both `booking_reschedule_requested`/`_succeeded` analytics events logged.
+- **Scenario C (unauthorized access)**: a real, unrelated logged-in customer's direct REST reschedule attempt on another customer's booking returned a real HTTP `403 bc_forbidden`.
+- **Scenario D (ineligible booking)**: a real completed booking's eligibility endpoint correctly returned `eligible:false, reason:"status"`, and a direct reschedule attempt returned a real HTTP `409 bc_reschedule_ineligible` with the correct Persian message; the reschedule button itself does not render for a completed booking in the real UI.
+- **Scenario E (receipt)**: opened the real receipt for the rescheduled booking — total (۲٬۵۰۰٬۰۰۰ تومان) exactly matched the real linked order, order number/payment status correct, appointment time correctly reflected the **new**, post-reschedule slot, fully Persian/RTL/Jalali.
+- **Scenario F (mobile)**: 375/390/412px — zero horizontal overflow on the bookings list, reschedule modal, or receipt modal.
+- **Professional/admin surfaces**: the owning professional's dashboard shows the same shared `BookingsTab` with the reschedule badge/actions and can itself query reschedule-eligibility for a customer's booking (`200`, correctly scoped); the platform admin's landing page's new "جابه‌جایی نوبت (این ماه)" card correctly showed `۱` after the one live reschedule performed during this pass.
+- **Scenario H (existing V2.1 flows still work)**: a fresh real cancel (`POST .../cancel`, real `200`) correctly released its slot and correctly triggered a real waitlist notification to a real waiting customer (`sms: sent`) — confirming Waitlist, unmodified by this step, is unaffected.
+
+Live verification used a credential-free WordPress session technique (`wp_set_auth_cookie()` via a temporary, session-scoped local script, deleted immediately after this QA pass) rather than typing any password into a login form or creating any new non-fixture account — the same "declined to reset the admin password, used a credential-free technique instead" discipline this document's own Step 11 notes already established as this project's convention.
+
+### Bugs discovered
+
+None in the new code. One pre-existing, unrelated repository-wide gap was found and is **not** fixed here (out of this step's own scope, would be a large, unrelated diff): `composer lint` (`phpcs.xml.dist`) fails on short-array-syntax (`[]` vs `array()`) across essentially every existing `beauclick-*` file, confirmed by running it against an entirely untouched file (`BookingService.php`) with identical results — this codebase has apparently never had a clean `composer lint` run; `php -l` (syntax) and the full PHPUnit suite are unaffected and clean.
+
+### Known limitations / deferred, per the task's own scope boundaries
+
+- Service change, provider change, and any resulting price difference are not supported — reschedule is same-provider/same-service/different-slot only, per the task's own named "minimum safe scope."
+- No cancellation-fee system exists in this codebase at all (confirmed by research), so reschedule has no fee/cancellation-policy interaction to build against.
+- No visual drag-and-drop professional calendar (explicitly excluded, Step 16/professional-platform territory if ever pursued).
+- No PDF receipt generation — printable HTML only, per the task's own "first safe scope" guidance.
+- `MetricsService`'s admin analytics dashboard was **not** extended with a reschedule funnel bucket — the three new event types are logged and queryable in `wp_bc_events`, but no dashboard UI change was made (task §15: "do not build a dedicated BI dashboard in this step unless genuinely necessary").
+
+### Business decisions still required (not invented here)
+
+- **Maximum reschedules per booking** (provisional engineering default: 2) — `NEEDS_BUSINESS_DECISION`.
+- **Minimum hours before an appointment a reschedule is still allowed** (provisional engineering default: 6h) — `NEEDS_BUSINESS_DECISION`.
+- **Whether/how a service or provider change should ever be supported**, and its price/payment implications — `NEEDS_BUSINESS_DECISION`, out of this step's scope entirely.
+- **Receipt legal status** — no tax-invoice wording or legal claim is made anywhere on the receipt; any such requirement is `NEEDS_LEGAL_REVIEW`, not assumed.
+
+### Deferred (explicitly out of this step's scope, per the task's own stop condition)
+
+Professional/Business Platform Completion (Step 16), Campaign Engine, Financial/Payout, AI for Professionals, Realtime, Native Mobile, Multi-vendor Marketplace — none started. Step 16 was not started.

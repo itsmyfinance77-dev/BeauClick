@@ -89,6 +89,7 @@ final class AdminMenu {
 		$has_waitlist_table = (bool) $wpdb->get_var( "SHOW TABLES LIKE '{$wpdb->prefix}bc_waitlist_entries'" );
 		$has_notifications_table = (bool) $wpdb->get_var( "SHOW TABLES LIKE '{$wpdb->prefix}bc_notifications'" );
 		$has_verification_table = (bool) $wpdb->get_var( "SHOW TABLES LIKE '{$wpdb->prefix}bc_verification_requests'" );
+		$has_reschedules_table  = (bool) $wpdb->get_var( "SHOW TABLES LIKE '{$wpdb->prefix}bc_booking_reschedules'" );
 
 		$pending_b2b          = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}bc_business_accounts WHERE approval_status = 'pending'" );
 		$pending_reviews      = $has_reviews_table ? (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}bc_reviews WHERE status = 'flagged'" ) : 0;
@@ -100,6 +101,15 @@ final class AdminMenu {
 		$total_bookings_this_month = (int) $wpdb->get_var(
 			$wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}bc_bookings WHERE created_at >= %s", current_time( 'Y-m-01' ) . ' 00:00:00' )
 		);
+		// V2.2 Step 15 — a cheap operational signal (§22's own "current
+		// slot, reschedule count, history" ask), deliberately just a count
+		// card here, not a dedicated Booking Operations screen — WooCommerce's
+		// native order admin plus this landing page's existing cards already
+		// cover what real usage has shown operators need (see ADMIN-04's own
+		// documented scope boundary).
+		$reschedules_this_month = $has_reschedules_table ? (int) $wpdb->get_var(
+			$wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}bc_booking_reschedules WHERE created_at >= %s", current_time( 'Y-m-01' ) . ' 00:00:00' )
+		) : 0;
 
 		AdminShell::header(
 			__( 'نمای کلی', 'beauclick-core' ),
@@ -139,6 +149,10 @@ final class AdminMenu {
 				[
 					'label' => __( 'رزروهای این ماه', 'beauclick-core' ),
 					'value' => JalaliDate::persianDigits( (string) $total_bookings_this_month ),
+				],
+				[
+					'label' => __( 'جابه‌جایی نوبت (این ماه)', 'beauclick-core' ),
+					'value' => JalaliDate::persianDigits( (string) $reschedules_this_month ),
 				],
 			]
 		);

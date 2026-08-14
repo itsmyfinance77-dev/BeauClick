@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { formatToman, formatFullJalaliDate, toPersianDigits } from '@/lib/format';
-import { LoadingDots, EmptyState } from '@/design-system';
+import { LoadingDots, EmptyState, Button } from '@/design-system';
+import { ReceiptView } from '@/features/booking/ReceiptView';
 import type { MyOrder } from './types';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -17,6 +18,7 @@ const STATUS_LABELS: Record<string, string> = {
 export function OrdersTab() {
 	const [ orders, setOrders ] = useState<MyOrder[] | null>( null );
 	const [ error, setError ] = useState<string | null>( null );
+	const [ receiptOrderId, setReceiptOrderId ] = useState<number | null>( null );
 
 	useEffect( () => {
 		api.get<MyOrder[]>( '/payments/my/orders' ).then( setOrders ).catch( () => setError( 'خطا در دریافت سفارش‌ها.' ) );
@@ -31,20 +33,31 @@ export function OrdersTab() {
 			<h1 style={ { fontSize: 22, marginTop: 0 } }>سفارش‌های من</h1>
 			<div style={ { display: 'flex', flexDirection: 'column', gap: 10 } }>
 				{ orders.map( ( o ) => (
-					<a key={ o.id } href={ o.viewUrl } className="bc-card" style={ { padding: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, textDecoration: 'none', color: 'inherit' } }>
-						<div>
-							<strong className="bc-numeric">#{ toPersianDigits( o.number ) }</strong>
-							<p style={ { margin: '4px 0 0', fontSize: 13, color: 'var(--bc-color-ink-faint)' } }>
-								{ o.date ? formatFullJalaliDate( new Date( o.date.replace( ' ', 'T' ) ) ) : '' } · { toPersianDigits( o.itemCount ) } کالا
-							</p>
+					<div key={ o.id }>
+						<a href={ o.viewUrl } className="bc-card" style={ { padding: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, textDecoration: 'none', color: 'inherit' } }>
+							<div>
+								<strong className="bc-numeric">#{ toPersianDigits( o.number ) }</strong>
+								<p style={ { margin: '4px 0 0', fontSize: 13, color: 'var(--bc-color-ink-faint)' } }>
+									{ o.date ? formatFullJalaliDate( new Date( o.date.replace( ' ', 'T' ) ) ) : '' } · { toPersianDigits( o.itemCount ) } کالا
+								</p>
+							</div>
+							<div style={ { textAlign: 'end' } }>
+								<strong className="bc-numeric">{ formatToman( o.total ) } تومان</strong>
+								<p style={ { margin: '4px 0 0', fontSize: 13, color: 'var(--bc-color-ink-faint)' } }>{ STATUS_LABELS[ o.status ] ?? o.status }</p>
+							</div>
+						</a>
+						<div style={ { display: 'flex', justifyContent: 'flex-end', marginTop: 4 } }>
+							<Button variant="ghost" onClick={ () => setReceiptOrderId( o.id ) }>مشاهده رسید</Button>
 						</div>
-						<div style={ { textAlign: 'end' } }>
-							<strong className="bc-numeric">{ formatToman( o.total ) } تومان</strong>
-							<p style={ { margin: '4px 0 0', fontSize: 13, color: 'var(--bc-color-ink-faint)' } }>{ STATUS_LABELS[ o.status ] ?? o.status }</p>
-						</div>
-					</a>
+					</div>
 				) ) }
 			</div>
+
+			<ReceiptView
+				open={ receiptOrderId !== null }
+				orderId={ receiptOrderId ?? undefined }
+				onClose={ () => setReceiptOrderId( null ) }
+			/>
 		</div>
 	);
 }

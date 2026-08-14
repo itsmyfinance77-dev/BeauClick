@@ -170,6 +170,30 @@ final class NotificationService {
 	}
 
 	/**
+	 * V2.2 Step 15 — lets a caller invalidate a specific notification's
+	 * idempotency record so a genuinely new occurrence (e.g. a reschedule
+	 * moving a reminder's target time) can fire again, without weakening
+	 * notify()'s own insert-before-dispatch UNIQUE-key guarantee for every
+	 * other, non-invalidated case. Deletes only the exact, already-known
+	 * idempotency key(s) a caller reconstructs from the same
+	 * `{template}:{entity_type}:{entity_id}:{user}:{channel}` shape
+	 * dispatch_one() builds — never a wildcard scan — so this can never
+	 * accidentally clear an unrelated notification's delivery record.
+	 *
+	 * @param list<string> $channels
+	 */
+	public function invalidate( string $template_key, string $entity_type, int $entity_id, int $user_id, array $channels = [ 'sms', 'email' ] ): void {
+		global $wpdb;
+		foreach ( $channels as $channel ) {
+			$wpdb->delete(
+				$wpdb->prefix . 'bc_notifications',
+				[ 'idempotency_key' => "{$template_key}:{$entity_type}:{$entity_id}:{$user_id}:{$channel}" ],
+				[ '%s' ]
+			);
+		}
+	}
+
+	/**
 	 * V2.2 Step 14 — the delivery LOG (category/status/timing) has real,
 	 * ongoing operational/debugging value (the same reasoning
 	 * NotificationsAdminPage's own docblock already gives for keeping it at

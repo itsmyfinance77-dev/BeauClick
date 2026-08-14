@@ -7,6 +7,7 @@ use BeauClick\Booking\Booking\BookingService;
 use BeauClick\Booking\Cron\HoldExpiryScheduler;
 use BeauClick\Booking\Cron\RankingScheduler;
 use BeauClick\Booking\Database\Migrations\AddHoldExpiryColumns;
+use BeauClick\Booking\Database\Migrations\CreateBookingReschedulesTable;
 use BeauClick\Booking\Database\Migrations\CreateBookingTables;
 use BeauClick\Booking\Database\Migrations\CreateCrmNotesTable;
 use BeauClick\Booking\Database\Migrations\CreateWaitlistTable;
@@ -36,7 +37,7 @@ final class Plugin {
 	}
 
 	private function migrations(): array {
-		return [ new CreateBookingTables(), new AddHoldExpiryColumns(), new CreateCrmNotesTable(), new CreateWaitlistTable() ];
+		return [ new CreateBookingTables(), new AddHoldExpiryColumns(), new CreateCrmNotesTable(), new CreateWaitlistTable(), new CreateBookingReschedulesTable() ];
 	}
 
 	public function boot(): void {

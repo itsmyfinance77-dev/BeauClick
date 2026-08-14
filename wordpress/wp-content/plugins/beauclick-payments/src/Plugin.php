@@ -8,6 +8,7 @@ use BeauClick\Payments\Booking\BookingOrderBridge;
 use BeauClick\Payments\Database\Seeds\DemoProductsSeed;
 use BeauClick\Payments\Product\ServiceProductSync;
 use BeauClick\Payments\Rest\MyOrdersController;
+use BeauClick\Payments\Rest\ReceiptController;
 
 final class Plugin {
 
@@ -52,6 +53,7 @@ final class Plugin {
 
 	public function register_rest_routes(): void {
 		( new MyOrdersController() )->register_routes();
+		( new ReceiptController() )->register_routes();
 	}
 
 	public function maybe_seed( ?string $only ): void {

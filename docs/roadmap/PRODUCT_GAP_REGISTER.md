@@ -538,8 +538,8 @@ Full rationale for every decision below lives in `VERSION_2_ARCHITECTURE_PLAN.md
 | AUTH-07 / PRIV-02 | No self-service account deletion | **V2.2 Step 14** (Account Privacy & Data Control) | Product development |
 | AUTH-08 / PRIV-03 | No self-service data export | **V2.2 Step 14** | Product development |
 | PRIV-04 / LEGAL-08 | Data retention/anonymization policy undefined | **V2.2 Step 14 builds the mechanism**; the policy itself remains `NEEDS_BUSINESS_DECISION` | Split |
-| BOOK-03 | Rescheduling — no reschedule action exists | **V2.2 Step 15** (Booking Evolution: Rescheduling + Receipts) | Product development |
-| COM-04 | No order/booking invoice or receipt PDF | **V2.2 Step 15** | Product development |
+| BOOK-03 | Rescheduling — no reschedule action exists | **V2.2 Step 15 ✅ Done** (Booking Evolution: Rescheduling + Receipts) | Product development |
+| COM-04 | No order/booking invoice or receipt PDF | **V2.2 Step 15 ✅ Done** | Product development |
 | PROF-05 | No multi-staff business permission model | **V2.2 Step 16** (Professional/Business Platform Completion) | Product development |
 | PROF-03 | Professional portfolio section still a V1-era placeholder | **V2.2 Step 16** | Product development |
 | — (deferred from V2.1 Step 5, no dedicated register ID) | CRM note edit/delete, frontend pagination UI | **V2.2 Step 16** | Product development |
@@ -604,3 +604,19 @@ Full rationale for every decision below lives in `VERSION_2_ARCHITECTURE_PLAN.md
 **What this step deliberately did not build, and why:** any self-service path for a professional/business account (§7's own explicit customer-only scope — a future step's concern if the product ever needs it); automatic time-based purging of anonymized-but-retained records or historical WooCommerce order billing PII (the retention *policy* remains undecided, per PRIV-04 above — this step built the mechanism a policy would use, not the policy itself); and any queue/job-runner infrastructure beyond the WP-Cron sweep pattern every other scheduler in this codebase already uses (deletion processing is resumable and bounded without needing one).
 
 **No other item in this register changed status as a result of this step** — every other classification already in this document was left exactly as written. The rest of §7 (Prioritization), §22–§27 (recommendations, closing note), §28–§38 (V2.1/V2.2 assignment tables and completion notes) above remain the accurate historical record and are preserved exactly as written.
+
+---
+
+## 40. V2.2 Step 15 Completion Note
+
+**Step 15 — Booking Evolution: Rescheduling + Receipts is complete.** BOOK-03 and COM-04 (§6/§35 rows updated above) now have real, tested, live-verified implementations. Full technical detail — the atomic reschedule algorithm, the receipt architecture and its WooCommerce-order-as-source-of-truth discipline, a real reminder-idempotency fragility found and fixed before any live bug occurred, database/API/UI changes, security, performance, tests, and live verification results — lives in `VERSION_2_ARCHITECTURE_PLAN.md`'s "V2.2 Step 15 — Booking Evolution: Rescheduling + Receipts Implementation Notes" section.
+
+**Scope decision, worth restating here:** rescheduling is deliberately limited to same booking + same provider + same service + a different slot only, per this task's own explicitly named "minimum safe scope" (§10 of the task). Service change, provider change, and any resulting price/payment interaction are **not built** — `NEEDS_BUSINESS_DECISION`, not invented. Because price never changes in this scope, no new payment/refund logic was needed and the existing linked WooCommerce order is simply carried over untouched.
+
+**A real fragility found and fixed before it ever caused a live bug, not discovered by accident:** `ReminderScheduler`'s notification idempotency key has no time component, confirmed by reading `NotificationService::dispatch_one()`'s key construction during this step's own research pass (before any reschedule code was written) — left alone, a reminder already sent for a booking's old appointment time would have silently suppressed the new reminder its new time genuinely needs, as a false "duplicate". Fixed with a new, narrowly-scoped `NotificationService::invalidate()` method (deletes only the exact, already-known idempotency key, never a wildcard scan), called on every successful reschedule; verified by a dedicated test that a fresh reminder does fire for the new time after the old one already fired for the old time.
+
+**What this step deliberately did not build, and why:** service/provider change support (out of the named minimum-safe-scope); any cancellation-fee logic (none exists anywhere in this codebase to interact with — confirmed by research, not assumed); a visual drag-and-drop professional calendar (Step 16/professional-platform territory, if ever pursued); PDF receipt generation (printable HTML is the task's own named "first safe scope"); and a reschedule-specific admin analytics dashboard (the three new event types are logged and queryable, but `MetricsService`'s dashboard UI was not extended — "do not build a dedicated BI dashboard in this step unless genuinely necessary," per the task's own §15).
+
+**One pre-existing, unrelated finding, not a Step 15 defect:** `composer lint` (`phpcs.xml.dist`) fails on short-array-syntax style across essentially the entire existing codebase, confirmed by running it against a completely untouched file (`BookingService.php`) with identical results — this project has apparently never had a clean `composer lint` run. Not fixed here (a large, unrelated diff, out of this step's own scope); `php -l` and the full PHPUnit suite (680/680) are unaffected.
+
+**No other item in this register changed status as a result of this step** — every other classification already in this document was left exactly as written. The rest of §7 (Prioritization), §22–§27 (recommendations, closing note), §28–§39 (V2.1/V2.2 assignment tables and completion notes) above remain the accurate historical record and are preserved exactly as written.

@@ -167,4 +167,127 @@ final class BookingControllerTest extends WP_UnitTestCase {
 		$this->assertContains( $just_inside, $starts, 'A slot 1 hour inside the 7-day window (measured from site-local now) must be included.' );
 		$this->assertNotContains( $just_outside, $starts, 'A slot 1 hour beyond the 7-day window must be excluded — if the two bounds used different time bases, this could wrongly include it.' );
 	}
+
+	// --- V2.2 Step 15 -- reschedule ownership + REST error mapping -----------
+
+	private function make_slot( int $provider_post_id, string $start ): int {
+		global $wpdb;
+		$wpdb->insert(
+			$wpdb->prefix . 'bc_availability_slots',
+			[ 'provider_id' => $provider_post_id, 'start_at' => $start, 'end_at' => gmdate( 'Y-m-d H:i:s', strtotime( $start ) + HOUR_IN_SECONDS ), 'status' => 'open', 'created_at' => current_time( 'mysql' ) ]
+		);
+		return $wpdb->insert_id;
+	}
+
+	private function far_future( int $days = 10 ): string {
+		return gmdate( 'Y-m-d H:i:s', strtotime( current_time( 'mysql' ) ) + $days * DAY_IN_SECONDS );
+	}
+
+	public function test_the_owning_customer_can_reschedule_their_own_booking_over_rest(): void {
+		$owner_id    = self::factory()->user->create();
+		$provider_id = $this->make_provider( $owner_id );
+		$customer_id = self::factory()->user->create();
+		$old_slot    = $this->make_slot( $provider_id, $this->far_future() );
+		$new_slot    = $this->make_slot( $provider_id, $this->far_future( 11 ) );
+		$booking     = ( new BookingService() )->create_booking( $customer_id, $provider_id, $old_slot );
+		( new BookingService() )->confirm_booking( $booking['booking_id'] );
+
+		wp_set_current_user( $customer_id );
+		$request = new \WP_REST_Request( 'POST', "/beauclick/v1/booking/bookings/{$booking['booking_id']}/reschedule" );
+		$request->set_param( 'id', $booking['booking_id'] );
+		$request->set_param( 'new_slot_id', $new_slot );
+
+		$response = ( new BookingController() )->reschedule( $request );
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( $new_slot, $response->get_data()['data']['slotId'] );
+	}
+
+	public function test_an_unrelated_customer_cannot_reschedule_someone_elses_booking(): void {
+		$owner_id    = self::factory()->user->create();
+		$provider_id = $this->make_provider( $owner_id );
+		$customer_id = self::factory()->user->create();
+		$stranger_id = self::factory()->user->create();
+		$old_slot    = $this->make_slot( $provider_id, $this->far_future() );
+		$booking     = ( new BookingService() )->create_booking( $customer_id, $provider_id, $old_slot );
+		( new BookingService() )->confirm_booking( $booking['booking_id'] );
+
+		wp_set_current_user( $stranger_id );
+		$request = new \WP_REST_Request( 'POST', "/beauclick/v1/booking/bookings/{$booking['booking_id']}/reschedule" );
+		$request->set_param( 'id', $booking['booking_id'] );
+
+		$this->assertInstanceOf( \WP_Error::class, ( new BookingController() )->can_manage_booking( $request ), 'A customer must never be able to reschedule a booking that is not their own.' );
+	}
+
+	public function test_the_owning_professional_can_reschedule_a_booking_they_manage(): void {
+		$owner_id    = self::factory()->user->create();
+		$provider_id = $this->make_provider( $owner_id );
+		$customer_id = self::factory()->user->create();
+		$old_slot    = $this->make_slot( $provider_id, $this->far_future() );
+
+		$booking = ( new BookingService() )->create_booking( $customer_id, $provider_id, $old_slot );
+		( new BookingService() )->confirm_booking( $booking['booking_id'] );
+
+		wp_set_current_user( $owner_id );
+		$request = new \WP_REST_Request( 'POST', "/beauclick/v1/booking/bookings/{$booking['booking_id']}/reschedule" );
+		$request->set_param( 'id', $booking['booking_id'] );
+
+		$this->assertTrue( ( new BookingController() )->can_manage_booking( $request ) );
+	}
+
+	public function test_reschedule_error_codes_map_to_the_correct_http_status(): void {
+		$owner_id    = self::factory()->user->create();
+		$provider_id = $this->make_provider( $owner_id );
+		$customer_id = self::factory()->user->create();
+		$old_slot    = $this->make_slot( $provider_id, $this->far_future() );
+
+		$booking = ( new BookingService() )->create_booking( $customer_id, $provider_id, $old_slot );
+		( new BookingService() )->confirm_booking( $booking['booking_id'] );
+		( new BookingService() )->complete_booking( $booking['booking_id'] ); // No longer eligible.
+
+		wp_set_current_user( $customer_id );
+		$request = new \WP_REST_Request( 'POST', "/beauclick/v1/booking/bookings/{$booking['booking_id']}/reschedule" );
+		$request->set_param( 'id', $booking['booking_id'] );
+		$request->set_param( 'new_slot_id', 999999 );
+
+		$response = ( new BookingController() )->reschedule( $request );
+		$this->assertSame( 409, $response->get_status() );
+		$this->assertSame( 'bc_reschedule_ineligible', $response->get_data()['error']['code'] );
+		$this->assertNotEmpty( $response->get_data()['error']['message'], 'The error message must be a real, non-empty Persian string.' );
+	}
+
+	public function test_reschedule_eligibility_endpoint_reports_the_configured_limits(): void {
+		$owner_id    = self::factory()->user->create();
+		$provider_id = $this->make_provider( $owner_id );
+		$customer_id = self::factory()->user->create();
+		$old_slot    = $this->make_slot( $provider_id, $this->far_future() );
+
+		$booking = ( new BookingService() )->create_booking( $customer_id, $provider_id, $old_slot );
+		( new BookingService() )->confirm_booking( $booking['booking_id'] );
+
+		wp_set_current_user( $customer_id );
+		$request = new \WP_REST_Request( 'GET', "/beauclick/v1/booking/bookings/{$booking['booking_id']}/reschedule-eligibility" );
+		$request->set_param( 'id', $booking['booking_id'] );
+
+		$data = ( new BookingController() )->reschedule_eligibility( $request )->get_data()['data'];
+		$this->assertTrue( $data['eligible'] );
+		$this->assertSame( 0, $data['rescheduleCount'] );
+	}
+
+	public function test_list_own_reports_the_reschedule_count_without_n_plus_one_queries(): void {
+		$owner_id    = self::factory()->user->create();
+		$provider_id = $this->make_provider( $owner_id );
+		$customer_id = self::factory()->user->create();
+		$old_slot    = $this->make_slot( $provider_id, $this->far_future() );
+		$new_slot    = $this->make_slot( $provider_id, $this->far_future( 11 ) );
+
+		$booking = ( new BookingService() )->create_booking( $customer_id, $provider_id, $old_slot );
+		( new BookingService() )->confirm_booking( $booking['booking_id'] );
+		( new \BeauClick\Booking\Booking\RescheduleService() )->reschedule( $booking['booking_id'], $new_slot, $customer_id );
+
+		wp_set_current_user( $customer_id );
+		$response = ( new BookingController() )->list_own( new \WP_REST_Request( 'GET', '/beauclick/v1/booking/bookings' ) );
+		$rows     = $response->get_data()['data'];
+
+		$this->assertSame( 1, $rows[0]['rescheduleCount'] );
+	}
 }

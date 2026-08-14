@@ -15,7 +15,9 @@ namespace BeauClick\Core\Support;
  * ai_recommendation_shown, ai_recommendation_clicked, b2b_account_applied,
  * b2b_account_{status}, b2b_quote_requested, b2b_quote_accepted,
  * booking_confirm_after_expiry_conflict, order_completed, order_refunded,
- * goal_created (V2.0 Step 4, entity_type='goal', actor_id=the customer).
+ * goal_created (V2.0 Step 4, entity_type='goal', actor_id=the customer),
+ * booking_reschedule_requested, booking_reschedule_succeeded,
+ * booking_reschedule_failed (V2.2 Step 15, entity_type='booking').
  *
  * A production-readiness pass found booking_created/_confirmed/_cancelled/
  * _completed, review_submitted, message_sent, and the AI/B2B events already

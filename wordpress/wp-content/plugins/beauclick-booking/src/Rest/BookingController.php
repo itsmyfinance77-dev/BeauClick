@@ -4,6 +4,7 @@ declare( strict_types=1 );
 namespace BeauClick\Booking\Rest;
 
 use BeauClick\Booking\Booking\BookingService;
+use BeauClick\Booking\Booking\RescheduleService;
 use BeauClick\Core\Rest\RestController;
 use BeauClick\Core\Rest\Response;
 use BeauClick\Marketplace\Support\ProviderLookup;
@@ -80,6 +81,44 @@ final class BookingController extends RestController {
 				'args'                => [ 'id' => [ 'type' => 'integer', 'required' => true ] ],
 			]
 		);
+
+		// V2.2 Step 15 -- reschedule uses the three-way ownership gate
+		// (customer OR owning provider OR platform admin), the same parties
+		// cancel() already allows to act on a booking, turned into a
+		// reusable permission_callback rather than duplicated inline logic.
+		$this->route(
+			'/booking/bookings/(?P<id>\d+)/reschedule-eligibility',
+			[
+				'methods'             => 'GET',
+				'callback'            => [ $this, 'reschedule_eligibility' ],
+				'permission_callback' => [ $this, 'can_manage_booking' ],
+				'args'                => [ 'id' => [ 'type' => 'integer', 'required' => true ] ],
+			]
+		);
+
+		$this->route(
+			'/booking/bookings/(?P<id>\d+)/reschedule',
+			[
+				'methods'             => 'POST',
+				'callback'            => [ $this, 'reschedule' ],
+				'permission_callback' => [ $this, 'can_manage_booking' ],
+				'args'                => [
+					'id'          => [ 'type' => 'integer', 'required' => true ],
+					'new_slot_id' => [ 'type' => 'integer', 'required' => true ],
+					'reason'      => [ 'type' => 'string', 'required' => false ],
+				],
+			]
+		);
+
+		$this->route(
+			'/booking/bookings/(?P<id>\d+)/reschedule-history',
+			[
+				'methods'             => 'GET',
+				'callback'            => [ $this, 'reschedule_history' ],
+				'permission_callback' => [ $this, 'can_manage_booking' ],
+				'args'                => [ 'id' => [ 'type' => 'integer', 'required' => true ] ],
+			]
+		);
 	}
 
 	public function can_book(): bool|\WP_Error {
@@ -99,6 +138,29 @@ final class BookingController extends RestController {
 			return true; // Let the handler 404 — permission isn't the interesting failure here.
 		}
 		$my_provider_id = ProviderLookup::for_user( get_current_user_id() );
+		if ( $my_provider_id && $my_provider_id === (int) $booking['provider_id'] ) {
+			return true;
+		}
+		return $this->require_capability( 'bc_manage_platform' );
+	}
+
+	/**
+	 * V2.2 Step 15 -- the same three parties cancel() already allows to act
+	 * on a booking (owning customer, owning provider via ProviderLookup, or
+	 * bc_manage_platform), extracted into a reusable permission_callback so
+	 * reschedule/receipt-adjacent routes don't duplicate cancel()'s inline
+	 * ownership logic a third time.
+	 */
+	public function can_manage_booking( WP_REST_Request $request ): bool|\WP_Error {
+		$booking = ( new BookingService() )->find( (int) $request->get_param( 'id' ) );
+		if ( ! $booking ) {
+			return true; // Let the handler 404 -- permission isn't the interesting failure here.
+		}
+		$user_id = get_current_user_id();
+		if ( $user_id && $user_id === (int) $booking['customer_id'] ) {
+			return true;
+		}
+		$my_provider_id = ProviderLookup::for_user( $user_id );
 		if ( $my_provider_id && $my_provider_id === (int) $booking['provider_id'] ) {
 			return true;
 		}
@@ -218,7 +280,21 @@ final class BookingController extends RestController {
 			ARRAY_A
 		);
 
-		return Response::paginated( array_map( [ $this, 'format_booking' ], $rows ?: [] ), $total, $page, $per_page );
+		// Bulk-fetched, not per-row -- a COUNT(*) inside format_booking()
+		// itself would be exactly the N+1 pattern a prior production-
+		// readiness audit already found and fixed elsewhere in this
+		// codebase (Dashboard/Chat/Reviews controllers).
+		$counts = ( new RescheduleService() )->counts_for( array_map( static fn ( array $r ): int => (int) $r['id'], $rows ?: [] ) );
+
+		return Response::paginated(
+			array_map(
+				fn ( array $row ): array => $this->format_booking( $row, $counts[ (int) $row['id'] ] ?? 0 ),
+				$rows ?: []
+			),
+			$total,
+			$page,
+			$per_page
+		);
 	}
 
 	public function cancel( WP_REST_Request $request ) {
@@ -258,15 +334,58 @@ final class BookingController extends RestController {
 			: Response::error( 'bc_cannot_mark_no_show', __( 'این رزرو در وضعیت قابل ثبت به‌عنوان عدم حضور نیست.', 'beauclick-booking' ), 409 );
 	}
 
-	private function format_booking( array $row ): array {
+	public function reschedule_eligibility( WP_REST_Request $request ) {
+		$booking = ( new BookingService() )->find( (int) $request->get_param( 'id' ) );
+		if ( ! $booking ) {
+			return Response::error( 'bc_not_found', __( 'رزرو پیدا نشد.', 'beauclick-booking' ), 404 );
+		}
+		return Response::ok( ( new RescheduleService() )->eligibility( $booking ) );
+	}
+
+	public function reschedule( WP_REST_Request $request ) {
+		$booking_id  = (int) $request->get_param( 'id' );
+		$new_slot_id = (int) $request->get_param( 'new_slot_id' );
+		$reason      = (string) $request->get_param( 'reason' );
+
+		$result = ( new RescheduleService() )->reschedule( $booking_id, $new_slot_id, get_current_user_id(), $reason );
+
+		if ( is_array( $result ) ) {
+			return Response::ok( $this->format_booking( $result, ( new RescheduleService() )->reschedule_count( $booking_id ) ) );
+		}
+
+		return match ( $result ) {
+			'not_found'        => Response::error( 'bc_not_found', __( 'رزرو پیدا نشد.', 'beauclick-booking' ), 404 ),
+			'status'           => Response::error( 'bc_reschedule_ineligible', __( 'این رزرو در وضعیتی نیست که بتوان آن را جابه‌جا کرد.', 'beauclick-booking' ), 409 ),
+			'max_reached'      => Response::error( 'bc_reschedule_limit_reached', __( 'این رزرو به حداکثر تعداد مجاز جابه‌جایی رسیده است.', 'beauclick-booking' ), 409 ),
+			'too_close'        => Response::error( 'bc_reschedule_too_late', __( 'برای جابه‌جایی این نوبت، زمان کافی تا شروع آن باقی نمانده است.', 'beauclick-booking' ), 409 ),
+			'same_slot'        => Response::error( 'bc_reschedule_same_slot', __( 'زمان انتخاب‌شده با زمان فعلی یکسان است.', 'beauclick-booking' ), 400 ),
+			'invalid_slot'     => Response::error( 'bc_invalid_slot', __( 'این زمان برای این رزرو معتبر نیست.', 'beauclick-booking' ), 409 ),
+			'slot_unavailable' => Response::error( 'bc_slot_unavailable', __( 'این زمان دیگر در دسترس نیست — لطفاً زمان دیگری انتخاب کنید.', 'beauclick-booking' ), 409 ),
+			'conflict'         => Response::error( 'bc_reschedule_conflict', __( 'وضعیت این رزرو هم‌زمان تغییر کرد — لطفاً دوباره تلاش کنید.', 'beauclick-booking' ), 409 ),
+			default            => Response::error( 'bc_reschedule_failed', __( 'جابه‌جایی نوبت با خطا مواجه شد.', 'beauclick-booking' ), 400 ),
+		};
+	}
+
+	public function reschedule_history( WP_REST_Request $request ) {
+		$booking = ( new BookingService() )->find( (int) $request->get_param( 'id' ) );
+		if ( ! $booking ) {
+			return Response::error( 'bc_not_found', __( 'رزرو پیدا نشد.', 'beauclick-booking' ), 404 );
+		}
+		return Response::ok( ( new RescheduleService() )->history( (int) $booking['id'] ) );
+	}
+
+	private function format_booking( array $row, int $reschedule_count = 0 ): array {
 		return [
-			'id'          => (int) $row['id'],
-			'providerId'  => (int) $row['provider_id'],
-			'customerId'  => (int) $row['customer_id'],
-			'serviceId'   => $row['service_id'] ? (int) $row['service_id'] : null,
-			'slotStart'   => $row['slot_start'],
-			'slotEnd'     => $row['slot_end'],
-			'status'      => $row['status'],
+			'id'              => (int) $row['id'],
+			'providerId'      => (int) $row['provider_id'],
+			'customerId'      => (int) $row['customer_id'],
+			'serviceId'       => $row['service_id'] ? (int) $row['service_id'] : null,
+			'slotId'          => (int) $row['slot_id'],
+			'slotStart'       => $row['slot_start'],
+			'slotEnd'         => $row['slot_end'],
+			'status'          => $row['status'],
+			'wcOrderId'       => $row['wc_order_id'] ? (int) $row['wc_order_id'] : null,
+			'rescheduleCount' => $reschedule_count,
 		];
 	}
 }
