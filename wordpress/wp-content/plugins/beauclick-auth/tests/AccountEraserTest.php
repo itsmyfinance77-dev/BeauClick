@@ -63,6 +63,27 @@ final class AccountEraserTest extends WP_UnitTestCase {
 		$this->assertNotSame( $old_user_id, $result['userId'], 'A fresh OTP registration with a previously-deleted account\'s phone number must never resurrect the old identity.' );
 	}
 
+	public function test_a_real_bc_prefixed_login_is_freed_so_the_same_phone_can_register_again(): void {
+		// Regression for the real deterministic login scheme
+		// (AccountResolver::create_customer()'s 'bc_<digits>'), not the
+		// factory's random login -- this is what actually collided.
+		$phone = '+989121234511';
+		$first = ( new AccountResolver() )->find_or_create_for_phone( $phone );
+		$this->assertTrue( $first['isNew'] );
+		$old_login = get_userdata( $first['userId'] )->user_login;
+		$this->assertSame( 'bc_9121234511', $old_login );
+
+		( new AccountEraser() )->forget( $first['userId'] );
+
+		$this->assertNotSame( $old_login, get_userdata( $first['userId'] )->user_login, 'The deterministic bc_<digits> login must be freed on deletion.' );
+
+		$second = ( new AccountResolver() )->find_or_create_for_phone( $phone );
+
+		$this->assertTrue( $second['isNew'], 'Re-registering a previously-deleted account\'s phone must succeed, not throw on a duplicate login.' );
+		$this->assertNotSame( $first['userId'], $second['userId'] );
+		$this->assertSame( 'bc_9121234511', get_userdata( $second['userId'] )->user_login, 'The new account gets to use the natural login the old one vacated.' );
+	}
+
 	public function test_forget_is_idempotent(): void {
 		$user_id = self::factory()->user->create();
 		$eraser  = new AccountEraser();

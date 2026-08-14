@@ -636,3 +636,22 @@ Full rationale for every decision below lives in `VERSION_2_ARCHITECTURE_PLAN.md
 **A real bug found and fixed during this step's own live verification, not by code review:** the theme's dashboard-routing check (`page-dashboard.php`) decided which React bundle to mount based on WordPress role alone — but this step's new staff model deliberately never changes a staff member's role, so a real authorized staff member's session was tested end to end and landed on the customer dashboard despite the backend correctly authorizing them. Fixed by extending the same check to also query the new `StaffService`.
 
 **No other item in this register changed status as a result of this step** — every other classification already in this document was left exactly as written. The rest of §7 (Prioritization), §22–§27 (recommendations, closing note), §28–§40 (V2.1/V2.2 assignment tables and completion notes) above remain the accurate historical record and are preserved exactly as written.
+
+---
+
+## 42. V2.2 Final Release Audit
+
+**Audit date:** 2026-08-15. **Baseline:** `744d29e`, verified as true `HEAD` matching `origin/master`, clean working tree. Full detail lives in `VERSION_2_ARCHITECTURE_PLAN.md`'s "V2.2 Final Release Audit" section — not duplicated here; this entry only records the register-relevant outcome.
+
+**One release-blocking defect found and fixed, not previously caught by this register or any prior step's own completion note:** AUTH-07's "Closed" status (§6/§39) accurately describes that self-service deletion is real and `IMPLEMENTED` — but the underlying `AccountEraser::forget()` had a real gap in *how completely* it freed the deleted identity: it freed the `wp_bc_phone_index` row (confirmed by existing tests) but never the deterministic `wp_users.user_login` (`bc_<digits>`) `AccountResolver::create_customer()` assigns, which WordPress core has no supported API to rename post-creation. A genuine future owner of a previously-deleted account's phone number would have been unable to register at all. Fixed (direct `$wpdb->update()` rename + cache clear), with a new regression test reproducing the real `bc_<digits>` login scheme rather than a factory-random one. AUTH-07/PRIV-02's `IMPLEMENTED` status is unchanged (the feature was and remains real) — this is recorded as a fixed defect within an already-correctly-scoped feature, not a status change.
+
+**Two new follow-up items opened, discovered during this audit's Step 16 re-review, neither release-blocking:**
+
+| ID | Description | Current state | Status | Severity | Target | Recommendation |
+|---|---|---|---|---|---|---|
+| NOTIF-07 | No professional-facing notification-preferences UI | `PreferenceService`/`NotificationsController` is generic (keyed by `user_id`), but the only frontend consumer is the customer dashboard's `AccountTab.tsx` — no equivalent surface exists under `app/src/features/dashboard/professional/` | MISSING | LOW | V2.3 | Reuse the existing generic backend; only a new dashboard tab/section is needed |
+| PROF-07 | Staff model is real but narrow (PROF-05 follow-up) | `StaffService`/`wp_bc_business_staff` links real accounts with owner-only add/remove, but only one flat `staff` role and only two wired surfaces (CRM, Analytics) — not booking confirm/cancel/reschedule, not reviews, not services | PARTIALLY_IMPLEMENTED | LOW | V2.3 | Acceptable if the current two-surface scope is a deliberate product decision; expand surface coverage or add role granularity only if real usage shows a need |
+
+**Everything else re-audited (Steps 11–13, 15; cross-cutting security/authorization; database/migrations; Persian/Jalali; V2.3 boundary) confirmed clean — no new gap-register entries required.** Test suite at this audit's completion: backend **725/725** (724 baseline + 1 new regression test for the AUTH-07 fix), frontend **38/38**, unchanged otherwise from the Step 16 completion baseline.
+
+**Final decision: `V2.2 READY FOR RELEASE`** (no `v2.2.0` tag created — a separate, explicit next step).

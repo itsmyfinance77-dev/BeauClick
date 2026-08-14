@@ -65,6 +65,23 @@ final class AccountEraser {
 		);
 		wp_set_password( wp_generate_password( 64, true, true ), $user_id );
 
+		// wp_update_user()/wp_insert_user() silently ignore 'user_login' for an
+		// existing ID -- WordPress core never lets a login be renamed through
+		// that API. AccountResolver::create_customer() assigns a deterministic
+		// login ('bc_<digits>') derived from the phone number, so without this
+		// direct rename the anonymized row permanently occupies that login and
+		// a genuine future owner of the same phone number would hit
+		// wp_insert_user()'s "existing_user_login" error on re-registration --
+		// exactly the resurrection this step's own requirement forbids.
+		$wpdb->update(
+			$wpdb->users,
+			[ 'user_login' => 'deleted-user-' . $user_id ],
+			[ 'ID' => $user_id ],
+			[ '%s' ],
+			[ '%d' ]
+		);
+		clean_user_cache( $user_id );
+
 		$user = get_userdata( $user_id );
 		if ( $user ) {
 			$user->set_role( '' ); // Strips every capability -- an anonymized account can no longer book/write reviews/etc. even if a login bypass ever occurred elsewhere.
