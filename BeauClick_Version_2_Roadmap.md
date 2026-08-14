@@ -11,9 +11,9 @@
 | V1 | **FROZEN** | `v1.0.0` → `v1.0.1` | Marketplace + booking + AI discovery + shop + B2B core loop. |
 | V2.0 | **RELEASED, FROZEN** | `v2.0.0` | Event instrumentation, AI discovery upgrade, advanced ranking, Beauty Journey. |
 | V2.1 | **RELEASED, FROZEN** | `v2.1.0` (commit `d1445092977ab6a9f95bd50221e43ef761ac2b91`) | Professional CRM, Authentication & Registration, Legal & Trust Foundation, Professional Verification Evidence & Trust, Loyalty Tiers + Membership, Waitlist + Smart Rebooking + Retention Automation. |
-| V2.2 | **PLANNED** | — (not tagged) | Growth & Discovery, Analytics, Admin Platform Maturity, Account Privacy & Data Control, Booking Evolution, Professional/Business Platform Completion. See the "V2.2 Strategic Roadmap & Architecture Plan" section of `VERSION_2_ARCHITECTURE_PLAN.md` for the full Step-by-Step plan. |
-| V2.3 | **FUTURE** | — | Central pricing/discount orchestration + Campaign/Promotion Engine, AI for Professionals & Businesses, Financial/Payout infrastructure. |
-| V2.4 | **FUTURE** | — | Realtime Communication, Multi-Sided Marketplace evolution, Native Mobile Application — each explicitly evidence-gated, not scheduled by default. |
+| V2.2 | **RELEASED, FROZEN** | `v2.2.0` (commit `9c980aba3f7f061db3f27e1af98bbfb544031fbe`) | Analytics & BI Foundation, Growth & Public Discovery (SEO + Referral), Admin Platform & Operations Maturity, Account Privacy & Data Control, Booking Evolution (Rescheduling + Receipts), Professional/Business Platform Completion. |
+| V2.3 | **PLANNED** | — (not tagged) | Pricing Orchestration + Campaign Engine (order-level promotions), Financial Ledger & Manual Settlement, AI for Professionals & Businesses (read-only insights), Growth & Professional Platform Quick Wins (B2B quote UI, basic marketplace search, professional notification preferences). See the "V2.3 Discovery, Gap Audit & Roadmap Definition" section of `VERSION_2_ARCHITECTURE_PLAN.md` for the full Step-by-Step plan. **Implementation not started — awaiting explicit approval.** |
+| V2.4 | **FUTURE** | — | Realtime Communication, Multi-Sided Marketplace evolution, Native Mobile Application, Professional Portfolio Upload, automated payout/disbursement — each explicitly evidence-gated or externally blocked, not scheduled by default. |
 
 ---
 
@@ -44,6 +44,29 @@ The net effect: V2.1 ended up completing almost the entire original V2.0–V2.2 
 Full detail — dependencies, database/API/UI impact, risk, complexity, definition of done for each step — lives in `VERSION_2_ARCHITECTURE_PLAN.md`'s "V2.2 Strategic Roadmap & Architecture Plan" section.
 
 **Explicitly not in V2.2** (see that same section for the full rationale): Campaign/Promotion Engine, Financial/Payout, AI for Professionals (all V2.3 — real-money and audience-targeting risk, each needs a business decision or real usage data V2.2 will help produce); Realtime Communication, Multi-Sided Marketplace, Native Mobile (all V2.4+, evidence-gated, unchanged from the original plan's own reasoning).
+
+---
+
+## V2.3 at a glance
+
+**Strategic theme: Monetization Foundations & Professional Tools.** V2.2 gave the platform real visibility and operational maturity. V2.3's job is to turn that into real business value — a real campaign/promotion mechanism, a real professional earnings figure (replacing the `درآمد` placeholder reserved since V1), a first AI-generated insight for professionals/businesses, and closing a handful of small, high-value gaps in already-built backends nobody can reach yet.
+
+A dedicated discovery/gap-audit pass (2026-08-15, baseline `v2.2.0`) deliberately did **not** blindly carry forward the original V2.3 sketch — it re-measured Campaign, Financial/Payout, and AI-for-Professionals against the real, current codebase first. All three remain correctly assigned to V2.3, but each turned out smaller and more separable than the original risk-based sequencing assumed — see `VERSION_2_ARCHITECTURE_PLAN.md`'s "V2.3 Discovery, Gap Audit & Roadmap Definition" section for the full evidence and reasoning.
+
+| Step | Capability | One-line objective |
+|---|---|---|
+| 17 | Pricing Orchestration + Campaign Engine (Phase 1) | A real, admin-authorable promotion mechanism, applied only as an order-level fee on booking and B2B-quote orders — never the WooCommerce cart, never WooCommerce's own (unused) coupon system. |
+| 18 | Financial Ledger & Manual Settlement | A real, commission-adjusted earnings figure for professionals/businesses, and an admin-executed, audit-logged settlement workflow — built with **zero payment-gateway dependency** (only fully-automated disbursement remains gateway-gated). |
+| 19 | AI for Professionals & Businesses (Read-Only Insights) | A first, strictly read-only AI-generated insight into a professional/business's own CRM and analytics data — never an autonomous action. |
+| 20 | Growth & Professional Platform Quick Wins | B2B quote request/accept UI, basic marketplace text search, professional/business notification-preferences UI, and an admin audit-log completeness fix — four small, independent, high-value-per-effort gaps in already-built backends. |
+
+**Structural note, unlike every prior version:** none of these four steps blocks another — each has only a small, self-contained internal prerequisite (a decision or a schema fix), not a cross-step dependency. All four can run in parallel if resourced that way; Step 20 is recommended first purely because it is cheapest and unlocks value already built.
+
+Full detail — dependencies, database/API/UI impact, the Financial Truth concept table, the Pricing Orchestration decision, risk, complexity, definition of done for each step — lives in `VERSION_2_ARCHITECTURE_PLAN.md`'s "V2.3 Discovery, Gap Audit & Roadmap Definition" section.
+
+**Explicitly not in V2.3** (see that section for the full rationale): automated payout/disbursement API integration (genuinely gateway-gated, unlike the ledger/settlement work that precedes it); Campaign Engine Phase 2 (cart-based Shop/B2B-wholesale promotions — evidence-gated); Professional Portfolio Upload (real gap, but not core to this version's monetization theme — V2.4 candidate); fuzzy/typo-tolerant search (evidence-gated past Step 20's basic search); expanded staff-permission granularity (evidence-gated); Realtime Communication, Multi-Sided Marketplace, Native Mobile (all V2.4+, unchanged).
+
+**Implementation has not started.** This section defines the plan; a separate, explicit approval begins Step 17.
 
 ---
 
