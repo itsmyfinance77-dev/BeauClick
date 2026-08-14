@@ -137,4 +137,29 @@ final class MembershipServiceTest extends WP_UnitTestCase {
 
 		$this->assertSame( 'active', $service->for_user( $user_id )['status'], 'A membership expiring 30 days from now must not be swept yet.' );
 	}
+
+	// V2.2 Step 14 — account deletion must block on a real, unresolved commercial commitment.
+	public function test_has_active_paid_membership_is_true_only_for_an_active_paid_plan(): void {
+		$service = new MembershipService();
+
+		$free_user = self::factory()->user->create();
+		$free_plan = $this->make_plan( [ 'slug' => 'free', 'isPaid' => false ] );
+		$service->activate( $free_user, $free_plan['id'], 'manual' );
+		$this->assertFalse( $service->has_active_paid_membership( $free_user ), 'A free plan must never block deletion.' );
+
+		$paid_user = self::factory()->user->create();
+		$paid_plan = $this->make_plan( [ 'slug' => 'paid', 'isPaid' => true, 'price' => 100000 ] );
+		$service->activate( $paid_user, $paid_plan['id'], 'manual' );
+		$this->assertTrue( $service->has_active_paid_membership( $paid_user ) );
+
+		$cancelled_user = self::factory()->user->create();
+		$service->activate( $cancelled_user, $paid_plan['id'], 'manual' );
+		$service->cancel( $cancelled_user );
+		$this->assertFalse( $service->has_active_paid_membership( $cancelled_user ), 'A cancelled paid membership must no longer block deletion.' );
+	}
+
+	public function test_has_active_paid_membership_is_false_for_a_user_with_no_membership_at_all(): void {
+		$user_id = self::factory()->user->create();
+		$this->assertFalse( ( new MembershipService() )->has_active_paid_membership( $user_id ) );
+	}
 }

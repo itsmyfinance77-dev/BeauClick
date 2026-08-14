@@ -169,4 +169,31 @@ final class NotificationServiceTest extends WP_UnitTestCase {
 
 		$this->assertSame( 0, $retried, 'A notification must not be retried forever -- it must stop once the max attempt count is reached.' );
 	}
+
+	// V2.2 Step 14 — account deletion's notification-history handling.
+	public function test_forget_user_scrubs_recipient_but_keeps_the_delivery_record(): void {
+		global $wpdb;
+		$user_id = self::factory()->user->create();
+		$wpdb->insert(
+			$wpdb->prefix . 'bc_notifications',
+			[ 'user_id' => $user_id, 'category' => 'reminder', 'template_key' => 'booking_reminder', 'channel' => 'email', 'status' => 'sent', 'recipient' => 'real-email@example.test', 'attempts' => 1, 'idempotency_key' => 'forget-test-key', 'created_at' => current_time( 'mysql' ) ]
+		);
+
+		( new NotificationService() )->forget_user( $user_id );
+
+		$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}bc_notifications WHERE idempotency_key = %s", 'forget-test-key' ), ARRAY_A );
+		$this->assertNotNull( $row, 'The delivery record itself must be retained -- only the recipient PII is scrubbed.' );
+		$this->assertNull( $row['recipient'] );
+		$this->assertSame( 'sent', $row['status'], 'Operational fields (status/category/timing) must survive unchanged.' );
+	}
+
+	public function test_forget_user_is_idempotent(): void {
+		$user_id = self::factory()->user->create();
+		$service = new NotificationService();
+
+		$service->forget_user( $user_id ); // No rows for this user -- must not error.
+		$service->forget_user( $user_id );
+
+		$this->assertTrue( true ); // Reaching here without a fatal is the assertion.
+	}
 }

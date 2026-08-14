@@ -44,6 +44,23 @@ final class MembershipService {
 		];
 	}
 
+	/**
+	 * V2.2 Step 14 (§9) — an active PAID membership implies an ongoing
+	 * commercial relationship (billing period, potential future renewal)
+	 * this task's own instruction says not to silently resolve ("do not
+	 * invent business policy" for what happens to it) — so deletion is
+	 * blocked until it's cancelled first through the existing, already-
+	 * built cancellation path, same as an unresolved booking. A free/
+	 * unpaid or already-expired/cancelled membership has no such
+	 * commitment and never blocks anything.
+	 */
+	public function has_active_paid_membership( int $user_id ): bool {
+		$membership = $this->for_user( $user_id );
+		return null !== $membership
+			&& self::STATUS_ACTIVE === $membership['status']
+			&& ! empty( $membership['plan']['isPaid'] );
+	}
+
 	/** @return list<array<string, mixed>> */
 	public function plans( bool $active_only = false ): array {
 		global $wpdb;

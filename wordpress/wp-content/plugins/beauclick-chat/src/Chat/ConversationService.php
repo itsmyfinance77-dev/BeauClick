@@ -276,6 +276,48 @@ final class ConversationService {
 		return $this->format_message( $row );
 	}
 
+	/**
+	 * V2.2 Step 14 — the customer's own chat history, for their own data
+	 * export. Deliberately only the customer's OWN authored messages, not
+	 * the counterpart's — the same data-minimization boundary this
+	 * codebase already applies to CRM notes (each party's own words stay
+	 * theirs), and matching the Privacy Policy's own existing text that a
+	 * conversation "stays between you and that professional." Conversations
+	 * and messages are retained (never deleted) on account deletion — the
+	 * counterpart professional/business has a legitimate ongoing interest,
+	 * exactly like CRM notes; `sender_id`/`participant_*_id` keep resolving
+	 * through the now-anonymized WP user row.
+	 *
+	 * @return array<int, array<string, mixed>>
+	 */
+	public function export_for_user( int $user_id ): array {
+		global $wpdb;
+		$conversation_ids = $wpdb->get_col(
+			$wpdb->prepare(
+				"SELECT id FROM {$wpdb->prefix}bc_conversations WHERE participant_a_id = %d OR participant_b_id = %d", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$user_id,
+				$user_id
+			)
+		);
+		if ( ! $conversation_ids ) {
+			return [];
+		}
+
+		$placeholders = implode( ',', array_fill( 0, count( $conversation_ids ), '%d' ) );
+		$rows         = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT conversation_id, body, created_at FROM {$wpdb->prefix}bc_messages WHERE conversation_id IN ({$placeholders}) AND sender_id = %d ORDER BY id ASC", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+				array_merge( array_map( 'intval', $conversation_ids ), [ $user_id ] )
+			),
+			ARRAY_A
+		);
+
+		return array_map(
+			static fn ( array $r ) => [ 'conversationId' => (int) $r['conversation_id'], 'body' => $r['body'], 'createdAt' => $r['created_at'] ],
+			$rows ?: []
+		);
+	}
+
 	private function format( array $row ): array {
 		return [
 			'id'              => (int) $row['id'],

@@ -86,6 +86,19 @@ final class BeautyProfileService {
 		return $this->get( $userId );
 	}
 
+	/**
+	 * V2.2 Step 14 — genuinely customer-owned preference data (city/specialty/
+	 * budget/notes), of no legitimate interest to any other party once the
+	 * account is gone, unlike a CRM note or a chat message a professional
+	 * also has a stake in. Deleted outright, not anonymized. Idempotent — a
+	 * customer who never set a profile has no row to delete, and a repeated
+	 * call after a resumed deletion sweep is a harmless no-op.
+	 */
+	public function forget_user( int $userId ): void {
+		global $wpdb;
+		$wpdb->delete( $wpdb->prefix . 'bc_beauty_profiles', [ 'user_id' => $userId ], [ '%d' ] );
+	}
+
 	private function format( int $userId, ?array $row ): array {
 		if ( ! $row ) {
 			return [

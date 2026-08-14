@@ -58,6 +58,7 @@ function _beauclick_manually_load_plugins(): void {
 		\BeauClick\Notifications\Plugin::class,
 		\BeauClick\Analytics\Plugin::class,
 		\BeauClick\Referral\Plugin::class,
+		\BeauClick\Privacy\Plugin::class, // V2.2 Step 14 — depends on core/auth/booking/journey/loyalty/notifications/referral/reviews/chat/ai, must activate last.
 	];
 
 	foreach ( $activation_order as $plugin_class ) {

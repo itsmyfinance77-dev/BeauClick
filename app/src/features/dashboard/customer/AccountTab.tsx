@@ -1,5 +1,7 @@
 import { NotificationPreferences } from '@/features/notifications/NotificationPreferences';
 import { NotificationsList } from '@/features/notifications/NotificationsList';
+import { DataExportCard } from '@/features/privacy/DataExportCard';
+import { AccountDeletionCard } from '@/features/privacy/AccountDeletionCard';
 
 export function AccountTab() {
 	return (
@@ -20,6 +22,10 @@ export function AccountTab() {
 				<h3 style={ { marginTop: 0, fontSize: 15 } }>اعلان‌های اخیر</h3>
 				<NotificationsList />
 			</div>
+
+			<h2 style={ { fontSize: 17, margin: '8px 0 0' } }>حریم خصوصی و اطلاعات من</h2>
+			<DataExportCard />
+			<AccountDeletionCard />
 		</div>
 	);
 }

@@ -1,0 +1,15 @@
+{
+    "name": "beauclick/privacy",
+    "description": "BeauClick account privacy & data control — self-service export, admin-reviewed deletion/anonymization, orchestrated across every domain plugin's own service layer.",
+    "type": "wordpress-plugin",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.2",
+        "ext-zip": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "BeauClick\\Privacy\\": "src/"
+        }
+    }
+}

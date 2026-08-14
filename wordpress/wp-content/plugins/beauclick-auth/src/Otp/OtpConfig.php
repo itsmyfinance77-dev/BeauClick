@@ -31,6 +31,21 @@ final class OtpConfig {
 
 	public const REQUEST_WINDOW_SECONDS = HOUR_IN_SECONDS;
 
-	public const PURPOSE_LOGIN_OR_REGISTER = 'login_or_register';
-	public const PURPOSE_CHANGE_PHONE      = 'change_phone';
+	public const PURPOSE_LOGIN_OR_REGISTER      = 'login_or_register';
+	public const PURPOSE_CHANGE_PHONE           = 'change_phone';
+
+	/**
+	 * V2.2 Step 14 — the one existing re-authentication mechanism this
+	 * product has (no password exists for the customer/professional/
+	 * business path), reused rather than duplicated for confirming
+	 * account-deletion requests. Kept to 16 characters deliberately —
+	 * `wp_bc_otp_requests.purpose` is `VARCHAR(20)`; a longer value here
+	 * silently fails the row insert (found live, during this step's own
+	 * QA pass: request_otp() doesn't check $wpdb->insert()'s return value,
+	 * so the original 25-character 'confirm_account_deletion' let the SMS
+	 * appear to send successfully while no row was ever written, making
+	 * every subsequent verify_otp() call fail as "expired" no matter what
+	 * code was entered).
+	 */
+	public const PURPOSE_CONFIRM_ACCOUNT_DELETION = 'confirm_deletion';
 }

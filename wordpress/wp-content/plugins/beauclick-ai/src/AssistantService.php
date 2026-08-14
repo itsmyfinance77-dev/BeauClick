@@ -38,6 +38,66 @@ final class AssistantService {
 		);
 	}
 
+	/**
+	 * V2.2 Step 14 — read-only lookup, unlike get_or_create_conversation():
+	 * an export/deletion pass must never CREATE a conversation for a
+	 * customer who never used the AI assistant.
+	 */
+	public function find_conversation_for_user( int $user_id ): ?array {
+		global $wpdb;
+		$row = $wpdb->get_row(
+			$wpdb->prepare( "SELECT * FROM {$wpdb->prefix}bc_ai_conversations WHERE user_id = %d", $user_id ), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			ARRAY_A
+		);
+		return $row ? $this->format_conversation( $row ) : null;
+	}
+
+	/**
+	 * Every message in the customer's own AI conversation (their own
+	 * prompts and the assistant's replies to them — a synchronous 1:1
+	 * exchange with no other human party, unlike beauclick-chat), for their
+	 * own data export.
+	 *
+	 * @return array<int, array<string, mixed>>
+	 */
+	public function export_for_user( int $user_id ): array {
+		$conversation = $this->find_conversation_for_user( $user_id );
+		if ( ! $conversation ) {
+			return [];
+		}
+		global $wpdb;
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT sender_id, body, created_at FROM {$wpdb->prefix}bc_ai_messages WHERE conversation_id = %d ORDER BY id ASC", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$conversation['id']
+			),
+			ARRAY_A
+		);
+		return array_map(
+			static fn ( array $r ) => [ 'from' => $r['sender_id'] ? 'customer' : 'assistant', 'body' => $r['body'], 'createdAt' => $r['created_at'] ],
+			$rows ?: []
+		);
+	}
+
+	/**
+	 * V2.2 Step 14 — fully customer-owned, no other party involved (unlike
+	 * beauclick-chat's professional-facing conversations), matching this
+	 * plugin's own docblock ("one user has exactly one ongoing AI
+	 * conversation"). Deleted outright: conversation, messages, and the
+	 * recommendation-click events tied to it. Idempotent — no conversation
+	 * means nothing to delete.
+	 */
+	public function forget_user( int $user_id ): void {
+		$conversation = $this->find_conversation_for_user( $user_id );
+		if ( ! $conversation ) {
+			return;
+		}
+		global $wpdb;
+		$wpdb->delete( $wpdb->prefix . 'bc_ai_recommendation_events', [ 'conversation_id' => $conversation['id'] ], [ '%d' ] );
+		$wpdb->delete( $wpdb->prefix . 'bc_ai_messages', [ 'conversation_id' => $conversation['id'] ], [ '%d' ] );
+		$wpdb->delete( $wpdb->prefix . 'bc_ai_conversations', [ 'id' => $conversation['id'] ], [ '%d' ] );
+	}
+
 	/** @return array<int, array<string, mixed>> */
 	public function messages( int $conversation_id, int $limit = 50 ): array {
 		global $wpdb;

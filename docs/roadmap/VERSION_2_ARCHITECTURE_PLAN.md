@@ -2032,3 +2032,126 @@ All three, above — (1) by switching from `$position` arguments to explicit, de
 ### Deferred (explicitly out of this step's scope, per the task's own stop condition)
 
 Account Privacy & Data Control (V2.2 Step 14), Booking Evolution (Step 15), Professional/Business Platform Completion (Step 16), Campaign Engine, Financial/Payout, Realtime, Native Mobile, AI for Professionals — none started. Step 14 was not started.
+
+---
+
+## V2.2 Step 14 — Account Privacy & Data Control Implementation Notes
+
+### What existed before, and what was actually missing
+
+The Privacy Policy (V2.1 Step 7) already told customers what data BeauClick holds and that they could request deletion or export "through the Contact page" — a real, honest disclosure, but a manual, out-of-band process with no actual in-product mechanism behind it. Direct inspection confirmed **zero existing account-deletion, anonymization, or data-export code anywhere** in the codebase (`wp_delete_user`/`register_privacy_exporter`/`register_privacy_eraser`/`anonymiz*` — no matches across any `beauclick-*` plugin). Nine domains genuinely hold customer data (auth/phone identity, bookings, WooCommerce orders, reviews, CRM notes *about* the customer, Beauty Journey, loyalty/membership, notifications, referrals, chat, AI conversations) with no existing lifecycle story for any of them once an account should stop existing.
+
+### Core architectural decision: anonymize the identity, don't chase every table
+
+Every domain's own display code already resolves a user via `get_userdata()`/`get_user_by()` and already handles a missing user gracefully (the `$user ? $user->display_name : '#'.$id` pattern already used throughout Step 13's admin pages). This made the central design choice straightforward: **anonymize the one WP user row (`AccountEraser::forget()`), never hard-delete it.** The numeric `wp_users.ID` never changes, so every other table's `customer_id`/`author_id`/`user_id` keeps resolving to a real (now-scrubbed) row — a professional's CRM note about the customer, a review the customer wrote, a booking they made all continue to display correctly (as "کاربر حذف‌شده") with **zero code changes needed in any of those domains' own display paths**. This single choice is what kept the blast radius of this step proportionate to nine domains rather than requiring a bespoke migration of every foreign-key-shaped column.
+
+### Delete vs. anonymize vs. retain — the domain-by-domain matrix actually used
+
+| Domain | Treatment | Why |
+|---|---|---|
+| WP user identity (`wp_users`/`wp_usermeta`) | **Anonymized** (`AccountEraser::forget()`) — display name → "کاربر حذف‌شده", email → a placeholder, password scrambled, every role/capability stripped, `_billing_*` usermeta cleared | The one row every other domain's display code resolves through |
+| `wp_bc_phone_index` | **Deleted outright** | Frees the phone number for a genuine new registration — §10's own explicit "same phone must never resurrect the old identity" requirement |
+| `wp_bc_otp_requests` (rows where this user was the requester) | **Deleted** | Security/audit artifacts with no ongoing purpose, codes were already one-way-hashed and short-lived |
+| WooCommerce orders (billing snapshot) | **Retained, untouched** | A real financial/transactional record; whether historical order-level PII should ever be purged is `NEEDS_LEGAL_REVIEW`, not an engineering default this step invents |
+| `wp_bc_bookings` | **Retained** | Operational history; carries no direct PII beyond `customer_id`, which resolves through the anonymized user |
+| `wp_bc_reviews` | **Retained, verbatim** | Matches the architecture plan's own explicit example — a professional's rating history depends on it staying real |
+| `wp_bc_crm_notes` | **Retained, untouched** — not even visited by this step's code | The professional's own words about the interaction; confirmed via a dedicated test that no CRM note ever appears in the customer's own export either |
+| `wp_bc_beauty_profiles` / `wp_bc_beauty_goals` | **Deleted** (`BeautyProfileService::forget_user()` / `GoalService::forget_user()`) | Purely customer-authored preference data, no other party's legitimate interest |
+| `wp_bc_loyalty_points` (ledger) | **Retained** | "Do not erase financial-like history blindly" — balance stays real but is inaccessible once the account can't log in |
+| `wp_bc_memberships` | **Retained if already inactive; an *active paid* membership blocks deletion outright** (see below) | A live commercial commitment this step must not silently resolve |
+| `wp_bc_notification_preferences` | **Deleted** | Pure settings, "no row = enabled" is already a valid default state |
+| `wp_bc_notifications` (delivery history) | **Retained, `recipient` column scrubbed** (`NotificationService::forget_user()`) | Operational/debugging value in the log itself; the one directly-identifying column is a phone/email that must go |
+| `wp_bc_referrals` / `wp_bc_referral_codes` | **Retained, untouched** | The *other* party's (the referrer's) reward record depends on it; also closes the exact "delete → recreate → re-earn a reward" loophole §21 warns about, since `referee_user_id`'s `UNIQUE` constraint stays satisfied by the same (now-anonymized) id forever |
+| `wp_bc_conversations` / `wp_bc_messages` | **Retained** | The counterpart professional/business has the same "their own record" interest as CRM notes; the Privacy Policy's own existing text already says a conversation "stays between you and that professional" |
+| `wp_bc_ai_conversations` / `_messages` / `_recommendation_events` | **Deleted** (`AssistantService::forget_user()`) | Fully 1:1 customer-owned, no other party involved |
+| `wp_bc_admin_audit_log` | **Untouched** | Already contains no raw PII (bare `entity_id` + small JSON state snippets) — the admin-action record itself must survive per §22 |
+
+### Deletion lifecycle — admin-reviewed by design, not a self-service delete button
+
+The architecture plan's own pre-existing design decision for this step is explicit: "admin-reviewed... not instant, irreversible self-execution." The implemented state machine: `pending` (customer requested, OTP-confirmed) → `approved` (an admin reviewed and approved) → `processing` → `completed`, with `blocked` (a real conflicting state exists) and `rejected`/`cancelled` as the other terminal/redirect states. **Processing never happens synchronously inside the admin's own approval request** — `DeletionScheduler` (a bounded, 15-minute WP-Cron sweep, `DataRequestService::batch_with_status()` capped at 20 per tick) picks up every `approved` row and calls `DeletionService::process()`, which **re-checks blocking conditions again** (state may have changed between approval and the sweep tick) before actually running. Every domain step inside `process()` is individually idempotent (each `forget_user()` checks before acting; `AccountEraser::is_forgotten()` gates the whole identity step) — a failure partway through leaves the request at `approved` (not stuck at `processing`) with `last_error` recorded, so the next sweep tick safely resumes rather than redoing or corrupting anything.
+
+**Blocking conditions** (`DeletionService::blocking_reasons()`), each naming a real existing product flow to resolve it rather than force-cancelling anything on the customer's behalf: a pending/confirmed booking (`BookingService::has_pending_or_confirmed_booking()`), an active waitlist entry (`WaitlistService::for_user()`), an unresolved WooCommerce order (`pending`/`on-hold`/`processing` status), and an active **paid** membership (`MembershipService::has_active_paid_membership()` — a free/unpaid plan never blocks).
+
+### OTP re-confirmation — reusing, not duplicating, authentication
+
+Since this product has no password for the customer/professional/business path (Step 6's OTP is the *only* re-authentication mechanism that exists), a new `OtpConfig::PURPOSE_CONFIRM_ACCOUNT_DELETION` purpose was added and `OtpService`'s existing requester-scoping check extended to cover it — no second confirmation system built. `PrivacyController` owns the `/privacy/deletion/otp/*` routes directly (calling `OtpService`/`PhoneLookup::for_user()`, a new one-method beauclick-auth class resolving the current user's own verified phone), rather than adding privacy-specific routes to `AuthController`.
+
+### Scope boundary: customer self-service only
+
+Per §7's own explicit instruction, every route in `PrivacyController` is self-scoped to `get_current_user_id()` — there is no admin-facing "delete this other user" self-service path, and no professional/business account has ever been exercised through this flow (their own account lifecycle is out of this step's scope, left for a future step if ever needed).
+
+### Export architecture
+
+A new `beauclick-privacy` plugin (the established "new domain → new plugin" precedent) owns one new table, `wp_bc_data_requests` (both `export` and `deletion` request types, per the architecture plan's own suggestion — one table, not two near-identical ones). `ExportService::request()` generates **synchronously** (per §14's own "a safe synchronous implementation may be acceptable for smaller accounts" guidance, matching this product's real per-customer data volume): collects a deliberate, structured export by calling each domain's own `export_for_*()`/`for_user()`/`summary_for_user()` method (added alongside this step — never a raw table dump), writes one JSON file per section plus a Persian `README.txt`, and packages them into a ZIP via `ZipArchive`, stored under `wp-content/uploads/bc-data-exports/` with the exact `index.php`/`.htaccess` protected-directory pattern `EvidenceStorage` (V2.1 Step 8) already established. A random 32-byte `export_token` (not the numeric request id) gates download; the file expires after 24 hours, purged by a daily `ExportCleanupScheduler` sweep (deletes the file from disk, not just the DB row). Re-requesting while a `ready`, unexpired export already exists returns the same one rather than regenerating.
+
+### Export security
+
+`PrivacyController::export_download()` follows the exact shape `VerificationController::download_evidence()` (V2.1 Step 8) already established: real auth check inside the handler (not just the route's `permission_callback`), ownership match against the token's own row, status/expiry re-checked on every request, a 404 (never 403) for both "unknown token" and "someone else's token" so no account/token enumeration signal exists. **Admins never get a download action for another user's export** — the new Privacy Requests admin page shows export requests for operational visibility (status, timestamp) only, per §22's own explicit "an admin must not be able to casually inspect exported personal data" instruction.
+
+### Admin review page
+
+`PrivacyRequestsPage` — the same queue → detail → decide/reason → history template `VerificationReviewPage` (V2.1 Step 8) already established, reusing Step 13's `AdminShell`, gated on the same `bc_manage_platform` capability every other Step 13 operational page uses (no new capability introduced). The detail view shows a **live, freshly-recomputed** `blocking_reasons()` check before an admin can approve — the approve button visibly disables when a real conflict exists, so an admin can't accidentally approve a deletion the system would immediately re-block anyway. Approve/reject both write to Step 13's general admin audit log (`privacy_deletion_approved`/`_rejected`/`_completed`), visible in the unified Audit Log page and the Overview's "recent activity" feed with zero extra code, since both already merge any `wp_bc_admin_audit_log` action type generically.
+
+### Frontend
+
+Two new cards in the existing customer Account tab (`DataExportCard`, `AccountDeletionCard`) — the accessible-warning/OTP-confirmation-modal pattern is modeled directly on `VerificationModal` (status display + `Modal` + form + Persian error handling, the closest existing precedent). The deletion warning is explicit prose ("این اقدام قابل بازگشت نیست"), not color-only. The OTP confirmation modal reuses the shared `Modal` primitive (existing focus-trap/Escape/labelled-close semantics, already covered by V2.2 Step 13's own `Modal.a11y.test.tsx`).
+
+### Security
+
+Every `PrivacyController` route is self-scoped; ownership is derived from `get_current_user_id()` everywhere, never a client-supplied id (verified directly for cross-user export-download and deletion-cancel attempts). No secret/PII ever appears in a REST error message. The admin-post-free, fully-REST design here (unlike Step 13's admin-post.php-based pages) still follows the same nonce discipline — every mutating call carries `X-WP-Nonce` via the existing `api.ts` client.
+
+### Performance
+
+Every export section query is bounded (booking/notification/loyalty history capped, no unbounded scans). The deletion sweep processes at most 20 requests per 15-minute tick — real per-request cost is low (this product's realistic data volume per customer), and nothing here runs on any customer- or professional-facing page load.
+
+### Database
+
+One new additive table (`wp_bc_data_requests`), one new migration, in a new plugin. No existing V1/V2.0/V2.1 table was altered.
+
+### REST API
+
+`GET/POST /privacy/export/status|request|download`, `GET /privacy/deletion/status`, `POST /privacy/deletion/otp/request|request|cancel` — all under the existing `beauclick/v1` namespace, all `require_login`, all deriving identity from `get_current_user_id()`.
+
+### Persian/Jalali/RTL/mobile/accessibility
+
+Every new string is Persian; every date goes through the existing shared `JalaliDate`. Verified live at 375px/412px on both the customer Account tab (including the open OTP-confirmation modal) and the admin Privacy Requests page — no new overflow beyond the same pre-existing WP-core admin-bar characteristic Step 13 already documented and isolated. `axe-core` (Step 13's own addition to the Vitest pipeline) covers `DataExportCard` directly.
+
+### Tests
+
+38 new backend PHPUnit tests across `beauclick-privacy` (data-request CRUD, export generation/content/reuse, deletion blocking/request/cancel/approve/reject/process/idempotency/retry, REST authorization, admin-page capability gating and audit-log writes) plus `beauclick-auth`'s new `AccountEraserTest` (anonymization, phone-index deletion, same-phone-creates-new-account, idempotency) and small additions to `beauclick-notifications`/`beauclick-ai`/`beauclick-chat`/`beauclick-loyalty`'s own existing test files for their new `forget_user()`/`export_for_user()`/`has_active_paid_membership()` methods. Backend suite: **647/647** (604 pre-existing + 43 new). Frontend: **32/32** (29 pre-existing + 3 new, including one accessibility test). TypeScript and production build both clean.
+
+### Live verification (real running site, real seeded database, real HTTP requests)
+
+Performed against the real local dev server after activating the new plugin and seeding a dedicated QA customer with a completed booking, a review, Beauty Journey profile/goal, awarded loyalty points, and a customer-set notification preference:
+- **Export, real data**: requested and downloaded a real ZIP; every section verified against the actual seeded data (`bookings.json`, `reviews.json`, `beauty_journey.json`, `loyalty.json` all matched exactly, including a real cross-domain finding — submitting the review also correctly triggered the pre-existing loyalty earning rule, `pointsBalance: 30` = 25 seeded + 5 `review_submitted`).
+- **Deletion, full real lifecycle**: requested (OTP-confirmed) → admin-approved via the real Privacy Requests page → processed by a real `DeletionScheduler::run()` call → verified afterward: identity anonymized (`کاربر حذف‌شده`, placeholder email, zero roles), `_billing_phone` cleared, `wp_bc_phone_index` row gone, Beauty Journey profile/goal genuinely deleted, the review's own text still fully intact and attributed to the now-anonymized user, loyalty points balance unchanged at 30, two real audit-log entries recorded with the correct admin actor.
+- **§10's own specific requirement, verified**: calling `AccountResolver::find_or_create_for_phone()` again with the deleted account's exact phone number correctly created a **brand-new** user id, never the old one.
+- **Unauthorized access, a real denied request**: logged in as a different real customer and requested the first customer's export-download URL directly — real HTTP 401/404 (see Bugs below for the real issue this surfaced).
+- **Mobile (375px/412px)**: both the customer Account tab (including the open deletion-confirmation modal) and the admin Privacy Requests page — no overflow beyond the same pre-existing WP-core admin-bar characteristic already documented in Step 13.
+
+### Bugs discovered
+
+1. **`wp_bc_otp_requests.purpose` is `VARCHAR(20)`; the new `PURPOSE_CONFIRM_ACCOUNT_DELETION` value was initially 25 characters.** `$wpdb->insert()`'s return value was never checked in `OtpService::request_otp()`, so the failed insert went completely unnoticed — the method proceeded to send a real SMS and return `ok: true`, while no row existed for `verify_otp()` to ever find, permanently breaking the entire deletion-confirmation flow behind an apparently-successful "code sent" response. Found only by directly querying the database after a real browser click-through, not by code inspection or by the (necessarily mocked) test suite.
+2. **The export download link, built as a plain `rest_url()` string with no nonce, hit WordPress core's own REST cookie-auth CSRF guard.** A same-origin `<a href>` navigation carries the auth cookie but no `X-WP-Nonce` header; core's `rest_cookie_check_errors()` treats that as unauthenticated, so even the real, legitimate owner's own download link 401'd. Found by actually clicking the rendered link in the browser (not just inspecting its `href` attribute) during the unauthorized-access verification pass.
+
+### Bugs fixed
+
+1. Shortened the purpose value to `confirm_deletion` (16 characters) and — the more important fix — added a check on `$wpdb->insert()`'s return value in `OtpService::request_otp()`, failing loudly (`send_failed`) rather than silently before ever sending an SMS for a code nothing could verify. Re-verified live: a real OTP row now persists and the full confirm-and-submit flow completes.
+2. Changed the API to return a relative `downloadPath` instead of an absolute `downloadUrl`, and the frontend to build the real link via `api.urlWithNonce()` (the same helper `VerificationModal`'s own evidence-download links already use). Re-verified live: the same download request now returns a real `200 OK` with the nonce present, `401` without it.
+
+### Known limitations
+
+- Historical WooCommerce order-level billing PII (name/phone/address snapshotted at checkout, independent of the user account) is deliberately left untouched on deletion — retained as a real financial record; whether/when it should ever be purged is `NEEDS_LEGAL_REVIEW`, not resolved here.
+- No self-service path exists for a professional/business account's own data — out of this step's explicit customer-only scope (§7); a future step if the product ever needs it.
+- The deletion sweep runs at most every 15 minutes (WP-Cron, page-load-triggered in this dev environment) — production should point a real system cron at `wp-cron.php`, same standing recommendation as every other scheduler in this codebase.
+- No automatic reward clawback if a referral tied to a deleted-then-anonymized account is later found fraudulent — referral rows are deliberately retained untouched, matching this codebase's existing "do not build a sophisticated fraud platform" stance (V2.2 Step 12).
+
+### Business/legal decisions still required (not invented here)
+
+- **Retention duration for anonymized-but-retained records** (bookings, reviews, loyalty ledger, referrals, notification history, chat/CRM data the counterpart holds) — this step keeps them indefinitely once anonymized; a real time-based purge policy remains `NEEDS_BUSINESS_DECISION`/`NEEDS_LEGAL_REVIEW`, matching PRIV-04/LEGAL-08's existing classification in the Gap Register.
+- **Whether historical WooCommerce order billing PII should ever be purged**, and after what period — `NEEDS_LEGAL_REVIEW`.
+- **Deletion grace/cooldown period** — this step's safety mechanism is admin review, not a fixed waiting window; whether a "changed your mind" cooldown should additionally exist before a request can even reach an admin is a product decision, not engineered here.
+
+### Deferred (explicitly out of this step's scope, per the task's own stop condition)
+
+Booking Rescheduling, Invoice/Receipt system (V2.2 Step 15), Professional/Business Platform Completion (Step 16), Campaign Engine, Financial/Payout, AI for Professionals, Realtime, Native Mobile, Multi-vendor Marketplace — none started. Step 15 was not started.

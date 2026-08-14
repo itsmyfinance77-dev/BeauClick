@@ -189,4 +189,25 @@ final class ConversationServiceTest extends WP_UnitTestCase {
 		$blocked = $service->send_message( $conversation['id'], $customer, 'پیام ۲۱' );
 		$this->assertFalse( $blocked, 'A 21st message within the window must be rate-limited, not silently accepted.' );
 	}
+
+	// V2.2 Step 14 — data export must only contain the requesting user's own words, never the counterpart's.
+	public function test_export_for_user_returns_only_their_own_messages(): void {
+		$customer = self::factory()->user->create();
+		$pro      = self::factory()->user->create();
+		$service  = new ConversationService();
+		$conversation = $service->start_or_get( $customer, $pro );
+
+		$service->send_message( $conversation['id'], $customer, 'سلام، وقت دارید؟' );
+		$service->send_message( $conversation['id'], $pro, 'بله، چه ساعتی مناسب است؟' );
+
+		$export = $service->export_for_user( $customer );
+
+		$this->assertCount( 1, $export );
+		$this->assertSame( 'سلام، وقت دارید؟', $export[0]['body'] );
+	}
+
+	public function test_export_for_user_is_empty_when_the_user_has_no_conversations(): void {
+		$user_id = self::factory()->user->create();
+		$this->assertSame( [], ( new ConversationService() )->export_for_user( $user_id ) );
+	}
 }

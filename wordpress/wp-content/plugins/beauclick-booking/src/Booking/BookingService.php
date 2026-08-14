@@ -350,4 +350,41 @@ final class BookingService {
 		$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}bc_bookings WHERE id = %d", $booking_id ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		return $row ?: null;
 	}
+
+	/**
+	 * V2.2 Step 14 — every booking this customer has ever made, for their
+	 * own data export. Bookings themselves carry no directly-identifying
+	 * data beyond the customer's own id (times/status/provider/service),
+	 * so this is a plain read — nothing here needs redaction for the
+	 * customer's own copy of their own history.
+	 *
+	 * @return array<int, array<string, mixed>>
+	 */
+	public function export_for_customer( int $customer_id ): array {
+		global $wpdb;
+		$rows = $wpdb->get_results(
+			$wpdb->prepare( "SELECT id, provider_id, service_id, slot_start, slot_end, status, cancelled_reason, created_at FROM {$wpdb->prefix}bc_bookings WHERE customer_id = %d ORDER BY slot_start DESC", $customer_id ), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			ARRAY_A
+		);
+		return $rows ?: [];
+	}
+
+	/**
+	 * V2.2 Step 14 (§9) — account deletion must not leave a broken booking
+	 * lifecycle. A customer with any booking still pending or confirmed
+	 * (i.e. not yet cancelled/completed/no-show) has a real, unresolved
+	 * commitment — deletion is blocked until it resolves itself naturally
+	 * (completes, or the customer/provider cancels it through the existing
+	 * cancellation flow), never force-cancelled as a side effect of a
+	 * privacy request.
+	 */
+	public function has_pending_or_confirmed_booking( int $customer_id ): bool {
+		global $wpdb;
+		return (bool) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT 1 FROM {$wpdb->prefix}bc_bookings WHERE customer_id = %d AND status IN ('pending','confirmed') LIMIT 1", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$customer_id
+			)
+		);
+	}
 }

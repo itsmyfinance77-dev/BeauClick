@@ -162,6 +162,25 @@ final class ReviewService {
 		return array_map( [ $this, 'format' ], $rows ?: [] );
 	}
 
+	/**
+	 * V2.2 Step 14 — every review this customer has authored, for their own
+	 * data export. Retained (never deleted/detached) on account deletion —
+	 * per the architecture plan's own explicit example, a professional's
+	 * rating history depends on it staying real; `author_id` keeps
+	 * resolving through the now-anonymized WP user row, so the review still
+	 * displays correctly (as "کاربر حذف‌شده") everywhere it already does.
+	 *
+	 * @return array<int, array<string, mixed>>
+	 */
+	public function for_author( int $author_id ): array {
+		global $wpdb;
+		$rows = $wpdb->get_results(
+			$wpdb->prepare( "SELECT * FROM {$wpdb->prefix}bc_reviews WHERE author_id = %d ORDER BY created_at DESC", $author_id ), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			ARRAY_A
+		);
+		return array_map( [ $this, 'format' ], $rows ?: [] );
+	}
+
 	public function find( int $review_id ): ?array {
 		global $wpdb;
 		$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}bc_reviews WHERE id = %d", $review_id ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared

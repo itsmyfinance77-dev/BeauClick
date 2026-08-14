@@ -53,6 +53,17 @@ final class PreferenceService {
 		return $prefs;
 	}
 
+	/**
+	 * V2.2 Step 14 — pure settings, no other party has any interest in them,
+	 * and the "no row = enabled" default already makes a missing row a
+	 * perfectly valid state. Deleted outright, not anonymized. Idempotent —
+	 * no rows means nothing to delete.
+	 */
+	public function forget_user( int $user_id ): void {
+		global $wpdb;
+		$wpdb->delete( $wpdb->prefix . 'bc_notification_preferences', [ 'user_id' => $user_id ], [ '%d' ] );
+	}
+
 	/** @param array<string, bool> $updates */
 	public function update( int $user_id, array $updates ): array {
 		global $wpdb;

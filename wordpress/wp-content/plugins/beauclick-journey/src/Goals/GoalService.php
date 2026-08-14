@@ -138,6 +138,19 @@ final class GoalService {
 		return $this->find( $goalId ) ?? 'هدف پیدا نشد.';
 	}
 
+	/**
+	 * V2.2 Step 14 — same reasoning as BeautyProfileService::forget_user():
+	 * goals are purely customer-authored, no other party has a legitimate
+	 * ongoing interest in them once the account is gone. Deleted outright
+	 * (not just status-transitioned to 'abandoned' the way a customer's own
+	 * in-product action would) — this is account erasure, not a product
+	 * lifecycle event. Idempotent — no goals means nothing to delete.
+	 */
+	public function forget_user( int $userId ): void {
+		global $wpdb;
+		$wpdb->delete( $wpdb->prefix . 'bc_beauty_goals', [ 'user_id' => $userId ], [ '%d' ] );
+	}
+
 	private function format( array $row ): array {
 		return [
 			'id'          => (int) $row['id'],

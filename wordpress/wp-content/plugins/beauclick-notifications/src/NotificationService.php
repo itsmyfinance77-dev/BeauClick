@@ -169,6 +169,27 @@ final class NotificationService {
 		return $retried;
 	}
 
+	/**
+	 * V2.2 Step 14 — the delivery LOG (category/status/timing) has real,
+	 * ongoing operational/debugging value (the same reasoning
+	 * NotificationsAdminPage's own docblock already gives for keeping it at
+	 * all), so rows are never deleted for a forgotten account. `recipient`
+	 * (a phone number, already masked for SMS but a raw address for email)
+	 * is the one directly-identifying column on this table and is scrubbed
+	 * to a fixed placeholder. Idempotent by construction — re-running this
+	 * UPDATE against already-scrubbed rows is a harmless no-op.
+	 */
+	public function forget_user( int $user_id ): void {
+		global $wpdb;
+		$wpdb->update(
+			$wpdb->prefix . 'bc_notifications',
+			[ 'recipient' => null ],
+			[ 'user_id' => $user_id ],
+			[ '%s' ],
+			[ '%d' ]
+		);
+	}
+
 	/** @return array<int, array<string, mixed>> */
 	public function for_user( int $user_id, int $limit = 30 ): array {
 		global $wpdb;

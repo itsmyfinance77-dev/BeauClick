@@ -46,6 +46,9 @@ final class AuditLogPage {
 		'verification_suspended'      => 'تعلیق تأیید',
 		'verification_reinstated'     => 'بازگرداندن تأیید',
 		'verification_revoked'        => 'لغو تأیید',
+		'privacy_deletion_approved'   => 'تأیید درخواست حذف حساب',
+		'privacy_deletion_rejected'   => 'رد درخواست حذف حساب',
+		'privacy_deletion_completed'  => 'انجام حذف حساب',
 	];
 
 	/** Shared with AdminMenu's "recent activity" card so both surfaces label the same action_type identically. */

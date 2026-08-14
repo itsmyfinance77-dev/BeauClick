@@ -39,8 +39,8 @@ final class OtpService {
 		$code = (string) random_int( 10 ** ( OtpConfig::CODE_LENGTH - 1 ), ( 10 ** OtpConfig::CODE_LENGTH ) - 1 );
 
 		global $wpdb;
-		$now = current_time( 'mysql' );
-		$wpdb->insert(
+		$now    = current_time( 'mysql' );
+		$stored = $wpdb->insert(
 			$wpdb->prefix . 'bc_otp_requests',
 			[
 				'phone_canonical'    => $phone_canonical,
@@ -54,6 +54,19 @@ final class OtpService {
 			],
 			[ '%s', '%s', '%s', '%d', '%d', '%s', '%d', '%s' ]
 		);
+
+		if ( ! $stored ) {
+			// A real bug found live during V2.2 Step 14's own QA pass: this
+			// return value used to go unchecked, so a failed insert (e.g. a
+			// $purpose value wider than the `purpose VARCHAR(20)` column)
+			// silently fell through to a real SMS send and an 'ok' response
+			// -- with no row for verify_otp() to ever find, permanently
+			// breaking that confirmation flow while looking successful.
+			// Failing loudly here, before ever sending an SMS for a code
+			// nothing can verify, is strictly better than a request that
+			// "succeeds" and can never be completed.
+			return [ 'ok' => false, 'errorCode' => 'send_failed' ];
+		}
 
 		$message = sprintf( 'کد تأیید BeauClick: %s', self::to_persian_digits( $code ) );
 		$result  = SmsProviderFactory::create()->send( $phone_canonical, $message );
@@ -89,7 +102,12 @@ final class OtpService {
 
 		$where       = 'phone_canonical = %s AND purpose = %s AND consumed_at IS NULL AND expires_at > %s';
 		$params      = [ $phone_canonical, $purpose, current_time( 'mysql' ) ];
-		if ( OtpConfig::PURPOSE_CHANGE_PHONE === $purpose ) {
+		// Both change-phone and (V2.2 Step 14) account-deletion confirmation
+		// are sensitive actions performed by an already-logged-in user against
+		// their OWN phone -- requester-scoping stops a code sent for one
+		// logged-in session from being consumable by anyone who merely knows
+		// the phone number, on top of the existing phone+purpose scoping.
+		if ( in_array( $purpose, [ OtpConfig::PURPOSE_CHANGE_PHONE, OtpConfig::PURPOSE_CONFIRM_ACCOUNT_DELETION ], true ) ) {
 			$where   .= ' AND requester_user_id = %d';
 			$params[] = $requester_user_id;
 		}

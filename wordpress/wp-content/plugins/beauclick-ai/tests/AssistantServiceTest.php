@@ -408,4 +408,52 @@ final class AssistantServiceTest extends WP_UnitTestCase {
 		$this->assertCount( 2, $recs );
 		$this->assertNotSame( $recs[0]['eventId'], $recs[1]['eventId'] );
 	}
+
+	// V2.2 Step 14 — data export/deletion.
+	public function test_find_conversation_for_user_never_creates_one(): void {
+		$user_id = self::factory()->user->create();
+		$this->assertNull( ( new AssistantService() )->find_conversation_for_user( $user_id ) );
+
+		global $wpdb;
+		$this->assertSame( 0, (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}bc_ai_conversations WHERE user_id = %d", $user_id ) ) );
+	}
+
+	public function test_export_for_user_returns_the_conversation_messages(): void {
+		$service = new AssistantService();
+		$user_id = self::factory()->user->create();
+		$conversation = $service->get_or_create_conversation( $user_id );
+
+		global $wpdb;
+		$wpdb->insert( $wpdb->prefix . 'bc_ai_messages', [ 'conversation_id' => $conversation['id'], 'sender_id' => $user_id, 'body' => 'سلام دستیار', 'created_at' => current_time( 'mysql' ) ] );
+		$wpdb->insert( $wpdb->prefix . 'bc_ai_messages', [ 'conversation_id' => $conversation['id'], 'sender_id' => null, 'body' => 'سلام! چطور می‌توانم کمک کنم؟', 'created_at' => current_time( 'mysql' ) ] );
+
+		$export = $service->export_for_user( $user_id );
+
+		$this->assertCount( 2, $export );
+		$this->assertSame( 'customer', $export[0]['from'] );
+		$this->assertSame( 'assistant', $export[1]['from'] );
+	}
+
+	public function test_forget_user_deletes_the_conversation_messages_and_recommendation_events(): void {
+		$service = new AssistantService();
+		$user_id = self::factory()->user->create();
+		$conversation = $service->get_or_create_conversation( $user_id );
+
+		global $wpdb;
+		$wpdb->insert( $wpdb->prefix . 'bc_ai_messages', [ 'conversation_id' => $conversation['id'], 'sender_id' => $user_id, 'body' => 'پیام', 'created_at' => current_time( 'mysql' ) ] );
+		$message_id = $wpdb->insert_id;
+		$wpdb->insert( $wpdb->prefix . 'bc_ai_recommendation_events', [ 'conversation_id' => $conversation['id'], 'message_id' => $message_id, 'recommended_type' => 'provider', 'recommended_id' => 1, 'clicked' => 0, 'created_at' => current_time( 'mysql' ) ] );
+
+		$service->forget_user( $user_id );
+
+		$this->assertNull( $service->find_conversation_for_user( $user_id ) );
+		$this->assertSame( 0, (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}bc_ai_messages WHERE conversation_id = %d", $conversation['id'] ) ) );
+		$this->assertSame( 0, (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}bc_ai_recommendation_events WHERE conversation_id = %d", $conversation['id'] ) ) );
+	}
+
+	public function test_forget_user_is_idempotent_for_a_user_with_no_conversation(): void {
+		$user_id = self::factory()->user->create();
+		( new AssistantService() )->forget_user( $user_id ); // Must not error.
+		$this->assertTrue( true );
+	}
 }
