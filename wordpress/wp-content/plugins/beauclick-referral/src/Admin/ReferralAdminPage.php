@@ -3,6 +3,7 @@ declare( strict_types=1 );
 
 namespace BeauClick\Referral\Admin;
 
+use BeauClick\Core\Admin\Shell\AdminShell;
 use BeauClick\Core\Support\JalaliDate;
 
 /**
@@ -23,8 +24,9 @@ final class ReferralAdminPage {
 		'rewarded'  => 'پاداش داده‌شده',
 	];
 
+	/** Hook priority (not add_submenu_page()'s own $position argument — see BeauClick\Core\Admin\OperationsHealthPage::register()'s docblock) is what places this menu in the intended BeauClick admin order. */
 	public function register(): void {
-		add_action( 'admin_menu', [ $this, 'add_page' ] );
+		add_action( 'admin_menu', [ $this, 'add_page' ], 14 );
 	}
 
 	public function add_page(): void {
@@ -49,16 +51,27 @@ final class ReferralAdminPage {
 		$where         = $status_filter ? $wpdb->prepare( 'WHERE status = %s', $status_filter ) : '';
 		$rows          = $wpdb->get_results( "SELECT * FROM {$wpdb->prefix}bc_referrals {$where} ORDER BY id DESC LIMIT 100", ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery
 
-		echo '<div class="wrap" dir="rtl"><h1>' . esc_html__( 'معرفی به دوستان', 'beauclick-referral' ) . '</h1>';
-		echo '<p style="font-size:12px;color:#666;">' . esc_html__( 'آخرین ۱۰۰ معرفی — برای بررسی عملیاتی. آمار کلی و نرخ تبدیل در داشبورد «آمار و تحلیل» موجود است.', 'beauclick-referral' ) . '</p>';
+		AdminShell::header(
+			__( 'معرفی به دوستان', 'beauclick-referral' ),
+			__( 'آخرین ۱۰۰ معرفی — برای بررسی عملیاتی. آمار کلی و نرخ تبدیل در داشبورد «آمار و تحلیل» موجود است.', 'beauclick-referral' ),
+			[ [ 'label' => __( 'معرفی به دوستان', 'beauclick-referral' ) ] ]
+		);
 
-		echo '<p>';
+		echo '<p class="bc-admin-filters">';
 		foreach ( [ '' => 'همه' ] + self::STATUS_LABELS as $value => $label ) {
 			$url = admin_url( 'admin.php?page=' . self::SLUG . ( $value ? '&status=' . $value : '' ) );
-			echo '<a href="' . esc_url( $url ) . '" class="button" style="margin-inline-end:6px;">' . esc_html( $label ) . '</a>';
+			$css = 'button' . ( $status_filter === $value ? ' button-primary' : '' );
+			echo '<a href="' . esc_url( $url ) . '" class="' . esc_attr( $css ) . '">' . esc_html( $label ) . '</a>';
 		}
 		echo '</p>';
 
+		if ( ! $rows ) {
+			AdminShell::empty_state( __( 'هنوز معرفی‌ای ثبت نشده است.', 'beauclick-referral' ) );
+			AdminShell::footer();
+			return;
+		}
+
+		AdminShell::table_open();
 		echo '<table class="wp-list-table widefat fixed striped"><thead><tr>';
 		echo '<th>' . esc_html__( 'معرف', 'beauclick-referral' ) . '</th>';
 		echo '<th>' . esc_html__( 'معرفی‌شده', 'beauclick-referral' ) . '</th>';
@@ -69,9 +82,6 @@ final class ReferralAdminPage {
 		echo '<th>' . esc_html__( 'پاداش داده شد', 'beauclick-referral' ) . '</th>';
 		echo '</tr></thead><tbody>';
 
-		if ( ! $rows ) {
-			echo '<tr><td colspan="7">' . esc_html__( 'هنوز معرفی‌ای ثبت نشده است.', 'beauclick-referral' ) . '</td></tr>';
-		}
 		foreach ( $rows as $row ) {
 			$referrer = get_userdata( (int) $row['referrer_user_id'] );
 			$referee  = get_userdata( (int) $row['referee_user_id'] );
@@ -85,6 +95,8 @@ final class ReferralAdminPage {
 			echo '<td class="bc-numeric">' . esc_html( $row['rewarded_at'] ? JalaliDate::format( $row['rewarded_at'], true ) : '—' ) . '</td>';
 			echo '</tr>';
 		}
-		echo '</tbody></table></div>';
+		echo '</tbody></table>';
+		AdminShell::table_close();
+		AdminShell::footer();
 	}
 }

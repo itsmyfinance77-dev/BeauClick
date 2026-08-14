@@ -3,6 +3,7 @@ declare( strict_types=1 );
 
 namespace BeauClick\Loyalty\Admin;
 
+use BeauClick\Core\Admin\Shell\AdminShell;
 use BeauClick\Loyalty\Benefits\BenefitService;
 use BeauClick\Loyalty\Membership\MembershipService;
 use BeauClick\Loyalty\Tiers\TierService;
@@ -23,8 +24,9 @@ final class LoyaltyAdminPage {
 
 	private const SLUG = 'beauclick-loyalty';
 
+	/** Hook priority (not add_submenu_page()'s own $position argument — see BeauClick\Core\Admin\OperationsHealthPage::register()'s docblock) is what places this menu in the intended BeauClick admin order. */
 	public function register(): void {
-		add_action( 'admin_menu', [ $this, 'add_page' ] );
+		add_action( 'admin_menu', [ $this, 'add_page' ], 12 );
 		add_action( 'admin_post_bc_loyalty_tier_create', [ $this, 'handle_tier_create' ] );
 		add_action( 'admin_post_bc_loyalty_tier_toggle', [ $this, 'handle_tier_toggle' ] );
 		add_action( 'admin_post_bc_loyalty_plan_create', [ $this, 'handle_plan_create' ] );
@@ -57,19 +59,23 @@ final class LoyaltyAdminPage {
 		$tiers              = $tier_service->all( false );
 		$plans              = $membership_service->plans( false );
 
-		echo '<div class="wrap"><h1>' . esc_html__( 'وفاداری و عضویت', 'beauclick-loyalty' ) . '</h1>';
+		AdminShell::header(
+			__( 'وفاداری و عضویت', 'beauclick-loyalty' ),
+			null,
+			[ [ 'label' => __( 'وفاداری و عضویت', 'beauclick-loyalty' ) ] ]
+		);
 		if ( isset( $_GET['bc_notice'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'انجام شد.', 'beauclick-loyalty' ) . '</p></div>';
+			AdminShell::notice( __( 'انجام شد.', 'beauclick-loyalty' ) );
 		}
 		if ( isset( $_GET['bc_error'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-			echo '<div class="notice notice-error is-dismissible"><p>' . esc_html( sanitize_text_field( wp_unslash( $_GET['bc_error'] ) ) ) . '</p></div>'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			AdminShell::notice( sanitize_text_field( wp_unslash( (string) $_GET['bc_error'] ) ), 'error' ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		}
 
 		$this->render_tiers_section( $tiers, $benefit_service );
 		$this->render_plans_section( $plans, $tiers, $benefit_service );
 		$this->render_membership_lookup_section( $membership_service );
 
-		echo '</div>';
+		AdminShell::footer();
 	}
 
 	private function render_tiers_section( array $tiers, BenefitService $benefit_service ): void {
@@ -229,7 +235,7 @@ final class LoyaltyAdminPage {
 		$this->assert_capability();
 		check_admin_referer( 'bc_loyalty_tier_create' );
 
-		$result = ( new TierService() )->create(
+		$result = $this->create_tier_and_log(
 			sanitize_key( wp_unslash( (string) ( $_POST['slug'] ?? '' ) ) ), // phpcs:ignore WordPress.Security.NonceVerification.Missing
 			sanitize_text_field( wp_unslash( (string) ( $_POST['name'] ?? '' ) ) ), // phpcs:ignore WordPress.Security.NonceVerification.Missing
 			(int) ( $_POST['threshold_points'] ?? 0 ) // phpcs:ignore WordPress.Security.NonceVerification.Missing
@@ -237,31 +243,57 @@ final class LoyaltyAdminPage {
 		$this->redirect_back( is_string( $result ) ? $result : null );
 	}
 
+	/** @return int|string New tier id on success, a Persian error string on failure. */
+	public function create_tier_and_log( string $slug, string $name, int $threshold_points ): int|string {
+		$result = ( new TierService() )->create( $slug, $name, $threshold_points );
+		if ( is_string( $result ) ) {
+			return $result;
+		}
+		$id = (int) $result['id'];
+		$this->audit( 'loyalty_tier_created', 'loyalty_tier', $id, null, [ 'name' => $name, 'thresholdPoints' => $threshold_points ] );
+		return $id;
+	}
+
 	public function handle_tier_toggle(): void {
 		$this->assert_capability();
 		$id = (int) ( $_POST['tier_id'] ?? 0 ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
 		check_admin_referer( 'bc_loyalty_tier_toggle_' . $id );
 
+		$this->toggle_tier_and_log( $id );
+		$this->redirect_back();
+	}
+
+	public function toggle_tier_and_log( int $id ): void {
 		$tier = ( new TierService() )->find( $id );
 		if ( $tier ) {
 			( new TierService() )->update( $id, [ 'isActive' => ! $tier['isActive'] ] );
+			$this->audit( 'loyalty_tier_toggled', 'loyalty_tier', $id, [ 'isActive' => $tier['isActive'] ], [ 'isActive' => ! $tier['isActive'] ] );
 		}
-		$this->redirect_back();
 	}
 
 	public function handle_plan_create(): void {
 		$this->assert_capability();
 		check_admin_referer( 'bc_loyalty_plan_create' );
 
-		$result = ( new MembershipService() )->create_plan(
+		$result = $this->create_plan_and_log(
 			sanitize_key( wp_unslash( (string) ( $_POST['slug'] ?? '' ) ) ), // phpcs:ignore WordPress.Security.NonceVerification.Missing
 			sanitize_text_field( wp_unslash( (string) ( $_POST['name'] ?? '' ) ) ), // phpcs:ignore WordPress.Security.NonceVerification.Missing
 			! empty( $_POST['tier_id'] ) ? (int) $_POST['tier_id'] : null, // phpcs:ignore WordPress.Security.NonceVerification.Missing
 			! empty( $_POST['is_paid'] ), // phpcs:ignore WordPress.Security.NonceVerification.Missing
-			isset( $_POST['price'] ) && '' !== $_POST['price'] ? (int) $_POST['price'] : null, // phpcs:ignore WordPress.Security.NonceVerification.Missing
-			null
+			isset( $_POST['price'] ) && '' !== $_POST['price'] ? (int) $_POST['price'] : null // phpcs:ignore WordPress.Security.NonceVerification.Missing
 		);
 		$this->redirect_back( is_string( $result ) ? $result : null );
+	}
+
+	/** @return int|string New plan id on success, a Persian error string on failure. */
+	public function create_plan_and_log( string $slug, string $name, ?int $tier_id, bool $is_paid, ?int $price ): int|string {
+		$result = ( new MembershipService() )->create_plan( $slug, $name, $tier_id, $is_paid, $price, null );
+		if ( is_string( $result ) ) {
+			return $result;
+		}
+		$id = (int) $result['id'];
+		$this->audit( 'loyalty_plan_created', 'loyalty_plan', $id, null, [ 'name' => $name ] );
+		return $id;
 	}
 
 	public function handle_plan_toggle(): void {
@@ -269,11 +301,16 @@ final class LoyaltyAdminPage {
 		$id = (int) ( $_POST['plan_id'] ?? 0 ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
 		check_admin_referer( 'bc_loyalty_plan_toggle_' . $id );
 
+		$this->toggle_plan_and_log( $id );
+		$this->redirect_back();
+	}
+
+	public function toggle_plan_and_log( int $id ): void {
 		$plan = ( new MembershipService() )->find_plan( $id );
 		if ( $plan ) {
 			( new MembershipService() )->update_plan( $id, [ 'isActive' => ! $plan['isActive'] ] );
+			$this->audit( 'loyalty_plan_toggled', 'loyalty_plan', $id, [ 'isActive' => $plan['isActive'] ], [ 'isActive' => ! $plan['isActive'] ] );
 		}
-		$this->redirect_back();
 	}
 
 	public function handle_benefit_create(): void {
@@ -289,7 +326,7 @@ final class LoyaltyAdminPage {
 			$config['percentage'] = $value;
 		}
 
-		$result = ( new BenefitService() )->create(
+		$result = $this->create_benefit_and_log(
 			sanitize_key( wp_unslash( (string) ( $_POST['source_type'] ?? '' ) ) ), // phpcs:ignore WordPress.Security.NonceVerification.Missing
 			(int) ( $_POST['source_id'] ?? 0 ), // phpcs:ignore WordPress.Security.NonceVerification.Missing
 			$type,
@@ -299,13 +336,32 @@ final class LoyaltyAdminPage {
 		$this->redirect_back( is_string( $result ) ? $result : null );
 	}
 
+	/**
+	 * @param array<string, mixed> $config
+	 * @return int|string New benefit id on success, a Persian error string on failure.
+	 */
+	public function create_benefit_and_log( string $source_type, int $source_id, string $benefit_type, string $label, array $config ): int|string {
+		$result = ( new BenefitService() )->create( $source_type, $source_id, $benefit_type, $label, $config );
+		if ( is_string( $result ) ) {
+			return $result;
+		}
+		$id = (int) $result['id'];
+		$this->audit( 'loyalty_benefit_created', 'loyalty_benefit', $id, null, [ 'label' => $label, 'sourceType' => $source_type, 'sourceId' => $source_id ] );
+		return $id;
+	}
+
 	public function handle_benefit_delete(): void {
 		$this->assert_capability();
 		$id = (int) ( $_POST['benefit_id'] ?? 0 ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
 		check_admin_referer( 'bc_loyalty_benefit_delete_' . $id );
 
-		( new BenefitService() )->delete( $id );
+		$this->delete_benefit_and_log( $id );
 		$this->redirect_back();
+	}
+
+	public function delete_benefit_and_log( int $id ): void {
+		( new BenefitService() )->delete( $id );
+		$this->audit( 'loyalty_benefit_deleted', 'loyalty_benefit', $id, null, null );
 	}
 
 	public function handle_membership_grant(): void {
@@ -313,15 +369,21 @@ final class LoyaltyAdminPage {
 		check_admin_referer( 'bc_loyalty_membership_grant' );
 
 		$email = sanitize_email( wp_unslash( (string) ( $_POST['email'] ?? '' ) ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
-		$user  = get_user_by( 'email', $email );
+		$this->redirect_back( $this->grant_membership_and_log( $email, (int) ( $_POST['plan_id'] ?? 0 ) ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
+	}
+
+	public function grant_membership_and_log( string $email, int $plan_id ): ?string {
+		$user = get_user_by( 'email', $email );
 		if ( ! $user ) {
-			$this->redirect_back( 'کاربری با این ایمیل پیدا نشد.' );
-			return;
+			return 'کاربری با این ایمیل پیدا نشد.';
 		}
 
-		$plan_id = (int) ( $_POST['plan_id'] ?? 0 ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
-		$result  = ( new MembershipService() )->activate( $user->ID, $plan_id, 'manual', get_current_user_id() );
-		$this->redirect_back( is_string( $result ) ? $result : null );
+		$result = ( new MembershipService() )->activate( $user->ID, $plan_id, 'manual', get_current_user_id() );
+		if ( is_string( $result ) ) {
+			return $result;
+		}
+		$this->audit( 'loyalty_membership_granted', 'user', $user->ID, null, [ 'planId' => $plan_id ] );
+		return null;
 	}
 
 	public function handle_membership_cancel(): void {
@@ -329,19 +391,36 @@ final class LoyaltyAdminPage {
 		check_admin_referer( 'bc_loyalty_membership_cancel' );
 
 		$email = sanitize_email( wp_unslash( (string) ( $_POST['email'] ?? '' ) ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
-		$user  = get_user_by( 'email', $email );
+		$this->redirect_back( $this->cancel_membership_and_log( $email ) );
+	}
+
+	public function cancel_membership_and_log( string $email ): ?string {
+		$user = get_user_by( 'email', $email );
 		if ( ! $user ) {
-			$this->redirect_back( 'کاربری با این ایمیل پیدا نشد.' );
-			return;
+			return 'کاربری با این ایمیل پیدا نشد.';
 		}
 
 		$result = ( new MembershipService() )->cancel( $user->ID, get_current_user_id() );
-		$this->redirect_back( is_string( $result ) ? $result : null );
+		if ( is_string( $result ) ) {
+			return $result;
+		}
+		$this->audit( 'loyalty_membership_cancelled', 'user', $user->ID, null, null );
+		return null;
 	}
 
 	private function assert_capability(): void {
 		if ( ! current_user_can( 'bc_manage_platform' ) ) {
 			wp_die( esc_html__( 'شما اجازه این کار را ندارید.', 'beauclick-loyalty' ), 403 );
+		}
+	}
+
+	/**
+	 * @param array<string, mixed>|null $previous_state
+	 * @param array<string, mixed>|null $new_state
+	 */
+	private function audit( string $action_type, string $entity_type, int $entity_id, ?array $previous_state, ?array $new_state ): void {
+		if ( function_exists( 'beauclick_core' ) ) {
+			beauclick_core()->audit_log()->record( $action_type, $entity_type, $entity_id, get_current_user_id(), $previous_state, $new_state );
 		}
 	}
 

@@ -57,4 +57,44 @@ final class RoleManagerTest extends WP_UnitTestCase {
 
 		$this->assertFalse( get_role( RoleManager::ROLE_PROFESSIONAL )->has_cap( 'bc_manage_own_services' ), 'maybe_register() must not re-run register() when the stored version already matches.' );
 	}
+
+	/**
+	 * V2.2 Step 13: RoleManager::ROLE_PLATFORM_OPERATOR exists specifically
+	 * so BeauClick operations staff can reach every bc_manage_platform-gated
+	 * admin page without being a full WordPress Administrator.
+	 */
+	public function test_register_creates_the_platform_operator_role_with_manage_platform_and_read(): void {
+		RoleManager::register();
+
+		$role = get_role( RoleManager::ROLE_PLATFORM_OPERATOR );
+
+		$this->assertNotNull( $role );
+		$this->assertTrue( $role->has_cap( 'bc_manage_platform' ) );
+		$this->assertTrue( $role->has_cap( 'read' ), 'The platform operator role must be able to reach wp-admin at all.' );
+	}
+
+	public function test_register_re_grants_capabilities_onto_an_already_existing_platform_operator_role(): void {
+		RoleManager::register();
+
+		$role = get_role( RoleManager::ROLE_PLATFORM_OPERATOR );
+		$role->remove_cap( 'bc_manage_platform' );
+		$this->assertFalse( $role->has_cap( 'bc_manage_platform' ) );
+
+		RoleManager::register();
+
+		$this->assertTrue( get_role( RoleManager::ROLE_PLATFORM_OPERATOR )->has_cap( 'bc_manage_platform' ) );
+	}
+
+	public function test_moderator_and_support_roles_can_reach_wp_admin(): void {
+		RoleManager::register();
+
+		$this->assertTrue( get_role( RoleManager::ROLE_MODERATOR )->has_cap( 'read' ) );
+		$this->assertTrue( get_role( RoleManager::ROLE_SUPPORT )->has_cap( 'read' ) );
+	}
+
+	public function test_administrator_still_has_platform_operator_capabilities(): void {
+		RoleManager::register();
+
+		$this->assertTrue( get_role( 'administrator' )->has_cap( 'bc_manage_platform' ) );
+	}
 }

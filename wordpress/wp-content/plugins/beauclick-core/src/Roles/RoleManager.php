@@ -16,10 +16,11 @@ namespace BeauClick\Core\Roles;
  */
 final class RoleManager {
 
-	public const ROLE_PROFESSIONAL = 'bc_professional';
-	public const ROLE_BUSINESS     = 'bc_business';
-	public const ROLE_SUPPORT      = 'bc_support';
-	public const ROLE_MODERATOR    = 'bc_moderator';
+	public const ROLE_PROFESSIONAL      = 'bc_professional';
+	public const ROLE_BUSINESS          = 'bc_business';
+	public const ROLE_SUPPORT           = 'bc_support';
+	public const ROLE_MODERATOR         = 'bc_moderator';
+	public const ROLE_PLATFORM_OPERATOR = 'bc_platform_operator';
 
 	/**
 	 * Bump whenever the capability lists below change. maybe_register()
@@ -28,8 +29,22 @@ final class RoleManager {
 	 * ...register())` would otherwise re-grant every capability on every
 	 * admin page load for every admin, which WP_Role::add_cap() persists
 	 * with its own update_option() call each time.
+	 *
+	 * 2026-08-14.1 (V2.2 Step 13): added ROLE_PLATFORM_OPERATOR — every
+	 * BeauClick admin page (B2B, loyalty, notifications, analytics, the new
+	 * audit log/operations/users pages) has so far only ever been reachable
+	 * by a full WordPress Administrator, since bc_manage_platform was only
+	 * ever granted to that role. That's more authority than "run BeauClick
+	 * operations" actually needs — a full Administrator can also install
+	 * plugins, edit theme/plugin files, and manage every other WP user.
+	 * This role holds bc_manage_platform (and 'read', so it can reach
+	 * wp-admin at all) without any of that. Also added 'read' to
+	 * moderator/support so those roles can reach wp-admin too — both were
+	 * previously missing it, a real (if narrow) gap: a user role with no
+	 * `read` capability is not guaranteed a working wp-admin session by
+	 * WordPress core.
 	 */
-	private const CAPS_VERSION = '2026-08-11.1';
+	private const CAPS_VERSION = '2026-08-14.1';
 
 	/**
 	 * Capabilities layered onto every shopper account (WooCommerce's
@@ -102,12 +117,29 @@ final class RoleManager {
 
 	/** @return string[] */
 	public static function support_capabilities(): array {
-		return [ 'bc_view_all_conversations', 'bc_moderate_reviews_limited' ];
+		return [ 'read', 'bc_view_all_conversations', 'bc_moderate_reviews_limited' ];
 	}
 
 	/** @return string[] */
 	public static function moderator_capabilities(): array {
-		return [ 'bc_moderate_reviews', 'bc_moderate_verification' ];
+		return [ 'read', 'bc_moderate_reviews', 'bc_moderate_verification' ];
+	}
+
+	/**
+	 * V2.2 Step 13 — a real, wp-admin-usable role for BeauClick operations
+	 * staff who need every BeauClick admin surface (overview, audit log,
+	 * operations/health, users, B2B, reviews, loyalty, notifications,
+	 * analytics — everything gated on bc_manage_platform) without being a
+	 * full WordPress Administrator. Deliberately still just
+	 * bc_manage_platform, the same single capability every one of those
+	 * pages already checks — this role does not introduce any new,
+	 * narrower capability, per this step's own "prefer a small,
+	 * understandable model" instruction.
+	 *
+	 * @return string[]
+	 */
+	public static function platform_operator_capabilities(): array {
+		return [ 'read', 'bc_manage_platform' ];
 	}
 
 	/** @return string[] All BeauClick capabilities administrators should implicitly have. */
@@ -117,6 +149,7 @@ final class RoleManager {
 				self::business_capabilities(),
 				self::support_capabilities(),
 				self::moderator_capabilities(),
+				self::platform_operator_capabilities(),
 				self::cpt_admin_capabilities( 'bc_professionals' ),
 				self::cpt_admin_capabilities( 'bc_business_listings' ),
 				self::cpt_admin_capabilities( 'bc_services' ),
@@ -140,6 +173,7 @@ final class RoleManager {
 		self::ensure_role( self::ROLE_BUSINESS, __( 'Business', 'beauclick-core' ), self::business_capabilities() );
 		self::ensure_role( self::ROLE_SUPPORT, __( 'BeauClick Support', 'beauclick-core' ), self::support_capabilities() );
 		self::ensure_role( self::ROLE_MODERATOR, __( 'BeauClick Moderator', 'beauclick-core' ), self::moderator_capabilities() );
+		self::ensure_role( self::ROLE_PLATFORM_OPERATOR, __( 'BeauClick Platform Operator', 'beauclick-core' ), self::platform_operator_capabilities() );
 
 		self::grant( 'administrator', self::admin_capabilities() );
 
@@ -174,6 +208,7 @@ final class RoleManager {
 		remove_role( self::ROLE_BUSINESS );
 		remove_role( self::ROLE_SUPPORT );
 		remove_role( self::ROLE_MODERATOR );
+		remove_role( self::ROLE_PLATFORM_OPERATOR );
 
 		self::revoke( 'administrator', self::admin_capabilities() );
 		self::revoke( 'customer', self::customer_capabilities() );

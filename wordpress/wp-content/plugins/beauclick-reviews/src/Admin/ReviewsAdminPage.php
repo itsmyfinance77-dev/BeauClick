@@ -3,8 +3,15 @@ declare( strict_types=1 );
 
 namespace BeauClick\Reviews\Admin;
 
+use BeauClick\Core\Admin\Shell\AdminShell;
 use BeauClick\Reviews\Reviews\ReviewService;
 
+/**
+ * V2.2 Step 13: moderation decisions now also write to the general admin
+ * audit log (ADMIN-02) — see moderate_and_log(), a small, directly
+ * testable method separated from the admin-post.php handler (which ends in
+ * wp_safe_redirect()+exit).
+ */
 final class ReviewsAdminPage {
 
 	private const STATUS_LABELS = [
@@ -14,8 +21,9 @@ final class ReviewsAdminPage {
 		'flagged'  => 'پرچم‌گذاری‌شده',
 	];
 
+	/** Hook priority (not add_submenu_page()'s own $position argument — see BeauClick\Core\Admin\OperationsHealthPage::register()'s docblock) is what places this menu in the intended BeauClick admin order. */
 	public function register(): void {
-		add_action( 'admin_menu', [ $this, 'add_page' ] );
+		add_action( 'admin_menu', [ $this, 'add_page' ], 11 );
 		add_action( 'admin_post_bc_review_moderate', [ $this, 'handle_moderate' ] );
 	}
 
@@ -32,51 +40,55 @@ final class ReviewsAdminPage {
 
 	public function render(): void {
 		$reviews = ( new ReviewService() )->all();
-		?>
-		<div class="wrap">
-			<h1><?php esc_html_e( 'بازبینی نظرات', 'beauclick-reviews' ); ?></h1>
-			<?php if ( isset( $_GET['bc_notice'] ) ) : // phpcs:ignore WordPress.Security.NonceVerification.Recommended ?>
-				<div class="notice notice-success is-dismissible"><p><?php esc_html_e( 'انجام شد.', 'beauclick-reviews' ); ?></p></div>
-			<?php endif; ?>
-			<table class="wp-list-table widefat fixed striped">
-				<thead>
-					<tr>
-						<th><?php esc_html_e( 'نویسنده', 'beauclick-reviews' ); ?></th>
-						<th><?php esc_html_e( 'امتیاز', 'beauclick-reviews' ); ?></th>
-						<th><?php esc_html_e( 'متن', 'beauclick-reviews' ); ?></th>
-						<th><?php esc_html_e( 'وضعیت', 'beauclick-reviews' ); ?></th>
-						<th><?php esc_html_e( 'عملیات', 'beauclick-reviews' ); ?></th>
-					</tr>
-				</thead>
-				<tbody>
-					<?php if ( ! $reviews ) : ?>
-						<tr><td colspan="5"><?php esc_html_e( 'هیچ نظری ثبت نشده است.', 'beauclick-reviews' ); ?></td></tr>
-					<?php endif; ?>
-					<?php foreach ( $reviews as $review ) : ?>
-						<tr>
-							<td><?php echo esc_html( $review['authorName'] ); ?></td>
-							<td><?php echo esc_html( (string) $review['rating'] ); ?></td>
-							<td><?php echo esc_html( wp_trim_words( (string) $review['body'], 20 ) ); ?></td>
-							<td><?php echo esc_html( self::STATUS_LABELS[ $review['status'] ] ?? $review['status'] ); ?></td>
-							<td>
-								<?php foreach ( [ 'approved', 'rejected', 'flagged' ] as $target_status ) : ?>
-									<?php if ( $target_status !== $review['status'] ) : ?>
-										<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="display:inline;">
-											<?php wp_nonce_field( 'bc_review_moderate_' . $review['id'] ); ?>
-											<input type="hidden" name="action" value="bc_review_moderate">
-											<input type="hidden" name="review_id" value="<?php echo esc_attr( $review['id'] ); ?>">
-											<input type="hidden" name="status" value="<?php echo esc_attr( $target_status ); ?>">
-											<button type="submit" class="button"><?php echo esc_html( self::STATUS_LABELS[ $target_status ] ); ?></button>
-										</form>
-									<?php endif; ?>
-								<?php endforeach; ?>
-							</td>
-						</tr>
-					<?php endforeach; ?>
-				</tbody>
-			</table>
-		</div>
-		<?php
+
+		AdminShell::header(
+			__( 'بازبینی نظرات', 'beauclick-reviews' ),
+			null,
+			[ [ 'label' => __( 'بازبینی نظرات', 'beauclick-reviews' ) ] ]
+		);
+
+		if ( isset( $_GET['bc_notice'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			AdminShell::notice( __( 'انجام شد.', 'beauclick-reviews' ) );
+		}
+
+		if ( ! $reviews ) {
+			AdminShell::empty_state( __( 'هیچ نظری ثبت نشده است.', 'beauclick-reviews' ) );
+			AdminShell::footer();
+			return;
+		}
+
+		AdminShell::table_open();
+		echo '<table class="wp-list-table widefat fixed striped">';
+		echo '<thead><tr>';
+		echo '<th>' . esc_html__( 'نویسنده', 'beauclick-reviews' ) . '</th>';
+		echo '<th>' . esc_html__( 'امتیاز', 'beauclick-reviews' ) . '</th>';
+		echo '<th>' . esc_html__( 'متن', 'beauclick-reviews' ) . '</th>';
+		echo '<th>' . esc_html__( 'وضعیت', 'beauclick-reviews' ) . '</th>';
+		echo '<th>' . esc_html__( 'عملیات', 'beauclick-reviews' ) . '</th>';
+		echo '</tr></thead><tbody>';
+		foreach ( $reviews as $review ) {
+			echo '<tr>';
+			echo '<td>' . esc_html( $review['authorName'] ) . '</td>';
+			echo '<td class="bc-numeric">' . esc_html( (string) $review['rating'] ) . '</td>';
+			echo '<td>' . esc_html( wp_trim_words( (string) $review['body'], 20 ) ) . '</td>';
+			echo '<td>' . esc_html( self::STATUS_LABELS[ $review['status'] ] ?? $review['status'] ) . '</td>';
+			echo '<td>';
+			foreach ( [ 'approved', 'rejected', 'flagged' ] as $target_status ) {
+				if ( $target_status === $review['status'] ) {
+					continue;
+				}
+				echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" style="display:inline;">';
+				wp_nonce_field( 'bc_review_moderate_' . $review['id'] );
+				echo '<input type="hidden" name="action" value="bc_review_moderate">';
+				echo '<input type="hidden" name="review_id" value="' . esc_attr( $review['id'] ) . '">';
+				echo '<input type="hidden" name="status" value="' . esc_attr( $target_status ) . '">';
+				echo '<button type="submit" class="button">' . esc_html( self::STATUS_LABELS[ $target_status ] ) . '</button></form> ';
+			}
+			echo '</td></tr>';
+		}
+		echo '</tbody></table>';
+		AdminShell::table_close();
+		AdminShell::footer();
 	}
 
 	public function handle_moderate(): void {
@@ -88,9 +100,24 @@ final class ReviewsAdminPage {
 		check_admin_referer( 'bc_review_moderate_' . $review_id );
 
 		$status = isset( $_POST['status'] ) ? sanitize_key( wp_unslash( $_POST['status'] ) ) : '';
-		( new ReviewService() )->moderate( $review_id, $status );
+		$this->moderate_and_log( $review_id, $status );
 
 		wp_safe_redirect( admin_url( 'admin.php?page=beauclick-reviews-moderation&bc_notice=1' ) );
 		exit;
+	}
+
+	public function moderate_and_log( int $review_id, string $status ): void {
+		$before = ( new ReviewService() )->find( $review_id );
+		( new ReviewService() )->moderate( $review_id, $status );
+		if ( function_exists( 'beauclick_core' ) ) {
+			beauclick_core()->audit_log()->record(
+				'review_moderated',
+				'review',
+				$review_id,
+				get_current_user_id(),
+				$before ? [ 'status' => $before['status'] ] : null,
+				[ 'status' => $status ]
+			);
+		}
 	}
 }

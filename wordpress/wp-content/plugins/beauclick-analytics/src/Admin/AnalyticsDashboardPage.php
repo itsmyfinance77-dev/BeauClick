@@ -4,6 +4,7 @@ declare( strict_types=1 );
 namespace BeauClick\Analytics\Admin;
 
 use BeauClick\Analytics\Metrics\MetricsService;
+use BeauClick\Core\Admin\Shell\AdminShell;
 use BeauClick\Core\Support\JalaliDate;
 
 /**
@@ -29,8 +30,9 @@ final class AnalyticsDashboardPage {
 
 	private const SLUG = 'beauclick-analytics';
 
+	/** Hook priority (not add_submenu_page()'s own $position argument — see BeauClick\Core\Admin\OperationsHealthPage::register()'s docblock) is what places this menu last in the intended BeauClick admin order — found live, during this step's own QA pass, wrongly appearing second when only $position was used, since this plugin's admin_menu hook otherwise fires alphabetically early. */
 	public function register(): void {
-		add_action( 'admin_menu', [ $this, 'add_page' ] );
+		add_action( 'admin_menu', [ $this, 'add_page' ], 15 );
 	}
 
 	public function add_page(): void {
@@ -107,9 +109,11 @@ final class AnalyticsDashboardPage {
 			'marketplace' => $service->marketplace( $from, $to ),
 		];
 
-		echo '<div class="wrap" dir="rtl">';
-		echo '<h1>' . esc_html__( 'آمار و تحلیل پلتفرم', 'beauclick-analytics' ) . '</h1>';
-		echo '<p style="color:#666;font-size:13px;">' . esc_html__( 'همهٔ اعداد در همین لحظه و مستقیماً از رویدادها و جداول واقعی محاسبه می‌شوند (نه گزارش ذخیره‌شدهٔ روزانه).', 'beauclick-analytics' ) . '</p>';
+		AdminShell::header(
+			__( 'آمار و تحلیل پلتفرم', 'beauclick-analytics' ),
+			__( 'همهٔ اعداد در همین لحظه و مستقیماً از رویدادها و جداول واقعی محاسبه می‌شوند (نه گزارش ذخیره‌شدهٔ روزانه).', 'beauclick-analytics' ),
+			[ [ 'label' => __( 'آمار و تحلیل', 'beauclick-analytics' ) ] ]
+		);
 
 		$this->render_range_picker( $preset, $from, $to );
 
@@ -226,7 +230,7 @@ final class AnalyticsDashboardPage {
 
 		echo '<p style="font-size:12px;color:#888;max-width:640px;">' . esc_html__( 'دسترسی حرفه‌ای‌ها/کسب‌وکارها به آمار اختصاصی خودشان در این مرحله ساخته نشده و برای گام بعدی مستند شده است.', 'beauclick-analytics' ) . '</p>';
 
-		echo '</div>';
+		AdminShell::footer();
 	}
 
 	private function render_range_picker( string $active, string $from, string $to ): void {

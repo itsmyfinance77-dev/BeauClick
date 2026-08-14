@@ -3,6 +3,10 @@ declare( strict_types=1 );
 
 namespace BeauClick\Core\Admin;
 
+use BeauClick\Core\Admin\Shell\AdminShell;
+use BeauClick\Core\Admin\AuditLogPage;
+use BeauClick\Core\Support\JalaliDate;
+
 /**
  * Registers the shared top-level "BeauClick" wp-admin menu — the parent
  * slug every other module's own admin/moderation page (B2B account
@@ -11,16 +15,33 @@ namespace BeauClick\Core\Admin;
  * one plugin every other module already depends on; the landing page
  * itself stays a thin real dashboard (not a placeholder) — pending counts
  * a moderator actually needs at a glance.
+ *
+ * V2.2 Step 13: grew from three raw pending-count cards into a real
+ * operational overview — every V2.1 subsystem (verification queue,
+ * notification delivery, loyalty grants, waitlist, retention sweeps) now
+ * generates day-to-day operational load, so the landing page surfaces the
+ * signals an operator actually needs at a glance, plus the most recent
+ * administrative actions (from the new general audit log — see
+ * AuditLogPage). Still reads only existing tables; no new metrics engine.
  */
 final class AdminMenu {
 
 	public function register(): void {
-		// Priority 5, ahead of every other beauclick-* module's own
-		// admin_menu-hooked add_submenu_page( 'beauclick', ... ) call (all at
-		// the default 10) — this parent's self-referencing submenu (below)
-		// must be the FIRST item registered under 'beauclick', or WordPress
-		// promotes whichever submenu got there first instead, regardless of
-		// plugin activation order.
+		// Priority 5 — ahead of every other beauclick-* module's own
+		// admin_menu-hooked add_submenu_page( 'beauclick', ... ) call. This
+		// parent's self-referencing submenu (below) must be the FIRST item
+		// registered under 'beauclick', or WordPress promotes whichever
+		// submenu got there first instead, regardless of plugin activation
+		// order. V2.2 Step 13 also uses this same "control the hook
+		// priority" mechanism to order the rest of the BeauClick admin menu
+		// (OperationsHealthPage=6, AuditLogPage=7, UsersAdminPage=8,
+		// VerificationReviewPage=9, AccountsAdminPage=10,
+		// ReviewsAdminPage=11, LoyaltyAdminPage=12,
+		// NotificationsAdminPage=13, ReferralAdminPage=14,
+		// AnalyticsDashboardPage=15) — add_submenu_page()'s own $position
+		// argument turned out NOT to be a stable global sort key (see
+		// OperationsHealthPage::register()'s docblock for the full story),
+		// so every one of those pages' priority is deliberate, not filler.
 		add_action( 'admin_menu', [ $this, 'add_menu' ], 5 );
 	}
 
@@ -64,35 +85,101 @@ final class AdminMenu {
 	public function render(): void {
 		global $wpdb;
 
-		$pending_b2b     = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}bc_business_accounts WHERE approval_status = 'pending'" );
-		$pending_reviews = $wpdb->get_var( "SHOW TABLES LIKE '{$wpdb->prefix}bc_reviews'" )
-			? (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}bc_reviews WHERE status = 'flagged'" )
-			: 0;
+		$has_reviews_table = (bool) $wpdb->get_var( "SHOW TABLES LIKE '{$wpdb->prefix}bc_reviews'" );
+		$has_waitlist_table = (bool) $wpdb->get_var( "SHOW TABLES LIKE '{$wpdb->prefix}bc_waitlist_entries'" );
+		$has_notifications_table = (bool) $wpdb->get_var( "SHOW TABLES LIKE '{$wpdb->prefix}bc_notifications'" );
+		$has_verification_table = (bool) $wpdb->get_var( "SHOW TABLES LIKE '{$wpdb->prefix}bc_verification_requests'" );
+
+		$pending_b2b          = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}bc_business_accounts WHERE approval_status = 'pending'" );
+		$pending_reviews      = $has_reviews_table ? (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}bc_reviews WHERE status = 'flagged'" ) : 0;
+		$pending_verification = $has_verification_table ? (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}bc_verification_requests WHERE status = 'pending'" ) : 0;
+		$waitlist_backlog     = $has_waitlist_table ? (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}bc_waitlist_entries WHERE status = 'waiting'" ) : 0;
+		$failed_notifications = $has_notifications_table ? (int) $wpdb->get_var(
+			$wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}bc_notifications WHERE status = 'failed' AND created_at >= %s", gmdate( 'Y-m-d H:i:s', time() - DAY_IN_SECONDS ) )
+		) : 0;
 		$total_bookings_this_month = (int) $wpdb->get_var(
 			$wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}bc_bookings WHERE created_at >= %s", current_time( 'Y-m-01' ) . ' 00:00:00' )
 		);
-		?>
-		<div class="wrap">
-			<h1><?php esc_html_e( 'BeauClick', 'beauclick-core' ); ?></h1>
-			<div style="display:flex; gap:16px; flex-wrap:wrap; margin-top:16px;">
-				<div class="card" style="max-width:240px;">
-					<h2 class="title"><?php esc_html_e( 'حساب‌های B2B در انتظار', 'beauclick-core' ); ?></h2>
-					<p style="font-size:28px; font-weight:700;"><?php echo esc_html( (string) $pending_b2b ); ?></p>
-					<?php if ( $pending_b2b > 0 ) : ?>
-						<p><a href="<?php echo esc_url( admin_url( 'admin.php?page=beauclick-b2b-accounts' ) ); ?>"><?php esc_html_e( 'بررسی درخواست‌ها', 'beauclick-core' ); ?></a></p>
-					<?php endif; ?>
-				</div>
-				<div class="card" style="max-width:240px;">
-					<h2 class="title"><?php esc_html_e( 'نظرات پرچم‌گذاری‌شده', 'beauclick-core' ); ?></h2>
-					<p style="font-size:28px; font-weight:700;"><?php echo esc_html( (string) $pending_reviews ); ?></p>
-					<p><a href="<?php echo esc_url( admin_url( 'admin.php?page=beauclick-reviews-moderation' ) ); ?>"><?php esc_html_e( 'بازبینی نظرات', 'beauclick-core' ); ?></a></p>
-				</div>
-				<div class="card" style="max-width:240px;">
-					<h2 class="title"><?php esc_html_e( 'رزروهای این ماه', 'beauclick-core' ); ?></h2>
-					<p style="font-size:28px; font-weight:700;"><?php echo esc_html( (string) $total_bookings_this_month ); ?></p>
-				</div>
-			</div>
-		</div>
-		<?php
+
+		AdminShell::header(
+			__( 'نمای کلی', 'beauclick-core' ),
+			__( 'وضعیت عملیاتی پلتفرم در یک نگاه.', 'beauclick-core' )
+		);
+
+		AdminShell::cards(
+			[
+				[
+					'label' => __( 'تأیید متخصصان در انتظار', 'beauclick-core' ),
+					'value' => JalaliDate::persianDigits( (string) $pending_verification ),
+					'url'   => admin_url( 'admin.php?page=beauclick-verification' ),
+					'tone'  => $pending_verification > 0 ? 'warning' : 'default',
+				],
+				[
+					'label' => __( 'حساب‌های B2B در انتظار', 'beauclick-core' ),
+					'value' => JalaliDate::persianDigits( (string) $pending_b2b ),
+					'url'   => admin_url( 'admin.php?page=beauclick-b2b-accounts' ),
+					'tone'  => $pending_b2b > 0 ? 'warning' : 'default',
+				],
+				[
+					'label' => __( 'نظرات پرچم‌گذاری‌شده', 'beauclick-core' ),
+					'value' => JalaliDate::persianDigits( (string) $pending_reviews ),
+					'url'   => admin_url( 'admin.php?page=beauclick-reviews-moderation' ),
+					'tone'  => $pending_reviews > 0 ? 'warning' : 'default',
+				],
+				[
+					'label' => __( 'اعلان‌های ناموفق (۲۴ ساعت اخیر)', 'beauclick-core' ),
+					'value' => JalaliDate::persianDigits( (string) $failed_notifications ),
+					'url'   => admin_url( 'admin.php?page=beauclick-notifications&status=failed' ),
+					'tone'  => $failed_notifications > 0 ? 'error' : 'default',
+				],
+				[
+					'label' => __( 'لیست انتظار فعال', 'beauclick-core' ),
+					'value' => JalaliDate::persianDigits( (string) $waitlist_backlog ),
+				],
+				[
+					'label' => __( 'رزروهای این ماه', 'beauclick-core' ),
+					'value' => JalaliDate::persianDigits( (string) $total_bookings_this_month ),
+				],
+			]
+		);
+
+		$this->render_recent_activity();
+
+		AdminShell::footer();
+	}
+
+	private function render_recent_activity(): void {
+		global $wpdb;
+
+		if ( ! $wpdb->get_var( "SHOW TABLES LIKE '{$wpdb->prefix}bc_admin_audit_log'" ) ) {
+			return;
+		}
+
+		$recent = function_exists( 'beauclick_core' ) ? beauclick_core()->audit_log()->recent( 8 ) : [];
+
+		echo '<h2>' . esc_html__( 'آخرین اقدامات مدیریتی', 'beauclick-core' ) . '</h2>';
+
+		if ( ! $recent ) {
+			AdminShell::empty_state( __( 'هنوز فعالیتی ثبت نشده است.', 'beauclick-core' ) );
+			return;
+		}
+
+		AdminShell::table_open();
+		echo '<table class="wp-list-table widefat fixed striped" style="max-width:900px;"><thead><tr>';
+		echo '<th>' . esc_html__( 'اقدام', 'beauclick-core' ) . '</th>';
+		echo '<th>' . esc_html__( 'انجام‌دهنده', 'beauclick-core' ) . '</th>';
+		echo '<th>' . esc_html__( 'زمان', 'beauclick-core' ) . '</th>';
+		echo '</tr></thead><tbody>';
+		foreach ( $recent as $row ) {
+			$actor = $row['actor_user_id'] ? get_userdata( (int) $row['actor_user_id'] ) : null;
+			echo '<tr>';
+			echo '<td>' . esc_html( AuditLogPage::label( $row['action_type'] ) ) . '</td>';
+			echo '<td>' . esc_html( $actor ? $actor->display_name : '—' ) . '</td>';
+			echo '<td class="bc-numeric">' . esc_html( JalaliDate::format( $row['created_at'], true ) ) . '</td>';
+			echo '</tr>';
+		}
+		echo '</tbody></table>';
+		AdminShell::table_close();
+		echo '<p><a href="' . esc_url( admin_url( 'admin.php?page=beauclick-audit-log' ) ) . '">' . esc_html__( 'مشاهدهٔ گزارش کامل فعالیت‌ها', 'beauclick-core' ) . ' &larr;</a></p>';
 	}
 }

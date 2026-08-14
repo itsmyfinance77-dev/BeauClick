@@ -1,0 +1,209 @@
+/*
+ * BeauClick Admin Shell — V2.2 Step 13.
+ * Loaded ONLY on BeauClick's own wp-admin screens (see
+ * AdminShell::maybe_enqueue()) — never on core/WooCommerce/other-plugin
+ * screens. Relies on the design-token custom properties already enqueued
+ * admin-wide by beauclick-core's Plugin::enqueue_design_tokens() (--bc-color-*,
+ * --bc-radius-*, --bc-space-*, --bc-font-family). Written with CSS logical
+ * properties throughout (margin-inline-*, padding-inline-*, border-inline-*)
+ * so it stays correct regardless of site text direction, not just because the
+ * current site locale (fa_IR) happens to be RTL.
+ */
+
+.bc-admin {
+	--bc-admin-max-width: 1180px;
+	max-width: var( --bc-admin-max-width );
+	font-family: var( --bc-font-family, inherit );
+}
+
+.bc-admin * {
+	box-sizing: border-box;
+}
+
+.bc-admin-header {
+	margin-block-end: 20px;
+}
+
+.bc-admin-breadcrumbs {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+	font-size: 12px;
+	color: var( --bc-color-ink-faint, #767b86 );
+	margin-block-end: 6px;
+}
+
+.bc-admin-breadcrumbs a {
+	color: var( --bc-color-ink-soft, #555 );
+	text-decoration: none;
+}
+
+.bc-admin-breadcrumbs a:hover,
+.bc-admin-breadcrumbs a:focus-visible {
+	color: var( --bc-color-primary, #3d3a8f );
+	text-decoration: underline;
+}
+
+.bc-admin-breadcrumb-sep {
+	color: var( --bc-color-line, #ccc );
+}
+
+.bc-admin-title {
+	font-size: 22px;
+	font-weight: 800;
+	color: var( --bc-color-ink, #1d1d1f );
+	margin: 0 0 4px;
+}
+
+.bc-admin-subtitle {
+	color: var( --bc-color-ink-soft, #555 );
+	font-size: 13px;
+	max-width: 720px;
+	margin: 0;
+}
+
+/* Stat card grid — responsive, never overflows a narrow viewport. */
+.bc-admin-cards {
+	display: grid;
+	grid-template-columns: repeat( auto-fit, minmax( 180px, 1fr ) );
+	gap: var( --bc-space-card-gap, 16px );
+	margin-block: 16px 24px;
+}
+
+.bc-admin-card {
+	background: var( --bc-color-surface, #fff );
+	border: 1px solid var( --bc-color-line, #e2e2e2 );
+	border-radius: var( --bc-radius-card, 12px );
+	padding: 16px;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.bc-admin-card--warning {
+	border-inline-start: 4px solid var( --bc-color-warning, #b8860b );
+}
+
+.bc-admin-card--error {
+	border-inline-start: 4px solid var( --bc-color-error, #b32d2e );
+}
+
+.bc-admin-card--success {
+	border-inline-start: 4px solid var( --bc-color-success, #2e7d32 );
+}
+
+.bc-admin-card-label {
+	font-size: 12px;
+	color: var( --bc-color-ink-faint, #767b86 );
+}
+
+.bc-admin-card-value {
+	font-size: 26px;
+	font-weight: 800;
+	color: var( --bc-color-ink, #1d1d1f );
+	font-variant-numeric: tabular-nums;
+}
+
+.bc-admin-card-link {
+	font-size: 12px;
+	color: var( --bc-color-primary, #3d3a8f );
+	text-decoration: none;
+	margin-block-start: 4px;
+}
+
+.bc-admin-card-link:hover,
+.bc-admin-card-link:focus-visible {
+	text-decoration: underline;
+}
+
+.bc-admin-empty {
+	color: var( --bc-color-ink-faint, #767b86 );
+	background: var( --bc-color-surface-tint, #f6f6f8 );
+	border-radius: var( --bc-radius-row, 10px );
+	padding: 20px;
+	text-align: center;
+}
+
+/* Wide tables scroll inside their own box on narrow screens instead of
+   pushing the whole admin page into horizontal overflow. */
+.bc-admin-table-scroll {
+	overflow-x: auto;
+	margin-block-end: 16px;
+	border-radius: var( --bc-radius-row, 10px );
+}
+
+.bc-admin-table-scroll table {
+	min-width: 100%;
+}
+
+.bc-numeric {
+	font-variant-numeric: tabular-nums;
+}
+
+.bc-admin-notice {
+	border-inline-start-width: 4px;
+}
+
+/* Focus visibility — every link/button inside the shell gets a real,
+   visible focus ring (keyboard navigation, per this step's own
+   accessibility requirement), instead of relying on wp-admin core's
+   sometimes-subtle default. */
+.bc-admin a:focus-visible,
+.bc-admin button:focus-visible,
+.bc-admin input:focus-visible,
+.bc-admin select:focus-visible,
+.bc-admin textarea:focus-visible {
+	outline: 2px solid var( --bc-color-primary, #3d3a8f );
+	outline-offset: 2px;
+}
+
+.bc-admin-tag {
+	display: inline-block;
+	font-size: 11px;
+	padding: 2px 8px;
+	border-radius: var( --bc-radius-pill, 999px );
+	background: var( --bc-color-primary-soft, #eceafc );
+	color: var( --bc-color-primary, #3d3a8f );
+}
+
+.bc-admin-tag--warning {
+	background: var( --bc-color-warning-soft, #fdf1da );
+	color: var( --bc-color-warning, #8a6100 );
+}
+
+.bc-admin-tag--error {
+	background: var( --bc-color-error-soft, #fde3e3 );
+	color: var( --bc-color-error, #b32d2e );
+}
+
+.bc-admin-tag--success {
+	background: var( --bc-color-success-soft, #e2f3e3 );
+	color: var( --bc-color-success, #2e7d32 );
+}
+
+.bc-admin-filters {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-block-end: 12px;
+}
+
+.bc-admin-form-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	align-items: end;
+}
+
+/* Mobile (375–412px): cards stack to a single column, section paddings
+   shrink, nothing forces horizontal scroll at the page level. */
+@media ( max-width: 600px ) {
+	.bc-admin-cards {
+		grid-template-columns: 1fr;
+	}
+
+	.bc-admin-title {
+		font-size: 19px;
+	}
+}

@@ -3,6 +3,7 @@ declare( strict_types=1 );
 
 namespace BeauClick\Marketplace\Admin;
 
+use BeauClick\Core\Admin\Shell\AdminShell;
 use BeauClick\Core\Support\JalaliDate;
 use BeauClick\Marketplace\Verification\VerificationService;
 
@@ -27,8 +28,9 @@ final class VerificationReviewPage {
 
 	private const SLUG = 'beauclick-verification';
 
+	/** Hook priority (not add_submenu_page()'s own $position argument — see BeauClick\Core\Admin\OperationsHealthPage::register()'s docblock) is what places this menu right after core's own Overview/Operations/Audit Log/Users. */
 	public function register(): void {
-		add_action( 'admin_menu', [ $this, 'add_page' ] );
+		add_action( 'admin_menu', [ $this, 'add_page' ], 9 );
 		add_action( 'admin_post_bc_verification_decide', [ $this, 'handle_decide' ] );
 		add_action( 'admin_post_bc_verification_status_action', [ $this, 'handle_status_action' ] );
 	}
@@ -50,10 +52,15 @@ final class VerificationReviewPage {
 		}
 
 		$request_id = isset( $_GET['request_id'] ) ? (int) $_GET['request_id'] : 0; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		echo '<div class="wrap"><h1>' . esc_html__( 'تأیید متخصصان و کسب‌وکارها', 'beauclick-marketplace' ) . '</h1>';
+
+		AdminShell::header(
+			__( 'تأیید متخصصان و کسب‌وکارها', 'beauclick-marketplace' ),
+			null,
+			[ [ 'label' => __( 'تأیید متخصصان', 'beauclick-marketplace' ) ] ]
+		);
 
 		if ( isset( $_GET['bc_notice'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'با موفقیت ثبت شد.', 'beauclick-marketplace' ) . '</p></div>';
+			AdminShell::notice( __( 'با موفقیت ثبت شد.', 'beauclick-marketplace' ) );
 		}
 
 		if ( $request_id ) {
@@ -63,7 +70,7 @@ final class VerificationReviewPage {
 			$this->render_verified_providers_panel();
 		}
 
-		echo '</div>';
+		AdminShell::footer();
 	}
 
 	private function render_queue(): void {
@@ -71,6 +78,7 @@ final class VerificationReviewPage {
 		$rows = $wpdb->get_results( "SELECT * FROM {$wpdb->prefix}bc_verification_requests WHERE status = 'pending' ORDER BY submitted_at ASC" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 
 		echo '<h2>' . esc_html__( 'درخواست‌های در انتظار بررسی', 'beauclick-marketplace' ) . '</h2>';
+		AdminShell::table_open();
 		echo '<table class="wp-list-table widefat fixed striped"><thead><tr>';
 		echo '<th>' . esc_html__( 'متخصص/کسب‌وکار', 'beauclick-marketplace' ) . '</th>';
 		echo '<th>' . esc_html__( 'نوع', 'beauclick-marketplace' ) . '</th>';
@@ -91,6 +99,7 @@ final class VerificationReviewPage {
 			echo '</tr>';
 		}
 		echo '</tbody></table>';
+		AdminShell::table_close();
 	}
 
 	private function render_request_detail( int $request_id ): void {
@@ -142,11 +151,13 @@ final class VerificationReviewPage {
 		$this->render_status_actions( (int) $request->provider_id, $service->current_status( (int) $request->provider_id ) );
 
 		echo '<h3>' . esc_html__( 'تاریخچه تأیید', 'beauclick-marketplace' ) . '</h3>';
+		AdminShell::table_open();
 		echo '<table class="wp-list-table widefat fixed striped"><thead><tr><th>' . esc_html__( 'از', 'beauclick-marketplace' ) . '</th><th>' . esc_html__( 'به', 'beauclick-marketplace' ) . '</th><th>' . esc_html__( 'تاریخ', 'beauclick-marketplace' ) . '</th><th>' . esc_html__( 'دلیل', 'beauclick-marketplace' ) . '</th></tr></thead><tbody>';
 		foreach ( $history as $h ) {
 			echo '<tr><td>' . esc_html( self::status_label( $h['fromStatus'] ) ) . '</td><td>' . esc_html( self::status_label( $h['toStatus'] ) ) . '</td><td>' . esc_html( JalaliDate::format( $h['createdAt'], true ) ) . '</td><td>' . esc_html( $h['reason'] ?? '' ) . '</td></tr>';
 		}
 		echo '</tbody></table>';
+		AdminShell::table_close();
 	}
 
 	private function render_status_actions( int $provider_id, string $current_status ): void {
@@ -182,6 +193,7 @@ final class VerificationReviewPage {
 		$rows = $wpdb->get_results( "SELECT ID, post_title, post_type FROM {$wpdb->prefix}posts WHERE post_type IN ('bc_professional','bc_business') AND post_status = 'publish' AND ID IN (SELECT post_id FROM {$wpdb->prefix}postmeta WHERE meta_key = '_bc_verification_status' AND meta_value IN ('verified','suspended'))" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 
 		echo '<h2 style="margin-top:32px;">' . esc_html__( 'متخصصان تأییدشده', 'beauclick-marketplace' ) . '</h2>';
+		AdminShell::table_open();
 		echo '<table class="wp-list-table widefat fixed striped"><thead><tr><th>' . esc_html__( 'نام', 'beauclick-marketplace' ) . '</th><th>' . esc_html__( 'وضعیت', 'beauclick-marketplace' ) . '</th><th></th></tr></thead><tbody>';
 		if ( ! $rows ) {
 			echo '<tr><td colspan="3">' . esc_html__( 'موردی وجود ندارد.', 'beauclick-marketplace' ) . '</td></tr>';
@@ -194,6 +206,7 @@ final class VerificationReviewPage {
 			echo '</td></tr>';
 		}
 		echo '</tbody></table>';
+		AdminShell::table_close();
 	}
 
 	public function handle_decide(): void {

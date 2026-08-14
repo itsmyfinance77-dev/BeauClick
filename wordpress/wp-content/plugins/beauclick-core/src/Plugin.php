@@ -4,12 +4,18 @@ declare( strict_types=1 );
 namespace BeauClick\Core;
 
 use BeauClick\Core\Admin\AdminMenu;
+use BeauClick\Core\Admin\AuditLogPage;
+use BeauClick\Core\Admin\OperationsHealthPage;
+use BeauClick\Core\Admin\Shell\AdminShell;
+use BeauClick\Core\Admin\UsersAdminPage;
 use BeauClick\Core\Content\ContactFormHandler;
 use BeauClick\Core\Content\LegalPages;
 use BeauClick\Core\Database\Migrator;
+use BeauClick\Core\Database\Migrations\CreateAdminAuditLogTable;
 use BeauClick\Core\Database\Migrations\CreateEventsTable;
 use BeauClick\Core\Roles\RoleManager;
 use BeauClick\Core\Support\ServiceContainer;
+use BeauClick\Core\Support\AuditLogger;
 use BeauClick\Core\Support\EventLogger;
 use BeauClick\Core\Support\Tokens;
 use BeauClick\Core\Cli\Commands;
@@ -61,7 +67,11 @@ final class Plugin {
 		add_action( 'admin_init', [ RoleManager::class, 'maybe_register' ] );
 		add_action( 'admin_init', [ LegalPages::class, 'maybe_ensure' ] );
 
+		AdminShell::register();
 		( new AdminMenu() )->register();
+		( new OperationsHealthPage() )->register();
+		( new AuditLogPage() )->register();
+		( new UsersAdminPage() )->register();
 		ContactFormHandler::register();
 
 		if ( defined( 'WP_CLI' ) && WP_CLI ) {
@@ -72,11 +82,12 @@ final class Plugin {
 	private function register_services(): void {
 		$this->container->set( 'migrator', static fn () => new Migrator() );
 		$this->container->set( 'events', static fn () => new EventLogger() );
+		$this->container->set( 'audit_log', static fn () => new AuditLogger() );
 
 		// Core's own migrations register immediately; dependent plugins hook
 		// `beauclick/core/register_migrations` at default priority (10) to
 		// register theirs onto the same Migrator instance.
-		$this->migrator()->register( 'beauclick-core', [ new CreateEventsTable() ] );
+		$this->migrator()->register( 'beauclick-core', [ new CreateEventsTable(), new CreateAdminAuditLogTable() ] );
 
 		add_action(
 			'plugins_loaded',
@@ -93,6 +104,10 @@ final class Plugin {
 
 	public function events(): EventLogger {
 		return $this->container->get( 'events' );
+	}
+
+	public function audit_log(): AuditLogger {
+		return $this->container->get( 'audit_log' );
 	}
 
 	public function container(): ServiceContainer {
