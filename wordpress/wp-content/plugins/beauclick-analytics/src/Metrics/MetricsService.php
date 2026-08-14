@@ -185,7 +185,152 @@ final class MetricsService {
 			'cancelled'       => $this->count_events( 'booking_cancelled', $from, $to ),
 			'expired'         => $this->count_events( 'booking_expired', $from, $to ),
 			'noShow'          => $this->count_events( 'booking_no_show', $from, $to ),
+			// V2.2 Step 16 -- Step 15 (Booking Evolution) added these events
+			// but never a funnel bucket for them (a documented gap found
+			// during this step's own research); added here rather than left
+			// unread now that a real consumer (provider_funnel() below, and
+			// this platform-wide bucket) needs it.
+			'rescheduled'     => $this->count_events( 'booking_reschedule_succeeded', $from, $to ),
 			'conversionRate'  => self::ratio( $completed, $started ),
+		];
+	}
+
+	/**
+	 * V2.2 Step 16 -- the one addition every method above this line has
+	 * lacked: ownership scoping. Booking-lifecycle events carry only a
+	 * booking id as entity_id (confirmed during this step's own research --
+	 * see SignalCollector's own docblock for the identical finding), so
+	 * every booking-derived count here JOINs through wp_bc_bookings.provider_id
+	 * -- the exact same "JOIN through bc_bookings" shape
+	 * shop_order_event_count() already established, just parameterized by
+	 * provider instead of hard-excluding booking orders. profile_view is the
+	 * one event that already carries the provider's own CPT post id as
+	 * entity_id directly (entity_type = the literal post type string, e.g.
+	 * 'bc_professional'/'bc_business' -- see MarketplaceController::detail())
+	 * and needs no join. Reviews/repeat-customers/service performance read
+	 * wp_bc_reviews/wp_bc_bookings directly, matching the exact bounded,
+	 * provider-scoped query shape CrmService/DashboardController already use
+	 * elsewhere in this codebase -- no new query pattern invented here.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public function for_provider( int $provider_id, string $provider_post_type, string $from, string $to ): array {
+		global $wpdb;
+		[ $start, $end ] = self::bounds( $from, $to );
+		$events_table   = $wpdb->prefix . 'bc_events';
+		$bookings_table = $wpdb->prefix . 'bc_bookings';
+		$reviews_table  = $wpdb->prefix . 'bc_reviews';
+
+		$booking_event_count = function ( string $event_type ) use ( $wpdb, $events_table, $bookings_table, $provider_id, $start, $end ): int {
+			return (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COUNT(*) FROM {$events_table} e
+					 JOIN {$bookings_table} b ON b.id = e.entity_id
+					 WHERE e.event_type = %s AND e.entity_type = 'booking' AND b.provider_id = %d AND e.created_at BETWEEN %s AND %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+					$event_type,
+					$provider_id,
+					$start,
+					$end
+				)
+			);
+		};
+
+		$started   = $booking_event_count( 'booking_created' );
+		$completed = $booking_event_count( 'booking_completed' );
+
+		$funnel = [
+			'started'        => $started,
+			'confirmed'      => $booking_event_count( 'booking_confirmed' ),
+			'completed'      => $completed,
+			'cancelled'      => $booking_event_count( 'booking_cancelled' ),
+			'expired'        => $booking_event_count( 'booking_expired' ),
+			'noShow'         => $booking_event_count( 'booking_no_show' ),
+			'rescheduled'    => $booking_event_count( 'booking_reschedule_succeeded' ),
+			'conversionRate' => self::ratio( $completed, $started ),
+		];
+
+		$profile_views = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM {$events_table} WHERE event_type = 'profile_view' AND entity_type = %s AND entity_id = %d AND created_at BETWEEN %s AND %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$provider_post_type,
+				$provider_id,
+				$start,
+				$end
+			)
+		);
+
+		$review_stats = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT COUNT(*) AS cnt, AVG(rating) AS avg_rating FROM {$reviews_table} WHERE target_type = 'provider' AND target_id = %d AND created_at BETWEEN %s AND %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$provider_id,
+				$start,
+				$end
+			),
+			ARRAY_A
+		);
+
+		// Repeat customers -- a status as of now (>= 2 completed visits ever),
+		// not a date-ranged event; same "current snapshot" reasoning
+		// marketplace()'s professionalSupply already uses for a figure that
+		// doesn't have a meaningful date-range reading.
+		$customer_stats = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT
+					COUNT(DISTINCT customer_id) AS total_customers,
+					COUNT(DISTINCT CASE WHEN completed_count >= 2 THEN customer_id END) AS repeat_customers
+				 FROM (
+					SELECT customer_id, SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed_count
+					FROM {$bookings_table} WHERE provider_id = %d GROUP BY customer_id
+				 ) t", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$provider_id
+			),
+			ARRAY_A
+		);
+
+		$new_customers = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(DISTINCT customer_id) FROM {$bookings_table} WHERE provider_id = %d AND created_at BETWEEN %s AND %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$provider_id,
+				$start,
+				$end
+			)
+		);
+
+		// Bounded top-5, one GROUP BY query -- never a per-service loop.
+		$service_rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT service_id, COUNT(*) AS completed_count
+				 FROM {$bookings_table}
+				 WHERE provider_id = %d AND status = 'completed' AND service_id IS NOT NULL AND slot_start BETWEEN %s AND %s
+				 GROUP BY service_id ORDER BY completed_count DESC LIMIT 5", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$provider_id,
+				$start,
+				$end
+			),
+			ARRAY_A
+		);
+		$service_performance = array_map(
+			static fn ( array $r ): array => [
+				'serviceId'      => (int) $r['service_id'],
+				'serviceName'    => get_the_title( (int) $r['service_id'] ) ?: '',
+				'completedCount' => (int) $r['completed_count'],
+			],
+			$service_rows ?: []
+		);
+
+		return [
+			'funnel'          => $funnel,
+			'profileViews'    => $profile_views,
+			'reviews'         => [
+				'count'     => (int) ( $review_stats['cnt'] ?? 0 ),
+				'avgRating' => round( (float) ( $review_stats['avg_rating'] ?? 0 ), 2 ),
+			],
+			'customers'       => [
+				'total'         => (int) ( $customer_stats['total_customers'] ?? 0 ),
+				'repeat'        => (int) ( $customer_stats['repeat_customers'] ?? 0 ),
+				'newInRange'    => $new_customers,
+			],
+			'servicePerformance' => $service_performance,
 		];
 	}
 

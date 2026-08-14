@@ -16,6 +16,7 @@ use BeauClick\Booking\Ranking\RankingEngine;
 use BeauClick\Booking\Rebooking\RebookingScheduler;
 use BeauClick\Booking\Reminders\ReminderScheduler;
 use BeauClick\Booking\Retention\RetentionScheduler;
+use BeauClick\Booking\Rest\AvailabilityController;
 use BeauClick\Booking\Rest\BookingController;
 use BeauClick\Booking\Rest\CrmController;
 use BeauClick\Booking\Rest\DashboardController;
@@ -119,6 +120,7 @@ final class Plugin {
 		( new DashboardController() )->register_routes();
 		( new CrmController() )->register_routes();
 		( new WaitlistController() )->register_routes();
+		( new AvailabilityController() )->register_routes();
 	}
 
 	public function maybe_seed( ?string $only ): void {

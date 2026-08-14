@@ -351,6 +351,59 @@ final class CrmService {
 		];
 	}
 
+	/**
+	 * V2.2 Step 16 — CRM note edit/delete (deferred from V2.1 Step 5, per the
+	 * Gap Register). Ownership is checked two ways, both required: the note
+	 * must belong to a genuine customer of $provider_id (is_customer_of()),
+	 * AND the note's own author_user_id must match the caller — a
+	 * professional/staff member may edit their own notes, never a
+	 * colleague's, even within the same business.
+	 */
+	public function update_note( int $provider_id, int $customer_id, int $note_id, int $editor_user_id, string $note ): ?array {
+		if ( ! $this->is_customer_of( $provider_id, $customer_id ) ) {
+			return null;
+		}
+		$note = mb_substr( trim( $note ), 0, 2000 );
+		if ( '' === $note ) {
+			return null;
+		}
+
+		global $wpdb;
+		$now      = current_time( 'mysql' );
+		$affected = $wpdb->query(
+			$wpdb->prepare(
+				"UPDATE {$wpdb->prefix}bc_crm_notes SET note = %s, updated_at = %s
+				 WHERE id = %d AND provider_id = %d AND customer_id = %d AND author_user_id = %d", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$note,
+				$now,
+				$note_id,
+				$provider_id,
+				$customer_id,
+				$editor_user_id
+			)
+		);
+
+		if ( ! $affected ) {
+			return null;
+		}
+
+		$author = get_userdata( $editor_user_id );
+		return [ 'id' => $note_id, 'note' => $note, 'authorName' => $author ? $author->display_name : '', 'createdAt' => $now ];
+	}
+
+	public function delete_note( int $provider_id, int $customer_id, int $note_id, int $editor_user_id ): bool {
+		if ( ! $this->is_customer_of( $provider_id, $customer_id ) ) {
+			return false;
+		}
+		global $wpdb;
+		$affected = $wpdb->delete(
+			$wpdb->prefix . 'bc_crm_notes',
+			[ 'id' => $note_id, 'provider_id' => $provider_id, 'customer_id' => $customer_id, 'author_user_id' => $editor_user_id ],
+			[ '%d', '%d', '%d', '%d' ]
+		);
+		return (bool) $affected;
+	}
+
 	/** @return array<int, \WP_User> */
 	private function users_by_id( array $ids ): array {
 		if ( ! $ids ) {

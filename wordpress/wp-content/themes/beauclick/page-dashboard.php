@@ -7,6 +7,15 @@
  * dashboard (their own orders/bookings/account). Logged-out visitors get a
  * login prompt — there is nothing to show them.
  *
+ * V2.2 Step 16 — an authorized staff member (StaffService) keeps their own
+ * WP role ('customer') by design (this minimal model never changes a
+ * user's role — see StaffService's own docblock), so the role-only check
+ * alone would silently route them to the customer dashboard despite the
+ * backend (CrmController/MyAnalyticsController) genuinely authorizing them.
+ * Caught during this step's own live verification, not assumed — a real
+ * staff member's session was tested end to end and landed on the wrong
+ * dashboard before this fix.
+ *
  * @package BeauClick\Theme
  */
 
@@ -16,6 +25,10 @@ get_header();
 
 $user = wp_get_current_user();
 $is_provider = $user->exists() && array_intersect( [ 'bc_professional', 'bc_business' ], (array) $user->roles );
+
+if ( ! $is_provider && $user->exists() && class_exists( '\BeauClick\Marketplace\Staff\StaffService' ) ) {
+	$is_provider = ! empty( ( new \BeauClick\Marketplace\Staff\StaffService() )->provider_ids_for_staff_user( $user->ID ) );
+}
 ?>
 
 <div class="bc-container bc-section">

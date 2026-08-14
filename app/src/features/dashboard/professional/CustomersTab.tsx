@@ -69,28 +69,57 @@ function jalaliDate( iso: string | null ): string {
 	return iso ? formatFullJalaliDate( new Date( iso.replace( ' ', 'T' ) ) ) : '—';
 }
 
+const PER_PAGE = 20;
+
 export function CustomersTab() {
 	const [ customers, setCustomers ] = useState<CustomerListItem[] | null>( null );
 	const [ error, setError ] = useState<string | null>( null );
 	const [ search, setSearch ] = useState( '' );
 	const [ filter, setFilter ] = useState( 'all' );
 	const [ openCustomerId, setOpenCustomerId ] = useState<number | null>( null );
+	const [ page, setPage ] = useState( 1 );
+	const [ hasMore, setHasMore ] = useState( false );
+	const [ loadingMore, setLoadingMore ] = useState( false );
 
 	// V2.2 Step 11 (ANLYT-05): fires once per tab visit, not on every
 	// search/filter change -- a separate effect with empty deps, deliberately
 	// not merged into the debounced search effect below.
 	useEffect( () => { track( 'crm_opened' ); }, [] );
 
+	// V2.2 Step 16 -- "load more" pagination, matching the existing api.ts
+	// client (api.get<T>() unwraps `data` only, dropping `meta.pagination`) --
+	// rather than a page-number UI needing that metadata, this appends the
+	// next page and disables further loading once a page returns fewer than
+	// PER_PAGE rows. Any search/filter change starts back at page 1.
 	useEffect( () => {
 		const timeout = setTimeout( () => {
 			setError( null );
+			setPage( 1 );
 			api
-				.get<CustomerListItem[]>( `/booking/crm/customers?search=${ encodeURIComponent( search ) }&filter=${ filter }&per_page=50` )
-				.then( setCustomers )
+				.get<CustomerListItem[]>( `/booking/crm/customers?search=${ encodeURIComponent( search ) }&filter=${ filter }&page=1&per_page=${ PER_PAGE }` )
+				.then( ( items ) => {
+					setCustomers( items );
+					setHasMore( items.length === PER_PAGE );
+				} )
 				.catch( ( e ) => setError( e instanceof ApiError ? e.message : 'خطا در دریافت فهرست مشتریان.' ) );
 		}, 300 );
 		return () => clearTimeout( timeout );
 	}, [ search, filter ] );
+
+	async function loadMore() {
+		setLoadingMore( true );
+		try {
+			const nextPage = page + 1;
+			const items = await api.get<CustomerListItem[]>( `/booking/crm/customers?search=${ encodeURIComponent( search ) }&filter=${ filter }&page=${ nextPage }&per_page=${ PER_PAGE }` );
+			setCustomers( ( prev ) => [ ...( prev ?? [] ), ...items ] );
+			setPage( nextPage );
+			setHasMore( items.length === PER_PAGE );
+		} catch ( e ) {
+			setError( e instanceof ApiError ? e.message : 'خطا در دریافت مشتریان بیشتر.' );
+		} finally {
+			setLoadingMore( false );
+		}
+	}
 
 	return (
 		<div>
@@ -157,6 +186,14 @@ export function CustomersTab() {
 				</div>
 			) }
 
+			{ hasMore && (
+				<div style={ { textAlign: 'center', marginTop: 16 } }>
+					<Button variant="outline" disabled={ loadingMore } onClick={ loadMore }>
+						{ loadingMore ? 'در حال بارگذاری…' : 'نمایش مشتریان بیشتر' }
+					</Button>
+				</div>
+			) }
+
 			{ openCustomerId !== null && (
 				<CustomerDetailModal customerId={ openCustomerId } onClose={ () => setOpenCustomerId( null ) } />
 			) }
@@ -170,6 +207,8 @@ function CustomerDetailModal( { customerId, onClose }: { customerId: number; onC
 	const [ noteText, setNoteText ] = useState( '' );
 	const [ savingNote, setSavingNote ] = useState( false );
 	const [ noteError, setNoteError ] = useState<string | null>( null );
+	const [ editingNoteId, setEditingNoteId ] = useState<number | null>( null );
+	const [ editingText, setEditingText ] = useState( '' );
 
 	function load() {
 		api
@@ -192,6 +231,32 @@ function CustomerDetailModal( { customerId, onClose }: { customerId: number; onC
 			setNoteError( e instanceof ApiError ? e.message : 'ثبت یادداشت ناموفق بود.' );
 		} finally {
 			setSavingNote( false );
+		}
+	}
+
+	// V2.2 Step 16 -- note edit/delete (deferred from V2.1 Step 5, per the
+	// Gap Register). Only the note's own author may edit/delete it, enforced
+	// server-side (CrmService::update_note()/delete_note()) -- the button
+	// visibility here is a convenience, not the security boundary.
+	async function saveEdit( noteId: number ) {
+		if ( ! editingText.trim() ) return;
+		setNoteError( null );
+		try {
+			await api.patch( `/booking/crm/customers/${ customerId }/notes/${ noteId }`, { note: editingText.trim() } );
+			setEditingNoteId( null );
+			load();
+		} catch ( e ) {
+			setNoteError( e instanceof ApiError ? e.message : 'ویرایش یادداشت ناموفق بود.' );
+		}
+	}
+
+	async function removeNote( noteId: number ) {
+		setNoteError( null );
+		try {
+			await api.del( `/booking/crm/customers/${ customerId }/notes/${ noteId }` );
+			load();
+		} catch ( e ) {
+			setNoteError( e instanceof ApiError ? e.message : 'حذف یادداشت ناموفق بود.' );
 		}
 	}
 
@@ -264,10 +329,47 @@ function CustomerDetailModal( { customerId, onClose }: { customerId: number; onC
 							<div style={ { display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 } }>
 								{ detail.notes.map( ( n ) => (
 									<div key={ n.id } style={ { padding: 10, background: 'var(--bc-color-surface-tint)', borderRadius: 12 } }>
-										<p style={ { margin: 0, fontSize: 13 } }>{ n.note }</p>
-										<p style={ { margin: '4px 0 0', fontSize: 11, color: 'var(--bc-color-ink-faint)' } } className="bc-numeric">
-											{ n.authorName } · { jalaliDate( n.createdAt ) }
-										</p>
+										{ editingNoteId === n.id ? (
+											<div>
+												<textarea
+													className="bc-input"
+													rows={ 2 }
+													value={ editingText }
+													onChange={ ( e ) => setEditingText( e.target.value ) }
+													aria-label="ویرایش یادداشت"
+													style={ { resize: 'vertical', width: '100%' } }
+												/>
+												<div style={ { display: 'flex', gap: 8, marginTop: 6 } }>
+													<Button variant="primary" disabled={ ! editingText.trim() } onClick={ () => saveEdit( n.id ) }>ذخیره</Button>
+													<Button variant="ghost" onClick={ () => setEditingNoteId( null ) }>انصراف</Button>
+												</div>
+											</div>
+										) : (
+											<>
+												<p style={ { margin: 0, fontSize: 13 } }>{ n.note }</p>
+												<div style={ { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 } }>
+													<p style={ { margin: 0, fontSize: 11, color: 'var(--bc-color-ink-faint)' } } className="bc-numeric">
+														{ n.authorName } · { jalaliDate( n.createdAt ) }
+													</p>
+													<div style={ { display: 'flex', gap: 10 } }>
+														<button
+															type="button"
+															onClick={ () => { setEditingNoteId( n.id ); setEditingText( n.note ); } }
+															style={ { border: 'none', background: 'none', color: 'var(--bc-color-primary)', cursor: 'pointer', fontSize: 12, padding: 0 } }
+														>
+															ویرایش
+														</button>
+														<button
+															type="button"
+															onClick={ () => removeNote( n.id ) }
+															style={ { border: 'none', background: 'none', color: 'var(--bc-color-error)', cursor: 'pointer', fontSize: 12, padding: 0 } }
+														>
+															حذف
+														</button>
+													</div>
+												</div>
+											</>
+										) }
 									</div>
 								) ) }
 							</div>

@@ -37,10 +37,34 @@ final class CrmController extends RestController {
 			'/booking/crm/customers/(?P<id>\d+)/notes',
 			[ 'methods' => 'POST', 'callback' => [ $this, 'add_note' ], 'permission_callback' => [ $this, 'require_login' ], 'args' => [ 'id' => [ 'type' => 'integer', 'required' => true ] ] ]
 		);
+
+		$this->route(
+			'/booking/crm/customers/(?P<id>\d+)/notes/(?P<note_id>\d+)',
+			[
+				[ 'methods' => 'PATCH', 'callback' => [ $this, 'update_note' ], 'permission_callback' => [ $this, 'require_login' ] ],
+				[ 'methods' => 'DELETE', 'callback' => [ $this, 'delete_note' ], 'permission_callback' => [ $this, 'require_login' ] ],
+			]
+		);
 	}
 
+	/**
+	 * V2.2 Step 16 — direct ownership first (the canonical resolution
+	 * everywhere else in this codebase), falling back to active staff
+	 * membership so an authorized staff member can also see/manage their
+	 * business's own CRM — see StaffService's own docblock for why this
+	 * fallback is deliberately limited to CRM + a professional's own
+	 * analytics, not every ownership check in the codebase.
+	 */
 	private function current_provider_id(): ?int {
-		return ProviderLookup::for_user( get_current_user_id() );
+		$owned = ProviderLookup::for_user( get_current_user_id() );
+		if ( $owned ) {
+			return $owned;
+		}
+		if ( class_exists( '\BeauClick\Marketplace\Staff\StaffService' ) ) {
+			$staff_of = ( new \BeauClick\Marketplace\Staff\StaffService() )->provider_ids_for_staff_user( get_current_user_id() );
+			return $staff_of[0] ?? null;
+		}
+		return null;
 	}
 
 	public function list_customers( WP_REST_Request $request ): \WP_REST_Response {
@@ -85,5 +109,36 @@ final class CrmController extends RestController {
 		}
 
 		return Response::ok( $note, [], 201 );
+	}
+
+	public function update_note( WP_REST_Request $request ) {
+		$provider_id = $this->current_provider_id();
+		$customer_id = (int) $request->get_param( 'id' );
+		$note_id     = (int) $request->get_param( 'note_id' );
+		$note_text   = (string) $request->get_param( 'note' );
+
+		if ( trim( $note_text ) === '' ) {
+			return Response::error( 'bc_invalid_input', __( 'متن یادداشت نمی‌تواند خالی باشد.', 'beauclick-booking' ), 422 );
+		}
+
+		$note = $provider_id ? ( new CrmService() )->update_note( $provider_id, $customer_id, $note_id, get_current_user_id(), $note_text ) : null;
+		if ( ! $note ) {
+			return Response::error( 'bc_not_found', __( 'این یادداشت پیدا نشد یا نویسنده آن شما نیستید.', 'beauclick-booking' ), 404 );
+		}
+
+		return Response::ok( $note );
+	}
+
+	public function delete_note( WP_REST_Request $request ) {
+		$provider_id = $this->current_provider_id();
+		$customer_id = (int) $request->get_param( 'id' );
+		$note_id     = (int) $request->get_param( 'note_id' );
+
+		$ok = $provider_id && ( new CrmService() )->delete_note( $provider_id, $customer_id, $note_id, get_current_user_id() );
+		if ( ! $ok ) {
+			return Response::error( 'bc_not_found', __( 'این یادداشت پیدا نشد یا نویسنده آن شما نیستید.', 'beauclick-booking' ), 404 );
+		}
+
+		return Response::ok( [ 'deleted' => true ] );
 	}
 }

@@ -268,4 +268,65 @@ final class CrmServiceTest extends WP_UnitTestCase {
 		// query per customer. 8 customers, well under a naive 8x N+1 count.
 		$this->assertLessThan( 10, $query_count, "Customer list must not issue a query per customer (got {$query_count} queries for 8 customers)." );
 	}
+
+	// --- V2.2 Step 16 -- note edit/delete ---------------------------------
+
+	public function test_the_author_can_edit_their_own_note(): void {
+		$owner       = self::factory()->user->create();
+		$provider_id = $this->make_provider( $owner );
+		$customer_id = self::factory()->user->create();
+		$this->make_booking( $provider_id, $customer_id, current_time( 'mysql' ), 'completed' );
+
+		$service = new CrmService();
+		$note    = $service->add_note( $provider_id, $customer_id, $owner, 'یادداشت اولیه' );
+		$updated = $service->update_note( $provider_id, $customer_id, $note['id'], $owner, 'یادداشت ویرایش‌شده' );
+
+		$this->assertNotNull( $updated );
+		$this->assertSame( 'یادداشت ویرایش‌شده', $updated['note'] );
+	}
+
+	public function test_a_different_user_cannot_edit_someone_elses_note(): void {
+		$owner        = self::factory()->user->create();
+		$other_writer = self::factory()->user->create();
+		$provider_id  = $this->make_provider( $owner );
+		$customer_id  = self::factory()->user->create();
+		$this->make_booking( $provider_id, $customer_id, current_time( 'mysql' ), 'completed' );
+
+		$service = new CrmService();
+		$note    = $service->add_note( $provider_id, $customer_id, $owner, 'یادداشت اصلی' );
+		$result  = $service->update_note( $provider_id, $customer_id, $note['id'], $other_writer, 'تلاش برای ویرایش' );
+
+		$this->assertNull( $result, 'Only the note\'s own author may edit it, even another staff member of the same business.' );
+	}
+
+	public function test_the_author_can_delete_their_own_note(): void {
+		$owner       = self::factory()->user->create();
+		$provider_id = $this->make_provider( $owner );
+		$customer_id = self::factory()->user->create();
+		$this->make_booking( $provider_id, $customer_id, current_time( 'mysql' ), 'completed' );
+
+		$service = new CrmService();
+		$note    = $service->add_note( $provider_id, $customer_id, $owner, 'یادداشت موقت' );
+		$deleted = $service->delete_note( $provider_id, $customer_id, $note['id'], $owner );
+
+		$this->assertTrue( $deleted );
+		$this->assertCount( 0, $service->list_notes( $provider_id, $customer_id ) );
+	}
+
+	public function test_deleting_a_note_for_a_customer_that_is_not_really_yours_fails(): void {
+		$owner_a     = self::factory()->user->create();
+		$owner_b     = self::factory()->user->create();
+		$provider_a  = $this->make_provider( $owner_a );
+		$provider_b  = $this->make_provider( $owner_b );
+		$customer_id = self::factory()->user->create();
+		$this->make_booking( $provider_a, $customer_id, current_time( 'mysql' ), 'completed' );
+
+		$service = new CrmService();
+		$note    = $service->add_note( $provider_a, $customer_id, $owner_a, 'یادداشت واقعی' );
+
+		// provider_b never had this customer -- is_customer_of() must fail first.
+		$deleted = $service->delete_note( $provider_b, $customer_id, $note['id'], $owner_a );
+
+		$this->assertFalse( $deleted );
+	}
 }

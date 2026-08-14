@@ -5,6 +5,7 @@ namespace BeauClick\Analytics;
 
 use BeauClick\Analytics\Admin\AnalyticsDashboardPage;
 use BeauClick\Analytics\Rest\AnalyticsController;
+use BeauClick\Analytics\Rest\MyAnalyticsController;
 use BeauClick\Analytics\Tracking\CommerceTracker;
 
 /**
@@ -43,6 +44,7 @@ final class Plugin {
 
 	public function register_rest_routes(): void {
 		( new AnalyticsController() )->register_routes();
+		( new MyAnalyticsController() )->register_routes();
 	}
 
 	public static function activate(): void {

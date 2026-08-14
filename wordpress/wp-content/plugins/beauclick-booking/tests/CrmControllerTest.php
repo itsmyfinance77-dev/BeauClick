@@ -170,4 +170,100 @@ final class CrmControllerTest extends WP_UnitTestCase {
 		$this->assertSame( 3, $body['meta']->pagination['total'] );
 		$this->assertSame( 2, $body['meta']->pagination['pages'] );
 	}
+
+	// --- V2.2 Step 16 -- note edit/delete REST layer ----------------------
+
+	public function test_update_note_rest_endpoint_works_for_the_author(): void {
+		$owner       = self::factory()->user->create();
+		$provider_id = $this->make_provider( $owner );
+		$customer_id = self::factory()->user->create();
+		$this->make_booking( $provider_id, $customer_id );
+
+		wp_set_current_user( $owner );
+		$controller  = new CrmController();
+		$add_request = new WP_REST_Request( 'POST', "/beauclick/v1/booking/crm/customers/{$customer_id}/notes" );
+		$add_request->set_param( 'id', $customer_id );
+		$add_request->set_param( 'note', 'یادداشت اول' );
+		$note_id = $controller->add_note( $add_request )->get_data()['data']['id'];
+
+		$update_request = new WP_REST_Request( 'PATCH', "/beauclick/v1/booking/crm/customers/{$customer_id}/notes/{$note_id}" );
+		$update_request->set_param( 'id', $customer_id );
+		$update_request->set_param( 'note_id', $note_id );
+		$update_request->set_param( 'note', 'یادداشت ویرایش‌شده' );
+
+		$response = $controller->update_note( $update_request );
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( 'یادداشت ویرایش‌شده', $response->get_data()['data']['note'] );
+	}
+
+	public function test_delete_note_rest_endpoint_returns_404_for_a_note_that_is_not_yours(): void {
+		$owner_a     = self::factory()->user->create();
+		$owner_b     = self::factory()->user->create();
+		$provider_a  = $this->make_provider( $owner_a );
+		$customer_id = self::factory()->user->create();
+		$this->make_booking( $provider_a, $customer_id );
+
+		wp_set_current_user( $owner_a );
+		$controller  = new CrmController();
+		$add_request = new WP_REST_Request( 'POST', "/beauclick/v1/booking/crm/customers/{$customer_id}/notes" );
+		$add_request->set_param( 'id', $customer_id );
+		$add_request->set_param( 'note', 'یادداشت واقعی' );
+		$note_id = $controller->add_note( $add_request )->get_data()['data']['id'];
+
+		wp_set_current_user( $owner_b );
+		$delete_request = new WP_REST_Request( 'DELETE', "/beauclick/v1/booking/crm/customers/{$customer_id}/notes/{$note_id}" );
+		$delete_request->set_param( 'id', $customer_id );
+		$delete_request->set_param( 'note_id', $note_id );
+
+		$response = $controller->delete_note( $delete_request );
+
+		$this->assertSame( 404, $response->get_status() );
+	}
+
+	// --- V2.2 Step 16 -- staff access to CRM -------------------------------
+
+	public function test_an_authorized_staff_member_can_see_the_businesss_own_customers(): void {
+		if ( ! class_exists( '\BeauClick\Marketplace\Staff\StaffService' ) ) {
+			$this->markTestSkipped( 'beauclick-marketplace Staff module not active in this test run.' );
+		}
+		$owner       = self::factory()->user->create();
+		$provider_id = $this->make_provider( $owner );
+		$customer_id = self::factory()->user->create();
+		$this->make_booking( $provider_id, $customer_id );
+
+		$staff_id = self::factory()->user->create();
+		global $wpdb;
+		$wpdb->insert(
+			$wpdb->prefix . 'bc_business_staff',
+			[ 'business_id' => $provider_id, 'user_id' => $staff_id, 'role' => 'staff', 'status' => 'active', 'added_by' => $owner, 'created_at' => current_time( 'mysql' ) ]
+		);
+
+		wp_set_current_user( $staff_id );
+		$response = ( new CrmController() )->list_customers( new WP_REST_Request( 'GET', '/beauclick/v1/booking/crm/customers' ) );
+
+		$this->assertCount( 1, $response->get_data()['data'], 'An authorized staff member must see the business\'s real customers, not an empty list.' );
+	}
+
+	public function test_a_removed_staff_member_loses_crm_access(): void {
+		if ( ! class_exists( '\BeauClick\Marketplace\Staff\StaffService' ) ) {
+			$this->markTestSkipped( 'beauclick-marketplace Staff module not active in this test run.' );
+		}
+		$owner       = self::factory()->user->create();
+		$provider_id = $this->make_provider( $owner );
+		$customer_id = self::factory()->user->create();
+		$this->make_booking( $provider_id, $customer_id );
+
+		$staff_id = self::factory()->user->create();
+		global $wpdb;
+		$wpdb->insert(
+			$wpdb->prefix . 'bc_business_staff',
+			[ 'business_id' => $provider_id, 'user_id' => $staff_id, 'role' => 'staff', 'status' => 'removed', 'added_by' => $owner, 'created_at' => current_time( 'mysql' ) ]
+		);
+
+		wp_set_current_user( $staff_id );
+		$response = ( new CrmController() )->list_customers( new WP_REST_Request( 'GET', '/beauclick/v1/booking/crm/customers' ) );
+
+		$this->assertCount( 0, $response->get_data()['data'], 'A removed ("status=removed") staff row must not grant CRM access.' );
+	}
 }

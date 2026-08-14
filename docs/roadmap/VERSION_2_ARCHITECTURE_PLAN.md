@@ -2257,3 +2257,133 @@ None in the new code. One pre-existing, unrelated repository-wide gap was found 
 ### Deferred (explicitly out of this step's scope, per the task's own stop condition)
 
 Professional/Business Platform Completion (Step 16), Campaign Engine, Financial/Payout, AI for Professionals, Realtime, Native Mobile, Multi-vendor Marketplace — none started. Step 16 was not started.
+
+---
+
+## V2.2 Step 16 — Professional/Business Platform Completion Implementation Notes
+
+### What existed before, and what was actually missing
+
+Confirmed by direct source inspection, not the roadmap's own older pre-scoping: the professional dashboard (`dashboard-professional.tsx`) had six real, data-backed tabs (Overview/Bookings/Services/Customers/Reviews/Messages) and four placeholders (Calendar/Revenue/Profile/Settings). The single most consequential finding of this step's own research, discovered *before* any code was written: **`wp_bc_availability_slots` had exactly one writer in the entire codebase — `DemoAvailabilitySeed`, a dev-only `wp bc:seed` fixture.** No REST route, no admin UI, no real code path let an actual professional create a bookable slot. Every prior QA session's "real" availability was demo-seeded data, never product functionality. This is a more severe, more fundamental gap than analytics — without it, no real professional signing up today could ever receive a booking — and became this step's first priority, ahead of the explicitly-emphasized analytics work.
+
+Also confirmed: `bc_manage_business_staff` has existed as a declared capability since V1 with **zero** backing table, service, or controller (`ProviderLookup::for_user()` is a hard 1:1 user↔provider-post resolution, no exceptions); CRM note edit/delete was add-only (no `update`/`delete` method existed on `CrmService`); `MetricsService` (Step 11) had **zero** methods accepting any ownership-scoping parameter — every metric was platform-wide only, confirmed by reading the entire class; and B2B (`beauclick-b2b`) had a complete, tested backend (account application, tiered pricing, quote request/price/accept) but the only real frontend was the server-rendered `/b2b/` catalog/apply page — the quote-request/accept flow has no UI anywhere, a real, confirmed gap this step did not close (see Deferred, below).
+
+### Scope decision
+
+Given the task's own "this is not another giant feature" framing and explicit permission to defer multi-staff if too large, four items were built to full quality (implementation + tests + live QA) and two were deliberately deferred with documented reasoning:
+
+**Built:**
+1. **Availability/Calendar** (`AvailabilityService`, `AvailabilityController`, `CalendarTab.tsx`) — the critical, previously-nonexistent gap above.
+2. **Professional/Business Analytics** (`MetricsService::for_provider()`, `MyAnalyticsController`, `AnalyticsTab.tsx`) — reuses Step 11's foundation with zero new analytics engine, per the task's own explicit, repeated requirement.
+3. **CRM note edit/delete + real frontend pagination** — closes the Gap Register's own long-standing deferred item.
+4. **A minimal staff model** (`wp_bc_business_staff`, `StaffService`, `StaffController`, `StaffTab.tsx`) — one flat role, owner-only management, wired into exactly two surfaces (CRM, analytics).
+
+**Deliberately deferred** (documented, not silently dropped): portfolio upload (not named anywhere in this step's own task text, unlike the older architecture-plan draft — task §3's own "do not implement a feature just because its name exists in an old document" instruction applies directly); the B2B quote-request/accept UI (a real, confirmed gap, but building a product-picker-for-quotes UI is a materially larger, separate feature than this step's own bounded scope allows); fine-grained per-capability staff permissions beyond the single flat role (task §11's own explicit escape hatch).
+
+### Availability/Calendar
+
+`AvailabilityService` (`beauclick-booking/src/Availability/AvailabilityService.php`) — deliberately NOT a recurrence-rule engine: `create_slot()` inserts one concrete, materialized `open` row (matching the architecture's own already-stated preference — the original `CreateBookingTables` migration docblock literally anticipated "the professional's own REST call" as the intended eventual source of slots, never built until now); `bulk_generate()` is a simple "weekday + time window + slot duration → concrete rows" generator, bounded to 60 days per call and idempotent (re-running the same weekly pattern skips slots that already exist, never duplicates). Both reuse the exact overlap-detection and ownership-resolution idioms already established by `BookingService`/`CrmController`. `delete_slot()` only ever touches a slot still `status='open'` — a held/booked slot backs a real, in-flight booking and must go through cancellation, never a silent delete.
+
+### Professional/Business Analytics
+
+`MetricsService::for_provider(int $providerId, string $providerPostType, string $from, string $to)` — the one addition every existing method in this class lacked: ownership scoping. Booking-lifecycle events (`booking_created/_confirmed/_completed/_cancelled/_expired/_no_show/_reschedule_succeeded`) carry only a booking id as `entity_id`, never a provider id (confirmed during research — `SignalCollector`'s own docblock independently documents the identical finding), so every booking-derived count JOINs through `wp_bc_bookings.provider_id` — the exact same JOIN-through pattern `shop_order_event_count()` already established for excluding booking orders from the shop funnel, just parameterized by provider instead. `profile_view` already carries the provider's own CPT post id directly as `entity_id` (`entity_type` = the literal post type) and needs no join. Reviews/repeat-customers/service-performance read `wp_bc_reviews`/`wp_bc_bookings` directly with the same bounded, single-query-per-metric discipline `CrmService`/`DashboardController` already use. The platform-wide `funnel()` (Step 11) also gained a `rescheduled` bucket — Step 15's own events were logged but never read by any funnel method, a real, if minor, gap found and closed in passing.
+
+`MyAnalyticsController` (`beauclick-analytics/src/Rest/MyAnalyticsController.php`) — `GET /analytics/my/summary`, resolves the caller's own provider id via `ProviderLookup::for_user()` (falling back to `StaffService::provider_ids_for_staff_user()`), **never** a client-supplied id. A B2B section is attached only when the current user has an *approved* `wp_bc_business_accounts` row (a genuinely separate identity from a marketplace `bc_business` CPT post, confirmed during research — a pure wholesale buyer with no marketplace listing gets no analytics tab at all, since they have neither role nor staff membership to reach the dashboard shell; they use the existing `/b2b/` page instead, a documented, deliberate boundary, not an oversight). The B2B figure is explicitly labelled "Gross order value" (`grossOrderValueLabel`), never "earnings" — real WooCommerce order totals from accepted quotes, not a fabricated revenue/commission figure the future Financial/Payout system would need to define (task §34's own explicit instruction).
+
+### Minimal staff model
+
+`wp_bc_business_staff` (new table, `beauclick-marketplace`) — one flat `staff` role (the owner is implicit via the provider post's own `post_author`, never a row in this table), added by phone number lookup against the existing `wp_bc_phone_index` (`beauclick-auth`'s `PhoneNormalizer`), never a new email-invite flow. `StaffService::remove()` is a soft status change (`status='removed'`), not a DELETE — matching this codebase's own established preference for an inspectable status change (`WaitlistService::cancel()`'s identical shape) — which is also what makes `add()`'s `ON DUPLICATE KEY UPDATE` upsert path meaningful: re-adding a previously-removed staff member flips the same row back to active.
+
+**Explicit, bounded blast radius**: staff resolution was wired into exactly `CrmController` and `MyAnalyticsController` — not `BookingController` (confirm/cancel/reschedule), not `ReviewsController` (respond). Extending every existing ownership check in the codebase to accept staff would be a meaningfully larger, higher-regression-risk change touching several already-shipped, already-tested controllers; left as a named, deliberate V2.3+ extension rather than silently expanded here, per the task's own explicit permission to keep this minimal.
+
+**A real bug found and fixed during this step's own live verification, not by code review**: `page-dashboard.php`'s role-only check (`bc_professional`/`bc_business` role) decides which React bundle mounts — but this minimal staff model never changes a staff member's WP role (by design). A real staff member's session was tested end to end and landed on the *customer* dashboard despite the backend (`CrmController`) correctly authorizing them — the routing check simply never knew staff membership was a thing. Fixed by extending the same theme file's check to also query `StaffService::provider_ids_for_staff_user()`. Verified live: adding/removing a real staff member correctly grants/revokes both dashboard-shell access and the underlying API access together.
+
+### CRM note edit/delete + pagination
+
+`CrmService::update_note()`/`delete_note()` — ownership checked two ways, both required: the note must belong to a genuine customer of the provider (`is_customer_of()`), **and** the note's own `author_user_id` must match the caller — a staff member may edit their own notes, never a colleague's, even within the same business. `CrmController` gained `PATCH`/`DELETE /booking/crm/customers/{id}/notes/{note_id}`. Frontend pagination is a "load more" pattern (20 per page, appends and stops once a page returns fewer than the page size) rather than a page-number UI — `api.ts`'s `api.get<T>()` unwraps `data` only and drops `meta.pagination`, so a page-number UI would need a new client method; "load more" needed none, extending nothing in the shared API client.
+
+### Database
+
+Two new tables (`wp_bc_business_staff` in `beauclick-marketplace`; no new table for availability — reuses the existing `wp_bc_availability_slots`; no new table for analytics — reuses `wp_bc_events`/`wp_bc_bookings`/`wp_bc_reviews`, per the task's own "reuse Step 11, don't duplicate it" instruction). No existing table's schema changed.
+
+### REST API
+
+`beauclick-booking`: `GET/POST /booking/my/availability`, `POST /booking/my/availability/bulk`, `DELETE /booking/my/availability/{id}`; `PATCH/DELETE /booking/crm/customers/{id}/notes/{note_id}`. `beauclick-analytics`: `GET /analytics/my/summary`. `beauclick-marketplace`: `GET/POST /marketplace/my/staff`, `DELETE /marketplace/my/staff/{user_id}`. Every route resolves ownership from the caller's own session (`ProviderLookup`/`StaffService`), never a request-supplied id — verified directly, not assumed (see Security below).
+
+### Security
+
+Live-verified over real HTTP, not just unit-tested: an authorized staff member sees the business's real customers and analytics (`200`, real data); a removed staff member immediately loses that access (`403`/empty result); a plain customer role is denied `/marketplace/my/staff` (`403`), `/booking/my/availability` (`403`, lacks `bc_manage_own_availability`), and `/analytics/my/summary` (`404`, no provider profile resolves — an honest "not found," never an internal detail leaked); a staff member cannot manage the staff list itself (owner-only, by design); analytics/CRM never accept a client-supplied provider id under any parameter name (tested directly by attempting to smuggle one in).
+
+### Performance
+
+`MetricsService::for_provider()` uses the same bounded, single-query-per-metric discipline as every other method in the class (no per-row loops); `list_own()`'s reschedule-count lookup (Step 15) and the CRM customer list (Step 5) were already N+1-safe and untouched. `bulk_generate()` is bounded to 60 days per call specifically to prevent an adversarial/mistyped range from generating an unbounded number of rows in one request.
+
+### Persian/Jalali/RTL/mobile/accessibility
+
+Every new string is Persian; every date goes through the existing shared `JalaliDate`/`jalali.ts`. Verified live at 375/390/412px across all three new tabs (Analytics/Calendar/Staff) plus the extended Customers tab — zero horizontal overflow. New UI reuses existing primitives (`StatCard`, `Chip`, `Input`, `Modal`, `Badge`, `EmptyState`, `LoadingDots`) with no new component patterns introduced.
+
+### Tests
+
+**44 new backend PHPUnit tests**: `MetricsServiceTest`/`MyAnalyticsControllerTest` (ownership scoping, date-range correctness, no-private-data-leakage, B2B section presence/absence — 15 tests), `StaffServiceTest`/`StaffControllerTest` (add/remove/list, owner-only, phone resolution, re-add-after-remove upsert — 12 tests), `AvailabilityServiceTest`/`AvailabilityControllerTest` (overlap detection, past-slot rejection, bulk-generate idempotency and bounding, ownership — 13 tests), CRM note edit/delete + staff-access additions to the existing `CrmServiceTest`/`CrmControllerTest` (4 tests). Full backend suite: **724/724** (680 pre-existing + 44 new), zero regressions. **5 new frontend tests** (`AnalyticsTab.test.tsx`) — full frontend suite **38/38**. TypeScript build, production `vite build`, and ESLint all clean.
+
+### Live verification (real running site, real seeded database, real HTTP requests)
+
+Performed against the real local dev server using the same `bc_qa_test_pro`/`bc_qa_customer` QA fixtures Step 15 established, plus a real credential-free session technique (`wp_set_auth_cookie()` via a temporary, session-scoped script, deleted immediately after each pass — no password ever entered):
+- **Analytics**: real numbers (`started: 3, completed: 1, cancelled: 1, rescheduled: 1`) verified to exactly match a direct database query against `wp_bc_events`/`wp_bc_bookings`.
+- **Calendar**: created real slots via the bulk-generate endpoint, confirmed they render grouped by day with correct status labels; deleted a real open slot via the UI and confirmed it disappeared; confirmed booked/held slots never show a delete action.
+- **Staff**: added a real user by real phone number through the actual form; confirmed they immediately gained real CRM access (a real customer row, matching a direct API call); removed them and confirmed both the dashboard-shell routing *and* the API access were revoked together.
+- **CRM notes**: a full add → edit → delete lifecycle through the real modal UI, each step confirmed via the re-rendered DOM.
+- **Isolation**: a plain customer role received real `403`/`403`/`404` from the staff, availability, and analytics endpoints respectively.
+- **Mobile**: 375/390/412px, zero overflow, across Analytics/Calendar/Staff/Customers.
+- **V2.2-wide regression pass**: all 11 BeauClick admin pages (Steps 9–16) return `200` with no fatal errors; the professional-profile public page still emits correct JSON-LD structured data (Step 12); the privacy data-export endpoint still returns a real, ready export (Step 14); a full booking creation → real WooCommerce order → appears in the customer's own list round trip still works end to end.
+
+### Bugs discovered
+
+1. **Staff dashboard-routing gap** (see "Minimal staff model" above) — found and fixed during this step's own live verification.
+
+No other bugs found. One pre-existing, unrelated finding carried forward from Step 15 and reconfirmed here, not re-litigated: `composer lint` (`phpcs.xml.dist`) still fails on short-array-syntax style across the pre-existing codebase, unrelated to this step's own changes.
+
+### Known limitations / deferred, per the task's own scope boundaries
+
+- Portfolio upload — not named in this step's own task text; the `bc_portfolio_item` CPT and capabilities remain registered with no REST controller or UI, unchanged from before this step.
+- B2B quote-request/accept UI — the backend is complete and tested (`beauclick-b2b`), but no frontend anywhere (React app-shell or the server-rendered `/b2b/` page) lets a business browse/request/accept a negotiated quote; only the wholesale-catalog direct-purchase flow exists on `/b2b/`. A real, confirmed, but deliberately out-of-scope gap for this step.
+- Fine-grained staff permissions (view-only vs. act, per-surface capability matrix) — this step's staff model is a single flat role with full CRM+analytics parity; a real capability matrix is `NEEDS_BUSINESS_DECISION` and explicitly named as a possible V2.3+ extension, not built speculatively.
+- A pure B2B-only wholesale buyer (no marketplace `bc_professional`/`bc_business` listing) has no analytics view through the dashboard — they use the existing `/b2b/` page, which itself lacks the quote UI above.
+
+### Business decisions still required (not invented here)
+
+- **Staff role/permission granularity beyond the single flat role** — `NEEDS_BUSINESS_DECISION`, per task §11/§33.
+- **Whether/how a B2B-only buyer should get any analytics view**, and through which surface — `NEEDS_BUSINESS_DECISION`.
+
+### Deferred (explicitly out of this step's scope, per the task's own stop condition)
+
+Campaign Engine, Financial/Payout, AI for Professionals, Realtime, Native Mobile, Multi-vendor Marketplace — none started, matching the task's own explicit V2.3+ boundary. V2.3 was not started.
+
+---
+
+## V2.2 Completion Summary
+
+**Status: all six planned V2.2 steps (11–16) are complete.** No `v2.2.0` tag has been created — release remains pending explicit approval, per every step's own standing instruction not to tag without it.
+
+| Step | Capability | Status |
+|---|---|---|
+| 11 | Analytics & BI Foundation | ✅ Complete |
+| 12 | Growth & Public Discovery (SEO + Referral) | ✅ Complete |
+| 13 | Admin Platform & Operations Maturity | ✅ Complete |
+| 14 | Account Privacy & Data Control | ✅ Complete |
+| 15 | Booking Evolution: Rescheduling + Receipts | ✅ Complete |
+| 16 | Professional/Business Platform Completion | ✅ Complete |
+
+**Major capabilities shipped across V2.2**: funnel/commerce/search/AI/retention/usage/referral/marketplace analytics with a real admin dashboard (11); SEO meta/sitemap/structured data and a real referral program (12); a general admin audit log, operations/health visibility, and a dedicated platform-operator role (13); real self-service account deletion and data export with a documented per-domain anonymization matrix (14); atomic booking rescheduling and a real, order-sourced receipt (15); a self-service availability/slot manager (closing a severe, previously-unbuilt operational gap), ownership-scoped professional/business analytics reusing Step 11's foundation, a minimal staff model, and CRM note edit/delete with real pagination (16).
+
+**Test status at completion**: backend **724/724**, frontend **38/38**, TypeScript build clean, production `vite build` clean, ESLint clean, `php -l` clean across every file touched this version. `composer lint` (phpcs style) has a pre-existing, repo-wide short-array-syntax gap unrelated to any V2.2 step's own changes (confirmed by running it against untouched files with identical results) — not fixed, as doing so would be a large, unrelated diff outside any step's actual scope.
+
+**Known limitations carried into V2.3+ planning** (full detail in each step's own notes above and in `PRODUCT_GAP_REGISTER.md`): B2B quote-request/accept UI; portfolio upload; fine-grained staff permissions; a pure B2B-only buyer's analytics home; professional/business revenue analytics (explicitly deferred until Financial/Payout, V2.3, defines an authoritative figure).
+
+**External configuration still required before any real production launch** (unchanged since the V2.1 Final Release Audit, re-confirmed not to have grown during V2.2): a real SMS gateway, a real Iranian payment gateway, outbound SMTP, automated backup, and error monitoring.
+
+**Business/legal decisions still required** (collected from each step's own notes, not newly invented here): referral reward structure; data-retention/anonymization window specifics; rescheduling limits (max count, minimum lead time) and receipt legal/tax status; staff role granularity; B2B-only buyer analytics access.
+
+**V2.3+ deferred work** (unchanged, explicitly not started during V2.2): Campaign/Promotion Engine, Financial/Payout, AI for Professionals & Businesses (all V2.3); Realtime Communication, Multi-Sided Marketplace evolution, Native Mobile (V2.4+, evidence-gated).
+
+**Production readiness note**: V2.2 is feature-complete against its own six-step plan and passes every automated and live-verification check performed. It is not, on its own, a production-launch readiness certification — the external-configuration items above (payment gateway, SMS, SMTP, backup, monitoring) remain genuine pre-launch blockers independent of any V2.2 code, exactly as already documented since the V2.1 Final Release Audit.
