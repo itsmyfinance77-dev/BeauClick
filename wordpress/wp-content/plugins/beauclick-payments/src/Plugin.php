@@ -46,6 +46,7 @@ final class Plugin {
 		add_action( 'woocommerce_order_status_refunded', [ $this, 'on_order_dead' ] );
 
 		add_filter( 'beauclick/booking/after_create', [ $this, 'attach_order_to_booking_result' ], 10, 2 );
+		add_action( 'beauclick/booking/cancelled', [ $this, 'on_booking_cancelled' ], 10, 3 );
 		add_action( 'beauclick/seed', [ $this, 'maybe_seed' ] );
 		add_action( 'beauclick/core/register_rest_routes', [ $this, 'register_rest_routes' ] );
 		add_action( 'woocommerce_review_order_before_submit', [ self::class, 'render_refund_policy_link' ] );
@@ -205,6 +206,60 @@ final class Plugin {
 		} else {
 			$order->add_order_note( __( 'رزرو مرتبط دیگر معتبر نیست — مبلغ سفارش صفر بود، نیازی به بازگشت وجه نیست.', 'beauclick-payments' ) );
 		}
+	}
+
+	/**
+	 * V2.3 Step 18 (FIN-02) -- a booking cancellation (via
+	 * `BookingController::cancel()`, the real customer/professional-facing
+	 * path) never triggered a refund for an already-paid booking until this
+	 * method existed, confirmed by the V2.3 discovery audit as a genuine
+	 * financial-correctness gap. Fires from `BookingService::cancel_booking()`'s
+	 * new `beauclick/booking/cancelled` hook -- deliberately generic and
+	 * fired unconditionally by that method, per its own docblock, so this
+	 * class (not beauclick-booking) decides whether the linked order is
+	 * even eligible for a refund at all.
+	 *
+	 * Refunds the order's own real REMAINING amount (`get_remaining_refund_amount()`),
+	 * never a value this method computes independently -- correct whether
+	 * this is the order's first refund or (defensively) a second one, and
+	 * correct regardless of any Step 17 Campaign/Loyalty discount already
+	 * reflected in the order's own total. Only ever fires for a genuinely
+	 * PAID order (`is_paid()`) -- a still-pending, unpaid COD hold being
+	 * cancelled has nothing to refund, exactly like every other cancel
+	 * flow that predates this step.
+	 *
+	 * @param array<string, mixed> $booking Pre-cancellation booking row (still carries wc_order_id).
+	 */
+	public function on_booking_cancelled( int $booking_id, array $booking, ?int $actor_id ): void {
+		$order_id = ! empty( $booking['wc_order_id'] ) ? (int) $booking['wc_order_id'] : null;
+		if ( ! $order_id ) {
+			return;
+		}
+
+		$order = wc_get_order( $order_id );
+		if ( ! $order || ! $order->is_paid() ) {
+			return;
+		}
+
+		$remaining = $order->get_remaining_refund_amount();
+		if ( $remaining <= 0 ) {
+			return; // Already fully refunded (or somehow over-refunded) -- nothing to do, safe to call repeatedly.
+		}
+
+		$refund = wc_create_refund(
+			[
+				'order_id' => $order_id,
+				'amount'   => $remaining,
+				'reason'   => __( 'رزرو مرتبط لغو شد — بازگشت خودکار وجه.', 'beauclick-payments' ),
+			]
+		);
+
+		if ( is_wp_error( $refund ) ) {
+			$order->add_order_note( __( 'رزرو مرتبط لغو شد اما بازگشت خودکار وجه ناموفق بود — نیاز به بررسی دستی.', 'beauclick-payments' ) );
+			return;
+		}
+
+		$order->add_order_note( __( 'رزرو مرتبط لغو شد؛ وجه به‌صورت خودکار بازگردانده شد.', 'beauclick-payments' ) );
 	}
 
 	/**

@@ -9,6 +9,7 @@ import { CustomersTab } from '@/features/dashboard/professional/CustomersTab';
 import { CalendarTab } from '@/features/dashboard/professional/CalendarTab';
 import { AnalyticsTab } from '@/features/dashboard/professional/AnalyticsTab';
 import { StaffTab } from '@/features/dashboard/professional/StaffTab';
+import { RevenueTab } from '@/features/dashboard/professional/RevenueTab';
 import { ChatPanel } from '@/features/chat/ChatPanel';
 import { EmptyState } from '@/design-system';
 import '@/design-system/tokens.generated.css';
@@ -18,12 +19,14 @@ import '@/design-system/tokens.generated.css';
  * this, no code path let a professional create a bookable slot at all) and
  * Analytics/Staff (new, reusing Step 11's MetricsService and this step's own
  * minimal staff model) join the previously-shipped Overview/Bookings/
- * Services/Reviews/Messages/Customers as real, data-backed tabs. Revenue
- * stays a documented placeholder — it depends on the future Financial/Payout
- * system (V2.3), not something this step can honestly build ahead of it.
- * Profile/Settings remain placeholders too — this step's own scope was
- * analytics/availability/staff/CRM, not the profile-editing UI gap (which
- * has no dedicated task ask here and is left for a future pass).
+ * Services/Reviews/Messages/Customers as real, data-backed tabs.
+ *
+ * V2.3 Step 18 — Revenue is now real too: the single most-anticipated
+ * "coming later" promise this dashboard has carried since V1 (see this
+ * docblock's own prior history), now backed by a real, ownership-scoped,
+ * WooCommerce-order-derived financial ledger (`beauclick-financial`) rather
+ * than an invented figure. Profile/Settings remain placeholders — still no
+ * dedicated task has asked for the profile-editing UI gap.
  */
 const NAV_ITEMS: NavItem[] = [
 	{ id: 'overview', label: 'نمای کلی', ready: true },
@@ -33,14 +36,14 @@ const NAV_ITEMS: NavItem[] = [
 	{ id: 'customers', label: 'مشتریان', ready: true },
 	{ id: 'analytics', label: 'آمار و تحلیل', ready: true },
 	{ id: 'staff', label: 'کارکنان', ready: true },
-	{ id: 'revenue', label: 'درآمد', ready: false },
+	{ id: 'revenue', label: 'درآمد', ready: true },
 	{ id: 'reviews', label: 'نظرات', ready: true },
 	{ id: 'messages', label: 'پیام‌ها', ready: true },
 	{ id: 'profile', label: 'پروفایل', ready: false },
 	{ id: 'settings', label: 'تنظیمات', ready: false },
 ];
 
-const READY_TABS = [ 'overview', 'bookings', 'calendar', 'services', 'customers', 'analytics', 'staff', 'reviews', 'messages' ];
+const READY_TABS = [ 'overview', 'bookings', 'calendar', 'services', 'customers', 'analytics', 'staff', 'revenue', 'reviews', 'messages' ];
 
 function App() {
 	const [ tab, setTab ] = useState( 'overview' );
@@ -54,6 +57,7 @@ function App() {
 			{ tab === 'customers' && <CustomersTab /> }
 			{ tab === 'analytics' && <AnalyticsTab /> }
 			{ tab === 'staff' && <StaffTab /> }
+			{ tab === 'revenue' && <RevenueTab /> }
 			{ tab === 'reviews' && <ReviewsTab /> }
 			{ tab === 'messages' && <ChatPanel /> }
 			{ ! READY_TABS.includes( tab ) && <EmptyState title="این بخش در نسخه بعدی محصول تکمیل می‌شود." /> }

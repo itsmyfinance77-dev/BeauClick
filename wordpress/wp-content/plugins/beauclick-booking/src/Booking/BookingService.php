@@ -176,6 +176,23 @@ final class BookingService {
 		// beauclick/booking/completed).
 		do_action( 'beauclick/booking/slot_opened', (int) $booking['slot_id'], (int) $booking['provider_id'], $booking['service_id'] ? (int) $booking['service_id'] : null, substr( (string) $booking['slot_start'], 0, 10 ) );
 
+		/**
+		 * V2.3 Step 18 (FIN-02) -- this REST-driven cancel() is the real,
+		 * primary customer/professional-facing cancellation path (unlike
+		 * the WooCommerce-order-status-driven on_order_dead() path, which
+		 * only ever reacts, never initiates), and until this step it never
+		 * triggered a refund for an already-paid booking at all — a real
+		 * financial-correctness gap the V2.3 discovery audit found and
+		 * named (PRODUCT_GAP_REGISTER.md's FIN-02). $booking here is the
+		 * pre-cancellation row already fetched above, so it still carries
+		 * the real wc_order_id — beauclick-booking deliberately still
+		 * doesn't know beauclick-payments/WooCommerce exists (same one-way
+		 * dependency direction as every hook in this file); the actual
+		 * refund decision and wc_create_refund() call live entirely in
+		 * beauclick-payments\Plugin::on_booking_cancelled().
+		 */
+		do_action( 'beauclick/booking/cancelled', $booking_id, $booking, $actor_id ?: null );
+
 		return true;
 	}
 

@@ -1,0 +1,14 @@
+{
+    "name": "beauclick/financial",
+    "description": "BeauClick Financial Ledger & Manual Settlement — commission/receivable bookkeeping over real WooCommerce order/refund facts.",
+    "type": "wordpress-plugin",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "BeauClick\\Financial\\": "src/"
+        }
+    }
+}
