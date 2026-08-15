@@ -1,0 +1,112 @@
+/**
+ * BeauClick branding for wp-login.php. Additive only — WordPress core's own
+ * login-rtl.css (auto-loaded since the page renders dir="rtl") still
+ * handles all structural/RTL mirroring; this file only restyles colors,
+ * the logo, radii, and focus states using the same --bc-* custom
+ * properties as the rest of the product (enqueued separately on this page
+ * by beauclick-core's Plugin::enqueue_design_tokens(), also hooked on
+ * login_enqueue_scripts). WordPress's own authentication markup/behavior
+ * (form fields, password-visibility toggle, error handling, password
+ * reset) is completely untouched — this file contains no JS and adds no
+ * new form fields.
+ */
+
+body.login {
+	background: var( --bc-color-background, #f7f6fb );
+	font-family: var( --bc-font-family, 'Vazirmatn', sans-serif );
+}
+
+body.login #login {
+	width: 100%;
+	max-width: 360px;
+	padding-inline: 16px;
+	box-sizing: border-box;
+}
+
+/* Swap WordPress's own logo for the BeauClick brand mark — the link/title
+ * text itself comes from the login_headerurl/login_headertext filters in
+ * inc/branding.php, kept for accessibility (a real, non-empty link name). */
+body.login h1 a {
+	background-image: url( '../brand/icon-gradient.svg' );
+	background-size: 48px;
+	width: 48px;
+	height: 48px;
+	margin-inline: auto;
+}
+
+body.login #loginform {
+	background: var( --bc-color-surface, #fff );
+	border: 1px solid var( --bc-color-line, #e4e1ee );
+	border-radius: var( --bc-radius-card, 18px );
+	box-shadow: var( --bc-shadow-card-hover, 0 14px 34px rgba( 40, 20, 70, 0.1 ) );
+	padding: 26px 24px;
+}
+
+body.login label {
+	color: var( --bc-color-ink, #221933 );
+	font-weight: 600;
+}
+
+body.login input[type='text'],
+body.login input[type='password'] {
+	border-radius: var( --bc-radius-button, 12px );
+	border-color: var( --bc-color-line, #e4e1ee );
+	color: var( --bc-color-ink, #221933 );
+	box-shadow: none;
+}
+
+body.login input[type='text']:focus,
+body.login input[type='password']:focus {
+	border-color: var( --bc-color-primary, #4b2e83 );
+	box-shadow: 0 0 0 2px var( --bc-color-primary-soft, #e9e2f7 );
+	outline: none;
+}
+
+body.login .button-primary {
+	background: var( --bc-color-primary, #4b2e83 );
+	border-color: var( --bc-color-primary, #4b2e83 );
+	border-radius: var( --bc-radius-button, 12px );
+	box-shadow: none;
+	text-shadow: none;
+	height: auto;
+	padding: 8px 18px;
+}
+
+body.login .button-primary:hover,
+body.login .button-primary:focus {
+	background: var( --bc-color-primary-hover, #3c2569 );
+	border-color: var( --bc-color-primary-hover, #3c2569 );
+}
+
+/* Error/notice state — WordPress core already announces this region to
+ * assistive tech; only the color follows the brand's error token. */
+body.login #login_error,
+body.login .notice {
+	border-inline-start-color: var( --bc-color-error, #c0392b );
+	border-radius: var( --bc-radius-row, 14px );
+	background: var( --bc-color-error-soft, #fbeae8 );
+}
+
+body.login #nav,
+body.login #backtoblog {
+	text-align: center;
+}
+
+body.login #nav a,
+body.login #backtoblog a {
+	color: var( --bc-color-ink-soft, #55507a );
+}
+
+body.login #nav a:hover,
+body.login #backtoblog a:hover {
+	color: var( --bc-color-primary, #4b2e83 );
+}
+
+/* No page-level horizontal overflow on a narrow device — #login already
+ * has a max-width above; this only guards the outer html/body themselves. */
+@media ( max-width: 412px ) {
+	html.login,
+	body.login {
+		overflow-x: hidden;
+	}
+}

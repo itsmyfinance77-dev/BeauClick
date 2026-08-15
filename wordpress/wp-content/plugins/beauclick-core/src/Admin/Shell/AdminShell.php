@@ -28,6 +28,7 @@ final class AdminShell {
 
 	public static function register(): void {
 		add_action( 'admin_enqueue_scripts', [ self::class, 'maybe_enqueue' ] );
+		add_action( 'admin_head', [ self::class, 'maybe_favicon' ] );
 	}
 
 	/**
@@ -53,6 +54,26 @@ final class AdminShell {
 	}
 
 	/**
+	 * Browser-tab favicon override, BeauClick's own admin pages only — never
+	 * forced onto native wp-admin screens (Plugins, Users, Settings,
+	 * WooCommerce), matching this step's own "do not blindly override native
+	 * WordPress identity on every technical screen" instruction. Reuses the
+	 * same SVG mark the public theme uses (see the theme's inc/branding.php),
+	 * read via get_stylesheet_directory_uri() rather than the theme's own
+	 * constant, since this is a plugin, not the theme itself.
+	 */
+	public static function maybe_favicon(): void {
+		$screen = get_current_screen();
+		if ( ! $screen || ! str_contains( $screen->id, 'beauclick' ) ) {
+			return;
+		}
+		printf(
+			'<link rel="icon" type="image/svg+xml" href="%s">' . "\n",
+			esc_url( get_stylesheet_directory_uri() . '/assets/brand/icon-gradient.svg' )
+		);
+	}
+
+	/**
 	 * Opens the page wrapper and prints a consistent header. Callers MUST
 	 * call footer() once, at the very end of their own render() method —
 	 * this class intentionally doesn't buffer or auto-close, matching every
@@ -66,7 +87,10 @@ final class AdminShell {
 		echo '<div class="bc-admin-header">';
 
 		echo '<nav class="bc-admin-breadcrumbs" aria-label="' . esc_attr__( 'مسیر دسترسی', 'beauclick-core' ) . '">';
-		echo '<a href="' . esc_url( admin_url( 'admin.php?page=beauclick' ) ) . '">' . esc_html__( 'بیوکلیک', 'beauclick-core' ) . '</a>';
+		echo '<a href="' . esc_url( admin_url( 'admin.php?page=beauclick' ) ) . '" class="bc-admin-brand">';
+		echo '<img src="' . esc_url( get_stylesheet_directory_uri() . '/assets/brand/icon-gradient.svg' ) . '" width="16" height="16" alt="">';
+		echo esc_html__( 'بیوکلیک', 'beauclick-core' );
+		echo '</a>';
 		foreach ( $breadcrumbs as $crumb ) {
 			echo '<span class="bc-admin-breadcrumb-sep" aria-hidden="true">/</span>';
 			if ( ! empty( $crumb['url'] ) ) {

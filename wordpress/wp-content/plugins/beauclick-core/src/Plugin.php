@@ -49,6 +49,10 @@ final class Plugin {
 		add_action( 'init', [ $this, 'load_textdomain' ] );
 		add_action( 'wp_enqueue_scripts', [ $this, 'enqueue_design_tokens' ] );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_design_tokens' ] );
+		// wp-login.php never loads wp_enqueue_scripts (only login_enqueue_scripts)
+		// — needed so the theme's login.css (inc/branding.php) can use the same
+		// --bc-* custom properties as every other BeauClick-branded surface.
+		add_action( 'login_enqueue_scripts', [ $this, 'enqueue_design_tokens' ] );
 		add_action( 'rest_api_init', [ $this, 'register_rest_routes' ] );
 
 		/**

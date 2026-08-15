@@ -27,6 +27,7 @@ declare( strict_types=1 );
 bc_enqueue_app_bundle( 'booking' );
 bc_enqueue_app_bundle( 'cart' );
 bc_enqueue_app_bundle( 'ai-assistant' );
+bc_enqueue_app_bundle( 'header-search' );
 if ( is_user_logged_in() ) {
 	bc_enqueue_app_bundle( 'chat' );
 }
@@ -34,6 +35,7 @@ if ( is_user_logged_in() ) {
 <div id="bc-booking-root"></div>
 <div id="bc-cart-root"></div>
 <div id="bc-ai-assistant-root"></div>
+<div id="bc-header-search-root"></div>
 <?php if ( is_user_logged_in() ) : ?>
 	<div id="bc-chat-root"></div>
 <?php endif; ?>

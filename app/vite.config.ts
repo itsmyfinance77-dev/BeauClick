@@ -23,6 +23,7 @@ export default defineConfig( {
 				'marketplace-filters': path.resolve( __dirname, 'src/mounts/marketplace-filters.tsx' ),
 				booking: path.resolve( __dirname, 'src/mounts/booking.tsx' ),
 				cart: path.resolve( __dirname, 'src/mounts/cart.tsx' ),
+				'header-search': path.resolve( __dirname, 'src/mounts/header-search.tsx' ),
 				'ai-assistant': path.resolve( __dirname, 'src/mounts/ai-assistant.tsx' ),
 				chat: path.resolve( __dirname, 'src/mounts/chat.tsx' ),
 				'dashboard-professional': path.resolve( __dirname, 'src/mounts/dashboard-professional.tsx' ),

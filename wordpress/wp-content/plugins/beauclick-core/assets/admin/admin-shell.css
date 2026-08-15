@@ -39,6 +39,17 @@
 	text-decoration: none;
 }
 
+.bc-admin-brand {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+}
+
+.bc-admin-brand img {
+	display: block;
+	border-radius: 4px;
+}
+
 .bc-admin-breadcrumbs a:hover,
 .bc-admin-breadcrumbs a:focus-visible {
 	color: var( --bc-color-primary, #3d3a8f );

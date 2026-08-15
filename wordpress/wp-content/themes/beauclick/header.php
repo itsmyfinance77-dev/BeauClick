@@ -31,7 +31,7 @@ declare( strict_types=1 );
 		</nav>
 
 		<div class="bc-header__actions">
-			<button type="button" class="bc-icon-chip" aria-label="<?php esc_attr_e( 'جستجو', 'beauclick' ); ?>">⌕</button>
+			<button type="button" class="bc-icon-chip" aria-label="<?php esc_attr_e( 'جستجو', 'beauclick' ); ?>" data-bc-search-open>⌕</button>
 			<button type="button" class="bc-icon-chip bc-icon-chip--cart-desktop-only" aria-label="<?php esc_attr_e( 'سبد خرید', 'beauclick' ); ?>" data-bc-cart-open>
 				🛍
 				<span class="bc-icon-chip__badge bc-numeric" id="bc-cart-count">۰</span>
