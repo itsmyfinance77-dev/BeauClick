@@ -53,6 +53,7 @@ function _beauclick_manually_load_plugins(): void {
 		\BeauClick\AI\Plugin::class,
 		\BeauClick\Reviews\Plugin::class,
 		\BeauClick\Loyalty\Plugin::class,
+		\BeauClick\Campaigns\Plugin::class, // V2.3 Step 17 — depends on core/booking/payments (Requires Plugins), and hooks the same beauclick/booking/after_create filter Loyalty's MembershipDiscount does at a later priority; activation order relative to Loyalty doesn't matter for correctness, placed here for readability.
 		\BeauClick\Journey\Plugin::class,
 		\BeauClick\Auth\Plugin::class,
 		\BeauClick\Notifications\Plugin::class,

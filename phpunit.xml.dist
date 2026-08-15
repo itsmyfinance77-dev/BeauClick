@@ -53,6 +53,9 @@
         <testsuite name="beauclick-privacy">
             <directory>wordpress/wp-content/plugins/beauclick-privacy/tests</directory>
         </testsuite>
+        <testsuite name="beauclick-campaigns">
+            <directory>wordpress/wp-content/plugins/beauclick-campaigns/tests</directory>
+        </testsuite>
     </testsuites>
     <coverage>
         <include>
@@ -72,6 +75,7 @@
             <directory suffix=".php">wordpress/wp-content/plugins/beauclick-analytics/src</directory>
             <directory suffix=".php">wordpress/wp-content/plugins/beauclick-referral/src</directory>
             <directory suffix=".php">wordpress/wp-content/plugins/beauclick-privacy/src</directory>
+            <directory suffix=".php">wordpress/wp-content/plugins/beauclick-campaigns/src</directory>
         </include>
     </coverage>
 </phpunit>

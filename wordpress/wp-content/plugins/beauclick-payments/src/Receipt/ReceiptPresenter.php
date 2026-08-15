@@ -20,11 +20,27 @@ final class ReceiptPresenter {
 
 	/** @return array<string, mixed> */
 	public function for_order( WC_Order $order ): array {
+		/**
+		 * V2.3 Step 17 fix: `WC_Order::get_items()` defaults to type
+		 * `'line_item'` only — a real, pre-existing gap this step's own live
+		 * verification found: `beauclick-loyalty`'s Membership discount fee
+		 * (a `WC_Order_Item_Fee`) has never actually appeared in this
+		 * receipt's own item list, only silently lowered the final `total`
+		 * with no line explaining why. WooCommerce's own checkout/order-
+		 * received templates already render fee items correctly (confirmed
+		 * live when Membership discount originally shipped) — this
+		 * dedicated receipt view was the one place that didn't. Fixed here,
+		 * once, for both Membership's existing fee and Campaign's new one
+		 * (beauclick-campaigns\Pricing\CampaignDiscount) — task §18's own
+		 * "the customer should be able to understand why the price changed"
+		 * requirement, and §33's "receipt must remain consistent with the
+		 * order."
+		 */
 		$items = [];
-		foreach ( $order->get_items() as $item ) {
+		foreach ( $order->get_items( [ 'line_item', 'fee' ] ) as $item ) {
 			$items[] = [
 				'name'     => $item->get_name(),
-				'quantity' => $item->get_quantity(),
+				'quantity' => 'fee' === $item->get_type() ? null : $item->get_quantity(),
 				'total'    => (float) $item->get_total(),
 			];
 		}

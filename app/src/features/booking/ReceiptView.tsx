@@ -5,7 +5,10 @@ import { formatToman } from '@/lib/format';
 
 interface ReceiptItem {
 	name: string;
-	quantity: number;
+	// null for a fee/discount line item (e.g. membership or campaign
+	// discount) — those have no meaningful "quantity", unlike a real
+	// product line item.
+	quantity: number | null;
 	total: number;
 }
 
@@ -98,8 +101,8 @@ export function ReceiptView( { open, onClose, bookingId, orderId }: {
 							{ receipt.items.length === 0 && <p style={ { color: 'var(--bc-color-ink-faint)', fontSize: 13 } }>هنوز سفارشی برای این رزرو ثبت نشده است.</p> }
 							{ receipt.items.map( ( item, i ) => (
 								<div key={ i } style={ { display: 'flex', justifyContent: 'space-between', fontSize: 14, marginBottom: 4 } }>
-									<span>{ item.name }{ item.quantity > 1 ? ` × ${ item.quantity }` : '' }</span>
-									<span className="bc-numeric">{ formatToman( item.total ) } تومان</span>
+									<span>{ item.name }{ item.quantity !== null && item.quantity > 1 ? ` × ${ item.quantity }` : '' }</span>
+									<span className="bc-numeric">{ item.total < 0 ? '−' : '' }{ formatToman( Math.abs( item.total ) ) } تومان</span>
 								</div>
 							) ) }
 						</div>

@@ -1,0 +1,14 @@
+{
+    "name": "beauclick/campaigns",
+    "description": "BeauClick Campaign & Promotion Engine — Phase 1: admin-authored, order-level promotional discounts on booking orders.",
+    "type": "wordpress-plugin",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "BeauClick\\Campaigns\\": "src/"
+        }
+    }
+}

@@ -58,7 +58,21 @@ final class MembershipDiscount {
 			return $result;
 		}
 
-		$discount_amount = round( (float) $order->get_total() * ( $percentage / 100 ), 2 );
+		/**
+		 * V2.3 Step 17 fix: was `round((float) $order->get_total() * ..., 2)`
+		 * — float math with 2-decimal rounding on a Toman-denominated
+		 * platform that has no subunit anywhere else (every other price/fee
+		 * figure in this codebase is a plain integer). Harmless in isolation
+		 * (this class always ran before any other fee existed, so
+		 * get_total() === get_subtotal() at the time it fired), but Step 17
+		 * introduces a second order-level discount (Campaign) that computes
+		 * its own amount against get_subtotal() explicitly (see
+		 * beauclick-campaigns\Pricing\CampaignDiscount's own "no compounding"
+		 * docblock) — fixed here too so both discounts share the same
+		 * integer-Toman, same-base convention rather than one of the two
+		 * silently being the odd one out.
+		 */
+		$discount_amount = (int) round( (int) $order->get_subtotal() * $percentage / 100 );
 		if ( $discount_amount <= 0 ) {
 			return $result;
 		}
