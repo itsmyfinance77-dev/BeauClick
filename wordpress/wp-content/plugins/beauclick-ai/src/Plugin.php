@@ -3,8 +3,10 @@ declare( strict_types=1 );
 
 namespace BeauClick\AI;
 
+use BeauClick\AI\Database\Migrations\CreateAiProfessionalTables;
 use BeauClick\AI\Database\Migrations\CreateAiTables;
 use BeauClick\AI\Rest\AssistantController;
+use BeauClick\AI\Rest\ProfessionalAssistantController;
 
 final class Plugin {
 
@@ -20,7 +22,7 @@ final class Plugin {
 	}
 
 	private function migrations(): array {
-		return [ new CreateAiTables() ];
+		return [ new CreateAiTables(), new CreateAiProfessionalTables() ];
 	}
 
 	public function boot(): void {
@@ -37,6 +39,7 @@ final class Plugin {
 
 	public function register_rest_routes(): void {
 		( new AssistantController() )->register_routes();
+		( new ProfessionalAssistantController() )->register_routes();
 	}
 
 	public static function activate(): void {

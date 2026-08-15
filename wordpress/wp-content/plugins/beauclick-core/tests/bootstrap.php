@@ -50,7 +50,6 @@ function _beauclick_manually_load_plugins(): void {
 		\BeauClick\Payments\Plugin::class,
 		\BeauClick\B2B\Plugin::class,
 		\BeauClick\Chat\Plugin::class,
-		\BeauClick\AI\Plugin::class,
 		\BeauClick\Reviews\Plugin::class,
 		\BeauClick\Loyalty\Plugin::class,
 		\BeauClick\Campaigns\Plugin::class, // V2.3 Step 17 — depends on core/booking/payments (Requires Plugins), and hooks the same beauclick/booking/after_create filter Loyalty's MembershipDiscount does at a later priority; activation order relative to Loyalty doesn't matter for correctness, placed here for readability.
@@ -59,6 +58,7 @@ function _beauclick_manually_load_plugins(): void {
 		\BeauClick\Auth\Plugin::class,
 		\BeauClick\Notifications\Plugin::class,
 		\BeauClick\Analytics\Plugin::class,
+		\BeauClick\AI\Plugin::class, // V2.3 Step 19 — moved after Marketplace/Analytics/Financial/Campaigns (now real Requires Plugins dependencies, for ProfessionalContext's read access to MetricsService/SettlementService/CampaignService), still before Privacy (which depends on AI).
 		\BeauClick\Referral\Plugin::class,
 		\BeauClick\Privacy\Plugin::class, // V2.2 Step 14 — depends on core/auth/booking/journey/loyalty/notifications/referral/reviews/chat/ai, must activate last.
 	];

@@ -4,7 +4,7 @@
  * Description: Conversational recommendation surface — provider-agnostic (BC_AI_PROVIDER), server-side proxied, no vendor hardcoded into calling code (architecture doc §16).
  * Version: 0.1.0
  * Requires PHP: 8.2
- * Requires Plugins: beauclick-core
+ * Requires Plugins: beauclick-core, beauclick-marketplace, beauclick-analytics, beauclick-financial, beauclick-campaigns
  * Author: BeauClick
  * Text Domain: beauclick-ai
  *

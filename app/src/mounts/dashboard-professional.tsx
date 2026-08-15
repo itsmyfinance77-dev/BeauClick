@@ -10,6 +10,7 @@ import { CalendarTab } from '@/features/dashboard/professional/CalendarTab';
 import { AnalyticsTab } from '@/features/dashboard/professional/AnalyticsTab';
 import { StaffTab } from '@/features/dashboard/professional/StaffTab';
 import { RevenueTab } from '@/features/dashboard/professional/RevenueTab';
+import { ProfessionalAiTab } from '@/features/dashboard/professional/ProfessionalAiTab';
 import { ChatPanel } from '@/features/chat/ChatPanel';
 import { EmptyState } from '@/design-system';
 import '@/design-system/tokens.generated.css';
@@ -25,8 +26,15 @@ import '@/design-system/tokens.generated.css';
  * "coming later" promise this dashboard has carried since V1 (see this
  * docblock's own prior history), now backed by a real, ownership-scoped,
  * WooCommerce-order-derived financial ledger (`beauclick-financial`) rather
- * than an invented figure. Profile/Settings remain placeholders — still no
- * dedicated task has asked for the profile-editing UI gap.
+ * than an invented figure.
+ *
+ * V2.3 Step 19 — a read-only AI insight tab, reading the professional's own
+ * already-ownership-scoped booking/review/financial/campaign data (never a
+ * second calculation engine — see ProfessionalContext's own docblock).
+ * Placed right after Revenue: the two most natural "ask a follow-up
+ * question about what I just saw" tabs sit next to each other. Profile/
+ * Settings remain placeholders — still no dedicated task has asked for the
+ * profile-editing UI gap.
  */
 const NAV_ITEMS: NavItem[] = [
 	{ id: 'overview', label: 'نمای کلی', ready: true },
@@ -37,13 +45,14 @@ const NAV_ITEMS: NavItem[] = [
 	{ id: 'analytics', label: 'آمار و تحلیل', ready: true },
 	{ id: 'staff', label: 'کارکنان', ready: true },
 	{ id: 'revenue', label: 'درآمد', ready: true },
+	{ id: 'ai', label: 'دستیار هوشمند', ready: true },
 	{ id: 'reviews', label: 'نظرات', ready: true },
 	{ id: 'messages', label: 'پیام‌ها', ready: true },
 	{ id: 'profile', label: 'پروفایل', ready: false },
 	{ id: 'settings', label: 'تنظیمات', ready: false },
 ];
 
-const READY_TABS = [ 'overview', 'bookings', 'calendar', 'services', 'customers', 'analytics', 'staff', 'revenue', 'reviews', 'messages' ];
+const READY_TABS = [ 'overview', 'bookings', 'calendar', 'services', 'customers', 'analytics', 'staff', 'revenue', 'ai', 'reviews', 'messages' ];
 
 function App() {
 	const [ tab, setTab ] = useState( 'overview' );
@@ -58,6 +67,7 @@ function App() {
 			{ tab === 'analytics' && <AnalyticsTab /> }
 			{ tab === 'staff' && <StaffTab /> }
 			{ tab === 'revenue' && <RevenueTab /> }
+			{ tab === 'ai' && <ProfessionalAiTab /> }
 			{ tab === 'reviews' && <ReviewsTab /> }
 			{ tab === 'messages' && <ChatPanel /> }
 			{ ! READY_TABS.includes( tab ) && <EmptyState title="این بخش در نسخه بعدی محصول تکمیل می‌شود." /> }

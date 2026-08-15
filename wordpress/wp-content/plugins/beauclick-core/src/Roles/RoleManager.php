@@ -30,6 +30,17 @@ final class RoleManager {
 	 * admin page load for every admin, which WP_Role::add_cap() persists
 	 * with its own update_option() call each time.
 	 *
+	 * 2026-08-15.1 (V2.3 Step 19): added 'bc_use_professional_ai' to
+	 * professional_capabilities() (and therefore, via array_merge,
+	 * business_capabilities() too) — the new professional-facing, read-only
+	 * AI insight surface. Deliberately its own capability, not a reuse of
+	 * 'bc_use_ai_assistant' (which every customer, including professionals
+	 * themselves in their shopper capacity, already holds) — the two
+	 * surfaces read from entirely different, differently-scoped data, and
+	 * keeping them separately grantable/revocable is the same "don't
+	 * conflate two different permissions just because one entity happens to
+	 * hold both today" discipline this file already applies elsewhere.
+	 *
 	 * 2026-08-14.1 (V2.2 Step 13): added ROLE_PLATFORM_OPERATOR — every
 	 * BeauClick admin page (B2B, loyalty, notifications, analytics, the new
 	 * audit log/operations/users pages) has so far only ever been reachable
@@ -44,7 +55,7 @@ final class RoleManager {
 	 * `read` capability is not guaranteed a working wp-admin session by
 	 * WordPress core.
 	 */
-	private const CAPS_VERSION = '2026-08-14.1';
+	private const CAPS_VERSION = '2026-08-15.1';
 
 	/**
 	 * Capabilities layered onto every shopper account (WooCommerce's
@@ -95,6 +106,7 @@ final class RoleManager {
 				'bc_manage_own_availability',
 				'bc_view_own_bookings',
 				'bc_respond_to_reviews',
+				'bc_use_professional_ai',
 			],
 			self::cpt_owner_capabilities( 'bc_professional', 'bc_professionals' ),
 			self::cpt_owner_capabilities( 'bc_service', 'bc_services' ),
