@@ -166,14 +166,59 @@ final class B2BController extends RestController {
 		return Response::ok( $rows ?: [] );
 	}
 
+	/**
+	 * V2.3 Step 20 (ADMIN-05): this REST route reaches the exact same
+	 * approve/reject action as AccountsAdminPage's wp-admin form, but was
+	 * never wired to AuditLogger — a real, reachable, admin-permission-gated
+	 * path that bypassed the audit trail. Logs with the same action_type/
+	 * entity_type/before-after shape AccountsAdminPage::approve_and_log()
+	 * uses, so the audit log reads identically regardless of which path was
+	 * used.
+	 */
 	public function approve_account( WP_REST_Request $request ): \WP_REST_Response {
-		( new BusinessAccountService() )->approve( (int) $request->get_param( 'id' ) );
+		$account_id = (int) $request->get_param( 'id' );
+		$before     = $this->account_status( $account_id );
+		( new BusinessAccountService() )->approve( $account_id );
+		$this->log_account_status_change( 'b2b_account_approved', $account_id, $before, BusinessAccountService::STATUS_APPROVED );
 		return Response::ok( [ 'approved' => true ] );
 	}
 
+	/**
+	 * Deliberately does not delegate to AccountsAdminPage::reject_and_log()
+	 * — that method hardcodes a default Persian rejection reason for the
+	 * wp-admin form (which has no reason field), while this REST route
+	 * already accepts a real caller-supplied `reason`. Logging must record
+	 * the reason actually given, not silently overwrite it.
+	 */
 	public function reject_account( WP_REST_Request $request ): \WP_REST_Response {
-		( new BusinessAccountService() )->reject( (int) $request->get_param( 'id' ), (string) $request->get_param( 'reason' ) );
+		$account_id = (int) $request->get_param( 'id' );
+		$reason     = (string) $request->get_param( 'reason' );
+		$before     = $this->account_status( $account_id );
+		( new BusinessAccountService() )->reject( $account_id, $reason );
+		$this->log_account_status_change( 'b2b_account_rejected', $account_id, $before, BusinessAccountService::STATUS_REJECTED, $reason );
 		return Response::ok( [ 'rejected' => true ] );
+	}
+
+	/** @return array<string, mixed>|null */
+	private function account_status( int $account_id ): ?array {
+		global $wpdb;
+		$row = $wpdb->get_row( $wpdb->prepare( "SELECT approval_status FROM {$wpdb->prefix}bc_business_accounts WHERE id = %d", $account_id ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		return $row ?: null;
+	}
+
+	private function log_account_status_change( string $action_type, int $account_id, ?array $before, string $new_status, ?string $reason = null ): void {
+		if ( ! function_exists( 'beauclick_core' ) ) {
+			return;
+		}
+		beauclick_core()->audit_log()->record(
+			$action_type,
+			'business_account',
+			$account_id,
+			get_current_user_id(),
+			$before,
+			[ 'approval_status' => $new_status ],
+			$reason
+		);
 	}
 
 	public function submit_quote_prices( WP_REST_Request $request ): \WP_REST_Response {

@@ -11,6 +11,9 @@
 
 declare( strict_types=1 );
 
+use BeauClick\B2B\Business\QuoteService;
+use BeauClick\Core\Support\JalaliDate;
+
 get_header();
 
 $user_id = get_current_user_id();
@@ -154,13 +157,185 @@ $is_approved = $account && 'approved' === $account['approval_status'];
 						<button type="button" class="bc-btn bc-btn--primary" style="width:100%;" data-bc-add-to-cart data-product-id="<?php echo esc_attr( $product->get_id() ); ?>" data-quantity="<?php echo esc_attr( $moq ); ?>">
 							<?php esc_html_e( 'افزودن به سفارش عمده', 'beauclick' ); ?>
 						</button>
+						<div style="display:flex; gap:6px; margin-top:8px;">
+							<label class="bc-visually-hidden" for="bc-b2b-qty-<?php echo esc_attr( $product->get_id() ); ?>"><?php esc_html_e( 'تعداد برای پیش‌فاکتور', 'beauclick' ); ?></label>
+							<input type="number" class="bc-input" style="width:72px;" min="1" step="1" value="<?php echo esc_attr( $moq ); ?>" id="bc-b2b-qty-<?php echo esc_attr( $product->get_id() ); ?>">
+							<button type="button" class="bc-btn bc-btn--outline" style="flex:1;" data-bc-add-to-quote data-product-id="<?php echo esc_attr( $product->get_id() ); ?>" data-product-name="<?php echo esc_attr( $product->get_name() ); ?>" data-qty-input="bc-b2b-qty-<?php echo esc_attr( $product->get_id() ); ?>">
+								<?php esc_html_e( 'افزودن به درخواست پیش‌فاکتور', 'beauclick' ); ?>
+							</button>
+						</div>
 					</div>
 				<?php endforeach; ?>
+			</div>
+
+			<div class="bc-card" id="bc-b2b-quote-builder" style="padding:16px; margin-top:16px; display:none;">
+				<h3 style="margin-top:0; font-size:15px;"><?php esc_html_e( 'درخواست پیش‌فاکتور شما', 'beauclick' ); ?></h3>
+				<ul id="bc-b2b-quote-items" style="list-style:none; padding:0; margin:0 0 12px; display:flex; flex-direction:column; gap:6px;"></ul>
+				<button type="button" class="bc-btn bc-btn--primary" id="bc-b2b-quote-submit"><?php esc_html_e( 'ارسال درخواست پیش‌فاکتور', 'beauclick' ); ?></button>
+				<p id="bc-b2b-quote-status" role="status" aria-live="polite" style="margin:8px 0 0; font-size:13px;"></p>
 			</div>
 		<?php else : ?>
 			<div class="bc-empty-state"><p class="bc-empty-state__title"><?php esc_html_e( 'هنوز محصولی برای فروش عمده تعریف نشده است.', 'beauclick' ); ?></p></div>
 		<?php endif; ?>
 	</div>
+<?php endif; ?>
+
+<?php if ( $is_approved ) : ?>
+	<div class="bc-container bc-section">
+		<h2 class="bc-section__title"><?php esc_html_e( 'پیش‌فاکتورهای من', 'beauclick' ); ?></h2>
+		<?php
+		$quotes       = ( new QuoteService() )->for_business_account( (int) $account['id'] );
+		$status_label = [
+			QuoteService::STATUS_REQUESTED => __( 'در انتظار قیمت‌گذاری', 'beauclick' ),
+			QuoteService::STATUS_QUOTED    => __( 'آماده تأیید', 'beauclick' ),
+			QuoteService::STATUS_ACCEPTED  => __( 'تأیید شده', 'beauclick' ),
+			QuoteService::STATUS_EXPIRED   => __( 'منقضی‌شده', 'beauclick' ),
+		];
+		?>
+		<?php if ( ! $quotes ) : ?>
+			<div class="bc-empty-state"><p class="bc-empty-state__title"><?php esc_html_e( 'هنوز درخواست پیش‌فاکتوری ثبت نکرده‌اید.', 'beauclick' ); ?></p></div>
+		<?php else : ?>
+			<div style="overflow-x:auto;">
+				<table style="width:100%; border-collapse:collapse; min-width:640px;">
+					<thead>
+						<tr style="background:var(--bc-color-surface-tint); text-align:start;">
+							<th style="padding:12px 16px;"><?php esc_html_e( 'تاریخ درخواست', 'beauclick' ); ?></th>
+							<th style="padding:12px 16px;"><?php esc_html_e( 'اقلام', 'beauclick' ); ?></th>
+							<th style="padding:12px 16px;"><?php esc_html_e( 'وضعیت', 'beauclick' ); ?></th>
+							<th style="padding:12px 16px;"><?php esc_html_e( 'مبلغ پیشنهادی', 'beauclick' ); ?></th>
+							<th style="padding:12px 16px;"><?php esc_html_e( 'مهلت پذیرش', 'beauclick' ); ?></th>
+							<th style="padding:12px 16px;"><?php esc_html_e( 'عملیات', 'beauclick' ); ?></th>
+						</tr>
+					</thead>
+					<tbody>
+						<?php foreach ( $quotes as $quote ) : ?>
+							<?php
+							$items        = json_decode( (string) $quote['items'], true ) ?: [];
+							$item_summary = implode(
+								'، ',
+								array_map(
+									static function ( array $i ): string {
+										$p = wc_get_product( (int) $i['product_id'] );
+										return ( $p ? $p->get_name() : '#' . $i['product_id'] ) . ' × ' . bc_persian_digits( (int) $i['quantity'] );
+									},
+									$items
+								)
+							);
+							$is_expired    = QuoteService::STATUS_QUOTED === $quote['status'] && $quote['expires_at'] && strtotime( (string) $quote['expires_at'] ) < time();
+							$display_label = $is_expired ? $status_label[ QuoteService::STATUS_EXPIRED ] : ( $status_label[ $quote['status'] ] ?? $quote['status'] );
+							?>
+							<tr style="border-bottom:1px solid var(--bc-color-line);">
+								<td style="padding:12px 16px;" class="bc-numeric"><?php echo esc_html( JalaliDate::format( (string) $quote['created_at'], false ) ); ?></td>
+								<td style="padding:12px 16px;"><?php echo esc_html( $item_summary ); ?></td>
+								<td style="padding:12px 16px;"><?php echo esc_html( $display_label ); ?></td>
+								<td style="padding:12px 16px;" class="bc-numeric"><?php echo $quote['quoted_total'] ? esc_html( bc_format_toman( (int) $quote['quoted_total'] ) . ' ' . __( 'تومان', 'beauclick' ) ) : '—'; ?></td>
+								<td style="padding:12px 16px;" class="bc-numeric"><?php echo $quote['expires_at'] ? esc_html( JalaliDate::format( (string) $quote['expires_at'], false ) ) : '—'; ?></td>
+								<td style="padding:12px 16px;">
+									<?php if ( QuoteService::STATUS_QUOTED === $quote['status'] && ! $is_expired ) : ?>
+										<button type="button" class="bc-btn bc-btn--primary" data-bc-accept-quote data-quote-id="<?php echo esc_attr( $quote['id'] ); ?>"><?php esc_html_e( 'تأیید و پرداخت', 'beauclick' ); ?></button>
+									<?php endif; ?>
+								</td>
+							</tr>
+						<?php endforeach; ?>
+					</tbody>
+				</table>
+			</div>
+		<?php endif; ?>
+		<p id="bc-b2b-accept-status" role="status" aria-live="polite" style="margin:8px 0 0; font-size:13px;"></p>
+	</div>
+
+	<script>
+	( function () {
+		var items = {}; // productId -> { name, quantity }
+
+		function renderQuoteBuilder() {
+			var builder = document.getElementById( 'bc-b2b-quote-builder' );
+			var list = document.getElementById( 'bc-b2b-quote-items' );
+			if ( ! builder || ! list ) { return; }
+			var keys = Object.keys( items );
+			builder.style.display = keys.length ? 'block' : 'none';
+			list.innerHTML = '';
+			keys.forEach( function ( id ) {
+				var li = document.createElement( 'li' );
+				li.style.cssText = 'display:flex; justify-content:space-between; align-items:center; gap:8px;';
+				var label = document.createElement( 'span' );
+				label.textContent = items[ id ].name + ' × ' + items[ id ].quantity;
+				var remove = document.createElement( 'button' );
+				remove.type = 'button';
+				remove.className = 'bc-btn bc-btn--outline';
+				remove.textContent = '<?php echo esc_js( __( 'حذف', 'beauclick' ) ); ?>';
+				remove.addEventListener( 'click', function () {
+					delete items[ id ];
+					renderQuoteBuilder();
+				} );
+				li.appendChild( label );
+				li.appendChild( remove );
+				list.appendChild( li );
+			} );
+		}
+
+		document.querySelectorAll( '[data-bc-add-to-quote]' ).forEach( function ( btn ) {
+			btn.addEventListener( 'click', function () {
+				var qtyInput = document.getElementById( btn.dataset.qtyInput );
+				var quantity = Math.max( 1, parseInt( qtyInput.value, 10 ) || 1 );
+				items[ btn.dataset.productId ] = { name: btn.dataset.productName, quantity: quantity };
+				renderQuoteBuilder();
+			} );
+		} );
+
+		var submitBtn = document.getElementById( 'bc-b2b-quote-submit' );
+		if ( submitBtn ) {
+			submitBtn.addEventListener( 'click', function () {
+				var status = document.getElementById( 'bc-b2b-quote-status' );
+				var payload = Object.keys( items ).map( function ( id ) {
+					return { product_id: parseInt( id, 10 ), quantity: items[ id ].quantity };
+				} );
+				if ( ! payload.length ) { return; }
+				submitBtn.disabled = true;
+				status.textContent = '<?php echo esc_js( __( 'در حال ارسال…', 'beauclick' ) ); ?>';
+				fetch( ( window.BeauClick && window.BeauClick.restUrl ) + '/b2b/quotes', {
+					method: 'POST',
+					credentials: 'same-origin',
+					headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': window.BeauClick.nonce },
+					body: JSON.stringify( { items: payload } ),
+				} ).then( function ( r ) { return r.json(); } ).then( function ( res ) {
+					if ( res.error ) {
+						status.textContent = res.error.message;
+						submitBtn.disabled = false;
+						return;
+					}
+					status.textContent = '<?php echo esc_js( __( 'درخواست شما ثبت شد. پس از قیمت‌گذاری توسط مدیریت، اینجا نمایش داده می‌شود.', 'beauclick' ) ); ?>';
+					window.location.reload();
+				} ).catch( function () {
+					status.textContent = '<?php echo esc_js( __( 'خطایی رخ داد.', 'beauclick' ) ); ?>';
+					submitBtn.disabled = false;
+				} );
+			} );
+		}
+
+		document.querySelectorAll( '[data-bc-accept-quote]' ).forEach( function ( btn ) {
+			btn.addEventListener( 'click', function () {
+				var status = document.getElementById( 'bc-b2b-accept-status' );
+				btn.disabled = true;
+				fetch( ( window.BeauClick && window.BeauClick.restUrl ) + '/b2b/quotes/' + btn.dataset.quoteId + '/accept', {
+					method: 'POST',
+					credentials: 'same-origin',
+					headers: { 'X-WP-Nonce': window.BeauClick.nonce },
+				} ).then( function ( r ) { return r.json(); } ).then( function ( res ) {
+					if ( res.error ) {
+						status.textContent = res.error.message;
+						btn.disabled = false;
+						return;
+					}
+					window.location.href = res.data.payUrl;
+				} ).catch( function () {
+					status.textContent = '<?php echo esc_js( __( 'خطایی رخ داد.', 'beauclick' ) ); ?>';
+					btn.disabled = false;
+				} );
+			} );
+		} );
+	}() );
+	</script>
 <?php endif; ?>
 
 <?php

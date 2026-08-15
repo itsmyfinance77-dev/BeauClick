@@ -59,6 +59,26 @@ final class IndexerTest extends WP_UnitTestCase {
 		$this->assertSame( '0', $verified );
 	}
 
+	/** V2.3 Step 20 (MKT-02): search_text is built from name + bio, normalized and lowercased. */
+	public function test_search_text_is_built_from_name_and_normalized_bio(): void {
+		global $wpdb;
+
+		$provider_id = self::factory()->post->create(
+			[
+				'post_type'    => Registrar::PROFESSIONAL,
+				'post_status'  => 'publish',
+				'post_title'   => 'آرایشگاه الگانس',
+				'post_content' => '۱۰ سال تجربه در میکاپ عروس <b>حرفه‌ای</b>',
+			]
+		);
+
+		$search_text = $wpdb->get_var( $wpdb->prepare( "SELECT search_text FROM {$wpdb->prefix}bc_provider_index WHERE provider_id = %d", $provider_id ) );
+
+		$this->assertStringContainsString( 'الگانس', $search_text );
+		$this->assertStringContainsString( '10 سال تجربه', $search_text, 'Persian digits in the bio must be normalized to ASCII in search_text.' );
+		$this->assertStringNotContainsString( '<b>', $search_text, 'HTML tags must be stripped from the indexed bio.' );
+	}
+
 	public function test_trashing_a_provider_removes_it_from_the_index(): void {
 		global $wpdb;
 

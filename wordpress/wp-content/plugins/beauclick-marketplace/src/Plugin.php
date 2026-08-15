@@ -6,6 +6,7 @@ namespace BeauClick\Marketplace;
 use BeauClick\Marketplace\Admin\VerificationMetaBox;
 use BeauClick\Marketplace\Admin\VerificationReviewPage;
 use BeauClick\Marketplace\Database\Migrations\AddProviderRankingSignalsColumn;
+use BeauClick\Marketplace\Database\Migrations\AddProviderSearchTextColumn;
 use BeauClick\Marketplace\Database\Migrations\CreateBusinessStaffTable;
 use BeauClick\Marketplace\Database\Migrations\CreateProviderIndexTable;
 use BeauClick\Marketplace\Database\Migrations\CreateVerificationTables;
@@ -42,7 +43,7 @@ final class Plugin {
 	}
 
 	private function migrations(): array {
-		return [ new CreateProviderIndexTable(), new AddProviderRankingSignalsColumn(), new CreateVerificationTables(), new CreateBusinessStaffTable() ];
+		return [ new CreateProviderIndexTable(), new AddProviderRankingSignalsColumn(), new CreateVerificationTables(), new CreateBusinessStaffTable(), new AddProviderSearchTextColumn() ];
 	}
 
 	public function register_migrations(): void {

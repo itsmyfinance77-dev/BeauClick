@@ -16,26 +16,20 @@ interface City {
 /**
  * V2.3 UI/branding pass — the header's magnifying-glass button (`⌕` in
  * header.php) previously had no click handler, no associated UI, and no
- * target at all; clicking it did nothing. This is the real fix: an
- * accessible search overlay that reuses the ONLY real discovery data this
- * platform's marketplace actually supports today — specialties
+ * target at all; clicking it did nothing. The overlay itself reuses the
+ * two small, real discovery reference endpoints — specialties
  * (`GET /marketplace/specialties`) and launched cities
- * (`GET /locations/cities?launched=true`), both real, already-existing,
- * read-only reference endpoints.
+ * (`GET /locations/cities?launched=true`) — filtered client-side (plain
+ * substring match) as you type, so a matching specialty/city chip goes
+ * straight to `/marketplace/?specialty_id=`/`?city_id=`.
  *
- * Deliberately NOT a new free-text marketplace search backend: there is no
- * `q`/free-text parameter on `MarketplaceController::browse()` today (its
- * own docblock names this a distinct, deliberately-deferred gap, MKT-02),
- * and building one is explicitly out of this task's scope (a future,
- * separately-scoped V2.3 step). Typing here filters the two small,
- * already-fetched, real reference lists client-side (plain substring
- * match, not fuzzy) — never a network call per keystroke, never invented
- * data. Selecting a match, or submitting, navigates via a real GET request
- * to `/marketplace/?specialty_id=`/`?city_id=` — the exact same query
- * parameters `page-marketplace.php` already reads today. An empty submit
- * falls back to the plain `/marketplace/` listing, the platform's own
- * documented real discovery entry point (`MarketplaceController::browse()`'s
- * own comment) — the button always goes somewhere real, never nothing.
+ * V2.3 Step 20 (MKT-02) closed the real gap this component's own docblock
+ * used to name here: `MarketplaceController::browse()` now has a real `q`
+ * free-text param (name+bio, see MarketplaceController.php). When the typed
+ * text isn't an exact specialty/city name, submitting (or the "جستجو در
+ * بین همه متخصصان" fallback button) now goes to a real
+ * `/marketplace/?q=<query>` search instead of doing nothing — this
+ * component no longer has a dead-end state.
  */
 export function HeaderSearch( { open, onClose }: { open: boolean; onClose: () => void } ) {
 	const [ specialties, setSpecialties ] = useState<Specialty[] | null>( null );
@@ -74,7 +68,7 @@ export function HeaderSearch( { open, onClose }: { open: boolean; onClose: () =>
 		[ cities, needle ]
 	);
 
-	function goToMarketplace( params: Record<string, number> = {} ) {
+	function goToMarketplace( params: Record<string, number | string> = {} ) {
 		const url = new URL( '/marketplace/', window.location.origin );
 		for ( const [ key, value ] of Object.entries( params ) ) {
 			url.searchParams.set( key, String( value ) );
@@ -88,9 +82,11 @@ export function HeaderSearch( { open, onClose }: { open: boolean; onClose: () =>
 			goToMarketplace();
 			return;
 		}
-		// A single unambiguous match on submit goes straight there; several
-		// matches are left for the user to pick a specific chip/link below
-		// rather than guessing which one they meant.
+		// A single unambiguous specialty/city match on submit goes straight
+		// there; several matches are left for the user to pick a specific
+		// chip below rather than guessing which one they meant. Anything
+		// else (no chip match, or an ambiguous multi-match) falls back to a
+		// real free-text search (V2.3 Step 20) rather than doing nothing.
 		if ( 1 === matchedSpecialties.length && 0 === matchedCities.length ) {
 			goToMarketplace( { specialty_id: matchedSpecialties[ 0 ].id } );
 			return;
@@ -98,6 +94,9 @@ export function HeaderSearch( { open, onClose }: { open: boolean; onClose: () =>
 		if ( 0 === matchedSpecialties.length && 1 === matchedCities.length ) {
 			goToMarketplace( { city_id: matchedCities[ 0 ].id } );
 			return;
+		}
+		if ( 0 === matchedSpecialties.length && 0 === matchedCities.length ) {
+			goToMarketplace( { q: needle } );
 		}
 	}
 
@@ -125,13 +124,18 @@ export function HeaderSearch( { open, onClose }: { open: boolean; onClose: () =>
 					{ error && <p role="alert" style={ { color: 'var(--bc-color-error)', fontSize: 13 } }>{ error }</p> }
 
 					{ ! loading && ! error && noMatches && (
-						<EmptyState title="نتیجه‌ای پیدا نشد. می‌توانید همه متخصصان را ببینید." />
+						<EmptyState title="تخصص یا شهری با این نام پیدا نشد." />
 					) }
 
 					{ ! loading && ! error && noMatches && (
-						<button type="button" className="bc-btn bc-btn--outline" onClick={ () => goToMarketplace() } style={ { marginTop: 12 } }>
-							مشاهده همه متخصصان
-						</button>
+						<div style={ { display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' } }>
+							<button type="button" className="bc-btn bc-btn--primary" onClick={ () => goToMarketplace( { q: needle } ) }>
+								جستجوی «{ needle }» در بین متخصصان
+							</button>
+							<button type="button" className="bc-btn bc-btn--outline" onClick={ () => goToMarketplace() }>
+								مشاهده همه متخصصان
+							</button>
+						</div>
 					) }
 
 					{ ! loading && ! error && ! noMatches && (

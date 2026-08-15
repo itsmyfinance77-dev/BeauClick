@@ -72,6 +72,19 @@ final class Indexer {
 		$specialty_ids = wp_get_post_terms( $post_id, Registrar::SPECIALTY, [ 'fields' => 'ids' ] );
 		$price_from    = $this->min_service_price( $post_id );
 
+		// V2.3 Step 20 (MKT-02): search_text is the normalized name+bio
+		// haystack MarketplaceController::browse()'s `q` LIKE matches
+		// against — built here, once, at index time (not recomputed per
+		// search request), same "denormalize into the index table" pattern
+		// every other browse()-facing field on this table already follows.
+		// Bounded length: bio is free text with no practical size cap, and
+		// LIKE '%term%' performance/storage shouldn't scale with how much a
+		// provider chose to write.
+		$search_text = TextNormalizer::normalize( $post->post_title . ' ' . wp_strip_all_tags( (string) $post->post_content ) );
+		if ( mb_strlen( $search_text ) > 2000 ) {
+			$search_text = mb_substr( $search_text, 0, 2000 );
+		}
+
 		$existing_rating = $wpdb->get_row(
 			$wpdb->prepare( "SELECT rating_avg, review_count FROM {$table} WHERE provider_id = %d AND provider_type = %s", $post_id, $post_type ), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			ARRAY_A
@@ -88,6 +101,7 @@ final class Indexer {
 				'district_id'    => get_post_meta( $post_id, '_bc_district_id', true ) ?: null,
 				'specialty_ids'  => $specialty_ids ? implode( ',', $specialty_ids ) : null,
 				'price_from'     => $price_from,
+				'search_text'    => $search_text,
 				'rating_avg'     => $existing_rating['rating_avg'] ?? 0,
 				'review_count'   => $existing_rating['review_count'] ?? 0,
 				'verified'       => 'verified' === get_post_meta( $post_id, '_bc_verification_status', true ) ? 1 : 0,

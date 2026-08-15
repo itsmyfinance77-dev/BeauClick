@@ -98,6 +98,14 @@ function bc_get_providers( array $args = [] ): array {
 		$where[]  = 'FIND_IN_SET(%d, specialty_ids)';
 		$params[] = (int) $args['specialty_id'];
 	}
+	// V2.3 Step 20 (MKT-02): same real q search MarketplaceController::browse()
+	// exposes over REST, reused here rather than re-implemented so SSR and the
+	// API can never drift on what "matches" means -- same class-reference
+	// precedent as RankingPresenter::ORDER_BY just above.
+	if ( ! empty( $args['q'] ) && class_exists( \BeauClick\Marketplace\Search\TextNormalizer::class ) ) {
+		$where[]  = 'search_text LIKE %s';
+		$params[] = '%' . $wpdb->esc_like( \BeauClick\Marketplace\Search\TextNormalizer::normalize( (string) $args['q'] ) ) . '%';
+	}
 
 	$limit = (int) ( $args['limit'] ?? 12 );
 	// V2.0 Step 3: same ORDER BY every ranking consumer in the codebase now

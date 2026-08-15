@@ -97,6 +97,92 @@ final class MarketplaceControllerTest extends WP_UnitTestCase {
 		$this->assertCount( 2, $row['rankingReasons'], 'An unrecognized/unknown signal key must never be surfaced raw to the user -- only known, truthful labels are shown.' );
 	}
 
+	/** V2.3 Step 20 (MKT-02): `q` matches a provider's name. */
+	public function test_browse_q_matches_provider_name(): void {
+		$owner_id = self::factory()->user->create();
+		$match    = self::factory()->post->create( [ 'post_type' => Registrar::PROFESSIONAL, 'post_status' => 'publish', 'post_author' => $owner_id, 'post_title' => 'سالن زیبایی مریم' ] );
+		$no_match = self::factory()->post->create( [ 'post_type' => Registrar::PROFESSIONAL, 'post_status' => 'publish', 'post_author' => $owner_id, 'post_title' => 'آرایشگاه رضا' ] );
+
+		$request = new \WP_REST_Request( 'GET', '/beauclick/v1/marketplace/providers' );
+		$request->set_param( 'q', 'مریم' );
+		$ids = array_column( ( new MarketplaceController() )->browse( $request )->get_data()['data'], 'id' );
+
+		$this->assertContains( $match, $ids );
+		$this->assertNotContains( $no_match, $ids );
+	}
+
+	/** V2.3 Step 20 (MKT-02): `q` also matches the provider's bio (post_content), not only the name. */
+	public function test_browse_q_matches_provider_bio(): void {
+		$owner_id = self::factory()->user->create();
+		$match    = self::factory()->post->create(
+			[
+				'post_type'    => Registrar::PROFESSIONAL,
+				'post_status'  => 'publish',
+				'post_author'  => $owner_id,
+				'post_title'   => 'متخصص شماره یک',
+				'post_content' => 'متخصص کاشت ناخن با ۱۵ سال سابقه',
+			]
+		);
+		$no_match = self::factory()->post->create( [ 'post_type' => Registrar::PROFESSIONAL, 'post_status' => 'publish', 'post_author' => $owner_id, 'post_title' => 'متخصص شماره دو' ] );
+
+		$request = new \WP_REST_Request( 'GET', '/beauclick/v1/marketplace/providers' );
+		$request->set_param( 'q', 'کاشت ناخن' );
+		$ids = array_column( ( new MarketplaceController() )->browse( $request )->get_data()['data'], 'id' );
+
+		$this->assertContains( $match, $ids );
+		$this->assertNotContains( $no_match, $ids );
+	}
+
+	/** V2.3 Step 20 (MKT-02): a query typed in ASCII digits must still match content stored with Persian digits, and vice versa. */
+	public function test_browse_q_matches_regardless_of_digit_system(): void {
+		$owner_id = self::factory()->user->create();
+		$provider_id = self::factory()->post->create(
+			[
+				'post_type'    => Registrar::PROFESSIONAL,
+				'post_status'  => 'publish',
+				'post_author'  => $owner_id,
+				'post_title'   => 'سالن تست اعداد',
+				'post_content' => '۲۰ سال تجربه',
+			]
+		);
+
+		$request = new \WP_REST_Request( 'GET', '/beauclick/v1/marketplace/providers' );
+		$request->set_param( 'q', '20 سال' );
+		$ids = array_column( ( new MarketplaceController() )->browse( $request )->get_data()['data'], 'id' );
+
+		$this->assertContains( $provider_id, $ids );
+	}
+
+	/** V2.3 Step 20: an empty/whitespace `q` must not filter anything (identical to omitting it). */
+	public function test_browse_with_blank_q_returns_all_providers(): void {
+		$owner_id    = self::factory()->user->create();
+		$provider_id = self::factory()->post->create( [ 'post_type' => Registrar::PROFESSIONAL, 'post_status' => 'publish', 'post_author' => $owner_id ] );
+
+		$request = new \WP_REST_Request( 'GET', '/beauclick/v1/marketplace/providers' );
+		$request->set_param( 'q', '   ' );
+		$ids = array_column( ( new MarketplaceController() )->browse( $request )->get_data()['data'], 'id' );
+
+		$this->assertContains( $provider_id, $ids );
+	}
+
+	/** V2.3 Step 20: `q` composes with the existing structured filters (AND, not OR). */
+	public function test_browse_q_combines_with_other_filters(): void {
+		global $wpdb;
+		$owner_id = self::factory()->user->create();
+		$right_city_right_name = self::factory()->post->create( [ 'post_type' => Registrar::PROFESSIONAL, 'post_status' => 'publish', 'post_author' => $owner_id, 'post_title' => 'سالن هدف' ] );
+		$wrong_city_right_name = self::factory()->post->create( [ 'post_type' => Registrar::PROFESSIONAL, 'post_status' => 'publish', 'post_author' => $owner_id, 'post_title' => 'سالن هدف' ] );
+		$wpdb->update( $wpdb->prefix . 'bc_provider_index', [ 'city_id' => 5 ], [ 'provider_id' => $right_city_right_name ] );
+		$wpdb->update( $wpdb->prefix . 'bc_provider_index', [ 'city_id' => 9 ], [ 'provider_id' => $wrong_city_right_name ] );
+
+		$request = new \WP_REST_Request( 'GET', '/beauclick/v1/marketplace/providers' );
+		$request->set_param( 'q', 'هدف' );
+		$request->set_param( 'city_id', 5 );
+		$ids = array_column( ( new MarketplaceController() )->browse( $request )->get_data()['data'], 'id' );
+
+		$this->assertContains( $right_city_right_name, $ids );
+		$this->assertNotContains( $wrong_city_right_name, $ids, 'q must AND with city_id, not OR — a name match in the wrong city must still be excluded.' );
+	}
+
 	public function test_specialties_endpoint_returns_real_taxonomy_terms(): void {
 		$term = wp_insert_term( 'میکاپ تست', 'bc_specialty' );
 

@@ -117,16 +117,34 @@ describe( 'HeaderSearch', () => {
 		expect( window.location.href ).toBe( `${ originalLocation.origin }/marketplace/` );
 	} );
 
-	// 6. No-results state is honest -- no fabricated match, a real fallback action is still offered.
-	it( 'shows a Persian no-results state for a query matching neither specialties nor cities, without fabricating a result', async () => {
+	// 6. No chip match is honest -- no fabricated specialty/city, but a real free-text search (V2.3 Step 20) is offered instead of a dead end.
+	it( 'shows a Persian no-chip-match state for a query matching neither specialties nor cities, offering a real text-search fallback', async () => {
 		mockReferenceDataFetch();
 		render( <HeaderSearch open={ true } onClose={ () => {} } /> );
 
 		await screen.findByText( 'میکاپ' );
 		typeQuery( 'zzz_no_such_thing' );
 
-		expect( await screen.findByText( 'نتیجه‌ای پیدا نشد. می‌توانید همه متخصصان را ببینید.' ) ).toBeTruthy();
+		expect( await screen.findByText( 'تخصص یا شهری با این نام پیدا نشد.' ) ).toBeTruthy();
 		expect( screen.getByText( 'مشاهده همه متخصصان' ) ).toBeTruthy();
+
+		fireEvent.click( screen.getByText( 'جستجوی «zzz_no_such_thing» در بین متخصصان' ) );
+		expect( window.location.href ).toContain( '/marketplace/' );
+		expect( window.location.href ).toContain( 'q=zzz_no_such_thing' );
+	} );
+
+	// V2.3 Step 20: submitting (not just clicking the fallback button) a no-chip-match query goes to the real q= search too.
+	it( 'submitting a query matching no specialty/city chip navigates to a real free-text marketplace search', async () => {
+		mockReferenceDataFetch();
+		render( <HeaderSearch open={ true } onClose={ () => {} } /> );
+
+		await screen.findByText( 'میکاپ' );
+		typeQuery( 'کاشت ناخن' );
+		submitForm();
+
+		const url = new URL( window.location.href );
+		expect( url.pathname ).toBe( '/marketplace/' );
+		expect( url.searchParams.get( 'q' ) ).toBe( 'کاشت ناخن' );
 	} );
 
 	// 7. A real backend failure surfaces a real Persian error, never a silent blank panel.
