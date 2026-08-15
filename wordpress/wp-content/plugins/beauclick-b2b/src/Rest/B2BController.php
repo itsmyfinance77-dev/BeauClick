@@ -221,12 +221,30 @@ final class B2BController extends RestController {
 		);
 	}
 
+	/**
+	 * Logs 'b2b_quote_priced' the same way QuotesAdminPage::price_and_log()'s
+	 * wp-admin path already does, so the audit trail reads identically
+	 * regardless of which path was used — this REST route previously bypassed
+	 * it entirely (V2.3 final release audit finding).
+	 */
 	public function submit_quote_prices( WP_REST_Request $request ): \WP_REST_Response {
-		$items = array_map(
+		$quote_id = (int) $request->get_param( 'id' );
+		$items    = array_map(
 			static fn ( array $i ) => [ 'product_id' => (int) $i['product_id'], 'quantity' => (int) $i['quantity'], 'price' => (int) $i['price'] ],
 			(array) $request->get_param( 'items' )
 		);
-		$ok = ( new QuoteService() )->submit_quote_prices( (int) $request->get_param( 'id' ), $items, $request->get_param( 'expires_at' ) );
+		$before = ( new QuoteService() )->find( $quote_id );
+		$ok     = ( new QuoteService() )->submit_quote_prices( $quote_id, $items, $request->get_param( 'expires_at' ) );
+		if ( $ok && function_exists( 'beauclick_core' ) ) {
+			beauclick_core()->audit_log()->record(
+				'b2b_quote_priced',
+				'quote',
+				$quote_id,
+				get_current_user_id(),
+				$before ? [ 'status' => $before['status'] ] : null,
+				[ 'status' => QuoteService::STATUS_QUOTED ]
+			);
+		}
 		return $ok ? Response::ok( [ 'quoted' => true ] ) : Response::error( 'bc_cannot_quote', __( 'این درخواست دیگر قابل قیمت‌گذاری نیست.', 'beauclick-b2b' ), 409 );
 	}
 

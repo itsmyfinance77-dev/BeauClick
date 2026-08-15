@@ -66,4 +66,75 @@ final class B2BControllerTest extends WP_UnitTestCase {
 		// not AccountsAdminPage::reject_and_log()'s hardcoded wp-admin default.
 		$this->assertSame( 'مدارک ناقص است', $row['reason'] );
 	}
+
+	private function make_product( int $price = 100000 ): int {
+		$product = new \WC_Product_Simple();
+		$product->set_name( 'Test Product' );
+		$product->set_regular_price( (string) $price );
+		$product->save();
+		return $product->get_id();
+	}
+
+	private function make_requested_quote(): array {
+		$user_id    = self::factory()->user->create();
+		$service    = new BusinessAccountService();
+		$account_id = $service->apply( $user_id, 'Test Salon' );
+		$service->approve( $account_id );
+		$product_id = $this->make_product();
+		$quote_id   = ( new \BeauClick\B2B\Business\QuoteService() )->request( $account_id, [ [ 'product_id' => $product_id, 'quantity' => 20 ] ] );
+		return [ $quote_id, $product_id ];
+	}
+
+	/**
+	 * V2.3 final release audit finding: B2BController::submit_quote_prices()
+	 * — the REST route QuotesAdminPage's own docblock says "has existed since
+	 * Phase 7 with no UI ever calling it at all" — wrote no audit entry even
+	 * after Step 20 added QuotesAdminPage's wp-admin twin (which does log).
+	 * Same bug class as approve/reject above, fixed the same way.
+	 */
+	public function test_rest_submit_quote_prices_records_an_audit_entry(): void {
+		global $wpdb;
+		[ $quote_id, $product_id ] = $this->make_requested_quote();
+
+		$moderator_id = self::factory()->user->create( [ 'role' => 'administrator' ] );
+		wp_set_current_user( $moderator_id );
+
+		$request = new WP_REST_Request( 'POST', '/beauclick/v1/b2b/quotes/' . $quote_id . '/quote' );
+		$request->set_param( 'id', $quote_id );
+		$request->set_param( 'items', [ [ 'product_id' => $product_id, 'quantity' => 20, 'price' => 90000 ] ] );
+		( new B2BController() )->submit_quote_prices( $request );
+
+		$quote = ( new \BeauClick\B2B\Business\QuoteService() )->find( $quote_id );
+		$this->assertSame( \BeauClick\B2B\Business\QuoteService::STATUS_QUOTED, $quote['status'] );
+
+		$row = $wpdb->get_row( "SELECT * FROM {$wpdb->prefix}bc_admin_audit_log ORDER BY id DESC LIMIT 1", ARRAY_A );
+		$this->assertSame( 'b2b_quote_priced', $row['action_type'] );
+		$this->assertSame( 'quote', $row['entity_type'] );
+		$this->assertSame( $quote_id, (int) $row['entity_id'] );
+		$this->assertSame( $moderator_id, (int) $row['actor_user_id'] );
+		$this->assertSame( [ 'status' => \BeauClick\B2B\Business\QuoteService::STATUS_REQUESTED ], json_decode( $row['previous_state'], true ) );
+		$this->assertSame( [ 'status' => \BeauClick\B2B\Business\QuoteService::STATUS_QUOTED ], json_decode( $row['new_state'], true ) );
+	}
+
+	public function test_rest_submit_quote_prices_does_not_record_an_audit_entry_when_pricing_fails(): void {
+		global $wpdb;
+		[ $quote_id, $product_id ] = $this->make_requested_quote();
+		$moderator_id = self::factory()->user->create( [ 'role' => 'administrator' ] );
+		wp_set_current_user( $moderator_id );
+
+		$request = new WP_REST_Request( 'POST', '/beauclick/v1/b2b/quotes/' . $quote_id . '/quote' );
+		$request->set_param( 'id', $quote_id );
+		$request->set_param( 'items', [ [ 'product_id' => $product_id, 'quantity' => 20, 'price' => 90000 ] ] );
+		( new B2BController() )->submit_quote_prices( $request );
+		$before_count = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}bc_admin_audit_log" );
+
+		// Pricing an already-quoted quote a second time must fail.
+		$second = new WP_REST_Request( 'POST', '/beauclick/v1/b2b/quotes/' . $quote_id . '/quote' );
+		$second->set_param( 'id', $quote_id );
+		$second->set_param( 'items', [ [ 'product_id' => $product_id, 'quantity' => 20, 'price' => 95000 ] ] );
+		( new B2BController() )->submit_quote_prices( $second );
+
+		$after_count = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}bc_admin_audit_log" );
+		$this->assertSame( $before_count, $after_count, 'A failed pricing attempt must not write a second audit entry.' );
+	}
 }

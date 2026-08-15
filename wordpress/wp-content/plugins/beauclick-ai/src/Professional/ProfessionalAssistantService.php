@@ -46,6 +46,64 @@ final class ProfessionalAssistantService {
 		);
 	}
 
+	/**
+	 * V2.3 final release audit finding: this table pair was never wired into
+	 * beauclick-privacy's export/deletion sweep the way the customer-mode
+	 * `AssistantService`'s equivalent methods already are — a professional's
+	 * business-AI chat history was an orphaned data domain, neither exported
+	 * nor erased on account deletion. Read-only lookup, unlike
+	 * get_or_create_conversation(): an export/deletion pass must never CREATE
+	 * a conversation for a professional who never used the professional AI.
+	 */
+	public function find_conversation_for_user( int $user_id ): ?array {
+		global $wpdb;
+		$row = $wpdb->get_row(
+			$wpdb->prepare( "SELECT * FROM {$wpdb->prefix}bc_ai_professional_conversations WHERE user_id = %d", $user_id ), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			ARRAY_A
+		);
+		return $row ? $this->format_conversation( $row ) : null;
+	}
+
+	/**
+	 * Every message in the professional's own AI conversation, for their own
+	 * data export — same shape as AssistantService::export_for_user().
+	 *
+	 * @return array<int, array<string, mixed>>
+	 */
+	public function export_for_user( int $user_id ): array {
+		$conversation = $this->find_conversation_for_user( $user_id );
+		if ( ! $conversation ) {
+			return [];
+		}
+		global $wpdb;
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT sender_id, body, created_at FROM {$wpdb->prefix}bc_ai_professional_messages WHERE conversation_id = %d ORDER BY id ASC", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$conversation['id']
+			),
+			ARRAY_A
+		);
+		return array_map(
+			static fn ( array $r ) => [ 'from' => $r['sender_id'] ? 'professional' : 'assistant', 'body' => $r['body'], 'createdAt' => $r['created_at'] ],
+			$rows ?: []
+		);
+	}
+
+	/**
+	 * Fully professional-owned, no other party involved. Deleted outright:
+	 * conversation and messages. Idempotent — no conversation means nothing
+	 * to delete. Matches AssistantService::forget_user()'s exact discipline.
+	 */
+	public function forget_user( int $user_id ): void {
+		$conversation = $this->find_conversation_for_user( $user_id );
+		if ( ! $conversation ) {
+			return;
+		}
+		global $wpdb;
+		$wpdb->delete( $wpdb->prefix . 'bc_ai_professional_messages', [ 'conversation_id' => $conversation['id'] ], [ '%d' ] );
+		$wpdb->delete( $wpdb->prefix . 'bc_ai_professional_conversations', [ 'id' => $conversation['id'] ], [ '%d' ] );
+	}
+
 	/** @return array<int, array<string, mixed>> */
 	public function messages( int $conversation_id, int $limit = 50 ): array {
 		global $wpdb;

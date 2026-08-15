@@ -51,7 +51,7 @@ final class ExportServiceTest extends WP_UnitTestCase {
 		}
 		$zip->close();
 
-		foreach ( [ 'account.json', 'bookings.json', 'orders.json', 'reviews.json', 'beauty_journey.json', 'loyalty.json', 'notifications.json', 'referrals.json', 'conversations.json', 'ai_assistant.json', 'README.txt' ] as $expected ) {
+		foreach ( [ 'account.json', 'bookings.json', 'orders.json', 'reviews.json', 'beauty_journey.json', 'loyalty.json', 'notifications.json', 'referrals.json', 'conversations.json', 'ai_assistant.json', 'ai_professional_assistant.json', 'README.txt' ] as $expected ) {
 			$this->assertContains( $expected, $names, "Export ZIP is missing {$expected}" );
 		}
 	}

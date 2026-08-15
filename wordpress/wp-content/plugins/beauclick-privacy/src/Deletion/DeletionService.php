@@ -4,6 +4,7 @@ declare( strict_types=1 );
 namespace BeauClick\Privacy\Deletion;
 
 use BeauClick\AI\AssistantService;
+use BeauClick\AI\Professional\ProfessionalAssistantService;
 use BeauClick\Auth\Account\AccountEraser;
 use BeauClick\Booking\Booking\BookingService;
 use BeauClick\Booking\Waitlist\WaitlistService;
@@ -166,6 +167,7 @@ final class DeletionService {
 				beauclick_notifications()->forget_user( $user_id );
 			}
 			( new AssistantService() )->forget_user( $user_id );
+			( new ProfessionalAssistantService() )->forget_user( $user_id );
 			( new AccountEraser() )->forget( $user_id ); // Identity last -- every step above still needed a resolvable user_id while it ran.
 
 			$this->requests->update( $request_id, [ 'status' => DataRequestService::STATUS_COMPLETED, 'completed_at' => current_time( 'mysql' ) ] );

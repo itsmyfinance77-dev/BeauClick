@@ -3,9 +3,11 @@ declare( strict_types=1 );
 
 namespace BeauClick\Privacy\Tests;
 
+use BeauClick\AI\Professional\ProfessionalAssistantService;
 use BeauClick\Auth\Account\AccountEraser;
 use BeauClick\Journey\Goals\GoalService;
 use BeauClick\Journey\Profile\BeautyProfileService;
+use BeauClick\Marketplace\PostTypes\Registrar;
 use BeauClick\Notifications\Preferences\PreferenceService;
 use BeauClick\Privacy\DataRequests\DataRequestService;
 use BeauClick\Privacy\Deletion\DeletionService;
@@ -144,6 +146,32 @@ final class DeletionServiceTest extends WP_UnitTestCase {
 		$user = get_userdata( $user_id );
 		$this->assertNotFalse( $user, 'get_userdata() must still resolve a real (anonymized) row -- other domains\' retained records depend on this.' );
 		$this->assertSame( 'کاربر حذف‌شده', $user->display_name );
+	}
+
+	/**
+	 * V2.3 final release audit finding: the professional-AI conversation
+	 * tables (added by V2.3 Step 19) were never wired into this sweep —
+	 * a professional's business-AI chat history was an orphaned data domain,
+	 * never erased on account deletion. Fixed by wiring
+	 * ProfessionalAssistantService::forget_user() alongside the existing
+	 * customer-mode AssistantService::forget_user() call in process().
+	 */
+	public function test_process_erases_the_professional_ai_conversation_too(): void {
+		$user_id  = self::factory()->user->create();
+		$admin_id = self::factory()->user->create( [ 'role' => 'administrator' ] );
+		$provider_id = self::factory()->post->create( [ 'post_type' => Registrar::PROFESSIONAL, 'post_status' => 'publish', 'post_author' => $user_id ] );
+
+		( new ProfessionalAssistantService() )->send( $provider_id, Registrar::PROFESSIONAL, $user_id, 'یک پیام واقعی که باید حذف شود' );
+		$this->assertNotNull( ( new ProfessionalAssistantService() )->find_conversation_for_user( $user_id ) );
+
+		$service = new DeletionService();
+		$result  = $service->request_deletion( $user_id );
+		$service->approve( $result['requestId'], $admin_id );
+		$service->process( $result['requestId'] );
+
+		$row = ( new DataRequestService() )->find( $result['requestId'] );
+		$this->assertSame( DataRequestService::STATUS_COMPLETED, $row['status'] );
+		$this->assertNull( ( new ProfessionalAssistantService() )->find_conversation_for_user( $user_id ), 'A professional\'s AI conversation must be erased along with every other domain on account deletion.' );
 	}
 
 	public function test_process_is_idempotent_and_a_repeat_call_on_a_completed_request_is_a_noop(): void {

@@ -19,6 +19,13 @@ use WP_REST_Request;
  * configuration, manual membership grant/revoke) require bc_manage_platform,
  * verified server-side, matching the capability every other platform-config
  * admin surface in this codebase already uses.
+ *
+ * Every admin mutation below writes an AuditLogger entry directly (V2.3
+ * final release audit finding: this REST-reachable path to the exact same
+ * tier/plan/benefit/membership actions LoyaltyAdminPage's wp-admin form
+ * performs wrote no audit entry at all, unlike that wp-admin twin — the
+ * same bug class this release already fixed for B2B account approve/reject
+ * and B2B quote pricing).
  */
 final class LoyaltyController extends RestController {
 
@@ -89,24 +96,35 @@ final class LoyaltyController extends RestController {
 	}
 
 	public function admin_create_tier( WP_REST_Request $request ) {
+		$name   = (string) $request->get_param( 'name' );
 		$result = ( new TierService() )->create(
 			(string) $request->get_param( 'slug' ),
-			(string) $request->get_param( 'name' ),
+			$name,
 			(int) $request->get_param( 'thresholdPoints' ),
 			(int) ( $request->get_param( 'sortOrder' ) ?? 0 )
 		);
-		return is_string( $result ) ? Response::error( 'bc_invalid_tier', $result, 422 ) : Response::ok( $result, [], 201 );
+		if ( is_string( $result ) ) {
+			return Response::error( 'bc_invalid_tier', $result, 422 );
+		}
+		$this->audit( 'loyalty_tier_created', 'loyalty_tier', (int) $result['id'], null, [ 'name' => $name ] );
+		return Response::ok( $result, [], 201 );
 	}
 
 	public function admin_update_tier( WP_REST_Request $request ) {
+		$id     = (int) $request->get_param( 'id' );
+		$before = ( new TierService() )->find( $id );
 		$fields = [];
 		foreach ( [ 'name', 'thresholdPoints', 'sortOrder', 'isActive' ] as $key ) {
 			if ( null !== $request->get_param( $key ) ) {
 				$fields[ $key ] = $request->get_param( $key );
 			}
 		}
-		$result = ( new TierService() )->update( (int) $request->get_param( 'id' ), $fields );
-		return is_string( $result ) ? Response::error( 'bc_invalid_tier', $result, 422 ) : Response::ok( $result );
+		$result = ( new TierService() )->update( $id, $fields );
+		if ( is_string( $result ) ) {
+			return Response::error( 'bc_invalid_tier', $result, 422 );
+		}
+		$this->audit( 'loyalty_tier_updated', 'loyalty_tier', $id, $before, $fields );
+		return Response::ok( $result );
 	}
 
 	public function admin_list_plans(): \WP_REST_Response {
@@ -114,27 +132,38 @@ final class LoyaltyController extends RestController {
 	}
 
 	public function admin_create_plan( WP_REST_Request $request ) {
+		$name   = (string) $request->get_param( 'name' );
 		$result = ( new MembershipService() )->create_plan(
 			(string) $request->get_param( 'slug' ),
-			(string) $request->get_param( 'name' ),
+			$name,
 			$request->get_param( 'tierId' ) ? (int) $request->get_param( 'tierId' ) : null,
 			(bool) $request->get_param( 'isPaid' ),
 			null !== $request->get_param( 'price' ) ? (int) $request->get_param( 'price' ) : null,
 			null !== $request->get_param( 'billingPeriodDays' ) ? (int) $request->get_param( 'billingPeriodDays' ) : null,
 			(int) ( $request->get_param( 'sortOrder' ) ?? 0 )
 		);
-		return is_string( $result ) ? Response::error( 'bc_invalid_plan', $result, 422 ) : Response::ok( $result, [], 201 );
+		if ( is_string( $result ) ) {
+			return Response::error( 'bc_invalid_plan', $result, 422 );
+		}
+		$this->audit( 'loyalty_plan_created', 'loyalty_plan', (int) $result['id'], null, [ 'name' => $name ] );
+		return Response::ok( $result, [], 201 );
 	}
 
 	public function admin_update_plan( WP_REST_Request $request ) {
+		$id     = (int) $request->get_param( 'id' );
+		$before = ( new MembershipService() )->find_plan( $id );
 		$fields = [];
 		foreach ( [ 'name', 'tierId', 'isPaid', 'price', 'isActive' ] as $key ) {
 			if ( null !== $request->get_param( $key ) ) {
 				$fields[ $key ] = $request->get_param( $key );
 			}
 		}
-		$result = ( new MembershipService() )->update_plan( (int) $request->get_param( 'id' ), $fields );
-		return is_string( $result ) ? Response::error( 'bc_invalid_plan', $result, 422 ) : Response::ok( $result );
+		$result = ( new MembershipService() )->update_plan( $id, $fields );
+		if ( is_string( $result ) ) {
+			return Response::error( 'bc_invalid_plan', $result, 422 );
+		}
+		$this->audit( 'loyalty_plan_updated', 'loyalty_plan', $id, $before, $fields );
+		return Response::ok( $result );
 	}
 
 	public function admin_list_benefits( WP_REST_Request $request ): \WP_REST_Response {
@@ -144,31 +173,42 @@ final class LoyaltyController extends RestController {
 	}
 
 	public function admin_create_benefit( WP_REST_Request $request ) {
-		$config = $request->get_param( 'config' );
-		$result = ( new BenefitService() )->create(
-			(string) $request->get_param( 'sourceType' ),
-			(int) $request->get_param( 'sourceId' ),
+		$source_type = (string) $request->get_param( 'sourceType' );
+		$source_id   = (int) $request->get_param( 'sourceId' );
+		$label       = (string) $request->get_param( 'label' );
+		$config      = $request->get_param( 'config' );
+		$result      = ( new BenefitService() )->create(
+			$source_type,
+			$source_id,
 			(string) $request->get_param( 'benefitType' ),
-			(string) $request->get_param( 'label' ),
+			$label,
 			is_array( $config ) ? $config : [],
 			(int) ( $request->get_param( 'sortOrder' ) ?? 0 )
 		);
-		return is_string( $result ) ? Response::error( 'bc_invalid_benefit', $result, 422 ) : Response::ok( $result, [], 201 );
+		if ( is_string( $result ) ) {
+			return Response::error( 'bc_invalid_benefit', $result, 422 );
+		}
+		$this->audit( 'loyalty_benefit_created', 'loyalty_benefit', (int) $result['id'], null, [ 'label' => $label, 'sourceType' => $source_type, 'sourceId' => $source_id ] );
+		return Response::ok( $result, [], 201 );
 	}
 
 	public function admin_update_benefit( WP_REST_Request $request ): \WP_REST_Response {
+		$id     = (int) $request->get_param( 'id' );
 		$fields = [];
 		foreach ( [ 'label', 'config', 'isActive' ] as $key ) {
 			if ( null !== $request->get_param( $key ) ) {
 				$fields[ $key ] = $request->get_param( $key );
 			}
 		}
-		( new BenefitService() )->update( (int) $request->get_param( 'id' ), $fields );
+		( new BenefitService() )->update( $id, $fields );
+		$this->audit( 'loyalty_benefit_updated', 'loyalty_benefit', $id, null, $fields );
 		return Response::ok( [ 'ok' => true ] );
 	}
 
 	public function admin_delete_benefit( WP_REST_Request $request ): \WP_REST_Response {
-		( new BenefitService() )->delete( (int) $request->get_param( 'id' ) );
+		$id = (int) $request->get_param( 'id' );
+		( new BenefitService() )->delete( $id );
+		$this->audit( 'loyalty_benefit_deleted', 'loyalty_benefit', $id, null, null );
 		return Response::ok( [ 'ok' => true ] );
 	}
 
@@ -180,11 +220,33 @@ final class LoyaltyController extends RestController {
 		}
 
 		$result = ( new MembershipService() )->activate( $user_id, $plan_id, 'manual', get_current_user_id() );
-		return is_string( $result ) ? Response::error( 'bc_invalid_grant', $result, 422 ) : Response::ok( $result, [], 201 );
+		if ( is_string( $result ) ) {
+			return Response::error( 'bc_invalid_grant', $result, 422 );
+		}
+		$this->audit( 'loyalty_membership_granted', 'user', $user_id, null, [ 'planId' => $plan_id ] );
+		return Response::ok( $result, [], 201 );
 	}
 
 	public function admin_cancel_membership( WP_REST_Request $request ) {
-		$result = ( new MembershipService() )->cancel( (int) $request->get_param( 'user_id' ), get_current_user_id() );
-		return is_string( $result ) ? Response::error( 'bc_invalid_cancel', $result, 422 ) : Response::ok( [ 'ok' => true ] );
+		$user_id = (int) $request->get_param( 'user_id' );
+		$result  = ( new MembershipService() )->cancel( $user_id, get_current_user_id() );
+		if ( is_string( $result ) ) {
+			return Response::error( 'bc_invalid_cancel', $result, 422 );
+		}
+		$this->audit( 'loyalty_membership_cancelled', 'user', $user_id, null, null );
+		return Response::ok( [ 'ok' => true ] );
+	}
+
+	/**
+	 * Mirrors LoyaltyAdminPage's own private audit() helper exactly, so the
+	 * audit trail reads identically regardless of which path was used.
+	 *
+	 * @param array<string, mixed>|null $previous_state
+	 * @param array<string, mixed>|null $new_state
+	 */
+	private function audit( string $action_type, string $entity_type, int $entity_id, ?array $previous_state, ?array $new_state ): void {
+		if ( function_exists( 'beauclick_core' ) ) {
+			beauclick_core()->audit_log()->record( $action_type, $entity_type, $entity_id, get_current_user_id(), $previous_state, $new_state );
+		}
 	}
 }

@@ -770,3 +770,37 @@ Full rationale for every decision below lives in `VERSION_2_ARCHITECTURE_PLAN.md
 **Known, disclosed limitation in this step's own verification:** a handful of unattributed `403 Forbidden` console errors were observed during live QA, most plausibly a stale admin-bar heartbeat nonce from switching between three different QA sessions in the same browser tab — every actual feature request in this step (search, quote request/price/accept, notification-preference toggle) returned `200 OK` and was independently confirmed correct against the live database. Not confirmed as a real defect; disclosed rather than either ignored or silently investigated away.
 
 **No other item in this register changed status as a result of this step** — every other classification already in this document was left exactly as written. The rest of §7 (Prioritization), §22–§27 (recommendations, closing note), §28–§46 (V2.1/V2.2/V2.3 assignment tables and completion notes) above remain the accurate historical record and are preserved exactly as written.
+
+---
+
+## 48. V2.3 Final Release Audit Findings
+
+Independent re-audit of all four V2.3 steps at `c6c6e5f`, per the audit's own instruction to treat prior Step completion notes as evidence, not authority. Full detail in `VERSION_2_ARCHITECTURE_PLAN.md`'s "V2.3 Final Release Audit" section; this entry records only the register-relevant disposition of every finding.
+
+**Fixed (release blockers, closed by this audit's own commit):**
+
+| ID | Item | Disposition |
+|---|---|---|
+| ADMIN-06 | `beauclick-loyalty\LoyaltyController` REST admin routes (tier/plan/benefit CRUD, membership grant/cancel) bypassed `AuditLogger` — the exact gap §47 above disclosed and deliberately left open | **FIXED** — every mutating method now calls `AuditLogger::record()` directly, matching `LoyaltyAdminPage`'s own action-type naming. 6 new regression tests. Escalated from "flagged, deferred" to a release blocker because the V2.3 Definition of Done explicitly requires complete audit-log coverage on every reachable action path, and this release had already fixed the identical bug class twice elsewhere (B2B). |
+| PRIV-06 | Step 19's `wp_bc_ai_professional_conversations`/`_messages` tables had no export/deletion coverage in `beauclick-privacy` — a professional's business-AI chat history was an orphaned data domain | **FIXED** — `ProfessionalAssistantService::export_for_user()`/`forget_user()` added, wired into `ExportService`/`DeletionService` alongside the existing customer-mode calls. 5 new regression tests across `beauclick-ai` and `beauclick-privacy`. |
+| ADMIN-05 (extension) | `B2BController::submit_quote_prices()` (REST) still bypassed `AuditLogger` after §47's own fix only covered account approve/reject | **FIXED** — now writes the identical `b2b_quote_priced` entry `QuotesAdminPage::price_and_log()` already does. 2 new regression tests. |
+
+**Open, logged, not fixed (non-blocking severity or pre-existing, not a V2.3 regression):**
+
+| ID | Item | Classification |
+|---|---|---|
+| CAMP-03 | `EligibilityResolver::is_eligible()`'s usage-count check and `CampaignService::record_usage()`'s insert are not atomic across different bookings — a narrow TOCTOU race can overrun `usage_limit_total`/`usage_limit_per_customer` by a small margin under real concurrent load | MEDIUM / DATA INTEGRITY / V2.3 regression, not fixed (needs a locking or atomic-`UPDATE...WHERE` redesign — future step) |
+| ADMIN-07 | `B2BController::set_tiers` (pricing-tier admin mutation) has no audit logging anywhere and no wp-admin twin | MEDIUM / SECURITY / PRE-EXISTING, not V2.3-introduced |
+| — | No structural mechanism ties a `bc_manage_platform`-gated REST mutation to mandatory audit logging — this exact bug class (REST bypasses the wp-admin path's audit call) has now recurred three times across two plugins (B2B accounts, B2B quotes, Loyalty) | MEDIUM / SECURITY (architecture) — recommend a base-class or registry-based enforcement design, not another one-off patch, as a future step |
+| B2B-02 | `QuoteService::accept()` has no DB-level state guard against a concurrent double-accept race (no `WHERE status='quoted'` on the UPDATE, no unique constraint on `wc_order_id`) | MEDIUM / DATA INTEGRITY / PRE-EXISTING (predates V2.3), not fixed |
+| AI-06 | `ProfessionalContext` does not call `CrmService::is_customer_of()` as `VERSION_2_ARCHITECTURE_PLAN.md`'s Step 19 design describes — it excludes individual CRM records from context entirely instead, which is safe but is a spec deviation worth tracking | LOW / PRODUCT GAP (documentation-vs-implementation drift, currently benign) |
+| AI-07 | `AssistantService::validate_recommendations()`'s ownership check (named "the crux" in the Step 19 design) was never added because professional-mode AI never emits a `recommendations` array in this phase | LOW / PRODUCT GAP — will need real attention the moment a future phase lets professional AI reference a CRM-scoped entity |
+
+**Business decisions / explicitly non-blocking, re-confirmed not bugs:**
+
+- Step 18's negative-outstanding-after-refund-post-settlement (no automated clawback) — explicit, documented business decision, not a defect.
+- `search_text LIKE '%term%'` full-scans on every free-text marketplace search — explicitly acknowledged/accepted tradeoff in the migration's own docblock, evidence-gated the same way MKT-02's fuzzy-search deferral already is.
+
+**External configuration:** unchanged since the V2.2 Final Release Audit — SMS gateway, SMTP, real Zarinpal credentials, backup, and error monitoring all remain required before any real production launch, independent of this audit's code-level findings.
+
+**No other item in this register changed status as a result of this audit.** The rest of this document above remains the accurate historical record and is preserved exactly as written.

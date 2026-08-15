@@ -83,6 +83,52 @@ final class ProfessionalAssistantServiceTest extends WP_UnitTestCase {
 		$this->assertFalse( $service->conversation_belongs_to( $conversation_a['id'], $provider_b ), "Provider B must never be recognized as the owner of provider A's conversation." );
 	}
 
+	/**
+	 * V2.3 final release audit finding: this table pair was never wired into
+	 * beauclick-privacy's export/deletion sweep — export_for_user()/
+	 * forget_user() are the two methods that fix closes that gap with (see
+	 * DeletionServiceTest/ExportServiceTest in beauclick-privacy for the
+	 * cross-plugin wiring itself).
+	 */
+	public function test_export_for_user_returns_the_conversation_transcript(): void {
+		$owner    = self::factory()->user->create();
+		$provider = $this->make_provider( $owner );
+		$service  = new ProfessionalAssistantService();
+		$service->send( $provider, Registrar::PROFESSIONAL, $owner, 'وضعیت این ماه چطور است؟' );
+
+		$export = $service->export_for_user( $owner );
+
+		$this->assertCount( 2, $export, 'Both the professional\'s own message and the assistant\'s reply must be exported.' );
+		$this->assertSame( 'professional', $export[0]['from'] );
+		$this->assertSame( 'وضعیت این ماه چطور است؟', $export[0]['body'] );
+		$this->assertSame( 'assistant', $export[1]['from'] );
+	}
+
+	public function test_export_for_user_returns_empty_for_a_professional_who_never_used_it(): void {
+		$owner = self::factory()->user->create();
+		$this->assertSame( [], ( new ProfessionalAssistantService() )->export_for_user( $owner ) );
+	}
+
+	public function test_forget_user_deletes_the_conversation_and_its_messages(): void {
+		global $wpdb;
+		$owner    = self::factory()->user->create();
+		$provider = $this->make_provider( $owner );
+		$service  = new ProfessionalAssistantService();
+		$service->send( $provider, Registrar::PROFESSIONAL, $owner, 'یک پیام برای حذف' );
+
+		$service->forget_user( $owner );
+
+		$this->assertNull( $service->find_conversation_for_user( $owner ) );
+		$remaining = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}bc_ai_professional_messages WHERE conversation_id NOT IN (SELECT id FROM {$wpdb->prefix}bc_ai_professional_conversations)" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$this->assertSame( 0, $remaining, 'forget_user() must not leave orphaned message rows behind.' );
+	}
+
+	public function test_forget_user_is_a_noop_for_a_professional_with_no_conversation(): void {
+		$owner = self::factory()->user->create();
+		( new ProfessionalAssistantService() )->forget_user( $owner ); // Must not throw.
+		$this->assertNull( ( new ProfessionalAssistantService() )->find_conversation_for_user( $owner ) );
+	}
+
 	public function test_two_different_providers_get_two_different_conversations(): void {
 		$owner_a    = self::factory()->user->create();
 		$provider_a = $this->make_provider( $owner_a );

@@ -4,6 +4,7 @@ declare( strict_types=1 );
 namespace BeauClick\Privacy\Export;
 
 use BeauClick\AI\AssistantService;
+use BeauClick\AI\Professional\ProfessionalAssistantService;
 use BeauClick\Booking\Booking\BookingService;
 use BeauClick\Booking\Waitlist\WaitlistService;
 use BeauClick\Chat\Chat\ConversationService;
@@ -142,6 +143,7 @@ final class ExportService {
 			'referrals'          => ( new ReferralService() )->summary_for_user( $user_id ),
 			'conversations'      => ( new ConversationService() )->export_for_user( $user_id ),
 			'ai_assistant'       => ( new AssistantService() )->export_for_user( $user_id ),
+			'ai_professional_assistant' => ( new ProfessionalAssistantService() )->export_for_user( $user_id ),
 		];
 	}
 
