@@ -15,7 +15,7 @@ namespace BeauClick\Payments\Database\Seeds;
  */
 final class DemoProductsSeed {
 
-	/** @return list<array{sku:string, name:string, price:int, oldPrice?:int, category:string, description:string}> */
+	/** @return list<array{sku:string, name:string, price:int, oldPrice?:int, category:string, description:string, mockup:string}> */
 	private static function products(): array {
 		return [
 			[
@@ -25,6 +25,7 @@ final class DemoProductsSeed {
 				'oldPrice'    => 600000,
 				'category'    => 'مراقبت پوست',
 				'description' => 'سرم روشن‌کننده و آنتی‌اکسیدان قوی برای پوست‌های کدر و خسته.',
+				'mockup'      => 'product-serum.svg',
 			],
 			[
 				'sku'         => 'bc-demo-moisturizer',
@@ -32,6 +33,7 @@ final class DemoProductsSeed {
 				'price'       => 350000,
 				'category'    => 'مراقبت پوست',
 				'description' => 'مرطوب‌کننده سبک و غیرچرب مناسب استفاده روزانه زیر آرایش.',
+				'mockup'      => 'product-moisturizer.svg',
 			],
 			[
 				'sku'         => 'bc-demo-hair-mask',
@@ -39,6 +41,7 @@ final class DemoProductsSeed {
 				'price'       => 420000,
 				'category'    => 'مراقبت مو',
 				'description' => 'ماسک تقویتی برای موهای آسیب‌دیده و شکننده.',
+				'mockup'      => 'product-hairmask.svg',
 			],
 			[
 				'sku'         => 'bc-demo-shampoo',
@@ -47,6 +50,7 @@ final class DemoProductsSeed {
 				'oldPrice'    => 340000,
 				'category'    => 'مراقبت مو',
 				'description' => 'شامپو تقویت‌کننده فولیکول مو با عصاره‌های گیاهی.',
+				'mockup'      => 'product-shampoo.svg',
 			],
 			[
 				'sku'         => 'bc-demo-sunscreen',
@@ -54,6 +58,7 @@ final class DemoProductsSeed {
 				'price'       => 380000,
 				'category'    => 'مراقبت پوست',
 				'description' => 'ضدآفتاب بدون چربی و مات‌کننده، مناسب پوست‌های چرب و مختلط.',
+				'mockup'      => 'product-sunscreen.svg',
 			],
 			[
 				'sku'         => 'bc-demo-lipstick',
@@ -61,6 +66,7 @@ final class DemoProductsSeed {
 				'price'       => 220000,
 				'category'    => 'آرایش',
 				'description' => 'رژ لب مات با ماندگاری بالا و بافت سبک.',
+				'mockup'      => 'product-lipstick.svg',
 			],
 		];
 	}
@@ -86,6 +92,13 @@ final class DemoProductsSeed {
 			$product->set_stock_quantity( 50 );
 			$product->set_stock_status( 'instock' );
 			$product_id = $product->save();
+
+			// Temporary visual mockup only — see DemoProvidersSeed's identical
+			// pattern and inc/helpers.php's bc_mockup_image_url() docblock for
+			// why this is postmeta, not a real WooCommerce product image
+			// (`_thumbnail_id`, which requires a Media Library attachment SVG
+			// isn't allowed to become).
+			update_post_meta( $product_id, '_bc_mockup_image', $data['mockup'] );
 
 			$category = self::get_or_create_category( $data['category'] );
 			if ( $category ) {

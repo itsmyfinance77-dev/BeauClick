@@ -1,0 +1,37 @@
+<svg viewBox="0 0 800 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-hidden="true">
+  <defs>
+    <linearGradient id="sbg2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="oklch(0.3 0.06 300)" />
+      <stop offset="100%" stop-color="oklch(0.58 0.1 270)" />
+    </linearGradient>
+    <radialGradient id="sglow2" cx="26%" cy="28%" r="60%">
+      <stop offset="0%" stop-color="oklch(1 0 0 / 0.22)" />
+      <stop offset="100%" stop-color="oklch(1 0 0 / 0)" />
+    </radialGradient>
+  </defs>
+  <rect width="800" height="300" fill="url(#sbg2)" />
+  <rect width="800" height="300" fill="url(#sglow2)" />
+  <rect x="0" y="230" width="800" height="70" fill="oklch(0.26 0.05 290 / 0.5)" />
+  <!-- window -->
+  <rect x="60" y="50" width="140" height="180" rx="10" fill="oklch(0.95 0.02 290 / 0.14)" stroke="oklch(0.95 0.02 290 / 0.4)" stroke-width="5" />
+  <line x1="130" y1="50" x2="130" y2="230" stroke="oklch(0.95 0.02 290 / 0.4)" stroke-width="4" />
+  <line x1="60" y1="140" x2="200" y2="140" stroke="oklch(0.95 0.02 290 / 0.4)" stroke-width="4" />
+  <!-- nail/skincare station table -->
+  <rect x="420" y="200" width="260" height="14" rx="6" fill="oklch(0.9 0.02 290 / 0.5)" />
+  <rect x="440" y="210" width="12" height="60" fill="oklch(0.4 0.06 290 / 0.5)" />
+  <rect x="640" y="210" width="12" height="60" fill="oklch(0.4 0.06 290 / 0.5)" />
+  <!-- small bottles/tools row -->
+  <rect x="450" y="176" width="16" height="26" rx="5" fill="oklch(0.85 0.05 335 / 0.7)" />
+  <rect x="472" y="168" width="16" height="34" rx="5" fill="oklch(0.8 0.06 300 / 0.7)" />
+  <rect x="494" y="180" width="16" height="22" rx="5" fill="oklch(0.85 0.04 150 / 0.65)" />
+  <rect x="516" y="172" width="16" height="30" rx="5" fill="oklch(0.85 0.05 80 / 0.65)" />
+  <circle cx="590" cy="184" r="16" fill="oklch(0.9 0.03 300 / 0.55)" />
+  <!-- pendant lights -->
+  <line x1="300" y1="0" x2="300" y2="60" stroke="oklch(0.95 0.02 300 / 0.4)" stroke-width="3" />
+  <circle cx="300" cy="72" r="14" fill="oklch(0.95 0.04 80 / 0.7)" />
+  <line x1="360" y1="0" x2="360" y2="80" stroke="oklch(0.95 0.02 300 / 0.4)" stroke-width="3" />
+  <circle cx="360" cy="92" r="14" fill="oklch(0.95 0.04 80 / 0.7)" />
+  <!-- plant accent -->
+  <path d="M730 214 C718 190 724 162 742 145 C754 168 750 196 730 214 Z" fill="oklch(0.5 0.13 150 / 0.5)" />
+  <rect x="722" y="212" width="20" height="24" rx="4" fill="oklch(0.4 0.08 60 / 0.5)" />
+</svg>

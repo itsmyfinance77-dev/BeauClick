@@ -1,0 +1,21 @@
+<svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-hidden="true">
+  <defs>
+    <linearGradient id="pbg4" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="oklch(0.94 0.03 300)" />
+      <stop offset="100%" stop-color="oklch(0.84 0.06 290)" />
+    </linearGradient>
+    <linearGradient id="pbottle4" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="oklch(0.42 0.14 300)" />
+      <stop offset="100%" stop-color="oklch(0.52 0.15 292)" />
+    </linearGradient>
+  </defs>
+  <rect width="400" height="300" fill="url(#pbg4)" />
+  <ellipse cx="200" cy="252" rx="60" ry="10" fill="oklch(0.3 0.05 300 / 0.18)" />
+  <!-- pump bottle -->
+  <path d="M170 120 C170 108 178 100 200 100 C222 100 230 108 230 120 L234 242 C234 248 228 252 222 252 L178 252 C172 252 166 248 166 242 Z" fill="url(#pbottle4)" />
+  <rect x="182" y="140" width="36" height="40" rx="6" fill="oklch(1 0 0 / 0.18)" />
+  <!-- pump -->
+  <rect x="192" y="72" width="16" height="30" rx="4" fill="oklch(0.3 0.09 292)" />
+  <path d="M208 78 L236 78 L236 88 L216 88 Z" fill="oklch(0.3 0.09 292)" />
+  <circle cx="200" cy="196" r="7" fill="oklch(0.95 0.03 300 / 0.5)" />
+</svg>

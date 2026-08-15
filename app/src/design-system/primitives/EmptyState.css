@@ -14,3 +14,9 @@
 	font-size: 14px;
 	margin: 0;
 }
+
+.bc-empty-state__illustration {
+	width: 100px;
+	height: 80px;
+	margin-block-end: -4px;
+}

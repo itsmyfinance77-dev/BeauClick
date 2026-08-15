@@ -23,12 +23,18 @@ $location  = trim( implode( '، ', array_filter( [ $city_name, $district_name ] 
 $ranking_reasons = ! empty( $provider['ranking_signals'] ) && class_exists( \BeauClick\Marketplace\Ranking\RankingPresenter::class )
 	? array_slice( \BeauClick\Marketplace\Ranking\RankingPresenter::explain( (array) json_decode( (string) $provider['ranking_signals'], true ) ), 0, 2 )
 	: [];
+
+$image_url = bc_mockup_image_url( (int) $provider['provider_id'] );
 ?>
 <div class="bc-card bc-card--hoverable">
 	<a href="<?php echo esc_url( bc_provider_permalink( $provider ) ); ?>" style="display:block;">
-		<div class="bc-placeholder-image" style="aspect-ratio:4/3;background:linear-gradient(135deg, oklch(0.9 0.04 290), oklch(0.8 0.06 330));">
-			<span><?php esc_html_e( 'تصویر متخصص', 'beauclick' ); ?></span>
-		</div>
+		<?php if ( $image_url ) : ?>
+			<img src="<?php echo esc_url( $image_url ); ?>" alt="" style="width:100%; aspect-ratio:4/3; object-fit:cover; border-radius:var(--bc-radius-card) var(--bc-radius-card) 0 0; display:block;" width="400" height="300" loading="lazy" />
+		<?php else : ?>
+			<div class="bc-placeholder-image" style="aspect-ratio:4/3;background:linear-gradient(135deg, oklch(0.9 0.04 290), oklch(0.8 0.06 330));">
+				<span><?php esc_html_e( 'تصویر متخصص', 'beauclick' ); ?></span>
+			</div>
+		<?php endif; ?>
 	</a>
 	<div class="bc-provider-card__body">
 		<div class="bc-provider-card__name-row">

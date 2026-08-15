@@ -1,0 +1,32 @@
+<svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-hidden="true">
+  <defs>
+    <linearGradient id="bg1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="oklch(0.93 0.035 330)" />
+      <stop offset="100%" stop-color="oklch(0.8 0.07 300)" />
+    </linearGradient>
+    <radialGradient id="glow1" cx="50%" cy="38%" r="55%">
+      <stop offset="0%" stop-color="oklch(1 0 0 / 0.55)" />
+      <stop offset="100%" stop-color="oklch(1 0 0 / 0)" />
+    </radialGradient>
+    <linearGradient id="bust1" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="oklch(0.5 0.14 330)" />
+      <stop offset="100%" stop-color="oklch(0.38 0.15 320)" />
+    </linearGradient>
+  </defs>
+  <rect width="400" height="400" fill="url(#bg1)" />
+  <circle cx="200" cy="150" r="180" fill="url(#glow1)" />
+  <!-- shoulders / bust -->
+  <path d="M60 400 C60 300 120 250 200 250 C280 250 340 300 340 400 Z" fill="url(#bust1)" />
+  <!-- neck -->
+  <rect x="178" y="205" width="44" height="55" rx="18" fill="oklch(0.62 0.11 330)" />
+  <!-- head -->
+  <circle cx="200" cy="168" r="66" fill="oklch(0.68 0.1 335)" />
+  <!-- wavy hair silhouette -->
+  <path d="M126 150 C120 90 160 48 200 48 C240 48 280 90 274 150 C274 120 258 158 246 118 C236 150 214 92 200 92 C186 92 164 150 154 118 C142 158 126 120 126 150 Z" fill="oklch(0.32 0.09 320)" />
+  <path d="M120 160 C112 200 122 236 140 250 C132 220 132 190 138 165 Z" fill="oklch(0.32 0.09 320)" />
+  <path d="M280 160 C288 200 278 236 260 250 C268 220 268 190 262 165 Z" fill="oklch(0.32 0.09 320)" />
+  <!-- earring accent -->
+  <circle cx="140" cy="196" r="4.5" fill="oklch(0.95 0.035 335)" />
+  <!-- decorative leaf accent -->
+  <path d="M298 300 C316 288 336 292 344 308 C328 312 310 312 298 300 Z" fill="oklch(0.5 0.13 150 / 0.5)" />
+</svg>

@@ -1,0 +1,20 @@
+<svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-hidden="true">
+  <defs>
+    <linearGradient id="pbg3" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="oklch(0.95 0.025 150)" />
+      <stop offset="100%" stop-color="oklch(0.86 0.05 130)" />
+    </linearGradient>
+    <linearGradient id="pbottle3" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="oklch(0.45 0.11 150)" />
+      <stop offset="100%" stop-color="oklch(0.55 0.12 140)" />
+    </linearGradient>
+  </defs>
+  <rect width="400" height="300" fill="url(#pbg3)" />
+  <ellipse cx="200" cy="252" rx="76" ry="10" fill="oklch(0.3 0.05 150 / 0.18)" />
+  <!-- wide jar -->
+  <rect x="140" y="150" width="120" height="94" rx="18" fill="url(#pbottle3)" />
+  <ellipse cx="200" cy="150" rx="60" ry="13" fill="oklch(0.62 0.12 140)" />
+  <rect x="136" y="118" width="128" height="36" rx="16" fill="oklch(0.33 0.08 140)" />
+  <ellipse cx="200" cy="118" rx="64" ry="11" fill="oklch(0.4 0.09 140)" />
+  <path d="M186 190 C186 178 214 178 214 190 C214 200 200 206 200 206 C200 206 186 200 186 190 Z" fill="oklch(0.95 0.03 150 / 0.5)" />
+</svg>

@@ -1,0 +1,27 @@
+<svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-hidden="true">
+  <defs>
+    <linearGradient id="bg5" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="oklch(0.92 0.035 290)" />
+      <stop offset="100%" stop-color="oklch(0.78 0.08 310)" />
+    </linearGradient>
+    <radialGradient id="glow5" cx="50%" cy="36%" r="55%">
+      <stop offset="0%" stop-color="oklch(1 0 0 / 0.55)" />
+      <stop offset="100%" stop-color="oklch(1 0 0 / 0)" />
+    </radialGradient>
+    <linearGradient id="bust5" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="oklch(0.44 0.16 290)" />
+      <stop offset="100%" stop-color="oklch(0.34 0.16 300)" />
+    </linearGradient>
+  </defs>
+  <rect width="400" height="400" fill="url(#bg5)" />
+  <circle cx="200" cy="150" r="180" fill="url(#glow5)" />
+  <path d="M58 400 C58 298 120 250 200 250 C280 250 342 298 342 400 Z" fill="url(#bust5)" />
+  <rect x="178" y="203" width="44" height="55" rx="18" fill="oklch(0.58 0.13 290)" />
+  <circle cx="200" cy="166" r="64" fill="oklch(0.65 0.11 292)" />
+  <!-- updo / bun silhouette -->
+  <path d="M138 158 C130 100 162 52 200 52 C238 52 270 100 262 158 C262 132 250 158 240 128 C230 156 170 156 160 128 C150 158 138 132 138 158 Z" fill="oklch(0.3 0.1 300)" />
+  <circle cx="200" cy="70" r="30" fill="oklch(0.3 0.1 300)" />
+  <path d="M182 46 C190 40 210 40 218 46" stroke="oklch(0.66 0.16 335)" stroke-width="5" fill="none" stroke-linecap="round" />
+  <circle cx="148" cy="192" r="4.5" fill="oklch(0.95 0.035 335)" />
+  <path d="M296 296 C314 284 334 288 342 304 C326 308 308 308 296 296 Z" fill="oklch(0.66 0.16 335 / 0.4)" />
+</svg>

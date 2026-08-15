@@ -18,6 +18,7 @@ $on_sale   = $product->is_on_sale();
 $regular   = (int) $product->get_regular_price();
 $price     = (int) $product->get_price();
 $brand_terms = wp_get_post_terms( $product->get_id(), 'product_brand', [ 'fields' => 'names' ] );
+$image_url   = bc_mockup_image_url( $product->get_id() );
 ?>
 <div class="bc-card bc-card--hoverable">
 	<a href="<?php echo esc_url( get_permalink( $product->get_id() ) ); ?>" style="display:block; position:relative;">
@@ -26,9 +27,13 @@ $brand_terms = wp_get_post_terms( $product->get_id(), 'product_brand', [ 'fields
 				<?php echo esc_html( bc_persian_digits( round( ( 1 - $price / max( $regular, 1 ) ) * 100 ) ) ); ?>٪
 			</span>
 		<?php endif; ?>
-		<div class="bc-placeholder-image" style="aspect-ratio:4/3;background:linear-gradient(135deg, oklch(0.9 0.04 335), oklch(0.82 0.06 300));">
-			<span><?php esc_html_e( 'تصویر محصول', 'beauclick' ); ?></span>
-		</div>
+		<?php if ( $image_url ) : ?>
+			<img src="<?php echo esc_url( $image_url ); ?>" alt="" style="width:100%; aspect-ratio:4/3; object-fit:cover; border-radius:var(--bc-radius-card) var(--bc-radius-card) 0 0; display:block;" width="400" height="300" loading="lazy" />
+		<?php else : ?>
+			<div class="bc-placeholder-image" style="aspect-ratio:4/3;background:linear-gradient(135deg, oklch(0.9 0.04 335), oklch(0.82 0.06 300));">
+				<span><?php esc_html_e( 'تصویر محصول', 'beauclick' ); ?></span>
+			</div>
+		<?php endif; ?>
 	</a>
 	<div class="bc-provider-card__body">
 		<?php if ( ! empty( $brand_terms ) && ! is_wp_error( $brand_terms ) ) : ?>

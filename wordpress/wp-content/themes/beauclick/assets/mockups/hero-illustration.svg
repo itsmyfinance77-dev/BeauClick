@@ -1,0 +1,39 @@
+<svg viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg" role="img" aria-hidden="true">
+  <defs>
+    <linearGradient id="hbg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="oklch(0.4 0.16 290)" />
+      <stop offset="100%" stop-color="oklch(0.66 0.16 335)" />
+    </linearGradient>
+    <radialGradient id="hglow" cx="60%" cy="30%" r="60%">
+      <stop offset="0%" stop-color="oklch(1 0 0 / 0.3)" />
+      <stop offset="100%" stop-color="oklch(1 0 0 / 0)" />
+    </radialGradient>
+  </defs>
+  <rect width="800" height="600" rx="0" fill="url(#hbg)" />
+  <rect width="800" height="600" fill="url(#hglow)" />
+  <!-- large arched mirror centerpiece -->
+  <path d="M260 520 L260 300 C260 210 320 150 400 150 C480 150 540 210 540 300 L540 520 Z" fill="none" stroke="oklch(1 0 0 / 0.55)" stroke-width="10" />
+  <path d="M284 520 L284 302 C284 224 334 176 400 176 C466 176 516 224 516 302 L516 520 Z" fill="oklch(1 0 0 / 0.12)" />
+  <!-- soft reflected bust silhouette inside the mirror -->
+  <circle cx="400" cy="330" r="58" fill="oklch(1 0 0 / 0.18)" />
+  <path d="M320 470 C320 400 354 372 400 372 C446 372 480 400 480 470 Z" fill="oklch(1 0 0 / 0.16)" />
+  <!-- floating decorative florals -->
+  <g fill="oklch(1 0 0 / 0.5)">
+    <circle cx="150" cy="140" r="10" />
+    <circle cx="176" cy="118" r="7" />
+    <circle cx="128" cy="112" r="6" />
+  </g>
+  <g fill="oklch(1 0 0 / 0.4)">
+    <circle cx="660" cy="470" r="12" />
+    <circle cx="690" cy="446" r="8" />
+    <circle cx="638" cy="440" r="6" />
+  </g>
+  <!-- leaf accents -->
+  <path d="M90 260 C70 240 74 210 96 192 C110 216 106 248 90 260 Z" fill="oklch(0.5 0.13 150 / 0.5)" />
+  <path d="M710 190 C728 172 726 144 706 128 C690 152 692 178 710 190 Z" fill="oklch(0.5 0.13 150 / 0.4)" />
+  <!-- sparkle accents -->
+  <g fill="oklch(1 0 0 / 0.7)">
+    <path d="M600 100 L606 116 L622 122 L606 128 L600 144 L594 128 L578 122 L594 116 Z" />
+    <path d="M170 400 L174 410 L184 414 L174 418 L170 428 L166 418 L156 414 L166 410 Z" />
+  </g>
+</svg>

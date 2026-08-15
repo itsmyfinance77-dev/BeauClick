@@ -5,6 +5,7 @@ import { Button, Card, LoadingDots, EmptyState } from '@/design-system';
 import { formatToman, formatFullJalaliDate } from '@/lib/format';
 import { RecommendationCard } from '@/features/ai/RecommendationCard';
 import { GoalForm } from './GoalForm';
+import emptyIllustration from '@/assets/mockups/empty-illustration.svg';
 import { LoyaltySection } from './LoyaltySection';
 import { ReferralCard } from './ReferralCard';
 import { WaitlistSection } from './WaitlistSection';
@@ -87,7 +88,7 @@ export function JourneyTab() {
 			<ReferralCard />
 
 			{ ! hasAnyContent && (
-				<EmptyState title="مسیر زیبایی‌ات هنوز خالیه — یه هدف تعریف کن تا شروع کنیم." />
+				<EmptyState title="مسیر زیبایی‌ات هنوز خالیه — یه هدف تعریف کن تا شروع کنیم." illustration={ emptyIllustration } />
 			) }
 
 			<section>

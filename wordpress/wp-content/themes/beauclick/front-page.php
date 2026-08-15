@@ -33,7 +33,7 @@ $specialties         = bc_get_specialties();
 			<div class="bc-hero__stat"><strong>۲۴/۷</strong><span><?php esc_html_e( 'رزرو آنلاین', 'beauclick' ); ?></span></div>
 		</div>
 	</div>
-	<div class="bc-hero__visual" aria-hidden="true"></div>
+	<div class="bc-hero__visual" aria-hidden="true" style="background-image:url('<?php echo esc_url( get_stylesheet_directory_uri() . '/assets/mockups/hero-illustration.svg' ); ?>'); background-size:cover; background-position:center;"></div>
 </section>
 
 <?php if ( $specialties ) : ?>

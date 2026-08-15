@@ -1,0 +1,26 @@
+<svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-hidden="true">
+  <defs>
+    <linearGradient id="pbg5" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="oklch(0.95 0.03 80)" />
+      <stop offset="100%" stop-color="oklch(0.87 0.055 60)" />
+    </linearGradient>
+    <linearGradient id="pbottle5" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="oklch(0.6 0.1 70)" />
+      <stop offset="100%" stop-color="oklch(0.7 0.11 75)" />
+    </linearGradient>
+  </defs>
+  <rect width="400" height="300" fill="url(#pbg5)" />
+  <ellipse cx="200" cy="250" rx="58" ry="10" fill="oklch(0.3 0.05 70 / 0.18)" />
+  <!-- flip-top tube, standing on cap -->
+  <path d="M176 244 L176 108 C176 96 224 96 224 108 L224 244 Z" fill="url(#pbottle5)" />
+  <rect x="176" y="140" width="48" height="34" rx="6" fill="oklch(1 0 0 / 0.2)" />
+  <path d="M170 100 C170 88 230 88 230 100 L230 112 C230 116 170 116 170 112 Z" fill="oklch(0.45 0.09 70)" />
+  <!-- sun accent glyph -->
+  <circle cx="200" cy="196" r="9" fill="oklch(0.95 0.04 80 / 0.65)" />
+  <g stroke="oklch(0.95 0.04 80 / 0.65)" stroke-width="2.5" stroke-linecap="round">
+    <line x1="200" y1="180" x2="200" y2="175" />
+    <line x1="200" y1="212" x2="200" y2="217" />
+    <line x1="184" y1="196" x2="179" y2="196" />
+    <line x1="216" y1="196" x2="221" y2="196" />
+  </g>
+</svg>

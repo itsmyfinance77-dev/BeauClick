@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Modal, Button, EmptyState, LoadingDots } from '@/design-system';
 import { storeApi, storeApiAmount, type StoreCart } from '@/lib/storeApi';
 import { formatToman, toPersianDigits } from '@/lib/format';
+import emptyIllustration from '@/assets/mockups/empty-illustration.svg';
 
 export interface CartDrawerProps {
 	open: boolean;
@@ -55,7 +56,7 @@ export function CartDrawer( { open, onClose, refreshToken }: CartDrawerProps ) {
 				{ loading && <LoadingDots /> }
 
 				{ ! loading && cart && cart.items.length === 0 && (
-					<EmptyState title="سبد خرید شما خالی است." />
+					<EmptyState title="سبد خرید شما خالی است." illustration={ emptyIllustration } />
 				) }
 
 				{ ! loading && cart && cart.items.length > 0 && (

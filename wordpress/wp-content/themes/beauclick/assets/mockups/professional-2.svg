@@ -1,0 +1,27 @@
+<svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-hidden="true">
+  <defs>
+    <linearGradient id="bg2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="oklch(0.92 0.035 300)" />
+      <stop offset="100%" stop-color="oklch(0.78 0.08 285)" />
+    </linearGradient>
+    <radialGradient id="glow2" cx="50%" cy="38%" r="55%">
+      <stop offset="0%" stop-color="oklch(1 0 0 / 0.55)" />
+      <stop offset="100%" stop-color="oklch(1 0 0 / 0)" />
+    </radialGradient>
+    <linearGradient id="bust2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="oklch(0.48 0.15 300)" />
+      <stop offset="100%" stop-color="oklch(0.36 0.15 292)" />
+    </linearGradient>
+  </defs>
+  <rect width="400" height="400" fill="url(#bg2)" />
+  <circle cx="200" cy="150" r="180" fill="url(#glow2)" />
+  <path d="M55 400 C55 296 118 248 200 248 C282 248 345 296 345 400 Z" fill="url(#bust2)" />
+  <rect x="178" y="203" width="44" height="55" rx="18" fill="oklch(0.6 0.12 300)" />
+  <circle cx="200" cy="166" r="64" fill="oklch(0.67 0.11 302)" />
+  <!-- short bob silhouette -->
+  <path d="M132 170 C124 108 156 50 200 50 C244 50 276 108 268 170 C268 150 262 176 250 190 L246 150 C246 120 224 96 200 96 C176 96 154 120 154 150 L150 190 C138 176 132 150 132 170 Z" fill="oklch(0.28 0.1 292)" />
+  <!-- bob fringe line -->
+  <path d="M158 118 C170 104 230 104 242 118" stroke="oklch(0.28 0.1 292)" stroke-width="10" fill="none" stroke-linecap="round" />
+  <circle cx="256" cy="204" r="4.5" fill="oklch(0.95 0.035 335)" />
+  <path d="M92 300 C74 288 54 292 46 308 C62 312 80 312 92 300 Z" fill="oklch(0.66 0.16 335 / 0.45)" />
+</svg>

@@ -1,0 +1,23 @@
+<svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-hidden="true">
+  <defs>
+    <linearGradient id="pbg1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="oklch(0.95 0.025 335)" />
+      <stop offset="100%" stop-color="oklch(0.86 0.05 300)" />
+    </linearGradient>
+    <linearGradient id="pbottle1" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="oklch(0.4 0.14 330)" />
+      <stop offset="100%" stop-color="oklch(0.5 0.15 320)" />
+    </linearGradient>
+  </defs>
+  <rect width="400" height="300" fill="url(#pbg1)" />
+  <ellipse cx="200" cy="248" rx="66" ry="10" fill="oklch(0.3 0.05 300 / 0.18)" />
+  <!-- dropper bottle body -->
+  <rect x="164" y="120" width="72" height="120" rx="14" fill="url(#pbottle1)" />
+  <rect x="176" y="150" width="48" height="30" rx="6" fill="oklch(1 0 0 / 0.22)" />
+  <!-- neck + dropper cap -->
+  <rect x="184" y="92" width="32" height="30" rx="6" fill="oklch(0.32 0.1 320)" />
+  <rect x="190" y="60" width="20" height="36" rx="8" fill="oklch(0.25 0.07 320)" />
+  <line x1="200" y1="96" x2="200" y2="130" stroke="oklch(0.9 0.03 300 / 0.7)" stroke-width="4" stroke-linecap="round" />
+  <!-- accent glyph, no text -->
+  <circle cx="200" cy="190" r="7" fill="oklch(0.95 0.03 300 / 0.55)" />
+</svg>

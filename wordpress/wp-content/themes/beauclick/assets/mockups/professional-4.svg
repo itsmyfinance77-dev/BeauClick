@@ -1,0 +1,25 @@
+<svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-hidden="true">
+  <defs>
+    <linearGradient id="bg4" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="oklch(0.93 0.035 350)" />
+      <stop offset="100%" stop-color="oklch(0.8 0.08 320)" />
+    </linearGradient>
+    <radialGradient id="glow4" cx="50%" cy="38%" r="55%">
+      <stop offset="0%" stop-color="oklch(1 0 0 / 0.55)" />
+      <stop offset="100%" stop-color="oklch(1 0 0 / 0)" />
+    </radialGradient>
+    <linearGradient id="bust4" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="oklch(0.5 0.16 350)" />
+      <stop offset="100%" stop-color="oklch(0.38 0.15 330)" />
+    </linearGradient>
+  </defs>
+  <rect width="400" height="400" fill="url(#bg4)" />
+  <circle cx="200" cy="150" r="180" fill="url(#glow4)" />
+  <path d="M58 400 C58 298 120 250 200 250 C280 250 342 298 342 400 Z" fill="url(#bust4)" />
+  <rect x="178" y="203" width="44" height="55" rx="18" fill="oklch(0.62 0.13 350)" />
+  <circle cx="200" cy="166" r="65" fill="oklch(0.69 0.12 352)" />
+  <!-- long wavy hair, past shoulders -->
+  <path d="M124 156 C114 92 156 46 200 46 C244 46 286 92 276 156 C286 220 272 300 250 340 C260 280 254 220 240 176 C232 210 168 210 160 176 C146 220 140 280 150 340 C128 300 114 220 124 156 Z" fill="oklch(0.32 0.11 335)" />
+  <circle cx="252" cy="200" r="4.5" fill="oklch(0.95 0.035 335)" />
+  <path d="M96 296 C78 284 58 288 50 304 C66 308 84 308 96 296 Z" fill="oklch(0.55 0.13 70 / 0.35)" />
+</svg>

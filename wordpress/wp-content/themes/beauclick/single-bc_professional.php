@@ -29,13 +29,27 @@ if ( function_exists( 'beauclick_core' ) ) {
 $reviews = class_exists( \BeauClick\Reviews\Reviews\ReviewService::class )
 	? ( new \BeauClick\Reviews\Reviews\ReviewService() )->for_provider( $provider_id )
 	: [];
+
+$avatar_url = bc_mockup_image_url( $provider_id );
+$cover_meta = get_post_meta( $provider_id, '_bc_mockup_cover', true );
+$cover_url  = is_string( $cover_meta ) && preg_match( '/^[a-z0-9\-]+\.svg$/', $cover_meta )
+	? get_stylesheet_directory_uri() . '/assets/mockups/' . $cover_meta
+	: null;
 ?>
 
-<div class="bc-placeholder-image" style="aspect-ratio:16/5;background:linear-gradient(135deg, oklch(0.3 0.06 290), oklch(0.55 0.1 330));"></div>
+<?php if ( $cover_url ) : ?>
+	<div style="aspect-ratio:16/5; background-image:url('<?php echo esc_url( $cover_url ); ?>'); background-size:cover; background-position:center;"></div>
+<?php else : ?>
+	<div class="bc-placeholder-image" style="aspect-ratio:16/5;background:linear-gradient(135deg, oklch(0.3 0.06 290), oklch(0.55 0.1 330));"></div>
+<?php endif; ?>
 
 <div class="bc-container bc-section">
 	<div style="display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap; margin-top:-48px;">
-		<div style="width:96px; height:96px; border-radius:24px; background:var(--bc-gradient-brand); border:4px solid var(--bc-color-surface); flex-shrink:0;"></div>
+		<?php if ( $avatar_url ) : ?>
+			<img src="<?php echo esc_url( $avatar_url ); ?>" alt="" width="96" height="96" style="width:96px; height:96px; border-radius:24px; object-fit:cover; border:4px solid var(--bc-color-surface); flex-shrink:0; display:block;" />
+		<?php else : ?>
+			<div style="width:96px; height:96px; border-radius:24px; background:var(--bc-gradient-brand); border:4px solid var(--bc-color-surface); flex-shrink:0;"></div>
+		<?php endif; ?>
 
 		<div style="flex:1; min-width:240px; padding-top:8px;">
 			<div style="display:flex; align-items:center; gap:8px;">
@@ -103,7 +117,10 @@ $reviews = class_exists( \BeauClick\Reviews\Reviews\ReviewService::class )
 
 	<div class="bc-section">
 		<h2 class="bc-section__title"><?php esc_html_e( 'نمونه‌کار', 'beauclick' ); ?></h2>
-		<div class="bc-empty-state"><p class="bc-empty-state__title"><?php esc_html_e( 'این بخش در نسخه بعدی محصول تکمیل می‌شود.', 'beauclick' ); ?></p></div>
+		<div class="bc-empty-state">
+			<img src="<?php echo esc_url( get_stylesheet_directory_uri() . '/assets/mockups/empty-illustration.svg' ); ?>" alt="" width="100" height="80" style="width:100px; height:80px; margin:0 auto 12px;" />
+			<p class="bc-empty-state__title"><?php esc_html_e( 'این بخش در نسخه بعدی محصول تکمیل می‌شود.', 'beauclick' ); ?></p>
+		</div>
 	</div>
 
 	<div class="bc-section">

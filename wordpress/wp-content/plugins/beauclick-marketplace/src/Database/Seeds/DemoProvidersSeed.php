@@ -36,7 +36,7 @@ final class DemoProvidersSeed {
 		return (int) $result['term_id'];
 	}
 
-	/** @return array<int, array{login: string, name: string, bio: string, specialty: array{name:string,slug:string}, city: string, district?: string, verified: bool, services: list<array{name:string,duration:int,price:int}>}> */
+	/** @return array<int, array{login: string, name: string, bio: string, specialty: array{name:string,slug:string}, city: string, district?: string, verified: bool, mockup: string, mockupCover: string, services: list<array{name:string,duration:int,price:int}>}> */
 	private static function providers(): array {
 		return [
 			[
@@ -47,6 +47,8 @@ final class DemoProvidersSeed {
 				'city'      => 'yazd',
 				'district'  => 'safaeieh',
 				'verified'  => true,
+				'mockup'    => 'professional-1.svg',
+				'mockupCover' => 'salon-1.svg',
 				'services'  => [
 					[ 'name' => 'میکاپ عروس', 'duration' => 120, 'price' => 2500000 ],
 					[ 'name' => 'میکاپ مراسم', 'duration' => 60, 'price' => 850000 ],
@@ -60,6 +62,8 @@ final class DemoProvidersSeed {
 				'city'      => 'yazd',
 				'district'  => 'fahadan',
 				'verified'  => true,
+				'mockup'    => 'professional-2.svg',
+				'mockupCover' => 'salon-2.svg',
 				'services'  => [
 					[ 'name' => 'کاشت ناخن ژل', 'duration' => 90, 'price' => 650000 ],
 					[ 'name' => 'طراحی ناخن', 'duration' => 45, 'price' => 350000 ],
@@ -73,6 +77,8 @@ final class DemoProvidersSeed {
 				'city'      => 'yazd',
 				'district'  => 'shahedieh',
 				'verified'  => false,
+				'mockup'    => 'professional-3.svg',
+				'mockupCover' => 'salon-3.svg',
 				'services'  => [
 					[ 'name' => 'پاکسازی پوست', 'duration' => 60, 'price' => 550000 ],
 				],
@@ -84,6 +90,8 @@ final class DemoProvidersSeed {
 				'specialty' => [ 'name' => 'رنگ مو', 'slug' => 'hair-color' ],
 				'city'      => 'isfahan',
 				'verified'  => true,
+				'mockup'    => 'professional-4.svg',
+				'mockupCover' => 'salon-1.svg',
 				'services'  => [
 					[ 'name' => 'رنگ و بالیاژ', 'duration' => 150, 'price' => 1800000 ],
 					[ 'name' => 'کوتاهی تخصصی', 'duration' => 45, 'price' => 400000 ],
@@ -96,6 +104,8 @@ final class DemoProvidersSeed {
 				'specialty' => [ 'name' => 'میکاپ', 'slug' => 'makeup' ],
 				'city'      => 'tehran',
 				'verified'  => true,
+				'mockup'    => 'professional-5.svg',
+				'mockupCover' => 'salon-2.svg',
 				'services'  => [
 					[ 'name' => 'میکاپ روزانه', 'duration' => 45, 'price' => 600000 ],
 					[ 'name' => 'میکاپ عروس', 'duration' => 120, 'price' => 3200000 ],
@@ -163,6 +173,15 @@ final class DemoProvidersSeed {
 			}
 
 			update_post_meta( $post_id, '_bc_verification_status', $data['verified'] ? 'verified' : 'pending' );
+
+			// Temporary visual mockup only — a bare filename under the theme's
+			// assets/mockups/, resolved by bc_mockup_image_url() (see
+			// inc/helpers.php's own docblock for why this is postmeta, not a
+			// real Media Library attachment). Never set on a post this seeder
+			// didn't itself just create, and always superseded automatically
+			// the moment a real featured image is ever set on this post.
+			update_post_meta( $post_id, '_bc_mockup_image', $data['mockup'] );
+			update_post_meta( $post_id, '_bc_mockup_cover', $data['mockupCover'] );
 
 			$term_id = self::specialty_term( $data['specialty']['name'], $data['specialty']['slug'] );
 			wp_set_post_terms( $post_id, [ $term_id ], Registrar::SPECIALTY );

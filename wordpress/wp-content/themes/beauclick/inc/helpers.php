@@ -151,3 +151,44 @@ function bc_provider_permalink( array $provider_row ): string {
 	// where a hand-built pretty path 404s with no rewrite rules active.
 	return get_permalink( (int) $provider_row['provider_id'] ) ?: home_url( '/' );
 }
+
+/**
+ * Temporary visual mockup asset resolver — reads `_bc_mockup_image`
+ * postmeta (a bare filename under assets/mockups/, written only by the
+ * demo/dev seeders — DemoProvidersSeed, DemoProductsSeed) rather than
+ * WordPress's own attachment/Media-Library pipeline, deliberately: SVG is
+ * not in WordPress's default `upload_mimes` allowlist (a real, intentional
+ * XSS guard against arbitrary SVG uploads), and widening that allowlist
+ * site-wide just to store a handful of trusted, developer-authored mockup
+ * files is a real security-posture change this task has no reason to make.
+ *
+ * A real featured image (`has_post_thumbnail()`, set through the CPT's
+ * already-registered `thumbnail` support once a real professional/business
+ * uploads their own photo, or once a real production asset replaces a
+ * mockup) always takes priority over the mockup meta — this function, and
+ * every template that calls it, must never show a mockup once real content
+ * exists. Returns null (never a broken path) when neither exists, so
+ * callers fall back to the existing gradient `.bc-placeholder-image`
+ * treatment — the honest "no photo yet" state stays unchanged for any
+ * organically-created (non-demo) post.
+ */
+function bc_mockup_image_url( int $post_id ): ?string {
+	if ( has_post_thumbnail( $post_id ) ) {
+		return get_the_post_thumbnail_url( $post_id, 'medium' ) ?: null;
+	}
+
+	$file = get_post_meta( $post_id, '_bc_mockup_image', true );
+	if ( ! $file || ! is_string( $file ) ) {
+		return null;
+	}
+
+	// Defense in depth even though the value only ever comes from this
+	// theme's own seeders, never user input: a bare filename only, no path
+	// traversal, confined to the mockups directory.
+	$file = basename( $file );
+	if ( ! preg_match( '/^[a-z0-9\-]+\.svg$/', $file ) ) {
+		return null;
+	}
+
+	return get_stylesheet_directory_uri() . '/assets/mockups/' . $file;
+}
