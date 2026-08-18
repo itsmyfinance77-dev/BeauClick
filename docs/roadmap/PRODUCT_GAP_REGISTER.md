@@ -804,3 +804,29 @@ Independent re-audit of all four V2.3 steps at `c6c6e5f`, per the audit's own in
 **External configuration:** unchanged since the V2.2 Final Release Audit — SMS gateway, SMTP, real Zarinpal credentials, backup, and error monitoring all remain required before any real production launch, independent of this audit's code-level findings.
 
 **No other item in this register changed status as a result of this audit.** The rest of this document above remains the accurate historical record and is preserved exactly as written.
+
+## 49. Global UI/UX & Product-Wide Audit Findings
+
+Product-wide UI/UX audit at `v2.3.0` (`c505c20`) plus one intervening documentation-only commit, run against the real local stack (PHP built-in server, real MySQL, real seeded QA accounts, real browser) rather than source-reading alone — the specific gap the prior V2.3 Final Release Audit itself disclosed (§48/`VERSION_2_ARCHITECTURE_PLAN.md`: "no local WordPress dev server was started"). Full narrative, method, and scope disclosure in `VERSION_2_ARCHITECTURE_PLAN.md`'s "Global UI/UX & Product-Wide Audit" section; this entry records only the register-relevant disposition.
+
+**Fixed (found and closed by this audit's own commit):**
+
+| ID | Item | Disposition |
+|---|---|---|
+| UI-01 | OTP resend (`AuthFlow.tsx`'s shared `requestOtp()`) never cleared the `code` field — a stale/expired code silently blocked correct re-entry via the input's `maxLength`, producing a confusing "کد تأیید نادرست است" on the genuinely-new code | **FIXED** — `setCode('')` added on a successful resend, mirroring the existing `setStep`/`setCooldown` reset. |
+| NAV-01 | A logged-out visit to any `/my-account/*` WooCommerce endpoint showed WooCommerce's own default password-login form — the exact UX AUTH-09 (§78/A above) documents as superseded; `/dashboard/` already redirects logged-out visitors to `/auth/`, `/my-account/*` had no equivalent | **FIXED** — new `template_redirect` hook (`inc/account-redirect.php`) sends any logged-out `is_account_page()` visit to `/auth/`; verified not to affect guest checkout. |
+| LOC-07 | AI assistant narration (`beauclick-ai\RuleBasedProvider` and `\Professional\ProfessionalRuleBasedProvider`) rendered numbers in raw Latin digits + English commas ("9 رزرو", "1,700,000 تومان"), inconsistent with the Persian-digit convention every other number in the product uses (dates, prices, receipts, even the OTP SMS text) | **FIXED** — both providers now convert their narrated output to Persian digits/`٬` separator at the single return point, mirroring `beauclick-auth\Otp\OtpService`'s own existing local-helper pattern. 3 existing tests updated to assert the corrected output (not weakened). |
+
+**Open, logged, not fixed (cosmetic / requires a backend change beyond this pass's UI-polish scope):**
+
+| ID | Item | Classification |
+|---|---|---|
+| COM-07 | A booking-flow order's receipt (`order-received`) shows `آدرس صورتحساب: نامعلوم` even when the customer has a real saved billing address, because `BookingOrderBridge` creates the order directly (bypassing the cart, by design — see COM-05) without copying the customer's billing address onto the order | LOW / PRODUCT GAP (cosmetic — a service booking needs no delivery address; the receipt just reads as incomplete). Not fixed here: the change is to order-construction logic in `BookingOrderBridge`, not a UI template, so it's left for a deliberate, separately-reviewed change. |
+
+**Confirmed clean (re-verified live, not re-litigated):** the header search icon overlay and its city/specialty/free-text search — the specific regression this audit exists because of (`35746b3`) — is correctly wired end-to-end with no recurrence. The full 5-step booking flow, WooCommerce payment bridge, live campaign discount, and order-received receipt all produced correct real data. The customer account area (`/dashboard/` + `/my-account/*`) is fully Persian, fully RTL, and a real edit→save→reload→persist round trip on a real address field was verified and then reverted, leaving QA data unchanged.
+
+**Scope disclosed as not reached this pass, not claimed as audited clean:** the wp-admin-side BeauClick admin pages (source-reviewed only — no live click-through, since setting a temporary password on `bc_qa_admin` was correctly refused by this session's own auto-mode safety classifier as a credential-modification action); a full B2B quote-acceptance round trip; the professional CRM/staff/calendar tabs in depth; an automated accessibility (axe-core) pass; and a systematic 6-breakpoint sweep of every page (only the account/dashboard surfaces got a full mobile-viewport pass, at 375px).
+
+**Tests:** backend PHPUnit 857/857 (3 tests updated, not skipped), frontend Vitest 48/48, TypeScript clean, ESLint clean, `php -l` clean — before and after this audit's fixes, no regressions.
+
+**No other item in this register changed status as a result of this audit.**
