@@ -57,6 +57,11 @@ export function AuthFlow() {
 			await api.post<RequestOtpResponse>( '/auth/request-otp', { phone: phone.trim() } );
 			setStep( 'otp' );
 			setCooldown( RESEND_COOLDOWN_DISPLAY_SECONDS );
+			// A resend re-uses this same function -- without this, a code typed
+			// against the previous (now-invalidated) OTP silently lingers in the
+			// field, blocking correct re-entry via the input's maxLength and
+			// producing a confusing "invalid code" error on the *new* code.
+			setCode( '' );
 		} catch ( e ) {
 			setError( e instanceof ApiError ? e.message : 'در ارسال کد تأیید مشکلی پیش آمد. لطفاً دوباره تلاش کنید.' );
 		} finally {

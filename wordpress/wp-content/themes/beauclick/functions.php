@@ -22,6 +22,7 @@ require_once BEAUCLICK_THEME_DIR . '/inc/sitemap.php';
 require_once BEAUCLICK_THEME_DIR . '/inc/referral.php';
 require_once BEAUCLICK_THEME_DIR . '/inc/performance.php';
 require_once BEAUCLICK_THEME_DIR . '/inc/branding.php';
+require_once BEAUCLICK_THEME_DIR . '/inc/account-redirect.php';
 
 add_action(
 	'after_setup_theme',
