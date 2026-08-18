@@ -83,46 +83,49 @@ function bc_get_district_name( int|string|null $district_id ): string {
 	return (string) $wpdb->get_var( $wpdb->prepare( "SELECT name_fa FROM {$wpdb->prefix}bc_districts WHERE id = %d", $district_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 }
 
-/** @return list<array<string,mixed>> */
+/**
+ * V2.4 Step 21: the same duplication RankingPresenter::ORDER_BY's own
+ * comment already named ("the theme referencing a plugin class directly is
+ * not a new pattern in kind") turned out to be real for the *whole* query,
+ * not just the ORDER BY — this helper used to hand-roll its own
+ * city/specialty/q WHERE clause, independently of and slightly differently
+ * from MarketplaceController::browse()'s REST version of the same query.
+ * Both now build a \BeauClick\Marketplace\Search\SearchQuery and delegate to
+ * SqlSearchProvider — one query, whether the caller is this SSR helper or
+ * the REST API (see that class's own docblock for the full reasoning).
+ *
+ * @return list<array<string,mixed>> unchanged shape — every existing caller
+ *         (front-page.php's featured-providers rail) keeps working exactly
+ *         as before. Callers that also need the search facts (zero-result,
+ *         synonym-expanded) should call bc_search_providers() instead.
+ */
 function bc_get_providers( array $args = [] ): array {
-	global $wpdb;
-	$table  = $wpdb->prefix . 'bc_provider_index';
-	$where  = [ '1=1' ];
-	$params = [];
+	return bc_search_providers( $args )->rows;
+}
 
-	if ( ! empty( $args['city_id'] ) ) {
-		$where[]  = 'city_id = %d';
-		$params[] = (int) $args['city_id'];
-	}
-	if ( ! empty( $args['specialty_id'] ) ) {
-		$where[]  = 'FIND_IN_SET(%d, specialty_ids)';
-		$params[] = (int) $args['specialty_id'];
-	}
-	// V2.3 Step 20 (MKT-02): same real q search MarketplaceController::browse()
-	// exposes over REST, reused here rather than re-implemented so SSR and the
-	// API can never drift on what "matches" means -- same class-reference
-	// precedent as RankingPresenter::ORDER_BY just above.
-	if ( ! empty( $args['q'] ) && class_exists( \BeauClick\Marketplace\Search\TextNormalizer::class ) ) {
-		$where[]  = 'search_text LIKE %s';
-		$params[] = '%' . $wpdb->esc_like( \BeauClick\Marketplace\Search\TextNormalizer::normalize( (string) $args['q'] ) ) . '%';
+/**
+ * The richer sibling of bc_get_providers() — same query, but returns the
+ * full \BeauClick\Marketplace\Search\SearchResult (total + whether a
+ * curated synonym match expanded the query) rather than just the matched
+ * rows. page-marketplace.php — the platform's actual live marketplace
+ * search page — uses this so it can log a real search_performed event and
+ * show the optional "نتایج مرتبط با …" hint; bc_get_providers() stays the
+ * simple call for every other, non-search use (e.g. the homepage's
+ * featured-providers rail, which is page content, not a user search).
+ */
+function bc_search_providers( array $args = [] ): \BeauClick\Marketplace\Search\SearchResult {
+	if ( ! class_exists( \BeauClick\Marketplace\Search\SqlSearchProvider::class ) ) {
+		return new \BeauClick\Marketplace\Search\SearchResult( [], 0, false );
 	}
 
-	$limit = (int) ( $args['limit'] ?? 12 );
-	// V2.0 Step 3: same ORDER BY every ranking consumer in the codebase now
-	// shares (REST API, AI recommendations, this SSR helper) — see
-	// \BeauClick\Marketplace\Ranking\RankingPresenter's own docblock. The
-	// theme referencing a plugin class directly is new here but not a new
-	// pattern in kind: PHP's autoloader is process-wide once any plugin
-	// registers it (beauclick-ai already calls marketplace classes the same
-	// way), and duplicating this ORDER BY as a fourth hand-copied string was
-	// the exact drift this step exists to remove.
-	$order = class_exists( \BeauClick\Marketplace\Ranking\RankingPresenter::class )
-		? \BeauClick\Marketplace\Ranking\RankingPresenter::ORDER_BY
-		: 'verified DESC, rating_avg DESC';
-	$sql   = "SELECT * FROM {$table} WHERE " . implode( ' AND ', $where ) . " ORDER BY {$order} LIMIT %d"; // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-	$sql   = $wpdb->prepare( $sql, array_merge( $params, [ $limit ] ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+	$query = new \BeauClick\Marketplace\Search\SearchQuery(
+		cityId: ! empty( $args['city_id'] ) ? (int) $args['city_id'] : null,
+		specialtyId: ! empty( $args['specialty_id'] ) ? (int) $args['specialty_id'] : null,
+		q: (string) ( $args['q'] ?? '' ),
+		limit: (int) ( $args['limit'] ?? 12 )
+	);
 
-	return $wpdb->get_results( $sql, ARRAY_A ) ?: [];
+	return ( new \BeauClick\Marketplace\Search\SqlSearchProvider() )->search( $query );
 }
 
 /** @return list<\WP_Term> */

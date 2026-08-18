@@ -7,7 +7,8 @@ use BeauClick\Core\Rest\RestController;
 use BeauClick\Core\Rest\Response;
 use BeauClick\Marketplace\PostTypes\Registrar;
 use BeauClick\Marketplace\Ranking\RankingPresenter;
-use BeauClick\Marketplace\Search\TextNormalizer;
+use BeauClick\Marketplace\Search\SearchQuery;
+use BeauClick\Marketplace\Search\SqlSearchProvider;
 use WP_REST_Request;
 
 /**
@@ -66,70 +67,49 @@ final class MarketplaceController extends RestController {
 	}
 
 	public function browse( WP_REST_Request $request ) {
-		global $wpdb;
 		[ $page, $per_page ] = $this->pagination_args( $request, 12, 48 );
 
-		$where  = [ '1=1' ];
-		$params = [];
+		$city_id      = (int) $request->get_param( 'city_id' ) ?: null;
+		$district_id  = (int) $request->get_param( 'district_id' ) ?: null;
+		$specialty_id = (int) $request->get_param( 'specialty_id' ) ?: null;
+		$price_max    = $request->get_param( 'price_max' ) ? (int) $request->get_param( 'price_max' ) : null;
+		$rating_min   = $request->get_param( 'rating_min' ) ? (float) $request->get_param( 'rating_min' ) : null;
+		$q            = trim( (string) $request->get_param( 'q' ) );
 
-		if ( $city_id = $request->get_param( 'city_id' ) ) {
-			$where[]  = 'city_id = %d';
-			$params[] = (int) $city_id;
-		}
-		if ( $district_id = $request->get_param( 'district_id' ) ) {
-			$where[]  = 'district_id = %d';
-			$params[] = (int) $district_id;
-		}
-		if ( $specialty_id = $request->get_param( 'specialty_id' ) ) {
-			$where[]  = 'FIND_IN_SET(%d, specialty_ids)';
-			$params[] = (int) $specialty_id;
-		}
-		if ( $price_max = $request->get_param( 'price_max' ) ) {
-			$where[]  = 'price_from <= %d';
-			$params[] = (int) $price_max;
-		}
-		if ( $rating_min = $request->get_param( 'rating_min' ) ) {
-			$where[]  = 'rating_avg >= %f';
-			$params[] = (float) $rating_min;
-		}
-		if ( rest_sanitize_boolean( $request->get_param( 'verified_only' ) ) ) {
-			$where[] = 'verified = 1';
-		}
-
-		// V2.3 Step 20 (MKT-02): the platform's first free-text search —
-		// plain LIKE against the pre-normalized search_text column
-		// (Indexer::sync() builds it from name+bio), never fuzzy/typo-
-		// tolerant matching (still evidence-gated past this step, see
-		// MKT-02's own recommendation). The query is normalized with the
-		// exact same digit-normalization idea CRM search already uses, so
-		// it matches search_text regardless of numeral system.
-		$q = trim( (string) $request->get_param( 'q' ) );
-		if ( '' !== $q ) {
-			$where[]  = 'search_text LIKE %s';
-			$params[] = '%' . $wpdb->esc_like( TextNormalizer::normalize( $q ) ) . '%';
-		}
-
-		$table       = $wpdb->prefix . 'bc_provider_index';
-		$where_sql   = implode( ' AND ', $where );
-		$count_sql   = "SELECT COUNT(*) FROM {$table} WHERE {$where_sql}";
-		$count_sql   = $params ? $wpdb->prepare( $count_sql, $params ) : $count_sql; // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		$total       = (int) $wpdb->get_var( $count_sql );
-
-		$offset      = ( $page - 1 ) * $per_page;
-		$order       = $this->sort_clause( (string) $request->get_param( 'sort' ) );
-		$select_sql  = "SELECT * FROM {$table} WHERE {$where_sql} ORDER BY {$order} LIMIT %d OFFSET %d";
-		$select_sql  = $wpdb->prepare( $select_sql, array_merge( $params, [ $per_page, $offset ] ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-
-		$rows = $wpdb->get_results( $select_sql, ARRAY_A );
+		// V2.4 Step 21: query-building itself now lives in SqlSearchProvider,
+		// shared with the theme's SSR bc_get_providers() helper — see that
+		// class's own docblock for why (this duplication was real and
+		// confirmed, not hypothetical).
+		$result = ( new SqlSearchProvider() )->search(
+			new SearchQuery(
+				cityId: $city_id,
+				districtId: $district_id,
+				specialtyId: $specialty_id,
+				priceMax: $price_max,
+				ratingMin: $rating_min,
+				verifiedOnly: rest_sanitize_boolean( $request->get_param( 'verified_only' ) ),
+				q: $q,
+				sort: (string) $request->get_param( 'sort' ),
+				limit: $per_page,
+				offset: ( $page - 1 ) * $per_page
+			)
+		);
 
 		// V2.2 Step 11 (ANLYT-02), extended in V2.3 Step 20 once a real
-		// free-text query param existed: this filtered browse is the
-		// platform's real search/discovery entry point. No idempotency
-		// guard, same reasoning as profile_view below: every real search is
-		// a distinct, legitimate event. Deliberately logs only bounded
-		// counts and filter-usage booleans, never the raw query text itself
-		// (privacy-conscious, matching this codebase's own "allow-listed,
-		// bounded, no raw sensitive text" analytics standard).
+		// free-text query param existed, and again in V2.4 Step 21: this
+		// filtered browse is the platform's real search/discovery entry
+		// point. No idempotency guard, same reasoning as profile_view below:
+		// every real search is a distinct, legitimate event. Deliberately
+		// logs only bounded counts and filter-usage booleans, never the raw
+		// query text itself (privacy-conscious, matching this codebase's own
+		// "allow-listed, bounded, no raw sensitive text" analytics
+		// standard). `matchedResultCount`/`zeroResult` replace the old,
+		// single `resultCount` field (same value, split so MetricsService
+		// can read the zero-result fact directly instead of casting a
+		// number out of JSON); `searchSource` distinguishes this REST path
+		// from the SSR marketplace page, which logs the identical event
+		// shape from page-marketplace.php now that it's the platform's
+		// actual live search entry point (see that file's own comment).
 		if ( function_exists( 'beauclick_core' ) ) {
 			beauclick_core()->events()->log(
 				'search_performed',
@@ -137,28 +117,17 @@ final class MarketplaceController extends RestController {
 				0,
 				get_current_user_id() ?: null,
 				[
-					'resultCount'     => $total,
-					'specialtyFilter' => (bool) $specialty_id,
-					'locationFilter'  => (bool) ( $city_id || $district_id ),
-					'textSearch'      => '' !== $q,
+					'matchedResultCount' => $result->total,
+					'zeroResult'         => $result->isZeroResult(),
+					'specialtyFilter'    => null !== $specialty_id,
+					'locationFilter'     => null !== $city_id || null !== $district_id,
+					'textSearch'         => '' !== $q,
+					'searchSource'       => 'rest_api',
 				]
 			);
 		}
 
-		return Response::paginated( array_map( [ $this, 'format_index_row' ], $rows ), $total, $page, $per_page );
-	}
-
-	private function sort_clause( string $sort ): string {
-		return match ( $sort ) {
-			'price_asc'  => 'price_from ASC',
-			'price_desc' => 'price_from DESC',
-			'rating'     => 'rating_avg DESC, review_count DESC',
-			// V2.0 Step 3: "recommended" — the real ranking engine this
-			// comment used to point at as a future Phase 11. RankingPresenter
-			// is the single shared ORDER_BY every ranking consumer in this
-			// codebase now uses (see its own docblock).
-			default      => RankingPresenter::ORDER_BY,
-		};
+		return Response::paginated( array_map( [ $this, 'format_index_row' ], $result->rows ), $result->total, $page, $per_page );
 	}
 
 	private function format_index_row( array $row ): array {

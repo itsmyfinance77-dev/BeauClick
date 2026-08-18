@@ -375,27 +375,26 @@ final class MetricsService {
 	}
 
 	/**
-	 * Search — source: wp_bc_events 'search_performed', added by this step
-	 * directly inside MarketplaceController::browse() (the platform's real
-	 * search/discovery entry point today; there is no separate free-text
-	 * search endpoint — MKT-02 in the gap register already documents that
-	 * as a distinct, deferred gap, not something this step invents).
-	 * Deliberately does not store or expose raw query text — only bounded,
-	 * privacy-safe counts and filter-usage booleans (§9/§22's own "avoid
-	 * logging raw sensitive search text" instruction).
+	 * Search — source: wp_bc_events 'search_performed', logged from both
+	 * real search entry points as of V2.4 Step 21: the SSR marketplace page
+	 * (page-marketplace.php — the platform's actual live search path) and
+	 * the REST browse() endpoint (no frontend consumer of its own yet, kept
+	 * logging for when one exists). Before Step 21 this event only ever
+	 * fired from the REST path, so this metric was silently zero for all
+	 * real production search traffic — a gap closed by Step 21, not by this
+	 * method. Deliberately does not store or expose raw query text — only
+	 * bounded, privacy-safe counts and filter-usage booleans (§9/§22's own
+	 * "avoid logging raw sensitive search text" instruction).
 	 */
 	public function search( string $from, string $to ): array {
-		global $wpdb;
-		[ $start, $end ] = self::bounds( $from, $to );
-
 		$total       = $this->count_events( 'search_performed', $from, $to );
-		$zero_result = (int) $wpdb->get_var(
-			$wpdb->prepare(
-				"SELECT COUNT(*) FROM {$wpdb->prefix}bc_events WHERE event_type = 'search_performed' AND created_at BETWEEN %s AND %s AND CAST(JSON_UNQUOTE(JSON_EXTRACT(meta, '$.resultCount')) AS UNSIGNED) = 0", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-				$start,
-				$end
-			)
-		);
+		// V2.4 Step 21: reads the explicit `zeroResult` boolean the event now
+		// carries (via the same count_meta_bool_true() helper every other
+		// boolean meta field on this event already uses) instead of casting
+		// a number out of JSON — `matchedResultCount` (renamed from
+		// `resultCount`, same value) is still logged for anyone reading the
+		// raw event, just no longer what this particular check parses.
+		$zero_result = $this->count_meta_bool_true( 'search_performed', 'zeroResult', $from, $to );
 
 		return [
 			'totalSearches'        => $total,

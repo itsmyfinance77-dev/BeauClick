@@ -16,10 +16,36 @@ $city_id      = isset( $_GET['city_id'] ) ? absint( $_GET['city_id'] ) : 0; // p
 $specialty_id = isset( $_GET['specialty_id'] ) ? absint( $_GET['specialty_id'] ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 $q            = isset( $_GET['q'] ) ? sanitize_text_field( wp_unslash( $_GET['q'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 
-$providers  = bc_get_providers( [ 'city_id' => $city_id, 'specialty_id' => $specialty_id, 'q' => $q, 'limit' => 48 ] );
-$cities      = bc_get_launched_cities();
-$specialties = bc_get_specialties();
-$city_label  = $city_id ? bc_get_city_name( $city_id ) : '';
+// V2.4 Step 21: this page, not the REST /marketplace/providers endpoint, is
+// the platform's actual live search entry point — the header search
+// overlay and the homepage hero form both land here, and the REST browse()
+// endpoint has no frontend consumer of its own yet. Before this step,
+// search_performed only ever logged from the REST path, so the analytics
+// dashboard's "Search" section (MetricsService::search()) was silently
+// empty for all real production search traffic. Logging it here, from the
+// one place a real search actually happens, is the fix.
+$search_result = bc_search_providers( [ 'city_id' => $city_id, 'specialty_id' => $specialty_id, 'q' => $q, 'limit' => 48 ] );
+$providers      = $search_result->rows;
+$cities         = bc_get_launched_cities();
+$specialties    = bc_get_specialties();
+$city_label     = $city_id ? bc_get_city_name( $city_id ) : '';
+
+if ( function_exists( 'beauclick_core' ) ) {
+	beauclick_core()->events()->log(
+		'search_performed',
+		'search',
+		0,
+		get_current_user_id() ?: null,
+		[
+			'matchedResultCount' => $search_result->total,
+			'zeroResult'         => $search_result->isZeroResult(),
+			'specialtyFilter'    => (bool) $specialty_id,
+			'locationFilter'     => (bool) $city_id,
+			'textSearch'         => '' !== $q,
+			'searchSource'       => 'marketplace_page',
+		]
+	);
+}
 ?>
 
 <div class="bc-container bc-section">
@@ -45,6 +71,9 @@ $city_label  = $city_id ? bc_get_city_name( $city_id ) : '';
 
 	<?php if ( $q ) : ?>
 		<p class="bc-provider-card__meta"><?php echo esc_html( sprintf( /* translators: %s: search query */ __( 'نتایج جستجو برای «%s»', 'beauclick' ), $q ) ); ?></p>
+		<?php if ( $search_result->synonymExpanded && $providers ) : ?>
+			<p class="bc-provider-card__meta bc-search-related-hint"><?php esc_html_e( 'نتایج مرتبط با عبارت جستجوی شما را هم نشان می‌دهیم.', 'beauclick' ); ?></p>
+		<?php endif; ?>
 	<?php endif; ?>
 
 	<div id="bc-marketplace-filters-root" class="bc-chip-row" data-selected-city="<?php echo esc_attr( $city_id ); ?>" data-selected-specialty="<?php echo esc_attr( $specialty_id ); ?>">

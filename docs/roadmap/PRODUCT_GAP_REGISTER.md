@@ -830,3 +830,16 @@ Product-wide UI/UX audit at `v2.3.0` (`c505c20`) plus one intervening documentat
 **Tests:** backend PHPUnit 857/857 (3 tests updated, not skipped), frontend Vitest 48/48, TypeScript clean, ESLint clean, `php -l` clean — before and after this audit's fixes, no regressions.
 
 **No other item in this register changed status as a result of this audit.**
+
+## 50. V2.4 Step 21 — Search & Discovery Evolution Completion Note
+
+| ID | Item | Disposition |
+|---|---|---|
+| MKT-02 (partial) / GAP-14 (partial) | Search was plain, unbounded `LIKE '%term%'` with no fuzzy/typo tolerance and no synonym handling; two independent, hand-duplicated query implementations existed (REST `MarketplaceController::browse()`, SSR `bc_get_providers()`) | **PARTIALLY_IMPLEMENTED** — a shared `SearchProviderInterface`/`SqlSearchProvider` now backs both real entry points (no more duplication); `TextNormalizer` extended with Persian/Arabic letter + ZWNJ normalization; a curated `SynonymExpander` closes the specific typo/alternate-phrasing examples named in this step's own brief. Still plain `LIKE`, still no fuzzy/typo-*distance* algorithm — **MKT-02/GAP-14 remain open** for that part, deliberately not claimed closed. |
+| — (new, found during this step's own pre-implementation audit) | `search_performed` — the event `MetricsService::search()` reads — was only ever logged from the REST `browse()` endpoint, which has zero live frontend consumers; the platform's actual live search path (`bc_get_providers()`/`page-marketplace.php`) never logged it, so the Search analytics dashboard was silently zero for all real production search traffic | **FIXED** — `page-marketplace.php` now logs `search_performed` on every real page view; `matchedResultCount`/`zeroResult`/`searchSource` fields added (renamed from the old single `resultCount`, safe — confirmed exactly 2 references codebase-wide before renaming). Live-verified: real search requests now write real events with the new shape. |
+
+**Tests:** backend PHPUnit grew 857 → **882** (25 new tests, zero regressions). Frontend Vitest unchanged **48/48** (no frontend code touched — UI was explicitly out of scope for this step beyond one optional server-rendered hint). TypeScript/ESLint/`php -l` clean, production build succeeds.
+
+**Live QA:** all 10 scenarios in this step's own brief verified against the real running site — exact-name match, the specific synonym/typo examples named in the brief ("خدمات ناخن", "کاشت ناحن"/"ناحن"), a genuine zero-result query, the homepage hero form, and the header search modal's fallback path, all confirmed producing correct real results and (where applicable) the synonym hint. `search_performed` events confirmed writing live with the new field shape. 375/390/412px: zero overflow, RTL correct, no console errors.
+
+**Not claimed:** OpenSearch readiness beyond a single swappable interface; fuzzy/typo-distance matching (MKT-02/GAP-14 remain open); relevance-ranking of matches (unchanged `RankingPresenter::ORDER_BY`).

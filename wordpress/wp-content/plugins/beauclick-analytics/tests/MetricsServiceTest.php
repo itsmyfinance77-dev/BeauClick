@@ -196,4 +196,48 @@ final class MetricsServiceTest extends WP_UnitTestCase {
 		$this->assertSame( 0, $result['customers']['total'] );
 		$this->assertSame( [], $result['servicePerformance'] );
 	}
+
+	/**
+	 * V2.4 Step 21: search()'s zero-result computation now reads the
+	 * search_performed event's explicit `zeroResult` boolean (written by
+	 * MarketplaceController::browse()/page-marketplace.php as of this step)
+	 * instead of casting a number out of the old `resultCount` field —
+	 * covering a method with no prior dedicated test.
+	 */
+	public function test_search_reports_totals_and_zero_result_rate(): void {
+		global $wpdb;
+		$log = function ( bool $zero_result, bool $specialty, bool $location ) use ( $wpdb ): void {
+			$wpdb->insert(
+				$wpdb->prefix . 'bc_events',
+				[
+					'event_type'  => 'search_performed',
+					'entity_type' => 'search',
+					'entity_id'   => 0,
+					'meta'        => wp_json_encode(
+						[
+							'matchedResultCount' => $zero_result ? 0 : 3,
+							'zeroResult'         => $zero_result,
+							'specialtyFilter'    => $specialty,
+							'locationFilter'     => $location,
+							'textSearch'         => true,
+							'searchSource'       => 'marketplace_page',
+						]
+					),
+					'created_at'  => current_time( 'mysql' ),
+				]
+			);
+		};
+		$log( false, true, false );
+		$log( true, false, true );
+		$log( true, false, false );
+
+		[ $from, $to ] = $this->range_today();
+		$result = ( new MetricsService() )->search( $from, $to );
+
+		$this->assertSame( 3, $result['totalSearches'] );
+		$this->assertSame( 2, $result['zeroResultSearches'] );
+		$this->assertSame( 1, $result['specialtyFilterUsage'] );
+		$this->assertSame( 1, $result['locationFilterUsage'] );
+		$this->assertEqualsWithDelta( 0.6667, $result['zeroResultRate'], 0.0001 );
+	}
 }

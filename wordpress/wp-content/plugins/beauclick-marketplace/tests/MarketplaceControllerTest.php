@@ -191,4 +191,48 @@ final class MarketplaceControllerTest extends WP_UnitTestCase {
 
 		$this->assertContains( 'میکاپ تست', $names );
 	}
+
+	/** V2.4 Step 21: a known common typo, matched through the full REST path via SqlSearchProvider. */
+	public function test_browse_q_matches_via_a_known_common_typo(): void {
+		$owner_id = self::factory()->user->create();
+		$match    = self::factory()->post->create( [ 'post_type' => Registrar::PROFESSIONAL, 'post_status' => 'publish', 'post_author' => $owner_id, 'post_content' => 'کاشت ناخن با کیفیت' ] );
+
+		$request = new \WP_REST_Request( 'GET', '/beauclick/v1/marketplace/providers' );
+		$request->set_param( 'q', 'کاشت ناحن' );
+		$ids = array_column( ( new MarketplaceController() )->browse( $request )->get_data()['data'], 'id' );
+
+		$this->assertContains( $match, $ids );
+	}
+
+	/** V2.4 Step 21: the search_performed event now carries matchedResultCount/zeroResult/searchSource. */
+	public function test_browse_writes_the_new_search_event_fields(): void {
+		global $wpdb;
+		$owner_id = self::factory()->user->create();
+		self::factory()->post->create( [ 'post_type' => Registrar::PROFESSIONAL, 'post_status' => 'publish', 'post_author' => $owner_id, 'post_title' => 'سالن زیبایی مریم' ] );
+
+		$request = new \WP_REST_Request( 'GET', '/beauclick/v1/marketplace/providers' );
+		$request->set_param( 'q', 'مریم' );
+		( new MarketplaceController() )->browse( $request );
+
+		$meta = $wpdb->get_var( "SELECT meta FROM {$wpdb->prefix}bc_events WHERE event_type = 'search_performed' ORDER BY id DESC LIMIT 1" );
+		$meta = json_decode( (string) $meta, true );
+
+		$this->assertSame( 1, $meta['matchedResultCount'] );
+		$this->assertFalse( $meta['zeroResult'] );
+		$this->assertSame( 'rest_api', $meta['searchSource'] );
+		$this->assertArrayNotHasKey( 'resultCount', $meta, 'The old field name must not linger alongside the new one.' );
+	}
+
+	/** V2.4 Step 21: a genuinely no-match query must report zeroResult=true. */
+	public function test_browse_with_no_matches_reports_zero_result_true(): void {
+		global $wpdb;
+		$request = new \WP_REST_Request( 'GET', '/beauclick/v1/marketplace/providers' );
+		$request->set_param( 'q', 'یک عبارت کاملا نامرتبط و بی‌نتیجه' );
+		( new MarketplaceController() )->browse( $request );
+
+		$meta = $wpdb->get_var( "SELECT meta FROM {$wpdb->prefix}bc_events WHERE event_type = 'search_performed' ORDER BY id DESC LIMIT 1" );
+		$meta = json_decode( (string) $meta, true );
+
+		$this->assertTrue( $meta['zeroResult'] );
+	}
 }

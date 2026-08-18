@@ -2877,4 +2877,69 @@ After fixes: backend PHPUnit **857/857** (3 pre-existing AI-provider tests updat
 
 **GLOBAL UI/UX & PRODUCT-WIDE AUDIT COMPLETE — READY FOR v2.3.1**, conditioned on the disclosed scope limits above (admin pages, full B2B accept-quote flow, professional CRM/calendar/staff tabs, and a full 6-breakpoint sweep were not exhaustively live-tested this pass) — no release-blocking defect was found or remains open; every confirmed bug was fixed, tested, and left the suite green. Per the audit's own explicit instruction, **no `v2.3.1` tag has been created** — tagging remains a separate, explicit product-owner action.
 
+**Update, post-tagging:** `v2.3.1` was subsequently tagged on the commit that included this audit's fixes and documentation (`8c50b67`). Both historical tags (`v2.3.0`, `v2.3.1`) and every prior tag were independently re-verified byte-identical local-vs-remote before and after tagging; see the release commit history for the full verification record.
+
+---
+
+## V2.4 Step 21 — Search & Discovery Evolution
+
+**Status: implemented.** Scope: transform the current marketplace search into a migration-ready layer, without introducing OpenSearch/Elasticsearch/Kafka/microservices/new infrastructure, without rewriting marketplace architecture, and without changing the external `q`/`city_id`/`specialty_id`/... REST/SSR contract.
+
+### Audit of the pre-existing search implementation (done before writing any code)
+
+Two real search paths existed, independently duplicating the same query logic — a real, confirmed drift, not a hypothetical one:
+
+1. **`MarketplaceController::browse()`** (REST, `/marketplace/providers`) — hand-rolled its own `WHERE` clause against `wp_bc_provider_index`, including its own `search_text LIKE %s` construction. Confirmed via a full-codebase grep to have **zero live frontend consumers** — `app/src/mounts/marketplace-filters.tsx` (the intended client-side re-filtering island) is still a Phase-4-follow-up stub that renders nothing; `HeaderSearch.tsx` never calls this endpoint, it only navigates to a URL. Only `MarketplaceControllerTest.php` exercised it before this step.
+2. **`bc_get_providers()`** (theme helper, `wordpress/wp-content/themes/beauclick/inc/helpers.php`) — an independent, slightly different hand-rolled copy of the same `WHERE` clause, called from `page-marketplace.php` (the server-rendered `/marketplace/` page) and `front-page.php` (the homepage's featured-providers rail). **This, not the REST endpoint, is the platform's actual live search entry point** — both the header search overlay's fallback and the homepage hero search form land here via a real page navigation.
+
+**Hidden gap found before implementation began:** `search_performed` (the analytics event `MetricsService::search()` reads) was only ever logged from `MarketplaceController::browse()` — the REST path with no live consumer. `bc_get_providers()`/`page-marketplace.php`, the platform's actual live search path, never logged it at all. This meant the "Search" section of the analytics dashboard was silently zero for all real production search traffic, for every session this project has ever run — a gap this step closes, not merely documents (see "Analytics" below).
+
+`TextNormalizer` (digit-only normalization) and the `search_text` index column already existed and worked correctly (V2.3 Step 20); no fuzzy/typo-distance algorithm existed; no synonym handling existed; no shared abstraction existed between the two duplicated query paths.
+
+### Architecture implemented
+
+```
+MarketplaceController::browse() ─┐
+                                   ├──> SqlSearchProvider (implements SearchProviderInterface)
+bc_get_providers() / bc_search_providers() (theme) ─┘         │
+                                                                 ├── TextNormalizer (extended)
+                                                                 └── SynonymExpander (new)
+```
+
+New, all in `beauclick-marketplace/src/Search/`: `SearchQuery` (immutable parameter object), `SearchResult` (rows + total + `synonymExpanded`), `SearchProviderInterface` (one method: `search(SearchQuery): SearchResult`), `SqlSearchProvider` (the only implementation — mirrors this codebase's own established provider-abstraction shape, `SmsProvider`/`beauclick-ai`'s `ProviderInterface`, deliberately with **no factory and no second implementation**, since none is needed yet; the interface exists so a future real change of backend never has to touch `MarketplaceController` or the theme helper, not because a second implementation is planned), `SynonymExpander` (new).
+
+**`TextNormalizer` extended** (same public method signature, zero breaking change) with: Arabic-presentation-form → Persian letter normalization (ك→ک, ي→ی, ة→ه, ؤ/إ/أ/آ→ا/و — the real, common source of a Persian word failing to match itself in `LIKE` search, independent of digits); ZWNJ removal (نیم‌فاصله — "میکاپ" and "می‌کاپ" now normalize identically; an ordinary space between two genuinely distinct words is deliberately left alone, so unrelated multi-word phrases don't collapse together); whitespace-run collapsing.
+
+**`SynonymExpander` (new)**: a small, static, curated table — explicitly **not** a fuzzy/Levenshtein/trigram algorithm, per this step's own boundary — grounded in the real specialty taxonomy (پوست و مو / رنگ مو / میکاپ / ناخن) and real live-verified service content (میکاپ عروس, میکاپ مراسم, پاکسازی پوست, کاشت ناخن). A query matching any phrase in a group expands the search to every other phrase in that group, so a confirmed common typo ("کاشت ناحن") or an alternate real phrasing ("خدمات ناخن", "ناخن کار") finds the same results as the platform's own correctly-spelled term. New groups should only be added from confirmed real search terms, not invented speculatively.
+
+`MarketplaceController::browse()` and `bc_get_providers()` (plus its new sibling `bc_search_providers()`, which also returns `total`/`synonymExpanded` for the one caller — `page-marketplace.php` — that needs them) now both build a `SearchQuery` and delegate to the same `SqlSearchProvider`; neither builds its own `WHERE` clause anymore.
+
+### Analytics
+
+`search_performed`'s meta shape changed: `resultCount` → `matchedResultCount` (renamed, same value — safe, since a full-codebase grep confirmed exactly two references, the writer and `MetricsService`'s one reader, both updated together) plus a new explicit `zeroResult` boolean (so `MetricsService::search()`'s zero-result count now reuses the existing `count_meta_bool_true()` helper instead of a `CAST(JSON_UNQUOTE(...))` numeric comparison) and a new `searchSource` field (`'rest_api'` | `'marketplace_page'`). Still never logs raw query text — privacy rules unchanged. `page-marketplace.php` now logs this event on every real page view, closing the hidden gap named above; live-verified (see Live QA below) that real production-shaped search requests now write real events, where before this step the last such event in the database was from the REST-only era.
+
+### UI
+
+Unchanged, per this step's own boundary — no React component was touched. One small, optional, server-rendered addition: `page-marketplace.php` shows "نتایج مرتبط با عبارت جستجوی شما را هم نشان می‌دهیم." when `SqlSearchProvider` reports `synonymExpanded` and at least one result exists (never shown alongside the zero-result empty state, which would be a confusing/false claim).
+
+### Security
+
+All query construction remains fully parameterized (`$wpdb->prepare()`), unchanged from before this step; no user input selects a provider implementation or reaches raw SQL; ownership/ordinary filter rules untouched.
+
+### Tests
+
+25 new tests added (`TextNormalizerTest`, `SynonymExpanderTest`, `SqlSearchProviderTest`, 3 new `MarketplaceControllerTest` cases, 1 new `MetricsServiceTest` case) — backend suite grew from 857 to **882**, all green, zero regressions in any pre-existing test. Frontend suite unchanged at **48/48** (no frontend code touched). TypeScript clean, ESLint clean, `php -l` clean, production build succeeds.
+
+### Live QA (real browser, real local stack)
+
+All 10 required scenarios verified against the running site: exact-name match, synonym match ("خدمات ناخن"), the exact typo example named in this step's own brief ("کاشت ناحن"/"ناحن" → real results + the synonym hint, verified both via direct marketplace-page navigation and via the header search modal's fallback button), a genuine zero-result query (clean empty state, no false hint), the homepage hero search form, and the header search overlay — all landing on real, correct results. `search_performed` events were confirmed writing with the new field shape from real live requests (`searchSource: "marketplace_page"`), where the event previously logged in this database was from the old REST-only era. 375/390/412px: zero horizontal overflow, RTL correct, no console errors. Digit-difference and Arabic/Persian-letter-variant matching were confirmed via the automated test suite with controlled fixture data (`SqlSearchProviderTest`) rather than re-verified live, since the seeded demo dataset has no content exercising those exact cases — the mechanism itself is directly, not just indirectly, tested.
+
+### Remaining limitations (not fixed, not claimed)
+
+Search is still plain `LIKE` — no fuzzy/typo-distance algorithm, no ranking-relevance scoring of matches, no search-as-you-type. `MKT-02`/`GAP-14` (the real, evidence-gated fuzzy-search deferral) is **not** closed by this step and should not be read as closed — the curated synonym/typo table is a real, useful, zero-infrastructure improvement, not a substitute for it. `SynonymExpander`'s curated groups cover the vocabulary confirmed real in this codebase today; they will need real usage data (via the now-fixed analytics) to grow correctly rather than by guesswork.
+
+### Future OpenSearch migration path
+
+Unchanged in kind from `V3_ARCHITECTURE_PLAN.md`'s own `search-service` proposal — this step does not claim OpenSearch readiness beyond what was actually built. What this step *does* provide toward that eventual migration: a single interface (`SearchProviderInterface`) both real call sites already depend on instead of raw SQL, so introducing a second, OpenSearch-backed implementation later is a new class plus a selection point (mirroring `SmsProviderFactory`'s established shape), not a `MarketplaceController`/theme-helper rewrite; and a real, validated `search_performed` event stream (now actually populated) to ground that future migration's relevance-ranking design in real query/zero-result data instead of assumption.
+
 ---
