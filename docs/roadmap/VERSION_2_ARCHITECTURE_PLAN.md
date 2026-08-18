@@ -2975,3 +2975,41 @@ Confirmed the site boots correctly and the REST API responds normally after modi
 `ADMIN-07`/the general "no structural mechanism ties a capability-gated mutation to mandatory audit logging" observation from the V2.3 Final Release Audit is now addressed for the 5+8 confirmed routes and for every *future* admin mutation that opts into `adminGated` — it is not retroactively enforced across the entire codebase's every route, which was never the scope of the confirmed bug class. `require_owner_or_capability()`'s 4 pre-existing direct-ownership call sites were left untouched (correct as-is, no indirect-ownership need); only `BookingController`'s two confirmed indirect cases were migrated.
 
 ---
+
+## V2.4 Step 24 — Notification Center
+
+**Status: implemented.** `beauclick-notifications`'s `wp_bc_notifications` table already recorded every dispatched notification, but nothing surfaced them to the recipient inside the product itself — a customer or professional could only ever learn a notification existed via the actual SMS. This step adds a real in-app read/unread inbox on top of the existing dispatch log, without touching how or when notifications are generated.
+
+### Backend
+
+New additive migration (`AddNotificationReadAtColumn`, registered alongside the existing `CreateNotificationTables` in `Plugin::migrations()`) adds `read_at DATETIME NULL` plus a `(user_id, read_at)` index to `wp_bc_notifications` — ledger-tracked and idempotent like every other migration in this codebase, applied to the local stack and confirmed via `SHOW COLUMNS`.
+
+`NotificationService` gained `unread_count(int $user_id): int`, `mark_read(int $notification_id, int $user_id): bool` (scoped to the owning user — a non-owner's call affects zero rows and returns `false`, not an error leaking the notification's existence), and `mark_all_read(int $user_id): void`. `for_user()` now also returns each row's `id` and a derived `isRead` boolean. Separately, `dispatch_one()` now fires a new `beauclick/notification/requested` action with the real category/template/user/entity facts, immediately before the existing enabled-channel check — a hook point that didn't exist before, added because it was the natural place to let future features (e.g. a live in-app toast) observe dispatch without duplicating `NotificationService`'s own delivery logic.
+
+`NotificationsController` gained three routes: `GET /notifications/unread-count`, `POST /notifications/{id}/read`, `POST /notifications/mark-all-read`. The single-notification route's permission callback resolves the notification's owning `user_id` and delegates to the existing `require_owner_or_capability()` helper (the same shared ownership check [[GAP-08]]'s fix generalized) — no new authorization logic was written for this step.
+
+### Frontend
+
+New `NotificationBell.tsx` reuses the existing `Modal` component's `variant="drawer-end"` — the same pattern `CartDrawer` already establishes — rather than introducing a new panel primitive. It fetches `/notifications/mine` on open, shows a real Persian empty state and a real Persian error state (never a silent blank panel), and marks a notification read optimistically in local state before confirming against the real REST endpoint. New `mounts/notification-bell.tsx` mirrors `mounts/cart.tsx`'s exact shape: a delegated click listener on `[data-bc-notifications-open]`, a badge element kept in sync via both a `window focus` listener and a `bc:notifications-count` `CustomEvent` (the same cross-mount refresh pattern the cart badge already uses). The bell button and badge were added to `header.php`, gated inside the existing `is_user_logged_in()` block (this feature has no meaningful logged-out state). The new `notification-bell` entry had to be added explicitly to `vite.config.ts`'s `rollupOptions.input` — this codebase's Vite entries are never auto-discovered from `src/mounts/`, and the bundle silently failed to build (no error, just absent from `dist/`) until this was caught by grepping the full build output rather than trusting a truncated view.
+
+### UI
+
+No existing component was changed in a way that alters prior behavior — `Modal`, `CartDrawer`, and every other consumer of the shared drawer variant are unaffected. The bell is a net-new, additive icon in the logged-in header.
+
+### Security
+
+`mark_read`'s ownership check is enforced at the REST-permission layer, not just inside the handler — a non-owner's request is rejected by `require_owner_or_capability()` before the handler runs, consistent with every other ownership-gated route in this codebase. No route in this step required `adminGated`/`auditAction` — these are ordinary-user self-service actions on the user's own notifications, not administrative mutations, so [[GAP-02]]'s enforcement correctly does not apply here.
+
+### Tests
+
+Backend suite grew **891 → 901** (10 new: `NotificationServiceTest` covering fresh-unread-default, `mark_read` reducing the count, `mark_read` refusing a non-owner, `mark_all_read` scoped correctly to one user, and the new `beauclick/notification/requested` hook firing with real facts; `NotificationsControllerTest` covering the three new routes including the non-owner-403 case). Frontend suite grew **48 → 55** (7 new `NotificationBell.test.tsx` cases: closed renders nothing/fetches nothing, real list renders with the unread indicator on only the unread item, real empty state, real Persian error state, click-to-mark-read calls the real endpoint, "mark all read" appears only with a real unread item and disappears once none remain). All 901 backend and 55 frontend tests pass; `php -l`, TypeScript, and ESLint all clean; production build succeeds with the `notification-bell` bundle present.
+
+### Live QA (real browser, real local stack)
+
+Logged in as `bc_qa_customer`: the bell renders in the header with a live unread-count badge; opening it performs a real `GET /notifications/mine` request and renders real rows (verified via `read_network_requests` and the panel's real Persian content, not a mock). Clicking an unread notification called the real `POST /notifications/{id}/read` endpoint and was confirmed, via a direct database query, to have written `read_at` on that exact row (id 54, `bc_qa_customer`) — a genuine persistence check, not just a UI-state check. 375/390/412px: the panel and bell button render with zero horizontal overflow at all three widths, the panel's Persian content and close button remain reachable, and viewport state (panel open, real fetched content) survived the resize. Console errors observed earlier in this same long-lived browser tab (`ERR_CONNECTION_REFUSED` ×2, `401` ×2, `403` ×1) were investigated and confirmed **not** attributable to this step: a fresh network-request log captured during the actual bell/mark-read interaction shows every request succeeding (`200 OK`), so those buffered console entries are stale noise from earlier, unrelated test navigation in the same tab, not a regression introduced here.
+
+### Remaining limitations
+
+No real-time delivery — the badge updates on window focus and on the same-tab `bc:notifications-count` event, not via any push/socket mechanism, so a notification dispatched while the tab is focused and idle won't update the badge until the next focus event or an in-tab action that dispatches it. This is a deliberate scope boundary (no new infrastructure), not an oversight.
+
+---

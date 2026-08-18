@@ -26,6 +26,7 @@ export default defineConfig( {
 				'header-search': path.resolve( __dirname, 'src/mounts/header-search.tsx' ),
 				'ai-assistant': path.resolve( __dirname, 'src/mounts/ai-assistant.tsx' ),
 				chat: path.resolve( __dirname, 'src/mounts/chat.tsx' ),
+				'notification-bell': path.resolve( __dirname, 'src/mounts/notification-bell.tsx' ),
 				'dashboard-professional': path.resolve( __dirname, 'src/mounts/dashboard-professional.tsx' ),
 				'dashboard-customer': path.resolve( __dirname, 'src/mounts/dashboard-customer.tsx' ),
 				auth: path.resolve( __dirname, 'src/mounts/auth.tsx' ),

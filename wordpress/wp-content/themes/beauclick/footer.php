@@ -30,6 +30,7 @@ bc_enqueue_app_bundle( 'ai-assistant' );
 bc_enqueue_app_bundle( 'header-search' );
 if ( is_user_logged_in() ) {
 	bc_enqueue_app_bundle( 'chat' );
+	bc_enqueue_app_bundle( 'notification-bell' );
 }
 ?>
 <div id="bc-booking-root"></div>
@@ -38,6 +39,7 @@ if ( is_user_logged_in() ) {
 <div id="bc-header-search-root"></div>
 <?php if ( is_user_logged_in() ) : ?>
 	<div id="bc-chat-root"></div>
+	<div id="bc-notifications-root"></div>
 <?php endif; ?>
 
 <?php wp_footer(); ?>

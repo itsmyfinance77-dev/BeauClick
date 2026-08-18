@@ -37,6 +37,10 @@ declare( strict_types=1 );
 				<span class="bc-icon-chip__badge bc-numeric" id="bc-cart-count">۰</span>
 			</button>
 			<?php if ( is_user_logged_in() ) : ?>
+				<button type="button" class="bc-icon-chip" aria-label="<?php esc_attr_e( 'اعلان‌ها', 'beauclick' ); ?>" data-bc-notifications-open>
+					🔔
+					<span class="bc-icon-chip__badge bc-numeric" id="bc-notifications-count" style="display:none;">۰</span>
+				</button>
 				<a href="<?php echo esc_url( home_url( '/dashboard/' ) ); ?>" class="bc-icon-chip" aria-label="<?php esc_attr_e( 'حساب کاربری', 'beauclick' ); ?>">
 					<?php echo esc_html( mb_substr( wp_get_current_user()->display_name ?: 'B', 0, 1 ) ); ?>
 				</a>

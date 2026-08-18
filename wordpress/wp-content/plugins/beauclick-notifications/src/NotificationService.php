@@ -92,6 +92,7 @@ final class NotificationService {
 			return 'suppressed';
 		}
 
+		do_action( 'beauclick/notification/requested', $category, $template_key, $user_id, $entity_type, $entity_id, $channel );
 		$notification_id = (int) $wpdb->insert_id;
 		return $this->attempt_delivery( $notification_id, $channel, $user_id, $rendered );
 	}
@@ -214,22 +215,75 @@ final class NotificationService {
 		);
 	}
 
-	/** @return array<int, array<string, mixed>> */
+	/**
+	 * V2.4 Step 24: `id`/`isRead` added for the notification center (bell +
+	 * unread count) — every field this method already returned stays
+	 * unchanged, so the pre-existing recent-activity list
+	 * (NotificationsList.tsx) that only ever read the old fields keeps
+	 * working without modification.
+	 *
+	 * @return array<int, array<string, mixed>>
+	 */
 	public function for_user( int $user_id, int $limit = 30 ): array {
 		global $wpdb;
 		$rows = $wpdb->get_results(
-			$wpdb->prepare( "SELECT category, template_key, channel, status, created_at FROM {$wpdb->prefix}bc_notifications WHERE user_id = %d ORDER BY id DESC LIMIT %d", $user_id, $limit ), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$wpdb->prepare( "SELECT id, category, template_key, channel, status, created_at, read_at FROM {$wpdb->prefix}bc_notifications WHERE user_id = %d ORDER BY id DESC LIMIT %d", $user_id, $limit ), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			ARRAY_A
 		);
 		return array_map(
 			static fn ( array $r ) => [
+				'id'          => (int) $r['id'],
 				'category'    => $r['category'],
 				'templateKey' => $r['template_key'],
 				'channel'     => $r['channel'],
 				'status'      => $r['status'],
 				'createdAt'   => $r['created_at'],
+				'isRead'      => null !== $r['read_at'],
 			],
 			$rows ?: []
+		);
+	}
+
+	/**
+	 * V2.4 Step 24: the bell's own unread badge count — every notification
+	 * for this user never yet marked read, regardless of delivery `status`
+	 * (a 'failed'/'suppressed' row is still a real, informational fact the
+	 * in-app center shows, same as NotificationsList.tsx already treats
+	 * every status as visible, not just 'sent').
+	 */
+	public function unread_count( int $user_id ): int {
+		global $wpdb;
+		return (int) $wpdb->get_var(
+			$wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}bc_notifications WHERE user_id = %d AND read_at IS NULL", $user_id ) // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		);
+	}
+
+	/**
+	 * Ownership-checked by the WHERE clause itself (user_id = %d), not by a
+	 * separate lookup-then-compare — a caller can never mark another user's
+	 * notification read even by guessing a valid id, and there is nothing
+	 * to leak in the "0 rows affected" response either way.
+	 */
+	public function mark_read( int $notification_id, int $user_id ): bool {
+		global $wpdb;
+		$updated = $wpdb->update(
+			$wpdb->prefix . 'bc_notifications',
+			[ 'read_at' => current_time( 'mysql' ) ],
+			[ 'id' => $notification_id, 'user_id' => $user_id ],
+			[ '%s' ],
+			[ '%d', '%d' ]
+		);
+		return false !== $updated && $updated > 0;
+	}
+
+	public function mark_all_read( int $user_id ): void {
+		global $wpdb;
+		$wpdb->query(
+			$wpdb->prepare(
+				"UPDATE {$wpdb->prefix}bc_notifications SET read_at = %s WHERE user_id = %d AND read_at IS NULL", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				current_time( 'mysql' ),
+				$user_id
+			)
 		);
 	}
 }

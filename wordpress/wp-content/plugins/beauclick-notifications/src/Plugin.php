@@ -5,6 +5,7 @@ namespace BeauClick\Notifications;
 
 use BeauClick\Notifications\Admin\NotificationsAdminPage;
 use BeauClick\Notifications\Cron\RetrySweepScheduler;
+use BeauClick\Notifications\Database\Migrations\AddNotificationReadAtColumn;
 use BeauClick\Notifications\Database\Migrations\CreateNotificationTables;
 use BeauClick\Notifications\Rest\NotificationsController;
 
@@ -32,7 +33,7 @@ final class Plugin {
 	}
 
 	private function migrations(): array {
-		return [ new CreateNotificationTables() ];
+		return [ new CreateNotificationTables(), new AddNotificationReadAtColumn() ];
 	}
 
 	public function boot(): void {

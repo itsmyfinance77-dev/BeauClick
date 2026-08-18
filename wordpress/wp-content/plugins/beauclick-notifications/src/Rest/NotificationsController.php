@@ -22,7 +22,40 @@ final class NotificationsController extends RestController {
 		$this->route( '/notifications/preferences', [ 'methods' => 'PATCH', 'callback' => [ $this, 'update_preferences' ], 'permission_callback' => [ $this, 'require_login' ] ] );
 		$this->route( '/notifications/mine', [ 'methods' => 'GET', 'callback' => [ $this, 'mine' ], 'permission_callback' => [ $this, 'require_login' ] ] );
 
+		// V2.4 Step 24: the notification center (bell + unread badge) —
+		// self-scoped, same "no route ever accepts a customer-supplied user
+		// id for their own data" pattern as /notifications/mine above.
+		$this->route( '/notifications/unread-count', [ 'methods' => 'GET', 'callback' => [ $this, 'unread_count' ], 'permission_callback' => [ $this, 'require_login' ] ] );
+		$this->route(
+			'/notifications/(?P<id>\d+)/read',
+			[
+				'methods'             => 'POST',
+				'callback'            => [ $this, 'mark_read' ],
+				'permission_callback' => [ $this, 'can_mark_own_notification_read' ],
+				'args'                => [ 'id' => [ 'type' => 'integer', 'required' => true ] ],
+			]
+		);
+		$this->route( '/notifications/mark-all-read', [ 'methods' => 'POST', 'callback' => [ $this, 'mark_all_read' ], 'permission_callback' => [ $this, 'require_login' ] ] );
+
 		$this->route( '/notifications/admin/list', [ 'methods' => 'GET', 'callback' => [ $this, 'admin_list' ], 'permission_callback' => [ $this, 'require_admin' ] ] );
+	}
+
+	/**
+	 * NotificationService::mark_read() already scopes its UPDATE to
+	 * user_id = current user (so it's never actually unsafe to call), but
+	 * gating the route itself — same convention as WaitlistController::
+	 * can_cancel() — means a request for another user's notification 404s
+	 * from a permission check, not silently succeeds-but-affects-0-rows
+	 * with a misleading 200.
+	 */
+	public function can_mark_own_notification_read( WP_REST_Request $request ): bool|\WP_Error {
+		global $wpdb;
+		$id      = (int) $request->get_param( 'id' );
+		$user_id = (int) $wpdb->get_var( $wpdb->prepare( "SELECT user_id FROM {$wpdb->prefix}bc_notifications WHERE id = %d", $id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		if ( ! $user_id ) {
+			return true; // Let the handler 404 -- permission isn't the interesting failure here.
+		}
+		return $this->require_owner_or_capability( $user_id, 'bc_manage_platform' );
 	}
 
 	public function require_admin(): bool|\WP_Error {
@@ -46,6 +79,20 @@ final class NotificationsController extends RestController {
 	public function mine( WP_REST_Request $request ): \WP_REST_Response {
 		$limit = min( 50, max( 1, (int) ( $request->get_param( 'per_page' ) ?: 30 ) ) );
 		return Response::ok( beauclick_notifications()->for_user( get_current_user_id(), $limit ) );
+	}
+
+	public function unread_count(): \WP_REST_Response {
+		return Response::ok( [ 'count' => beauclick_notifications()->unread_count( get_current_user_id() ) ] );
+	}
+
+	public function mark_read( WP_REST_Request $request ): \WP_REST_Response {
+		$marked = beauclick_notifications()->mark_read( (int) $request->get_param( 'id' ), get_current_user_id() );
+		return Response::ok( [ 'marked' => $marked ] );
+	}
+
+	public function mark_all_read(): \WP_REST_Response {
+		beauclick_notifications()->mark_all_read( get_current_user_id() );
+		return Response::ok( [ 'marked' => true ] );
 	}
 
 	public function admin_list( WP_REST_Request $request ): \WP_REST_Response {

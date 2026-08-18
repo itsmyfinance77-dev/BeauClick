@@ -196,4 +196,86 @@ final class NotificationServiceTest extends WP_UnitTestCase {
 
 		$this->assertTrue( true ); // Reaching here without a fatal is the assertion.
 	}
+
+	// V2.4 Step 24 (notification center): a freshly-dispatched notification
+	// has never been seen in the UI yet -- read_at starts NULL, unread_count
+	// includes it, for_user() reports isRead=false.
+	public function test_a_fresh_notification_is_unread_by_default(): void {
+		$user_id = $this->make_customer_with_phone();
+		$service = new NotificationService();
+		$service->notify( PreferenceService::CATEGORY_REMINDER, TemplateRegistry::BOOKING_REMINDER, $user_id, [ 'providerName' => 'سارا', 'when' => 'فردا' ], 'booking', 1, [ 'sms' ] );
+
+		$this->assertSame( 1, $service->unread_count( $user_id ) );
+
+		$items = $service->for_user( $user_id );
+		$this->assertFalse( $items[0]['isRead'] );
+		$this->assertIsInt( $items[0]['id'], 'for_user() must expose a real id -- required for mark_read() to target a specific row.' );
+	}
+
+	public function test_mark_read_reduces_the_unread_count_and_is_reflected_in_for_user(): void {
+		$user_id = $this->make_customer_with_phone();
+		$service = new NotificationService();
+		$service->notify( PreferenceService::CATEGORY_REMINDER, TemplateRegistry::BOOKING_REMINDER, $user_id, [ 'providerName' => 'سارا', 'when' => 'فردا' ], 'booking', 1, [ 'sms' ] );
+		$id = $service->for_user( $user_id )[0]['id'];
+
+		$marked = $service->mark_read( $id, $user_id );
+
+		$this->assertTrue( $marked );
+		$this->assertSame( 0, $service->unread_count( $user_id ) );
+		$this->assertTrue( $service->for_user( $user_id )[0]['isRead'] );
+	}
+
+	/** Ownership: mark_read() must never let one user mark another user's notification read, even by guessing a valid id. */
+	public function test_mark_read_refuses_a_notification_belonging_to_a_different_user(): void {
+		$owner_id   = $this->make_customer_with_phone();
+		$other_id   = self::factory()->user->create();
+		$service    = new NotificationService();
+		$service->notify( PreferenceService::CATEGORY_REMINDER, TemplateRegistry::BOOKING_REMINDER, $owner_id, [ 'providerName' => 'سارا', 'when' => 'فردا' ], 'booking', 1, [ 'sms' ] );
+		$id = $service->for_user( $owner_id )[0]['id'];
+
+		$marked = $service->mark_read( $id, $other_id );
+
+		$this->assertFalse( $marked, 'A non-owner mark_read() attempt must report false, not silently succeed.' );
+		$this->assertSame( 1, $service->unread_count( $owner_id ), 'The real owner\'s unread count must be untouched by the other user\'s attempt.' );
+	}
+
+	public function test_mark_all_read_clears_every_unread_notification_for_that_user_only(): void {
+		$user_id  = $this->make_customer_with_phone();
+		$other_id = $this->make_customer_with_phone();
+		$service  = new NotificationService();
+		$service->notify( PreferenceService::CATEGORY_REMINDER, TemplateRegistry::BOOKING_REMINDER, $user_id, [ 'providerName' => 'سارا', 'when' => 'فردا' ], 'booking', 1, [ 'sms' ] );
+		$service->notify( PreferenceService::CATEGORY_REMINDER, TemplateRegistry::BOOKING_REMINDER, $user_id, [ 'providerName' => 'سارا', 'when' => 'پس‌فردا' ], 'booking', 2, [ 'sms' ] );
+		$service->notify( PreferenceService::CATEGORY_REMINDER, TemplateRegistry::BOOKING_REMINDER, $other_id, [ 'providerName' => 'سارا', 'when' => 'فردا' ], 'booking', 3, [ 'sms' ] );
+
+		$service->mark_all_read( $user_id );
+
+		$this->assertSame( 0, $service->unread_count( $user_id ) );
+		$this->assertSame( 1, $service->unread_count( $other_id ), 'mark_all_read() must never touch another user\'s notifications.' );
+	}
+
+	/**
+	 * V2.4 Step 24: NotificationRequested is fired for every real dispatch
+	 * attempt -- zero production subscribers today (same as this codebase's
+	 * own otp_generated precedent), but the hook itself must genuinely fire,
+	 * not merely exist as an aspiration in a docblock.
+	 */
+	public function test_notification_requested_hook_fires_with_the_real_dispatch_facts(): void {
+		$user_id = $this->make_customer_with_phone();
+		$captured = null;
+		$listener = static function ( $category, $template_key, $uid, $entity_type, $entity_id, $channel ) use ( &$captured ) {
+			$captured = compact( 'category', 'template_key', 'uid', 'entity_type', 'entity_id', 'channel' );
+		};
+		add_action( 'beauclick/notification/requested', $listener, 10, 6 );
+
+		( new NotificationService() )->notify( PreferenceService::CATEGORY_REMINDER, TemplateRegistry::BOOKING_REMINDER, $user_id, [ 'providerName' => 'سارا', 'when' => 'فردا' ], 'booking', 42, [ 'sms' ] );
+
+		remove_action( 'beauclick/notification/requested', $listener, 10 );
+
+		$this->assertNotNull( $captured );
+		$this->assertSame( PreferenceService::CATEGORY_REMINDER, $captured['category'] );
+		$this->assertSame( $user_id, $captured['uid'] );
+		$this->assertSame( 'booking', $captured['entity_type'] );
+		$this->assertSame( 42, $captured['entity_id'] );
+		$this->assertSame( 'sms', $captured['channel'] );
+	}
 }

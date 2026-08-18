@@ -854,3 +854,15 @@ Product-wide UI/UX audit at `v2.3.0` (`c505c20`) plus one intervening documentat
 **Tests:** 882 → **891** backend (9 new, zero regressions); the pre-existing `BookingControllerTest` ownership assertions passed unchanged through the refactor. `php -l` clean.
 
 **Live QA:** site boot and REST API confirmed unaffected after modifying the shared `RestController` base class (a real risk, since a registration-time throw there would fatal every plugin, not just one). `can_manage_booking()`'s fix live-verified with a real professional session against real bookings: owner → `200`, non-owner → `403`. `set_tiers`'s audit fix verified via real-database `WP_UnitTestCase` integration test; live wp-admin click-through not performed (same credential-access constraint as the V2.3.1 audit).
+
+## 52. V2.4 Step 24 — Notification Center Completion Note
+
+| ID | Item | Disposition |
+|---|---|---|
+| — (new; recurring product gap, not a pre-numbered register entry) | `wp_bc_notifications` recorded every dispatched notification, but nothing surfaced them inside the product — a recipient could only ever learn a notification existed via the actual SMS, not via any in-app UI | **IMPLEMENTED** — additive `read_at` migration + `unread_count()`/`mark_read()`/`mark_all_read()` on the existing `NotificationService`; three new REST routes (`GET /notifications/unread-count`, `POST /notifications/{id}/read`, `POST /notifications/mark-all-read}`), the single-notification route ownership-gated via the same `require_owner_or_capability()` helper [[GAP-08]] generalized; a new header bell (`NotificationBell.tsx`, reusing the existing drawer-end `Modal` variant `CartDrawer` already established) with a live unread badge. |
+
+**Tests:** backend PHPUnit grew 891 → **901** (10 new, zero regressions). Frontend Vitest grew 48 → **55** (7 new `NotificationBell.test.tsx` cases). `php -l`/TypeScript/ESLint clean, production build succeeds (required adding the new `notification-bell` entry to `vite.config.ts`'s `rollupOptions.input` — caught only by grepping the full build output, since the build otherwise succeeds silently without the bundle).
+
+**Live QA:** real `GET /notifications/mine` fetch and render verified against `bc_qa_customer`'s real data; a real mark-read click verified, via direct database query (not just UI state), to have written `read_at` on the real row. 375/390/412px: zero horizontal overflow, panel and close button remain usable, state survives resize. Console errors observed earlier in the same browser tab (`ERR_CONNECTION_REFUSED`, `401`, `403`) were investigated and confirmed pre-existing/unrelated — a fresh network log captured during the actual interaction shows 100% successful requests, so this step introduces no new console errors.
+
+**Not claimed:** real-time/push delivery of the unread badge — it refreshes on window focus and a same-tab custom event only, the same boundary `CartDrawer`'s own badge already accepts, not a new limitation introduced here.

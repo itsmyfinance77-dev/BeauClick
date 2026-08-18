@@ -36,8 +36,8 @@ export function NotificationsList() {
 
 	return (
 		<div style={ { display: 'flex', flexDirection: 'column', gap: 6 } }>
-			{ items.map( ( n, i ) => (
-				<div key={ i } style={ { display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '6px 0', borderBottom: '1px solid var(--bc-color-line)' } }>
+			{ items.map( ( n ) => (
+				<div key={ n.id } style={ { display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '6px 0', borderBottom: '1px solid var(--bc-color-line)' } }>
 					<span>{ CATEGORY_LABELS[ n.category ] ?? n.category }</span>
 					<span className="bc-numeric" style={ { color: 'var(--bc-color-ink-faint)' } }>
 						{ STATUS_LABELS[ n.status ] ?? n.status } · { jalali( n.createdAt ) }
