@@ -59,11 +59,11 @@ final class B2BController extends RestController {
 		);
 		$this->route(
 			'/b2b/accounts/(?P<id>\d+)/approve',
-			[ 'methods' => 'POST', 'callback' => [ $this, 'approve_account' ], 'permission_callback' => [ $this, 'require_admin' ] ]
+			[ 'methods' => 'POST', 'callback' => [ $this, 'approve_account' ], 'permission_callback' => [ $this, 'require_admin' ], 'adminGated' => true, 'auditAction' => 'b2b_account_approved' ]
 		);
 		$this->route(
 			'/b2b/accounts/(?P<id>\d+)/reject',
-			[ 'methods' => 'POST', 'callback' => [ $this, 'reject_account' ], 'permission_callback' => [ $this, 'require_admin' ] ]
+			[ 'methods' => 'POST', 'callback' => [ $this, 'reject_account' ], 'permission_callback' => [ $this, 'require_admin' ], 'adminGated' => true, 'auditAction' => 'b2b_account_rejected' ]
 		);
 		$this->route(
 			'/b2b/quotes/(?P<id>\d+)/quote',
@@ -72,9 +72,16 @@ final class B2BController extends RestController {
 				'callback'            => [ $this, 'submit_quote_prices' ],
 				'permission_callback' => [ $this, 'require_admin' ],
 				'args'                => [ 'items' => [ 'type' => 'array', 'required' => true ] ],
+				'adminGated'          => true,
+				'auditAction'         => 'b2b_quote_priced',
 			]
 		);
 
+		// V2.4 Step 26 (GAP-02): the one confirmed, still-open instance of
+		// this recurring bug class as of v2.3.1 -- set_tiers() wrote no
+		// audit entry anywhere and had no wp-admin twin to have copied one
+		// from. Now fixed (see set_tiers() below) and declared here like
+		// every other admin mutation in this controller.
 		$this->route(
 			'/b2b/tiers/(?P<product_id>\d+)',
 			[
@@ -82,6 +89,8 @@ final class B2BController extends RestController {
 				'callback'            => [ $this, 'set_tiers' ],
 				'permission_callback' => [ $this, 'require_admin' ],
 				'args'                => [ 'tiers' => [ 'type' => 'array', 'required' => true ] ],
+				'adminGated'          => true,
+				'auditAction'         => 'b2b_tiers_set',
 			]
 		);
 	}
@@ -248,8 +257,18 @@ final class B2BController extends RestController {
 		return $ok ? Response::ok( [ 'quoted' => true ] ) : Response::error( 'bc_cannot_quote', __( 'این درخواست دیگر قابل قیمت‌گذاری نیست.', 'beauclick-b2b' ), 409 );
 	}
 
+	/**
+	 * V2.4 Step 26 (GAP-02): the one confirmed, still-open instance of the
+	 * recurring "REST-reachable, bc_manage_platform-gated mutation with no
+	 * audit entry" bug class as of v2.3.1 -- pricing-tier configuration
+	 * (pre-existing since before V2.3) had no wp-admin twin to have copied
+	 * a log call from, unlike account approve/reject and quote pricing.
+	 * Logs before/after with the same shape the other admin mutations in
+	 * this controller already use.
+	 */
 	public function set_tiers( WP_REST_Request $request ): \WP_REST_Response {
-		$tiers = array_map(
+		$product_id = (int) $request->get_param( 'product_id' );
+		$tiers      = array_map(
 			static fn ( array $t ) => [
 				'min_qty'        => (int) $t['min_qty'],
 				'max_qty'        => isset( $t['max_qty'] ) ? (int) $t['max_qty'] : null,
@@ -258,7 +277,22 @@ final class B2BController extends RestController {
 			],
 			(array) $request->get_param( 'tiers' )
 		);
-		( new TierPricingEngine() )->set_tiers( (int) $request->get_param( 'product_id' ), $tiers );
+
+		$engine = new TierPricingEngine();
+		$before = $engine->get_tiers( $product_id );
+		$engine->set_tiers( $product_id, $tiers );
+
+		if ( function_exists( 'beauclick_core' ) ) {
+			beauclick_core()->audit_log()->record(
+				'b2b_tiers_set',
+				'product',
+				$product_id,
+				get_current_user_id(),
+				[ 'tiers' => $before ],
+				[ 'tiers' => $engine->get_tiers( $product_id ) ]
+			);
+		}
+
 		return Response::ok( [ 'saved' => true ] );
 	}
 }

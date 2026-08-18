@@ -843,3 +843,14 @@ Product-wide UI/UX audit at `v2.3.0` (`c505c20`) plus one intervening documentat
 **Live QA:** all 10 scenarios in this step's own brief verified against the real running site — exact-name match, the specific synonym/typo examples named in the brief ("خدمات ناخن", "کاشت ناحن"/"ناحن"), a genuine zero-result query, the homepage hero form, and the header search modal's fallback path, all confirmed producing correct real results and (where applicable) the synonym hint. `search_performed` events confirmed writing live with the new field shape. 375/390/412px: zero overflow, RTL correct, no console errors.
 
 **Not claimed:** OpenSearch readiness beyond a single swappable interface; fuzzy/typo-distance matching (MKT-02/GAP-14 remain open); relevance-ranking of matches (unchanged `RankingPresenter::ORDER_BY`).
+
+## 51. V2.4 Step 26 (part 1) — GAP-02, GAP-08 Completion Note
+
+| ID | Item | Disposition |
+|---|---|---|
+| ADMIN-07 / GAP-02 | `B2BController::set_tiers` — the one confirmed, still-open instance of the audit-logging-bypass bug class as of `v2.3.1` | **FIXED** — now writes a `b2b_tiers_set` audit entry (before/after tier state). A new, opt-in, boot-time `RestController::route()` enforcement (`'adminGated' => true` requires `'auditAction'` or `'auditExempt'`, mirroring the existing missing-`permission_callback` guard exactly) now also declared on all 5 confirmed B2B and 8 confirmed Loyalty admin mutations, so this specific bug class cannot recur silently on any route that opts in going forward. |
+| GAP-08 | `RestController::require_owner_or_capability()` couldn't express indirect ownership (booking→provider→user) | **FIXED** — a re-audit first found this project's own prior claim that the method was "dead code, called nowhere" (repeated in `V3_GAP_REGISTER.md` and this project's own V2.4 roadmap doc) to be **stale/incorrect** — 4 real call sites exist, all direct-ownership. A new optional `?callable $owner_resolver` parameter (default `null` = unchanged direct-comparison behavior, zero risk to the 4 existing call sites) adds the missing indirect case; `BookingController::can_confirm()`/`can_manage_booking()` now use it instead of their own inline duplicate of the same logic. |
+
+**Tests:** 882 → **891** backend (9 new, zero regressions); the pre-existing `BookingControllerTest` ownership assertions passed unchanged through the refactor. `php -l` clean.
+
+**Live QA:** site boot and REST API confirmed unaffected after modifying the shared `RestController` base class (a real risk, since a registration-time throw there would fatal every plugin, not just one). `can_manage_booking()`'s fix live-verified with a real professional session against real bookings: owner → `200`, non-owner → `403`. `set_tiers`'s audit fix verified via real-database `WP_UnitTestCase` integration test; live wp-admin click-through not performed (same credential-access constraint as the V2.3.1 audit).

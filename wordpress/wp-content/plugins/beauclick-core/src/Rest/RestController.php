@@ -19,7 +19,17 @@ abstract class RestController {
 	abstract public function register_routes(): void;
 
 	/**
-	 * @param array<string, mixed> $args register_rest_route() args, minus namespace/route.
+	 * @param array<string, mixed> $args register_rest_route() args, minus
+	 *        namespace/route, plus two BeauClick-only keys stripped before
+	 *        being handed to register_rest_route() (which ignores unknown
+	 *        keys anyway, but stripping keeps the args WP itself receives
+	 *        exactly what every other route already passes):
+	 *        - 'adminGated' (bool): declares this route as a
+	 *          bc_manage_platform-class administrative mutation.
+	 *        - 'auditAction' (string) or 'auditExempt' (string): required
+	 *          together with 'adminGated' — either the action_type string
+	 *          this route's handler calls AuditLogger::record() with, or a
+	 *          short, real reason it deliberately doesn't (e.g. "read-only").
 	 */
 	protected function route( string $path, array $args ): void {
 		// register_rest_route() accepts either one flat args array (the
@@ -31,6 +41,19 @@ abstract class RestController {
 		foreach ( $variants as $variant ) {
 			if ( is_array( $variant ) && isset( $variant['callback'] ) && ! isset( $variant['permission_callback'] ) ) {
 				throw new \LogicException( sprintf( 'REST route "%s" is missing an explicit permission_callback.', $path ) );
+			}
+			// V2.4 Step 26 (GAP-02): the identical structural-enforcement
+			// shape the permission_callback guard above already uses,
+			// applied to audit logging — the specific recurring bug class
+			// found and fixed three separate times across two plugins (B2B
+			// account approve/reject, B2B quote pricing, Loyalty tier/plan/
+			// benefit CRUD): a REST-reachable, capability-gated admin
+			// mutation silently skipping the audit call its wp-admin twin
+			// already makes. A route marked 'adminGated' must now declare
+			// how it satisfies the audit trail at registration time — it
+			// cannot simply be forgotten the way the bug recurred before.
+			if ( is_array( $variant ) && ! empty( $variant['adminGated'] ) && ! isset( $variant['auditAction'] ) && ! isset( $variant['auditExempt'] ) ) {
+				throw new \LogicException( sprintf( 'REST route "%s" is adminGated but declares neither auditAction nor auditExempt.', $path ) );
 			}
 		}
 		register_rest_route( self::NAMESPACE, $path, $args );
@@ -57,16 +80,38 @@ abstract class RestController {
 
 	/**
 	 * Ownership check helper: the logged-in user must either own the resource
-	 * (via the supplied $owner_user_id) or hold $override_capability (e.g. an
-	 * admin/moderator capability). This is the pattern every "edit my own X"
-	 * endpoint should use instead of a bare capability check, so a
+	 * (via the supplied $resource_owner_id) or hold $override_capability
+	 * (e.g. an admin/moderator capability). This is the pattern every "edit
+	 * my own X" endpoint should use instead of a bare capability check, so a
 	 * professional editing another professional's booking is rejected even
 	 * though both share the bc_manage_own_services capability.
+	 *
+	 * V2.4 Step 26 (GAP-08): $owner_resolver fixes the real, confirmed gap —
+	 * most ownership in this codebase is INDIRECT (a booking is owned by a
+	 * provider, which is owned by a user; not "a booking is owned by a user"
+	 * directly), which this method previously couldn't express, forcing
+	 * every indirect-ownership domain (BookingController::can_confirm()/
+	 * can_manage_booking() are the confirmed real example) to reimplement
+	 * its own inline ownership gate instead of using this shared one.
+	 * Omitting it (the default) preserves the exact previous behavior and
+	 * every existing direct-ownership call site (WaitlistController,
+	 * JourneyController, MyProfileController, ReceiptController) needs no
+	 * change.
+	 *
+	 * @param callable(int $currentUserId): (int|null) $owner_resolver
+	 *        Resolves the CURRENT user's own identity in whatever space
+	 *        $resource_owner_id is expressed — e.g. their own provider post
+	 *        id via ProviderLookup::for_user(), not their raw WP user id.
+	 *        Return null when the current user has no such identity at all
+	 *        (e.g. they're not a professional).
 	 */
-	public function require_owner_or_capability( int $owner_user_id, string $override_capability ): bool|WP_Error {
+	public function require_owner_or_capability( int $resource_owner_id, string $override_capability, ?callable $owner_resolver = null ): bool|WP_Error {
 		$user_id = get_current_user_id();
-		if ( $user_id && $user_id === $owner_user_id ) {
-			return true;
+		if ( $user_id ) {
+			$my_id = null !== $owner_resolver ? $owner_resolver( $user_id ) : $user_id;
+			if ( null !== $my_id && $my_id === $resource_owner_id ) {
+				return true;
+			}
 		}
 		return $this->require_capability( $override_capability );
 	}

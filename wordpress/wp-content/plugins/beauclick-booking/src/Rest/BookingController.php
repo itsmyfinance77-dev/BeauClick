@@ -127,21 +127,22 @@ final class BookingController extends RestController {
 
 	/**
 	 * `bc_bookings.provider_id` is the professional's CPT post id, not their
-	 * WP user id (see ProviderLookup) — require_owner_or_capability() can't
-	 * be used directly here the way it is elsewhere, since it compares
-	 * against get_current_user_id(), not against the current user's own
-	 * provider post id.
+	 * WP user id (see ProviderLookup) — the exact indirect-ownership case
+	 * (booking -> provider -> user, not booking -> user directly)
+	 * RestController::require_owner_or_capability()'s $owner_resolver
+	 * parameter exists for (V2.4 Step 26 / GAP-08), replacing this method's
+	 * own previously-inline reimplementation of the same check.
 	 */
 	public function can_confirm( WP_REST_Request $request ): bool|\WP_Error {
 		$booking = ( new BookingService() )->find( (int) $request->get_param( 'id' ) );
 		if ( ! $booking ) {
 			return true; // Let the handler 404 — permission isn't the interesting failure here.
 		}
-		$my_provider_id = ProviderLookup::for_user( get_current_user_id() );
-		if ( $my_provider_id && $my_provider_id === (int) $booking['provider_id'] ) {
-			return true;
-		}
-		return $this->require_capability( 'bc_manage_platform' );
+		return $this->require_owner_or_capability(
+			(int) $booking['provider_id'],
+			'bc_manage_platform',
+			static fn ( int $user_id ): ?int => ProviderLookup::for_user( $user_id )
+		);
 	}
 
 	/**
@@ -156,15 +157,19 @@ final class BookingController extends RestController {
 		if ( ! $booking ) {
 			return true; // Let the handler 404 -- permission isn't the interesting failure here.
 		}
+		// Direct ownership (the booking's own customer) checked inline;
+		// the remaining "indirect provider ownership, else admin capability"
+		// half is the exact shape require_owner_or_capability()'s
+		// $owner_resolver now handles (V2.4 Step 26 / GAP-08).
 		$user_id = get_current_user_id();
 		if ( $user_id && $user_id === (int) $booking['customer_id'] ) {
 			return true;
 		}
-		$my_provider_id = ProviderLookup::for_user( $user_id );
-		if ( $my_provider_id && $my_provider_id === (int) $booking['provider_id'] ) {
-			return true;
-		}
-		return $this->require_capability( 'bc_manage_platform' );
+		return $this->require_owner_or_capability(
+			(int) $booking['provider_id'],
+			'bc_manage_platform',
+			static fn ( int $user_id ): ?int => ProviderLookup::for_user( $user_id )
+		);
 	}
 
 	public function availability( WP_REST_Request $request ) {

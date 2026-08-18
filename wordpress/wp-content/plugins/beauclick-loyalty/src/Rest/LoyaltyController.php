@@ -34,34 +34,34 @@ final class LoyaltyController extends RestController {
 		$this->route( '/loyalty/tiers', [ 'methods' => 'GET', 'callback' => [ $this, 'public_tiers' ], 'permission_callback' => [ $this, 'require_login' ] ] );
 
 		$this->route( '/loyalty/admin/tiers', [ 'methods' => 'GET', 'callback' => [ $this, 'admin_list_tiers' ], 'permission_callback' => [ $this, 'require_admin' ] ] );
-		$this->route( '/loyalty/admin/tiers', [ 'methods' => 'POST', 'callback' => [ $this, 'admin_create_tier' ], 'permission_callback' => [ $this, 'require_admin' ] ] );
+		$this->route( '/loyalty/admin/tiers', [ 'methods' => 'POST', 'callback' => [ $this, 'admin_create_tier' ], 'permission_callback' => [ $this, 'require_admin' ], 'adminGated' => true, 'auditAction' => 'loyalty_tier_created' ] );
 		$this->route(
 			'/loyalty/admin/tiers/(?P<id>\d+)',
-			[ 'methods' => 'PATCH', 'callback' => [ $this, 'admin_update_tier' ], 'permission_callback' => [ $this, 'require_admin' ], 'args' => [ 'id' => [ 'type' => 'integer', 'required' => true ] ] ]
+			[ 'methods' => 'PATCH', 'callback' => [ $this, 'admin_update_tier' ], 'permission_callback' => [ $this, 'require_admin' ], 'args' => [ 'id' => [ 'type' => 'integer', 'required' => true ] ], 'adminGated' => true, 'auditAction' => 'loyalty_tier_updated' ]
 		);
 
 		$this->route( '/loyalty/admin/plans', [ 'methods' => 'GET', 'callback' => [ $this, 'admin_list_plans' ], 'permission_callback' => [ $this, 'require_admin' ] ] );
-		$this->route( '/loyalty/admin/plans', [ 'methods' => 'POST', 'callback' => [ $this, 'admin_create_plan' ], 'permission_callback' => [ $this, 'require_admin' ] ] );
+		$this->route( '/loyalty/admin/plans', [ 'methods' => 'POST', 'callback' => [ $this, 'admin_create_plan' ], 'permission_callback' => [ $this, 'require_admin' ], 'adminGated' => true, 'auditAction' => 'loyalty_plan_created' ] );
 		$this->route(
 			'/loyalty/admin/plans/(?P<id>\d+)',
-			[ 'methods' => 'PATCH', 'callback' => [ $this, 'admin_update_plan' ], 'permission_callback' => [ $this, 'require_admin' ], 'args' => [ 'id' => [ 'type' => 'integer', 'required' => true ] ] ]
+			[ 'methods' => 'PATCH', 'callback' => [ $this, 'admin_update_plan' ], 'permission_callback' => [ $this, 'require_admin' ], 'args' => [ 'id' => [ 'type' => 'integer', 'required' => true ] ], 'adminGated' => true, 'auditAction' => 'loyalty_plan_updated' ]
 		);
 
 		$this->route( '/loyalty/admin/benefits', [ 'methods' => 'GET', 'callback' => [ $this, 'admin_list_benefits' ], 'permission_callback' => [ $this, 'require_admin' ] ] );
-		$this->route( '/loyalty/admin/benefits', [ 'methods' => 'POST', 'callback' => [ $this, 'admin_create_benefit' ], 'permission_callback' => [ $this, 'require_admin' ] ] );
+		$this->route( '/loyalty/admin/benefits', [ 'methods' => 'POST', 'callback' => [ $this, 'admin_create_benefit' ], 'permission_callback' => [ $this, 'require_admin' ], 'adminGated' => true, 'auditAction' => 'loyalty_benefit_created' ] );
 		$this->route(
 			'/loyalty/admin/benefits/(?P<id>\d+)',
-			[ 'methods' => 'PATCH', 'callback' => [ $this, 'admin_update_benefit' ], 'permission_callback' => [ $this, 'require_admin' ], 'args' => [ 'id' => [ 'type' => 'integer', 'required' => true ] ] ]
+			[ 'methods' => 'PATCH', 'callback' => [ $this, 'admin_update_benefit' ], 'permission_callback' => [ $this, 'require_admin' ], 'args' => [ 'id' => [ 'type' => 'integer', 'required' => true ] ], 'adminGated' => true, 'auditAction' => 'loyalty_benefit_updated' ]
 		);
 		$this->route(
 			'/loyalty/admin/benefits/(?P<id>\d+)',
-			[ 'methods' => 'DELETE', 'callback' => [ $this, 'admin_delete_benefit' ], 'permission_callback' => [ $this, 'require_admin' ], 'args' => [ 'id' => [ 'type' => 'integer', 'required' => true ] ] ]
+			[ 'methods' => 'DELETE', 'callback' => [ $this, 'admin_delete_benefit' ], 'permission_callback' => [ $this, 'require_admin' ], 'args' => [ 'id' => [ 'type' => 'integer', 'required' => true ] ], 'adminGated' => true, 'auditAction' => 'loyalty_benefit_deleted' ]
 		);
 
-		$this->route( '/loyalty/admin/memberships/grant', [ 'methods' => 'POST', 'callback' => [ $this, 'admin_grant_membership' ], 'permission_callback' => [ $this, 'require_admin' ] ] );
+		$this->route( '/loyalty/admin/memberships/grant', [ 'methods' => 'POST', 'callback' => [ $this, 'admin_grant_membership' ], 'permission_callback' => [ $this, 'require_admin' ], 'adminGated' => true, 'auditAction' => 'loyalty_membership_granted' ] );
 		$this->route(
 			'/loyalty/admin/memberships/(?P<user_id>\d+)/cancel',
-			[ 'methods' => 'POST', 'callback' => [ $this, 'admin_cancel_membership' ], 'permission_callback' => [ $this, 'require_admin' ], 'args' => [ 'user_id' => [ 'type' => 'integer', 'required' => true ] ] ]
+			[ 'methods' => 'POST', 'callback' => [ $this, 'admin_cancel_membership' ], 'permission_callback' => [ $this, 'require_admin' ], 'args' => [ 'user_id' => [ 'type' => 'integer', 'required' => true ] ], 'adminGated' => true, 'auditAction' => 'loyalty_membership_cancelled' ]
 		);
 	}
 

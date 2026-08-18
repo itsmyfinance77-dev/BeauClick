@@ -137,4 +137,39 @@ final class B2BControllerTest extends WP_UnitTestCase {
 		$after_count = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}bc_admin_audit_log" );
 		$this->assertSame( $before_count, $after_count, 'A failed pricing attempt must not write a second audit entry.' );
 	}
+
+	/**
+	 * V2.4 Step 26 (GAP-02): set_tiers() -- the one confirmed, still-open
+	 * instance of this bug class as of v2.3.1 (no wp-admin twin existed to
+	 * have copied a log call from) -- now writes a real audit entry, same
+	 * as every other admin mutation in this controller.
+	 */
+	public function test_rest_set_tiers_records_an_audit_entry(): void {
+		global $wpdb;
+		$product_id   = $this->make_product();
+		$moderator_id = self::factory()->user->create( [ 'role' => 'administrator' ] );
+		wp_set_current_user( $moderator_id );
+
+		$request = new WP_REST_Request( 'POST', '/beauclick/v1/b2b/tiers/' . $product_id );
+		$request->set_param( 'product_id', $product_id );
+		$request->set_param(
+			'tiers',
+			[
+				[ 'min_qty' => 1, 'max_qty' => 9, 'price' => 100000 ],
+				[ 'min_qty' => 10, 'max_qty' => null, 'price' => 90000, 'is_recommended' => true ],
+			]
+		);
+		( new B2BController() )->set_tiers( $request );
+
+		$tiers = ( new \BeauClick\B2B\Pricing\TierPricingEngine() )->get_tiers( $product_id );
+		$this->assertCount( 2, $tiers, 'The tiers must actually be saved, unchanged behavior.' );
+
+		$row = $wpdb->get_row( "SELECT * FROM {$wpdb->prefix}bc_admin_audit_log ORDER BY id DESC LIMIT 1", ARRAY_A );
+		$this->assertSame( 'b2b_tiers_set', $row['action_type'] );
+		$this->assertSame( 'product', $row['entity_type'] );
+		$this->assertSame( $product_id, (int) $row['entity_id'] );
+		$this->assertSame( $moderator_id, (int) $row['actor_user_id'] );
+		$this->assertSame( [], json_decode( $row['previous_state'], true )['tiers'], 'No tiers existed before this call.' );
+		$this->assertCount( 2, json_decode( $row['new_state'], true )['tiers'] );
+	}
 }
