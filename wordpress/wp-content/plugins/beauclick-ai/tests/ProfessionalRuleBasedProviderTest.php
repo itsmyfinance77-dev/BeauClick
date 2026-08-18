@@ -29,14 +29,17 @@ final class ProfessionalRuleBasedProviderTest extends WP_UnitTestCase {
 	}
 
 	public function test_a_booking_question_narrates_the_real_funnel_numbers(): void {
+		// Global UI/UX audit: this provider's narrated numbers render in
+		// Persian digits, like every other user-facing number in the
+		// codebase -- '10'/'7' would never actually appear on screen.
 		$reply = $this->chat( 'رزروهای من چطوره؟' );
-		$this->assertStringContainsString( '10', $reply );
-		$this->assertStringContainsString( '7', $reply );
+		$this->assertStringContainsString( '۱۰', $reply );
+		$this->assertStringContainsString( '۷', $reply );
 	}
 
 	public function test_a_financial_question_narrates_the_real_receivable(): void {
 		$reply = $this->chat( 'وضعیت مالی من چیه؟' );
-		$this->assertStringContainsString( number_format( 5000000 ), $reply );
+		$this->assertStringContainsString( '۵٬۰۰۰٬۰۰۰', $reply );
 	}
 
 	public function test_a_service_question_names_the_top_real_service(): void {

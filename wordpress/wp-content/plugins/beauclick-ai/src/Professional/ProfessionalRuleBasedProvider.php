@@ -41,7 +41,23 @@ final class ProfessionalRuleBasedProvider implements ProviderInterface {
 			$parts[] = $this->narrate( $topic, $context );
 		}
 
-		return new AssistantResponse( implode( "\n\n", $parts ) );
+		return new AssistantResponse( self::to_persian_digits( implode( "\n\n", $parts ) ) );
+	}
+
+	/**
+	 * Every other user-facing surface in this codebase (dates, prices,
+	 * dashboard stats, OTP codes) renders digits in Persian — this
+	 * provider's narrated numbers (booking counts, conversion rate,
+	 * تومان amounts) were the one place still emitting raw Latin digits
+	 * and English-style commas, found during the Global UI/UX audit.
+	 * Applied once here, at the single return point, rather than at each
+	 * narrate_*() call site.
+	 */
+	private static function to_persian_digits( string $text ): string {
+		// ',' -> '٬' first: the same Arabic thousands separator every تومان
+		// amount elsewhere in this codebase uses (see app/src/lib/format.ts's
+		// own toPersianToman()), not a second, differently-formatted number.
+		return strtr( $text, [ ',' => '٬', '0' => '۰', '1' => '۱', '2' => '۲', '3' => '۳', '4' => '۴', '5' => '۵', '6' => '۶', '7' => '۷', '8' => '۸', '9' => '۹' ] );
 	}
 
 	/** @return list<string> */

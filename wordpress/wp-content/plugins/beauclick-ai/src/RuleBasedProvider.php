@@ -285,8 +285,15 @@ final class RuleBasedProvider implements ProviderInterface {
 		return array_map(
 			static function ( array $r ): array {
 				$rating = (float) $r['rating_avg'];
+				// Every other user-facing number in this codebase renders in
+				// Persian digits (dates, prices, dashboard stats) -- this was
+				// the one AI-recommendation string still emitting raw Latin
+				// digits, found during the Global UI/UX audit.
 				$reason = $rating > 0
-					? sprintf( 'متخصص با امتیاز %.1f از %d نظر.', $rating, (int) $r['review_count'] )
+					? strtr(
+						sprintf( 'متخصص با امتیاز %.1f از %d نظر.', $rating, (int) $r['review_count'] ),
+						[ '0' => '۰', '1' => '۱', '2' => '۲', '3' => '۳', '4' => '۴', '5' => '۵', '6' => '۶', '7' => '۷', '8' => '۸', '9' => '۹' ]
+					)
 					: 'متخصص فعال، متناسب با درخواستت.';
 				return [ 'type' => 'provider', 'id' => (int) $r['provider_id'], 'reason' => $reason ];
 			},

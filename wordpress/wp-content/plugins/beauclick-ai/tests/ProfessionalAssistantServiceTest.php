@@ -152,6 +152,8 @@ final class ProfessionalAssistantServiceTest extends WP_UnitTestCase {
 		$this->assertIsArray( $result );
 		// A brand-new provider has no ledger entries -- the reply must state
 		// a real zero, never omit the fact or invent a nonzero figure.
-		$this->assertStringContainsString( '0', $result['assistantMessage']['body'] );
+		// Rendered in Persian digits like every other number in this reply
+		// (Global UI/UX audit) -- a literal '0' never appears on screen.
+		$this->assertStringContainsString( '۰', $result['assistantMessage']['body'] );
 	}
 }
