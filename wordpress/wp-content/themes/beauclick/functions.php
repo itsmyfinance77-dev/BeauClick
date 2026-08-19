@@ -23,6 +23,8 @@ require_once BEAUCLICK_THEME_DIR . '/inc/referral.php';
 require_once BEAUCLICK_THEME_DIR . '/inc/performance.php';
 require_once BEAUCLICK_THEME_DIR . '/inc/branding.php';
 require_once BEAUCLICK_THEME_DIR . '/inc/account-redirect.php';
+require_once BEAUCLICK_THEME_DIR . '/inc/woocommerce-images.php';
+require_once BEAUCLICK_THEME_DIR . '/inc/woocommerce-i18n.php';
 
 add_action(
 	'after_setup_theme',
@@ -39,6 +41,21 @@ add_action(
 		);
 	}
 );
+
+// This theme has no widgetized sidebar at all (a headless-ish PHP+React
+// hybrid, not a classic widget-driven WordPress theme) — without this,
+// the single-product page's stock woocommerce_sidebar() call falls
+// through to WordPress core's own get_sidebar() default output: a raw
+// PHP deprecated-file notice printed straight into the page, followed by
+// an entirely unstyled, unbranded search box + page list + archives +
+// categories widget stack. Every other WooCommerce page either has its
+// own full-page override that never calls this action (archive-product.php)
+// or isn't a product/shop template at all (cart/checkout render through a
+// plain WordPress Page with a shortcode) — single-product is the one real
+// gap. WooCommerce registers this at plugin-load time, well before this
+// theme's functions.php runs, so removing it here (not deferred to a
+// later hook) is safe.
+remove_action( 'woocommerce_sidebar', 'woocommerce_get_sidebar', 10 );
 
 /**
  * BeauClick is Persian-first, RTL-first, regardless of the WordPress admin

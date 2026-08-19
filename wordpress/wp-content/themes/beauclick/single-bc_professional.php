@@ -61,20 +61,20 @@ $cover_url  = is_string( $cover_meta ) && preg_match( '/^[a-z0-9\-]+\.svg$/', $c
 ?>
 
 <?php if ( $cover_url ) : ?>
-	<div style="aspect-ratio:16/5; background-image:url('<?php echo esc_url( $cover_url ); ?>'); background-size:cover; background-position:center;"></div>
+	<div class="bc-profile-hero__cover" style="background-image:url('<?php echo esc_url( $cover_url ); ?>');"></div>
 <?php else : ?>
-	<div class="bc-placeholder-image" style="aspect-ratio:16/5;background:linear-gradient(135deg, oklch(0.3 0.06 290), oklch(0.55 0.1 330));"></div>
+	<div class="bc-profile-hero__cover bc-placeholder-image" style="background:linear-gradient(135deg, oklch(0.3 0.06 290), oklch(0.55 0.1 330));"></div>
 <?php endif; ?>
 
 <div class="bc-container bc-section">
-	<div style="display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap; margin-top:-48px;">
+	<div class="bc-profile-hero__header">
 		<?php if ( $avatar_url ) : ?>
-			<img src="<?php echo esc_url( $avatar_url ); ?>" alt="" width="96" height="96" style="width:96px; height:96px; border-radius:24px; object-fit:cover; border:4px solid var(--bc-color-surface); flex-shrink:0; display:block;" />
+			<img src="<?php echo esc_url( $avatar_url ); ?>" alt="" width="96" height="96" class="bc-profile-hero__avatar" />
 		<?php else : ?>
-			<div style="width:96px; height:96px; border-radius:24px; background:var(--bc-gradient-brand); border:4px solid var(--bc-color-surface); flex-shrink:0;"></div>
+			<div class="bc-profile-hero__avatar-fallback"></div>
 		<?php endif; ?>
 
-		<div style="flex:1; min-width:240px; padding-top:8px;">
+		<div class="bc-profile-hero__info">
 			<div style="display:flex; align-items:center; gap:8px;">
 				<h1 style="margin:0; font-size:24px;"><?php the_title(); ?></h1>
 				<?php if ( $verified ) : ?><span class="bc-badge bc-badge--verified" title="<?php esc_attr_e( 'این پروفایل توسط BeauClick بررسی و تأیید شده است.', 'beauclick' ); ?>">تایید‌شده</span><?php endif; ?>
@@ -92,7 +92,7 @@ $cover_url  = is_string( $cover_meta ) && preg_match( '/^[a-z0-9\-]+\.svg$/', $c
 			<?php endif; ?>
 		</div>
 
-		<div style="display:flex; gap:8px; padding-top:8px;">
+		<div class="bc-profile-hero__actions">
 			<button type="button" class="bc-btn bc-btn--primary" data-bc-book-trigger data-provider-id="<?php echo esc_attr( $provider_id ); ?>"><?php esc_html_e( 'رزرو نوبت', 'beauclick' ); ?></button>
 			<?php if ( is_user_logged_in() && get_current_user_id() !== $owner_id ) : ?>
 				<button type="button" class="bc-btn bc-btn--outline" data-bc-chat-open data-counterpart-id="<?php echo esc_attr( $owner_id ); ?>"><?php esc_html_e( 'پیام', 'beauclick' ); ?></button>

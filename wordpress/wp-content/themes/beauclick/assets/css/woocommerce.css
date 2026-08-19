@@ -131,3 +131,177 @@
 .woocommerce-error {
 	border-top-color: var(--bc-color-error) !important;
 }
+
+/* Single product page (no PHP template override exists for this one —
+   content-single-product.php's hook-based structure is left alone and
+   CSS-themed only, same strategy as the rest of this file). Previously
+   completely unstyled: WooCommerce's stock stacked layout with default
+   browser spacing, no card treatment on the gallery image, and an
+   unstyled tab strip — the direct source of this page reading as "not
+   BeauClick". */
+.woocommerce div.product {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 32px;
+	margin-bottom: 32px;
+}
+
+.woocommerce div.product .woocommerce-product-gallery,
+.woocommerce div.product .summary.entry-summary {
+	flex: 1 1 320px;
+	min-width: 280px;
+}
+
+.woocommerce div.product .woocommerce-product-gallery__wrapper,
+.woocommerce div.product .woocommerce-product-gallery img {
+	border-radius: var(--bc-radius-card, 18px);
+	overflow: hidden;
+}
+
+.woocommerce div.product .product_title {
+	font-size: 24px;
+	font-weight: 800;
+	margin: 0 0 8px;
+}
+
+@media (min-width: 900px) {
+	.woocommerce div.product .product_title {
+		font-size: 28px;
+	}
+}
+
+.woocommerce div.product .woocommerce-product-rating {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-bottom: 12px;
+}
+
+.woocommerce div.product p.price {
+	font-size: 22px;
+	font-weight: 700;
+	margin-bottom: 16px;
+}
+
+.woocommerce div.product .woocommerce-product-details__short-description {
+	color: var(--bc-color-ink-soft);
+	margin-bottom: 20px;
+}
+
+.woocommerce div.product form.cart {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	flex-wrap: wrap;
+	margin-bottom: 20px;
+}
+
+.woocommerce div.product form.cart .quantity {
+	margin: 0;
+}
+
+.woocommerce div.product form.cart .qty {
+	width: 72px !important;
+}
+
+.woocommerce div.product .product_meta {
+	font-size: 13px;
+	color: var(--bc-color-ink-faint);
+	padding-top: 16px;
+	border-top: 1px solid var(--bc-color-line);
+}
+
+.woocommerce div.product .product_meta > span {
+	display: block;
+	margin-bottom: 4px;
+}
+
+/* Tabs (description/reviews) — default WooCommerce renders these as a
+   flat, unstyled <ul> of links; restyled as a simple underline-tab strip
+   matching the rest of the design system's button/chip weight. */
+.woocommerce div.product .woocommerce-tabs {
+	flex-basis: 100%;
+	margin-top: 8px;
+}
+
+.woocommerce div.product .woocommerce-tabs ul.tabs {
+	display: flex;
+	gap: 4px;
+	list-style: none;
+	margin: 0 0 20px;
+	padding: 0;
+	border-bottom: 1px solid var(--bc-color-line);
+}
+
+.woocommerce div.product .woocommerce-tabs ul.tabs li {
+	margin: 0;
+}
+
+.woocommerce div.product .woocommerce-tabs ul.tabs li a {
+	display: inline-block;
+	padding: 10px 16px;
+	font-weight: 700;
+	font-size: 14px;
+	color: var(--bc-color-ink-soft);
+}
+
+.woocommerce div.product .woocommerce-tabs ul.tabs li.active a {
+	color: var(--bc-color-primary);
+	border-bottom: 2px solid var(--bc-color-primary);
+}
+
+.woocommerce div.product .woocommerce-tabs .panel {
+	color: var(--bc-color-ink-soft);
+	line-height: 1.9;
+}
+
+/* Related products / up-sells — reuses content-product.php's bc-card
+   markup for each item but the surrounding <section>/<h2>/<ul.products>
+   wrapper is still WooCommerce's own default output, previously with
+   zero rules here (root cause of the "related products presentation"
+   gap): floated li's, English "Related products"/"You may also
+   like…" heading text with no design-system styling at all. */
+.woocommerce div.product .related.products,
+.woocommerce div.product .up-sells.products {
+	flex-basis: 100%;
+	margin-top: 40px;
+	padding-top: 32px;
+	border-top: 1px solid var(--bc-color-line);
+}
+
+.woocommerce div.product .related.products h2,
+.woocommerce div.product .up-sells.products h2 {
+	font-size: 20px;
+	font-weight: 800;
+	margin: 0 0 16px;
+}
+
+@media (min-width: 900px) {
+	.woocommerce div.product .related.products h2,
+	.woocommerce div.product .up-sells.products h2 {
+		font-size: 24px;
+	}
+}
+
+.woocommerce div.product .related.products ul.products,
+.woocommerce div.product .up-sells.products ul.products {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+	gap: var(--bc-space-card-gap-large, 20px);
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.woocommerce div.product .related.products ul.products li.product,
+.woocommerce div.product .up-sells.products ul.products li.product {
+	width: auto;
+	margin: 0;
+	float: none;
+}
+
+@media (max-width: 899px) {
+	.woocommerce div.product {
+		gap: 24px;
+	}
+}

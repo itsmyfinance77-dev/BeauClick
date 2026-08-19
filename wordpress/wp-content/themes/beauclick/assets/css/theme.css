@@ -542,3 +542,68 @@
 		grid-template-columns: 1fr;
 	}
 }
+
+/* Professional profile hero (single-bc_professional.php) — was a set of
+   hand-written inline styles (aspect-ratio:16/5 cover with no max-height,
+   uncapped so a wide desktop viewport renders a 500px+ banner; a raw -48px
+   avatar-overlap margin) instead of the shared token scale every other
+   page uses. Same visual relationship (cover, avatar overlapping into it,
+   name/rating beside the avatar, CTAs trailing), just bounded and tokenized. */
+.bc-profile-hero__cover {
+	aspect-ratio: 21 / 5;
+	max-height: 240px;
+	background-size: cover;
+	background-position: center;
+}
+
+@media (max-width: 899px) {
+	.bc-profile-hero__cover {
+		aspect-ratio: 16 / 7;
+		max-height: 160px;
+	}
+}
+
+.bc-profile-hero__header {
+	display: flex;
+	align-items: flex-start;
+	gap: 20px;
+	flex-wrap: wrap;
+	margin-top: -40px;
+}
+
+.bc-profile-hero__avatar,
+.bc-profile-hero__avatar-fallback {
+	width: 96px;
+	height: 96px;
+	border-radius: var(--bc-radius-avatar, 20px);
+	object-fit: cover;
+	border: 4px solid var(--bc-color-surface);
+	flex-shrink: 0;
+	display: block;
+}
+
+.bc-profile-hero__avatar-fallback {
+	background: var(--bc-gradient-brand);
+}
+
+.bc-profile-hero__info {
+	flex: 1;
+	min-width: 240px;
+	padding-top: 8px;
+}
+
+.bc-profile-hero__actions {
+	display: flex;
+	gap: 8px;
+	padding-top: 8px;
+}
+
+/* Below 640px the actions row no longer fits beside the name/rating column
+   without crowding — give it the full row width instead of letting it
+   wrap into a cramped leftover sliver. */
+@media (max-width: 640px) {
+	.bc-profile-hero__actions {
+		flex-basis: 100%;
+		padding-top: 12px;
+	}
+}
