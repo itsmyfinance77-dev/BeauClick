@@ -85,4 +85,40 @@ final class MyProfileControllerTest extends WP_UnitTestCase {
 
 		$this->assertSame( [], $response->get_data()['data'] );
 	}
+
+	// V2.4 Step 22: a professional can set their own specialties, and get_profile() reflects it back.
+	public function test_a_professional_can_update_their_own_specialties(): void {
+		$owner_id    = self::factory()->user->create( [ 'role' => 'bc_professional' ] );
+		$provider_id = self::factory()->post->create( [ 'post_type' => Registrar::PROFESSIONAL, 'post_status' => 'publish', 'post_author' => $owner_id ] );
+		$term_a      = wp_insert_term( 'کاشت ناخن', Registrar::SPECIALTY );
+		$term_b      = wp_insert_term( 'میکاپ', Registrar::SPECIALTY );
+		wp_set_current_user( $owner_id );
+
+		$controller = new MyProfileController();
+		$request    = new \WP_REST_Request( 'PATCH', '/beauclick/v1/marketplace/my/profile' );
+		$request->set_param( 'specialty_ids', [ $term_a['term_id'], $term_b['term_id'] ] );
+		$controller->update_profile( $request );
+
+		$profile = $controller->get_profile()->get_data()['data'];
+		sort( $profile['specialtyIds'] );
+		$expected = [ $term_a['term_id'], $term_b['term_id'] ];
+		sort( $expected );
+		$this->assertSame( $expected, $profile['specialtyIds'] );
+	}
+
+	// V2.4 Step 22: setting specialties to an empty array clears them, not a no-op.
+	public function test_setting_specialties_to_an_empty_array_clears_them(): void {
+		$owner_id    = self::factory()->user->create( [ 'role' => 'bc_professional' ] );
+		$provider_id = self::factory()->post->create( [ 'post_type' => Registrar::PROFESSIONAL, 'post_status' => 'publish', 'post_author' => $owner_id ] );
+		$term        = wp_insert_term( 'کاشت ناخن', Registrar::SPECIALTY );
+		wp_set_post_terms( $provider_id, [ $term['term_id'] ], Registrar::SPECIALTY );
+		wp_set_current_user( $owner_id );
+
+		$controller = new MyProfileController();
+		$request    = new \WP_REST_Request( 'PATCH', '/beauclick/v1/marketplace/my/profile' );
+		$request->set_param( 'specialty_ids', [] );
+		$controller->update_profile( $request );
+
+		$this->assertSame( [], $controller->get_profile()->get_data()['data']['specialtyIds'] );
+	}
 }

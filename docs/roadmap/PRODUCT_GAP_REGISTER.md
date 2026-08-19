@@ -892,3 +892,16 @@ Product-wide UI/UX audit at `v2.3.0` (`c505c20`) plus one intervening documentat
 **Live QA:** a real add-to-wishlist from a real provider profile page persisted a real row (confirmed via direct database query); the dashboard tab fetched and correctly rendered it; removal updated both the UI and the database. 375/390/412px: zero overflow with real content rendered. No new console/network errors during the actual interaction.
 
 **Not claimed:** an "add to wishlist" affordance on marketplace search-result cards (only the single-provider profile page has the toggle) — a small, deliberately deferred follow-up, not an oversight.
+
+## 55. V2.4 Step 22 — Professional Profile, Portfolio, Settings Completion Note
+
+| ID | Item | Disposition |
+|---|---|---|
+| — (dashboard's own `ready: false` Profile/Settings placeholders, explicitly named as unbuilt in V2.3 Step 19's own docblock) | Profile-editing backend (`MyProfileController`) already existed; specialty editing and portfolio management (write side) did not | **IMPLEMENTED** — specialty_ids added to the existing profile endpoint; new `PortfolioController` (real WordPress Media Library uploads, 24-item cap, ownership-checked); `ProfileTab.tsx` and `SettingsTab.tsx` (mirrors customer `AccountTab.tsx`'s privacy cards). |
+| — (found during this step's own Live QA, not its initial audit) | The public profile page's "نمونه‌کار" section never actually read `bc_portfolio_item` posts — it unconditionally showed a static "not built yet" placeholder regardless of real data, invisible to a code-only read since the placeholder looked like an intentional boundary | **FIXED** — `single-bc_professional.php` now queries and renders real portfolio items the same way the REST API already did; the fallback empty state now says "not yet added" (true) instead of "not built yet" (now false). |
+
+**Tests:** backend PHPUnit grew 922 → **931** (9 new, zero regressions). Frontend Vitest grew 63 → **69** (6 new). The full real-upload-success path is deliberately not unit-tested — PHP's own `is_uploaded_file()` anti-spoofing check cannot be satisfied outside a genuine HTTP multipart request, confirmed by reading WordPress core's own upload internals; proven instead via Live QA. TypeScript/ESLint/`php -l` clean, production build succeeds.
+
+**Live QA:** a real bio/specialty edit persisted to the database; a real browser file upload (genuine `File`/`DataTransfer`, not a mock) created a real WordPress attachment and portfolio post, visible on the dashboard, deletable, and — after the template fix above — visible on the real public profile page. Settings tab confirmed rendering real data. 375/390/412px: zero overflow. Zero console/network errors on a freshly-loaded tab.
+
+**Not claimed:** city/district editing (no cascading picker exists anywhere in this codebase yet) or avatar/cover-photo editing (a separate, pre-existing "temporary mockup" image system, out of this step's scope).

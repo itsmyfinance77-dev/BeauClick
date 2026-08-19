@@ -3099,3 +3099,37 @@ Forcing a single term everywhere would have **removed** a real, useful distincti
 The wishlist has no "add from marketplace search-results card" affordance yet — only the single-provider profile page carries the heart toggle. Adding it to the listing cards themselves is a small, contained follow-up (the card component already exists; it would need the same `data-bc-wishlist-toggle` attributes this step's own button already established), deliberately deferred rather than expanding this step's own surface area further.
 
 ---
+
+## V2.4 Step 22 — Professional Profile, Portfolio, Settings
+
+**Status: implemented.** The professional dashboard's own `profile`/`settings` nav items had carried a `ready: false` placeholder since V2.3 Step 19's own docblock explicitly named them as still-unbuilt ("no dedicated task has asked for the profile-editing UI gap").
+
+### Pre-implementation audit
+
+`MyProfileController`'s `GET`/`PATCH /marketplace/my/profile` (name, bio, city, district) already existed and worked — only the frontend UI was missing, the same shape of gap Step 23's wishlist turned out to be. Specialty editing had no endpoint at all. `bc_portfolio_item` was already registered (`supports: ['thumbnail']`) and already read back correctly by `MarketplaceController::detail()`'s REST response, but had zero write-side support anywhere, and the public profile template's own "نمونه‌کار" section unconditionally rendered a static "این بخش در نسخه بعدی محصول تکمیل می‌شود" placeholder regardless of what existed — this second fact was only discovered during this step's own Live QA, not the initial audit, and is explained below.
+
+### Backend
+
+`MyProfileController::update_profile()` gained `specialty_ids` support (`wp_set_post_terms()`); `get_profile()` now also returns `specialtyIds`. New `PortfolioController` (`GET`/`POST /marketplace/my/portfolio`, `DELETE /marketplace/my/portfolio/{id}`) — login-gated, ownership-checked exactly like `MyProfileController`'s own services endpoints, a 24-item-per-provider cap enforced before any upload is attempted. Deliberately uses WordPress's real Media Library (`media_handle_upload()` + `set_post_thumbnail()`), never `Verification\EvidenceStorage`'s private storage system — that class's own docblock already documents the exact distinction this controller follows: a portfolio image is a deliberately public, non-sensitive asset (like the profile photo), unlike verification evidence.
+
+### Frontend
+
+`ProfileTab.tsx` — name/bio (existing endpoint) + a specialty multi-select (`Chip` toggle group, the design system's existing component, driving the new `specialty_ids` field) + portfolio management (upload form with a real file input, grid of existing items with per-item delete). City/district editing was deliberately left out of scope — neither the original placeholder nor this step's own instruction named it, and it would need a real cascading city→district picker this codebase doesn't have anywhere yet. `SettingsTab.tsx` mirrors the customer dashboard's `AccountTab.tsx` composition for the parts that generalize (WooCommerce account link, `DataExportCard`, `AccountDeletionCard` — already user-agnostic) — notification preferences are deliberately NOT duplicated here since this dashboard already has its own dedicated Notifications tab.
+
+### A real gap found only during Live QA, not the initial audit
+
+The public profile page (`single-bc_professional.php`) never actually read `bc_portfolio_item` posts at all — its "نمونه‌کار" section unconditionally printed the static placeholder regardless of whether any items existed. This was invisible to a code-only audit (the placeholder *looks* like an intentional, documented boundary, identical in spirit to the portfolio's own former dashboard-side placeholder) and was only caught by actually uploading a real image through the dashboard and then checking whether it appeared on the public page — it didn't. Fixed: the template now queries real portfolio items the same way `MarketplaceController::detail()` already does, renders a real image grid when items exist, and falls back to an honest "هنوز نمونه‌کاری ثبت نشده است" (not yet added, a factually true and now-correct message) rather than the old "not built yet" claim.
+
+### Tests
+
+Backend suite grew **922 → 931** (9 new: 2 `MyProfileControllerTest` for specialty set/clear, 7 `PortfolioControllerTest` — ownership, missing-image validation, no-profile-yet 404, per-customer isolation in listing, the 24-item cap, admin override). The full "real successful upload" happy path is deliberately NOT unit-tested — confirmed, by reading WordPress core's own `_wp_handle_upload()`, that PHP's `is_uploaded_file()` check (a real anti-spoofing measure) can never be satisfied by a file created outside of a genuine HTTP multipart request, a disclosed PHPUnit/CLI limitation, not a gap in this controller's own logic; every other piece of `PortfolioController`'s behavior is covered, and the real upload path itself is proven in Live QA below instead. Frontend grew **63 → 69** (6 new `ProfileTab.test.tsx` cases; `SettingsTab.tsx` has no dedicated test file, matching the customer `AccountTab.tsx`'s own precedent — a pure composition of already-independently-tested child components). TypeScript/ESLint/`php -l` clean, production build succeeds.
+
+### Live QA (real browser, real local stack)
+
+Logged in as `bc_demo_sara_ahmadi`: edited bio and toggled a specialty, saved, confirmed both persisted via direct database query. Uploaded a real PNG file through the dashboard's own file input (a genuine `File`/`DataTransfer` browser upload, not a mock) — confirmed a real `bc_portfolio_item` post and a real WordPress attachment (a real `/wp-content/uploads/2026/08/...` URL) were both created; deleted it through the UI and confirmed it disappeared from both the dashboard and the database. Uploaded a second image and confirmed it appears on the real public profile page — the exact gap this step's own Live QA (not its initial audit) found and fixed. Settings tab confirmed rendering its own real data (export/deletion status) with zero errors. 375/390/412px: zero horizontal overflow on both new tabs. Console/network: zero errors on a freshly-loaded tab (no buffered-noise ambiguity this time, since this was checked immediately after a fresh page load, not a long-lived tab).
+
+### Remaining limitations
+
+City/district editing is out of scope, as explained above. Avatar/cover-photo editing is also out of scope — this codebase's provider avatars/covers currently use a separate, explicitly-labeled "temporary mockup" resolver (`bc_mockup_image_url()`), a different, larger, pre-existing scope boundary this step did not touch.
+
+---

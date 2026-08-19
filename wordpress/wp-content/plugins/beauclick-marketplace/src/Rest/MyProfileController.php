@@ -85,13 +85,14 @@ final class MyProfileController extends RestController {
 
 		return Response::ok(
 			[
-				'id'         => $provider->ID,
-				'name'       => $provider->post_title,
-				'bio'        => $provider->post_content,
-				'status'     => $provider->post_status,
-				'cityId'     => (int) get_post_meta( $provider->ID, '_bc_city_id', true ) ?: null,
-				'districtId' => (int) get_post_meta( $provider->ID, '_bc_district_id', true ) ?: null,
-				'verified'   => 'verified' === get_post_meta( $provider->ID, '_bc_verification_status', true ),
+				'id'           => $provider->ID,
+				'name'         => $provider->post_title,
+				'bio'          => $provider->post_content,
+				'status'       => $provider->post_status,
+				'cityId'       => (int) get_post_meta( $provider->ID, '_bc_city_id', true ) ?: null,
+				'districtId'   => (int) get_post_meta( $provider->ID, '_bc_district_id', true ) ?: null,
+				'verified'     => 'verified' === get_post_meta( $provider->ID, '_bc_verification_status', true ),
+				'specialtyIds' => wp_get_post_terms( $provider->ID, Registrar::SPECIALTY, [ 'fields' => 'ids' ] ),
 			]
 		);
 	}
@@ -116,6 +117,10 @@ final class MyProfileController extends RestController {
 		}
 		if ( null !== $request->get_param( 'district_id' ) ) {
 			update_post_meta( $provider->ID, '_bc_district_id', (int) $request->get_param( 'district_id' ) );
+		}
+		if ( is_array( $request->get_param( 'specialty_ids' ) ) ) {
+			$specialty_ids = array_map( 'intval', $request->get_param( 'specialty_ids' ) );
+			wp_set_post_terms( $provider->ID, $specialty_ids, Registrar::SPECIALTY );
 		}
 
 		( new Indexer() )->sync( $provider->ID, $provider->post_type );

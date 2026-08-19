@@ -15,6 +15,7 @@ use BeauClick\Marketplace\Database\Seeds\DemoProvidersSeed;
 use BeauClick\Marketplace\PostTypes\Registrar;
 use BeauClick\Marketplace\Rest\MarketplaceController;
 use BeauClick\Marketplace\Rest\MyProfileController;
+use BeauClick\Marketplace\Rest\PortfolioController;
 use BeauClick\Marketplace\Rest\StaffController;
 use BeauClick\Marketplace\Rest\VerificationController;
 use BeauClick\Marketplace\Rest\WishlistController;
@@ -58,6 +59,7 @@ final class Plugin {
 	public function register_rest_routes(): void {
 		( new MarketplaceController() )->register_routes();
 		( new MyProfileController() )->register_routes();
+		( new PortfolioController() )->register_routes();
 		( new VerificationController() )->register_routes();
 		( new StaffController() )->register_routes();
 		( new WishlistController() )->register_routes();

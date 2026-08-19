@@ -30,6 +30,21 @@ $reviews = class_exists( \BeauClick\Reviews\Reviews\ReviewService::class )
 	? ( new \BeauClick\Reviews\Reviews\ReviewService() )->for_provider( $provider_id )
 	: [];
 
+// V2.4 Step 22: real portfolio items, replacing this section's own
+// long-standing "این بخش در نسخه بعدی محصول تکمیل می‌شود" placeholder --
+// PortfolioController (beauclick-marketplace) now lets a professional
+// actually add these; this is simply the public read side finally reading
+// them back, the same real-attachment shape MarketplaceController::detail()
+// already reads for the REST API.
+$portfolio_items = get_posts(
+	[
+		'post_type'      => \BeauClick\Marketplace\PostTypes\Registrar::PORTFOLIO_ITEM,
+		'post_parent'    => $provider_id,
+		'post_status'    => 'publish',
+		'posts_per_page' => -1,
+	]
+);
+
 $is_wishlisted = is_user_logged_in() && class_exists( \BeauClick\Marketplace\Wishlist\WishlistService::class )
 	? ( new \BeauClick\Marketplace\Wishlist\WishlistService() )->contains( get_current_user_id(), $provider_id )
 	: false;
@@ -136,10 +151,21 @@ $cover_url  = is_string( $cover_meta ) && preg_match( '/^[a-z0-9\-]+\.svg$/', $c
 
 	<div class="bc-section">
 		<h2 class="bc-section__title"><?php esc_html_e( 'نمونه‌کار', 'beauclick' ); ?></h2>
-		<div class="bc-empty-state">
-			<img src="<?php echo esc_url( get_stylesheet_directory_uri() . '/assets/mockups/empty-illustration.svg' ); ?>" alt="" width="100" height="80" style="width:100px; height:80px; margin:0 auto 12px;" />
-			<p class="bc-empty-state__title"><?php esc_html_e( 'این بخش در نسخه بعدی محصول تکمیل می‌شود.', 'beauclick' ); ?></p>
-		</div>
+		<?php if ( $portfolio_items ) : ?>
+			<div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:12px;">
+				<?php foreach ( $portfolio_items as $item ) : ?>
+					<?php $image_url = get_the_post_thumbnail_url( $item->ID, 'large' ); ?>
+					<?php if ( $image_url ) : ?>
+						<img src="<?php echo esc_url( $image_url ); ?>" alt="<?php echo esc_attr( $item->post_title ); ?>" style="width:100%; aspect-ratio:1; object-fit:cover; border-radius:12px; display:block;" />
+					<?php endif; ?>
+				<?php endforeach; ?>
+			</div>
+		<?php else : ?>
+			<div class="bc-empty-state">
+				<img src="<?php echo esc_url( get_stylesheet_directory_uri() . '/assets/mockups/empty-illustration.svg' ); ?>" alt="" width="100" height="80" style="width:100px; height:80px; margin:0 auto 12px;" />
+				<p class="bc-empty-state__title"><?php esc_html_e( 'هنوز نمونه‌کاری ثبت نشده است.', 'beauclick' ); ?></p>
+			</div>
+		<?php endif; ?>
 	</div>
 
 	<div class="bc-section">
