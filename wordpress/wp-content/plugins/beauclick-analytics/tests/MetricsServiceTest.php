@@ -240,4 +240,63 @@ final class MetricsServiceTest extends WP_UnitTestCase {
 		$this->assertSame( 1, $result['locationFilterUsage'] );
 		$this->assertEqualsWithDelta( 0.6667, $result['zeroResultRate'], 0.0001 );
 	}
+
+	// V2.4 Step 25: with no specialty on file, the benchmark falls back to a real, honestly-labeled platform-wide peer group.
+	public function test_platform_benchmark_falls_back_to_platform_wide_with_no_specialty(): void {
+		$me   = $this->make_provider( self::factory()->user->create() );
+		$peer = $this->make_provider( self::factory()->user->create() );
+		$customer = self::factory()->user->create();
+		$booking  = $this->make_booking( $peer, $customer, 'completed' );
+		$this->log_event( 'booking_created', $booking );
+		$this->log_event( 'booking_completed', $booking );
+
+		[ $from, $to ] = $this->range_today();
+		$result = ( new MetricsService() )->platform_benchmark( $me, [], $from, $to );
+
+		$this->assertSame( 'platform_wide', $result['scope'] );
+		$this->assertGreaterThanOrEqual( 1, $result['peerCount'] );
+		$this->assertSame( 1.0, $result['conversionRate'] );
+	}
+
+	// V2.4 Step 25: with a specialty on file, the benchmark scopes to real peers sharing it, excluding an unrelated provider.
+	public function test_platform_benchmark_scopes_to_real_specialty_peers_only(): void {
+		$term_a = wp_insert_term( 'کاشت ناخن', 'bc_specialty' );
+		$term_b = wp_insert_term( 'ماساژ', 'bc_specialty' );
+
+		$me = $this->make_provider( self::factory()->user->create() );
+		wp_set_post_terms( $me, [ $term_a['term_id'] ], 'bc_specialty' );
+
+		$peer = $this->make_provider( self::factory()->user->create() );
+		wp_set_post_terms( $peer, [ $term_a['term_id'] ], 'bc_specialty' );
+		$peer_booking = $this->make_booking( $peer, self::factory()->user->create(), 'completed' );
+		$this->log_event( 'booking_created', $peer_booking );
+		$this->log_event( 'booking_completed', $peer_booking );
+
+		$unrelated = $this->make_provider( self::factory()->user->create() );
+		wp_set_post_terms( $unrelated, [ $term_b['term_id'] ], 'bc_specialty' );
+		$unrelated_booking = $this->make_booking( $unrelated, self::factory()->user->create(), 'completed' );
+		$this->log_event( 'booking_created', $unrelated_booking );
+		// Deliberately never completed -- if the unrelated provider leaked into the peer group, conversionRate would drop below 1.0.
+
+		[ $from, $to ] = $this->range_today();
+		$result = ( new MetricsService() )->platform_benchmark( $me, [ $term_a['term_id'] ], $from, $to );
+
+		$this->assertSame( 'specialty_peers', $result['scope'] );
+		$this->assertSame( 1, $result['peerCount'], 'Only the real same-specialty peer must be counted, never the unrelated provider or the caller themselves.' );
+		$this->assertSame( 1.0, $result['conversionRate'] );
+	}
+
+	// V2.4 Step 25: with genuinely zero real peers, the benchmark reports an honest zero rather than a divide-by-zero error.
+	public function test_platform_benchmark_with_no_real_peers_reports_honest_zeros(): void {
+		$term = wp_insert_term( 'خدمت کاملاً منحصربه‌فرد', 'bc_specialty' );
+		$me   = $this->make_provider( self::factory()->user->create() );
+		wp_set_post_terms( $me, [ $term['term_id'] ], 'bc_specialty' );
+
+		[ $from, $to ] = $this->range_today();
+		$result = ( new MetricsService() )->platform_benchmark( $me, [ $term['term_id'] ], $from, $to );
+
+		$this->assertSame( 0, $result['peerCount'] );
+		$this->assertSame( 0.0, $result['conversionRate'] );
+		$this->assertSame( 0.0, $result['avgRating'] );
+	}
 }

@@ -23,6 +23,7 @@ const SAMPLE_SUMMARY = {
 		customers: { total: 9, repeat: 3, newInRange: 4 },
 		servicePerformance: [ { serviceId: 1, serviceName: 'میکاپ عروس', completedCount: 5 } ],
 	},
+	benchmark: { peerCount: 3, scope: 'specialty_peers', conversionRate: 0.5, avgRating: 4.2 },
 	b2b: null,
 };
 
@@ -59,5 +60,27 @@ describe( 'AnalyticsTab', () => {
 		render( <AnalyticsTab /> );
 
 		expect( await screen.findByText( 'فعالیت B2B' ) ).toBeTruthy();
+	} );
+
+	it( 'renders the specialty-peer benchmark with a real peer count, never a generic platform-wide label when peers were actually found', async () => {
+		mockFetchOnce( SAMPLE_SUMMARY );
+		render( <AnalyticsTab /> );
+
+		expect( await screen.findByText( 'مقایسه با هم‌رده‌ها' ) ).toBeTruthy();
+		expect( screen.getByText( 'میانگین ۳ متخصص دیگر با تخصص مشابه شما' ) ).toBeTruthy();
+	} );
+
+	it( 'labels a platform_wide benchmark honestly, never presenting it as a specialty match', async () => {
+		mockFetchOnce( { ...SAMPLE_SUMMARY, benchmark: { peerCount: 20, scope: 'platform_wide', conversionRate: 0.4, avgRating: 4.0 } } );
+		render( <AnalyticsTab /> );
+
+		expect( await screen.findByText( 'میانگین ۲۰ متخصص دیگر در پلتفرم (تخصصی برای شما ثبت نشده است)' ) ).toBeTruthy();
+	} );
+
+	it( 'shows a real empty state, not a fabricated zero, when there are genuinely no peers to compare against', async () => {
+		mockFetchOnce( { ...SAMPLE_SUMMARY, benchmark: { peerCount: 0, scope: 'specialty_peers', conversionRate: 0, avgRating: 0 } } );
+		render( <AnalyticsTab /> );
+
+		expect( await screen.findByText( 'در حال حاضر هم‌ردهٔ کافی برای مقایسه یافت نشد.' ) ).toBeTruthy();
 	} );
 } );

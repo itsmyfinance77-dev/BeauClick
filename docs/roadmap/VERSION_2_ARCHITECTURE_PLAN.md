@@ -3133,3 +3133,37 @@ Logged in as `bc_demo_sara_ahmadi`: edited bio and toggled a specialty, saved, c
 City/district editing is out of scope, as explained above. Avatar/cover-photo editing is also out of scope — this codebase's provider avatars/covers currently use a separate, explicitly-labeled "temporary mockup" resolver (`bc_mockup_image_url()`), a different, larger, pre-existing scope boundary this step did not touch.
 
 ---
+
+## V2.4 Step 25 — Analytics Benchmarking + Event Formalization
+
+**Status: implemented.** Two independent halves, taken together because both extend `beauclick-analytics` without touching its own "no new infrastructure, live-computed metrics only" architecture (`MetricsService`'s own docblock).
+
+### Analytics benchmarking
+
+**Pre-implementation audit:** `AnalyticsTab.tsx` already showed a professional their own funnel/reviews/customer numbers, but nothing to compare them against — no benchmarking of any kind existed anywhere in the codebase.
+
+**A real correctness question resolved before writing code, not after:** comparing a professional against the WHOLE platform (every specialty mixed together) would be a genuinely misleading figure — a nail technician's conversion rate compared against a platform average dominated by, say, hairdressers, is not a truthful comparison, the same "never show a number that could mislead" discipline this codebase's ranking-reasons/receipt code already follows. `MetricsService::platform_benchmark()` therefore scopes the comparison to the professional's own real peer group — every other provider sharing at least one `bc_specialty` term — falling back to a true, honestly-labeled platform-wide average only when the professional has no specialty on file at all. The caller always receives which scope was used (`specialty_peers` vs `platform_wide`); the frontend labels this explicitly rather than presenting one as the other. `conversionRate` is computed via the identical `booking_created`/`booking_completed` event-join definition `for_provider()`'s own "your own numbers" already uses — a benchmark computed from a *different* definition than the number it's compared against would be a false comparison even if each side were individually correct.
+
+`MyAnalyticsController::summary()` gained a `benchmark` field; `AnalyticsTab.tsx` gained a "مقایسه با هم‌رده‌ها" card showing side-by-side conversion-rate and average-rating comparisons, a real "no peers yet" empty state (never a fabricated zero) when the peer group is genuinely empty, and an honest "—" (never an invented average) when peers exist but none have reviews in range.
+
+### Event formalization
+
+**Pre-implementation audit, scoped deliberately smaller than V3_GAP_REGISTER.md's own GAP-07:** GAP-07 describes a full versioned event contract with a producer/consumer registry — real, but a V3-scale undertaking this step does not attempt (this codebase's own "no infrastructure overreach" discipline). What GAP-07 actually named as broken today — `EventLogger`'s event types were "documented only in a code comment," confirmed still true by reading the class fresh — is the part achievable within V2's existing architecture: real PHP class constants a call site can reference (IDE-checkable, typo-resistant) instead of a bare magic string, plus a soft, non-breaking way to catch a genuinely new or misspelled event type during development.
+
+**The registry was compiled by actually finding every real call site, not by trusting the prior docblock's own list** (which, per this session's own recurring finding, turned out to be incomplete): a multi-pattern search across all 17 plugins, including indirect call sites that don't pass a literal string at the `log()` call itself (`BookingService::transition()`'s own `$event` parameter, `RescheduleService::log_event()`'s wrapper, `MembershipService::log()`'s wrapper). `log()` now checks the event_type against this registry and, only when `WP_DEBUG` is on, calls WordPress core's own `_doing_it_wrong()` — never blocking or dropping the write, purely a development-time signal.
+
+**This mechanism caught two real, previously-undocumented event types during this step's own development, not after:** running the full backend suite against the first draft of the registry immediately surfaced `membership_activated` and a family of four client-triggered "track" events (`ai_assistant_opened`, `crm_opened`, `journey_opened`, `referral_link_shared`, all funneled through `AnalyticsController::track()`'s own allow-list) that even the careful multi-pattern grep had missed. Both were added; the full suite was then re-run clean, giving real, empirical (not just static-analysis) confidence the registry is now complete for every event this codebase's test suite actually exercises.
+
+### Tests
+
+Backend suite grew **931 → 938** (7 new: 4 `MetricsServiceTest`/`MyAnalyticsControllerTest` for the benchmark — platform-wide fallback, real specialty-peer scoping excluding an unrelated provider, honest zeros with no real peers, and the controller's own response shape; 3 `EventLoggerTest` proving every real registered constant is accepted silently, an unregistered event_type genuinely triggers the notice via WordPress's own `setExpectedIncorrectUsage()` test hook, and the write still succeeds despite the notice). Frontend grew **69 → 72** (3 new `AnalyticsTab.test.tsx` cases for the benchmark card's three states). TypeScript/ESLint/`php -l` clean, production build succeeds.
+
+### Live QA
+
+Logged in as `bc_demo_sara_ahmadi` (a specialty already on file from this phase's own Step 22 QA): the benchmark card correctly showed "میانگین ۵ متخصص دیگر با تخصص مشابه شما" (5 real same-specialty peers), her own 13% conversion rate against a real peer average, and an honest "—" for peer average rating (the peer group's demo data has no reviews in range) rather than a fabricated number. The `crm_opened` client-tracked event (one of the two types this step's own registry-completeness pass found) was confirmed firing correctly live (`POST /analytics/track` → `200 OK`) with no `doing_it_wrong` disruption. 375/390/412px: zero overflow. Zero console/network errors.
+
+### Remaining limitations
+
+Event formalization here is real but intentionally partial, not GAP-07's full scope — no event versioning, no schema validation on `meta`'s own shape, no producer/consumer registry; a soft type-name registry only, exactly what V2's existing architecture can support without new infrastructure. Benchmarking has no visual trend/chart, matching this dashboard's own established "a small, actionable set of numbers, never 30 charts" boundary from Step 16.
+
+---

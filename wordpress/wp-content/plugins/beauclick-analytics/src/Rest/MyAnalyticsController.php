@@ -71,12 +71,15 @@ final class MyAnalyticsController extends RestController {
 			$request->get_param( 'to' ) ? (string) $request->get_param( 'to' ) : null
 		);
 
-		$service = new MetricsService();
+		$service       = new MetricsService();
+		$specialty_ids = array_map( 'intval', wp_get_post_terms( $provider_id, 'bc_specialty', [ 'fields' => 'ids' ] ) );
+
 		$payload = [
 			'range'      => [ 'from' => $from, 'to' => $to ],
 			'providerId' => $provider_id,
 			'postType'   => $provider->post_type,
 			'metrics'    => $service->for_provider( $provider_id, $provider->post_type, $from, $to ),
+			'benchmark'  => $service->platform_benchmark( $provider_id, $specialty_ids, $from, $to ),
 			'b2b'        => $this->b2b_section( $user_id, $from, $to ),
 		];
 

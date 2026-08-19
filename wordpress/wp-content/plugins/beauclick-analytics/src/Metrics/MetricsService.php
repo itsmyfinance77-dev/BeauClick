@@ -335,6 +335,89 @@ final class MetricsService {
 	}
 
 	/**
+	 * V2.4 Step 25. Comparing a professional's own numbers against the
+	 * WHOLE platform (every category mixed together) would be a genuinely
+	 * misleading figure -- a nail technician's conversion rate compared
+	 * against a platform average dominated by, say, hairdressers, is not a
+	 * truthful comparison, the same "never show a number that could mislead"
+	 * discipline this codebase's own ranking-reasons/receipt code already
+	 * follows. This scopes the comparison to the professional's own real
+	 * peer group: every OTHER provider sharing at least one of the same
+	 * `bc_specialty` terms. Falls back to a true, honestly-labeled
+	 * platform-wide average only when the professional has no specialty on
+	 * file at all (nothing to scope by) -- the caller is expected to label
+	 * this distinction to the user, never silently presenting one as the
+	 * other.
+	 *
+	 * @param int[] $specialty_ids
+	 * @return array{peerCount:int, scope:string, conversionRate:float, avgRating:float}
+	 */
+	public function platform_benchmark( int $exclude_provider_id, array $specialty_ids, string $from, string $to ): array {
+		global $wpdb;
+		[ $start, $end ] = self::bounds( $from, $to );
+		$events_table   = $wpdb->prefix . 'bc_events';
+		$bookings_table = $wpdb->prefix . 'bc_bookings';
+		$reviews_table  = $wpdb->prefix . 'bc_reviews';
+
+		if ( $specialty_ids ) {
+			$placeholders = implode( ',', array_fill( 0, count( $specialty_ids ), '%d' ) );
+			$peer_ids     = $wpdb->get_col(
+				$wpdb->prepare(
+					"SELECT DISTINCT tr.object_id FROM {$wpdb->term_relationships} tr
+					 JOIN {$wpdb->term_taxonomy} tt ON tt.term_taxonomy_id = tr.term_taxonomy_id
+					 WHERE tt.taxonomy = 'bc_specialty' AND tt.term_id IN ({$placeholders}) AND tr.object_id != %d", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared
+					array_merge( $specialty_ids, [ $exclude_provider_id ] )
+				)
+			);
+			$scope = 'specialty_peers';
+		} else {
+			$peer_ids = $wpdb->get_col(
+				$wpdb->prepare( "SELECT ID FROM {$wpdb->posts} WHERE post_type IN ('bc_professional','bc_business') AND post_status = 'publish' AND ID != %d", $exclude_provider_id ) // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			);
+			$scope = 'platform_wide';
+		}
+
+		$peer_ids = array_map( 'intval', $peer_ids ?: [] );
+		if ( ! $peer_ids ) {
+			return [ 'peerCount' => 0, 'scope' => $scope, 'conversionRate' => 0.0, 'avgRating' => 0.0 ];
+		}
+
+		$in_placeholders = implode( ',', array_fill( 0, count( $peer_ids ), '%d' ) );
+
+		// Matches for_provider()'s own definition of started/completed
+		// exactly (booking_created/booking_completed EVENTS, joined through
+		// bc_bookings for provider scoping) -- a benchmark computed from a
+		// different definition than "your own numbers" would be a false
+		// comparison even if each side were individually correct.
+		$event_count = static function ( string $event_type ) use ( $wpdb, $events_table, $bookings_table, $in_placeholders, $peer_ids, $start, $end ): int {
+			return (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COUNT(*) FROM {$events_table} e
+					 JOIN {$bookings_table} b ON b.id = e.entity_id
+					 WHERE e.event_type = %s AND e.entity_type = 'booking' AND b.provider_id IN ({$in_placeholders}) AND e.created_at BETWEEN %s AND %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared
+					array_merge( [ $event_type ], $peer_ids, [ $start, $end ] )
+				)
+			);
+		};
+
+		$started   = $event_count( 'booking_created' );
+		$completed = $event_count( 'booking_completed' );
+		$avg_rating = (float) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COALESCE(AVG(rating), 0) FROM {$reviews_table} WHERE target_type = 'provider' AND target_id IN ({$in_placeholders}) AND created_at BETWEEN %s AND %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared
+				array_merge( $peer_ids, [ $start, $end ] )
+			)
+		);
+
+		return [
+			'peerCount'      => count( $peer_ids ),
+			'scope'          => $scope,
+			'conversionRate' => self::ratio( $completed, $started ),
+			'avgRating'      => round( $avg_rating, 2 ),
+		];
+	}
+
+	/**
 	 * Shop/B2B commerce funnel — product_view/cart_add/checkout_started are
 	 * new events this step adds (CommerceTracker), hooked to genuine
 	 * WooCommerce cart lifecycle actions that a booking purchase never fires

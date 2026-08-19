@@ -81,6 +81,23 @@ final class MyAnalyticsControllerTest extends WP_UnitTestCase {
 		$this->assertNull( $response->get_data()['data']['b2b'] );
 	}
 
+	// V2.4 Step 25: the summary response includes a real benchmark section, scoped correctly by the caller's own specialties.
+	public function test_summary_includes_a_specialty_scoped_benchmark_section(): void {
+		$owner       = self::factory()->user->create();
+		$provider_id = $this->make_provider( $owner );
+		$term        = wp_insert_term( 'کاشت ناخن', 'bc_specialty' );
+		wp_set_post_terms( $provider_id, [ $term['term_id'] ], 'bc_specialty' );
+		wp_set_current_user( $owner );
+
+		$response  = ( new MyAnalyticsController() )->summary( new WP_REST_Request( 'GET', '/beauclick/v1/analytics/my/summary' ) );
+		$benchmark = $response->get_data()['data']['benchmark'];
+
+		$this->assertSame( 'specialty_peers', $benchmark['scope'] );
+		$this->assertArrayHasKey( 'peerCount', $benchmark );
+		$this->assertArrayHasKey( 'conversionRate', $benchmark );
+		$this->assertArrayHasKey( 'avgRating', $benchmark );
+	}
+
 	public function test_an_approved_b2b_account_surfaces_a_b2b_section(): void {
 		if ( ! class_exists( '\BeauClick\B2B\Business\BusinessAccountService' ) ) {
 			$this->markTestSkipped( 'beauclick-b2b not active in this test run.' );

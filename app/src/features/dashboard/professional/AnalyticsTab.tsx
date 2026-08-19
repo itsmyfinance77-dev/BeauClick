@@ -25,6 +25,12 @@ interface AnalyticsSummary {
 		customers: { total: number; repeat: number; newInRange: number };
 		servicePerformance: { serviceId: number; serviceName: string; completedCount: number }[];
 	};
+	benchmark: {
+		peerCount: number;
+		scope: 'specialty_peers' | 'platform_wide';
+		conversionRate: number;
+		avgRating: number;
+	};
 	b2b: {
 		accountStatus: string;
 		quoteCounts: { requested: number; quoted: number; accepted: number; expired: number };
@@ -67,6 +73,15 @@ const B2B_STATUS_LABELS: Record<string, string> = {
  * instruction) — funnel, profile views, reviews, customer retention,
  * top services, and B2B activity when relevant — never a revenue/earnings
  * figure this product doesn't yet have an authoritative source for.
+ *
+ * V2.4 Step 25 — a real peer-benchmark comparison, scoped to providers
+ * sharing at least one of the professional's own specialties
+ * (MetricsService::platform_benchmark()'s own docblock explains why a
+ * whole-platform average would be a misleading comparison across unrelated
+ * categories). Explicitly labels which comparison it's showing
+ * (`specialty_peers` vs the honest `platform_wide` fallback when no
+ * specialty is on file) rather than presenting either as the other, and
+ * shows a real "no peers yet" empty state instead of a fabricated zero.
  */
 export function AnalyticsTab() {
 	const [ preset, setPreset ] = useState<PresetId>( '30d' );
@@ -88,6 +103,7 @@ export function AnalyticsTab() {
 	if ( ! data ) return <LoadingDots />;
 
 	const { funnel, profileViews, reviews, customers, servicePerformance } = data.metrics;
+	const { benchmark } = data;
 
 	return (
 		<div>
@@ -134,6 +150,39 @@ export function AnalyticsTab() {
 							</tbody>
 						</table>
 					</div>
+				) }
+			</div>
+
+			<div className="bc-card" style={ { padding: 16, marginBottom: 24 } }>
+				<h3 style={ { marginTop: 0, fontSize: 15 } }>مقایسه با هم‌رده‌ها</h3>
+				{ benchmark.peerCount === 0 ? (
+					<EmptyState title="در حال حاضر هم‌ردهٔ کافی برای مقایسه یافت نشد." />
+				) : (
+					<>
+						<p style={ { fontSize: 12, color: 'var(--bc-color-ink-faint)', marginTop: 0 } }>
+							{ benchmark.scope === 'specialty_peers'
+								? `میانگین ${ toPersianDigits( benchmark.peerCount ) } متخصص دیگر با تخصص مشابه شما`
+								: `میانگین ${ toPersianDigits( benchmark.peerCount ) } متخصص دیگر در پلتفرم (تخصصی برای شما ثبت نشده است)` }
+						</p>
+						<div style={ { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 16 } }>
+							<StatCard
+								label="نرخ تبدیل شما"
+								value={ `${ toPersianDigits( Math.round( funnel.conversionRate * 100 ) ) }٪` }
+							/>
+							<StatCard
+								label="میانگین هم‌رده‌ها"
+								value={ `${ toPersianDigits( Math.round( benchmark.conversionRate * 100 ) ) }٪` }
+							/>
+							<StatCard
+								label="امتیاز شما"
+								value={ reviews.count > 0 ? formatRating( reviews.avgRating ) : '—' }
+							/>
+							<StatCard
+								label="میانگین امتیاز هم‌رده‌ها"
+								value={ benchmark.avgRating > 0 ? formatRating( benchmark.avgRating ) : '—' }
+							/>
+						</div>
+					</>
 				) }
 			</div>
 
