@@ -143,4 +143,47 @@ final class SettlementServiceTest extends WP_UnitTestCase {
 		$this->assertNotContains( 312, $order_ids );
 		$this->assertContains( 313, $order_ids );
 	}
+
+	// 11. GAP-05: my_party_summary() resolves the real current session's own party -- proven with two real, distinct professionals, never trusting a single-party fixture to hide a resolution bug.
+	public function test_my_party_summary_resolves_the_real_current_users_own_party(): void {
+		$owner_a    = self::factory()->user->create( [ 'role' => 'bc_professional' ] );
+		$provider_a = self::factory()->post->create( [ 'post_type' => \BeauClick\Marketplace\PostTypes\Registrar::PROFESSIONAL, 'post_status' => 'publish', 'post_author' => $owner_a ] );
+		$owner_b    = self::factory()->user->create( [ 'role' => 'bc_professional' ] );
+		$provider_b = self::factory()->post->create( [ 'post_type' => \BeauClick\Marketplace\PostTypes\Registrar::PROFESSIONAL, 'post_status' => 'publish', 'post_author' => $owner_b ] );
+
+		$this->ledger->record_payment( 521, 621, LedgerService::PARTY_PROFESSIONAL, $provider_a, 1000000 );
+		$this->ledger->record_payment( 522, 622, LedgerService::PARTY_PROFESSIONAL, $provider_b, 9000000 );
+
+		wp_set_current_user( $owner_a );
+		$result = $this->settlements->my_party_summary();
+
+		$this->assertSame( $provider_a, $result['partyId'] );
+		$this->assertNotSame( $provider_b, $result['partyId'] );
+		$this->assertSame( 850000, $result['summary']['receivableNet'], "Professional A's own real figure must never be professional B's." );
+	}
+
+	// 12. GAP-05: null, not another user's data or a fatal error, when the current user has no provider/business profile at all.
+	public function test_my_party_summary_is_null_with_no_profile(): void {
+		wp_set_current_user( self::factory()->user->create() );
+
+		$this->assertNull( $this->settlements->my_party_summary() );
+		$this->assertNull( $this->settlements->my_outstanding_orders() );
+	}
+
+	// 13. GAP-05: my_outstanding_orders() lists exactly the current session's own real outstanding orders, never another party's.
+	public function test_my_outstanding_orders_lists_only_the_current_users_own_orders(): void {
+		$owner_a    = self::factory()->user->create( [ 'role' => 'bc_professional' ] );
+		$provider_a = self::factory()->post->create( [ 'post_type' => \BeauClick\Marketplace\PostTypes\Registrar::PROFESSIONAL, 'post_status' => 'publish', 'post_author' => $owner_a ] );
+		$owner_b    = self::factory()->user->create( [ 'role' => 'bc_professional' ] );
+		$provider_b = self::factory()->post->create( [ 'post_type' => \BeauClick\Marketplace\PostTypes\Registrar::PROFESSIONAL, 'post_status' => 'publish', 'post_author' => $owner_b ] );
+
+		$this->ledger->record_payment( 531, 631, LedgerService::PARTY_PROFESSIONAL, $provider_a, 400000 );
+		$this->ledger->record_payment( 532, 632, LedgerService::PARTY_PROFESSIONAL, $provider_b, 600000 );
+
+		wp_set_current_user( $owner_a );
+		$order_ids = array_column( $this->settlements->my_outstanding_orders(), 'orderId' );
+
+		$this->assertContains( 531, $order_ids );
+		$this->assertNotContains( 532, $order_ids, "Professional B's own order must never appear in professional A's own outstanding list." );
+	}
 }

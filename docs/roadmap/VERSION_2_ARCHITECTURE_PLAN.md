@@ -3167,3 +3167,29 @@ Logged in as `bc_demo_sara_ahmadi` (a specialty already on file from this phase'
 Event formalization here is real but intentionally partial, not GAP-07's full scope — no event versioning, no schema validation on `meta`'s own shape, no producer/consumer registry; a soft type-name registry only, exactly what V2's existing architecture can support without new infrastructure. Benchmarking has no visual trend/chart, matching this dashboard's own established "a small, actionable set of numbers, never 30 charts" boundary from Step 16.
 
 ---
+
+## Post-v2.4.0 — GAP-05: Ledger/Settlement Data-Access Layer Isolation
+
+**Status: implemented.** Taken up after the `v2.4.0` release audit, per its own explicit request to close `V3_GAP_REGISTER.md`'s GAP-05.
+
+### Audit, before writing any code
+
+GAP-05's own wording: "Financial cross-professional isolation is enforced only at the REST controller boundary (`MyFinanceController`), not at `LedgerService`'s own data-access layer." Read every real caller fresh rather than trusting that description at face value (the same discipline that already caught two stale claims earlier in this phase): `MyFinanceController` (session-resolved, correct), `beauclick-ai\Professional\ProfessionalContext` (also correctly session-resolved, three layers up through `ProfessionalAssistantController` → `ProfessionalAssistantService` → here — verified end to end, not assumed), and `FinancialAdminPage` (correctly `bc_manage_platform`-gated, legitimately needs cross-party access for its own admin aggregates). The finding held up: every REAL caller today happens to be correctly scoped, but nothing on `LedgerService`/`SettlementService` themselves would catch a *future* caller that forgot to — the exact gap named. Also found: a global `beauclick_financial()` accessor function returns a raw, completely unguarded `LedgerService` instance, reachable from any plugin.
+
+### Fix
+
+`LedgerService::receivable_net_for_current_session(): ?int` — a new method that resolves the party identity entirely internally (`get_current_user_id()` + the same canonical `ProviderLookup::for_user()` resolution every self-service surface in this codebase already uses) and accepts **no caller-supplied party argument at all** — there is nothing here a caller could get wrong or spoof, unlike the pre-existing `party_receivable_net(string, int)`, which is unchanged and still correct for the legitimate cross-party admin/settlement use cases. `SettlementService` gained the equivalent `my_party_summary()`/`my_outstanding_orders()`, and `MyFinanceController::summary()` was rewritten to call these instead of resolving the party identity itself and threading it through — the isolation guarantee this route depends on now lives on the data-access classes themselves, not only at the REST boundary, closing the gap for real rather than adding a parallel, unused method nothing actually calls.
+
+### Tests
+
+6 new tests (3 `LedgerServiceTest`, 3 `SettlementServiceTest`), each proving the isolation property directly with two real, distinct professionals — never a single-party fixture that could hide a resolution bug. All 4 pre-existing `MyFinanceControllerTest` adversarial-ownership tests (professional A can never see professional B's data, a forged `provider_id` request parameter is ignored, a profile-less user gets a clean 404) pass unchanged, confirming the refactor preserves the route's exact external contract. Backend suite grew **938 → 944**, zero regressions.
+
+### Live QA
+
+Logged in as `bc_demo_sara_ahmadi`: `GET /financial/my-summary` confirmed returning her own real party (`partyId: 11`), her own real receivable/settled/outstanding figures (including the booking created during this same release audit's own regression pass), and her own real settlement history — all via the new session-safe resolution path, with zero console/network errors.
+
+### Remaining limitations
+
+`for_order(int $order_id)` and `order_receivable_net(int $order_id)` (order-scoped, not party-scoped) were left unchanged — confirmed, by grep, to have no real external caller today (only used internally within `SettlementService` in ways that are already party-scoped upstream, and in tests), so adding a parallel session-safe variant for a method nothing calls would be a parallel API surface with no real consumer, not a real fix. The global `beauclick_financial()` accessor remains unguarded (unchanged — removing or gating a public accessor function is a larger, riskier change than this focused fix intended, and no real caller currently misuses it). `LedgerService`/`SettlementService` still have no capability check of their own beyond identity resolution — an admin building a new admin-facing feature must still remember to use the raw, unscoped methods deliberately, exactly as `FinancialAdminPage` already does today.
+
+---

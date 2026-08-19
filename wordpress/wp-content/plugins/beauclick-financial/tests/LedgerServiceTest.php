@@ -196,4 +196,36 @@ final class LedgerServiceTest extends WP_UnitTestCase {
 		$this->assertFalse( $result, 'A raw DELETE against wp_bc_ledger_entries must be rejected by the BEFORE DELETE trigger, not silently succeed.' );
 		$this->assertSame( 2, (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}bc_ledger_entries WHERE order_id = %d", 113 ) ), 'Both rows recorded for this order must still exist.' );
 	}
+
+	// 13. GAP-05: the session-safe method returns exactly the current user's own receivable, never another party's.
+	public function test_receivable_net_for_current_session_returns_the_real_current_users_own_receivable(): void {
+		$owner_a = self::factory()->user->create( [ 'role' => 'bc_professional' ] );
+		$provider_a = self::factory()->post->create( [ 'post_type' => \BeauClick\Marketplace\PostTypes\Registrar::PROFESSIONAL, 'post_status' => 'publish', 'post_author' => $owner_a ] );
+		$owner_b = self::factory()->user->create( [ 'role' => 'bc_professional' ] );
+		$provider_b = self::factory()->post->create( [ 'post_type' => \BeauClick\Marketplace\PostTypes\Registrar::PROFESSIONAL, 'post_status' => 'publish', 'post_author' => $owner_b ] );
+
+		$service = new LedgerService();
+		$service->record_payment( 501, 601, LedgerService::PARTY_PROFESSIONAL, $provider_a, 1000000 );
+		$service->record_payment( 502, 602, LedgerService::PARTY_PROFESSIONAL, $provider_b, 5000000 );
+
+		wp_set_current_user( $owner_a );
+		$this->assertSame( 850000, $service->receivable_net_for_current_session(), "Professional A's own session must resolve to their own 15%-net figure, never professional B's." );
+
+		wp_set_current_user( $owner_b );
+		$this->assertSame( 4250000, $service->receivable_net_for_current_session() );
+	}
+
+	// 14. GAP-05: no argument this method accepts, because it accepts none -- there is nothing to spoof; it can only ever read the calling user's own party.
+	public function test_receivable_net_for_current_session_is_null_with_no_provider_profile(): void {
+		wp_set_current_user( self::factory()->user->create() );
+
+		$this->assertNull( ( new LedgerService() )->receivable_net_for_current_session() );
+	}
+
+	// 15. GAP-05: a logged-out call resolves to null, never a fatal error or a real party's data.
+	public function test_receivable_net_for_current_session_is_null_when_logged_out(): void {
+		wp_set_current_user( 0 );
+
+		$this->assertNull( ( new LedgerService() )->receivable_net_for_current_session() );
+	}
 }

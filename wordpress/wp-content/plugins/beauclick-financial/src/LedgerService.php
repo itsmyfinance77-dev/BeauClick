@@ -230,6 +230,56 @@ final class LedgerService {
 		);
 	}
 
+	/**
+	 * V3_GAP_REGISTER.md GAP-05: `party_receivable_net()` (and every other
+	 * party-scoped read on this class) takes `$party_type`/`$party_id`
+	 * directly as caller-supplied arguments — isolation between
+	 * professionals/businesses has, until now, only ever existed because
+	 * every REAL caller (`MyFinanceController`, `ProfessionalContext`)
+	 * happened to correctly resolve its own party identity from the current
+	 * session before calling in. Nothing on THIS class stopped a future
+	 * caller from passing a different party's id and getting their
+	 * financial data back. Real, not stale — confirmed by reading every
+	 * current caller before writing this.
+	 *
+	 * This method closes that gap the only way a class with no session
+	 * context of its own safely can: it resolves the party identity
+	 * ENTIRELY internally, via the same canonical `ProviderLookup::
+	 * for_user()` resolution every self-service surface in this codebase
+	 * already uses, and accepts no caller-supplied identity at all — there
+	 * is no argument here a caller could get wrong or spoof. A future
+	 * caller that wants "my own party's receivable" now has an
+	 * un-misusable method to reach for directly on `LedgerService` itself,
+	 * not just at the REST controller boundary. The original
+	 * `party_receivable_net(string, int)` is unchanged and still the right
+	 * choice for genuinely cross-party reads (`FinancialAdminPage`,
+	 * settlement recording) — this is an addition, not a replacement.
+	 *
+	 * Returns null (never a fabricated 0) when the current user has no
+	 * resolvable provider/business profile at all, so a caller can
+	 * distinguish "genuinely zero receivable" from "not a party at all"
+	 * without needing its own separate ProviderLookup call.
+	 */
+	public function receivable_net_for_current_session(): ?int {
+		$user_id = get_current_user_id();
+		if ( ! $user_id ) {
+			return null;
+		}
+
+		$provider_id = \BeauClick\Marketplace\Support\ProviderLookup::for_user( $user_id );
+		if ( ! $provider_id ) {
+			return null;
+		}
+
+		$post_type  = get_post_type( $provider_id );
+		$party_type = 'bc_business' === $post_type ? self::PARTY_BUSINESS : ( 'bc_professional' === $post_type ? self::PARTY_PROFESSIONAL : null );
+		if ( ! $party_type ) {
+			return null;
+		}
+
+		return $this->party_receivable_net( $party_type, $provider_id );
+	}
+
 	/** @return array{partyType:string, partyId:?int, count:int, commission:int, receivable:int} Platform-wide totals, admin overview only. */
 	public function platform_totals(): array {
 		global $wpdb;

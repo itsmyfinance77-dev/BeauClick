@@ -72,6 +72,63 @@ final class SettlementService {
 	}
 
 	/**
+	 * V3_GAP_REGISTER.md GAP-05: the session-safe counterpart to
+	 * `party_summary()`, resolving the party identity entirely from the
+	 * current session (via `ProviderLookup::for_user()`, `LedgerService::
+	 * receivable_net_for_current_session()`'s own canonical resolution) —
+	 * never a caller-supplied party_type/party_id. `MyFinanceController`
+	 * now calls this instead of resolving the identity itself and passing
+	 * it through, so the isolation guarantee lives on the data-access
+	 * class, not just at the REST boundary. Returns null under the exact
+	 * same "no profile yet" condition the REST controller already surfaces
+	 * as its own 404.
+	 *
+	 * @return array{partyType:string, partyId:int, summary:array{receivableNet:int, settled:int, outstanding:int}}|null
+	 */
+	public function my_party_summary(): ?array {
+		$identity = $this->resolve_current_session_identity();
+		if ( ! $identity ) {
+			return null;
+		}
+		[ $party_type, $party_id ] = $identity;
+
+		return [
+			'partyType' => $party_type,
+			'partyId'   => $party_id,
+			'summary'   => $this->party_summary( $party_type, $party_id ),
+		];
+	}
+
+	/** @return list<array{orderId:int, outstanding:int}>|null Null under the same "no profile yet" condition my_party_summary() returns null for. */
+	public function my_outstanding_orders(): ?array {
+		$identity = $this->resolve_current_session_identity();
+		if ( ! $identity ) {
+			return null;
+		}
+		[ $party_type, $party_id ] = $identity;
+
+		return $this->outstanding_orders_for_party( $party_type, $party_id );
+	}
+
+	/** @return array{0:string,1:int}|null [party_type, party_id] resolved from the current session only, or null if the current user has no provider/business profile. */
+	private function resolve_current_session_identity(): ?array {
+		$user_id = get_current_user_id();
+		if ( ! $user_id ) {
+			return null;
+		}
+		$provider_id = \BeauClick\Marketplace\Support\ProviderLookup::for_user( $user_id );
+		if ( ! $provider_id ) {
+			return null;
+		}
+		$post_type  = get_post_type( $provider_id );
+		$party_type = 'bc_business' === $post_type ? LedgerService::PARTY_BUSINESS : ( 'bc_professional' === $post_type ? LedgerService::PARTY_PROFESSIONAL : null );
+		if ( ! $party_type ) {
+			return null;
+		}
+		return [ $party_type, $provider_id ];
+	}
+
+	/**
 	 * @param list<int> $order_ids
 	 * @return array{id:int}|string New settlement id on success, a Persian error message on failure.
 	 */

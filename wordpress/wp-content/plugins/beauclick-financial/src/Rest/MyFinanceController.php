@@ -6,7 +6,6 @@ namespace BeauClick\Financial\Rest;
 use BeauClick\Core\Rest\RestController;
 use BeauClick\Core\Rest\Response;
 use BeauClick\Financial\SettlementService;
-use BeauClick\Marketplace\Support\ProviderLookup;
 use WP_REST_Request;
 
 /**
@@ -37,29 +36,32 @@ final class MyFinanceController extends RestController {
 		);
 	}
 
+	/**
+	 * V3_GAP_REGISTER.md GAP-05: this handler no longer resolves the party
+	 * identity itself and threads it through to `SettlementService` --
+	 * `my_party_summary()`/`my_outstanding_orders()` now do that resolution
+	 * internally (see their own docblocks), so the isolation guarantee this
+	 * route relies on lives on the data-access classes themselves, not only
+	 * here. `for_party()`'s own settlement history listing is the one piece
+	 * that still takes an explicit party_type/party_id -- both values are
+	 * still resolved from the session only (never a request parameter),
+	 * matching this controller's own pre-existing, still-correct discipline.
+	 */
 	public function summary( WP_REST_Request $request ): \WP_REST_Response {
-		$user_id     = get_current_user_id();
-		$provider_id = ProviderLookup::for_user( $user_id );
-
-		if ( ! $provider_id ) {
-			return Response::error( 'bc_no_profile', __( 'شما هنوز پروفایل متخصص یا کسب‌وکار ندارید.', 'beauclick-financial' ), 404 );
-		}
-
-		$post_type = get_post_type( $provider_id );
-		$party_type = 'bc_business' === $post_type ? 'business' : ( 'bc_professional' === $post_type ? 'professional' : null );
-		if ( ! $party_type ) {
-			return Response::error( 'bc_no_profile', __( 'شما هنوز پروفایل متخصص یا کسب‌وکار ندارید.', 'beauclick-financial' ), 404 );
-		}
-
 		$settlements = new SettlementService();
+
+		$party_summary = $settlements->my_party_summary();
+		if ( null === $party_summary ) {
+			return Response::error( 'bc_no_profile', __( 'شما هنوز پروفایل متخصص یا کسب‌وکار ندارید.', 'beauclick-financial' ), 404 );
+		}
 
 		return Response::ok(
 			[
-				'partyType'   => $party_type,
-				'partyId'     => $provider_id,
-				'summary'     => $settlements->party_summary( $party_type, $provider_id ),
-				'outstanding' => $settlements->outstanding_orders_for_party( $party_type, $provider_id ),
-				'settlements' => array_slice( $settlements->for_party( $party_type, $provider_id ), 0, 20 ),
+				'partyType'   => $party_summary['partyType'],
+				'partyId'     => $party_summary['partyId'],
+				'summary'     => $party_summary['summary'],
+				'outstanding' => $settlements->my_outstanding_orders(),
+				'settlements' => array_slice( $settlements->for_party( $party_summary['partyType'], $party_summary['partyId'] ), 0, 20 ),
 			]
 		);
 	}

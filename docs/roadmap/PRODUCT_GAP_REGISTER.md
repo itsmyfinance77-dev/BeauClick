@@ -916,3 +916,15 @@ Product-wide UI/UX audit at `v2.3.0` (`c505c20`) plus one intervening documentat
 **Tests:** backend PHPUnit grew 931 → **938** (7 new, zero regressions). Frontend Vitest grew 69 → **72** (3 new). TypeScript/ESLint/`php -l` clean, production build succeeds.
 
 **Live QA:** the benchmark card rendered real peer-group data (5 real same-specialty peers) with an honest "—" for missing peer-rating data. The `crm_opened` event (one of the two gaps this step's own registry-completeness check found) confirmed firing correctly live with no disruption. 375/390/412px: zero overflow. Zero console/network errors.
+
+## 57. Post-v2.4.0 — GAP-05 Completion Note
+
+| ID | Item | Disposition |
+|---|---|---|
+| GAP-05 | Financial cross-professional isolation enforced only at the REST controller boundary (`MyFinanceController`), not at `LedgerService`'s own data-access layer — a future caller reaching `LedgerService`/`SettlementService` without going through the gated controller would not be isolated by the service itself | **RESOLVED** — new `LedgerService::receivable_net_for_current_session()` and `SettlementService::my_party_summary()`/`my_outstanding_orders()` resolve the party identity entirely internally (the same canonical `ProviderLookup::for_user()` every self-service surface already uses), accepting no caller-supplied party argument at all. `MyFinanceController` now calls these instead of resolving identity itself and threading it through, so the isolation guarantee lives on the data-access classes, not only the REST boundary. Re-audited fresh before fixing: every real caller today (`MyFinanceController`, `beauclick-ai`'s `ProfessionalContext`, the admin-only `FinancialAdminPage`) was already correctly scoped — the gap was architectural (no defense-in-depth for a *future* caller), not an active leak. |
+
+**Tests:** 6 new (3 `LedgerServiceTest`, 3 `SettlementServiceTest`), each with two real, distinct professionals proving the isolation property directly. All 4 pre-existing `MyFinanceControllerTest` adversarial-ownership tests pass unchanged. Backend grew 938 → **944**, zero regressions.
+
+**Live QA:** `GET /financial/my-summary` confirmed returning the real logged-in professional's own real party/figures/settlement history via the new resolution path, zero console/network errors.
+
+**Not claimed:** `for_order()`/order-scoped `order_receivable_net()` (no real external caller today, confirmed by grep — left unchanged rather than adding an unused parallel method); the global `beauclick_financial()` accessor remains unguarded (no real misuse found; gating it was judged a larger, separate change than this focused fix).
