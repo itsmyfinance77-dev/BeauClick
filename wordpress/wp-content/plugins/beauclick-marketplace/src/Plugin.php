@@ -10,12 +10,14 @@ use BeauClick\Marketplace\Database\Migrations\AddProviderSearchTextColumn;
 use BeauClick\Marketplace\Database\Migrations\CreateBusinessStaffTable;
 use BeauClick\Marketplace\Database\Migrations\CreateProviderIndexTable;
 use BeauClick\Marketplace\Database\Migrations\CreateVerificationTables;
+use BeauClick\Marketplace\Database\Migrations\CreateWishlistTable;
 use BeauClick\Marketplace\Database\Seeds\DemoProvidersSeed;
 use BeauClick\Marketplace\PostTypes\Registrar;
 use BeauClick\Marketplace\Rest\MarketplaceController;
 use BeauClick\Marketplace\Rest\MyProfileController;
 use BeauClick\Marketplace\Rest\StaffController;
 use BeauClick\Marketplace\Rest\VerificationController;
+use BeauClick\Marketplace\Rest\WishlistController;
 use BeauClick\Marketplace\Search\Indexer;
 
 final class Plugin {
@@ -43,7 +45,7 @@ final class Plugin {
 	}
 
 	private function migrations(): array {
-		return [ new CreateProviderIndexTable(), new AddProviderRankingSignalsColumn(), new CreateVerificationTables(), new CreateBusinessStaffTable(), new AddProviderSearchTextColumn() ];
+		return [ new CreateProviderIndexTable(), new AddProviderRankingSignalsColumn(), new CreateVerificationTables(), new CreateBusinessStaffTable(), new AddProviderSearchTextColumn(), new CreateWishlistTable() ];
 	}
 
 	public function register_migrations(): void {
@@ -58,6 +60,7 @@ final class Plugin {
 		( new MyProfileController() )->register_routes();
 		( new VerificationController() )->register_routes();
 		( new StaffController() )->register_routes();
+		( new WishlistController() )->register_routes();
 	}
 
 	public function maybe_seed( ?string $only ): void {

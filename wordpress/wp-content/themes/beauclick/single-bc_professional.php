@@ -30,6 +30,14 @@ $reviews = class_exists( \BeauClick\Reviews\Reviews\ReviewService::class )
 	? ( new \BeauClick\Reviews\Reviews\ReviewService() )->for_provider( $provider_id )
 	: [];
 
+$is_wishlisted = is_user_logged_in() && class_exists( \BeauClick\Marketplace\Wishlist\WishlistService::class )
+	? ( new \BeauClick\Marketplace\Wishlist\WishlistService() )->contains( get_current_user_id(), $provider_id )
+	: false;
+
+if ( is_user_logged_in() ) {
+	bc_enqueue_app_bundle( 'wishlist-button' );
+}
+
 $avatar_url = bc_mockup_image_url( $provider_id );
 $cover_meta = get_post_meta( $provider_id, '_bc_mockup_cover', true );
 $cover_url  = is_string( $cover_meta ) && preg_match( '/^[a-z0-9\-]+\.svg$/', $cover_meta )
@@ -73,6 +81,17 @@ $cover_url  = is_string( $cover_meta ) && preg_match( '/^[a-z0-9\-]+\.svg$/', $c
 			<button type="button" class="bc-btn bc-btn--primary" data-bc-book-trigger data-provider-id="<?php echo esc_attr( $provider_id ); ?>"><?php esc_html_e( 'رزرو نوبت', 'beauclick' ); ?></button>
 			<?php if ( is_user_logged_in() && get_current_user_id() !== $owner_id ) : ?>
 				<button type="button" class="bc-btn bc-btn--outline" data-bc-chat-open data-counterpart-id="<?php echo esc_attr( $owner_id ); ?>"><?php esc_html_e( 'پیام', 'beauclick' ); ?></button>
+				<button
+					type="button"
+					class="bc-btn bc-btn--outline bc-wishlist-btn<?php echo $is_wishlisted ? ' bc-wishlist-btn--active' : ''; ?>"
+					data-bc-wishlist-toggle
+					data-provider-id="<?php echo esc_attr( $provider_id ); ?>"
+					data-wishlisted="<?php echo $is_wishlisted ? 'true' : 'false'; ?>"
+					aria-pressed="<?php echo $is_wishlisted ? 'true' : 'false'; ?>"
+				>
+					<span aria-hidden="true"><?php echo $is_wishlisted ? '♥' : '♡'; ?></span>
+					<span data-bc-wishlist-label><?php echo $is_wishlisted ? esc_html__( 'در علاقه‌مندی‌ها', 'beauclick' ) : esc_html__( 'افزودن به علاقه‌مندی‌ها', 'beauclick' ); ?></span>
+				</button>
 			<?php elseif ( ! is_user_logged_in() ) : ?>
 				<a href="<?php echo esc_url( home_url( '/auth/' ) ); ?>" class="bc-btn bc-btn--outline"><?php esc_html_e( 'پیام', 'beauclick' ); ?></a>
 			<?php endif; ?>

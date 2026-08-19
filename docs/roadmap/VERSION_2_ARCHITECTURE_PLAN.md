@@ -3067,3 +3067,35 @@ A real booking against a real active campaign (`bc_qa_customer`, a real open slo
 GAP-01's database-layer enforcement is not yet active on this development host (or any host with the same DB-privilege constraint) — disclosed above, not hidden; code-level immutability holds regardless. GAP-04's atomic guard can, under genuine three-way-or-more contention for the very last unit of a cap, occasionally leave the cap slightly *under*-utilized (a losing deadlock participant simply doesn't retry) rather than always filling it to the exact limit — an accepted availability trade-off, never a correctness violation, and not expected to matter at this product's real traffic scale.
 
 ---
+
+## V2.4 Step 23 — Wishlist, Receipt, Terminology
+
+**Status: wishlist implemented; receipt PDF found already implemented; terminology audited, no rename made.** The last item in this sequence, taken last per its own "cheap, parallelizable" characterization — each of its three sub-items turned out to need a different response once actually investigated, not the uniform "build it" the original roadmap wording assumed.
+
+### Wishlist — implemented
+
+**Pre-implementation audit:** the customer dashboard's "علاقه‌مندی‌ها" nav item has existed as a `ready: false` placeholder (`mounts/dashboard-customer.tsx`) since the app-shell's own scaffolding; a full-codebase grep confirmed zero backend wishlist code anywhere — a genuine, real gap, not a stale claim this time.
+
+**Backend** (`beauclick-marketplace`, matching the plugin that already owns provider data): a new `wp_bc_wishlist_items` table (`customer_id`, `provider_id`, `created_at`, `UNIQUE(customer_id, provider_id)` as the real idempotency guard, same `INSERT IGNORE` discipline as every other write in this codebase); `WishlistService` (add/remove/contains/list, sole owner of the table); `WishlistController` — `GET /marketplace/wishlist`, `POST`/`DELETE /marketplace/wishlist/{provider_id}`, all login-gated and scoped to the current user's own id (never a request param). A wishlisted provider that later gets unpublished is still reported (`available: false`) rather than silently vanishing from the customer's own saved list — an explicit, tested decision, not an oversight.
+
+**Frontend:** `WishlistTab.tsx` (real fetch, real Persian empty/error states, optimistic remove with server-failure rollback) wired into `dashboard-customer.tsx` (now `ready: true`); a heart-toggle button on the provider profile page (`single-bc_professional.php`, logged-in non-owner visitors only) wired via a new `wishlist-button` mount — deliberately no React root (a stateless DOM toggle + `fetch` call, the same imperative-update style `notification-bell.tsx`'s own badge already uses, not a component tree for a single button).
+
+**Tests:** 12 new backend (`WishlistServiceTest`, `WishlistControllerTest` — idempotency, isolation between customers, 404 on a non-existent provider, unavailable-but-still-reported), 8 new frontend (`WishlistTab.test.tsx`, `wishlist-button.test.tsx`). Backend grew 910 → **922**; frontend grew 55 → **63**. TypeScript/ESLint/`php -l` clean, production build succeeds with the new `wishlist-button` bundle present.
+
+**Live QA:** a real add from `bc_demo_sara_ahmadi`'s profile page (as `bc_qa_customer`) persisted a real row, confirmed via direct database query; the dashboard tab fetched and rendered it correctly (real name, real Persian-formatted price); removal both updated the UI and deleted the real row, confirmed the same way. 375/390/412px: zero horizontal overflow with real content rendered, not just the empty state. Console/network: zero errors during the actual interaction (the buffered `ERR_CONNECTION_REFUSED`/`401`/`403`/`404` entries were confirmed, the same way as every prior step's own audit, to be stale entries from earlier unrelated navigation in the same long-lived tab — a fresh network log captured during this exact flow shows 100% `200 OK`).
+
+### Receipt PDF — found already implemented, not built
+
+Before writing any code, `ReceiptView.tsx` was read in full: it already has a scoped `@media print` stylesheet and a "چاپ رسید" button calling `window.print()`, with its own docblock explicitly recording the decision — `window.print()` + a scoped print stylesheet was named, at the time, as the deliberate "first safe scope," not a placeholder awaiting a real PDF library. No PDF-capable dependency (Dompdf, mPDF, TCPDF) exists anywhere in `composer.json`/`composer.lock`, confirming no second implementation was ever started or abandoned. This item in the earlier V2.4 roadmap's own wording was stale — the work it described was already done before this step began. Nothing was changed here.
+
+### Terminology (نوبت/رزرو) — audited, no rename made
+
+**The premise did not hold up under an actual read of the code**, the same category of finding as GAP-08's "dead code" claim and GAP-01/03/04's original wording earlier in this same phase. A full-codebase grep found 40 uses of نوبت and 30 of رزرو across the frontend; reading each in context showed a real, mostly-consistent split already in place: **نوبت** for the temporal/appointment concept (زمان نوبت, جابه‌جایی نوبت, نوبت‌های امروز/هفته, یادآوری نوبت, مدت هر نوبت) and **رزرو** for the transactional/booking-record concept (رزروهای من, لغو رزرو, رزرو با خطا مواجه شد, رزروهای اخیر). This mirrors a distinction common to real Persian booking products (comparable to English "appointment" vs. "booking") and reads as intentional in every instance actually inspected, not arbitrary switching.
+
+Forcing a single term everywhere would have **removed** a real, useful distinction rather than fixed a genuine inconsistency, so no rename was made. This finding is recorded here specifically so a future contributor doesn't independently rediscover the same question and doesn't treat the two-term split as an unexplained inconsistency needing a fix.
+
+### Remaining limitations
+
+The wishlist has no "add from marketplace search-results card" affordance yet — only the single-provider profile page carries the heart toggle. Adding it to the listing cards themselves is a small, contained follow-up (the card component already exists; it would need the same `data-bc-wishlist-toggle` attributes this step's own button already established), deliberately deferred rather than expanding this step's own surface area further.
+
+---
