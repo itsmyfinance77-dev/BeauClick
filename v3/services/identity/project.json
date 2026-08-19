@@ -1,0 +1,9 @@
+{
+  "name": "identity",
+  "sourceRoot": "services/identity/src",
+  "projectType": "library",
+  "targets": {
+    "typecheck": { "executor": "nx:run-commands", "options": { "command": "tsc -p services/identity/tsconfig.json --noEmit" } },
+    "test": { "executor": "nx:run-commands", "options": { "command": "jest --config services/identity/jest.config.js" } }
+  }
+}

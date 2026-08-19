@@ -7,3 +7,8 @@ dist/
 .env.local
 coverage/
 .next/
+
+# The repo root .gitignore excludes *.sql (V2's local MySQL dump
+# convention) -- these are real, versioned migration source files, not
+# local dumps, so they're explicitly un-ignored here.
+!database/migrations/**/*.sql
