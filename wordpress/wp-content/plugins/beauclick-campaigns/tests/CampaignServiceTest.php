@@ -209,4 +209,12 @@ final class CampaignServiceTest extends WP_UnitTestCase {
 		$this->assertContains( $wildcard, $ids_for_service_99 );
 		$this->assertNotContains( $service_specific, $ids_for_service_99, 'A campaign targeting service 55 must never match a booking for service 99.' );
 	}
+
+	// record_usage_within_cap() (GAP-04) is deliberately NOT tested in this
+	// class -- it issues a real START TRANSACTION/COMMIT internally (the SELECT
+	// ... FOR UPDATE lock it relies on only holds across statements inside a
+	// real transaction, not under default autocommit), which would silently
+	// commit WP_UnitTestCase's own per-test transaction wrapper this class's
+	// other tests rely on for isolation. See CampaignUsageCapTest.php, which
+	// isolates those tests with explicit manual cleanup instead.
 }

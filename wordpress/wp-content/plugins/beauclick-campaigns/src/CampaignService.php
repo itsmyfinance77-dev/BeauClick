@@ -281,6 +281,77 @@ final class CampaignService {
 		return (bool) $inserted;
 	}
 
+	/**
+	 * V2.4 Step 26 (part 2), GAP-04. `record_usage()`'s own `UNIQUE(booking_id)`
+	 * only ever guarded against the SAME booking being recorded twice — it
+	 * never protected the CAP itself. `EligibilityResolver::is_eligible()`'s
+	 * `usage_count() >= limit` check runs well before this method (candidate
+	 * SELECTion, not the authoritative gate), so two concurrent bookings for
+	 * DIFFERENT booking_ids against the same near-full campaign could both
+	 * read a count still under the limit and both then insert successfully,
+	 * overshooting `usageLimitTotal`/`usageLimitPerCustomer`.
+	 *
+	 * This is the real, authoritative, race-safe gate — one atomic
+	 * `INSERT ... SELECT ... WHERE` statement, the cap re-check and the
+	 * insert as a single unit of work, the same "one statement is the real
+	 * guard" idiom `record_usage()`'s own `INSERT IGNORE` already uses (see
+	 * that method's docblock), never a multi-statement check-then-insert. An
+	 * earlier version of this method used an explicit `START TRANSACTION` +
+	 * `SELECT ... FOR UPDATE`; abandoned after it was found to corrupt
+	 * `WP_UnitTestCase`'s own per-test transaction-rollback isolation for
+	 * every test that exercises `CampaignDiscount::apply()` (a `START
+	 * TRANSACTION` always silently commits whatever transaction the test
+	 * framework already had open) — a real, reproduced problem (20+
+	 * cascading failures across unrelated test files), not a hypothetical
+	 * one. This single-statement form needs no explicit transaction of its
+	 * own, so it composes safely inside any caller's transaction (or none),
+	 * exactly like every other write in this codebase. Empirically verified
+	 * under genuine concurrent load (`CampaignUsageCapTest`'s own
+	 * concurrency test, and ad hoc multi-process racing during development):
+	 * N truly concurrent connections against a cap of K always leave exactly
+	 * K rows, never more — MySQL either blocks the losing connections until
+	 * the winner's INSERT is visible to their own re-evaluated subquery, or
+	 * resolves the conflict via its own deadlock detector, which aborts the
+	 * loser's statement outright (surfaced here as a normal `false` return,
+	 * indistinguishable from "cap already reached" -- correct, since both
+	 * mean "no discount granted this attempt").
+	 */
+	public function record_usage_within_cap( int $campaign_id, int $booking_id, int $order_id, int $customer_id, int $discount_amount, ?int $usage_limit_total, ?int $usage_limit_per_customer ): bool {
+		global $wpdb;
+		$now = current_time( 'mysql' );
+
+		$conditions = [];
+		$params     = [ $campaign_id, $booking_id, $order_id, $customer_id, $discount_amount, $now, $now ];
+
+		if ( null !== $usage_limit_total ) {
+			$conditions[] = "(SELECT COUNT(*) FROM {$wpdb->prefix}bc_campaign_usages WHERE campaign_id = %d AND status = 'applied') < %d";
+			$params[]     = $campaign_id;
+			$params[]     = $usage_limit_total;
+		}
+
+		if ( null !== $usage_limit_per_customer ) {
+			$conditions[] = "(SELECT COUNT(*) FROM {$wpdb->prefix}bc_campaign_usages WHERE campaign_id = %d AND customer_id = %d AND status = 'applied') < %d";
+			$params[]     = $campaign_id;
+			$params[]     = $customer_id;
+			$params[]     = $usage_limit_per_customer;
+		}
+
+		$where = $conditions ? ( 'WHERE ' . implode( ' AND ', $conditions ) ) : '';
+
+		$inserted = $wpdb->query(
+			$wpdb->prepare(
+				"INSERT IGNORE INTO {$wpdb->prefix}bc_campaign_usages
+				 (campaign_id, booking_id, order_id, customer_id, discount_amount, status, created_at, updated_at)
+				 SELECT %d, %d, %d, %d, %d, 'applied', %s, %s
+				 FROM DUAL
+				 {$where}", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared
+				$params
+			)
+		);
+
+		return (bool) $inserted;
+	}
+
 	/** Called when the order a campaign discount was applied to dies (cancelled/failed/refunded) — frees the usage slot without deleting the audit row. */
 	public function release_usage_for_order( int $order_id ): void {
 		global $wpdb;

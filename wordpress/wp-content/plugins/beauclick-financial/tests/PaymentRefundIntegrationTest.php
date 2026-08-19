@@ -231,7 +231,37 @@ final class PaymentRefundIntegrationTest extends WP_UnitTestCase {
 		$this->assertCount( $before_count, $ledger->for_order( $result['orderId'] ) );
 	}
 
-	// 8. Idempotency across a spuriously duplicated order (same underlying pattern V2.3 Step 17's own test surfaced: Payments' order-creation handler has no idempotency of its own).
+	/**
+	 * 8. Idempotency across a spuriously duplicated order. Since GAP-03
+	 * (V2.4 Step 26 part 2), `BookingOrderBridge::create_order_for_booking()`
+	 * itself now refuses to create a second order for a booking that already
+	 * has one (it returns the existing order instead) -- so re-firing
+	 * `beauclick/booking/after_create` for the same booking, this test's own
+	 * former reproduction method, no longer produces a second order at all.
+	 * This constructs a genuinely separate second order directly (the same
+	 * way `create_order_for_booking()` does internally), deliberately
+	 * bypassing its own new guard, to still exercise the ledger's self-healing
+	 * behavior for the case where a booking somehow ends up with two real
+	 * orders anyway (e.g. a payment-gateway retry via a path GAP-03's guard
+	 * doesn't cover).
+	 *
+	 * The expected OUTCOME changed from this test's pre-GAP-03 version, for a
+	 * real reason, not an incidental one: before GAP-03, `wp_bc_bookings.
+	 * wc_order_id` was left pointing at whichever spurious order was created
+	 * LAST (the very bug GAP-03 fixes), so `PaymentRefundIntegrationTest`'s
+	 * original assertion that "the first order stays untouched" was actually
+	 * only true because that stale pointer happened to make `cancel_booking()`
+	 * `wc_order_id`-linked-order refund logic target the SECOND order a
+	 * second time (a harmless no-op) instead of the first. Now that GAP-03
+	 * keeps `wc_order_id` correctly pointing at the real, first-confirmed
+	 * order, that same pre-existing `cancel_booking()` safety net (refund
+	 * whatever order is genuinely linked to a booking that just got
+	 * cancelled) correctly reaches the FIRST order too once the booking is
+	 * cancelled as a side effect of the second order's own refund -- a
+	 * stronger, more coherent guarantee than the old test proved: no booking
+	 * can end up cancelled while ANY of its real orders is left paid and
+	 * un-refunded, not just the spurious one.
+	 */
 	public function test_a_second_spurious_order_for_the_same_booking_still_records_its_own_correct_entries(): void {
 		$provider_post = $this->make_provider();
 		$service_id    = $this->make_priced_service( $provider_post, 200000 );
@@ -241,7 +271,19 @@ final class PaymentRefundIntegrationTest extends WP_UnitTestCase {
 		$booking = ( new BookingService() )->create_booking( $customer_id, $provider_post, $slot_id, $service_id );
 		$context = [ 'booking_id' => $booking['booking_id'], 'customer_id' => $customer_id, 'provider_id' => $provider_post, 'service_id' => $service_id ];
 		$first   = apply_filters( 'beauclick/booking/after_create', $booking, $context );
-		$second  = apply_filters( 'beauclick/booking/after_create', $booking, $context );
+
+		$product       = new \WC_Product_Simple();
+		$product->set_regular_price( '200000' );
+		$product->set_price( '200000' );
+		$product->set_virtual( true );
+		$product->save();
+		$second_order = wc_create_order( [ 'customer_id' => $customer_id ] );
+		$second_order->add_product( $product, 1 );
+		$second_order->update_meta_data( '_bc_booking_id', $booking['booking_id'] );
+		$second_order->calculate_totals();
+		$second_order->set_status( 'pending' );
+		$second_order->save();
+		$second = [ 'orderId' => $second_order->get_id() ];
 
 		$this->assertNotSame( $first['orderId'], $second['orderId'] );
 
@@ -250,28 +292,32 @@ final class PaymentRefundIntegrationTest extends WP_UnitTestCase {
 
 		$ledger = new LedgerService();
 
-		// The first order successfully confirms the (real, shared)
-		// booking -- exactly one real commission + receivable pair, net
-		// unchanged.
-		$this->assertCount( 2, $ledger->for_order( $first['orderId'] ) );
-		$this->assertGreaterThan( 0, $ledger->order_receivable_net( $first['orderId'] ) );
-
-		// The second order's payment_complete() also fires MY recorder
-		// first (both recorders sit independently on the same
-		// woocommerce_payment_complete hook) -- but beauclick-payments'
-		// OWN existing pre-Step-18 logic then finds the shared booking
-		// already confirmed by the first order and, via its own
+		// The second order's payment_complete() finds the booking already
+		// confirmed by the first and, via beauclick-payments' own
 		// long-standing handle_paid_but_unconfirmable_booking() path,
-		// automatically refunds this second, genuinely-unconfirmable
-		// order. That real refund fires woocommerce_order_refunded, which
-		// this step's own RefundRecorder correctly reacts to -- so the
-		// second order ends up with 4 rows (the original pair plus its own
-		// reversal pair), netting to exactly zero. This is the ledger
-		// correctly, automatically self-healing a pre-existing Payments
-		// edge case it was never specifically designed around -- not a
-		// bug, and a stronger correctness guarantee than "each order gets
-		// exactly 2 rows" would have been.
+		// automatically refunds this second, genuinely-unconfirmable order
+		// -- 4 ledger rows (the pair plus its own reversal), net zero.
 		$this->assertCount( 4, $ledger->for_order( $second['orderId'] ) );
 		$this->assertSame( 0, $ledger->order_receivable_net( $second['orderId'] ), 'The spurious, auto-refunded second order must never leave a real net receivable behind.' );
+
+		// That second order's own refund transitions IT to 'refunded',
+		// which fires on_order_dead() -> cancel_booking() for the shared
+		// booking (V2.1 Step 9's existing wc_order_status reaction) --
+		// cancelling a booking that, by this point, genuinely still has a
+		// real, paid, linked order (the first one) is exactly FIN-02's own
+		// scope (V2.3 Step 18): BookingService::cancel_booking() refunds
+		// that real linked order too, rather than leaving a cancelled
+		// booking with unrefunded money attached to it. Since GAP-03 (V2.4
+		// Step 26 part 2) now keeps wp_bc_bookings.wc_order_id correctly
+		// pointing at the real order throughout (instead of the pre-GAP-03
+		// bug's stale pointer, which happened to make this same
+		// FIN-02 safety net redundantly re-target the second order instead)
+		// this now correctly reaches the first order -- a stronger, more
+		// coherent guarantee than "the first order is always left alone"
+		// would have been: no booking can end up cancelled while any of its
+		// real orders is left paid and un-refunded.
+		$this->assertCount( 4, $ledger->for_order( $first['orderId'] ), 'FIN-02\'s existing cancel-time refund must reach the first order once the shared booking is cancelled by the second order\'s own refund.' );
+		$this->assertSame( 0, $ledger->order_receivable_net( $first['orderId'] ) );
+		$this->assertSame( BookingService::STATUS_CANCELLED, ( new BookingService() )->find( $booking['booking_id'] )['status'] );
 	}
 }

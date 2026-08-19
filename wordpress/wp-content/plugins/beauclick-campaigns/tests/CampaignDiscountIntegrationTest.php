@@ -110,20 +110,15 @@ final class CampaignDiscountIntegrationTest extends WP_UnitTestCase {
 
 	/**
 	 * Idempotency: the SAME booking_id must never be granted a campaign
-	 * discount twice, ever, regardless of how many times or how many orders
-	 * the filter chain is re-fired for it. This is deliberately NOT a
-	 * "re-fire and expect the exact same order" test — a real, pre-existing
-	 * fact this test surfaced about `beauclick-payments\Plugin::
-	 * attach_order_to_booking_result()` (priority 10, upstream of this
-	 * plugin) is that it has no idempotency of its own: every filter fire
-	 * unconditionally calls `wc_create_order()` again and overwrites
-	 * `$result['orderId']` with a brand-new order. That is pre-existing
-	 * Payments behavior this plugin neither causes nor needs to fix — this
-	 * test instead proves the guarantee this plugin IS responsible for: the
-	 * `UNIQUE(booking_id)` usage constraint means booking 13 gets its
-	 * discount on the FIRST order only, a spurious second order for the
-	 * same booking_id gets none, and exactly one usage row ever exists for
-	 * that booking no matter how many orders were spuriously created.
+	 * discount twice, ever, regardless of how many times the filter chain is
+	 * re-fired for it. Since GAP-03 (V2.4 Step 26 part 2), `beauclick-payments
+	 * \Booking\BookingOrderBridge::create_order_for_booking()` itself now
+	 * returns the SAME order for a booking_id that already has one, rather
+	 * than the old behavior of creating a second, orphaned order every fire
+	 * — so a re-fire lands on the identical order, and this plugin's own
+	 * `UNIQUE(booking_id)` usage constraint is exercised as the second,
+	 * defense-in-depth layer: re-running `CampaignDiscount::apply()` against
+	 * that same order for that same booking must never add a second fee.
 	 */
 	public function test_the_same_booking_id_is_never_granted_the_discount_twice_across_any_number_of_orders(): void {
 		$campaign_row = $this->create_active_campaign();
@@ -131,22 +126,22 @@ final class CampaignDiscountIntegrationTest extends WP_UnitTestCase {
 		$provider_post = $this->make_provider();
 		$service_id    = $this->make_priced_service( $provider_post, 400000 );
 		$customer_id   = self::factory()->user->create();
+		$slot_id       = $this->make_open_slot( $provider_post );
 
-		$context = [ 'booking_id' => 13, 'customer_id' => $customer_id, 'provider_id' => $provider_post, 'service_id' => $service_id ];
-		$first   = apply_filters( 'beauclick/booking/after_create', [ 'booking_id' => 13 ], $context );
-		$this->assertCount( 1, wc_get_order( $first['orderId'] )->get_items( 'fee' ), 'The first, real order for booking 13 must receive the discount.' );
+		// GAP-03's fix keys off a REAL `wp_bc_bookings.wc_order_id` value, so
+		// this must be a real booking (not a hand-built filter context with a
+		// synthetic booking_id) for the re-fire to actually exercise it.
+		$booking = ( new BookingService() )->create_booking( $customer_id, $provider_post, $slot_id, $service_id );
+		$context = [ 'booking_id' => $booking['booking_id'], 'customer_id' => $customer_id, 'provider_id' => $provider_post, 'service_id' => $service_id ];
 
-		// Re-firing the same context a second time is not a realistic retry
-		// of THIS plugin (Payments' own upstream handler creates a second,
-		// distinct order every time) -- but it's exactly the scenario that
-		// would silently double-grant a limited campaign's usage if this
-		// plugin's own idempotency guard were keyed on order_id instead of
-		// booking_id.
-		$second = apply_filters( 'beauclick/booking/after_create', [ 'booking_id' => 13 ], $context );
-		$this->assertNotSame( $first['orderId'], $second['orderId'], 'Sanity check on the premise: Payments itself creates a genuinely new order on each fire.' );
-		$this->assertCount( 0, wc_get_order( $second['orderId'] )->get_items( 'fee' ), 'A second order for the SAME booking_id must never receive a second discount.' );
+		$first = apply_filters( 'beauclick/booking/after_create', $booking, $context );
+		$this->assertCount( 1, wc_get_order( $first['orderId'] )->get_items( 'fee' ), 'The first, real order for this booking must receive the discount.' );
 
-		$this->assertSame( 1, ( new CampaignService() )->usage_count( $campaign_row['id'] ), 'Exactly one usage row must ever exist for booking 13, no matter how many orders were created for it.' );
+		$second = apply_filters( 'beauclick/booking/after_create', $booking, $context );
+		$this->assertSame( $first['orderId'], $second['orderId'], 'Since GAP-03, a second fire for the same booking_id must return the SAME order, never a duplicate.' );
+		$this->assertCount( 1, wc_get_order( $second['orderId'] )->get_items( 'fee' ), 'The same order must still show exactly one fee -- not removed, not duplicated.' );
+
+		$this->assertSame( 1, ( new CampaignService() )->usage_count( $campaign_row['id'] ), 'Exactly one usage row must ever exist for this booking, no matter how many times the filter fired.' );
 	}
 
 	// 4. Stacking with Membership: both discounts apply, computed independently against the same subtotal (no compounding), and the order total reflects both.

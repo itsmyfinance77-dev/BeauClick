@@ -4,6 +4,7 @@ declare( strict_types=1 );
 namespace BeauClick\Financial;
 
 use BeauClick\Financial\Admin\FinancialAdminPage;
+use BeauClick\Financial\Database\Migrations\AddLedgerImmutabilityTriggers;
 use BeauClick\Financial\Database\Migrations\CreateFinancialTables;
 use BeauClick\Financial\Recording\PaymentRecorder;
 use BeauClick\Financial\Recording\RefundRecorder;
@@ -25,7 +26,7 @@ final class Plugin {
 	private function __construct() {}
 
 	private function migrations(): array {
-		return [ new CreateFinancialTables() ];
+		return [ new CreateFinancialTables(), new AddLedgerImmutabilityTriggers() ];
 	}
 
 	public function boot(): void {

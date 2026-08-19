@@ -114,6 +114,30 @@ final class BookingOrderBridgeTest extends WP_UnitTestCase {
 		$this->assertGreaterThan( 0, count( $order->get_refunds() ), 'A payment completing for an already-expired booking must be automatically refunded.' );
 	}
 
+	/**
+	 * GAP-03 (V2.4 Step 26 part 2): a second call for a booking that already
+	 * has an order must return the SAME order, never create an orphaned
+	 * second one and silently overwrite wc_order_id.
+	 */
+	public function test_a_second_call_for_the_same_booking_returns_the_existing_order_instead_of_a_new_one(): void {
+		global $wpdb;
+		$provider_id = self::factory()->user->create();
+		$customer_id = self::factory()->user->create();
+		$slot_id     = $this->make_open_slot( $provider_id );
+
+		$booking = ( new BookingService() )->create_booking( $customer_id, $provider_id, $slot_id );
+		$product = $this->make_product( 'میکاپ عروس', 2500000 );
+		$bridge  = new BookingOrderBridge();
+
+		$first  = $bridge->create_order_for_booking( $booking['booking_id'], $customer_id, $product );
+		$second = $bridge->create_order_for_booking( $booking['booking_id'], $customer_id, $product );
+
+		$this->assertSame( $first->get_id(), $second->get_id(), 'A repeated call for the same booking_id must return the exact same order, not a duplicate.' );
+
+		$wc_order_id = $wpdb->get_var( $wpdb->prepare( "SELECT wc_order_id FROM {$wpdb->prefix}bc_bookings WHERE id = %d", $booking['booking_id'] ) );
+		$this->assertSame( (string) $first->get_id(), $wc_order_id, 'The booking must still point at the original order, never overwritten by the second call.' );
+	}
+
 	public function test_the_booking_create_endpoint_attaches_a_pay_url_when_payments_is_active(): void {
 		$result = apply_filters(
 			'beauclick/booking/after_create',

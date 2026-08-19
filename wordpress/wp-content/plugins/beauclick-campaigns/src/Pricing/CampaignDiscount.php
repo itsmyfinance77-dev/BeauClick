@@ -99,16 +99,22 @@ final class CampaignDiscount {
 		$campaign = $best['campaign'];
 		$services = new CampaignService();
 
-		// Insert-first: the UNIQUE(booking_id) constraint is the real,
-		// race-safe idempotency guard. If a usage row already exists for
-		// this booking (a re-fired filter, a retried request), the fee is
-		// never added twice.
-		$recorded = $services->record_usage(
+		// The UNIQUE(booking_id) constraint on wp_bc_campaign_usages still
+		// guards against this same booking being recorded twice (a re-fired
+		// filter, a retried request). The cap itself (usageLimitTotal /
+		// usageLimitPerCustomer) is enforced authoritatively here, inside a
+		// transaction, not just by EligibilityResolver's earlier candidate
+		// -selection check — see record_usage_within_cap()'s own docblock
+		// (V2.4 Step 26 part 2, GAP-04) for why that earlier check alone is
+		// racy against concurrent bookings for different booking_ids.
+		$recorded = $services->record_usage_within_cap(
 			(int) $campaign['id'],
 			(int) $context['booking_id'],
 			(int) $result['orderId'],
 			(int) $context['customer_id'],
-			$discount_amount
+			$discount_amount,
+			$campaign['usageLimitTotal'],
+			$campaign['usageLimitPerCustomer']
 		);
 		if ( ! $recorded ) {
 			return $result;

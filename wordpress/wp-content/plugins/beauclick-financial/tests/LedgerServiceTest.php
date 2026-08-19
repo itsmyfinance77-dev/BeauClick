@@ -142,4 +142,58 @@ final class LedgerServiceTest extends WP_UnitTestCase {
 		$this->assertSame( 450000, $totals['commission'] ); // 150,000 + 300,000.
 		$this->assertGreaterThanOrEqual( 2, $totals['orderCount'] );
 	}
+
+	/**
+	 * Both GAP-01 trigger tests below skip (not fail, not silently pass) when
+	 * this DB user cannot create triggers -- confirmed a real, disclosed
+	 * environment constraint on this local host (`CREATE TRIGGER` requires
+	 * SUPER or `log_bin_trust_function_creators=1` with binary logging on;
+	 * see `AddLedgerImmutabilityTriggers`'s own docblock). Asserting green
+	 * here without the trigger actually present would be a false proof; a
+	 * hard failure would misreport a hosting precondition as a code defect.
+	 */
+	private function skip_unless_ledger_triggers_exist(): void {
+		global $wpdb;
+		$triggers = $wpdb->get_col( "SHOW TRIGGERS WHERE `Table` = '{$wpdb->prefix}bc_ledger_entries'" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery
+		if ( count( $triggers ) < 2 ) {
+			self::markTestSkipped( 'wp_bc_ledger_entries immutability triggers are not present on this host (this DB user lacks CREATE TRIGGER privilege while binary logging is enabled) -- see AddLedgerImmutabilityTriggers\'s docblock. Code-layer immutability (no update/delete method exists on LedgerService) is unaffected.' );
+		}
+	}
+
+	// 11. GAP-01: wp_bc_ledger_entries is genuinely append-only at the database layer, not just by LedgerService's own code discipline.
+	public function test_a_direct_update_against_ledger_entries_is_blocked_at_the_database_layer(): void {
+		$this->skip_unless_ledger_triggers_exist();
+		global $wpdb;
+		$service = new LedgerService();
+		$service->record_payment( 112, 212, LedgerService::PARTY_PROFESSIONAL, 22, 400000 );
+		$row_id = (int) $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$wpdb->prefix}bc_ledger_entries WHERE order_id = %d AND entry_type = 'receivable' LIMIT 1", 112 ) );
+		$this->assertGreaterThan( 0, $row_id );
+
+		$wpdb->suppress_errors( true );
+		$result = $wpdb->update( $wpdb->prefix . 'bc_ledger_entries', [ 'amount' => 1 ], [ 'id' => $row_id ] );
+		$wpdb->suppress_errors( false );
+
+		$this->assertFalse( $result, 'A raw UPDATE against wp_bc_ledger_entries must be rejected by the BEFORE UPDATE trigger, not silently succeed.' );
+		$this->assertStringContainsString( 'append-only', (string) $wpdb->last_error );
+
+		$unchanged = (int) $wpdb->get_var( $wpdb->prepare( "SELECT amount FROM {$wpdb->prefix}bc_ledger_entries WHERE id = %d", $row_id ) );
+		$this->assertSame( 340000, $unchanged, 'The row must be completely unchanged after the blocked update attempt.' );
+	}
+
+	// 12. GAP-01: the same append-only guarantee blocks DELETE, not just UPDATE.
+	public function test_a_direct_delete_against_ledger_entries_is_blocked_at_the_database_layer(): void {
+		$this->skip_unless_ledger_triggers_exist();
+		global $wpdb;
+		$service = new LedgerService();
+		$service->record_payment( 113, 213, LedgerService::PARTY_PROFESSIONAL, 23, 200000 );
+		$row_id = (int) $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$wpdb->prefix}bc_ledger_entries WHERE order_id = %d AND entry_type = 'commission' LIMIT 1", 113 ) );
+		$this->assertGreaterThan( 0, $row_id );
+
+		$wpdb->suppress_errors( true );
+		$result = $wpdb->delete( $wpdb->prefix . 'bc_ledger_entries', [ 'id' => $row_id ] );
+		$wpdb->suppress_errors( false );
+
+		$this->assertFalse( $result, 'A raw DELETE against wp_bc_ledger_entries must be rejected by the BEFORE DELETE trigger, not silently succeed.' );
+		$this->assertSame( 2, (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}bc_ledger_entries WHERE order_id = %d", 113 ) ), 'Both rows recorded for this order must still exist.' );
+	}
 }
