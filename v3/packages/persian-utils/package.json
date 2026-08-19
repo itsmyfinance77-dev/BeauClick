@@ -1,0 +1,8 @@
+{
+  "name": "@beauclick/persian-utils",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Ported verbatim from V2 (app/src/lib/jalali.ts, format.ts) per V3_MIGRATION_MATRIX.md's DIRECT REUSE classification -- pure functions, zero framework coupling.",
+  "main": "src/index.ts",
+  "types": "src/index.ts"
+}

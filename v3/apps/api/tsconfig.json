@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "../../dist/apps/api",
+    "module": "commonjs",
+    "baseUrl": "../..",
+    "paths": {
+      "@beauclick/http": ["libs/http/src/index.ts"],
+      "@beauclick/auth": ["libs/auth/src/index.ts"],
+      "@beauclick/ownership": ["libs/ownership/src/index.ts"],
+      "@beauclick/identity": ["services/identity/src/index.ts"],
+      "@beauclick/provider": ["services/provider/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts"]
+}

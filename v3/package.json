@@ -1,0 +1,27 @@
+{
+  "name": "beauclick-v3",
+  "version": "0.0.0",
+  "private": true,
+  "description": "BeauClick V3 monorepo — Phase 1: identity-service + provider-service foundation. See docs/roadmap/v3/V3_REPOSITORY_STRUCTURE.md (ADR-011) for the full architecture this workspace implements.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "nx run-many -t build",
+    "test": "nx run-many -t test",
+    "lint": "eslint \"apps/**/src/**/*.ts\" \"apps/**/test/**/*.ts\" \"services/**/src/**/*.ts\" \"libs/**/src/**/*.ts\" \"packages/**/src/**/*.ts\" --no-error-on-unmatched-pattern",
+    "typecheck": "nx run-many -t typecheck",
+    "api:dev": "nx run api:dev"
+  },
+  "devDependencies": {
+    "nx": "^23.1.1",
+    "typescript": "^5.6.3",
+    "@typescript-eslint/eslint-plugin": "^8.8.1",
+    "@typescript-eslint/parser": "^8.8.1",
+    "eslint": "^8.57.1",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.5",
+    "@types/jest": "^29.5.13",
+    "@types/node": "^22.7.5"
+  }
+}

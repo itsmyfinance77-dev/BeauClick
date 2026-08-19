@@ -1,0 +1,36 @@
+packages:
+  - "apps/*"
+  - "services/*"
+  - "libs/*"
+  - "packages/*"
+allowBuilds:
+  '@nestjs/core': true
+  nx: true
+# Forces one exact physical copy of each of these packages across the whole
+# workspace. Without this, pnpm's per-peer-dependency-context install
+# strategy created TWO separate installs of @nestjs/common, @nestjs/core,
+# and @nestjs/typeorm (apps/api resolved one set, services/identity and
+# services/provider resolved another) -- invisible at the type-checking
+# level, but a real bug at runtime: a DataSource/token PROVIDED using one
+# physical copy's class reference is not recognized by @InjectRepository
+# decorators compiled against the OTHER copy, since JS class/token identity
+# is per-module-instance. Found via a genuine NestJS DI resolution failure
+# in the Phase 1 e2e test suite ("Nest can't resolve dependencies of the
+# CityEntityRepository... make sure DataSource is available"), not
+# hypothetical -- see V3_PHASE1_IMPLEMENTATION.md Known Limitations.
+overrides:
+  '@nestjs/common': 10.4.22
+  '@nestjs/core': 10.4.22
+  '@nestjs/platform-express': 10.4.22
+  '@nestjs/config': 3.3.0
+  '@nestjs/jwt': 10.2.0
+  '@nestjs/typeorm': 10.0.2
+  '@nestjs/throttler': 6.2.1
+  '@nestjs/testing': 10.4.22
+  '@nestjs/mapped-types': 2.0.6
+  typeorm: 0.3.31
+  pg: 8.23.0
+  rxjs: 7.8.2
+  reflect-metadata: 0.2.2
+  class-validator: 0.14.4
+  class-transformer: 0.5.1

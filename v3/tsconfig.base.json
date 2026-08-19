@@ -1,0 +1,32 @@
+{
+  "compileOnSave": false,
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "lib": ["ES2022"],
+    "declaration": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "types": ["jest", "node"],
+    "baseUrl": ".",
+    "paths": {
+      "@beauclick/auth": ["libs/auth/src/index.ts"],
+      "@beauclick/ownership": ["libs/ownership/src/index.ts"],
+      "@beauclick/http": ["libs/http/src/index.ts"],
+      "@beauclick/testing": ["libs/testing/src/index.ts"],
+      "@beauclick/persian-utils": ["packages/persian-utils/src/index.ts"],
+      "@beauclick/identity": ["services/identity/src/index.ts"],
+      "@beauclick/provider": ["services/provider/src/index.ts"]
+    }
+  }
+}

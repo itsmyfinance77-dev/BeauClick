@@ -1,0 +1,11 @@
+{
+  "name": "api",
+  "sourceRoot": "apps/api/src",
+  "projectType": "application",
+  "targets": {
+    "build": { "executor": "nx:run-commands", "options": { "command": "tsc -p apps/api/tsconfig.json" } },
+    "typecheck": { "executor": "nx:run-commands", "options": { "command": "tsc -p apps/api/tsconfig.json --noEmit" } },
+    "dev": { "executor": "nx:run-commands", "options": { "command": "ts-node -r tsconfig-paths/register apps/api/src/main.ts" } },
+    "test": { "executor": "nx:run-commands", "options": { "command": "jest --config apps/api/jest.config.js" } }
+  }
+}

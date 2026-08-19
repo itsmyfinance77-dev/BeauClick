@@ -1,0 +1,69 @@
+import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, Reflector } from '@nestjs/core';
+import { JwtModule, JwtService } from '@nestjs/jwt';
+
+import { BeauClickExceptionFilter, ResponseEnvelopeInterceptor } from '@beauclick/http';
+import { JwtAuthGuard, CapabilityGuard } from '@beauclick/auth';
+import { OwnershipGuard } from '@beauclick/ownership';
+import { IdentityModule, IDENTITY_ENTITIES } from '@beauclick/identity';
+import { ProviderModule, PROVIDER_ENTITIES } from '@beauclick/provider';
+
+import { validateEnv } from './config/env.validation';
+import { HealthController } from './health/health.controller';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
+    TypeOrmModule.forRootAsync({
+      // See BeauClickJwtModule's identical note (libs/auth/src/jwt-config.module.ts):
+      // a registerAsync/forRootAsync dynamic module needs ConfigModule in
+      // its OWN imports to resolve `inject: [ConfigService]`, even though
+      // ConfigModule is global -- the standard NestJS/@nestjs/config fix.
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        type: 'postgres' as const,
+        url: config.get('DATABASE_URL') ?? 'postgres://beauclick:beauclick@localhost:5432/beauclick',
+        entities: [...IDENTITY_ENTITIES, ...PROVIDER_ENTITIES],
+        // Phase 1 dev/test convenience ONLY -- V3_DATABASE_BLUEPRINT.md §3
+        // mandates real migrations (see database/migrations/) for anything
+        // resembling production. synchronize is fine for boot-in-dev
+        // convenience but must never be relied on beyond Phase 1.
+        synchronize: config.get('NODE_ENV') !== 'production',
+      }),
+    }),
+    // JwtModule is imported again here (identical config to
+    // BeauClickJwtModule) so JwtAuthGuard's JwtService dependency resolves
+    // at the app-module level, not only inside IdentityModule's own scope
+    // -- global guards need their dependencies available at the root
+    // injector.
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        secret: config.get('JWT_ACCESS_SECRET') ?? 'dev-only-insecure-secret-override-in-env',
+        signOptions: { expiresIn: config.get('JWT_ACCESS_TTL') ?? '15m' },
+      }),
+    }),
+    IdentityModule,
+    ProviderModule,
+  ],
+  controllers: [HealthController],
+  providers: [
+    { provide: APP_FILTER, useClass: BeauClickExceptionFilter },
+    { provide: APP_INTERCEPTOR, useClass: ResponseEnvelopeInterceptor },
+    // Order matters: Jwt populates req.user first, then Capability checks
+    // req.user.capabilities, then Ownership resolves the real resource
+    // owner and compares against req.user.userId.
+    {
+      provide: APP_GUARD,
+      useFactory: (jwt: JwtService, reflector: Reflector) => new JwtAuthGuard(jwt, reflector),
+      inject: [JwtService, Reflector],
+    },
+    { provide: APP_GUARD, useClass: CapabilityGuard },
+    { provide: APP_GUARD, useClass: OwnershipGuard },
+  ],
+})
+export class AppModule {}

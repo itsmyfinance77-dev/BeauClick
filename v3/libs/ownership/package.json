@@ -1,0 +1,12 @@
+{
+  "name": "@beauclick/ownership",
+  "version": "0.0.0",
+  "private": true,
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "dependencies": {
+    "@nestjs/common": "^10.4.4",
+    "@nestjs/core": "^10.4.4",
+    "reflect-metadata": "^0.2.2"
+  }
+}

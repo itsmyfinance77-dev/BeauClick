@@ -1,0 +1,9 @@
+{
+  "name": "ownership",
+  "sourceRoot": "libs/ownership/src",
+  "projectType": "library",
+  "targets": {
+    "typecheck": { "executor": "nx:run-commands", "options": { "command": "tsc -p libs/ownership/tsconfig.json --noEmit" } },
+    "test": { "executor": "nx:run-commands", "options": { "command": "jest --config libs/ownership/jest.config.js" } }
+  }
+}

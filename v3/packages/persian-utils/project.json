@@ -1,0 +1,9 @@
+{
+  "name": "persian-utils",
+  "sourceRoot": "packages/persian-utils/src",
+  "projectType": "library",
+  "targets": {
+    "typecheck": { "executor": "nx:run-commands", "options": { "command": "tsc -p packages/persian-utils/tsconfig.json --noEmit" } },
+    "test": { "executor": "nx:run-commands", "options": { "command": "jest --config packages/persian-utils/jest.config.js" } }
+  }
+}
