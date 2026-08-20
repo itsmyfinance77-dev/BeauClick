@@ -1,7 +1,16 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "outDir": "../../dist/apps/api",
+    // outDir is the dist ROOT, with rootDir pinned to the workspace root, so
+    // compiled output mirrors the source tree exactly:
+    //   dist/apps/api/src/main.js, dist/libs/..., dist/services/...
+    // Previously outDir already contained "apps/api" while tsc ALSO preserved
+    // each file's path from the inferred common root, producing a doubled
+    // dist/apps/api/apps/api/src/main.js. Pinning rootDir removes the
+    // inference (and with it the ambiguity when the set of input files
+    // changes).
+    "outDir": "../../dist",
+    "rootDir": "../..",
     "module": "commonjs",
     "baseUrl": "../..",
     "paths": {

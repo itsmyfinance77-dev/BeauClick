@@ -10,6 +10,24 @@ async function bootstrap() {
 
   app.use(helmet());
 
+  // CORS: the frontend (apps/web) is a separate origin from the API, so
+  // browser calls are cross-origin and require this. Deliberately an
+  // explicit ALLOW-LIST from configuration, never `origin: true` /
+  // wildcard -- a wildcard would let any site on the internet drive this
+  // API with a user's browser. credentials:true is set for the future
+  // httpOnly-refresh-cookie design (V3_PHASE1_IMPLEMENTATION.md), which a
+  // wildcard origin would also forbid outright.
+  const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS ?? 'http://localhost:3100')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+  app.enableCors({
+    origin: allowedOrigins,
+    credentials: true,
+    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Device-Label'],
+  });
+
   // Backend foundation requirement: API versioning -- every controller
   // route is already declared as 'v1/...' (ADR-014's URI-based, per-module
   // independent versioning); this prefix completes /api/v1/... to match

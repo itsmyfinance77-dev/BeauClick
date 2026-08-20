@@ -1,0 +1,89 @@
+@import '@beauclick/design-tokens/src/tokens.css';
+
+/**
+ * V3 base styles. RTL is enforced structurally: dir="rtl" on <html> (see
+ * layout.tsx) plus CSS LOGICAL properties everywhere below -- never
+ * margin-left/right or text-align: left/right. This is V2's proven
+ * approach carried forward (V3_MIGRATION_MATRIX.md: "RTL enforcement
+ * (document-level dir, CSS logical properties, zero LTR branching) --
+ * DIRECT REUSE (pattern)").
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--bc-font-family);
+  background: var(--bc-color-background);
+  color: var(--bc-color-ink);
+  line-height: 1.8;
+  /* Persian digits render with consistent width in tabular contexts (prices, counts, OTP inputs). */
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0 0 12px;
+  line-height: 1.25;
+}
+
+a {
+  color: var(--bc-color-primary);
+}
+
+/* Accessibility baseline: a visible, high-contrast focus ring on every
+   interactive element. :focus-visible (not :focus) so it appears for
+   keyboard users without adding a ring to every mouse click. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--bc-color-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Screen-reader-only content that stays focusable (used by the skip link). */
+.bc-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.bc-skip-link:focus {
+  position: fixed;
+  inset-block-start: 12px;
+  inset-inline-start: 12px;
+  width: auto;
+  height: auto;
+  clip: auto;
+  padding: 10px 16px;
+  background: var(--bc-color-surface);
+  border: 2px solid var(--bc-color-primary);
+  border-radius: var(--bc-radius-button);
+  z-index: 100;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

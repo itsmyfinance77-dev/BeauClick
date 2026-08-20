@@ -1,0 +1,60 @@
+/**
+ * CSS custom properties generated from tokens.json (V2's canonical
+ * shared/design-tokens.json, carried forward verbatim). Every V3 surface
+ * styles against these variables -- never a hardcoded literal.
+ *
+ * Kept in sync with tokens.json by hand for Phase 1's small token set; a
+ * generator script is the natural next step once tokens start changing
+ * (V2 had one: app/scripts/generate-tokens-css.mjs).
+ */
+:root {
+  /* color */
+  --bc-color-ink: oklch(0.2 0.02 290);
+  --bc-color-ink-soft: oklch(0.48 0.02 290);
+  --bc-color-ink-faint: oklch(0.6 0.02 290);
+  --bc-color-line: oklch(0.9 0.012 290);
+  --bc-color-background: oklch(0.985 0.006 280);
+  --bc-color-surface: oklch(1 0 0);
+  --bc-color-surface-tint: oklch(0.965 0.014 290);
+  --bc-color-primary: oklch(0.4 0.16 290);
+  --bc-color-primary-hover: oklch(0.34 0.16 290);
+  --bc-color-primary-soft: oklch(0.94 0.03 290);
+  --bc-color-accent: oklch(0.66 0.16 335);
+  --bc-color-accent-soft: oklch(0.95 0.035 335);
+  --bc-color-success: oklch(0.5 0.13 150);
+  --bc-color-success-soft: oklch(0.94 0.04 150);
+  --bc-color-warning: oklch(0.55 0.13 70);
+  --bc-color-warning-soft: oklch(0.95 0.045 80);
+  --bc-color-error: oklch(0.55 0.19 25);
+  --bc-color-error-soft: oklch(0.95 0.05 25);
+
+  /* gradient */
+  --bc-gradient-brand: linear-gradient(135deg, var(--bc-color-primary), var(--bc-color-accent));
+
+  /* typography */
+  --bc-font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, sans-serif;
+
+  /* spacing */
+  --bc-spacing-section-mobile: 24px;
+  --bc-spacing-section-desktop: 40px;
+  --bc-spacing-content-max-width: 1280px;
+  --bc-spacing-card-gap: 16px;
+  --bc-spacing-card-gap-large: 20px;
+  --bc-spacing-chip-gap: 8px;
+  --bc-spacing-chip-gap-large: 10px;
+
+  /* radius */
+  --bc-radius-card: 18px;
+  --bc-radius-row: 14px;
+  --bc-radius-row-large: 16px;
+  --bc-radius-avatar: 20px;
+  --bc-radius-hero: 28px;
+  --bc-radius-pill: 999px;
+  --bc-radius-button: 12px;
+
+  /* shadow */
+  --bc-shadow-card-hover: 0 14px 34px oklch(0.3 0.06 290 / 0.14);
+  --bc-shadow-floating-min: 0 8px 30px oklch(0.2 0.05 290 / 0.1);
+  --bc-shadow-floating-max: 0 10px 40px oklch(0.2 0.05 290 / 0.2);
+  --bc-shadow-ai-fab: 0 10px 26px oklch(0.4 0.14 300 / 0.35);
+}
