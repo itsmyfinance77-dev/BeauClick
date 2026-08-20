@@ -1,0 +1,11 @@
+{
+  "name": "payment",
+  "sourceRoot": "services/payment/src",
+  "projectType": "library",
+  "tags": ["type:service", "scope:payment"],
+  "targets": {
+    "typecheck": { "executor": "nx:run-commands", "options": { "command": "tsc -p services/payment/tsconfig.json --noEmit" } },
+    "test": { "executor": "nx:run-commands", "options": { "command": "jest --config services/payment/jest.config.js" } },
+    "lint": { "executor": "nx:run-commands", "options": { "command": "eslint services/payment/src --resolve-plugins-relative-to ." } }
+  }
+}
