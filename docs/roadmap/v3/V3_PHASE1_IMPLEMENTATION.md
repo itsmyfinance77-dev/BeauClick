@@ -1,6 +1,8 @@
 # V3 Phase 1 Implementation — Identity Service + Provider Service Foundation
 
-Status: **Implemented and verified in this environment.** Code lives under `v3/` at the repository root (a new top-level directory, chosen specifically to avoid colliding with V2's existing `app/` and `wordpress/` directories and to leave V2 completely untouched). V2.4.1's behavior was not modified in any way — no file under `wordpress/`, `app/`, or `shared/` was read, written, or deleted during this phase.
+Status: **COMPLETE.** Verified against real PostgreSQL 16, with a real frontend, in a real browser. Code lives under `v3/` at the repository root (a new top-level directory, chosen specifically to avoid colliding with V2's existing `app/` and `wordpress/` directories and to leave V2 completely untouched). V2.4.1's behavior was not modified in any way — no file under `wordpress/`, `app/`, or `shared/` was written or deleted during this phase (`shared/design-tokens.json` was read once, to copy into the V3 design-tokens package).
+
+> **Document history.** The first pass built the backend foundation and disclosed four things as incomplete: no real PostgreSQL, no frontend, no automated module-boundary enforcement, and a build-output path problem. **All four are now closed** — see §15 (Phase 1 completion pass). Sections 1–14 describe the foundation; §15 records what the completion pass changed, including three real bugs that only a real database could surface.
 
 ---
 
@@ -147,12 +149,14 @@ See §14 (Git status) and the commit log for the actual commits created. Baselin
 
 ## 11. Known limitations (disclosed, not silently worked around)
 
-1. **No real PostgreSQL server available in this environment** (confirmed: no `psql`, no Docker, no local Postgres service). All integration/e2e tests run against pg-mem, a real in-memory SQL engine — genuinely exercises schema/query correctness, not a mocked repository layer, but is **not** equivalent to real Postgres (no real connection pooling, no real role-grant enforcement, some Postgres system catalogs unimplemented — worked around, not present). **Action before Phase 2**: run `v3/database/migrations/**/*.sql` against a real Postgres instance and re-run the full test suite with a real `DATABASE_URL` before trusting this foundation for the financial-service ledger, whose append-only guarantee (`ADR-009`) specifically depends on real Postgres role-grant behavior pg-mem cannot verify.
-2. **Frontend foundation not built** — see §6. First item of remaining work, §14.
+> **Items 1, 2, 5, and 6 below were CLOSED by the Phase 1 completion pass — see §15.** They are left here unedited as an accurate record of the first pass's state; §15 states what changed. Items 3, 4, 7, and 8 remain open and are restated in §15's own limitations list.
+
+1. ~~**No real PostgreSQL server available in this environment**~~ — **CLOSED (§15.1)**: PostgreSQL 16.15 installed, migrations run and verified, 26 real-DB integration tests passing. *(Original text:)* All integration/e2e tests run against pg-mem, a real in-memory SQL engine — genuinely exercises schema/query correctness, not a mocked repository layer, but is **not** equivalent to real Postgres (no real connection pooling, no real role-grant enforcement, some Postgres system catalogs unimplemented — worked around, not present). **Action before Phase 2**: run `v3/database/migrations/**/*.sql` against a real Postgres instance and re-run the full test suite with a real `DATABASE_URL` before trusting this foundation for the financial-service ledger, whose append-only guarantee (`ADR-009`) specifically depends on real Postgres role-grant behavior pg-mem cannot verify.
+2. ~~**Frontend foundation not built**~~ — **CLOSED (§15.4)**: Next.js App Router foundation built, 30 frontend tests passing, live-verified in a real browser.
 3. **RBAC is code-based (`capabilities.ts`'s static role→capability map), not the dynamic `identity.roles`/`identity.capabilities` tables** `V3_DATABASE_BLUEPRINT.md` §8 lists. Every authorization check still goes through capability names (never a role string), so upgrading to dynamic tables later changes only where the map's data comes from, not how any guard/controller checks it — but this is a real scope reduction from the full blueprint, done deliberately to keep Phase 1 focused.
 4. **Audit logging is structured-logger-based** (`Logger`, tagged `AUDIT:*`), not the DB-persisted, structurally-enforced-at-registration-time contract `V3_SECURITY_MODEL.md` §7 and `V3_IMPLEMENTATION_ROADMAP.md` Phase 4 describe. Security-relevant events (OTP requested, login, logout, provider created/updated) are logged; the full `libs/audit` structural-enforcement decorator is explicitly Phase 4 scope per the roadmap this task itself set, not silently skipped.
-5. **Nx module-boundary enforcement is by convention, not yet an automated `enforce-module-boundaries` lint rule** — verified by direct inspection (no `services/*` package imports another `services/*` package; the one real violation caught during implementation was fixed by extracting `libs/auth`), but not yet backed by a CI-breaking lint rule as `ADR-011` specifies as the eventual goal.
-6. **`apps/api`'s TypeScript build output path is deeper than intended** (`dist/apps/api/apps/api/src/main.js` — a cosmetic `outDir`/`baseUrl` interaction, not a correctness issue) — the app runs and is fully tested via `ts-node` in dev and via Jest/supertest for testing; a real production build path is a Phase 1-remaining-work/Phase 2 infrastructure concern (`ADR-016`), not resolved here.
+5. ~~**Nx module-boundary enforcement is by convention**~~ — **CLOSED (§15.3)**: `@nx/eslint-plugin`'s `enforce-module-boundaries` is now active with scope tags and verified by deliberate violation in both directions.
+6. ~~**`apps/api`'s TypeScript build output path is deeper than intended**~~ — **CLOSED (§15.5)**: output is now a clean `dist/apps/api/src/main.js`.
 7. **One-profile-per-owner is enforced for `professionals` only** (a unique constraint on `ownerId`) — this is Phase 1's deliberate scope (`Business` entities are explicitly out of scope, per this task's own instruction listing only "Professional entity" among what to implement), not a general product constraint being silently imposed on the eventual multi-staff Business model.
 8. **`pnpm-lock.yaml`'s dependency-duplication fix (§2) should be re-verified whenever a new package is added** to any `v3/` `package.json` — a new package with a peer-dependency range slightly different from what's already pinned in `pnpm-workspace.yaml`'s `overrides` can silently reintroduce the same class of bug this phase found and fixed.
 
@@ -160,11 +164,11 @@ See §14 (Git status) and the commit log for the actual commits created. Baselin
 
 ## 12. Remaining Phase 1 work
 
-Per this task's own scope list, not yet built:
-1. **Frontend foundation** (Next.js app skeleton, routing structure, auth client layer, API client with token handling, RTL configuration, Persian localization foundation wired to `packages/persian-utils`, design-token package integration reusing `shared/design-tokens.json`).
-2. **Verify migrations against a real PostgreSQL server** once one is available in this environment or a hosting decision is made (`V3_INFRASTRUCTURE_PLAN.md` §1) — the single highest-priority item, since it's a precondition for trusting Phase 2's financial-service work.
-3. **Nx `enforce-module-boundaries` lint rule**, converting the currently-by-convention module-boundary discipline into a CI-enforced one.
-4. Minor build-output path cleanup for `apps/api` (§11.6).
+**All four items in this section were completed by the Phase 1 completion pass (§15).** Left unedited as a record of what the first pass owed:
+1. ~~**Frontend foundation**~~ — done, §15.4.
+2. ~~**Verify migrations against a real PostgreSQL server**~~ — done, §15.1.
+3. ~~**Nx `enforce-module-boundaries` lint rule**~~ — done, §15.3.
+4. ~~Minor build-output path cleanup for `apps/api`~~ — done, §15.5.
 
 ---
 
@@ -174,6 +178,119 @@ See `V3_GAP_REGISTER.md`'s new Phase 1 addendum for the formal record. Summary: 
 
 ---
 
+## 15. Phase 1 completion pass (2026-08-20)
+
+Closes the four items the first pass disclosed as outstanding, and adds real-database + real-browser verification throughout.
+
+### 15.1 Real PostgreSQL verification
+
+**Environment**: PostgreSQL **16.15** installed locally (via Chocolatey, with Administrator rights available in this session — the first pass had correctly reported none was installed). Disposable dev database `beauclick_v3_dev` owned by a non-superuser role `beauclick_app`.
+
+**Migration runner built** (`database/scripts/migrate.ts`): applies `database/migrations/{schema}/*.sql` in filename order, tracks applied files in `public.schema_migrations`, wraps each file in its own transaction (rollback on failure), and skips already-applied files. The first pass had migration *files* but no runner — TypeORM's `synchronize` was doing the work in tests, which is precisely why the divergences below went unnoticed.
+
+**Verified, in this order:**
+1. Applied both migrations to an empty database → both `APPLY`.
+2. Re-ran → both `SKIP (already applied)`, zero writes. **Idempotency confirmed.**
+3. Dropped the database entirely, recreated, migrated from zero → clean success.
+4. Inspected the resulting schema directly via `psql` (`\d`): every table, column, type, default, index, PK, FK, and unique constraint matches the migration source.
+5. Exercised constraints with real SQL: duplicate phone → `duplicate key value violates unique constraint "uq_users_phone"`; bad city FK → `violates foreign key constraint "professionals_city_id_fkey"`; second professional per owner → `violates unique constraint "uq_professionals_owner_id"`.
+
+**Three real bugs found — all invisible to pg-mem, because pg-mem generated its own schema from entity metadata instead of running the real migration SQL:**
+
+| # | Bug | Fix |
+|---|---|---|
+| 1 | TypeORM's default naming strategy is **camelCase**; the migrations (and `V3_DATABASE_BLUEPRINT.md` §2) are **snake_case**. Every generated query referenced non-existent columns (`"createdAt"` vs `created_at`). The live API returned `INTERNAL_ERROR` on `/auth/request-otp` and `/providers` while the health check passed. | `SnakeNamingStrategy` applied at **both** DataSource construction sites (`apps/api`, `libs/testing`) — so the fast test layer now matches real Postgres rather than diverging from it. |
+| 2 | Two hand-written raw SQL fragments hardcoded quoted camelCase identifiers, which a naming strategy cannot rewrite: `OtpService`'s atomic consume-on-success `WHERE "consumedAt" IS NULL`, and `TokenService`'s `WHERE "userId" = ... AND "revokedAt" IS NULL`. | Corrected to the real snake_case columns. Grepped the whole codebase for the same pattern; no others exist. |
+| 3 | An explicit `@JoinColumn({ name: 'cityId' })` **overrides** the naming strategy entirely, so `provider.professionals` was queried for a `cityId` column the migration never created. | Corrected to `city_id`. Found by the new real-Postgres suite *after* fixes 1–2, which is the point of having it. |
+
+The `professional_specialties` join table's columns were also normalized to snake_case (`professional_id`/`specialty_id`) in both the entity and the migration, for consistency with the stated convention.
+
+### 15.2 PostgreSQL role/grant verification (ADR-009 / GAP-01)
+
+`database/scripts/financial-role-contract.sql` + an automated spec (`apps/api/test/financial-role-contract.pg-spec.ts`). financial-service is **not** implemented in Phase 1 (out of scope) — this verifies the *infrastructure contract* Phase 2 will depend on, per this phase's explicit instruction.
+
+Two disposable, **non-superuser** roles were created (granting SUPERUSER to make the test pass would defeat it — the spec asserts `usesuper = false` explicitly):
+
+| Operation | `financial_writer` | `financial_reader` |
+|---|---|---|
+| INSERT | ✅ allowed | ❌ `permission denied` |
+| SELECT | ✅ allowed | ✅ allowed |
+| UPDATE | ❌ `permission denied` | ❌ `permission denied` |
+| DELETE | ❌ `permission denied` | — |
+| TRUNCATE | ❌ `permission denied` | — |
+
+The row was re-read after every denied mutation and confirmed **byte-identical**. **`ADR-009`'s append-only ledger guarantee is empirically enforceable on this database** — the guarantee V2 could never achieve, because its MySQL hosting lacked the `SUPER`/`log_bin_trust_function_creators` privileges its trigger approach needed (`PRODUCT_GAP_REGISTER.md` §53).
+
+### 15.3 Nx module-boundary enforcement
+
+`@nx/eslint-plugin` with `enforce-module-boundaries`, `scope:*`/`type:*` tags on all 10 projects, and `depConstraints` in `.eslintrc.json`. Each project has a real `lint` target, so `nx run-many -t lint` (CI-ready) enforces it.
+
+**Verified by deliberate violation, not assumed:**
+- `provider` → `@beauclick/identity`: ❌ *"A project tagged with scope:provider can only depend on libs tagged with scope:shared"*
+- `identity` → `@beauclick/provider`: ❌ same rule, reverse direction
+- relative-path cross-project import: ❌ *"Projects cannot be imported by a relative or absolute path"*
+- legitimate `services/*` → `libs/*` (scope:shared): ✅ passes
+
+Constraints encoded: no service may depend on another service (blocks cross-module persistence access and circular domain dependencies); `scope:shared` libs may not depend on any domain or app; only `scope:app` may compose domains. `financial` and `payment` scopes are pre-declared so Phase 2 inherits the isolation automatically.
+
+### 15.4 Frontend foundation
+
+`apps/web` — Next.js 14 App Router, TypeScript, per `ADR-012`.
+
+- **Shell/routing**: root layout with `lang="fa" dir="rtl"`, header + `<main>`, skip link, error boundary; routes `/` (server-rendered), `/auth`, `/dashboard` (protected).
+- **API client** (`lib/api-client.ts`): carries forward the one genuinely portable piece of V2's `api.ts` (envelope + `ApiError` + error-message hygiene) and drops everything WordPress-specific. Handles 401 by invoking a refresh callback and retrying **exactly once** — never a loop.
+- **Auth integration** (`lib/auth-context.tsx`): OTP request → verify → session, refresh with rotation, logout. Refresh uses a deliberately *bare* client so it cannot recurse into its own 401 handler.
+- **Token security** (`lib/token-storage.ts`): access **and** refresh tokens are held **in memory only** — never localStorage, sessionStorage, or cookies. Asserted by tests *and* verified live in the browser while genuinely logged in (`localStorage`/`sessionStorage`/`document.cookie` all empty, no `eyJ` JWT prefix anywhere). The cost is that a page reload signs the user out; that is a **deliberate, disclosed** trade (see §15.7 item 1) — the correct fix is an httpOnly refresh cookie, which needs a server-side auth route that is Phase 2 scope.
+- **Design tokens**: `packages/design-tokens` carries V2's `shared/design-tokens.json` **verbatim** plus a CSS-custom-property file. Verified live: `--bc-color-primary` resolves to the real V2 value `oklch(0.4 0.16 290)`.
+- **Persian/RTL/Jalali**: `packages/persian-utils` wired in; the dashboard rendered **پنجشنبه، ۲۹ مرداد ۱۴۰۵** and the auth screen rendered the phone number as **۰۹۱۲۷۷۷۸۸۹۹** in a real browser. `globals.css` uses only logical properties (asserted by a test that strips comments first, after the file's own docblock naming the banned properties tripped the check).
+- **Accessibility baseline**: labelled inputs, `role="alert"` errors tied via `aria-describedby`, `aria-busy` buttons, `role="status"` loading states, visible focus rings, 44px touch targets, `prefers-reduced-motion`.
+- **Responsive**: mobile-first; verified at 375×812 — no horizontal overflow, 44px targets, mobile padding, RTL intact.
+
+### 15.5 Build output
+
+`apps/api`'s output was `dist/apps/api/apps/api/src/main.js` (doubled) because `outDir` already contained `apps/api` while tsc *also* preserved each file's path from an inferred common root. Fixed by setting `outDir` to the dist root and pinning `rootDir` to the workspace root: output is now a clean `dist/apps/api/src/main.js` mirroring the source tree. `dist/`, `.next/`, and `.nx/` are all git-ignored and confirmed untracked.
+
+### 15.6 Live verification (real stack, real data)
+
+Real PostgreSQL + real NestJS API (`:3099`) + real Next.js frontend (`:3100`), driven through a real browser:
+
+- Health endpoint reports a genuine DB connection.
+- OTP requested **through the browser UI** → real row in `identity.otp_requests` with the canonicalized phone `+989127778899` and a **64-char HMAC hash** (never the plaintext code).
+- Code verified → JWT issued → redirected to `/dashboard` → dashboard fetched `/v1/me` with the real token and rendered real data from real Postgres.
+- **Refresh rotation**: new token differs from the old; replaying the old token → `401` **and** the freshly-rotated token is also killed — full-chain revocation confirmed live.
+- **Cross-tenant isolation**: two real users; party A's PATCH of party B's provider → `404 NOT_FOUND_OR_NOT_YOURS`, party B's secret marker absent from the response, and party B's row verified **unchanged** afterwards.
+- **Protected route**: after logout, `/dashboard` redirects to `/auth`.
+- Unauthenticated `/v1/me` → `401`.
+
+**A real integration bug was found here and fixed**: the API had **no CORS configuration**, so every browser call from `:3100` was blocked at preflight. (The frontend degraded correctly — Persian network message, no raw error leaked — which is how it was noticed rather than mis-diagnosed.) Fixed with an explicit **allow-list** from `CORS_ALLOWED_ORIGINS`, never a wildcard. Verified: the real origin receives `Access-Control-Allow-Origin`; `http://evil.example.com` receives **no** allow-origin header.
+
+### 15.7 Known limitations remaining after this pass
+
+1. **Refresh token is in memory, so a page reload signs the user out.** Deliberate: the alternative available today (localStorage) is strictly worse for XSS exposure. The real fix — an httpOnly/Secure/SameSite refresh cookie set by a server-side route handler — is Phase 2 scope.
+2. **RBAC data is still code-based** (`capabilities.ts`), not the dynamic `identity.roles`/`identity.capabilities` tables. Every check still goes through capability names, so this changes only where the map's data comes from. *(Unchanged from §11.3.)*
+3. **Audit logging is still structured-logger-based**, not the DB-persisted, registration-time-enforced contract (`V3_SECURITY_MODEL.md` §7). Phase 4 scope per the roadmap. *(Unchanged from §11.4.)*
+4. **One-profile-per-owner applies to `professionals` only** — Business entities remain out of scope, and the `UNIQUE(owner_id)` constraint will need revisiting when multi-staff Business arrives. *(Unchanged from §11.7.)*
+5. **`pnpm-workspace.yaml` `overrides` must be re-checked when adding packages** — a new peer-dependency range can silently reintroduce the duplicate-install DI bug. *(Unchanged from §11.8.)*
+6. **The local PostgreSQL is a disposable dev instance**, not a provisioned environment. Hosting/region remains the open decision in `V3_INFRASTRUCTURE_PLAN.md` §1 — this pass proves the *contract* is enforceable, not that a production database exists.
+7. **No CI pipeline is wired yet.** Every gate (typecheck, lint incl. module boundaries, tests, build, real-DB suite) is runnable as an `nx` target and CI-ready, but `ADR-016`'s actual pipeline is Phase 2 infrastructure scope.
+8. **Screenshots could not be captured** in this environment (the browser pane doesn't composite frames headlessly). Live verification was done via DOM/accessibility-tree reads and computed-style assertions instead — stronger evidence than a screenshot for the properties being checked, but no image artifacts exist.
+
+### 15.8 Final verification bar
+
+| Gate | Result |
+|---|---|
+| TypeScript (strict) | ✅ 10/10 projects clean |
+| ESLint incl. module boundaries | ✅ 10/10 projects clean |
+| Backend + frontend test suites | ✅ **96 passed** (7 projects) |
+| Real PostgreSQL integration suite | ✅ **26 passed** (2 suites) |
+| **Total automated tests** | ✅ **122 passing, 0 failing** |
+| Build | ✅ `api` + `web` both succeed |
+| Real migrations from zero | ✅ apply → verify → re-run idempotent |
+| DB role/grant contract | ✅ UPDATE/DELETE/TRUNCATE denied |
+| Live browser auth flow | ✅ end to end on real data |
+
+---
+
 ## Cross-references
-- `V3_DOMAIN_BOUNDARIES.md`, `V3_DATABASE_BLUEPRINT.md`, `V3_API_CONTRACT_BLUEPRINT.md`, `ADR-008`, `ADR-011`, `ADR-014`, `ADR-015` — the designs this phase implements.
-- `V3_IMPLEMENTATION_ROADMAP.md` Phase 1 — the plan this phase executes against; acceptance criteria there are met (§7/§8 above).
+- `V3_DOMAIN_BOUNDARIES.md`, `V3_DATABASE_BLUEPRINT.md`, `V3_API_CONTRACT_BLUEPRINT.md`, `ADR-008`, `ADR-011`, `ADR-012`, `ADR-014`, `ADR-015` — the designs this phase implements.
+- `V3_IMPLEMENTATION_ROADMAP.md` Phase 1 — the plan this phase executes against; acceptance criteria there are met (§7/§8/§15).
