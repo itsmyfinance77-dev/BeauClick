@@ -1,0 +1,11 @@
+{
+  "name": "commerce",
+  "sourceRoot": "services/commerce/src",
+  "projectType": "library",
+  "tags": ["type:service", "scope:commerce"],
+  "targets": {
+    "typecheck": { "executor": "nx:run-commands", "options": { "command": "tsc -p services/commerce/tsconfig.json --noEmit" } },
+    "test": { "executor": "nx:run-commands", "options": { "command": "jest --config services/commerce/jest.config.js" } },
+    "lint": { "executor": "nx:run-commands", "options": { "command": "eslint services/commerce/src --resolve-plugins-relative-to ." } }
+  }
+}
