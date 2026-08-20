@@ -2,8 +2,10 @@
   "name": "provider",
   "sourceRoot": "services/provider/src",
   "projectType": "library",
+  "tags": ["type:service", "scope:provider"],
   "targets": {
     "typecheck": { "executor": "nx:run-commands", "options": { "command": "tsc -p services/provider/tsconfig.json --noEmit" } },
-    "test": { "executor": "nx:run-commands", "options": { "command": "jest --config services/provider/jest.config.js" } }
+    "test": { "executor": "nx:run-commands", "options": { "command": "jest --config services/provider/jest.config.js" } },
+    "lint": { "executor": "nx:run-commands", "options": { "command": "eslint services/provider/src --resolve-plugins-relative-to ." } }
   }
 }

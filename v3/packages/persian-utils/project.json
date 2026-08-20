@@ -2,8 +2,10 @@
   "name": "persian-utils",
   "sourceRoot": "packages/persian-utils/src",
   "projectType": "library",
+  "tags": ["type:lib", "scope:shared"],
   "targets": {
     "typecheck": { "executor": "nx:run-commands", "options": { "command": "tsc -p packages/persian-utils/tsconfig.json --noEmit" } },
-    "test": { "executor": "nx:run-commands", "options": { "command": "jest --config packages/persian-utils/jest.config.js" } }
+    "test": { "executor": "nx:run-commands", "options": { "command": "jest --config packages/persian-utils/jest.config.js" } },
+    "lint": { "executor": "nx:run-commands", "options": { "command": "eslint packages/persian-utils/src --resolve-plugins-relative-to ." } }
   }
 }

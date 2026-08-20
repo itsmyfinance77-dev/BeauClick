@@ -116,7 +116,9 @@ export class TokenService {
       .createQueryBuilder()
       .update(RefreshTokenEntity)
       .set({ revokedAt: new Date() })
-      .where('"userId" = :userId AND "revokedAt" IS NULL', { userId })
+      // Real snake_case columns (user_id, revoked_at per SnakeNamingStrategy)
+      // -- same class of bug as OtpService's consumed_at fix, same fix.
+      .where('user_id = :userId AND revoked_at IS NULL', { userId })
       .execute();
   }
 

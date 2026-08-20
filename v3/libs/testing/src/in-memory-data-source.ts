@@ -1,5 +1,6 @@
 import { newDb, DataType } from 'pg-mem';
 import { DataSource, DataSourceOptions, getMetadataArgsStorage } from 'typeorm';
+import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
 import { uuidv7 } from 'uuidv7';
 
 /**
@@ -65,9 +66,17 @@ function buildPgMemDataSource(entities: DataSourceOptions['entities']): DataSour
   // catalog pg-mem doesn't implement. Unneeded anyway: each call here
   // builds a brand-new, empty `newDb()` instance, so there is nothing to
   // drop -- synchronize:true alone creates the schema fresh every time.
+  // namingStrategy MUST match apps/api's real DataSource config exactly
+  // (SnakeNamingStrategy) -- this is precisely what was missing before: this
+  // in-memory DataSource used TypeORM's default camelCase naming while the
+  // real migration SQL was snake_case, so passing tests here gave zero
+  // signal about the real-Postgres column-name mismatch. With this fix,
+  // pg-mem's own synchronize:true output now matches the real migrations'
+  // column names, so this test layer is representative again.
   return db.adapters.createTypeormDataSource({
     type: 'postgres',
     entities,
+    namingStrategy: new SnakeNamingStrategy(),
     synchronize: true,
   } as DataSourceOptions) as DataSource;
 }

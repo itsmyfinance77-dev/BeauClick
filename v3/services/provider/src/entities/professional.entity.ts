@@ -33,16 +33,21 @@ export class ProfessionalEntity {
   @Column({ type: 'uuid', nullable: true })
   cityId!: string | null;
 
+  // Explicit column name MUST be snake_case: an explicit @JoinColumn name
+  // overrides SnakeNamingStrategy entirely, so leaving it camelCase made
+  // TypeORM query a "cityId" column that the real migration never created.
+  // Caught by the real-PostgreSQL integration suite (pg-mem never saw it,
+  // since it generated its own schema from this same metadata).
   @ManyToOne(() => CityEntity, { nullable: true })
-  @JoinColumn({ name: 'cityId' })
+  @JoinColumn({ name: 'city_id' })
   city?: CityEntity;
 
   @ManyToMany(() => SpecialtyEntity)
   @JoinTable({
     name: 'professional_specialties',
     schema: 'provider',
-    joinColumn: { name: 'professionalId', referencedColumnName: 'id' },
-    inverseJoinColumn: { name: 'specialtyId', referencedColumnName: 'id' },
+    joinColumn: { name: 'professional_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'specialty_id', referencedColumnName: 'id' },
   })
   specialties!: SpecialtyEntity[];
 

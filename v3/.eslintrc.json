@@ -5,7 +5,7 @@
     "ecmaVersion": 2022,
     "sourceType": "module"
   },
-  "plugins": ["@typescript-eslint"],
+  "plugins": ["@typescript-eslint", "@nx"],
   "extends": ["eslint:recommended", "plugin:@typescript-eslint/recommended"],
   "env": {
     "node": true,
@@ -14,7 +14,40 @@
   "rules": {
     "@typescript-eslint/no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
     "@typescript-eslint/no-explicit-any": "warn",
-    "no-console": ["warn", { "allow": ["warn", "error"] }]
+    "no-console": ["warn", { "allow": ["warn", "error"] }],
+    "@nx/enforce-module-boundaries": [
+      "error",
+      {
+        "enforceBuildableLibDependency": true,
+        "allow": [],
+        "depConstraints": [
+          {
+            "sourceTag": "scope:identity",
+            "onlyDependOnLibsWithTags": ["scope:shared"],
+            "notDependOnLibsWithTags": ["scope:provider", "scope:financial", "scope:payment"]
+          },
+          {
+            "sourceTag": "scope:provider",
+            "onlyDependOnLibsWithTags": ["scope:shared"],
+            "notDependOnLibsWithTags": ["scope:identity", "scope:financial", "scope:payment"]
+          },
+          {
+            "sourceTag": "scope:financial",
+            "onlyDependOnLibsWithTags": ["scope:shared"],
+            "notDependOnLibsWithTags": ["scope:identity", "scope:provider", "scope:payment"]
+          },
+          {
+            "sourceTag": "scope:shared",
+            "onlyDependOnLibsWithTags": ["scope:shared"],
+            "notDependOnLibsWithTags": ["scope:identity", "scope:provider", "scope:financial", "scope:payment", "scope:app"]
+          },
+          {
+            "sourceTag": "scope:app",
+            "onlyDependOnLibsWithTags": ["scope:shared", "scope:identity", "scope:provider", "scope:financial", "scope:payment"]
+          }
+        ]
+      }
+    ]
   },
   "ignorePatterns": ["dist", "node_modules", "*.js"]
 }

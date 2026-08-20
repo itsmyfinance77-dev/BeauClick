@@ -2,8 +2,10 @@
   "name": "identity",
   "sourceRoot": "services/identity/src",
   "projectType": "library",
+  "tags": ["type:service", "scope:identity"],
   "targets": {
     "typecheck": { "executor": "nx:run-commands", "options": { "command": "tsc -p services/identity/tsconfig.json --noEmit" } },
-    "test": { "executor": "nx:run-commands", "options": { "command": "jest --config services/identity/jest.config.js" } }
+    "test": { "executor": "nx:run-commands", "options": { "command": "jest --config services/identity/jest.config.js" } },
+    "lint": { "executor": "nx:run-commands", "options": { "command": "eslint services/identity/src --resolve-plugins-relative-to ." } }
   }
 }

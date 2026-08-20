@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, Reflector } from '@nestjs/core';
 import { JwtModule, JwtService } from '@nestjs/jwt';
+import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
 
 import { BeauClickExceptionFilter, ResponseEnvelopeInterceptor } from '@beauclick/http';
 import { JwtAuthGuard, CapabilityGuard } from '@beauclick/auth';
@@ -27,6 +28,17 @@ import { HealthController } from './health/health.controller';
         type: 'postgres' as const,
         url: config.get('DATABASE_URL') ?? 'postgres://beauclick:beauclick@localhost:5432/beauclick',
         entities: [...IDENTITY_ENTITIES, ...PROVIDER_ENTITIES],
+        // V3_DATABASE_BLUEPRINT.md §2 mandates lower_snake_case columns;
+        // TypeORM's default naming strategy uses the JS property name
+        // verbatim (camelCase) instead. Without this, TypeORM generates
+        // queries against columns like "createdAt" that do not exist in
+        // the real, hand-written migration schema (which is snake_case,
+        // e.g. created_at) -- a real bug found during Phase 1 completion's
+        // live-Postgres verification (pg-mem's synchronize:true had always
+        // generated ITS OWN camelCase schema in tests, so this divergence
+        // was invisible until the actual migration SQL was run against a
+        // real server and the app pointed at it with synchronize:false).
+        namingStrategy: new SnakeNamingStrategy(),
         // Phase 1 dev/test convenience ONLY -- V3_DATABASE_BLUEPRINT.md §3
         // mandates real migrations (see database/migrations/) for anything
         // resembling production. synchronize is fine for boot-in-dev

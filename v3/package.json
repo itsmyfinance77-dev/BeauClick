@@ -11,17 +11,23 @@
     "test": "nx run-many -t test",
     "lint": "eslint \"apps/**/src/**/*.ts\" \"apps/**/test/**/*.ts\" \"services/**/src/**/*.ts\" \"libs/**/src/**/*.ts\" \"packages/**/src/**/*.ts\" --no-error-on-unmatched-pattern",
     "typecheck": "nx run-many -t typecheck",
+    "test:pg": "nx run api:test:pg",
+    "migrate": "ts-node database/scripts/migrate.ts",
     "api:dev": "nx run api:dev"
   },
   "devDependencies": {
-    "nx": "^23.1.1",
-    "typescript": "^5.6.3",
+    "@nx/eslint-plugin": "23.1.1",
+    "@types/jest": "^29.5.13",
+    "@types/node": "^22.7.5",
+    "@types/pg": "^8.23.1",
     "@typescript-eslint/eslint-plugin": "^8.8.1",
     "@typescript-eslint/parser": "^8.8.1",
     "eslint": "^8.57.1",
     "jest": "^29.7.0",
+    "nx": "^23.1.1",
+    "pg": "^8.23.0",
     "ts-jest": "^29.2.5",
-    "@types/jest": "^29.5.13",
-    "@types/node": "^22.7.5"
+    "typeorm-naming-strategies": "^4.1.0",
+    "typescript": "^5.6.3"
   }
 }

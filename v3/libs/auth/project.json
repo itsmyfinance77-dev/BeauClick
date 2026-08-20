@@ -2,7 +2,9 @@
   "name": "auth",
   "sourceRoot": "libs/auth/src",
   "projectType": "library",
+  "tags": ["type:lib", "scope:shared"],
   "targets": {
-    "typecheck": { "executor": "nx:run-commands", "options": { "command": "tsc -p libs/auth/tsconfig.json --noEmit" } }
+    "typecheck": { "executor": "nx:run-commands", "options": { "command": "tsc -p libs/auth/tsconfig.json --noEmit" } },
+    "lint": { "executor": "nx:run-commands", "options": { "command": "eslint libs/auth/src --resolve-plugins-relative-to ." } }
   }
 }

@@ -1,13 +1,14 @@
 -- V3_DATABASE_BLUEPRINT.md: schema-per-module, UUIDv7 PKs generated
 -- application-side (not gen_random_uuid()), standard audit columns.
--- NOTE (Phase 1 known limitation, see V3_PHASE1_IMPLEMENTATION.md): this
--- file has not been executed against a real PostgreSQL server in this
--- environment (no Docker/psql/pg service available) -- it has been
--- exercised structurally via TypeORM's schema-sync path against pg-mem
--- (libs/testing) in the automated test suite, which validates the DDL
--- shape and every query against it, but is not a substitute for a real
--- Postgres run. Verify this file directly against a real Postgres instance
--- before Phase 2.
+-- Verified against a real PostgreSQL 16 server (see V3_PHASE1_IMPLEMENTATION.md
+-- Phase 1 completion pass) -- applied via database/scripts/migrate.ts,
+-- schema inspected directly via psql, constraints (UNIQUE phone, FKs)
+-- exercised with real INSERT statements, re-run confirmed idempotent
+-- (skip-if-applied). This pass also found and fixed a real naming-strategy
+-- gap: TypeORM's default column naming is camelCase, which never matched
+-- this file's snake_case columns until SnakeNamingStrategy was applied to
+-- every DataSource construction site (apps/api, libs/testing) -- see
+-- V3_GAP_REGISTER.md's Phase 1 completion addendum.
 
 CREATE SCHEMA IF NOT EXISTS identity;
 

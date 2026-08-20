@@ -154,7 +154,13 @@ export class OtpService {
       .createQueryBuilder()
       .update(OtpRequestEntity)
       .set({ consumedAt: new Date() })
-      .where('id = :id AND "consumedAt" IS NULL', { id: candidate.id })
+      // Raw identifier here MUST be the real snake_case column
+      // (consumed_at, per SnakeNamingStrategy) -- a raw WHERE-clause
+      // fragment is not auto-translated from the entity property name the
+      // way .set({...}) is; a real bug (a stale camelCase "consumedAt"
+      // reference) was caught here by the Phase 1 completion pass's real
+      // PostgreSQL verification.
+      .where('id = :id AND consumed_at IS NULL', { id: candidate.id })
       .execute();
 
     if (!result.affected) {

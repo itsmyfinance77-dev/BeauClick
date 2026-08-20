@@ -1,6 +1,7 @@
--- See identity migration's header note re: not yet executed against a real
--- Postgres server in this environment (Known Limitation, disclosed in
--- V3_PHASE1_IMPLEMENTATION.md).
+-- Verified against a real PostgreSQL 16 server (see V3_PHASE1_IMPLEMENTATION.md
+-- Phase 1 completion pass) -- applied via database/scripts/migrate.ts,
+-- schema inspected directly via psql, constraints exercised with real
+-- INSERT statements, re-run confirmed idempotent (skip-if-applied).
 
 CREATE SCHEMA IF NOT EXISTS provider;
 
@@ -31,9 +32,9 @@ CREATE UNIQUE INDEX uq_professionals_owner_id ON provider.professionals (owner_i
 CREATE INDEX ix_professionals_city_id ON provider.professionals (city_id);
 
 CREATE TABLE provider.professional_specialties (
-    "professionalId" UUID NOT NULL REFERENCES provider.professionals (id),
-    "specialtyId" UUID NOT NULL REFERENCES provider.specialties (id),
-    PRIMARY KEY ("professionalId", "specialtyId")
+    professional_id UUID NOT NULL REFERENCES provider.professionals (id),
+    specialty_id UUID NOT NULL REFERENCES provider.specialties (id),
+    PRIMARY KEY (professional_id, specialty_id)
 );
 
 CREATE TABLE provider.services (
