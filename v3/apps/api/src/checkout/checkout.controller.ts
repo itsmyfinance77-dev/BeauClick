@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Headers, Param, Post, Query, Redirect } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { AuthenticatedUser, CurrentUser } from '@beauclick/http';
+import { AuthenticatedUser, CurrentUser, SkipResponseEnvelope } from '@beauclick/http';
 import { Public } from '@beauclick/auth';
 import { CreateBookingDto, toBookingShape, BookingService } from '@beauclick/booking';
 import { toOrderDetail } from '@beauclick/commerce';
@@ -91,6 +91,7 @@ export class PaymentCallbackController {
    * support one.
    */
   @Public()
+  @SkipResponseEnvelope()
   @Get('callback/:provider')
   @Redirect()
   async callbackGet(@Param('provider') provider: string, @Query() query: Record<string, string>) {
@@ -98,6 +99,7 @@ export class PaymentCallbackController {
   }
 
   @Public()
+  @SkipResponseEnvelope()
   @Post('callback/:provider')
   @Redirect()
   async callbackPost(

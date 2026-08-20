@@ -262,10 +262,19 @@ export class BookingService {
    */
   async confirm(bookingId: string, actor: BookingActor = SYSTEM_ACTOR, manager?: EntityManager): Promise<boolean> {
     return this.runInTransaction(manager, async (m) => {
-      const moved = await this.transition(m, bookingId, 'confirmed', ['pending'], actor, null, {
-        confirmedAt: new Date(),
-        holdExpiresAt: null,
-      });
+      const moved = await this.transition(
+        m,
+        bookingId,
+        'confirmed',
+        ['pending'],
+        actor,
+        null,
+        { confirmedAt: new Date(), holdExpiresAt: null },
+        // Never throw: see transition()'s own note. A booking that expired
+        // while the customer was at the gateway must yield false, not abort
+        // the payment transaction.
+        'report',
+      );
       if (!moved) return false;
 
       const booking = await m.findOneOrFail(BookingEntity, { where: { id: bookingId } });
@@ -312,13 +321,24 @@ export class BookingService {
       const before = await m.findOne(BookingEntity, { where: { id: bookingId } });
       if (!before) return false;
 
-      const moved = await this.transition(m, bookingId, 'cancelled', ['pending', 'confirmed'], actor, reason, {
-        cancellationReason: reason,
-        cancelledByActorType: actor.type,
-        cancelledByActorId: actor.id,
-        cancelledAt: new Date(),
-        holdExpiresAt: null,
-      });
+      // Cancelling an already-terminal booking is a normal, idempotent
+      // no-op (a retried request, a double-clicked button), not an error.
+      const moved = await this.transition(
+        m,
+        bookingId,
+        'cancelled',
+        ['pending', 'confirmed'],
+        actor,
+        reason,
+        {
+          cancellationReason: reason,
+          cancelledByActorType: actor.type,
+          cancelledByActorId: actor.id,
+          cancelledAt: new Date(),
+          holdExpiresAt: null,
+        },
+        'report',
+      );
       if (!moved) return false;
 
       await this.releaseSlot(m, before.slotId, bookingId);
@@ -550,9 +570,18 @@ export class BookingService {
     let expired = 0;
     for (const row of stale) {
       const done = await this.dataSource.transaction(async (m) => {
-        const moved = await this.transition(m, row.id, 'expired', ['pending'], SYSTEM_ACTOR, 'hold_expired', {
-          holdExpiresAt: null,
-        });
+        // 'report': a payment confirmation that won the race leaves the
+        // booking confirmed, and the sweep must simply skip it.
+        const moved = await this.transition(
+          m,
+          row.id,
+          'expired',
+          ['pending'],
+          SYSTEM_ACTOR,
+          'hold_expired',
+          { holdExpiresAt: null },
+          'report',
+        );
         if (!moved) return false; // a payment confirmation won the race -- correct outcome, skip.
 
         await this.releaseSlot(m, row.slotId, row.id);
@@ -663,15 +692,25 @@ export class BookingService {
     actor: BookingActor,
     reason: string | null,
     extraFields: Partial<BookingEntity>,
+    onIllegal: 'throw' | 'report' = 'throw',
   ): Promise<boolean> {
     const current = await manager.findOne(BookingEntity, { where: { id: bookingId } });
     if (!current) return false;
 
     if (!allowedFrom.includes(current.status)) {
-      // Distinguish "not legal in this state machine at all" (a caller bug,
-      // worth surfacing) from "legal but this caller's expected source state
-      // no longer holds" (a race, handled by returning false).
-      if (!LEGAL_TRANSITIONS[current.status].includes(to)) {
+      // `onIllegal` is a real behavioural choice, not a style knob.
+      //
+      // 'throw' suits a human-initiated action ("mark this completed") where
+      // an impossible transition is worth a 409 the caller can act on.
+      //
+      // 'report' is REQUIRED for `confirm()`, and this is load-bearing:
+      // confirmation runs inside the same transaction that just recorded a
+      // real, verified payment. Throwing there would roll that payment back
+      // and LOSE A CHARGE THAT ACTUALLY HAPPENED. The caller needs `false`
+      // so it can commit the payment and issue a refund instead. An earlier
+      // version threw unconditionally, which the payment suite caught by
+      // exercising the paid-but-expired path.
+      if (onIllegal === 'throw' && !LEGAL_TRANSITIONS[current.status].includes(to)) {
         throw new InvalidBookingTransitionException(current.status, to);
       }
       return false;

@@ -54,8 +54,14 @@ export class MockGatewayProvider implements PaymentProvider {
 
   /**
    * Whether this provider may be used at all in the current environment.
-   * Checked by the registry at resolution time, not merely at boot, so a
-   * configuration change cannot leave a stale permissive decision cached.
+   *
+   * Consulted by the registry on every resolution, so the decision is not
+   * frozen into a boot-time flag of our own. Note the honest limit: when
+   * `ConfigModule.forRoot({ validate })` is used, @nestjs/config caches a
+   * validated snapshot of the environment at boot, so in practice the answer
+   * changes only on restart. That is the correct granularity for a
+   * production gate anyway -- what matters is that a production process
+   * cannot serve payments through this provider, and it cannot.
    */
   isEnabled(): boolean {
     const nodeEnv = this.config.get<string>('NODE_ENV') ?? 'development';

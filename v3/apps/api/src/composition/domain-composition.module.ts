@@ -1,20 +1,14 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { DOMAIN_EVENT_HANDLERS, OUTBOX_SOURCES, OutboxRelay, OutboxSource } from '@beauclick/events';
-import { ProfessionalEntity, ServiceOfferingEntity, ProviderModule } from '@beauclick/provider';
-import { BookingModule, BookingOutboxEntity, PROFESSIONAL_DIRECTORY } from '@beauclick/booking';
-import { CommerceModule, CommerceOutboxEntity, SERVICE_CATALOG } from '@beauclick/commerce';
+import { ProviderModule } from '@beauclick/provider';
+import { BookingModule, BookingOutboxEntity } from '@beauclick/booking';
+import { CommerceModule, CommerceOutboxEntity } from '@beauclick/commerce';
 import { PaymentModule, PaymentOutboxEntity } from '@beauclick/payment';
-import { FinancialModule, FINANCIAL_PARTY_RESOLVER } from '@beauclick/financial';
+import { FinancialModule } from '@beauclick/financial';
 
-import {
-  ProviderBackedFinancialPartyResolver,
-  ProviderBackedProfessionalDirectory,
-  ProviderBackedServiceCatalog,
-} from './port-adapters';
-import { financialDataSourceProvider } from './financial-datasource.provider';
+import { DomainPortsModule } from './domain-ports.module';
 import { CheckoutService } from '../checkout/checkout.service';
 import { CheckoutController, MockGatewayController, PaymentCallbackController } from '../checkout/checkout.controller';
 import { OutboxSweepScheduler } from '../events/outbox-sweep.scheduler';
@@ -55,11 +49,9 @@ import {
 @Module({
   imports: [
     ConfigModule,
-    // Provider entities are registered here (not merely imported via
-    // ProviderModule) so the adapters can inject their repositories from the
-    // main DataSource without provider-service exporting them for a purpose
-    // it does not own.
-    TypeOrmModule.forFeature([ProfessionalEntity, ServiceOfferingEntity]),
+    // Global, so BookingModule/CommerceModule/FinancialModule each resolve
+    // the ports they declare without importing one another.
+    DomainPortsModule,
     ProviderModule,
     BookingModule,
     CommerceModule,
@@ -68,12 +60,6 @@ import {
   ],
   controllers: [CheckoutController, PaymentCallbackController, MockGatewayController],
   providers: [
-    financialDataSourceProvider,
-
-    { provide: PROFESSIONAL_DIRECTORY, useClass: ProviderBackedProfessionalDirectory },
-    { provide: SERVICE_CATALOG, useClass: ProviderBackedServiceCatalog },
-    { provide: FINANCIAL_PARTY_RESOLVER, useClass: ProviderBackedFinancialPartyResolver },
-
     CheckoutService,
     OutboxSweepScheduler,
 

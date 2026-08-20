@@ -339,7 +339,16 @@ export class PaymentService {
     }
 
     const succeeded = providerResult.outcome === 'succeeded' && amountMatches;
-    const failureCode = succeeded ? null : (amountMatches ? providerResult.failureCode : 'amount_mismatch');
+    // The gateway's own failure code wins when the gateway itself failed.
+    // Only a gateway-reported SUCCESS whose amount disagrees is a mismatch --
+    // an earlier version reported 'amount_mismatch' for every failure
+    // (including a plain declined card), which would send a support engineer
+    // hunting a tampering incident that never happened.
+    const failureCode = succeeded
+      ? null
+      : providerResult.outcome === 'failed'
+        ? providerResult.failureCode
+        : 'amount_mismatch';
 
     const claimed = await manager
       .createQueryBuilder()
