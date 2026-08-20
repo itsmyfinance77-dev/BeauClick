@@ -198,3 +198,56 @@ V2 has two purely structural hooks with no business meaning of their own: `beauc
 ## Cross-cutting note: `beauclick/auth/otp_generated`
 
 V2's OTP-generation hook (`do_action('beauclick/auth/otp_generated', $phone, $code, $purpose)`) is confirmed to have **zero production subscribers** — it exists solely so the test suite can observe a real generated code without a test-only return-value path (and, as this project's own live QA session confirmed, as a legitimate local-only debugging aid via a temporary, deliberately non-committed mu-plugin). **This must never become a real, persisted `OTPGenerated` event in V3's catalog** — an OTP code must never appear in an event payload, log, or message bus, even internally. Its absence from this catalog is deliberate, not an oversight.
+
+---
+
+# Phase 2 implementation status (2026-08-20)
+
+The events below are **built and running**, produced through a transactional outbox and consumed by idempotent handlers. Ones not listed remain specification only.
+
+| Event | Producer | Consumers in Phase 2 | Idempotency mechanism |
+|---|---|---|---|
+| `BookingCreated` v1 | booking | (none yet) | `bookingId` natural key |
+| `BookingConfirmed` v1 | booking | audit observer | status CAS — the transition happens once or not at all |
+| `BookingCancelled` v1 | booking | payment (refund decision) | `UNIQUE(order_id, request_key)` on the refund |
+| `BookingCompleted` v1 | booking | (loyalty/referral, later phases) | status CAS |
+| `BookingRescheduled` v1 | booking | (notifications, later phase) | CAS on `(status, reschedule_count)` |
+| **`BookingExpired` v1 (NEW)** | booking | commerce (cancel unpaid order) | status CAS |
+| `OrderCreated` v1 | commerce | (none yet) | `UNIQUE(source_type, source_id)` |
+| `OrderPaid` v1 | commerce | financial (commission + receivable) | `UNIQUE(entry_type, reference_type, reference_id)` |
+| `OrderCancelled` v1 | commerce | (campaign usage release, later phase) | status CAS |
+| `OrderRefunded` v1 | commerce | financial (reversal at the ORIGINAL rate) | same ledger unique constraint |
+| `PaymentInitiated` v1 | payment | (analytics, later phase) | `UNIQUE(provider_key, provider_reference)` |
+| `PaymentSucceeded` v1 | payment | commerce (via the checkout orchestrator) | attempt-status CAS |
+| `PaymentFailed` v1 | payment | (none yet) | attempt-status CAS |
+| `RefundCompleted` v1 | payment | commerce (order refunds only — see below) | refund-status CAS |
+| `LedgerEntriesRecorded` v1 | financial | (analytics, later phase) | ledger unique constraint |
+| `SettlementRecorded` v1 | financial | (none yet) | append-only batch |
+| `SettlementReversed` v1 | financial | (none yet) | `UNIQUE(reverses_settlement_id)` |
+
+## `BookingExpired` — new in Phase 2
+
+Not in the original catalog because V2 had no such concept: it modelled an abandoned hold as `cancelled` with `reason='expired'`. Separating them makes "did a customer actually cancel on us?" answerable from a status column, and — more importantly — makes the refund decision independent of parsing a free-text string. A cancellation may need a refund; an expired unpaid hold never does.
+
+**Payload:** `{ bookingId, professionalId, customerId, slotId, expiredAt }`.
+**Consumer:** commerce cancels the unpaid order. `cancel()` only touches a `pending` order, so an order that was in fact paid just as the hold lapsed is left alone — that case belongs to the paid-but-unconfirmable path.
+
+## `RefundCompleted` carries a `kind`
+
+`kind: 'order' | 'duplicate_charge'`. Consumers **must** branch on it.
+
+A `duplicate_charge` refund corrects a second gateway charge that should never have happened; the order was legitimately paid once. Recording it as an order refund would drive a correctly-paid order to `refunded` and reverse a commission the professional genuinely earned. See `V3_PHASE2_IMPLEMENTATION.md` §5.2 for how such a charge becomes reachable at all.
+
+## The no-secrets rule is now enforced by a throw
+
+The catalog's warning that an OTP code must never appear in an event payload was, until now, a comment. Every outbox write scans its payload recursively against a deny-list of credential-shaped keys (`code`, `otp`, `codeHash`, `password`, `token`, `accessToken`, `refreshToken`, `secret`, `apiKey`, `merchantId`, `cardNumber`, `cvv`, …). A payload carrying one **fails at the write, inside the producing transaction** — not later, in a log aggregator.
+
+Deliberately an exact-key deny-list rather than a substring heuristic: `providerReference` and `paymentIntentId` are legitimate, necessary payload fields, and a naive `/token|secret/` rule would reject them and push authors toward disabling the check entirely.
+
+Asserted by `outbox-transactional.pg-spec.ts`, which scans every payload the real checkout flow actually produced.
+
+## Transport
+
+Phase 2 ships an **in-process relay**, not Kafka (ADR-018). The correctness-bearing parts — the transactional outbox, versioned envelopes, and the idempotent-consumer contract — are built. No producer writes to a broker directly and no consumer knows how the envelope arrived, so adopting Kafka changes one file.
+
+Delivery is **at-least-once**: rows are dispatched first and marked published second, because the opposite order loses events when a process dies mid-dispatch. That is why every consumer above names a real database constraint or a status compare-and-swap.

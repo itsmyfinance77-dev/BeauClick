@@ -115,3 +115,58 @@ Closes the four items the initial Phase 1 addendum left open, and materially cha
 ## Note on trusting the existing gap register
 
 `docs/roadmap/PRODUCT_GAP_REGISTER.md` is itself confirmed to contain at least one **stale** entry: it lists rescheduling (BOOK-03) as `MISSING` in one section while a later section of the *same document*, and the actual shipped code (`RescheduleService`, full REST routes, full test coverage), show it's been complete since V2.2 Step 15. This is not a criticism of that document — it's an accurate historical log of a point-in-time audit — but it means **the register must be read as a timeline, not a live dashboard**, and every item this V3 Gap Register cites from it was independently re-verified against current source before being carried forward here.
+
+---
+
+# Phase 2 addendum (2026-08-20) — Booking + Commerce + Payment + Financial
+
+Status changes from the Phase 2 implementation pass. Every "CLOSED" below is backed by a test that runs against a real PostgreSQL 16 server; nothing here is closed on the strength of application convention.
+
+## Closed
+
+**`GAP-01` — ledger append-only guarantee — CLOSED.**
+Phase 1 proved the *contract* was enforceable on a stand-in table. Phase 2 makes it true of the real ledger. `financial.ledger_entries`, `settlement_batches`, and `settlement_items` are owned by `beauclick_financial_owner` (a NOLOGIN role the application does not have); financial-service connects as `beauclick_financial_writer` with `INSERT` + `SELECT` only; `UPDATE`/`DELETE`/`TRUNCATE` are granted to no application role. The **main application role has `REVOKE ALL ON SCHEMA financial`** and cannot even `SELECT` the ledger — stronger than the blueprint required. Because the application role is not the owner, it cannot grant itself back what was revoked.
+
+Verified in `apps/api/test/financial-integrity.pg-spec.ts`: every mutation denied, rows re-read and confirmed byte-identical afterwards, and the connecting role asserted `usesuper = false` so the result cannot pass for the wrong reason. The one deliberate exception — `UPDATE` on `financial.outbox_events`, which holds delivery receipts rather than financial facts — is asserted explicitly rather than left implicit.
+
+*Residual:* verified on a local PostgreSQL 16 instance. A managed provider must be re-verified with `database/scripts/financial-roles.sql` before production relies on it. The *capability* doubt is gone; a specific host's behaviour is still a specific host's behaviour.
+
+**`GAP-03` — booking→order double creation — CLOSED.**
+`uq_orders_source` on `(source_type, source_id)` makes a second authoritative order for one booking impossible at the storage layer. V2's guard "self-healed only by accident"; this one cannot fail to hold. Booking and order are additionally created in ONE transaction, so neither can exist without the other.
+
+**`GAP-05` — financial party isolation — CLOSED, structurally.**
+The session-facing API (`MyFinanceService`) takes a **session user id and nothing else**. There is no party argument to spoof, mistype, or forget to validate; the party is resolved internally through a port. Cross-party reads live on a separate, capability-gated admin service, so the dangerous shape is never one typo away from the self-service one. Nine isolation tests, including the adversarial-no-leak harness asserting another professional's distinguishable figure appears nowhere in the response payload.
+
+**`FIN-02` (V2 carry-over) — cancellation did not refund a paid booking — CLOSED by construction.**
+The refund is now a consequence of the `BookingCancelled` event itself, so no future cancellation path can be added that forgets it.
+
+## Still open
+
+**`GAP-06` — a real Iranian payment gateway — OPEN.**
+Unchanged in substance, but the surrounding work is done. The provider abstraction, registry, and a production-gated local mock gateway are built and verified (23 callback-security tests plus a real browser round trip). A real adapter was deliberately **not** shipped: no merchant credentials exist in this environment, and an adapter whose money-unit and field semantics were never exercised against the live API is a liability rather than an asset. Remaining work is one adapter against a known-good interface; commerce, booking, financial, and every controller are untouched by adding it.
+
+**`GAP-10`** (OTP tuning), **`GAP-12`** (AI conversation cardinality), **`GAP-18`** (automated payout), **`GAP-29`** (Journey boundary) — unchanged, all out of Phase 2 scope. Note that `GAP-18`'s natural integration point now exists: settlement is built, append-only, and idempotent, so automated payout is additive within it rather than a parallel system.
+
+## New findings from this phase
+
+**PHASE2-01 — pg-mem does not honour TypeORM's `ROLLBACK`.**
+Probed directly: a row written inside a transaction that throws is still present afterwards, where real PostgreSQL leaves zero rows. **Consequence: no test on the fast layer can prove anything about atomicity, isolation, or locking.** Phase 1's suite was not wrong about what it did assert, but it gave zero signal about transactional behaviour — and Phase 2's correctness rests almost entirely on that. Every such assertion now runs against real PostgreSQL. Documented in `libs/testing/src/in-memory-data-source.ts` so it cannot be rediscovered the hard way.
+
+**PHASE2-02 — the migration runner ordered by schema directory, not timestamp.**
+Phase 1 code. Adding a `booking/` schema would have applied every booking migration before every identity migration purely because `'b' < 'i'`, silently reordering the deployment history the timestamp prefixes exist to define. Harmless while no cross-schema dependency existed; it would first surface at the worst possible time. Fixed.
+
+**PHASE2-03 — `financial-role-contract.sql` was never committed.**
+The repo-root `*.sql` ignore rule swallowed it and `v3/.gitignore` un-ignored only `database/migrations/`. A guarantee documented in `V3_PHASE1_IMPLEMENTATION.md` §15.2 and exercised by a passing spec existed only on the machine that ran it. Fixed, with `database/scripts/*.sql` un-ignored.
+
+**PHASE2-04 — a retried checkout opened a second live gateway attempt.**
+Found by driving the real flow in a real browser, not by any unit test. Two live gateway references for one payment intent are two separately-chargeable transactions, and the second charge would have been silently absorbed. Closed at three levels: `initiate()` reuses a live attempt; a partial unique index makes a second one unrepresentable; and a genuinely-new payment landing on an already-paid order is now detected as a duplicate charge and refunded rather than absorbed. See `V3_PHASE2_IMPLEMENTATION.md` §5.2.
+
+**PHASE2-05 — `@Redirect()` routes were incompatible with the response envelope.**
+The global interceptor wrapped Nest's redirect control object, so the payment gateway's return leg silently degraded to a 302 with no location. Fixed with an explicit `@SkipResponseEnvelope()` decorator rather than shape-sniffing for a `url` field, which would also un-envelope a legitimate DTO.
+
+**PHASE2-06 — header nav touch targets were 25px.**
+Phase 1 code, below the 44px baseline that phase set for itself. Measured at 375px during live QA rather than eyeballed. Fixed.
+
+## Carried forward, unresolved
+
+**The httpOnly refresh cookie was named Phase 2 scope in `V3_PHASE1_IMPLEMENTATION.md` §15.7 and was NOT done.** Booking, commerce, payment, and financial consumed this phase. A page reload still signs the user out. Restated as open rather than quietly dropped.
