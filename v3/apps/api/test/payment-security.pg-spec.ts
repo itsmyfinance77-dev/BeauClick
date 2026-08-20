@@ -234,6 +234,122 @@ describeIfPg('Payment callback security on real PostgreSQL', () => {
     });
   });
 
+  describe('one live gateway attempt per intent (the double-charge hole)', () => {
+    it('REUSES the live attempt when checkout is retried, instead of opening a second one', async () => {
+      // Found in live QA: a retried checkout returned the same booking and
+      // order (idempotency working) but called initiate() again, producing a
+      // SECOND gateway reference. Two live references for one intent are two
+      // separately-chargeable transactions.
+      const { customer, professional, slotId } = await bookAndReachGateway();
+      void customer;
+      void professional;
+      void slotId;
+
+      const [{ count }] = await dataSource.query(`SELECT COUNT(*)::int AS count FROM payment.payment_attempts`);
+      expect(count).toBe(1);
+    });
+
+    it('opens exactly ONE attempt across repeated checkout calls with the same idempotency key', async () => {
+      seq += 1;
+      const owner = await seedUser(app, dataSource, `+98916${String(seq).padStart(7, '0')}`, ['professional']);
+      const customer = await seedUser(app, dataSource, `+98917${String(seq).padStart(7, '0')}`);
+      const professional = await seedProfessional(dataSource, owner.id, 'سارا', 200_000);
+      const slotId = await seedSlot(dataSource, professional.id, professional.serviceId, futureSlotTime(300 + seq));
+
+      const args = {
+        customerId: customer.id,
+        professionalId: professional.id,
+        slotId,
+        serviceId: professional.serviceId,
+        idempotencyKey: 'retry-me',
+        callbackUrl: 'http://localhost:3099/api/v1/payments/callback/mock',
+      };
+      const first = await checkout.checkout(args);
+      const second = await checkout.checkout(args);
+      const third = await checkout.checkout(args);
+
+      const [{ count }] = await dataSource.query(
+        `SELECT COUNT(*)::int AS count FROM payment.payment_attempts WHERE payment_intent_id = $1`,
+        [first.paymentIntentId],
+      );
+      expect(count).toBe(1);
+      // The same redirect URL every time -- the customer is sent to the same
+      // gateway transaction, not a fresh chargeable one.
+      expect(second.redirectUrl).toBe(first.redirectUrl);
+      expect(third.redirectUrl).toBe(first.redirectUrl);
+    });
+
+    it('forbids a second live attempt at the DATABASE level', async () => {
+      const { result } = await bookAndReachGateway();
+      await expect(
+        dataSource.query(
+          `INSERT INTO payment.payment_attempts (id, payment_intent_id, provider_key, provider_reference, status, requested_amount_toman)
+           VALUES (gen_random_uuid(), $1, 'mock', 'FORCED-SECOND', 'initiated', 1)`,
+          [result.paymentIntentId],
+        ),
+      ).rejects.toThrow(/uq_payment_attempts_live_per_intent|duplicate key/i);
+    });
+
+    it('REFUNDS a genuine second charge instead of silently absorbing it', async () => {
+      const { result, reference } = await bookAndReachGateway();
+      await mock.settle(reference, true);
+      await checkout.handleCallback('mock', reference, { reference });
+      expect((await orders.findById(result.order.order.id))?.status).toBe('paid');
+
+      // Simulate a customer who kept an older redirect URL open: a second,
+      // genuinely-paid gateway transaction lands on an already-paid order.
+      const secondReference = 'MOCK-SECOND-CHARGE-0001';
+      await dataSource.query(
+        `INSERT INTO payment.mock_gateway_transactions (reference, amount_toman, outcome, settlement_reference)
+         VALUES ($1, $2, 'paid', 'MOCKTX-SECOND')`,
+        [secondReference, result.order.order.totalToman],
+      );
+      await dataSource.query(
+        `INSERT INTO payment.payment_attempts (id, payment_intent_id, provider_key, provider_reference, status, requested_amount_toman)
+         VALUES (gen_random_uuid(), $1, 'mock', $2, 'initiated', $3)`,
+        [result.paymentIntentId, secondReference, result.order.order.totalToman],
+      );
+
+      const callback = await checkout.handleCallback('mock', secondReference, { reference: secondReference });
+      expect(callback.duplicateChargeRefunded).toBe(true);
+
+      const refunds = await payments.listRefundsForOrder(result.order.order.id);
+      const duplicate = refunds.filter((r) => r.kind === 'duplicate_charge');
+      expect(duplicate).toHaveLength(1);
+      expect(duplicate[0].status).toBe('succeeded');
+      expect(duplicate[0].amountToman).toBe(result.order.order.totalToman);
+    });
+
+    it('does NOT let a duplicate-charge refund reverse the order or the commission', async () => {
+      const { result, reference } = await bookAndReachGateway();
+      await mock.settle(reference, true);
+      await checkout.handleCallback('mock', reference, { reference });
+
+      const secondReference = 'MOCK-SECOND-CHARGE-0002';
+      await dataSource.query(
+        `INSERT INTO payment.mock_gateway_transactions (reference, amount_toman, outcome, settlement_reference)
+         VALUES ($1, $2, 'paid', 'MOCKTX-SECOND2')`,
+        [secondReference, result.order.order.totalToman],
+      );
+      await dataSource.query(
+        `INSERT INTO payment.payment_attempts (id, payment_intent_id, provider_key, provider_reference, status, requested_amount_toman)
+         VALUES (gen_random_uuid(), $1, 'mock', $2, 'initiated', $3)`,
+        [result.paymentIntentId, secondReference, result.order.order.totalToman],
+      );
+      await checkout.handleCallback('mock', secondReference, { reference: secondReference });
+
+      // Drain repeatedly so the RefundCompleted event is definitely consumed.
+      for (let i = 0; i < 3; i++) await ctx.relay.drain();
+
+      // The order was legitimately paid ONCE. It must remain `paid` with a
+      // zero refunded total -- otherwise the professional loses a receivable
+      // for a service they are still owed for.
+      const order = await orders.findById(result.order.order.id);
+      expect(order?.status).toBe('paid');
+      expect(order?.refundedTotalToman).toBe(0);
+    });
+  });
+
   describe('expiry', () => {
     it('refuses to verify an intent that has already expired', async () => {
       const { result, reference } = await bookAndReachGateway();

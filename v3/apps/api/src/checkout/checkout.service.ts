@@ -16,6 +16,8 @@ export interface CheckoutResult {
 export interface CallbackResult {
   outcome: VerificationOutcome;
   refundIssued: boolean;
+  /** True when this callback was a genuine SECOND charge that had to be given back. */
+  duplicateChargeRefunded: boolean;
 }
 
 /**
@@ -144,29 +146,63 @@ export class CheckoutService {
   ): Promise<CallbackResult> {
     const prepared = await this.payments.prepareVerification(providerKey, providerReference, callbackParams);
 
-    const { outcome, bookingUnavailable } = await this.dataSource.transaction(async (manager) => {
+    const { outcome, bookingUnavailable, duplicateCharge } = await this.dataSource.transaction(async (manager) => {
       const verification = await this.payments.applyVerification(prepared, manager);
       if (verification.status !== 'succeeded') {
-        return { outcome: verification, bookingUnavailable: false };
+        return { outcome: verification, bookingUnavailable: false, duplicateCharge: false };
       }
 
       const marked = await this.orders.markPaid(verification.orderId, manager);
       if (!marked) {
-        // The order was already paid -- a genuine replay that got past the
-        // attempt-level check. Nothing further to do; never double-confirm.
-        return { outcome: { ...verification, status: 'replayed' as const }, bookingUnavailable: false };
+        // THIS attempt just won its own compare-and-swap, meaning the gateway
+        // confirmed a payment that had not been recorded before -- yet the
+        // order was already paid. That is not a replay of the same
+        // transaction; it is a genuine SECOND charge, and real money moved.
+        //
+        // Found in Phase 2 live QA: a retried checkout used to open a second
+        // gateway attempt, so two chargeable references existed for one
+        // intent. `initiate()` now reuses a live attempt and a partial unique
+        // index forbids a second one -- but a customer who kept an old
+        // redirect URL open could still get here, so the money is given back
+        // rather than silently absorbed.
+        return {
+          outcome: { ...verification, status: 'replayed' as const },
+          bookingUnavailable: false,
+          duplicateCharge: true,
+        };
       }
 
       const order = await this.orders.findById(verification.orderId, manager);
       if (!order || order.sourceType !== 'booking') {
-        return { outcome: verification, bookingUnavailable: false };
+        return { outcome: verification, bookingUnavailable: false, duplicateCharge: false };
       }
 
       const confirmed = await this.bookings.confirm(order.sourceId, { type: 'system', id: null }, manager);
-      return { outcome: verification, bookingUnavailable: !confirmed };
+      return { outcome: verification, bookingUnavailable: !confirmed, duplicateCharge: false };
     });
 
     let refundIssued = false;
+    let duplicateChargeRefunded = false;
+
+    if (duplicateCharge) {
+      this.logger.error(
+        `DUPLICATE CHARGE detected on order ${outcome.orderId} (attempt ${outcome.attemptId}). Refunding the second charge.`,
+      );
+      await this.payments.refund({
+        orderId: outcome.orderId,
+        amountToman: outcome.amountToman,
+        reason: 'پرداخت تکراری برای همین سفارش — بازگشت خودکار وجه.',
+        // Keyed by the ATTEMPT, not the order: the order legitimately has one
+        // real payment, and only this extra attempt is being corrected.
+        requestKey: `duplicate-charge:${outcome.attemptId}`,
+        actorType: 'system',
+        actorId: null,
+        kind: 'duplicate_charge',
+        paymentAttemptId: outcome.attemptId,
+      });
+      duplicateChargeRefunded = true;
+    }
+
     if (bookingUnavailable) {
       this.logger.error(
         `Payment ${outcome.intentId} succeeded but its booking could not be confirmed (order ${outcome.orderId}). Auto-refunding.`,
@@ -185,7 +221,7 @@ export class CheckoutService {
     }
 
     await this.drainQuietly();
-    return { outcome, refundIssued };
+    return { outcome, refundIssued, duplicateChargeRefunded };
   }
 
   /**

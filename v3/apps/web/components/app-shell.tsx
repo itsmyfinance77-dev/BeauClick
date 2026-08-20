@@ -15,6 +15,25 @@ import { ErrorBoundary } from './error-boundary';
  * at the token-defined breakpoint (see the clamp below). Mobile-first --
  * the base rules ARE the mobile rules.
  */
+/**
+ * Header nav links get a real 44px touch target.
+ *
+ * They were 25px tall, which is comfortably tappable for a mouse and
+ * genuinely awkward on a phone -- and below the 44px baseline this project's
+ * own frontend foundation set for itself. Measured directly in a 375px
+ * viewport during Phase 2 live QA rather than eyeballed.
+ */
+const NAV_LINK_STYLE = {
+  fontSize: 14,
+  fontWeight: 600,
+  display: 'inline-flex',
+  alignItems: 'center',
+  minHeight: 44,
+  // Vertical padding only: horizontal padding here would push the nav wide
+  // enough to wrap at 375px.
+  padding: '0 2px',
+} as const;
+
 export function AppShell({ children }: { children: ReactNode }) {
   const { status, user, logout } = useAuth();
 
@@ -37,14 +56,31 @@ export function AppShell({ children }: { children: ReactNode }) {
             gap: 'var(--bc-spacing-card-gap)',
           }}
         >
-          <Link href="/" style={{ fontWeight: 800, fontSize: 20, textDecoration: 'none', color: 'var(--bc-color-ink)' }}>
+          <Link
+            href="/"
+            style={{
+              fontWeight: 800,
+              fontSize: 20,
+              textDecoration: 'none',
+              color: 'var(--bc-color-ink)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              minHeight: 44,
+            }}
+          >
             BeauClick
           </Link>
 
           <nav aria-label="ناوبری اصلی" style={{ display: 'flex', alignItems: 'center', gap: 'var(--bc-spacing-chip-gap-large)' }}>
+            <Link href="/providers" style={NAV_LINK_STYLE}>
+              متخصص‌ها
+            </Link>
             {status === 'authenticated' ? (
               <>
-                <Link href="/dashboard" style={{ fontSize: 14, fontWeight: 600 }}>
+                <Link href="/bookings" style={NAV_LINK_STYLE}>
+                  رزروهای من
+                </Link>
+                <Link href="/dashboard" style={NAV_LINK_STYLE}>
                   داشبورد
                 </Link>
                 <span style={{ fontSize: 13, color: 'var(--bc-color-ink-faint)' }}>{user?.displayName ?? user?.phone}</span>
@@ -67,7 +103,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 </button>
               </>
             ) : (
-              <Link href="/auth" style={{ fontSize: 14, fontWeight: 600 }}>
+              <Link href="/auth" style={NAV_LINK_STYLE}>
                 ورود
               </Link>
             )}

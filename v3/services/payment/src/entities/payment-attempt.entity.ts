@@ -42,6 +42,17 @@ export class PaymentAttemptEntity {
   @Column({ type: 'bigint', nullable: true, transformer: moneyTransformer })
   verifiedAmountToman!: number | null;
 
+  /**
+   * Where the gateway said to send the customer.
+   *
+   * Stored so a retried checkout can REUSE this attempt instead of opening a
+   * second one. Two live attempts means two separately-chargeable gateway
+   * references for one intent -- the double-charge hole found in Phase 2
+   * live QA (see the 20260820100005 migration).
+   */
+  @Column({ type: 'text', nullable: true })
+  redirectUrl!: string | null;
+
   /** The settlement reference printed on the customer's receipt. */
   @Column({ type: 'varchar', length: 128, nullable: true })
   providerTransactionId!: string | null;

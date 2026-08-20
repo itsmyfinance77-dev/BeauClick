@@ -10,7 +10,7 @@ import { assertNonNegativeAmount } from '@beauclick/money';
 import { LIVE_INTENT_STATUSES, PaymentIntentEntity, PaymentIntentStatus } from './entities/payment-intent.entity';
 import { PaymentAttemptEntity } from './entities/payment-attempt.entity';
 import { PaymentOutboxEntity } from './entities/payment-outbox.entity';
-import { RefundEntity, RefundStatus } from './entities/refund.entity';
+import { RefundEntity, RefundKind, RefundStatus } from './entities/refund.entity';
 import { PaymentProviderRegistry } from './providers/payment-provider.registry';
 import { VerifyPaymentResult } from './providers/payment-provider.interface';
 
@@ -78,6 +78,15 @@ export interface RequestRefundInput {
   requestKey: string;
   actorType: 'customer' | 'professional' | 'system' | 'admin';
   actorId: string | null;
+  /**
+   * Defaults to 'order'. Use 'duplicate_charge' for a second gateway charge
+   * that should never have happened -- that money is outside the order's
+   * accounting entirely, so it must not reduce the order's total or reverse
+   * a commission that was correctly earned once.
+   */
+  kind?: RefundKind;
+  /** Refund this SPECIFIC attempt rather than the order's primary one. Required for a duplicate charge. */
+  paymentAttemptId?: string;
 }
 
 @Injectable()
@@ -177,6 +186,27 @@ export class PaymentService {
       throw new PaymentIntentNotPayableException('expired');
     }
 
+    // REUSE a live attempt rather than opening a second one.
+    //
+    // This is the fix for a double-charge hole found in Phase 2 live QA: a
+    // retried checkout correctly returned the same booking and order, but
+    // called initiate() again -- producing a second gateway reference. Two
+    // live references for one intent are two separately-chargeable
+    // transactions, and the second charge would have been silently absorbed
+    // (its callback wins its own attempt CAS, then finds the order already
+    // paid and reports a harmless-looking "replayed").
+    //
+    // The gateway's authority is still valid, so handing back the same
+    // redirect URL is both correct and what the customer expects from a
+    // re-tapped button.
+    const live = await this.attempts.findOne({
+      where: { paymentIntentId: intent.id, status: 'initiated' },
+      order: { id: 'DESC' },
+    });
+    if (live?.redirectUrl) {
+      return { intent, attempt: live, redirectUrl: live.redirectUrl };
+    }
+
     const provider = this.providers.get(intent.providerKey);
     const initiated = await provider.initiate({
       paymentIntentId: intent.id,
@@ -187,37 +217,54 @@ export class PaymentService {
     });
 
     const attemptId = uuidv7();
-    await this.dataSource.transaction(async (m) => {
-      await m.insert(PaymentAttemptEntity, {
-        id: attemptId,
-        paymentIntentId: intent.id,
-        providerKey: provider.key,
-        providerReference: initiated.providerReference,
-        status: 'initiated',
-        requestedAmountToman: intent.amountToman,
-        verifiedAmountToman: null,
-        providerTransactionId: null,
-        failureCode: null,
-        providerResponse: null,
-        verifiedAt: null,
-      });
-
-      await m.update(PaymentIntentEntity, { id: intent.id, status: In(['created', 'failed']) }, { status: 'pending' });
-
-      await emitEvent(m, PaymentOutboxEntity, {
-        aggregateType: 'payment',
-        aggregateId: intent.id,
-        eventType: 'PaymentInitiated',
-        payload: {
+    try {
+      await this.dataSource.transaction(async (m) => {
+        await m.insert(PaymentAttemptEntity, {
+          id: attemptId,
           paymentIntentId: intent.id,
-          paymentAttemptId: attemptId,
-          orderId: intent.orderId,
-          provider: provider.key,
-          amountToman: intent.amountToman,
-          currency: intent.currency,
-        },
+          providerKey: provider.key,
+          providerReference: initiated.providerReference,
+          status: 'initiated',
+          requestedAmountToman: intent.amountToman,
+          verifiedAmountToman: null,
+          redirectUrl: initiated.redirectUrl,
+          providerTransactionId: null,
+          failureCode: null,
+          providerResponse: null,
+          verifiedAt: null,
+        });
+
+        await m.update(PaymentIntentEntity, { id: intent.id, status: In(['created', 'failed']) }, { status: 'pending' });
+
+        await emitEvent(m, PaymentOutboxEntity, {
+          aggregateType: 'payment',
+          aggregateId: intent.id,
+          eventType: 'PaymentInitiated',
+          payload: {
+            paymentIntentId: intent.id,
+            paymentAttemptId: attemptId,
+            orderId: intent.orderId,
+            provider: provider.key,
+            amountToman: intent.amountToman,
+            currency: intent.currency,
+          },
+        });
       });
-    });
+    } catch (err) {
+      // `uq_payment_attempts_live_per_intent` is the structural backstop for
+      // the same hole: a concurrent initiate lost the race, and its caller
+      // must get the winner's redirect rather than a second gateway trip.
+      if (isUniqueViolation(err)) {
+        const winner = await this.attempts.findOne({
+          where: { paymentIntentId: intent.id, status: 'initiated' },
+          order: { id: 'DESC' },
+        });
+        if (winner?.redirectUrl) {
+          return { intent, attempt: winner, redirectUrl: winner.redirectUrl };
+        }
+      }
+      throw err;
+    }
 
     this.auditLog.log({
       action: 'payment.initiated',
@@ -442,10 +489,12 @@ export class PaymentService {
     const intent = await this.intents.findOne({ where: { orderId: input.orderId, status: 'succeeded' } });
     if (!intent) throw new PaymentIntentNotFoundException();
 
-    const attempt = await this.attempts.findOne({
-      where: { paymentIntentId: intent.id, status: 'succeeded' },
-      order: { id: 'DESC' },
-    });
+    const attempt = input.paymentAttemptId
+      ? await this.attempts.findOne({ where: { id: input.paymentAttemptId } })
+      : await this.attempts.findOne({
+          where: { paymentIntentId: intent.id, status: 'succeeded' },
+          order: { id: 'DESC' },
+        });
 
     const refundId = uuidv7();
     try {
@@ -457,6 +506,7 @@ export class PaymentService {
         requestKey: input.requestKey,
         amountToman: input.amountToman,
         status: 'pending',
+        kind: input.kind ?? 'order',
         providerRefundReference: null,
         failureCode: null,
         reason: input.reason,
@@ -535,6 +585,9 @@ export class PaymentService {
           paymentIntentId: refund.paymentIntentId,
           orderId: refund.orderId,
           amountToman: refund.amountToman,
+          // Consumers MUST branch on this: a duplicate-charge correction is
+          // not a refund of the order and must not reduce its total.
+          kind: refund.kind,
           providerRefundReference,
           completedAt: new Date().toISOString(),
         },

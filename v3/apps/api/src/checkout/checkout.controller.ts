@@ -116,7 +116,11 @@ export class PaymentCallbackController {
     const reference = params.reference ?? params.Authority ?? params.authority ?? params.token ?? '';
 
     const result = await this.checkout.handleCallback(provider, reference, params);
-    const status = result.refundIssued ? 'refunded' : result.outcome.status;
+    const status = result.duplicateChargeRefunded
+      ? 'duplicate_refunded'
+      : result.refundIssued
+        ? 'refunded'
+        : result.outcome.status;
 
     // 303 See Other: the browser must follow with GET even when the gateway
     // returned via POST, so a refresh of the result page cannot re-submit.

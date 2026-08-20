@@ -103,7 +103,19 @@ export class RefundCompletedCommerceHandler implements DomainEventHandler {
    * redelivery affects zero rows.
    */
   async handle(envelope: EventEnvelope): Promise<void> {
-    const payload = envelope.payload as { refundId: string; orderId: string; amountToman: number };
+    const payload = envelope.payload as {
+      refundId: string;
+      orderId: string;
+      amountToman: number;
+      kind?: 'order' | 'duplicate_charge';
+    };
+
+    // A duplicate-charge correction is money that was never part of this
+    // order's accounting -- the order was legitimately paid once. Recording
+    // it here would drive a correctly-paid order to `refunded` and reverse a
+    // commission the professional genuinely earned.
+    if (payload.kind === 'duplicate_charge') return;
+
     const order = await this.orders.findById(payload.orderId);
     if (!order) return;
 

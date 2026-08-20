@@ -5,6 +5,23 @@ export const REFUND_STATUSES = ['pending', 'succeeded', 'failed', 'manual_requir
 export type RefundStatus = (typeof REFUND_STATUSES)[number];
 
 /**
+ * What a refund is CORRECTING, which is not the same question as how much.
+ *
+ * `order`            -- money back for the order itself (a cancellation, a
+ *                       booking that could not be honoured). Flows on to
+ *                       commerce and reverses the ledger.
+ * `duplicate_charge` -- a second gateway charge that should never have
+ *                       happened. The order was legitimately paid ONCE, so
+ *                       this must NOT touch the order's refunded total or
+ *                       reverse a commission that was correctly earned.
+ *
+ * Conflating the two would drive a correctly-paid order to `refunded` and
+ * strip the professional's receivable for a service they are still owed for.
+ */
+export const REFUND_KINDS = ['order', 'duplicate_charge'] as const;
+export type RefundKind = (typeof REFUND_KINDS)[number];
+
+/**
  * A refund is its own durable fact, written BEFORE the gateway is called.
  *
  * That ordering is the whole design. If the row were written only after a
@@ -49,6 +66,9 @@ export class RefundEntity {
 
   @Column({ type: 'varchar', length: 20, default: 'pending' })
   status!: RefundStatus;
+
+  @Column({ type: 'varchar', length: 20, default: 'order' })
+  kind!: RefundKind;
 
   @Column({ type: 'varchar', length: 128, nullable: true })
   providerRefundReference!: string | null;

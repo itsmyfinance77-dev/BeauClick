@@ -4,16 +4,47 @@
     {
       "name": "beauclick-app-preview",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--", "--port", "5173"],
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "5173"
+      ],
       "port": 5173,
       "cwd": "app"
     },
     {
       "name": "beauclick-wordpress",
       "runtimeExecutable": "php",
-      "runtimeArgs": ["-S", "localhost:8080", "router.php"],
+      "runtimeArgs": [
+        "-S",
+        "localhost:8080",
+        "router.php"
+      ],
       "port": 8080,
       "cwd": "wordpress"
+    },
+    {
+      "name": "beauclick-v3-api",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "nx",
+        "run",
+        "api:dev"
+      ],
+      "port": 3099,
+      "cwd": "v3"
+    },
+    {
+      "name": "beauclick-v3-web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "port": 3100,
+      "cwd": "v3/apps/web"
     }
   ]
 }
