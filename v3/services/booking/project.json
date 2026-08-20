@@ -1,0 +1,11 @@
+{
+  "name": "booking",
+  "sourceRoot": "services/booking/src",
+  "projectType": "library",
+  "tags": ["type:service", "scope:booking"],
+  "targets": {
+    "typecheck": { "executor": "nx:run-commands", "options": { "command": "tsc -p services/booking/tsconfig.json --noEmit" } },
+    "test": { "executor": "nx:run-commands", "options": { "command": "jest --config services/booking/jest.config.js" } },
+    "lint": { "executor": "nx:run-commands", "options": { "command": "eslint services/booking/src --resolve-plugins-relative-to ." } }
+  }
+}
