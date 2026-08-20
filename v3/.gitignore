@@ -8,6 +8,13 @@ coverage/
 .next/
 
 # The repo root .gitignore excludes *.sql (V2's local MySQL dump
-# convention) -- these are real, versioned migration source files, not
-# local dumps, so they're explicitly un-ignored here.
+# convention) -- these are real, versioned SQL sources, not local dumps,
+# so they're explicitly un-ignored here.
+#
+# `database/scripts/` was missing from this list until Phase 2, which is
+# why `financial-role-contract.sql` was referenced by a passing test and
+# by V3_PHASE1_IMPLEMENTATION.md while never actually being committed.
+# Infrastructure SQL that a documented guarantee depends on must be in
+# the repository, not only on the machine that ran it.
 !database/migrations/**/*.sql
+!database/scripts/*.sql
