@@ -12,6 +12,12 @@ module.exports = {
     '^@beauclick/testing$': '<rootDir>/../../libs/testing/src/index.ts',
     '^@beauclick/identity$': '<rootDir>/../../services/identity/src/index.ts',
     '^@beauclick/provider$': '<rootDir>/../../services/provider/src/index.ts',
+    '^@beauclick/money$': '<rootDir>/../../libs/money/src/index.ts',
+    '^@beauclick/events$': '<rootDir>/../../libs/events/src/index.ts',
+    '^@beauclick/booking$': '<rootDir>/../../services/booking/src/index.ts',
+    '^@beauclick/commerce$': '<rootDir>/../../services/commerce/src/index.ts',
+    '^@beauclick/payment$': '<rootDir>/../../services/payment/src/index.ts',
+    '^@beauclick/financial$': '<rootDir>/../../services/financial/src/index.ts',
   },
   testTimeout: 20000,
 };

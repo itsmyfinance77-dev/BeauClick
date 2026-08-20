@@ -18,7 +18,13 @@
       "@beauclick/auth": ["libs/auth/src/index.ts"],
       "@beauclick/ownership": ["libs/ownership/src/index.ts"],
       "@beauclick/identity": ["services/identity/src/index.ts"],
-      "@beauclick/provider": ["services/provider/src/index.ts"]
+      "@beauclick/provider": ["services/provider/src/index.ts"],
+      "@beauclick/booking": ["services/booking/src/index.ts"],
+      "@beauclick/commerce": ["services/commerce/src/index.ts"],
+      "@beauclick/payment": ["services/payment/src/index.ts"],
+      "@beauclick/financial": ["services/financial/src/index.ts"],
+      "@beauclick/money": ["libs/money/src/index.ts"],
+      "@beauclick/events": ["libs/events/src/index.ts"]
     }
   },
   "include": ["src/**/*.ts"]

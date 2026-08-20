@@ -10,6 +10,10 @@ import { JwtAuthGuard, CapabilityGuard } from '@beauclick/auth';
 import { OwnershipGuard } from '@beauclick/ownership';
 import { IdentityModule, IDENTITY_ENTITIES } from '@beauclick/identity';
 import { ProviderModule, PROVIDER_ENTITIES } from '@beauclick/provider';
+import { BOOKING_ENTITIES } from '@beauclick/booking';
+import { COMMERCE_ENTITIES } from '@beauclick/commerce';
+import { PAYMENT_ENTITIES } from '@beauclick/payment';
+import { DomainCompositionModule } from './composition/domain-composition.module';
 
 import { validateEnv } from './config/env.validation';
 import { HealthController } from './health/health.controller';
@@ -27,7 +31,11 @@ import { HealthController } from './health/health.controller';
       useFactory: (config: ConfigService) => ({
         type: 'postgres' as const,
         url: config.get('DATABASE_URL') ?? 'postgres://beauclick:beauclick@localhost:5432/beauclick',
-        entities: [...IDENTITY_ENTITIES, ...PROVIDER_ENTITIES],
+        // financial's entities are deliberately ABSENT from this list. They
+        // live on a separate DataSource connected as the append-only role
+        // (ADR-017); registering them here would give this pool -- the one
+        // every controller and guard shares -- a live handle on the ledger.
+        entities: [...IDENTITY_ENTITIES, ...PROVIDER_ENTITIES, ...BOOKING_ENTITIES, ...COMMERCE_ENTITIES, ...PAYMENT_ENTITIES],
         // V3_DATABASE_BLUEPRINT.md §2 mandates lower_snake_case columns;
         // TypeORM's default naming strategy uses the JS property name
         // verbatim (camelCase) instead. Without this, TypeORM generates
@@ -43,7 +51,14 @@ import { HealthController } from './health/health.controller';
         // mandates real migrations (see database/migrations/) for anything
         // resembling production. synchronize is fine for boot-in-dev
         // convenience but must never be relied on beyond Phase 1.
-        synchronize: config.get('NODE_ENV') !== 'production',
+        // Phase 2 turns this OFF everywhere. Phase 1 allowed it for
+        // dev-boot convenience, but the Phase 2 schemas carry partial unique
+        // indexes, exclusion constraints, and CHECK constraints that TypeORM's
+        // metadata cannot express -- so a synchronize-generated schema would
+        // silently DROP the very invariants the correctness of booking and
+        // payment rests on. Real migrations are now the only way this schema
+        // is created (database/scripts/migrate.ts).
+        synchronize: false,
       }),
     }),
     // JwtModule is imported again here (identical config to
@@ -61,6 +76,7 @@ import { HealthController } from './health/health.controller';
     }),
     IdentityModule,
     ProviderModule,
+    DomainCompositionModule,
   ],
   controllers: [HealthController],
   providers: [
