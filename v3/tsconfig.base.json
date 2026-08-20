@@ -25,8 +25,14 @@
       "@beauclick/http": ["libs/http/src/index.ts"],
       "@beauclick/testing": ["libs/testing/src/index.ts"],
       "@beauclick/persian-utils": ["packages/persian-utils/src/index.ts"],
+      "@beauclick/money": ["libs/money/src/index.ts"],
+      "@beauclick/events": ["libs/events/src/index.ts"],
       "@beauclick/identity": ["services/identity/src/index.ts"],
-      "@beauclick/provider": ["services/provider/src/index.ts"]
+      "@beauclick/provider": ["services/provider/src/index.ts"],
+      "@beauclick/booking": ["services/booking/src/index.ts"],
+      "@beauclick/commerce": ["services/commerce/src/index.ts"],
+      "@beauclick/payment": ["services/payment/src/index.ts"],
+      "@beauclick/financial": ["services/financial/src/index.ts"]
     }
   }
 }

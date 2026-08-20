@@ -1,0 +1,11 @@
+{
+  "name": "events",
+  "sourceRoot": "libs/events/src",
+  "projectType": "library",
+  "tags": ["type:lib", "scope:shared"],
+  "targets": {
+    "typecheck": { "executor": "nx:run-commands", "options": { "command": "tsc -p libs/events/tsconfig.json --noEmit" } },
+    "test": { "executor": "nx:run-commands", "options": { "command": "jest --config libs/events/jest.config.js" } },
+    "lint": { "executor": "nx:run-commands", "options": { "command": "eslint libs/events/src --resolve-plugins-relative-to ." } }
+  }
+}

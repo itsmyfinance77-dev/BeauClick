@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // No `rootDir` (unlike the other libs): this project's spec imports
+    // @beauclick/testing for a real pg-mem DataSource, which lives outside
+    // src/. Pinning rootDir to src/ makes tsc reject that cross-project
+    // import outright, even though the path mapping resolves it correctly.
+    "outDir": "../../dist/libs/events"
+  },
+  "include": ["src/**/*.ts"]
+}

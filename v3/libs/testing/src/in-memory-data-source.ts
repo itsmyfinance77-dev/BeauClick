@@ -93,6 +93,24 @@ function distinctSchemaNames(entities: DataSourceOptions['entities']): string[] 
   return Array.from(schemas);
 }
 
+/**
+ * !! LOAD-BEARING LIMITATION, verified directly in the Phase 2 pass !!
+ *
+ * **pg-mem does NOT honour TypeORM's ROLLBACK.** A row written inside a
+ * `dataSource.transaction()` callback that throws is still present after
+ * the transaction "rolls back" (probed explicitly: 1 row survived a
+ * deliberately-failed transaction that real PostgreSQL leaves at 0 rows).
+ *
+ * Consequence, and it is a big one: **no test running against this
+ * DataSource can prove anything about atomicity, isolation, row locking,
+ * or concurrency.** Phase 2's correctness rests almost entirely on those
+ * properties (the atomic slot claim, booking+order in one transaction,
+ * payment-verify + order-paid + booking-confirm in one transaction), so
+ * every such test lives in `apps/api/test/*.pg-spec.ts` against a real
+ * server instead. This layer stays useful for what it is genuinely good
+ * at -- fast schema/query/shape coverage -- and must never be cited as
+ * evidence for a transactional guarantee.
+ */
 export async function createInMemoryDataSource(entities: DataSourceOptions['entities']): Promise<DataSource> {
   const dataSource = buildPgMemDataSource(entities);
   await dataSource.initialize();

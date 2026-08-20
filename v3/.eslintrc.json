@@ -5,16 +5,35 @@
     "ecmaVersion": 2022,
     "sourceType": "module"
   },
-  "plugins": ["@typescript-eslint", "@nx"],
-  "extends": ["eslint:recommended", "plugin:@typescript-eslint/recommended"],
+  "plugins": [
+    "@typescript-eslint",
+    "@nx"
+  ],
+  "extends": [
+    "eslint:recommended",
+    "plugin:@typescript-eslint/recommended"
+  ],
   "env": {
     "node": true,
     "jest": true
   },
   "rules": {
-    "@typescript-eslint/no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
+    "@typescript-eslint/no-unused-vars": [
+      "warn",
+      {
+        "argsIgnorePattern": "^_"
+      }
+    ],
     "@typescript-eslint/no-explicit-any": "warn",
-    "no-console": ["warn", { "allow": ["warn", "error"] }],
+    "no-console": [
+      "warn",
+      {
+        "allow": [
+          "warn",
+          "error"
+        ]
+      }
+    ],
     "@nx/enforce-module-boundaries": [
       "error",
       {
@@ -23,31 +42,116 @@
         "depConstraints": [
           {
             "sourceTag": "scope:identity",
-            "onlyDependOnLibsWithTags": ["scope:shared"],
-            "notDependOnLibsWithTags": ["scope:provider", "scope:financial", "scope:payment"]
+            "onlyDependOnLibsWithTags": [
+              "scope:shared"
+            ],
+            "notDependOnLibsWithTags": [
+              "scope:provider",
+              "scope:booking",
+              "scope:commerce",
+              "scope:payment",
+              "scope:financial"
+            ]
           },
           {
             "sourceTag": "scope:provider",
-            "onlyDependOnLibsWithTags": ["scope:shared"],
-            "notDependOnLibsWithTags": ["scope:identity", "scope:financial", "scope:payment"]
+            "onlyDependOnLibsWithTags": [
+              "scope:shared"
+            ],
+            "notDependOnLibsWithTags": [
+              "scope:identity",
+              "scope:booking",
+              "scope:commerce",
+              "scope:payment",
+              "scope:financial"
+            ]
+          },
+          {
+            "sourceTag": "scope:booking",
+            "onlyDependOnLibsWithTags": [
+              "scope:shared"
+            ],
+            "notDependOnLibsWithTags": [
+              "scope:identity",
+              "scope:provider",
+              "scope:commerce",
+              "scope:payment",
+              "scope:financial"
+            ]
+          },
+          {
+            "sourceTag": "scope:commerce",
+            "onlyDependOnLibsWithTags": [
+              "scope:shared"
+            ],
+            "notDependOnLibsWithTags": [
+              "scope:identity",
+              "scope:provider",
+              "scope:booking",
+              "scope:payment",
+              "scope:financial"
+            ]
+          },
+          {
+            "sourceTag": "scope:payment",
+            "onlyDependOnLibsWithTags": [
+              "scope:shared"
+            ],
+            "notDependOnLibsWithTags": [
+              "scope:identity",
+              "scope:provider",
+              "scope:booking",
+              "scope:commerce",
+              "scope:financial"
+            ]
           },
           {
             "sourceTag": "scope:financial",
-            "onlyDependOnLibsWithTags": ["scope:shared"],
-            "notDependOnLibsWithTags": ["scope:identity", "scope:provider", "scope:payment"]
+            "onlyDependOnLibsWithTags": [
+              "scope:shared"
+            ],
+            "notDependOnLibsWithTags": [
+              "scope:identity",
+              "scope:provider",
+              "scope:booking",
+              "scope:commerce",
+              "scope:payment"
+            ]
           },
           {
             "sourceTag": "scope:shared",
-            "onlyDependOnLibsWithTags": ["scope:shared"],
-            "notDependOnLibsWithTags": ["scope:identity", "scope:provider", "scope:financial", "scope:payment", "scope:app"]
+            "onlyDependOnLibsWithTags": [
+              "scope:shared"
+            ],
+            "notDependOnLibsWithTags": [
+              "scope:identity",
+              "scope:provider",
+              "scope:booking",
+              "scope:commerce",
+              "scope:payment",
+              "scope:financial",
+              "scope:app"
+            ]
           },
           {
             "sourceTag": "scope:app",
-            "onlyDependOnLibsWithTags": ["scope:shared", "scope:identity", "scope:provider", "scope:financial", "scope:payment"]
+            "onlyDependOnLibsWithTags": [
+              "scope:shared",
+              "scope:identity",
+              "scope:provider",
+              "scope:booking",
+              "scope:commerce",
+              "scope:payment",
+              "scope:financial"
+            ]
           }
         ]
       }
     ]
   },
-  "ignorePatterns": ["dist", "node_modules", "*.js"]
+  "ignorePatterns": [
+    "dist",
+    "node_modules",
+    "*.js"
+  ]
 }
