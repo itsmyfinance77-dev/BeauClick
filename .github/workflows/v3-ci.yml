@@ -1,0 +1,211 @@
+name: V3 CI
+
+# Phase 2 listed CI as an open item with every gate already an `nx` target and
+# "CI-ready". This is that pipeline.
+#
+# It runs the SAME commands a developer runs locally -- no CI-only script that
+# can drift from what people actually execute. If a gate passes here and fails
+# on a laptop, that is a bug in the environment, not in a parallel definition
+# of "green".
+#
+# Deliberately NOT here: any production credential, any deploy step, and any
+# job that talks to a real payment gateway or SMS provider. Every service this
+# pipeline needs is stood up as an ephemeral container and thrown away.
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'v3/**'
+      - '.github/workflows/v3-ci.yml'
+  pull_request:
+    paths:
+      - 'v3/**'
+      - '.github/workflows/v3-ci.yml'
+  workflow_dispatch:
+
+concurrency:
+  # A newer push supersedes an in-flight run on the same ref. Real-PostgreSQL
+  # and OpenSearch jobs are slow enough that queueing them up is wasteful.
+  group: v3-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: v3
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '9'
+
+jobs:
+  # --------------------------------------------------------------------------
+  # Fast gates. No external services, so these fail in under a minute when
+  # something obvious is wrong.
+  # --------------------------------------------------------------------------
+  static:
+    name: typecheck · lint · build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: v3/pnpm-lock.yaml
+
+      - name: Install
+        # `--frozen-lockfile` so a lockfile that disagrees with package.json
+        # fails the build instead of being silently resolved differently here
+        # than on a developer's machine.
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint (includes Nx module boundaries)
+        # This is the gate that enforces ADR-011: a domain importing another
+        # domain fails CI rather than merely disappointing a reviewer.
+        run: pnpm lint
+
+      - name: Build
+        run: pnpm build
+
+  fast-tests:
+    name: unit · pg-mem
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: v3/pnpm-lock.yaml
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Fast suite
+        run: pnpm test
+
+  # --------------------------------------------------------------------------
+  # The real-database gate.
+  #
+  # ADR-015 and Phase 2's findings make this non-optional: pg-mem does not
+  # honour TypeORM's ROLLBACK, so NOTHING about atomicity, isolation, locking,
+  # or a unique constraint can be proved on the fast layer. Every guarantee
+  # this platform's correctness rests on is proved here or nowhere.
+  # --------------------------------------------------------------------------
+  real-postgres:
+    name: real PostgreSQL · real OpenSearch
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: beauclick_v3_ci
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+      opensearch:
+        image: opensearchproject/opensearch:2.19.1
+        env:
+          discovery.type: single-node
+          DISABLE_SECURITY_PLUGIN: 'true'
+          DISABLE_INSTALL_DEMO_CONFIG: 'true'
+          OPENSEARCH_JAVA_OPTS: '-Xms1g -Xmx1g'
+        ports: ['9200:9200']
+        options: >-
+          --health-cmd="curl -sf http://localhost:9200 || exit 1"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=30
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: v3/pnpm-lock.yaml
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Provision roles and the application database
+        # The financial roles must exist BEFORE the financial migration runs,
+        # because that schema is owned by `beauclick_financial_owner` and NOT
+        # by the application role -- an owner can always grant itself UPDATE,
+        # so an application-owned ledger would be one statement away from
+        # losing its append-only guarantee (ADR-017).
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d beauclick_v3_ci -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE beauclick_app LOGIN PASSWORD 'ci_app';
+          GRANT ALL ON DATABASE beauclick_v3_ci TO beauclick_app;
+          SQL
+          psql -h localhost -U postgres -d beauclick_v3_ci -v ON_ERROR_STOP=1 \
+            -v owner_password=ci_owner \
+            -v writer_password=ci_writer \
+            -v reader_password=ci_reader \
+            -v db_name=beauclick_v3_ci \
+            -f database/scripts/financial-roles.sql
+
+      - name: Migrate
+        run: pnpm migrate
+        env:
+          DATABASE_URL: postgres://beauclick_app:ci_app@localhost:5432/beauclick_v3_ci
+          MIGRATION_URL_FINANCIAL: postgres://beauclick_financial_owner:ci_owner@localhost:5432/beauclick_v3_ci
+
+      - name: Verify migrations are idempotent
+        # Re-running must apply nothing. A migration that is not re-runnable is
+        # one that cannot be safely retried after a partial deploy.
+        run: |
+          OUTPUT=$(pnpm migrate 2>&1)
+          echo "$OUTPUT"
+          echo "$OUTPUT" | grep -q "Applied: 0" || { echo "Re-running migrations was not a no-op"; exit 1; }
+        env:
+          DATABASE_URL: postgres://beauclick_app:ci_app@localhost:5432/beauclick_v3_ci
+          MIGRATION_URL_FINANCIAL: postgres://beauclick_financial_owner:ci_owner@localhost:5432/beauclick_v3_ci
+
+      - name: Real-PostgreSQL and OpenSearch suite
+        run: pnpm test:pg
+        env:
+          TEST_DATABASE_URL: postgres://beauclick_app:ci_app@localhost:5432/beauclick_v3_ci
+          TEST_FINANCIAL_WRITER_URL: postgres://beauclick_financial_writer:ci_writer@localhost:5432/beauclick_v3_ci
+          # Present, so the financial grant-contract suite RUNS rather than
+          # skipping. A silently-skipped suite is the failure mode this gate
+          # exists to prevent.
+          TEST_FINANCIAL_OWNER_URL: postgres://beauclick_financial_owner:ci_owner@localhost:5432/beauclick_v3_ci
+          TEST_OPENSEARCH_URL: http://localhost:9200
+
+      - name: Assert no suite was silently skipped
+        # A `describe.skip` triggered by a missing environment variable looks
+        # identical to a passing run in the summary line. This makes that
+        # difference fatal.
+        run: |
+          OUTPUT=$(pnpm test:pg 2>&1 | tail -20)
+          echo "$OUTPUT"
+          if echo "$OUTPUT" | grep -qE "[0-9]+ skipped, [0-9]+ of [0-9]+ total"; then
+            echo "A test suite was skipped -- a required service or credential is missing."
+            exit 1
+          fi
+        env:
+          TEST_DATABASE_URL: postgres://beauclick_app:ci_app@localhost:5432/beauclick_v3_ci
+          TEST_FINANCIAL_WRITER_URL: postgres://beauclick_financial_writer:ci_writer@localhost:5432/beauclick_v3_ci
+          TEST_FINANCIAL_OWNER_URL: postgres://beauclick_financial_owner:ci_owner@localhost:5432/beauclick_v3_ci
+          TEST_OPENSEARCH_URL: http://localhost:9200
