@@ -1,12 +1,16 @@
-import { Module } from '@nestjs/common';
+import { Inject, Logger, Module, OnApplicationBootstrap } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
-import { DOMAIN_EVENT_HANDLERS, OUTBOX_SOURCES, OutboxRelay, OutboxSource } from '@beauclick/events';
+import { DOMAIN_EVENT_HANDLERS, DomainEventHandler, OUTBOX_SOURCES, OutboxRelay, OutboxSource } from '@beauclick/events';
+import { ALL_EVENT_CONTRACTS, EVENT_CONTRACT_REGISTRY, EventContractRegistry } from '@beauclick/event-contracts';
 import { ProviderModule } from '@beauclick/provider';
 import { BookingModule, BookingOutboxEntity } from '@beauclick/booking';
 import { CommerceModule, CommerceOutboxEntity } from '@beauclick/commerce';
 import { PaymentModule, PaymentOutboxEntity } from '@beauclick/payment';
 import { FinancialModule } from '@beauclick/financial';
+
+import { Phase3CompositionModule } from './phase3-composition.module';
+import { PHASE3_EVENT_HANDLERS, PHASE3_OUTBOX_SOURCES } from './phase3-tokens';
 
 import { DomainPortsModule } from './domain-ports.module';
 import { CheckoutService } from '../checkout/checkout.service';
@@ -57,6 +61,9 @@ import {
     CommerceModule,
     PaymentModule,
     FinancialModule,
+    // Phase 3's domains and their handlers/outboxes, contributed under their
+    // own tokens and merged into the single relay below.
+    Phase3CompositionModule,
   ],
   controllers: [CheckoutController, PaymentCallbackController, MockGatewayController],
   providers: [
@@ -72,17 +79,24 @@ import {
 
     {
       provide: OUTBOX_SOURCES,
-      // The three outbox tables the shared DataSource can see. Order
-      // matters only for tidiness -- each source is drained independently
-      // and every handler is idempotent.
-      useValue: [
+      // Phase 2's three tables plus Phase 3's five, merged here because the
+      // relay takes ONE list. Order matters only for tidiness -- each source
+      // is drained independently and every handler is idempotent.
+      inject: [PHASE3_OUTBOX_SOURCES],
+      useFactory: (phase3: OutboxSource[]): OutboxSource[] => [
         { name: 'booking', entity: BookingOutboxEntity },
         { name: 'commerce', entity: CommerceOutboxEntity },
         { name: 'payment', entity: PaymentOutboxEntity },
-      ] satisfies OutboxSource[],
+        ...phase3,
+      ],
     },
     {
       provide: DOMAIN_EVENT_HANDLERS,
+      // Phase 2's handlers plus Phase 3's, in one list. Several event types
+      // now have MULTIPLE handlers -- `OrderPaid` reaches the ledger, loyalty,
+      // the journey timeline, a notification, and analytics. The relay
+      // dispatches to every handler registered for a type, and each is
+      // independently idempotent, so the fan-out needs no coordination.
       useFactory: (
         orderPaid: OrderPaidLedgerHandler,
         orderRefunded: OrderRefundedLedgerHandler,
@@ -90,7 +104,16 @@ import {
         bookingCancelled: BookingCancelledRefundHandler,
         bookingExpired: BookingExpiredOrderHandler,
         bookingConfirmed: BookingConfirmedLogHandler,
-      ) => [orderPaid, orderRefunded, refundCompleted, bookingCancelled, bookingExpired, bookingConfirmed],
+        phase3: DomainEventHandler[],
+      ) => [
+        orderPaid,
+        orderRefunded,
+        refundCompleted,
+        bookingCancelled,
+        bookingExpired,
+        bookingConfirmed,
+        ...phase3,
+      ],
       inject: [
         OrderPaidLedgerHandler,
         OrderRefundedLedgerHandler,
@@ -98,10 +121,67 @@ import {
         BookingCancelledRefundHandler,
         BookingExpiredOrderHandler,
         BookingConfirmedLogHandler,
+        PHASE3_EVENT_HANDLERS,
       ],
     },
     OutboxRelay,
   ],
-  exports: [CheckoutService, OutboxRelay, OutboxSweepScheduler],
+  exports: [CheckoutService, OutboxRelay, OutboxSweepScheduler, Phase3CompositionModule],
 })
-export class DomainCompositionModule {}
+export class DomainCompositionModule implements OnApplicationBootstrap {
+  private readonly logger = new Logger('EventContracts');
+
+  constructor(
+    @Inject(EVENT_CONTRACT_REGISTRY) private readonly contracts: EventContractRegistry,
+    // The COMPLETE handler list -- Phase 2's and Phase 3's merged. The check
+    // lives here rather than in Phase3CompositionModule for exactly that
+    // reason: run against Phase 3's handlers alone it reported Phase 2's
+    // events (RefundCompleted, OrderCancelled, PaymentSucceeded) as having no
+    // consumer, which was simply untrue and would have sent somebody hunting
+    // for a broken subscription that was working fine.
+    @Inject(DOMAIN_EVENT_HANDLERS) private readonly handlers: DomainEventHandler[],
+  ) {}
+
+  /**
+   * Boot-time contract check.
+   *
+   * ADR-007 asks for a producer/consumer registry that is "a real, queryable
+   * artifact, not tribal knowledge". This makes it real rather than
+   * documentary: a handler registered against a typo'd event name or a version
+   * nobody publishes fails STARTUP, instead of sitting silently idle in
+   * production until somebody asks why a notification never arrived.
+   *
+   * V2's `beauclick/auth/otp_generated` -- a real hook with zero subscribers,
+   * found only by grepping the whole codebase -- is the mirror image of the
+   * same blind spot.
+   */
+  onApplicationBootstrap(): void {
+    for (const handler of this.handlers ?? []) {
+      this.contracts.registerConsumer({
+        eventName: handler.eventType,
+        // A handler that does not pin a version consumes v1 -- the only
+        // version published so far. Explicit, so the day a v2 appears this
+        // check starts failing for handlers nobody updated.
+        eventVersion: handler.eventVersion ?? 1,
+        // The handler class IS the consumer identity: one composed in the
+        // composition root from two domains' collaborators has no single
+        // owning service, so recording the class is the honest answer.
+        consumer: handler.constructor.name,
+        handler: handler.constructor.name,
+        description: `${handler.constructor.name} consumes ${handler.eventType}`,
+      });
+    }
+
+    this.contracts.assertConsumersHaveProducers();
+
+    const unconsumed = this.contracts.unconsumedEvents();
+    if (unconsumed.length > 0) {
+      // NOT an error: an analytics-only fact with no reactive consumer is a
+      // legitimate design. Logged so it is a visible, deliberate state rather
+      // than something discovered by grepping.
+      this.logger.log(
+        `${ALL_EVENT_CONTRACTS.length} contracts registered; no reactive consumer for: ${unconsumed.join(', ')}`,
+      );
+    }
+  }
+}

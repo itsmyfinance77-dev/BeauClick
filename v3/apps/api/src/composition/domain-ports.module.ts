@@ -4,15 +4,26 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 
 import { ProfessionalEntity, ServiceOfferingEntity } from '@beauclick/provider';
+import { UserEntity } from '@beauclick/identity';
 import { PROFESSIONAL_DIRECTORY } from '@beauclick/booking';
-import { SERVICE_CATALOG } from '@beauclick/commerce';
+import { PRICING_RULES, SERVICE_CATALOG } from '@beauclick/commerce';
 import { FINANCIAL_DATA_SOURCE, FINANCIAL_PARTY_RESOLVER } from '@beauclick/financial';
+import { PROVIDER_REINDEX_SOURCE } from '@beauclick/search';
+import { RECIPIENT_RESOLVER } from '@beauclick/notification';
+import { ANALYTICS_SUBJECT_RESOLVER } from '@beauclick/analytics';
+import { LoyaltyModule } from '@beauclick/loyalty';
 
 import {
   ProviderBackedFinancialPartyResolver,
   ProviderBackedProfessionalDirectory,
   ProviderBackedServiceCatalog,
 } from './port-adapters';
+import {
+  IdentityBackedRecipientResolver,
+  ProviderBackedAnalyticsSubjectResolver,
+  ProviderBackedReindexSource,
+} from './phase3-ports';
+import { MembershipDiscountRule } from '../pricing/membership-discount.rule';
 import { financialDataSourceProvider } from './financial-datasource.provider';
 
 /**
@@ -26,12 +37,17 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
  * to receive the tokens through its own `forRoot`, pushing wiring detail into
  * modules whose whole point is not to know about it.
  *
- * A domain module still cannot reach a SERVICE it should not see -- only
- * these four narrow, domain-declared tokens are exported.
+ * A domain module still cannot reach a SERVICE it should not see -- only the
+ * narrow, domain-declared tokens are exported.
  */
 @Global()
 @Module({
-  imports: [ConfigModule, TypeOrmModule.forFeature([ProfessionalEntity, ServiceOfferingEntity])],
+  imports: [
+    ConfigModule,
+    TypeOrmModule.forFeature([ProfessionalEntity, ServiceOfferingEntity, UserEntity]),
+    // Imported so the membership pricing rule can resolve BenefitService.
+    LoyaltyModule,
+  ],
   providers: [
     ProviderBackedProfessionalDirectory,
     ProviderBackedServiceCatalog,
@@ -40,8 +56,51 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     { provide: SERVICE_CATALOG, useExisting: ProviderBackedServiceCatalog },
     { provide: FINANCIAL_PARTY_RESOLVER, useExisting: ProviderBackedFinancialPartyResolver },
     financialDataSourceProvider,
+
+    // Phase 3's ports, global for the same reason as Phase 2's: search,
+    // notification, and analytics each DECLARE a port they must not
+    // implement, and none of them may import the domain that can answer it.
+    ProviderBackedReindexSource,
+    IdentityBackedRecipientResolver,
+    ProviderBackedAnalyticsSubjectResolver,
+    { provide: PROVIDER_REINDEX_SOURCE, useExisting: ProviderBackedReindexSource },
+    { provide: RECIPIENT_RESOLVER, useExisting: IdentityBackedRecipientResolver },
+    { provide: ANALYTICS_SUBJECT_RESOLVER, useExisting: ProviderBackedAnalyticsSubjectResolver },
+
+    /**
+     * The pricing rules commerce's engine evaluates.
+     *
+     * Bound HERE, in the global ports module, rather than in
+     * Phase3CompositionModule -- and that placement is load-bearing rather
+     * than tidy. `PricingService` lives inside CommerceModule and resolves
+     * `PRICING_RULES` from ITS OWN injector, so a binding provided by a
+     * sibling module is simply not visible to it: the `@Optional()` fallback
+     * kicks in, the engine runs with zero rules, and every order is priced at
+     * full price with no error anywhere.
+     *
+     * That is exactly what happened -- caught by driving a real booking for a
+     * customer who genuinely held a 10% membership benefit and watching the
+     * total come back at 850,000 instead of 765,000. A silent, money-affecting
+     * failure that no unit test would have surfaced, because the rule itself
+     * was correct.
+     */
+    MembershipDiscountRule,
+    {
+      provide: PRICING_RULES,
+      inject: [MembershipDiscountRule],
+      useFactory: (membership: MembershipDiscountRule) => [membership],
+    },
   ],
-  exports: [PROFESSIONAL_DIRECTORY, SERVICE_CATALOG, FINANCIAL_PARTY_RESOLVER, FINANCIAL_DATA_SOURCE],
+  exports: [
+    PROFESSIONAL_DIRECTORY,
+    SERVICE_CATALOG,
+    FINANCIAL_PARTY_RESOLVER,
+    FINANCIAL_DATA_SOURCE,
+    PROVIDER_REINDEX_SOURCE,
+    RECIPIENT_RESOLVER,
+    ANALYTICS_SUBJECT_RESOLVER,
+    PRICING_RULES,
+  ],
 })
 export class DomainPortsModule implements OnApplicationShutdown {
   constructor(@Inject(FINANCIAL_DATA_SOURCE) private readonly financialDataSource: DataSource) {}

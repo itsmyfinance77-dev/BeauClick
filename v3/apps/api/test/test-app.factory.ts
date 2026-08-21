@@ -11,6 +11,7 @@ import { JwtAuthGuard, CapabilityGuard } from '@beauclick/auth';
 import { OwnershipGuard } from '@beauclick/ownership';
 import { IdentityModule, IDENTITY_ENTITIES, OTP_DEBUG_OBSERVER, OtpDebugObserver } from '@beauclick/identity';
 import { ProviderModule, PROVIDER_ENTITIES } from '@beauclick/provider';
+import { EventContractsModule } from '@beauclick/event-contracts';
 import { createInMemoryDataSource } from '@beauclick/testing';
 import { TypeOrmTestingModule } from './typeorm-testing.module';
 
@@ -42,6 +43,8 @@ export class CapturingOtpObserver implements OtpDebugObserver {
 export interface TestApp {
   app: INestApplication;
   otpObserver: CapturingOtpObserver;
+  /** The in-memory DataSource, so a test can manipulate stored state directly (e.g. age a timestamp past a grace window). */
+  dataSource: DataSource;
 }
 
 /**
@@ -101,6 +104,9 @@ export async function createTestApp(): Promise<TestApp> {
       }),
       TypeOrmTestingModule.forDataSource(dataSource),
       JwtModule.register({ secret: TEST_JWT_SECRET, signOptions: { expiresIn: '15m' } }),
+      // Global, and required: provider-service now validates every event it
+      // produces against the registry on the way into its own outbox.
+      EventContractsModule,
       IdentityModule,
       ProviderModule,
     ],
@@ -129,7 +135,7 @@ export async function createTestApp(): Promise<TestApp> {
     }),
   );
   await app.init();
-  return { app, otpObserver };
+  return { app, otpObserver, dataSource };
 }
 
 export function getTestDataSource(app: INestApplication): DataSource {

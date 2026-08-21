@@ -4,7 +4,6 @@ import request from 'supertest';
 import { uuidv7 } from 'uuidv7';
 
 import { AvailabilityService, BookingService } from '@beauclick/booking';
-import { OrderService } from '@beauclick/commerce';
 import { assertNoLeak } from '@beauclick/testing';
 import { CheckoutService } from '../src/checkout/checkout.service';
 
@@ -27,7 +26,6 @@ describeIfPg('Booking lifecycle, idempotency and authorization on real PostgreSQ
   let dataSource: DataSource;
   let bookings: BookingService;
   let availability: AvailabilityService;
-  let orders: OrderService;
   let checkout: CheckoutService;
 
   beforeAll(async () => {
@@ -36,7 +34,6 @@ describeIfPg('Booking lifecycle, idempotency and authorization on real PostgreSQ
     dataSource = ctx.dataSource;
     bookings = app.get(BookingService);
     availability = app.get(AvailabilityService);
-    orders = app.get(OrderService);
     checkout = app.get(CheckoutService);
   });
 

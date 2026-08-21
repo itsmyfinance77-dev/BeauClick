@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, Reflector } from '@nestjs/core';
@@ -13,7 +13,15 @@ import { ProviderModule, PROVIDER_ENTITIES } from '@beauclick/provider';
 import { BOOKING_ENTITIES } from '@beauclick/booking';
 import { COMMERCE_ENTITIES } from '@beauclick/commerce';
 import { PAYMENT_ENTITIES } from '@beauclick/payment';
+import { SEARCH_ENTITIES } from '@beauclick/search';
+import { LOYALTY_ENTITIES } from '@beauclick/loyalty';
+import { JOURNEY_ENTITIES } from '@beauclick/journey';
+import { NOTIFICATION_ENTITIES } from '@beauclick/notification';
+import { ANALYTICS_ENTITIES } from '@beauclick/analytics';
+import { EventContractsModule } from '@beauclick/event-contracts';
 import { DomainCompositionModule } from './composition/domain-composition.module';
+
+import cookieParser from 'cookie-parser';
 
 import { validateEnv } from './config/env.validation';
 import { HealthController } from './health/health.controller';
@@ -35,7 +43,22 @@ import { HealthController } from './health/health.controller';
         // live on a separate DataSource connected as the append-only role
         // (ADR-017); registering them here would give this pool -- the one
         // every controller and guard shares -- a live handle on the ledger.
-        entities: [...IDENTITY_ENTITIES, ...PROVIDER_ENTITIES, ...BOOKING_ENTITIES, ...COMMERCE_ENTITIES, ...PAYMENT_ENTITIES],
+        entities: [
+          ...IDENTITY_ENTITIES,
+          ...PROVIDER_ENTITIES,
+          ...BOOKING_ENTITIES,
+          ...COMMERCE_ENTITIES,
+          ...PAYMENT_ENTITIES,
+          // Phase 3. financial's remain deliberately absent -- they live on a
+          // separate DataSource connected as the append-only role (ADR-017),
+          // and registering them here would give this shared pool a live
+          // handle on the ledger.
+          ...SEARCH_ENTITIES,
+          ...LOYALTY_ENTITIES,
+          ...JOURNEY_ENTITIES,
+          ...NOTIFICATION_ENTITIES,
+          ...ANALYTICS_ENTITIES,
+        ],
         // V3_DATABASE_BLUEPRINT.md §2 mandates lower_snake_case columns;
         // TypeORM's default naming strategy uses the JS property name
         // verbatim (camelCase) instead. Without this, TypeORM generates
@@ -74,6 +97,9 @@ import { HealthController } from './health/health.controller';
         signOptions: { expiresIn: config.get('JWT_ACCESS_TTL') ?? '15m' },
       }),
     }),
+    // Global: every event producer validates against it on the way into
+    // its own outbox, and no domain may import another to obtain it.
+    EventContractsModule,
     IdentityModule,
     ProviderModule,
     DomainCompositionModule,
@@ -94,4 +120,21 @@ import { HealthController } from './health/health.controller';
     { provide: APP_GUARD, useClass: OwnershipGuard },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  /**
+   * Cookie parsing is registered HERE rather than in `main.ts`.
+   *
+   * It was in `main.ts` first, and that was a real bug: the test harness boots
+   * the application through `Test.createTestingModule`, which never runs
+   * `bootstrap()`. So `req.cookies` was undefined under test, every
+   * cookie-authenticated refresh silently fell through to the body path, and
+   * the CSRF check -- which only applies to the cookie path -- was never
+   * exercised at all. The suite passed while the mechanism was untested.
+   *
+   * Middleware that the application's behaviour depends on belongs to the
+   * module, so every consumer of AppModule gets it identically.
+   */
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(cookieParser()).forRoutes('*');
+  }
+}

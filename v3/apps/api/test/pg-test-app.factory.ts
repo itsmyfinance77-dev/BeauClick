@@ -6,7 +6,7 @@ import { DataSource } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
 
 import { ValidationException } from '@beauclick/http';
-import { capabilitiesForRoles } from '@beauclick/identity';
+import { OTP_DEBUG_OBSERVER, OtpDebugObserver, capabilitiesForRoles } from '@beauclick/identity';
 import { OutboxRelay } from '@beauclick/events';
 import { FINANCIAL_DATA_SOURCE } from '@beauclick/financial';
 
@@ -35,6 +35,29 @@ export interface PgTestApp {
   dataSource: DataSource;
   financialDataSource: DataSource;
   relay: OutboxRelay;
+  /**
+   * Observes generated OTP codes.
+   *
+   * The ONLY way a test can learn a code: `OtpService` never returns, logs, or
+   * persists a plaintext one, and the stored value is an HMAC. That is the
+   * property under test as much as it is an inconvenience -- V2's own
+   * `otp_generated` hook existed for exactly this reason and for no other.
+   */
+  otpObserver: CapturingOtpObserver;
+}
+
+export class CapturingOtpObserver implements OtpDebugObserver {
+  private readonly codesByPhone = new Map<string, string>();
+
+  onCodeGenerated(phone: string, code: string): void {
+    this.codesByPhone.set(phone, code);
+  }
+
+  lastCodeFor(phone: string): string {
+    const code = this.codesByPhone.get(phone);
+    if (!code) throw new Error(`No OTP code was captured for ${phone} -- did requestOtp run first?`);
+    return code;
+  }
 }
 
 const HERMETIC_ENV: Record<string, string> = {
@@ -61,6 +84,20 @@ const HERMETIC_ENV: Record<string, string> = {
   // A background sweep firing mid-assertion is a flaky test, not coverage.
   DISABLE_BACKGROUND_SWEEPS: 'true',
   NODE_ENV: 'test',
+  // Loyalty policy pinned so a case asserting a points total is testing the
+  // ledger, not whatever GAP-10 default happens to be current.
+  LOYALTY_POINTS_BOOKING_COMPLETED: '10',
+  LOYALTY_POINTS_ORDER_COMPLETED: '10',
+  LOYALTY_POINTS_REVIEW_SUBMITTED: '5',
+  LOYALTY_TIER_BASIS: 'lifetime',
+  // Left unset unless a spec opts in: without it the search module binds the
+  // in-memory engine, which is correct for every case that is not about
+  // OpenSearch itself.
+  AUTH_COOKIE_SECURE: 'false',
+  AUTH_COOKIE_SAMESITE: 'lax',
+  // The CSRF policy reads the same allow-list CORS does -- one source of
+  // truth for "who may drive this API".
+  CORS_ALLOWED_ORIGINS: 'http://localhost:3100',
 };
 
 export function requiredPgEnv(): { database: string; financial: string } | null {
@@ -88,9 +125,15 @@ export async function createPgTestApp(): Promise<PgTestApp> {
   // DOUBLE-WRAPPED every response envelope -- data.data.redirectUrl instead
   // of data.redirectUrl -- and ran each guard twice. The harness must boot
   // the application, not rebuild half of it.
+  const otpObserver = new CapturingOtpObserver();
   const moduleRef = await Test.createTestingModule({
     imports: [AppModule],
-  }).compile();
+  })
+    // The one substitution this harness makes, and it replaces a NO-OP with a
+    // recorder -- no production behaviour is bypassed.
+    .overrideProvider(OTP_DEBUG_OBSERVER)
+    .useValue(otpObserver)
+    .compile();
 
   const app = moduleRef.createNestApplication();
   app.setGlobalPrefix('api');
@@ -109,6 +152,7 @@ export async function createPgTestApp(): Promise<PgTestApp> {
     dataSource: app.get<DataSource>(getDataSourceToken()),
     financialDataSource: app.get<DataSource>(FINANCIAL_DATA_SOURCE),
     relay: app.get(OutboxRelay),
+    otpObserver,
   };
 }
 
@@ -122,6 +166,31 @@ export async function createPgTestApp(): Promise<PgTestApp> {
  * schema really is.
  */
 export const RESETTABLE_TABLES = [
+  // Phase 3 schemas first: they are read models and logs downstream of the
+  // Phase 2 tables, so clearing them first keeps the order children-first.
+  'analytics.daily_metrics',
+  'analytics.rollup_state',
+  'analytics.events',
+  'notification.outbox_events',
+  'notification.preferences',
+  'notification.notifications',
+  'journey.outbox_events',
+  'journey.timeline_entries',
+  'journey.beauty_goals',
+  'journey.beauty_profiles',
+  'loyalty.outbox_events',
+  'loyalty.tier_crossings',
+  'loyalty.points_entries',
+  'loyalty.memberships',
+  'loyalty.benefits',
+  'loyalty.membership_plans',
+  'loyalty.tiers',
+  'search.outbox_events',
+  'search.signal_applications',
+  'search.ranking_signals',
+  'search.provider_documents',
+  'search.index_state',
+  'provider.outbox_events',
   'payment.outbox_events',
   'payment.refunds',
   'payment.payment_attempts',
