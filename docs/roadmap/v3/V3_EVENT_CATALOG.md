@@ -251,3 +251,85 @@ Asserted by `outbox-transactional.pg-spec.ts`, which scans every payload the rea
 Phase 2 ships an **in-process relay**, not Kafka (ADR-018). The correctness-bearing parts — the transactional outbox, versioned envelopes, and the idempotent-consumer contract — are built. No producer writes to a broker directly and no consumer knows how the envelope arrived, so adopting Kafka changes one file.
 
 Delivery is **at-least-once**: rows are dispatched first and marked published second, because the opposite order loses events when a process dies mid-dispatch. That is why every consumer above names a real database constraint or a status compare-and-swap.
+
+---
+
+# Phase 3 implementation status (2026-08-21)
+
+## The catalog is now executable
+
+This document is no longer the only place a contract lives. `libs/event-contracts`
+carries **33 registered contracts**, each with a name, an integer version, exactly
+one producer, a runtime schema, and the idempotency strategy a consumer signs by
+registering. The TypeScript payload type is *derived* from the schema rather than
+declared beside it, so the two cannot drift.
+
+Three consequences worth stating, because they change what "the catalog says" means:
+
+* **Validation runs inside the producing transaction.** A payload that violates its
+  own contract fails the business write, not a log aggregator.
+* **Unknown keys are stripped, not passed through.** An accidental entity spread
+  cannot publish a field nobody declared — which is exactly how a `phone` or a
+  private note would otherwise reach a consumer that should never see it. Phase 2's
+  credential deny-list still runs underneath as an independent second layer.
+* **A consumer registered against an event nobody produces fails STARTUP.** Every
+  wired handler is recorded at boot and checked. V2's `beauclick/auth/otp_generated`
+  — a real hook with zero subscribers, found only by grepping the whole codebase —
+  is the mirror image of that blind spot.
+
+## Events implemented in Phase 3
+
+| Event | Producer | Consumers | Idempotency |
+|---|---|---|---|
+| `ProfessionalUpdated` v1 | provider | search projection | `revision` — an older revision is DISCARDED, not applied |
+| `ProfessionalVerificationChanged` v1 | provider | analytics | status CAS; also emits `ProfessionalUpdated` |
+| `ServiceOfferingUpdated` v1 | provider | search (validation) | owning professional's `revision` |
+| `LoyaltyPointsEarned` v1 | loyalty | analytics | `UNIQUE(reference_type, reference_id, reason)` |
+| `LoyaltyTierChanged` v1 | loyalty | notification, journey, analytics | `UNIQUE(user, toTier, lifetimeEarned)` on the crossing |
+| `MembershipActivated` v1 | loyalty | notification, journey, analytics | `UNIQUE(user_id)` on the membership |
+| `MembershipEnded` v1 | loyalty | analytics | status CAS from active |
+| `BeautyGoalCreated` v1 | journey | (analytics-only, none yet) | goalId natural key |
+| `BeautyGoalStatusChanged` v1 | journey | (none yet) | status CAS |
+| `NotificationRequested` v1 | notification | analytics | `UNIQUE(idempotency_key)` |
+| `NotificationSent` v1 | notification | analytics | status CAS |
+| `NotificationFailed` v1 | notification | analytics | attempt counter |
+| `NotificationDeadLettered` v1 | notification | analytics | status CAS |
+| `NotificationRead` v1 | notification | analytics | CAS on `read_at IS NULL` |
+| `SearchPerformed` v1 | search | analytics | not required — append-only fact |
+| `ProviderProfileViewed` v1 | search | search ranking, analytics | not required; `signal_applications` dedupes the increment |
+
+## `SearchPerformed` has no field that could hold a query
+
+V2 logged a `search_performed` fact that deliberately never recorded the raw query.
+That redaction is now **structural**: the contract carries `queryClass`
+(`empty` | `text` | `filtered` | `text_and_filtered`) and `queryTermCount`, and there
+is no field a query string could occupy. Adding one would require editing the
+contract and bumping the version — a reviewable act rather than an accident.
+
+## `ProviderProfileViewed` closes GAP-15
+
+`entityType` is `z.literal('provider')`. V2 logged the raw CPT post type here while
+every other provider-scoped event logged `provider`, making the two uncomparable.
+The analytics fact table additionally carries a `CHECK` constraint that makes the
+un-normalized value unstorable.
+
+## A note on idempotency keys for RECURRING facts
+
+Keying a consumer on the subject id is correct for a fact that happens at most once
+per entity (a booking is confirmed once). It is **wrong** for a fact that legitimately
+recurs for one subject: a customer crosses bronze → silver → gold against one loyalty
+account, so keying on the account id records the first crossing and silently swallows
+every later one.
+
+Both the notification and journey-timeline consumers of `LoyaltyTierChanged` and
+`MembershipActivated` therefore key on the **source event's id**, which is stable
+across redeliveries of one event and distinct between different events. This was a
+real bug, found by crossing two tiers against the running stack and reading the
+notification table.
+
+## Transport
+
+Still an **in-process relay**, and now on evidence rather than deferral. `OrderPaid`
+has five independent consumers (ledger, loyalty, journey timeline, notification,
+analytics) and runs correctly. See `ADR-022` for why nothing in the observed load
+argues for a broker yet, and what would change the answer.

@@ -170,3 +170,88 @@ Phase 1 code, below the 44px baseline that phase set for itself. Measured at 375
 ## Carried forward, unresolved
 
 **The httpOnly refresh cookie was named Phase 2 scope in `V3_PHASE1_IMPLEMENTATION.md` §15.7 and was NOT done.** Booking, commerce, payment, and financial consumed this phase. A page reload still signs the user out. Restated as open rather than quietly dropped.
+
+---
+
+# Phase 3 addendum (2026-08-21)
+
+## Closed in Phase 3
+
+**`GAP-14` (search is unbounded `LIKE '%term%'`) — CLOSED.** Replaced by a real
+OpenSearch read model with a Persian analyzer chain verified against a live
+OpenSearch 2.19.1 instance: Arabic↔Persian letter folding, ZWNJ removal,
+Persian and Arabic-Indic digit folding, fuzzy typo tolerance with transpositions,
+and edge-ngram autocomplete with a non-expanding search analyzer. Note this is a
+genuine capability change, not a re-platform of the same limitation — see ADR-021.
+
+**`GAP-15` (`profile_view` logs the raw CPT type) — CLOSED STRUCTURALLY.** The
+`ProviderProfileViewed` contract types `entityType` as `z.literal('provider')`, and
+`analytics.events` carries a CHECK constraint making any un-normalized subject type
+unstorable. The inconsistency is now unrepresentable rather than merely corrected.
+
+**`GAP-17` (no in-app notification center) — CLOSED.** A real notification centre
+with list, unread count, mark-read, mark-all-read, deep links, pagination,
+per-category preferences, and cross-user denial. Verified in a browser.
+
+**`GAP-29` (Beauty Journey has no V3 boundary) — CLOSED ON EVIDENCE.** The row
+previously recorded that the placement was settled *by direction* rather than by the
+evidence review its own preliminary recommendation asked for. ADR-019 performs that
+review and confirms the standalone placement, on the strength of a specific artifact
+(`beauty_profiles.notes`) rather than assertion.
+
+**Phase 2 carry-over: httpOnly refresh cookie — CLOSED.** ADR-020. A page reload now
+keeps the session, verified in a real browser, with no long-lived credential readable
+by JavaScript.
+
+**Phase 2 carry-over: zero registered pricing rules — CLOSED.** `MembershipDiscountRule`
+is the first real rule; verified live at 850,000 → 765,000 with an itemized adjustment
+persisted on the order.
+
+**Phase 2 carry-over: no CI pipeline — CLOSED (authored).** `.github/workflows/v3-ci.yml`
+runs the same commands a developer runs, against ephemeral PostgreSQL and OpenSearch
+containers, and **fails if any suite silently skips**. Disclosed honestly: this
+repository has no configured remote runner, so the workflow has never executed on CI
+infrastructure. Every command in it was run locally.
+
+## Re-evaluated, deliberately NOT closed
+
+**Kafka (ADR-007's named transport) — DEFERRED ON EVIDENCE.** §24 asked for an
+evaluation rather than an automatic adoption. `OrderPaid` now fans out to five
+independent consumers and runs correctly on the in-process relay. See ADR-022 Part 1
+for what would change the answer.
+
+**ClickHouse (roadmap's named analytics store) — NOT ADOPTED.** V3 does not have more
+data than V2 did. See ADR-022 Part 2 for what was taken from the columnar design
+anyway, and for the migration path that stays open.
+
+## Still open, unchanged
+
+**`GAP-06`** (no real payment gateway) — no merchant credentials exist in this
+environment. Untouched by this phase.
+
+**`GAP-11`** (AI/SMS providers never exercised against a real API) — still true for
+SMS and email. Phase 3 ships a real channel abstraction with logging providers behind
+it, and reports `providerVerified: false` through the admin API so a channel that
+quietly logs can never be mistaken for one that delivers.
+
+**`GAP-10`** (provisional numeric policy) — carried forward deliberately and made
+*visible*: every loyalty value is environment-configurable and
+`GET /v1/admin/loyalty/policy` reports which are still running on V2's placeholders.
+The tier qualification basis is likewise configurable, with `rolling_365` genuinely
+implemented rather than merely named.
+
+**`GAP-12`** (AI conversation cardinality), **`GAP-13`** (flat staff model),
+**`GAP-16`** (unbatched ranking recompute — now moot for search, since scoring is
+per-event rather than a full-table sweep, but `CrmService` is untouched),
+**`GAP-18`** (automated payout), **`GAP-19`**–**`GAP-28`** — all unchanged and out of
+Phase 3 scope.
+
+## New finding, this phase
+
+**No review domain exists in V3.** Ranking's rating signal, the `minRating` filter,
+and the rating sort are all built and correct, but no producer populates
+`ratingAvg`/`reviewCount` — they are permanently 0/0 until reviews ship. The scoring
+formula handles that through its existing no-evidence path (the Bayesian term collapses
+to the platform mean; cold-start blending pulls toward neutral), so nothing is faked
+and nothing is penalised. Recorded here because a reader seeing a rating filter in the
+API could reasonably assume there is rating data behind it.
