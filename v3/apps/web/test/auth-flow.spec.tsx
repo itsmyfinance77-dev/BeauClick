@@ -43,9 +43,21 @@ describe('Auth flow (OTP request -> verify -> session)', () => {
 
     await waitFor(() => expect(screen.getByLabelText('کد تأیید')).toBeInTheDocument());
 
-    const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
-    expect(url).toContain('/v1/auth/request-otp');
-    expect(JSON.parse(init.body)).toEqual({ phone: '09123456789', purpose: 'login' });
+    const calls = (global.fetch as jest.Mock).mock.calls as Array<[string, RequestInit]>;
+
+    // The FIRST call is now the mount-time session restore (ADR-020): the app
+    // tries the httpOnly refresh cookie before deciding the visitor is signed
+    // out. Asserted rather than skipped over -- it is the behaviour that makes
+    // a page reload keep the session.
+    expect(calls[0][0]).toContain('/v1/auth/refresh');
+    expect(calls[0][1].credentials).toBe('include');
+
+    const otpCall = calls.find(([url]) => url.includes('/v1/auth/request-otp'));
+    expect(otpCall).toBeDefined();
+    expect(JSON.parse(otpCall![1].body as string)).toEqual({ phone: '09123456789', purpose: 'login' });
+    // The OTP request is made by the ordinary client, which cannot send the
+    // refresh cookie at all.
+    expect(otpCall![1].credentials).toBe('omit');
   });
 
   it('verifies the code, stores the session, and redirects to the dashboard', async () => {

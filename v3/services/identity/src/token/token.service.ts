@@ -4,6 +4,7 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { createHash, randomBytes } from 'crypto';
+import { returningRows } from '@beauclick/events';
 import { uuidv7 } from 'uuidv7';
 import { RefreshTokenEntity } from '../entities/refresh-token.entity';
 import { UserEntity } from '../entities/user.entity';
@@ -24,6 +25,18 @@ export interface TokenPair {
  */
 @Injectable()
 export class TokenService {
+  /**
+   * How long after a rotation a re-presentation of the old token is treated
+   * as a benign race rather than a replay attack.
+   *
+   * Short on purpose. Long enough to absorb a concurrent client (which races
+   * within milliseconds), short enough that it is not a usable window for
+   * someone replaying a captured credential. Either way the request is
+   * DENIED -- the grace period only decides whether the rest of the session
+   * survives.
+   */
+  private static readonly REPLAY_GRACE_MS = 10_000;
+
   private readonly refreshTtlDays: number;
 
   constructor(
@@ -74,32 +87,98 @@ export class TokenService {
    */
   async rotate(rawRefreshToken: string, deviceLabel: string | null, userAgent: string | null): Promise<TokenPair> {
     const tokenHash = this.hashToken(rawRefreshToken);
-    const existing = await this.refreshRepo.findOne({ where: { tokenHash } });
 
-    if (!existing) {
+    /**
+     * CLAIM the token with a conditional UPDATE before doing anything else.
+     *
+     * This was a read-then-write, and that was a real concurrency hole: two
+     * simultaneous refreshes both loaded the row, both saw `revoked_at IS
+     * NULL`, and both issued a new pair -- so ONE refresh token produced TWO
+     * live sessions. Proved by firing two genuinely concurrent refreshes with
+     * the same cookie and getting `200` twice.
+     *
+     * Under READ COMMITTED a second concurrent UPDATE of this row blocks on
+     * the first transaction's lock and, on release, re-evaluates its WHERE
+     * against the newly committed row -- so `revoked_at IS NULL` is false for
+     * the loser and it matches zero rows. That re-check is specific to
+     * UPDATE/DELETE, which is exactly why the claim is one statement rather
+     * than SELECT-then-UPDATE. The same mechanism booking-service's slot claim
+     * rests on.
+     */
+    const raw = await this.refreshRepo.query(
+        `UPDATE identity.refresh_tokens
+            SET revoked_at = now(), last_used_at = now()
+          WHERE token_hash = $1 AND revoked_at IS NULL AND expires_at > now()
+      RETURNING id, user_id, device_label, user_agent`,
+      [tokenHash],
+    );
+
+    // `returningRows` because TypeORM returns `[rows, rowCount]` for an
+    // UPDATE, so a naive `raw.length === 0` check is ALWAYS false and a
+    // revoked token would mint a new session. See sql-result.ts.
+    const claimed = returningRows<{
+      id: string;
+      user_id: string;
+      device_label: string | null;
+      user_agent: string | null;
+    }>(raw);
+
+    if (claimed.length === 0) {
+      await this.handleUnclaimableToken(tokenHash);
       throw new UnauthorizedException({ code: 'UNAUTHORIZED', message: 'نشست شما نامعتبر است. دوباره وارد شوید.' });
     }
 
-    if (existing.revokedAt || existing.expiresAt.getTime() < Date.now()) {
-      // Replay of an already-rotated (or expired) token -- revoke the
-      // entire chain for this user as a precaution, not just this token.
-      await this.revokeAllForUser(existing.userId);
-      throw new UnauthorizedException({ code: 'UNAUTHORIZED', message: 'نشست شما نامعتبر است. دوباره وارد شوید.' });
-    }
-
-    const user = await this.refreshRepo.manager.findOne(UserEntity, { where: { id: existing.userId } });
+    const claim = claimed[0];
+    const user = await this.refreshRepo.manager.findOne(UserEntity, { where: { id: claim.user_id } });
     if (!user) {
       throw new UnauthorizedException({ code: 'UNAUTHORIZED', message: 'نشست شما نامعتبر است. دوباره وارد شوید.' });
     }
 
-    const next = await this.issuePair(user, deviceLabel ?? existing.deviceLabel, userAgent ?? existing.userAgent);
+    const next = await this.issuePair(user, deviceLabel ?? claim.device_label, userAgent ?? claim.user_agent);
 
-    existing.revokedAt = new Date();
-    existing.replacedByTokenId = next.refreshTokenId;
-    existing.lastUsedAt = new Date();
-    await this.refreshRepo.save(existing);
+    // The rotation chain, written after the replacement exists so the pointer
+    // is never dangling.
+    await this.refreshRepo.update({ id: claim.id }, { replacedByTokenId: next.refreshTokenId });
 
     return next;
+  }
+
+  /**
+   * Decides what a token we could NOT claim means.
+   *
+   * Three cases reach here, and they must not be treated alike:
+   *
+   *   * **Unknown token** -- nothing to revoke; deny and stop.
+   *
+   *   * **Rotated moments ago** -- a benign RACE. Two tabs, or two API calls
+   *     that 401 at the same instant, both present the same cookie; one wins
+   *     the claim above and the other arrives holding what is now an old
+   *     token. Revoking the chain here would sign a legitimate user out for
+   *     doing nothing wrong -- reproduced live, with the browser's own network
+   *     log showing `refresh -> 200` immediately followed by `refresh -> 401`
+   *     and the user bounced to the sign-in page.
+   *
+   *   * **Rotated long ago, or explicitly revoked** -- a genuine replay. The
+   *     token is presumed compromised and the WHOLE session chain goes.
+   *
+   * Either way the request is denied. The window only decides whether the
+   * rest of the session survives, and it is deliberately tiny: a client race
+   * resolves in milliseconds, while someone replaying a captured credential
+   * is not typically doing so within seconds of the legitimate rotation.
+   * Clients also single-flight their refreshes, so this is the second line of
+   * defence rather than the first.
+   */
+  private async handleUnclaimableToken(tokenHash: string): Promise<void> {
+    const existing = await this.refreshRepo.findOne({ where: { tokenHash } });
+    if (!existing) return;
+
+    const rotatedRecently =
+      existing.revokedAt !== null &&
+      Date.now() - existing.revokedAt.getTime() < TokenService.REPLAY_GRACE_MS;
+
+    if (!rotatedRecently) {
+      await this.revokeAllForUser(existing.userId);
+    }
   }
 
   async revoke(rawRefreshToken: string): Promise<void> {

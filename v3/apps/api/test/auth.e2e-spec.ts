@@ -1,4 +1,5 @@
 import { INestApplication } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 import request from 'supertest';
 import { createTestApp, CapturingOtpObserver } from './test-app.factory';
 
@@ -7,11 +8,13 @@ const PHONE = '09121234567';
 describe('Authentication flow (e2e)', () => {
   let app: INestApplication;
   let otpObserver: CapturingOtpObserver;
+  let dataSource: DataSource;
 
   beforeAll(async () => {
     const testApp = await createTestApp();
     app = testApp.app;
     otpObserver = testApp.otpObserver;
+    dataSource = testApp.dataSource;
   });
 
   afterAll(async () => {
@@ -173,6 +176,17 @@ describe('Authentication flow (e2e)', () => {
       const firstRotation = await request(app.getHttpServer()).post('/api/v1/auth/refresh').send({ refreshToken: originalRefreshToken });
       expect(firstRotation.status).toBe(200);
       const rotatedRefreshToken = firstRotation.body.data.refreshToken;
+
+      // Age the rotation past the replay GRACE WINDOW.
+      //
+      // Without this the replay lands inside the window that exists to absorb
+      // a benign concurrent refresh (two tabs, or two API calls that 401 at
+      // once), and the chain is deliberately left intact -- so the test would
+      // silently stop covering the security property it exists for. See
+      // TokenService.REPLAY_GRACE_MS.
+      await dataSource.query(
+        `UPDATE identity.refresh_tokens SET revoked_at = revoked_at - interval '1 hour' WHERE revoked_at IS NOT NULL`,
+      );
 
       // Replay the ALREADY-ROTATED (stale) token -- a real security event.
       const replay = await request(app.getHttpServer()).post('/api/v1/auth/refresh').send({ refreshToken: originalRefreshToken });

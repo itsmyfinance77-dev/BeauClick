@@ -10,13 +10,18 @@ async function bootstrap() {
 
   app.use(helmet());
 
+  // Cookie parsing lives in AppModule's `configure()`, NOT here -- see the
+  // note there. Registering it in bootstrap meant the test harness, which
+  // never runs bootstrap, silently had no cookie support.
+
   // CORS: the frontend (apps/web) is a separate origin from the API, so
   // browser calls are cross-origin and require this. Deliberately an
   // explicit ALLOW-LIST from configuration, never `origin: true` /
   // wildcard -- a wildcard would let any site on the internet drive this
-  // API with a user's browser. credentials:true is set for the future
-  // httpOnly-refresh-cookie design (V3_PHASE1_IMPLEMENTATION.md), which a
-  // wildcard origin would also forbid outright.
+  // API with a user's browser. `credentials: true` is now load-bearing
+  // rather than forward-looking: the refresh cookie is only sent, and only
+  // accepted, on a credentialed cross-origin request, and the spec forbids
+  // pairing that with a wildcard origin at all.
   const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS ?? 'http://localhost:3100')
     .split(',')
     .map((o) => o.trim())
@@ -25,7 +30,10 @@ async function bootstrap() {
     origin: allowedOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Device-Label'],
+    // X-CSRF-Token is the double-submit header the refresh route requires.
+    // A cross-origin attacker cannot set it without this allow-list naming it,
+    // which is half of why the double-submit check works.
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Device-Label', 'X-CSRF-Token'],
   });
 
   // Backend foundation requirement: API versioning -- every controller

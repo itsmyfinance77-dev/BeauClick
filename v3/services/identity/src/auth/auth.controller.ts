@@ -1,6 +1,20 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Ip, Param, Post, Req } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  ForbiddenException,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Ip,
+  Param,
+  Post,
+  Req,
+  Res,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { Request } from 'express';
+import { Request, Response } from 'express';
 import { CurrentUser, AuthenticatedUser } from '@beauclick/http';
 import { NotFoundOrNotYoursException } from '@beauclick/ownership';
 import { Public } from '@beauclick/auth';
@@ -9,19 +23,48 @@ import { RequestOtpDto } from './dto/request-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { TokenService } from '../token/token.service';
+import {
+  CookieSettings,
+  clearAuthCookies,
+  cookieSettingsFromEnv,
+  issueCsrfToken,
+  readRefreshCookie,
+  setRefreshCookie,
+} from './refresh-cookie';
+import { CsrfPolicy, csrfPolicyFromEnv, evaluateCsrf } from './csrf';
 
 /**
  * V3_API_CONTRACT_BLUEPRINT.md §2 -- the authentication flow. Every route
  * here is @Public() (no JWT required to call it), which is the deliberate
  * exception to "every route requires auth by default" -- these ARE the
  * routes that establish auth in the first place.
+ *
+ * Phase 3 adds the httpOnly refresh cookie (ADR-020). The refresh token is
+ * carried in a cookie for browser clients and MAY still be supplied in the
+ * body -- but the two are not equivalent, and the difference is enforced:
+ *
+ *   * A request presenting the COOKIE is CSRF-checked, because a cookie is
+ *     sent ambiently and is therefore forgeable cross-site. See `csrf.ts`.
+ *   * A request presenting the token in the BODY needs no CSRF check, because
+ *     a cross-site attacker cannot read the token to put it there in the
+ *     first place. This is the path a native mobile client uses.
+ *
+ * The cookie is preferred when both are present: a client that has a cookie
+ * is a browser, and honouring a body token in that case would let a page with
+ * XSS downgrade itself out of CSRF protection.
  */
 @Controller('v1/auth')
 export class AuthController {
+  private readonly cookieSettings: CookieSettings;
+  private readonly csrfPolicy: CsrfPolicy;
+
   constructor(
     private readonly auth: AuthService,
     private readonly tokens: TokenService,
-  ) {}
+  ) {
+    this.cookieSettings = cookieSettingsFromEnv(process.env);
+    this.csrfPolicy = csrfPolicyFromEnv(process.env);
+  }
 
   // Route-level throttle is a coarse DoS backstop only -- the REAL business
   // rate limit (5/phone/hour, 10/IP/hour, V3_SECURITY_MODEL.md §2) lives in
@@ -43,7 +86,11 @@ export class AuthController {
   @Throttle({ default: { limit: 100, ttl: 60_000 } })
   @Post('verify-otp')
   @HttpCode(HttpStatus.OK)
-  async verifyOtp(@Body() dto: VerifyOtpDto, @Req() req: Request) {
+  async verifyOtp(
+    @Body() dto: VerifyOtpDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const result = await this.auth.verifyOtpAndLogin(
       dto.phone,
       dto.code,
@@ -51,9 +98,18 @@ export class AuthController {
       (req.headers['x-device-label'] as string) ?? null,
       req.headers['user-agent'] ?? null,
     );
+
+    setRefreshCookie(res, result.tokens.refreshToken, this.cookieSettings);
+    const csrfToken = issueCsrfToken(res, this.cookieSettings);
+
     return {
       accessToken: result.tokens.accessToken,
+      // The refresh token is STILL returned in the body, for non-browser
+      // clients that have no cookie jar. A browser client must ignore it and
+      // keep nothing in localStorage -- and apps/web does exactly that, which
+      // is asserted by its own test rather than left to convention.
       refreshToken: result.tokens.refreshToken,
+      csrfToken,
       user: result.user,
     };
   }
@@ -62,26 +118,69 @@ export class AuthController {
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  async refresh(@Body() dto: RefreshDto, @Req() req: Request) {
-    const pair = await this.auth.refresh(dto.refreshToken, (req.headers['x-device-label'] as string) ?? null, req.headers['user-agent'] ?? null);
-    return { accessToken: pair.accessToken, refreshToken: pair.refreshToken };
+  async refresh(@Body() dto: RefreshDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const cookieToken = readRefreshCookie(req);
+    const presentedToken = cookieToken ?? dto.refreshToken;
+
+    if (!presentedToken) {
+      throw new UnauthorizedException({ code: 'UNAUTHORIZED', message: 'نشست شما نامعتبر است. دوباره وارد شوید.' });
+    }
+
+    // CSRF is checked only on the cookie path -- a body-supplied token is not
+    // vulnerable to it. See `csrf.ts` for why this is Origin validation rather
+    // than pure double-submit.
+    if (cookieToken) {
+      const verdict = evaluateCsrf(req, this.csrfPolicy);
+      if (!verdict.ok) {
+        throw new ForbiddenException({ code: 'CSRF_FAILED', message: 'درخواست نامعتبر است. صفحه را تازه‌سازی کنید.' });
+      }
+    }
+
+    const pair = await this.auth.refresh(
+      presentedToken,
+      (req.headers['x-device-label'] as string) ?? null,
+      req.headers['user-agent'] ?? null,
+    );
+
+    // Rotation means the cookie MUST be rewritten: the old token was revoked
+    // by `rotate()`, and leaving the stale cookie in place would make the
+    // next refresh look like a replay and revoke the entire session chain.
+    setRefreshCookie(res, pair.refreshToken, this.cookieSettings);
+    const csrfToken = issueCsrfToken(res, this.cookieSettings);
+
+    return { accessToken: pair.accessToken, refreshToken: pair.refreshToken, csrfToken };
   }
 
   @Post('logout')
   @HttpCode(HttpStatus.OK)
-  async logout(@Body() dto: RefreshDto, @CurrentUser() user: AuthenticatedUser): Promise<{ loggedOut: true }> {
-    await this.auth.logout(dto.refreshToken, user.userId);
+  async logout(
+    @Body() dto: RefreshDto,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<{ loggedOut: true }> {
+    const token = readRefreshCookie(req) ?? dto.refreshToken;
+    if (token) await this.auth.logout(token, user.userId);
+
+    // Cookies are cleared even when no token was presented. A logout that
+    // leaves a live cookie behind because the body happened to be empty is
+    // the worst possible outcome of this route.
+    clearAuthCookies(res, this.cookieSettings);
     return { loggedOut: true };
   }
 
   @Post('logout-all-devices')
   @HttpCode(HttpStatus.OK)
-  async logoutAllDevices(@CurrentUser() user: AuthenticatedUser): Promise<{ loggedOut: true }> {
+  async logoutAllDevices(
+    @CurrentUser() user: AuthenticatedUser,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<{ loggedOut: true }> {
     await this.auth.logoutAllDevices(user.userId);
+    clearAuthCookies(res, this.cookieSettings);
     return { loggedOut: true };
   }
 
-  /** Device management (this task's item 7): a self-scoped list of the caller's own live/past sessions -- never another user's. */
+  /** Device management: a self-scoped list of the caller's own live/past sessions -- never another user's. */
   @Get('sessions')
   async listSessions(@CurrentUser() user: AuthenticatedUser) {
     const sessions = await this.tokens.listSessionsForUser(user.userId);

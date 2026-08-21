@@ -49,6 +49,18 @@ export interface ApiClientOptions {
   getAccessToken?: () => string | null;
   /** Called once on a 401 to attempt a refresh; returns true if a new token is now available. */
   onUnauthorized?: () => Promise<boolean>;
+  /**
+   * Sends the httpOnly refresh cookie with the request.
+   *
+   * Off by default and enabled ONLY for the auth routes. A cookie attached to
+   * every request is a cookie that can be replayed by any page that can make
+   * one -- which is what CSRF is. Restricting it to the two routes that
+   * genuinely need it is the client-side half of the server's `Path`
+   * restriction.
+   */
+  withCredentials?: boolean;
+  /** Supplies the double-submit CSRF token for cookie-authenticated requests. */
+  getCsrfToken?: () => string | null;
 }
 
 export class ApiClient {
@@ -60,6 +72,14 @@ export class ApiClient {
 
     const token = this.options.getAccessToken?.() ?? null;
     if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    // Only sent on the credentialed client. The server rejects a
+    // cookie-authenticated refresh whose header does not match the cookie, so
+    // omitting it here on a cookie request is a 403, not a silent downgrade.
+    if (this.options.withCredentials) {
+      const csrf = this.options.getCsrfToken?.() ?? null;
+      if (csrf) headers['X-CSRF-Token'] = csrf;
+    }
     return headers;
   }
 
@@ -75,6 +95,11 @@ export class ApiClient {
         method,
         headers: this.buildHeaders(body !== undefined, extraHeaders),
         body: body === undefined ? undefined : JSON.stringify(body),
+        // `include` rather than `same-origin`: the API is a different origin
+        // from the web app, and without this the browser sends no cookie at
+        // all -- the refresh would silently fall back to the body path and
+        // the whole httpOnly design would be inert.
+        credentials: this.options.withCredentials ? 'include' : 'omit',
       });
     } catch {
       // A genuine network/transport failure -- never surfaced as a raw
