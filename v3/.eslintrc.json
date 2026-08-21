@@ -50,7 +50,12 @@
               "scope:booking",
               "scope:commerce",
               "scope:payment",
-              "scope:financial"
+              "scope:financial",
+              "scope:search",
+              "scope:loyalty",
+              "scope:journey",
+              "scope:notification",
+              "scope:analytics"
             ]
           },
           {
@@ -63,7 +68,12 @@
               "scope:booking",
               "scope:commerce",
               "scope:payment",
-              "scope:financial"
+              "scope:financial",
+              "scope:search",
+              "scope:loyalty",
+              "scope:journey",
+              "scope:notification",
+              "scope:analytics"
             ]
           },
           {
@@ -76,7 +86,12 @@
               "scope:provider",
               "scope:commerce",
               "scope:payment",
-              "scope:financial"
+              "scope:financial",
+              "scope:search",
+              "scope:loyalty",
+              "scope:journey",
+              "scope:notification",
+              "scope:analytics"
             ]
           },
           {
@@ -89,7 +104,12 @@
               "scope:provider",
               "scope:booking",
               "scope:payment",
-              "scope:financial"
+              "scope:financial",
+              "scope:search",
+              "scope:loyalty",
+              "scope:journey",
+              "scope:notification",
+              "scope:analytics"
             ]
           },
           {
@@ -102,7 +122,12 @@
               "scope:provider",
               "scope:booking",
               "scope:commerce",
-              "scope:financial"
+              "scope:financial",
+              "scope:search",
+              "scope:loyalty",
+              "scope:journey",
+              "scope:notification",
+              "scope:analytics"
             ]
           },
           {
@@ -115,7 +140,102 @@
               "scope:provider",
               "scope:booking",
               "scope:commerce",
-              "scope:payment"
+              "scope:payment",
+              "scope:search",
+              "scope:loyalty",
+              "scope:journey",
+              "scope:notification",
+              "scope:analytics"
+            ]
+          },
+          {
+            "sourceTag": "scope:search",
+            "onlyDependOnLibsWithTags": [
+              "scope:shared"
+            ],
+            "notDependOnLibsWithTags": [
+              "scope:identity",
+              "scope:provider",
+              "scope:booking",
+              "scope:commerce",
+              "scope:payment",
+              "scope:financial",
+              "scope:loyalty",
+              "scope:journey",
+              "scope:notification",
+              "scope:analytics"
+            ]
+          },
+          {
+            "sourceTag": "scope:loyalty",
+            "onlyDependOnLibsWithTags": [
+              "scope:shared"
+            ],
+            "notDependOnLibsWithTags": [
+              "scope:identity",
+              "scope:provider",
+              "scope:booking",
+              "scope:commerce",
+              "scope:payment",
+              "scope:financial",
+              "scope:search",
+              "scope:journey",
+              "scope:notification",
+              "scope:analytics"
+            ]
+          },
+          {
+            "sourceTag": "scope:journey",
+            "onlyDependOnLibsWithTags": [
+              "scope:shared"
+            ],
+            "notDependOnLibsWithTags": [
+              "scope:identity",
+              "scope:provider",
+              "scope:booking",
+              "scope:commerce",
+              "scope:payment",
+              "scope:financial",
+              "scope:search",
+              "scope:loyalty",
+              "scope:notification",
+              "scope:analytics"
+            ]
+          },
+          {
+            "sourceTag": "scope:notification",
+            "onlyDependOnLibsWithTags": [
+              "scope:shared"
+            ],
+            "notDependOnLibsWithTags": [
+              "scope:identity",
+              "scope:provider",
+              "scope:booking",
+              "scope:commerce",
+              "scope:payment",
+              "scope:financial",
+              "scope:search",
+              "scope:loyalty",
+              "scope:journey",
+              "scope:analytics"
+            ]
+          },
+          {
+            "sourceTag": "scope:analytics",
+            "onlyDependOnLibsWithTags": [
+              "scope:shared"
+            ],
+            "notDependOnLibsWithTags": [
+              "scope:identity",
+              "scope:provider",
+              "scope:booking",
+              "scope:commerce",
+              "scope:payment",
+              "scope:financial",
+              "scope:search",
+              "scope:loyalty",
+              "scope:journey",
+              "scope:notification"
             ]
           },
           {
@@ -130,6 +250,11 @@
               "scope:commerce",
               "scope:payment",
               "scope:financial",
+              "scope:search",
+              "scope:loyalty",
+              "scope:journey",
+              "scope:notification",
+              "scope:analytics",
               "scope:app"
             ]
           },
@@ -142,7 +267,12 @@
               "scope:booking",
               "scope:commerce",
               "scope:payment",
-              "scope:financial"
+              "scope:financial",
+              "scope:search",
+              "scope:loyalty",
+              "scope:journey",
+              "scope:notification",
+              "scope:analytics"
             ]
           }
         ]

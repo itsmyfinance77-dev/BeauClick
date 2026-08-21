@@ -17,17 +17,21 @@
   },
   "devDependencies": {
     "@nx/eslint-plugin": "23.1.1",
+    "@opensearch-project/opensearch": "^3.6.0",
+    "@types/cookie-parser": "^1.4.10",
     "@types/jest": "^29.5.13",
     "@types/node": "^22.7.5",
     "@types/pg": "^8.23.1",
     "@typescript-eslint/eslint-plugin": "^8.8.1",
     "@typescript-eslint/parser": "^8.8.1",
+    "cookie-parser": "^1.4.7",
     "eslint": "^8.57.1",
     "jest": "^29.7.0",
     "nx": "^23.1.1",
     "pg": "^8.23.0",
     "ts-jest": "^29.2.5",
     "typeorm-naming-strategies": "^4.1.0",
-    "typescript": "^5.6.3"
+    "typescript": "^5.6.3",
+    "zod": "^4.4.3"
   }
 }

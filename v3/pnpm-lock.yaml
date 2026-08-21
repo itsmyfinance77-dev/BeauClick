@@ -28,6 +28,12 @@ importers:
       '@nx/eslint-plugin':
         specifier: 23.1.1
         version: 23.1.1(@babel/traverse@7.29.8(supports-color@7.2.0))(@typescript-eslint/parser@8.67.0(eslint@8.57.1(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3))(eslint@8.57.1(supports-color@7.2.0))(nx@23.1.1)(supports-color@7.2.0)(typescript@5.9.3)
+      '@opensearch-project/opensearch':
+        specifier: ^3.6.0
+        version: 3.6.0(supports-color@7.2.0)
+      '@types/cookie-parser':
+        specifier: ^1.4.10
+        version: 1.4.10(@types/express@4.17.25)
       '@types/jest':
         specifier: ^29.5.13
         version: 29.5.14
@@ -43,6 +49,9 @@ importers:
       '@typescript-eslint/parser':
         specifier: ^8.8.1
         version: 8.67.0(eslint@8.57.1(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3)
+      cookie-parser:
+        specifier: ^1.4.7
+        version: 1.4.7
       eslint:
         specifier: ^8.57.1
         version: 8.57.1(supports-color@7.2.0)
@@ -64,9 +73,15 @@ importers:
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
 
   apps/api:
     dependencies:
+      '@beauclick/analytics':
+        specifier: workspace:*
+        version: link:../../services/analytics
       '@beauclick/auth':
         specifier: workspace:*
         version: link:../../libs/auth
@@ -76,6 +91,9 @@ importers:
       '@beauclick/commerce':
         specifier: workspace:*
         version: link:../../services/commerce
+      '@beauclick/event-contracts':
+        specifier: workspace:*
+        version: link:../../libs/event-contracts
       '@beauclick/events':
         specifier: workspace:*
         version: link:../../libs/events
@@ -88,18 +106,33 @@ importers:
       '@beauclick/identity':
         specifier: workspace:*
         version: link:../../services/identity
+      '@beauclick/journey':
+        specifier: workspace:*
+        version: link:../../services/journey
+      '@beauclick/loyalty':
+        specifier: workspace:*
+        version: link:../../services/loyalty
       '@beauclick/money':
         specifier: workspace:*
         version: link:../../libs/money
+      '@beauclick/notification':
+        specifier: workspace:*
+        version: link:../../services/notification
       '@beauclick/ownership':
         specifier: workspace:*
         version: link:../../libs/ownership
       '@beauclick/payment':
         specifier: workspace:*
         version: link:../../services/payment
+      '@beauclick/persian-utils':
+        specifier: workspace:*
+        version: link:../../packages/persian-utils
       '@beauclick/provider':
         specifier: workspace:*
         version: link:../../services/provider
+      '@beauclick/search':
+        specifier: workspace:*
+        version: link:../../services/search
       '@nestjs/common':
         specifier: 10.4.22
         version: 10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1)
@@ -127,6 +160,9 @@ importers:
       class-validator:
         specifier: 0.14.4
         version: 0.14.4
+      cookie-parser:
+        specifier: ^1.4.7
+        version: 1.4.7
       helmet:
         specifier: ^7.1.0
         version: 7.2.0
@@ -229,6 +265,21 @@ importers:
         specifier: 10.2.0
         version: 10.2.0(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))
 
+  libs/event-contracts:
+    dependencies:
+      '@beauclick/events':
+        specifier: workspace:*
+        version: link:../events
+      '@nestjs/common':
+        specifier: 10.4.22
+        version: 10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1)
+      typeorm:
+        specifier: 0.3.31
+        version: 0.3.31(babel-plugin-macros@3.1.0)(pg@8.23.0)(supports-color@8.1.1)(ts-node@10.9.2(@types/node@22.20.1)(typescript@5.9.3))
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+
   libs/events:
     dependencies:
       '@nestjs/common':
@@ -302,6 +353,55 @@ importers:
   packages/design-tokens: {}
 
   packages/persian-utils: {}
+
+  services/analytics:
+    dependencies:
+      '@beauclick/auth':
+        specifier: workspace:*
+        version: link:../../libs/auth
+      '@beauclick/event-contracts':
+        specifier: workspace:*
+        version: link:../../libs/event-contracts
+      '@beauclick/events':
+        specifier: workspace:*
+        version: link:../../libs/events
+      '@beauclick/http':
+        specifier: workspace:*
+        version: link:../../libs/http
+      '@beauclick/money':
+        specifier: workspace:*
+        version: link:../../libs/money
+      '@beauclick/ownership':
+        specifier: workspace:*
+        version: link:../../libs/ownership
+      '@nestjs/common':
+        specifier: 10.4.22
+        version: 10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1)
+      '@nestjs/config':
+        specifier: 3.3.0
+        version: 3.3.0(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(rxjs@7.8.2)
+      '@nestjs/core':
+        specifier: 10.4.22
+        version: 10.4.22(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/platform-express@10.4.22)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/typeorm':
+        specifier: 10.0.2
+        version: 10.0.2(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@10.4.22)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@0.3.31(babel-plugin-macros@3.1.0)(pg@8.23.0)(supports-color@8.1.1)(ts-node@10.9.2(@types/node@22.20.1)(typescript@5.9.3)))
+      class-transformer:
+        specifier: 0.5.1
+        version: 0.5.1
+      class-validator:
+        specifier: 0.14.4
+        version: 0.14.4
+      typeorm:
+        specifier: 0.3.31
+        version: 0.3.31(babel-plugin-macros@3.1.0)(pg@8.23.0)(supports-color@8.1.1)(ts-node@10.9.2(@types/node@22.20.1)(typescript@5.9.3))
+      uuidv7:
+        specifier: ^1.0.2
+        version: 1.2.1
+    devDependencies:
+      '@beauclick/testing':
+        specifier: workspace:*
+        version: link:../../libs/testing
 
   services/booking:
     dependencies:
@@ -446,6 +546,9 @@ importers:
       '@beauclick/auth':
         specifier: workspace:*
         version: link:../../libs/auth
+      '@beauclick/events':
+        specifier: workspace:*
+        version: link:../../libs/events
       '@beauclick/http':
         specifier: workspace:*
         version: link:../../libs/http
@@ -476,6 +579,9 @@ importers:
       class-validator:
         specifier: 0.14.4
         version: 0.14.4
+      cookie-parser:
+        specifier: ^1.4.7
+        version: 1.4.7
       express:
         specifier: ^4.21.1
         version: 4.22.2(supports-color@8.1.1)
@@ -492,6 +598,150 @@ importers:
       '@types/express':
         specifier: ^4.17.21
         version: 4.17.25
+
+  services/journey:
+    dependencies:
+      '@beauclick/auth':
+        specifier: workspace:*
+        version: link:../../libs/auth
+      '@beauclick/event-contracts':
+        specifier: workspace:*
+        version: link:../../libs/event-contracts
+      '@beauclick/events':
+        specifier: workspace:*
+        version: link:../../libs/events
+      '@beauclick/http':
+        specifier: workspace:*
+        version: link:../../libs/http
+      '@beauclick/ownership':
+        specifier: workspace:*
+        version: link:../../libs/ownership
+      '@nestjs/common':
+        specifier: 10.4.22
+        version: 10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1)
+      '@nestjs/config':
+        specifier: 3.3.0
+        version: 3.3.0(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(rxjs@7.8.2)
+      '@nestjs/core':
+        specifier: 10.4.22
+        version: 10.4.22(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/platform-express@10.4.22)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/typeorm':
+        specifier: 10.0.2
+        version: 10.0.2(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@10.4.22)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@0.3.31(babel-plugin-macros@3.1.0)(pg@8.23.0)(supports-color@8.1.1)(ts-node@10.9.2(@types/node@22.20.1)(typescript@5.9.3)))
+      class-transformer:
+        specifier: 0.5.1
+        version: 0.5.1
+      class-validator:
+        specifier: 0.14.4
+        version: 0.14.4
+      typeorm:
+        specifier: 0.3.31
+        version: 0.3.31(babel-plugin-macros@3.1.0)(pg@8.23.0)(supports-color@8.1.1)(ts-node@10.9.2(@types/node@22.20.1)(typescript@5.9.3))
+      uuidv7:
+        specifier: ^1.0.2
+        version: 1.2.1
+    devDependencies:
+      '@beauclick/testing':
+        specifier: workspace:*
+        version: link:../../libs/testing
+
+  services/loyalty:
+    dependencies:
+      '@beauclick/auth':
+        specifier: workspace:*
+        version: link:../../libs/auth
+      '@beauclick/event-contracts':
+        specifier: workspace:*
+        version: link:../../libs/event-contracts
+      '@beauclick/events':
+        specifier: workspace:*
+        version: link:../../libs/events
+      '@beauclick/http':
+        specifier: workspace:*
+        version: link:../../libs/http
+      '@beauclick/money':
+        specifier: workspace:*
+        version: link:../../libs/money
+      '@beauclick/ownership':
+        specifier: workspace:*
+        version: link:../../libs/ownership
+      '@nestjs/common':
+        specifier: 10.4.22
+        version: 10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1)
+      '@nestjs/config':
+        specifier: 3.3.0
+        version: 3.3.0(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(rxjs@7.8.2)
+      '@nestjs/core':
+        specifier: 10.4.22
+        version: 10.4.22(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/platform-express@10.4.22)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/typeorm':
+        specifier: 10.0.2
+        version: 10.0.2(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@10.4.22)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@0.3.31(babel-plugin-macros@3.1.0)(pg@8.23.0)(supports-color@8.1.1)(ts-node@10.9.2(@types/node@22.20.1)(typescript@5.9.3)))
+      class-transformer:
+        specifier: 0.5.1
+        version: 0.5.1
+      class-validator:
+        specifier: 0.14.4
+        version: 0.14.4
+      typeorm:
+        specifier: 0.3.31
+        version: 0.3.31(babel-plugin-macros@3.1.0)(pg@8.23.0)(supports-color@8.1.1)(ts-node@10.9.2(@types/node@22.20.1)(typescript@5.9.3))
+      uuidv7:
+        specifier: ^1.0.2
+        version: 1.2.1
+    devDependencies:
+      '@beauclick/testing':
+        specifier: workspace:*
+        version: link:../../libs/testing
+
+  services/notification:
+    dependencies:
+      '@beauclick/auth':
+        specifier: workspace:*
+        version: link:../../libs/auth
+      '@beauclick/event-contracts':
+        specifier: workspace:*
+        version: link:../../libs/event-contracts
+      '@beauclick/events':
+        specifier: workspace:*
+        version: link:../../libs/events
+      '@beauclick/http':
+        specifier: workspace:*
+        version: link:../../libs/http
+      '@beauclick/ownership':
+        specifier: workspace:*
+        version: link:../../libs/ownership
+      '@beauclick/persian-utils':
+        specifier: workspace:*
+        version: link:../../packages/persian-utils
+      '@nestjs/common':
+        specifier: 10.4.22
+        version: 10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1)
+      '@nestjs/config':
+        specifier: 3.3.0
+        version: 3.3.0(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(rxjs@7.8.2)
+      '@nestjs/core':
+        specifier: 10.4.22
+        version: 10.4.22(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/platform-express@10.4.22)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/typeorm':
+        specifier: 10.0.2
+        version: 10.0.2(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@10.4.22)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@0.3.31(babel-plugin-macros@3.1.0)(pg@8.23.0)(supports-color@8.1.1)(ts-node@10.9.2(@types/node@22.20.1)(typescript@5.9.3)))
+      class-transformer:
+        specifier: 0.5.1
+        version: 0.5.1
+      class-validator:
+        specifier: 0.14.4
+        version: 0.14.4
+      typeorm:
+        specifier: 0.3.31
+        version: 0.3.31(babel-plugin-macros@3.1.0)(pg@8.23.0)(supports-color@8.1.1)(ts-node@10.9.2(@types/node@22.20.1)(typescript@5.9.3))
+      uuidv7:
+        specifier: ^1.0.2
+        version: 1.2.1
+    devDependencies:
+      '@beauclick/testing':
+        specifier: workspace:*
+        version: link:../../libs/testing
 
   services/payment:
     dependencies:
@@ -544,6 +794,12 @@ importers:
       '@beauclick/auth':
         specifier: workspace:*
         version: link:../../libs/auth
+      '@beauclick/event-contracts':
+        specifier: workspace:*
+        version: link:../../libs/event-contracts
+      '@beauclick/events':
+        specifier: workspace:*
+        version: link:../../libs/events
       '@beauclick/http':
         specifier: workspace:*
         version: link:../../libs/http
@@ -574,6 +830,58 @@ importers:
       uuidv7:
         specifier: ^1.0.2
         version: 1.2.1
+
+  services/search:
+    dependencies:
+      '@beauclick/auth':
+        specifier: workspace:*
+        version: link:../../libs/auth
+      '@beauclick/event-contracts':
+        specifier: workspace:*
+        version: link:../../libs/event-contracts
+      '@beauclick/events':
+        specifier: workspace:*
+        version: link:../../libs/events
+      '@beauclick/http':
+        specifier: workspace:*
+        version: link:../../libs/http
+      '@beauclick/ownership':
+        specifier: workspace:*
+        version: link:../../libs/ownership
+      '@beauclick/persian-utils':
+        specifier: workspace:*
+        version: link:../../packages/persian-utils
+      '@nestjs/common':
+        specifier: 10.4.22
+        version: 10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1)
+      '@nestjs/config':
+        specifier: 3.3.0
+        version: 3.3.0(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(rxjs@7.8.2)
+      '@nestjs/core':
+        specifier: 10.4.22
+        version: 10.4.22(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/platform-express@10.4.22)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/typeorm':
+        specifier: 10.0.2
+        version: 10.0.2(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@10.4.22)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@0.3.31(babel-plugin-macros@3.1.0)(pg@8.23.0)(supports-color@8.1.1)(ts-node@10.9.2(@types/node@22.20.1)(typescript@5.9.3)))
+      '@opensearch-project/opensearch':
+        specifier: ^3.6.0
+        version: 3.6.0(supports-color@8.1.1)
+      class-transformer:
+        specifier: 0.5.1
+        version: 0.5.1
+      class-validator:
+        specifier: 0.14.4
+        version: 0.14.4
+      typeorm:
+        specifier: 0.3.31
+        version: 0.3.31(babel-plugin-macros@3.1.0)(pg@8.23.0)(supports-color@8.1.1)(ts-node@10.9.2(@types/node@22.20.1)(typescript@5.9.3))
+      uuidv7:
+        specifier: ^1.0.2
+        version: 1.2.1
+    devDependencies:
+      '@beauclick/testing':
+        specifier: workspace:*
+        version: link:../../libs/testing
 
 packages:
 
@@ -1609,6 +1917,10 @@ packages:
   '@nx/workspace@23.1.1':
     resolution: {integrity: sha512-woBDOW9bNcp+I2UEKhV62zc+1/gPCKPkTHZgwCdgoXSlXC3N9soGpnLG5QFy8NLodFC1f+5TSQJqN1tBW5rfIA==}
 
+  '@opensearch-project/opensearch@3.6.0':
+    resolution: {integrity: sha512-ow1A/Z7MBlNL/JZzTY4+M+8psiVh66g0Z7EQSl/qbT0U6zLBsVDYh6nvm8D4e4tIzQtn6ODbA2OsqYGvqZj76g==}
+    engines: {node: '>=14', yarn: ^1.22.10}
+
   '@paralleldrive/cuid2@2.3.1':
     resolution: {integrity: sha512-XO7cAxhnTZl0Yggq6jOgjiOHhbgcO4NqFqwSmQpjK3b6TEE6Uj/jfSk6wzYyemh3+I0sHirKSetjQwn5cZktFw==}
 
@@ -1717,6 +2029,11 @@ packages:
 
   '@types/connect@3.4.38':
     resolution: {integrity: sha512-K6uROf1LD88uDQqJCktA4yzL1YYAK6NgfsI0v/mTgyPKWsX1CnJ0XPSDhViejru1GcRkLWb8RlzFYJRqGUbaug==}
+
+  '@types/cookie-parser@1.4.10':
+    resolution: {integrity: sha512-B4xqkqfZ8Wek+rCOeRxsjMS9OgvzebEzzLYw7NHYuvzb7IdxOkI0ZHGgeEBX4PUM7QGVvNSK60T3OvWj3YfBRg==}
+    peerDependencies:
+      '@types/express': '*'
 
   '@types/cookiejar@2.1.5':
     resolution: {integrity: sha512-he+DHOWReW0nghN24E1WUqM0efK4kI9oTqDm6XmK8ZPe2djZ90BSNdGnIyCLzCPw7/pogPlGbzI2wHGGmi4O/Q==}
@@ -1996,6 +2313,9 @@ packages:
     resolution: {integrity: sha512-wvUjBtSGN7+7SjNpq/9M2Tg350UZD3q62IFZLbRAR1bSMlCo1ZaeW+BJ+D090e4hIIZLBcTDWe4Mh4jvUDajzQ==}
     engines: {node: '>= 0.4'}
 
+  aws4@1.13.2:
+    resolution: {integrity: sha512-lHe62zvbTB5eEABUVi/AwVh0ZKY9rMMDhmm+eeyuuUQbQ3+J+fONVQOZyj+DdrvD4BY33uYniyRJ4UJIaSKAfw==}
+
   axios@1.18.1:
     resolution: {integrity: sha512-3nTvFlvpn9Zu/RkHUqtc7/+al4UpRW5az71ap5zccp6e8RAYEzhMTecX8Dz1wWDYrPpUoB1HAQEGEAEvUr7S9g==}
 
@@ -2264,6 +2584,13 @@ packages:
 
   convert-source-map@2.0.0:
     resolution: {integrity: sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg==}
+
+  cookie-parser@1.4.7:
+    resolution: {integrity: sha512-nGUvgXnotP3BsjiLX2ypbQnWoGUPIIfHQNZkkC668ntrzGWEZVW70HDEB1qnNGMicPje6EttlIgzo51YSwNQGw==}
+    engines: {node: '>= 0.8.0'}
+
+  cookie-signature@1.0.6:
+    resolution: {integrity: sha512-QADzlaHc8icV8I7vbaJXJwod9HWYp8uCqf1xa4OfNu1T7JVxQIrUgOWtHdNDtPiywmFbiS12VjotIXLrKM3orQ==}
 
   cookie-signature@1.0.7:
     resolution: {integrity: sha512-NXdYc3dLr47pBkpUCHtKSwIOQXLVn8dZEuywboCOJY/osA0wFSLlSawr3KN8qXJEyX66FcONTH8EIlVuK0yyFA==}
@@ -2812,6 +3139,10 @@ packages:
     resolution: {integrity: sha512-ZRiwvN089JfMXokizgqEPXsl2Guk094yExfoDXR0cBYWxtBbaSww/w+vT4WEJsBW2iTUi1GgZ6swmoug3Oy4Xw==}
     engines: {node: '>=16.0.0'}
 
+  hpagent@1.2.0:
+    resolution: {integrity: sha512-A91dYTeIB6NoXG+PxTQpCCDDnfHsW9kc06Lvpu1TEe9gnd6ZFeiBoRO9JvzEv6xK7EX97/dUE8g/vBMTqTS3CA==}
+    engines: {node: '>=14'}
+
   html-encoding-sniffer@3.0.0:
     resolution: {integrity: sha512-oWv4T4yJ52iKrufjnyZPkrN0CH3QnrUqdB6In1g5Fe1mia8GmF36gnfNySxoZtxD5+NmYw1EElVXiBk93UeskA==}
     engines: {node: '>=12'}
@@ -3172,6 +3503,10 @@ packages:
   json-stable-stringify@1.3.0:
     resolution: {integrity: sha512-qtYiSSFlwot9XHtF9bD9c7rwKjr+RecWT//ZnPvSmEjpV5mmPOCN4j8UjY5hbjNkOwZ/jQv3J6R1/pL7RwgMsg==}
     engines: {node: '>= 0.4'}
+
+  json11@2.0.2:
+    resolution: {integrity: sha512-HIrd50UPYmP6sqLuLbFVm75g16o0oZrVfxrsY0EEys22klz8mRoWlX9KAEDOSOR9Q34rcxsyC8oDveGrCz5uLQ==}
+    hasBin: true
 
   json5@2.2.3:
     resolution: {integrity: sha512-XmOWe7eyHYH14cLdVPoyg+GOH3rYX++KpzrylJwSW98t3Nk+U8XOl8FWKOgwtzdb8lXGf6zYwDUzeHMWfxasyg==}
@@ -3863,6 +4198,9 @@ packages:
   scheduler@0.23.2:
     resolution: {integrity: sha512-UOShsPwz7NrMUqhR6t0hWjFduvOzbtv7toDH1/hIrfRNIDBnnBWd0CwJTGvTpngVlmwGCdP9/Zl/tVrDqcuYzQ==}
 
+  secure-json-parse@2.7.0:
+    resolution: {integrity: sha512-6aU+Rwsezw7VR8/nyvKTx8QpWH9FrcYiXXlqC4z5d5XQBDRqtbfsRjnwGyqbi3gddNtWHuEk9OANUotL26qKUw==}
+
   semver@6.3.1:
     resolution: {integrity: sha512-BR7VvDCVHO+q2xBEWskxS6DJE1qRnb7DxzUrogb71CWoSficBxYsiAGd+Kl0mmq/MprG9yArRkyrQxTO6XjMzA==}
     hasBin: true
@@ -4480,6 +4818,9 @@ packages:
   yocto-queue@0.1.0:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
+
+  zod@4.4.3:
+    resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
 
 snapshots:
 
@@ -5856,6 +6197,28 @@ snapshots:
       - '@swc-node/register'
       - '@swc/core'
 
+  '@opensearch-project/opensearch@3.6.0(supports-color@7.2.0)':
+    dependencies:
+      aws4: 1.13.2
+      debug: 4.4.3(supports-color@7.2.0)
+      hpagent: 1.2.0
+      json11: 2.0.2
+      ms: 2.1.3
+      secure-json-parse: 2.7.0
+    transitivePeerDependencies:
+      - supports-color
+
+  '@opensearch-project/opensearch@3.6.0(supports-color@8.1.1)':
+    dependencies:
+      aws4: 1.13.2
+      debug: 4.4.3(supports-color@8.1.1)
+      hpagent: 1.2.0
+      json11: 2.0.2
+      ms: 2.1.3
+      secure-json-parse: 2.7.0
+    transitivePeerDependencies:
+      - supports-color
+
   '@paralleldrive/cuid2@2.3.1':
     dependencies:
       '@noble/hashes': 1.8.0
@@ -5978,6 +6341,10 @@ snapshots:
   '@types/connect@3.4.38':
     dependencies:
       '@types/node': 22.20.1
+
+  '@types/cookie-parser@1.4.10(@types/express@4.17.25)':
+    dependencies:
+      '@types/express': 4.17.25
 
   '@types/cookiejar@2.1.5': {}
 
@@ -6296,6 +6663,8 @@ snapshots:
   available-typed-arrays@1.0.7:
     dependencies:
       possible-typed-array-names: 1.1.0
+
+  aws4@1.13.2: {}
 
   axios@1.18.1(debug@4.4.3(supports-color@7.2.0))(supports-color@7.2.0):
     dependencies:
@@ -6630,6 +6999,13 @@ snapshots:
   content-type@1.0.5: {}
 
   convert-source-map@2.0.0: {}
+
+  cookie-parser@1.4.7:
+    dependencies:
+      cookie: 0.7.2
+      cookie-signature: 1.0.6
+
+  cookie-signature@1.0.6: {}
 
   cookie-signature@1.0.7: {}
 
@@ -7246,6 +7622,8 @@ snapshots:
 
   helmet@7.2.0: {}
 
+  hpagent@1.2.0: {}
+
   html-encoding-sniffer@3.0.0:
     dependencies:
       whatwg-encoding: 2.0.0
@@ -7807,6 +8185,8 @@ snapshots:
       isarray: 2.0.5
       jsonify: 0.0.1
       object-keys: 1.1.1
+
+  json11@2.0.2: {}
 
   json5@2.2.3: {}
 
@@ -8541,6 +8921,8 @@ snapshots:
     dependencies:
       loose-envify: 1.4.0
 
+  secure-json-parse@2.7.0: {}
+
   semver@6.3.1: {}
 
   semver@7.8.4: {}
@@ -9120,3 +9502,5 @@ snapshots:
   yn@3.1.1: {}
 
   yocto-queue@0.1.0: {}
+
+  zod@4.4.3: {}

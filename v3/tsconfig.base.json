@@ -27,12 +27,18 @@
       "@beauclick/persian-utils": ["packages/persian-utils/src/index.ts"],
       "@beauclick/money": ["libs/money/src/index.ts"],
       "@beauclick/events": ["libs/events/src/index.ts"],
+      "@beauclick/event-contracts": ["libs/event-contracts/src/index.ts"],
       "@beauclick/identity": ["services/identity/src/index.ts"],
       "@beauclick/provider": ["services/provider/src/index.ts"],
       "@beauclick/booking": ["services/booking/src/index.ts"],
       "@beauclick/commerce": ["services/commerce/src/index.ts"],
       "@beauclick/payment": ["services/payment/src/index.ts"],
-      "@beauclick/financial": ["services/financial/src/index.ts"]
+      "@beauclick/financial": ["services/financial/src/index.ts"],
+      "@beauclick/search": ["services/search/src/index.ts"],
+      "@beauclick/loyalty": ["services/loyalty/src/index.ts"],
+      "@beauclick/journey": ["services/journey/src/index.ts"],
+      "@beauclick/notification": ["services/notification/src/index.ts"],
+      "@beauclick/analytics": ["services/analytics/src/index.ts"]
     }
   }
 }
