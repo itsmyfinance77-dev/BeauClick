@@ -5,14 +5,26 @@ import { ProviderService, ProviderAlreadyExistsException } from './provider.serv
 import { ProfessionalEntity } from './entities/professional.entity';
 import { SpecialtyEntity } from './entities/specialty.entity';
 import { CityEntity } from './entities/city.entity';
+import { ProviderOutboxEntity } from './entities/provider-outbox.entity';
+import { ProviderEventsService } from './provider-events.service';
+import { createEventContractRegistry } from '@beauclick/event-contracts';
 
 describe('ProviderService (integration, pg-mem)', () => {
   let dataSource: DataSource;
   let service: ProviderService;
 
   beforeEach(async () => {
-    dataSource = await createInMemoryDataSource([ProfessionalEntity, SpecialtyEntity, CityEntity]);
-    service = new ProviderService(dataSource.getRepository(ProfessionalEntity), dataSource.getRepository(SpecialtyEntity));
+    dataSource = await createInMemoryDataSource([ProfessionalEntity, SpecialtyEntity, CityEntity, ProviderOutboxEntity]);
+    // Phase 3: provider-service now publishes its facts, so the events
+    // collaborator is a real one here rather than a stub -- the contract
+    // validation it performs is part of what these cases exercise.
+    const events = new ProviderEventsService(dataSource, createEventContractRegistry());
+    service = new ProviderService(
+      dataSource,
+      dataSource.getRepository(ProfessionalEntity),
+      dataSource.getRepository(SpecialtyEntity),
+      events,
+    );
   });
 
   afterEach(async () => {

@@ -4,4 +4,7 @@ export * from './entities/specialty.entity';
 export * from './entities/city.entity';
 export * from './entities/service-offering.entity';
 export * from './provider.service';
+export * from './service-offering.service';
 export * from './provider-owner.resolver';
+export * from './entities/provider-outbox.entity';
+export * from './provider-events.service';

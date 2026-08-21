@@ -17,6 +17,17 @@ export class CreateProfessionalDto {
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(10)
-  @IsUUID('4', { each: true })
+  /**
+   * Any UUID version, not v4.
+   *
+   * This said `IsUUID('4')`, which rejected every id this platform actually
+   * issues: `uuidv7()` is the id generator everywhere in V3, and a v7 id fails
+   * a v4 check. So a legitimate specialty id -- one the API itself had just
+   * returned from `GET /v1/specialties` -- came back as a validation error.
+   *
+   * Found by driving the real stack in Phase 3 live QA, not by a test: every
+   * existing spec passed its own hand-written v4 fixtures.
+   */
+  @IsUUID('all', { each: true })
   specialtyIds?: string[];
 }

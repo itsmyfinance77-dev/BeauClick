@@ -54,6 +54,18 @@ export class ProfessionalEntity {
   @Column({ type: 'varchar', length: 20, default: 'unverified' })
   verificationStatus!: VerificationStatus;
 
+  /**
+   * Monotonic per professional, bumped on every indexable change (Phase 3).
+   *
+   * Consumed by search-service to discard an out-of-order or redelivered
+   * event: an event carrying a revision <= the one already applied is older
+   * data and is dropped. Without it, at-least-once delivery would let a
+   * redelivered older update silently overwrite newer data, with both
+   * payloads looking equally valid.
+   */
+  @Column({ type: 'bigint', default: 1, transformer: { to: (v: number) => v, from: (v: string) => Number(v) } })
+  revision!: number;
+
   @Column({ type: 'timestamptz', nullable: true })
   deletedAt!: Date | null;
 

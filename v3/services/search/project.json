@@ -1,0 +1,11 @@
+{
+  "name": "search",
+  "sourceRoot": "services/search/src",
+  "projectType": "library",
+  "tags": ["type:service", "scope:search"],
+  "targets": {
+    "typecheck": { "executor": "nx:run-commands", "options": { "command": "tsc -p services/search/tsconfig.json --noEmit" } },
+    "test": { "executor": "nx:run-commands", "options": { "command": "jest --config services/search/jest.config.js" } },
+    "lint": { "executor": "nx:run-commands", "options": { "command": "eslint services/search/src --resolve-plugins-relative-to ." } }
+  }
+}

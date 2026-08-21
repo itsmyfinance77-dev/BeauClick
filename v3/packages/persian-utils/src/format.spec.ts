@@ -1,4 +1,4 @@
-import { formatCount, formatFullJalaliDate, formatRating, formatShortDate, formatTime, formatToman, toPersianDigits } from './format';
+import { formatCount, formatFullJalaliDate, formatRating, formatShortDate, formatTime, formatToman, normalizeDigits, toPersianDigits } from './format';
 
 describe( 'toPersianDigits', () => {
 	it( 'converts every ASCII digit to its Persian equivalent', () => {
@@ -68,5 +68,37 @@ describe( 'formatTime', () => {
 	it( 'formats HH:mm in Persian digits, independent of calendar system', () => {
 		const date = new Date( 2026, 7, 12, 9, 5 );
 		expect( formatTime( date ) ).toBe( '۰۹:۰۵' );
+	} );
+} );
+
+describe( 'normalizeDigits (Phase 3 — the input direction)', () => {
+	it( 'folds Persian digits to ASCII so a typed number is a number', () => {
+		// Without this, Number('۵۰۰') is NaN and a perfectly valid price filter
+		// is rejected as malformed — which reads to the user as a broken feature.
+		expect( normalizeDigits( '۵۰۰۰۰۰' ) ).toBe( '500000' );
+		expect( Number( normalizeDigits( '۵۰۰۰۰۰' ) ) ).toBe( 500000 );
+	} );
+
+	it( 'folds Arabic-Indic digits too', () => {
+		// Arabic-locale keyboards and mobile IMEs that Persian speakers
+		// genuinely use emit this range, not the Persian one.
+		expect( normalizeDigits( '٤٥٦' ) ).toBe( '456' );
+	} );
+
+	it( 'handles a mixed-numeral string', () => {
+		expect( normalizeDigits( '۱٢3' ) ).toBe( '123' );
+	} );
+
+	it( 'leaves ASCII digits and non-digits untouched', () => {
+		expect( normalizeDigits( 'abc 123 سلام' ) ).toBe( 'abc 123 سلام' );
+	} );
+
+	it( 'round-trips with toPersianDigits', () => {
+		expect( normalizeDigits( toPersianDigits( '2026-08-20' ) ) ).toBe( '2026-08-20' );
+	} );
+
+	it( 'is asymmetric on purpose: output is always Persian, input accepts anything', () => {
+		// A user must never have to know which numeral system the system prefers.
+		expect( toPersianDigits( normalizeDigits( '٤٥٦' ) ) ).toBe( '۴۵۶' );
 	} );
 } );
