@@ -1,0 +1,11 @@
+{
+  "name": "journey",
+  "sourceRoot": "services/journey/src",
+  "projectType": "library",
+  "tags": ["type:service", "scope:journey"],
+  "targets": {
+    "typecheck": { "executor": "nx:run-commands", "options": { "command": "tsc -p services/journey/tsconfig.json --noEmit" } },
+    "test": { "executor": "nx:run-commands", "options": { "command": "jest --config services/journey/jest.config.js" } },
+    "lint": { "executor": "nx:run-commands", "options": { "command": "eslint services/journey/src --resolve-plugins-relative-to ." } }
+  }
+}

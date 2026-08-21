@@ -1,0 +1,11 @@
+{
+  "name": "loyalty",
+  "sourceRoot": "services/loyalty/src",
+  "projectType": "library",
+  "tags": ["type:service", "scope:loyalty"],
+  "targets": {
+    "typecheck": { "executor": "nx:run-commands", "options": { "command": "tsc -p services/loyalty/tsconfig.json --noEmit" } },
+    "test": { "executor": "nx:run-commands", "options": { "command": "jest --config services/loyalty/jest.config.js" } },
+    "lint": { "executor": "nx:run-commands", "options": { "command": "eslint services/loyalty/src --resolve-plugins-relative-to ." } }
+  }
+}
