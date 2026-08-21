@@ -1,0 +1,11 @@
+{
+  "name": "notification",
+  "sourceRoot": "services/notification/src",
+  "projectType": "library",
+  "tags": ["type:service", "scope:notification"],
+  "targets": {
+    "typecheck": { "executor": "nx:run-commands", "options": { "command": "tsc -p services/notification/tsconfig.json --noEmit" } },
+    "test": { "executor": "nx:run-commands", "options": { "command": "jest --config services/notification/jest.config.js" } },
+    "lint": { "executor": "nx:run-commands", "options": { "command": "eslint services/notification/src --resolve-plugins-relative-to ." } }
+  }
+}

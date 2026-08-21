@@ -1,0 +1,11 @@
+{
+  "name": "analytics",
+  "sourceRoot": "services/analytics/src",
+  "projectType": "library",
+  "tags": ["type:service", "scope:analytics"],
+  "targets": {
+    "typecheck": { "executor": "nx:run-commands", "options": { "command": "tsc -p services/analytics/tsconfig.json --noEmit" } },
+    "test": { "executor": "nx:run-commands", "options": { "command": "jest --config services/analytics/jest.config.js" } },
+    "lint": { "executor": "nx:run-commands", "options": { "command": "eslint services/analytics/src --resolve-plugins-relative-to ." } }
+  }
+}
