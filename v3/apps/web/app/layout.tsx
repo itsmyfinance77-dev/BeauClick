@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { AuthProvider } from '@/lib/auth-context';
+import { UnreadProvider } from '@/lib/unread-context';
 import { AppShell } from '@/components/app-shell';
 import './globals.css';
 
@@ -24,7 +25,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           پرش به محتوای اصلی
         </a>
         <AuthProvider>
-          <AppShell>{children}</AppShell>
+          {/* Inside AuthProvider: the unread count is session-scoped and
+              resets when the session does. */}
+          <UnreadProvider>
+            <AppShell>{children}</AppShell>
+          </UnreadProvider>
         </AuthProvider>
       </body>
     </html>
