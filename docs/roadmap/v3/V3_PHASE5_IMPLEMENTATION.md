@@ -52,6 +52,18 @@ This phase's own instructions contain a specific, non-overridable rule: *"If rea
 
 This is not a verdict on code quality. The payment **architecture** — provider abstraction, idempotent callbacks, server-to-server verification, amount-tampering rejection, the mock gateway's fail-closed production gate — is real, tested, and release-ready. What is missing is a real adapter and real merchant credentials, which this phase's own rules forbid fabricating or working around.
 
+## 9. Addendum — GAP-06 sandbox implementation (same phase, later pass)
+
+After the release audit above concluded, the sandbox half of GAP-06 was implemented. Full architecture, security properties, and limitations: `V3_PAYMENT_SANDBOX.md`.
+
+**What was built:** `SandboxPaymentProvider`, an **evolution of** the Phase 2 `MockGatewayProvider` rather than a second provider beside it. The mock already was a sandbox by every meaningful measure (its own gateway-side table, a `verify()` that genuinely asks that table and ignores callback params, a redirect checkout page, idempotent refunds, a production gate); building a parallel one would have produced two simulators, two tables, two checkout pages, and two suites proving the same properties. What was genuinely missing — and is now added — is `cancelled` as an outcome distinct from `declined`, the richer gateway-side data model, a two-condition production gate with **no** override, a decide endpoint that refuses unrecognised input rather than defaulting to paid, and CAS-hardened concurrent refunds.
+
+**The most security-relevant change is a removal.** The old provider honoured `PAYMENT_ALLOW_MOCK_GATEWAY=true`, which re-enabled the simulated bank under `NODE_ENV=production`. That escape hatch is **gone**: production is now a hard stop with no override of any kind, and `PAYMENT_ENVIRONMENT` must independently be `sandbox`. A simulated bank that one environment variable can switch on in production is exactly the hazard the gate exists to prevent — and is the same class of hazard a V2 readiness audit found in that version's Cash-on-Delivery stand-in.
+
+**What it does NOT do:** it makes no network call, moves no money, and leaves the money-unit and field semantics of any real Iranian gateway entirely unexercised. It is not, and is never claimed to be, production payment.
+
+**Release implication — the sandbox does not unblock v3.0.0, and was not treated as if it did.** See `V3_GAP_REGISTER.md`'s Phase 5 addendum II for the full reasoning: the roadmap's Phase 2 acceptance criterion ("against a real (even sandbox) payment gateway") sits alongside its own risk note describing the sandbox-test cycle as part of *building* the gateway integration, not a substitute for having one. Treating a locally-simulated bank as satisfying that gate would be the silent policy override this phase's brief explicitly forbids. **v3.0.0 remains uncreated, pending an explicit human release-policy decision.**
+
 ## 6. Documentation
 
 This document, `V3_RELEASE_AUDIT.md` (the full audit, gap reconciliation table, and release reasoning), `V3_GAP_REGISTER.md`'s Phase 5 addendum, and brief addenda to `V3_SECURITY_MODEL.md` and `V3_EVENT_CATALOG.md`.
@@ -67,3 +79,5 @@ Clean. `HEAD == origin/master` at `250a720`. No `v3.0.0` tag. V2/V2.4.1 untouche
 ---
 
 **V3 RELEASE BLOCKED — PAYMENT CONFIGURATION REQUIRED**
+
+*(Updated after the §9 sandbox pass: the sandbox payment lifecycle is now implemented and CI-verified, but GAP-06b — a real production gateway — remains open and EXTERNAL_CONFIGURATION. The blocker is unchanged in substance; what changed is that everything buildable around it is now built and proven. Whether a verified sandbox is sufficient for a v3.0.0 pre-release is a release-policy decision for a human to make explicitly, not one this phase may take silently.)*

@@ -443,3 +443,62 @@ in this environment, exactly as Phase 4 recorded.
 GAP-28 item, GAP-09/12/16/18's deferrals, and GAP-10's provisional-policy
 status all stand exactly as Phase 4 left them, re-confirmed rather than
 re-litigated.
+
+---
+
+# Phase 5 addendum II (2026-08-22) — GAP-06 split into two halves
+
+`GAP-06` is no longer a single open item. It is now explicitly **two**
+items with different statuses, and conflating them again would be the
+dishonest move this split exists to prevent:
+
+**`GAP-06a` — SANDBOX PAYMENT LIFECYCLE — IMPLEMENTED AND VERIFIED.**
+`SandboxPaymentProvider` (an evolution of the Phase 2 `MockGatewayProvider`,
+not a second provider beside it — see `V3_PAYMENT_SANDBOX.md` §1 for why
+duplicating it was rejected) implements the same `PaymentProvider` interface
+a real adapter will. The full lifecycle is proven against real PostgreSQL in
+CI: initiate → redirect → SUCCESS/FAILURE/CANCEL decision → callback →
+server-to-server verify → paid → booking confirmed → real ledger entry, plus
+refund → real ledger reversal. Evidence: `sandbox-payment-lifecycle.pg-spec.ts`
+(24 cases) and the migrated `payment-security.pg-spec.ts` adversarial suite.
+
+What this closes that was genuinely missing before: `cancelled` as an outcome
+DISTINCT from `declined` (the old CHECK constraint allowed neither, and the
+checkout page conflated both behind one button), the §4 gateway-side data
+model (`order_id`, `payment_intent_id`, `currency`, `updated_at`), a decide
+endpoint that REFUSES an unrecognised decision instead of defaulting to paid,
+and CAS-hardened concurrent refunds.
+
+**`GAP-06b` — REAL PRODUCTION GATEWAY — OPEN / EXTERNAL_CONFIGURATION.**
+Unchanged and unchangeable in code. No real Iranian gateway adapter exists,
+no merchant credentials exist in this environment, and none were fabricated.
+The sandbox does not and cannot substitute for this: it makes no network
+call, moves no money, and leaves the money-unit and field semantics of any
+actual gateway entirely unexercised — which is precisely the risk a real
+adapter must be tested against.
+
+**Release implication — the sandbox does NOT unblock v3.0.0.**
+`V3_IMPLEMENTATION_ROADMAP.md`'s Phase 2 acceptance criteria requires the
+core loop to run *"against a real (even sandbox) payment gateway"*, and its
+own risk note for that phase says to *"budget it as new-feature engineering
+with its own sandbox-test cycle"* — i.e. the roadmap treats the sandbox-test
+cycle as part of BUILDING the gateway integration, not as a substitute for
+having one. A locally-simulated bank is not "a payment gateway" in the sense
+that criterion means, and GAP-06's own register wording ("explicit
+precondition for a real V3 launch") is about a real gateway, not a
+simulator. Reading the sandbox as satisfying the gate would be exactly the
+silent policy override Phase 5's brief forbids. **The release gate therefore
+still requires an explicit human release-policy decision** — see
+`V3_PHASE5_IMPLEMENTATION.md` §9.
+
+**PHASE5-03 — a real outbox lesson, found by CI.** The sandbox refund test
+initially asserted a net-zero receivable and got the full un-reversed amount.
+Not a product bug: the refund path is a TWO-HOP event chain
+(`RefundCompleted` on the payment outbox → `OrderRefunded` on the commerce
+outbox → ledger reversal), and a single `relay.drain()` pass scans `commerce`
+BEFORE `payment` and fetches each source's pending rows once up front — so
+the row hop 1 creates is invisible to the pass that created it. The existing
+financial suite never surfaced this because it calls `ledger.recordRefund()`
+directly rather than going through the chain. Recorded because the *class* of
+mistake ("one drain is enough") will recur for any future multi-hop chain;
+fixed with a drain-until-quiet helper rather than a hardcoded second drain.
