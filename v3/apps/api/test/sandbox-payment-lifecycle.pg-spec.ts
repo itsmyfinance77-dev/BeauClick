@@ -41,7 +41,27 @@ describeIfPg('Sandbox payment lifecycle on real PostgreSQL', () => {
   let orders: OrderService;
   let bookings: BookingService;
   let payments: PaymentService;
-  let relay: { drain: () => Promise<unknown> };
+  let relay: { drain: () => Promise<{ dispatched: number; failed: number }> };
+
+  /**
+   * Drains until the outbox goes quiet, rather than a fixed number of times.
+   *
+   * One `drain()` is NOT enough for any multi-hop chain, and the refund chain
+   * is two hops: `payments.refund()` writes `RefundCompleted` to the PAYMENT
+   * outbox; dispatching it makes `RefundCompletedCommerceHandler` write
+   * `OrderRefunded` to the COMMERCE outbox; only dispatching THAT reaches the
+   * ledger. A single pass scans `commerce` before `payment` (that is the
+   * registered source order) and fetches each source's pending rows once up
+   * front, so the row hop 1 creates is invisible to the pass that created it.
+   * Looping until nothing is dispatched makes these assertions independent of
+   * both the source ordering and the chain's length.
+   */
+  async function drainUntilQuiet(maxPasses = 5): Promise<void> {
+    for (let i = 0; i < maxPasses; i += 1) {
+      const { dispatched } = await relay.drain();
+      if (dispatched === 0) return;
+    }
+  }
 
   beforeAll(async () => {
     const ctx = await createPgTestApp();
@@ -131,7 +151,7 @@ describeIfPg('Sandbox payment lifecycle on real PostgreSQL', () => {
 
       // The financial consequence, through the REAL financial service on its
       // own append-only connection -- not a fake path.
-      await relay.drain();
+      await drainUntilQuiet();
       const entries = await financialDataSource.query(
         `SELECT entry_type, amount_toman FROM financial.ledger_entries WHERE order_id = $1 ORDER BY entry_type`,
         [result.order.order.id],
@@ -172,7 +192,7 @@ describeIfPg('Sandbox payment lifecycle on real PostgreSQL', () => {
       expect(tx?.outcome).toBe('declined');
       expect(tx?.settlementReference).toBeNull();
 
-      await relay.drain();
+      await drainUntilQuiet();
       const entries = await financialDataSource.query(
         `SELECT count(*)::int AS n FROM financial.ledger_entries WHERE order_id = $1`,
         [result.order.order.id],
@@ -199,7 +219,7 @@ describeIfPg('Sandbox payment lifecycle on real PostgreSQL', () => {
       const order = await orders.findById(result.order.order.id);
       expect(order?.status).toBe('pending');
 
-      await relay.drain();
+      await drainUntilQuiet();
       const entries = await financialDataSource.query(
         `SELECT count(*)::int AS n FROM financial.ledger_entries WHERE order_id = $1`,
         [result.order.order.id],
@@ -241,7 +261,7 @@ describeIfPg('Sandbox payment lifecycle on real PostgreSQL', () => {
       const { result, reference } = await reachGateway(400_000);
       await sandbox.decide(reference, 'success');
       await checkout.handleCallback('sandbox', reference, { reference });
-      await relay.drain();
+      await drainUntilQuiet();
 
       await payments.refund({
         orderId: result.order.order.id,
@@ -251,7 +271,7 @@ describeIfPg('Sandbox payment lifecycle on real PostgreSQL', () => {
         actorType: 'system',
         actorId: null,
       });
-      await relay.drain();
+      await drainUntilQuiet();
 
       const tx = await sandbox.inspect(reference);
       expect(tx?.refundReference).toMatch(/^SBXRF-/);
