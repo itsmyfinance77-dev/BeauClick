@@ -7,6 +7,7 @@
 --
 --   psql -U postgres -d beauclick_v3_dev \
 --        -v owner_password=... -v writer_password=... -v reader_password=... \
+--        -v app_role=beauclick_app -v db_name=beauclick_v3_dev \
 --        -f database/scripts/financial-roles.sql
 --
 -- Why THREE roles rather than two:
@@ -85,6 +86,20 @@ CREATE TABLE IF NOT EXISTS public.schema_migrations (
 
 GRANT CREATE ON DATABASE :"db_name" TO beauclick_financial_owner;
 GRANT SELECT, INSERT ON public.schema_migrations TO beauclick_financial_owner;
+
+-- The general application role (`:app_role` -- `beauclick_app` in this
+-- project's own environments) needs the SAME grant, for the OPPOSITE
+-- reason: this script runs as a superuser and therefore OWNS whatever it
+-- just created above, which means the general role -- migrate.ts's normal
+-- caller for every non-financial migration -- would otherwise have no
+-- grant on a table it needs to INSERT its own bookkeeping rows into. This
+-- is the second half of the exact bug the CREATE TABLE above was written
+-- to fix: creating the table here solved "does not exist" but, without
+-- this grant, immediately replaced it with "permission denied for table
+-- schema_migrations" for the ordinary migration role. A superuser's GRANT
+-- is not limited by table ownership, so this succeeds regardless of who
+-- ends up owning the row.
+GRANT SELECT, INSERT ON public.schema_migrations TO :"app_role";
 
 -- The schema itself is created here, owned by the owner role, so the
 -- migration that populates it never has to run as anyone more privileged.

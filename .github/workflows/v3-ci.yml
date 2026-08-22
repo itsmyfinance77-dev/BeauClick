@@ -181,6 +181,7 @@ jobs:
             -v writer_password=ci_writer \
             -v reader_password=ci_reader \
             -v db_name=beauclick_v3_ci \
+            -v app_role=beauclick_app \
             -f database/scripts/financial-roles.sql
 
       - name: Migrate
