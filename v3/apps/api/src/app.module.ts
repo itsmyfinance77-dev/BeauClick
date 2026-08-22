@@ -5,8 +5,10 @@ import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, Reflector } from '@nestjs/core'
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
 
+import { ThrottlerModule } from '@nestjs/throttler';
+
 import { BeauClickExceptionFilter, ResponseEnvelopeInterceptor } from '@beauclick/http';
-import { JwtAuthGuard, CapabilityGuard } from '@beauclick/auth';
+import { BeauClickThrottlerGuard, JwtAuthGuard, CapabilityGuard, throttlerOptionsFromEnv } from '@beauclick/auth';
 import { OwnershipGuard } from '@beauclick/ownership';
 import { IdentityModule, IDENTITY_ENTITIES } from '@beauclick/identity';
 import { ProviderModule, PROVIDER_ENTITIES } from '@beauclick/provider';
@@ -104,6 +106,25 @@ import { HealthController } from './health/health.controller';
         signOptions: { expiresIn: config.get('JWT_ACCESS_TTL') ?? '15m' },
       }),
     }),
+    /**
+     * Rate limiting, configured at the ROOT.
+     *
+     * Placement is load-bearing, not tidiness: `ThrottlerModule.forRoot()` is
+     * not a @Global module in v6, so its ThrottlerStorage/options are only
+     * visible to the injector that imports it. It previously lived in
+     * IdentityModule, where a root-level APP_GUARD could never have resolved
+     * it. Configured through `forRootAsync` so every limit stays
+     * environment-tunable (see `throttlerOptionsFromEnv`) -- infrastructure
+     * must be able to retune under real traffic without a code change.
+     */
+    ThrottlerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      // Read from process.env rather than ConfigService.get: the throttler
+      // options are plain data, and this keeps one source of truth with the
+      // pure `throttlerOptionsFromEnv` the tests exercise directly.
+      useFactory: () => throttlerOptionsFromEnv(),
+    }),
     // Global: every event producer validates against it on the way into
     // its own outbox, and no domain may import another to obtain it.
     EventContractsModule,
@@ -123,6 +144,13 @@ import { HealthController } from './health/health.controller';
       useFactory: (jwt: JwtService, reflector: Reflector) => new JwtAuthGuard(jwt, reflector),
       inject: [JwtService, Reflector],
     },
+    // Throttling runs AFTER JwtAuthGuard, deliberately. It keys on the
+    // authenticated user id when there is one, and `req.user` only exists
+    // once JwtAuthGuard has verified the token -- registered before it,
+    // every authenticated request would silently fall back to a shared IP
+    // bucket, which is precisely the bug this ordering avoids. Unauthenticated
+    // and @Public() routes still reach it and are keyed by IP.
+    { provide: APP_GUARD, useClass: BeauClickThrottlerGuard },
     { provide: APP_GUARD, useClass: CapabilityGuard },
     { provide: APP_GUARD, useClass: OwnershipGuard },
   ],

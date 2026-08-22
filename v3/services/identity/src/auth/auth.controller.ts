@@ -72,7 +72,7 @@ export class AuthController {
   // high enough here that it never fires before OtpService's own limit
   // does under realistic traffic.
   @Public()
-  @Throttle({ default: { limit: 100, ttl: 60_000 } })
+  @Throttle({ auth: {} })
   @Post('request-otp')
   @HttpCode(HttpStatus.OK)
   async requestOtp(@Body() dto: RequestOtpDto, @Ip() ip: string): Promise<{ requested: true }> {
@@ -83,7 +83,7 @@ export class AuthController {
   }
 
   @Public()
-  @Throttle({ default: { limit: 100, ttl: 60_000 } })
+  @Throttle({ auth: {} })
   @Post('verify-otp')
   @HttpCode(HttpStatus.OK)
   async verifyOtp(
@@ -115,7 +115,7 @@ export class AuthController {
   }
 
   @Public()
-  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @Throttle({ refresh: {} })
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   async refresh(@Body() dto: RefreshDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {

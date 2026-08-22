@@ -1,4 +1,5 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { Public } from '@beauclick/auth';
 import { AuthenticatedUser, CurrentUser } from '@beauclick/http';
 import { RequireCapability } from '@beauclick/auth';
@@ -50,6 +51,13 @@ function toPublic(doc: ProviderSearchDocument): PublicProviderResult {
   };
 }
 
+/**
+ * The `read` policy, not `default`: autocomplete is debounced at 250ms by
+ * `apps/web/app/search/page.tsx`, so a customer typing normally can
+ * legitimately issue ~240 requests a minute. Under the default limit,
+ * ordinary typing would rate-limit itself.
+ */
+@Throttle({ read: {} })
 @Controller('v1/search')
 export class SearchController {
   constructor(

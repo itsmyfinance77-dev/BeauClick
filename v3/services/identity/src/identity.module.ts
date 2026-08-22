@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ThrottlerModule } from '@nestjs/throttler';
 import { BeauClickJwtModule } from '@beauclick/auth';
 
 import { UserEntity } from './entities/user.entity';
@@ -19,11 +18,15 @@ import { NoopOtpDebugObserver, OTP_DEBUG_OBSERVER } from './otp/otp-debug-observ
 export const IDENTITY_ENTITIES = [UserEntity, OtpRequestEntity, RefreshTokenEntity, PhoneConflictEntity];
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature(IDENTITY_ENTITIES),
-    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 30 }]),
-    BeauClickJwtModule,
-  ],
+  // ThrottlerModule is deliberately NOT configured here any more. It was,
+  // and that was half of why global throttling never actually worked:
+  // `ThrottlerModule.forRoot()` is not a @Global module in v6, so its
+  // ThrottlerStorage/options were only resolvable inside THIS module's
+  // injector -- meaning a root-level APP_GUARD could not have resolved them
+  // even once someone registered one. It now lives in AppModule, at the root,
+  // where the global guard actually runs. (Same class of DI trap as Phase 4's
+  // PRICING_RULES-in-the-wrong-module bug.)
+  imports: [TypeOrmModule.forFeature(IDENTITY_ENTITIES), BeauClickJwtModule],
   controllers: [AuthController, MeController],
   providers: [
     OtpService,

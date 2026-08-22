@@ -99,6 +99,24 @@ const HERMETIC_ENV: Record<string, string> = {
   // The CSRF policy reads the same allow-list CORS does -- one source of
   // truth for "who may drive this API".
   CORS_ALLOWED_ORIGINS: 'http://localhost:3100',
+  /**
+   * Rate limiting stays FULLY ACTIVE in tests -- the guard is registered and
+   * runs on every request here exactly as it does in production. Only the
+   * LIMITS differ, raised high enough that a suite firing hundreds of
+   * requests from one IP never trips them.
+   *
+   * Deliberately not `DISABLE_THROTTLING=true`: an off switch would mean the
+   * entire suite proves nothing about whether the guard is wired at all,
+   * which is the precise failure this whole fix exists to correct (the guard
+   * was unwired for four phases and no test noticed). `throttling.pg-spec.ts`
+   * builds its own app with LOW limits to prove the guard really fires, so
+   * both properties are covered: wired everywhere, and enforcing.
+   */
+  THROTTLE_DEFAULT_LIMIT: '100000',
+  THROTTLE_READ_LIMIT: '100000',
+  THROTTLE_MUTATION_LIMIT: '100000',
+  THROTTLE_AUTH_LIMIT: '100000',
+  THROTTLE_REFRESH_LIMIT: '100000',
 };
 
 export function requiredPgEnv(): { database: string; financial: string } | null {
@@ -107,7 +125,15 @@ export function requiredPgEnv(): { database: string; financial: string } | null 
   return database && financial ? { database, financial } : null;
 }
 
-export async function createPgTestApp(): Promise<PgTestApp> {
+/**
+ * @param envOverrides applied AFTER the hermetic defaults, so a suite can
+ * boot the real application under a different configuration -- used by
+ * `throttling.pg-spec.ts` to run with deliberately tiny rate limits while
+ * every other suite runs with limits high enough never to trip. Because
+ * @nestjs/config snapshots the environment at boot, these must be set before
+ * the app is created, which is exactly what this parameter guarantees.
+ */
+export async function createPgTestApp(envOverrides: Record<string, string> = {}): Promise<PgTestApp> {
   const env = requiredPgEnv();
   if (!env) throw new Error('TEST_DATABASE_URL and TEST_FINANCIAL_WRITER_URL are required for the real-Postgres suite');
 
@@ -118,6 +144,7 @@ export async function createPgTestApp(): Promise<PgTestApp> {
   // under `nx run api:test:pg` on identical code -- a real, reproduced
   // Phase 1 failure.
   for (const [key, value] of Object.entries(HERMETIC_ENV)) process.env[key] = value;
+  for (const [key, value] of Object.entries(envOverrides)) process.env[key] = value;
   process.env.DATABASE_URL = env.database;
   process.env.FINANCIAL_DATABASE_URL = env.financial;
 

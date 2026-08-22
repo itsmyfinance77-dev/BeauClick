@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Headers, Param, Post, Query, Redirect } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Throttle } from '@nestjs/throttler';
 import { AuthenticatedUser, CurrentUser, SkipResponseEnvelope } from '@beauclick/http';
 import { Public } from '@beauclick/auth';
 import { CreateBookingDto, toBookingShape, BookingService } from '@beauclick/booking';
@@ -17,7 +18,13 @@ import { CheckoutService } from './checkout.service';
  * `/v1/bookings` resource across two controllers is the honest cost of that
  * boundary; the alternative -- letting booking-service reach into commerce
  * -- would trade a small routing oddity for a real architectural leak.
+ *
+ * Throttled under the `mutation` policy, deliberately tighter than the
+ * default: creating a booking claims a real slot, creates an order, and
+ * opens a gateway attempt. No legitimate customer does that thirty times a
+ * minute, and each one costs real downstream work.
  */
+@Throttle({ mutation: {} })
 @Controller('v1')
 export class CheckoutController {
   constructor(
@@ -71,7 +78,28 @@ export class CheckoutController {
  * decides what happened. An attacker hitting this URL with a forged
  * reference gets a generic not-found; with a real reference for an unpaid
  * transaction, they get a verified failure.
+ *
+ * **Throttling: `read` (generous), NOT `mutation`, and NOT exempt.**
+ * Deliberate, because the failure modes are asymmetric. Every callback for
+ * every customer arrives from the GATEWAY's own small set of IPs, so they
+ * all share one IP bucket -- and a false 429 here means a customer's money
+ * moved while their booking stayed unconfirmed, the worst outcome in the
+ * system. A tight limit would manufacture exactly that. Full exemption was
+ * also rejected: this route is `@Public()` and reachable by anyone.
+ *
+ * The generous limit is safe because throttling is NOT what protects this
+ * endpoint -- the server-to-server verification does. A flood cannot
+ * fabricate a payment, cannot replay one (verification returns `replayed`,
+ * and `markPaid` is a compare-and-swap), and cannot enumerate anything (a
+ * forged reference is indistinguishable from an unpaid one). The limit here
+ * bounds resource abuse only.
+ *
+ * **Revisit when GAP-06b lands.** This policy is calibrated against the
+ * sandbox's volume characteristics, which are this environment's, not a real
+ * gateway's. A real gateway's callback rate and source-IP behaviour must be
+ * measured and this limit re-derived from it -- see V3_SECURITY_MODEL.md.
  */
+@Throttle({ read: {} })
 @Controller('v1/payments')
 export class PaymentCallbackController {
   constructor(
