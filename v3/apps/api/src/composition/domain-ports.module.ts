@@ -12,11 +12,13 @@ import { PROVIDER_REINDEX_SOURCE } from '@beauclick/search';
 import { RECIPIENT_RESOLVER } from '@beauclick/notification';
 import { ANALYTICS_SUBJECT_RESOLVER } from '@beauclick/analytics';
 import { LoyaltyModule } from '@beauclick/loyalty';
+import { BusinessEntity, BusinessStaffEntity } from '@beauclick/business';
 
 import {
   ProviderBackedFinancialPartyResolver,
   ProviderBackedProfessionalDirectory,
   ProviderBackedServiceCatalog,
+  SellerPartyLookup,
 } from './port-adapters';
 import {
   IdentityBackedRecipientResolver,
@@ -44,11 +46,12 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
 @Module({
   imports: [
     ConfigModule,
-    TypeOrmModule.forFeature([ProfessionalEntity, ServiceOfferingEntity, UserEntity]),
+    TypeOrmModule.forFeature([ProfessionalEntity, ServiceOfferingEntity, UserEntity, BusinessEntity, BusinessStaffEntity]),
     // Imported so the membership pricing rule can resolve BenefitService.
     LoyaltyModule,
   ],
   providers: [
+    SellerPartyLookup,
     ProviderBackedProfessionalDirectory,
     ProviderBackedServiceCatalog,
     ProviderBackedFinancialPartyResolver,

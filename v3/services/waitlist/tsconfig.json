@@ -1,0 +1,7 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "../../dist/services/waitlist"
+  },
+  "include": ["src/**/*.ts"]
+}

@@ -38,7 +38,9 @@
       "@beauclick/loyalty": ["services/loyalty/src/index.ts"],
       "@beauclick/journey": ["services/journey/src/index.ts"],
       "@beauclick/notification": ["services/notification/src/index.ts"],
-      "@beauclick/analytics": ["services/analytics/src/index.ts"]
+      "@beauclick/analytics": ["services/analytics/src/index.ts"],
+      "@beauclick/business": ["services/business/src/index.ts"],
+      "@beauclick/waitlist": ["services/waitlist/src/index.ts"]
     }
   }
 }

@@ -166,8 +166,17 @@ export async function createPgTestApp(): Promise<PgTestApp> {
  * schema really is.
  */
 export const RESETTABLE_TABLES = [
-  // Phase 3 schemas first: they are read models and logs downstream of the
-  // Phase 2 tables, so clearing them first keeps the order children-first.
+  // Phase 4 schemas first, for the same children-first reason Phase 3's
+  // comment gives: waitlist entries reference booking/provider ids by
+  // convention (no FK), and business staff rows reference identity/provider
+  // ids the same way, so clearing them before what they reference is safe
+  // regardless of ordering, but keeping the newest-downstream-first
+  // convention consistent is what makes this list easy to extend correctly.
+  'waitlist.outbox_events',
+  'waitlist.entries',
+  'business.outbox_events',
+  'business.business_staff',
+  'business.businesses',
   'analytics.daily_metrics',
   'analytics.rollup_state',
   'analytics.events',
@@ -302,6 +311,20 @@ export async function seedSlot(
     [id, professionalId, serviceId, startAt, new Date(startAt.getTime() + durationMinutes * 60_000)],
   );
   return id;
+}
+
+export interface SeededBusiness {
+  id: string;
+  ownerUserId: string;
+}
+
+export async function seedBusiness(dataSource: DataSource, ownerUserId: string, displayName: string): Promise<SeededBusiness> {
+  const id = uuidv7();
+  await dataSource.query(
+    `INSERT INTO business.businesses (id, owner_id, display_name, verification_status) VALUES ($1, $2, $3, 'unverified')`,
+    [id, ownerUserId, displayName],
+  );
+  return { id, ownerUserId };
 }
 
 /** A slot far enough ahead to satisfy the reschedule minimum-notice rule. */

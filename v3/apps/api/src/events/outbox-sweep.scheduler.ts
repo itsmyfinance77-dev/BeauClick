@@ -2,6 +2,7 @@ import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } fro
 import { ConfigService } from '@nestjs/config';
 import { OutboxRelay } from '@beauclick/events';
 import { BookingService } from '@beauclick/booking';
+import { WaitlistService } from '@beauclick/waitlist';
 
 /**
  * Two periodic backstops, both deliberately backstops rather than mechanisms.
@@ -29,6 +30,7 @@ export class OutboxSweepScheduler implements OnApplicationBootstrap, OnApplicati
   constructor(
     private readonly relay: OutboxRelay,
     private readonly bookings: BookingService,
+    private readonly waitlist: WaitlistService,
     private readonly config: ConfigService,
   ) {}
 
@@ -40,6 +42,9 @@ export class OutboxSweepScheduler implements OnApplicationBootstrap, OnApplicati
 
     this.timers.push(this.every(this.intervalMs('OUTBOX_SWEEP_INTERVAL_MS', 5_000), () => this.sweepOutbox()));
     this.timers.push(this.every(this.intervalMs('HOLD_EXPIRY_SWEEP_INTERVAL_MS', 60_000), () => this.sweepHolds()));
+    this.timers.push(
+      this.every(this.intervalMs('WAITLIST_OFFER_EXPIRY_SWEEP_INTERVAL_MS', 60_000), () => this.sweepWaitlistOffers()),
+    );
   }
 
   onApplicationShutdown(): void {
@@ -75,5 +80,20 @@ export class OutboxSweepScheduler implements OnApplicationBootstrap, OnApplicati
   private async sweepHolds(): Promise<void> {
     const expired = await this.bookings.expireStaleHolds();
     if (expired > 0) this.logger.log(`Hold expiry sweep: ${expired} booking(s) expired`);
+  }
+
+  /**
+   * The same "sweep is a backstop, not the mechanism" shape as the two
+   * above: a waitlist offer's own `offerExpiresAt` already makes `accept()`
+   * reject it in real time (`WaitlistService.claimOfferForAcceptance`), so
+   * a customer is never protected by how recently this ran. What the sweep
+   * adds is moving the entry out of `offered` and emitting `WaitlistExpired`
+   * so `WaitlistMatcherHandler` re-offers the still-open slot to the next
+   * candidate -- without it, an unanswered offer would sit forever and no
+   * one else would ever get a turn at that slot.
+   */
+  private async sweepWaitlistOffers(): Promise<void> {
+    const expired = await this.waitlist.expireStaleOffers();
+    if (expired > 0) this.logger.log(`Waitlist offer expiry sweep: ${expired} offer(s) expired`);
   }
 }

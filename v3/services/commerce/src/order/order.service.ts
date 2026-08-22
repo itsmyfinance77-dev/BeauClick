@@ -107,8 +107,8 @@ export class OrderService {
 
     const priced: PricingResult = await this.pricing.quote({
       customerId: input.customerId,
-      sellerPartyType: 'professional',
-      sellerPartyId: input.professionalId,
+      sellerPartyType: offering.sellerPartyType,
+      sellerPartyId: offering.sellerPartyId,
       bookingId: input.bookingId,
       at: new Date(),
       lines: [
@@ -127,8 +127,8 @@ export class OrderService {
       sourceType: 'booking',
       sourceId: input.bookingId,
       customerId: input.customerId,
-      sellerPartyType: 'professional',
-      sellerPartyId: input.professionalId,
+      sellerPartyType: offering.sellerPartyType,
+      sellerPartyId: offering.sellerPartyId,
       status: 'pending',
       currency: priced.currency,
       subtotalToman: priced.subtotalToman,
@@ -176,8 +176,8 @@ export class OrderService {
         sourceType: 'booking',
         sourceId: input.bookingId,
         customerId: input.customerId,
-        sellerPartyType: 'professional',
-        sellerPartyId: input.professionalId,
+        sellerPartyType: offering.sellerPartyType,
+        sellerPartyId: offering.sellerPartyId,
         subtotalToman: priced.subtotalToman,
         totalToman: priced.totalToman,
         currency: priced.currency,

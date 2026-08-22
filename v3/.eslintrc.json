@@ -55,7 +55,9 @@
               "scope:loyalty",
               "scope:journey",
               "scope:notification",
-              "scope:analytics"
+              "scope:analytics",
+              "scope:business",
+              "scope:waitlist"
             ]
           },
           {
@@ -73,7 +75,9 @@
               "scope:loyalty",
               "scope:journey",
               "scope:notification",
-              "scope:analytics"
+              "scope:analytics",
+              "scope:business",
+              "scope:waitlist"
             ]
           },
           {
@@ -91,7 +95,9 @@
               "scope:loyalty",
               "scope:journey",
               "scope:notification",
-              "scope:analytics"
+              "scope:analytics",
+              "scope:business",
+              "scope:waitlist"
             ]
           },
           {
@@ -109,7 +115,9 @@
               "scope:loyalty",
               "scope:journey",
               "scope:notification",
-              "scope:analytics"
+              "scope:analytics",
+              "scope:business",
+              "scope:waitlist"
             ]
           },
           {
@@ -127,7 +135,9 @@
               "scope:loyalty",
               "scope:journey",
               "scope:notification",
-              "scope:analytics"
+              "scope:analytics",
+              "scope:business",
+              "scope:waitlist"
             ]
           },
           {
@@ -145,7 +155,9 @@
               "scope:loyalty",
               "scope:journey",
               "scope:notification",
-              "scope:analytics"
+              "scope:analytics",
+              "scope:business",
+              "scope:waitlist"
             ]
           },
           {
@@ -163,7 +175,9 @@
               "scope:loyalty",
               "scope:journey",
               "scope:notification",
-              "scope:analytics"
+              "scope:analytics",
+              "scope:business",
+              "scope:waitlist"
             ]
           },
           {
@@ -181,7 +195,9 @@
               "scope:search",
               "scope:journey",
               "scope:notification",
-              "scope:analytics"
+              "scope:analytics",
+              "scope:business",
+              "scope:waitlist"
             ]
           },
           {
@@ -199,7 +215,9 @@
               "scope:search",
               "scope:loyalty",
               "scope:notification",
-              "scope:analytics"
+              "scope:analytics",
+              "scope:business",
+              "scope:waitlist"
             ]
           },
           {
@@ -217,7 +235,9 @@
               "scope:search",
               "scope:loyalty",
               "scope:journey",
-              "scope:analytics"
+              "scope:analytics",
+              "scope:business",
+              "scope:waitlist"
             ]
           },
           {
@@ -235,7 +255,49 @@
               "scope:search",
               "scope:loyalty",
               "scope:journey",
-              "scope:notification"
+              "scope:notification",
+              "scope:business",
+              "scope:waitlist"
+            ]
+          },
+          {
+            "sourceTag": "scope:business",
+            "onlyDependOnLibsWithTags": [
+              "scope:shared"
+            ],
+            "notDependOnLibsWithTags": [
+              "scope:identity",
+              "scope:provider",
+              "scope:booking",
+              "scope:commerce",
+              "scope:payment",
+              "scope:financial",
+              "scope:search",
+              "scope:loyalty",
+              "scope:journey",
+              "scope:notification",
+              "scope:analytics",
+              "scope:waitlist"
+            ]
+          },
+          {
+            "sourceTag": "scope:waitlist",
+            "onlyDependOnLibsWithTags": [
+              "scope:shared"
+            ],
+            "notDependOnLibsWithTags": [
+              "scope:identity",
+              "scope:provider",
+              "scope:booking",
+              "scope:commerce",
+              "scope:payment",
+              "scope:financial",
+              "scope:search",
+              "scope:loyalty",
+              "scope:journey",
+              "scope:notification",
+              "scope:analytics",
+              "scope:business"
             ]
           },
           {
@@ -255,6 +317,8 @@
               "scope:journey",
               "scope:notification",
               "scope:analytics",
+              "scope:business",
+              "scope:waitlist",
               "scope:app"
             ]
           },
@@ -272,7 +336,9 @@
               "scope:loyalty",
               "scope:journey",
               "scope:notification",
-              "scope:analytics"
+              "scope:analytics",
+              "scope:business",
+              "scope:waitlist"
             ]
           }
         ]

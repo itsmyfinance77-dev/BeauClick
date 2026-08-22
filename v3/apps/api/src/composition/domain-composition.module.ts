@@ -1,13 +1,17 @@
 import { Inject, Logger, Module, OnApplicationBootstrap } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 
 import { DOMAIN_EVENT_HANDLERS, DomainEventHandler, OUTBOX_SOURCES, OutboxRelay, OutboxSource } from '@beauclick/events';
 import { ALL_EVENT_CONTRACTS, EVENT_CONTRACT_REGISTRY, EventContractRegistry } from '@beauclick/event-contracts';
 import { ProviderModule } from '@beauclick/provider';
-import { BookingModule, BookingOutboxEntity } from '@beauclick/booking';
+import { AvailabilitySlotEntity, BookingModule, BookingOutboxEntity } from '@beauclick/booking';
 import { CommerceModule, CommerceOutboxEntity } from '@beauclick/commerce';
 import { PaymentModule, PaymentOutboxEntity } from '@beauclick/payment';
 import { FinancialModule } from '@beauclick/financial';
+import { BusinessModule, BusinessOutboxEntity } from '@beauclick/business';
+import { WaitlistModule, WaitlistOutboxEntity, WaitlistService } from '@beauclick/waitlist';
 
 import { Phase3CompositionModule } from './phase3-composition.module';
 import { PHASE3_EVENT_HANDLERS, PHASE3_OUTBOX_SOURCES } from './phase3-tokens';
@@ -24,6 +28,9 @@ import {
   OrderRefundedLedgerHandler,
   RefundCompletedCommerceHandler,
 } from '../events/financial-projection.handlers';
+import { WaitlistAcceptanceService } from '../waitlist/waitlist-acceptance.service';
+import { WaitlistAcceptanceController } from '../waitlist/waitlist-acceptance.controller';
+import { WaitlistMatcherHandler } from '../waitlist/waitlist-matcher.handler';
 
 /**
  * The composition root for Phase 2's domains.
@@ -61,13 +68,16 @@ import {
     CommerceModule,
     PaymentModule,
     FinancialModule,
+    BusinessModule,
+    WaitlistModule,
     // Phase 3's domains and their handlers/outboxes, contributed under their
     // own tokens and merged into the single relay below.
     Phase3CompositionModule,
   ],
-  controllers: [CheckoutController, PaymentCallbackController, MockGatewayController],
+  controllers: [CheckoutController, PaymentCallbackController, MockGatewayController, WaitlistAcceptanceController],
   providers: [
     CheckoutService,
+    WaitlistAcceptanceService,
     OutboxSweepScheduler,
 
     OrderPaidLedgerHandler,
@@ -87,6 +97,8 @@ import {
         { name: 'booking', entity: BookingOutboxEntity },
         { name: 'commerce', entity: CommerceOutboxEntity },
         { name: 'payment', entity: PaymentOutboxEntity },
+        { name: 'business', entity: BusinessOutboxEntity },
+        { name: 'waitlist', entity: WaitlistOutboxEntity },
         ...phase3,
       ],
     },
@@ -104,6 +116,8 @@ import {
         bookingCancelled: BookingCancelledRefundHandler,
         bookingExpired: BookingExpiredOrderHandler,
         bookingConfirmed: BookingConfirmedLogHandler,
+        waitlistSvc: WaitlistService,
+        slots: Repository<AvailabilitySlotEntity>,
         phase3: DomainEventHandler[],
       ) => [
         orderPaid,
@@ -112,6 +126,13 @@ import {
         bookingCancelled,
         bookingExpired,
         bookingConfirmed,
+        // Four triggers, one reaction (WaitlistMatcherHandler.handle) --
+        // every event that can mean "this professional's slot might be open
+        // again". See waitlist-matcher.handler.ts.
+        new WaitlistMatcherHandler('BookingCancelled', waitlistSvc, slots),
+        new WaitlistMatcherHandler('BookingExpired', waitlistSvc, slots),
+        new WaitlistMatcherHandler('WaitlistDeclined', waitlistSvc, slots),
+        new WaitlistMatcherHandler('WaitlistExpired', waitlistSvc, slots),
         ...phase3,
       ],
       inject: [
@@ -121,6 +142,8 @@ import {
         BookingCancelledRefundHandler,
         BookingExpiredOrderHandler,
         BookingConfirmedLogHandler,
+        WaitlistService,
+        getRepositoryToken(AvailabilitySlotEntity),
         PHASE3_EVENT_HANDLERS,
       ],
     },

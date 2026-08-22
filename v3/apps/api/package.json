@@ -9,6 +9,8 @@
   "dependencies": {
     "@beauclick/auth": "workspace:*",
     "@beauclick/booking": "workspace:*",
+    "@beauclick/business": "workspace:*",
+    "@beauclick/waitlist": "workspace:*",
     "@beauclick/search": "workspace:*",
     "@beauclick/notification": "workspace:*",
     "@beauclick/loyalty": "workspace:*",

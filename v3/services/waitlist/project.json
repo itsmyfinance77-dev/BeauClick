@@ -1,0 +1,11 @@
+{
+  "name": "waitlist",
+  "sourceRoot": "services/waitlist/src",
+  "projectType": "library",
+  "tags": ["type:service", "scope:waitlist"],
+  "targets": {
+    "typecheck": { "executor": "nx:run-commands", "options": { "command": "tsc -p services/waitlist/tsconfig.json --noEmit" } },
+    "test": { "executor": "nx:run-commands", "options": { "command": "jest --config services/waitlist/jest.config.js" } },
+    "lint": { "executor": "nx:run-commands", "options": { "command": "eslint services/waitlist/src --resolve-plugins-relative-to ." } }
+  }
+}

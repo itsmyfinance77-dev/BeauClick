@@ -16,6 +16,18 @@ export interface ServiceOfferingSnapshot {
   name: string;
   priceToman: number;
   durationMinutes: number;
+  /**
+   * Phase 4 (ADR-023 §3): the real seller of record for this offering.
+   * `professionalId` above never changes meaning -- it still identifies
+   * whose calendar/booking this is. `sellerPartyId` is who the money is
+   * FOR: the professional themselves when independent, or the business
+   * when that professional is an active staff member of one. Order
+   * creation copies these two fields verbatim rather than re-deriving
+   * "professional" on its own, so this port is the single place that
+   * decision is made.
+   */
+  sellerPartyType: 'professional' | 'business';
+  sellerPartyId: string;
 }
 
 export interface ServiceCatalog {
