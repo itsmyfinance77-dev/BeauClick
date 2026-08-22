@@ -210,6 +210,13 @@ jobs:
           # skipping. A silently-skipped suite is the failure mode this gate
           # exists to prevent.
           TEST_FINANCIAL_OWNER_URL: postgres://beauclick_financial_owner:ci_owner@localhost:5432/beauclick_v3_ci
+          # Phase 5: the read-only role's grants are asserted against the REAL
+          # ledger by financial-integrity.pg-spec.ts, but that assertion was
+          # skipped on every run so far because this variable was never set --
+          # the role itself has always been provisioned with this exact
+          # password by the step above. Wiring it activates real coverage that
+          # was written in Phase 2 and has never once actually executed.
+          TEST_FINANCIAL_READER_URL: postgres://beauclick_financial_reader:ci_reader@localhost:5432/beauclick_v3_ci
           TEST_OPENSEARCH_URL: http://localhost:9200
 
       - name: Assert no suite was silently skipped
@@ -227,4 +234,5 @@ jobs:
           TEST_DATABASE_URL: postgres://beauclick_app:ci_app@localhost:5432/beauclick_v3_ci
           TEST_FINANCIAL_WRITER_URL: postgres://beauclick_financial_writer:ci_writer@localhost:5432/beauclick_v3_ci
           TEST_FINANCIAL_OWNER_URL: postgres://beauclick_financial_owner:ci_owner@localhost:5432/beauclick_v3_ci
+          TEST_FINANCIAL_READER_URL: postgres://beauclick_financial_reader:ci_reader@localhost:5432/beauclick_v3_ci
           TEST_OPENSEARCH_URL: http://localhost:9200

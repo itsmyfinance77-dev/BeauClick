@@ -12,8 +12,10 @@ coverage/
 # so they're explicitly un-ignored here.
 #
 # `database/scripts/` was missing from this list until Phase 2, which is
-# why `financial-role-contract.sql` was referenced by a passing test and
-# by V3_PHASE1_IMPLEMENTATION.md while never actually being committed.
+# why a script referenced by a passing test and by
+# V3_PHASE1_IMPLEMENTATION.md was never actually committed (that script,
+# `financial-role-contract.sql`, was itself retired in Phase 5 -- see
+# V3_RELEASE_AUDIT.md -- but the lesson it taught stands).
 # Infrastructure SQL that a documented guarantee depends on must be in
 # the repository, not only on the machine that ran it.
 !database/migrations/**/*.sql
