@@ -166,6 +166,15 @@ jobs:
           psql -h localhost -U postgres -d beauclick_v3_ci -v ON_ERROR_STOP=1 <<'SQL'
           CREATE ROLE beauclick_app LOGIN PASSWORD 'ci_app';
           GRANT ALL ON DATABASE beauclick_v3_ci TO beauclick_app;
+          -- PostgreSQL 15+ no longer grants CREATE on the public schema to
+          -- PUBLIC by default (a real, breaking change from every earlier
+          -- version this project's own docs were written against). Database-
+          -- level ALL does not include it -- schema privileges are a
+          -- separate grant -- so migrate.ts's own "CREATE TABLE IF NOT
+          -- EXISTS public.schema_migrations", run as beauclick_app, failed
+          -- with "permission denied for schema public" the first time this
+          -- workflow ever got far enough to reach it.
+          GRANT CREATE ON SCHEMA public TO beauclick_app;
           SQL
           psql -h localhost -U postgres -d beauclick_v3_ci -v ON_ERROR_STOP=1 \
             -v owner_password=ci_owner \
