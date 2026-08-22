@@ -7,6 +7,7 @@ import { EVENT_CONTRACT_REGISTRY, EventContractRegistry } from '@beauclick/event
 
 import { ProfessionalEntity, ProviderModule, ProviderOutboxEntity, ServiceOfferingEntity } from '@beauclick/provider';
 import { UserEntity } from '@beauclick/identity';
+import { BusinessEntity } from '@beauclick/business';
 import { BookingModule } from '@beauclick/booking';
 import { SearchIndexerService, SearchModule, SearchOutboxEntity } from '@beauclick/search';
 import { LoyaltyModule, LoyaltyOutboxEntity } from '@beauclick/loyalty';
@@ -51,8 +52,12 @@ import { PHASE3_EVENT_HANDLERS, PHASE3_OUTBOX_SOURCES } from './phase3-tokens';
   imports: [
     ConfigModule,
     // Registered so the ports below can read provider/identity data without
-    // any domain module depending on those services.
-    TypeOrmModule.forFeature([ProfessionalEntity, ServiceOfferingEntity, UserEntity]),
+    // any domain module depending on those services. BusinessEntity: Phase 4's
+    // NotificationEnricher.sellerUserId() needs it directly -- a repository
+    // provider is scoped to the module that registers it, so being available
+    // in the (also @Global()) DomainPortsModule does not make it visible
+    // here too; each module that injects a repository must register it.
+    TypeOrmModule.forFeature([ProfessionalEntity, ServiceOfferingEntity, UserEntity, BusinessEntity]),
     ProviderModule,
     BookingModule,
     SearchModule,
@@ -139,6 +144,11 @@ import { PHASE3_EVENT_HANDLERS, PHASE3_OUTBOX_SOURCES } from './phase3-tokens';
     JourneyModule,
     NotificationModule,
     AnalyticsModule,
+    // Phase 4's financial-outbox-relay.provider.ts (DomainCompositionModule)
+    // injects NotificationEnricher directly for the settlement notification
+    // rule, so it must be visible outside this module too, not only used
+    // internally by this module's own NOTIFICATION_RULES handlers.
+    NotificationEnricher,
   ],
 })
 export class Phase3CompositionModule {}
