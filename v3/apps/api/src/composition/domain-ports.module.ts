@@ -13,6 +13,7 @@ import { RECIPIENT_RESOLVER } from '@beauclick/notification';
 import { ANALYTICS_SUBJECT_RESOLVER } from '@beauclick/analytics';
 import { LoyaltyModule } from '@beauclick/loyalty';
 import { BusinessEntity, BusinessStaffEntity } from '@beauclick/business';
+import { PROFESSIONAL_OWNER_LOOKUP } from '@beauclick/waitlist';
 
 import {
   ProviderBackedFinancialPartyResolver,
@@ -56,6 +57,12 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     ProviderBackedServiceCatalog,
     ProviderBackedFinancialPartyResolver,
     { provide: PROFESSIONAL_DIRECTORY, useExisting: ProviderBackedProfessionalDirectory },
+    // waitlist-service's port for the identical question booking-service's
+    // PROFESSIONAL_DIRECTORY already answers -- ADR-011 forbids waitlist
+    // importing booking's token directly, so the SAME adapter instance is
+    // bound a second time under waitlist's own token, rather than a second
+    // implementation answering the same question a second way.
+    { provide: PROFESSIONAL_OWNER_LOOKUP, useExisting: ProviderBackedProfessionalDirectory },
     { provide: SERVICE_CATALOG, useExisting: ProviderBackedServiceCatalog },
     { provide: FINANCIAL_PARTY_RESOLVER, useExisting: ProviderBackedFinancialPartyResolver },
     financialDataSourceProvider,
@@ -96,6 +103,7 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
   ],
   exports: [
     PROFESSIONAL_DIRECTORY,
+    PROFESSIONAL_OWNER_LOOKUP,
     SERVICE_CATALOG,
     FINANCIAL_PARTY_RESOLVER,
     FINANCIAL_DATA_SOURCE,
