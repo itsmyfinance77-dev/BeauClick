@@ -6,7 +6,7 @@ import { formatFullJalaliDate, toPersianDigits } from '@beauclick/persian-utils'
 import { useAuth } from '@/lib/auth-context';
 import { useUnread } from '@/lib/unread-context';
 import { ProtectedRoute } from '@/components/protected-route';
-import { Alert, Button, Card, LoadingState } from '@/components/ui';
+import { Alert, Card, LoadingState } from '@/components/ui';
 import {
   listNotifications,
   markAllNotificationsRead,

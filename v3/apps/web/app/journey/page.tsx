@@ -27,7 +27,10 @@ export default function JourneyPage() {
 
 function Journey() {
   const { api } = useAuth();
-  const [profile, setProfile] = useState<BeautyProfile | null>(null);
+  // The profile is fetched and stored so the form reflects the SERVER's copy
+  // after every write, not the optimistic local one. Nothing renders it
+  // directly -- `notes` and `budget` below are seeded from it.
+  const [, setProfile] = useState<BeautyProfile | null>(null);
   const [goals, setGoals] = useState<BeautyGoal[]>([]);
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
   const [notes, setNotes] = useState('');
