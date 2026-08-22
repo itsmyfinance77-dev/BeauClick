@@ -26,42 +26,42 @@ function fakeProvider(key: string, enabled?: boolean): PaymentProvider {
  */
 describe('PaymentProviderRegistry', () => {
   it('resolves a registered provider by key', () => {
-    const registry = new PaymentProviderRegistry([fakeProvider('mock')], stubConfig());
-    expect(registry.get('mock').key).toBe('mock');
+    const registry = new PaymentProviderRegistry([fakeProvider('sandbox')], stubConfig());
+    expect(registry.get('sandbox').key).toBe('sandbox');
   });
 
   it('refuses an unknown key rather than falling back to another gateway', () => {
-    const registry = new PaymentProviderRegistry([fakeProvider('mock')], stubConfig());
+    const registry = new PaymentProviderRegistry([fakeProvider('sandbox')], stubConfig());
     expect(() => registry.get('zarinpal')).toThrow(PaymentProviderUnavailableException);
   });
 
   it('refuses a registered but DISABLED provider', () => {
-    const registry = new PaymentProviderRegistry([fakeProvider('mock', false)], stubConfig());
-    expect(() => registry.get('mock')).toThrow(PaymentProviderUnavailableException);
+    const registry = new PaymentProviderRegistry([fakeProvider('sandbox', false)], stubConfig());
+    expect(() => registry.get('sandbox')).toThrow(PaymentProviderUnavailableException);
     expect(registry.enabledKeys()).toEqual([]);
   });
 
   it('rejects two providers registered under the same key, at construction', () => {
-    expect(() => new PaymentProviderRegistry([fakeProvider('mock'), fakeProvider('mock')], stubConfig())).toThrow(
+    expect(() => new PaymentProviderRegistry([fakeProvider('sandbox'), fakeProvider('sandbox')], stubConfig())).toThrow(
       /same key/,
     );
   });
 
   it('uses the single enabled provider as the default when only one exists', () => {
-    const registry = new PaymentProviderRegistry([fakeProvider('mock')], stubConfig());
-    expect(registry.defaultProviderKey()).toBe('mock');
+    const registry = new PaymentProviderRegistry([fakeProvider('sandbox')], stubConfig());
+    expect(registry.defaultProviderKey()).toBe('sandbox');
   });
 
   it('REQUIRES an explicit default once more than one provider is registered', () => {
     // Deliberately not "the first one wins": that would make the production
     // gateway depend on module import order.
-    const registry = new PaymentProviderRegistry([fakeProvider('mock'), fakeProvider('zarinpal')], stubConfig());
+    const registry = new PaymentProviderRegistry([fakeProvider('sandbox'), fakeProvider('zarinpal')], stubConfig());
     expect(() => registry.defaultProviderKey()).toThrow(PaymentProviderUnavailableException);
   });
 
   it('honours the configured default', () => {
     const registry = new PaymentProviderRegistry(
-      [fakeProvider('mock'), fakeProvider('zarinpal')],
+      [fakeProvider('sandbox'), fakeProvider('zarinpal')],
       stubConfig({ PAYMENT_DEFAULT_PROVIDER: 'zarinpal' }),
     );
     expect(registry.defaultProviderKey()).toBe('zarinpal');
@@ -75,10 +75,10 @@ describe('PaymentProviderRegistry', () => {
 
   it('describes only enabled providers for a gateway picker', () => {
     const registry = new PaymentProviderRegistry(
-      [fakeProvider('mock', true), fakeProvider('offline', false)],
+      [fakeProvider('sandbox', true), fakeProvider('offline', false)],
       stubConfig(),
     );
-    expect(registry.describeEnabled().map((p) => p.key)).toEqual(['mock']);
+    expect(registry.describeEnabled().map((p) => p.key)).toEqual(['sandbox']);
   });
 
   it('reports a Persian, non-technical message when a gateway is unavailable', () => {

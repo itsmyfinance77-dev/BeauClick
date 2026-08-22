@@ -4,7 +4,7 @@ import request from 'supertest';
 
 import { BookingService } from '@beauclick/booking';
 import { OrderService } from '@beauclick/commerce';
-import { MockGatewayProvider, PaymentService, PaymentProviderRegistry } from '@beauclick/payment';
+import { SandboxPaymentProvider, PaymentService, PaymentProviderRegistry } from '@beauclick/payment';
 import { CheckoutService } from '../src/checkout/checkout.service';
 
 import {
@@ -26,7 +26,7 @@ import {
  *
  * Every test attacks that from a different direction -- a forged callback, a
  * replayed one, a tampered amount, an expired intent, an unknown reference,
- * a concurrent double-callback. The mock gateway keeps its own table and
+ * a concurrent double-callback. The sandbox gateway keeps its own table and
  * `verify()` genuinely queries it, so a forged callback fails here for the
  * same structural reason it would against ZarinPal: the callback parameters
  * are never the evidence.
@@ -41,7 +41,7 @@ describeIfPg('Payment callback security on real PostgreSQL', () => {
   let payments: PaymentService;
   let orders: OrderService;
   let bookings: BookingService;
-  let mock: MockGatewayProvider;
+  let sandbox: SandboxPaymentProvider;
 
   beforeAll(async () => {
     ctx = await createPgTestApp();
@@ -51,7 +51,7 @@ describeIfPg('Payment callback security on real PostgreSQL', () => {
     payments = app.get(PaymentService);
     orders = app.get(OrderService);
     bookings = app.get(BookingService);
-    mock = app.get(MockGatewayProvider);
+    sandbox = app.get(SandboxPaymentProvider);
   });
 
   afterAll(async () => {
@@ -75,7 +75,7 @@ describeIfPg('Payment callback security on real PostgreSQL', () => {
       professionalId: professional.id,
       slotId,
       serviceId: professional.serviceId,
-      callbackUrl: 'http://localhost:3099/api/v1/payments/callback/mock',
+      callbackUrl: 'http://localhost:3099/api/v1/payments/callback/sandbox',
     });
 
     const attempts = await dataSource.query(
@@ -91,9 +91,9 @@ describeIfPg('Payment callback security on real PostgreSQL', () => {
       const { result, reference } = await bookAndReachGateway();
 
       // The customer never completed anything at the gateway; they simply
-      // hit the success URL. The mock gateway's own record still says
+      // hit the success URL. The sandbox gateway's own record still says
       // 'pending', and verification asks IT, not the caller.
-      const callback = await checkout.handleCallback('mock', reference, { reference, Status: 'OK', status: 'success' });
+      const callback = await checkout.handleCallback('sandbox', reference, { reference, Status: 'OK', status: 'success' });
 
       expect(callback.outcome.status).toBe('failed');
       expect(callback.outcome.failureCode).toBe('not_completed');
@@ -109,15 +109,15 @@ describeIfPg('Payment callback security on real PostgreSQL', () => {
     it('rejects a completely fabricated provider reference without leaking whether it exists', async () => {
       await bookAndReachGateway();
       await expect(
-        checkout.handleCallback('mock', 'MOCK-DOES-NOT-EXIST', { reference: 'MOCK-DOES-NOT-EXIST', Status: 'OK' }),
+        checkout.handleCallback('sandbox', 'SBX-DOES-NOT-EXIST', { reference: 'SBX-DOES-NOT-EXIST', Status: 'OK' }),
       ).rejects.toMatchObject({ response: { code: 'NOT_FOUND_OR_NOT_YOURS' } });
     });
 
     it('ignores the callback parameters entirely when the gateway says the payment was DECLINED', async () => {
       const { result, reference } = await bookAndReachGateway();
-      await mock.settle(reference, false); // the bank declined
+      await sandbox.decide(reference, 'failure'); // the bank declined
 
-      const callback = await checkout.handleCallback('mock', reference, { reference, Status: 'OK', status: 'success' });
+      const callback = await checkout.handleCallback('sandbox', reference, { reference, Status: 'OK', status: 'success' });
 
       expect(callback.outcome.status).toBe('failed');
       expect(callback.outcome.failureCode).toBe('declined');
@@ -128,14 +128,14 @@ describeIfPg('Payment callback security on real PostgreSQL', () => {
   describe('amount tampering', () => {
     it('refuses to succeed when the gateway captured LESS than the order total', async () => {
       const { result, reference } = await bookAndReachGateway(200_000);
-      await mock.settle(reference, true);
+      await sandbox.decide(reference, 'success');
 
       // Simulate the gateway reporting a different captured amount than the
       // intent recorded -- the exact shape of a tampered redirect or a
       // manipulated gateway-side amount.
-      await dataSource.query(`UPDATE payment.mock_gateway_transactions SET amount_toman = 1000 WHERE reference = $1`, [reference]);
+      await dataSource.query(`UPDATE payment.sandbox_transactions SET amount_toman = 1000 WHERE reference = $1`, [reference]);
 
-      const callback = await checkout.handleCallback('mock', reference, { reference });
+      const callback = await checkout.handleCallback('sandbox', reference, { reference });
 
       expect(callback.outcome.status).toBe('failed');
       expect(callback.outcome.failureCode).toBe('amount_mismatch');
@@ -145,18 +145,18 @@ describeIfPg('Payment callback security on real PostgreSQL', () => {
 
     it('refuses to succeed when the gateway captured MORE than the order total', async () => {
       const { result, reference } = await bookAndReachGateway(200_000);
-      await mock.settle(reference, true);
-      await dataSource.query(`UPDATE payment.mock_gateway_transactions SET amount_toman = 999999 WHERE reference = $1`, [reference]);
+      await sandbox.decide(reference, 'success');
+      await dataSource.query(`UPDATE payment.sandbox_transactions SET amount_toman = 999999 WHERE reference = $1`, [reference]);
 
-      const callback = await checkout.handleCallback('mock', reference, { reference });
+      const callback = await checkout.handleCallback('sandbox', reference, { reference });
       expect(callback.outcome.status).toBe('failed');
       expect((await orders.findById(result.order.order.id))?.status).toBe('pending');
     });
 
     it('compares against the amount captured at INTENT time, so mutating the order afterwards cannot launder a mismatch', async () => {
       const { result, reference } = await bookAndReachGateway(200_000);
-      await mock.settle(reference, true);
-      await dataSource.query(`UPDATE payment.mock_gateway_transactions SET amount_toman = 1000 WHERE reference = $1`, [reference]);
+      await sandbox.decide(reference, 'success');
+      await dataSource.query(`UPDATE payment.sandbox_transactions SET amount_toman = 1000 WHERE reference = $1`, [reference]);
 
       // An attacker who could also lower the order total still fails: the
       // intent's own captured figure is what verification checks.
@@ -165,7 +165,7 @@ describeIfPg('Payment callback security on real PostgreSQL', () => {
         [result.order.order.id],
       );
 
-      const callback = await checkout.handleCallback('mock', reference, { reference });
+      const callback = await checkout.handleCallback('sandbox', reference, { reference });
       expect(callback.outcome.status).toBe('failed');
       expect(callback.outcome.failureCode).toBe('amount_mismatch');
     });
@@ -174,11 +174,11 @@ describeIfPg('Payment callback security on real PostgreSQL', () => {
   describe('replay and duplicate delivery', () => {
     it('processes a duplicated callback exactly once', async () => {
       const { result, reference } = await bookAndReachGateway();
-      await mock.settle(reference, true);
+      await sandbox.decide(reference, 'success');
 
-      const first = await checkout.handleCallback('mock', reference, { reference });
-      const second = await checkout.handleCallback('mock', reference, { reference });
-      const third = await checkout.handleCallback('mock', reference, { reference });
+      const first = await checkout.handleCallback('sandbox', reference, { reference });
+      const second = await checkout.handleCallback('sandbox', reference, { reference });
+      const third = await checkout.handleCallback('sandbox', reference, { reference });
 
       expect(first.outcome.status).toBe('succeeded');
       expect(second.outcome.status).toBe('replayed');
@@ -201,12 +201,12 @@ describeIfPg('Payment callback security on real PostgreSQL', () => {
 
     it('processes SIMULTANEOUS duplicate callbacks exactly once', async () => {
       const { result, reference } = await bookAndReachGateway();
-      await mock.settle(reference, true);
+      await sandbox.decide(reference, 'success');
 
       const results = await Promise.all([
-        checkout.handleCallback('mock', reference, { reference }),
-        checkout.handleCallback('mock', reference, { reference }),
-        checkout.handleCallback('mock', reference, { reference }),
+        checkout.handleCallback('sandbox', reference, { reference }),
+        checkout.handleCallback('sandbox', reference, { reference }),
+        checkout.handleCallback('sandbox', reference, { reference }),
       ]);
 
       const succeeded = results.filter((r) => r.outcome.status === 'succeeded');
@@ -221,11 +221,11 @@ describeIfPg('Payment callback security on real PostgreSQL', () => {
 
     it('does not re-verify with the gateway on a replayed callback', async () => {
       const { reference } = await bookAndReachGateway();
-      await mock.settle(reference, true);
-      await checkout.handleCallback('mock', reference, { reference });
+      await sandbox.decide(reference, 'success');
+      await checkout.handleCallback('sandbox', reference, { reference });
 
-      const verifySpy = jest.spyOn(mock, 'verify');
-      await checkout.handleCallback('mock', reference, { reference });
+      const verifySpy = jest.spyOn(sandbox, 'verify');
+      await checkout.handleCallback('sandbox', reference, { reference });
       // A replay short-circuits on the attempt's terminal status: talking to
       // the bank again would be a pointless external call, and for some
       // gateways a second verify is itself an error.
@@ -262,7 +262,7 @@ describeIfPg('Payment callback security on real PostgreSQL', () => {
         slotId,
         serviceId: professional.serviceId,
         idempotencyKey: 'retry-me',
-        callbackUrl: 'http://localhost:3099/api/v1/payments/callback/mock',
+        callbackUrl: 'http://localhost:3099/api/v1/payments/callback/sandbox',
       };
       const first = await checkout.checkout(args);
       const second = await checkout.checkout(args);
@@ -284,7 +284,7 @@ describeIfPg('Payment callback security on real PostgreSQL', () => {
       await expect(
         dataSource.query(
           `INSERT INTO payment.payment_attempts (id, payment_intent_id, provider_key, provider_reference, status, requested_amount_toman)
-           VALUES (gen_random_uuid(), $1, 'mock', 'FORCED-SECOND', 'initiated', 1)`,
+           VALUES (gen_random_uuid(), $1, 'sandbox', 'FORCED-SECOND', 'initiated', 1)`,
           [result.paymentIntentId],
         ),
       ).rejects.toThrow(/uq_payment_attempts_live_per_intent|duplicate key/i);
@@ -292,25 +292,25 @@ describeIfPg('Payment callback security on real PostgreSQL', () => {
 
     it('REFUNDS a genuine second charge instead of silently absorbing it', async () => {
       const { result, reference } = await bookAndReachGateway();
-      await mock.settle(reference, true);
-      await checkout.handleCallback('mock', reference, { reference });
+      await sandbox.decide(reference, 'success');
+      await checkout.handleCallback('sandbox', reference, { reference });
       expect((await orders.findById(result.order.order.id))?.status).toBe('paid');
 
       // Simulate a customer who kept an older redirect URL open: a second,
       // genuinely-paid gateway transaction lands on an already-paid order.
       const secondReference = 'MOCK-SECOND-CHARGE-0001';
       await dataSource.query(
-        `INSERT INTO payment.mock_gateway_transactions (reference, amount_toman, outcome, settlement_reference)
+        `INSERT INTO payment.sandbox_transactions (reference, amount_toman, outcome, settlement_reference)
          VALUES ($1, $2, 'paid', 'MOCKTX-SECOND')`,
         [secondReference, result.order.order.totalToman],
       );
       await dataSource.query(
         `INSERT INTO payment.payment_attempts (id, payment_intent_id, provider_key, provider_reference, status, requested_amount_toman)
-         VALUES (gen_random_uuid(), $1, 'mock', $2, 'initiated', $3)`,
+         VALUES (gen_random_uuid(), $1, 'sandbox', $2, 'initiated', $3)`,
         [result.paymentIntentId, secondReference, result.order.order.totalToman],
       );
 
-      const callback = await checkout.handleCallback('mock', secondReference, { reference: secondReference });
+      const callback = await checkout.handleCallback('sandbox', secondReference, { reference: secondReference });
       expect(callback.duplicateChargeRefunded).toBe(true);
 
       const refunds = await payments.listRefundsForOrder(result.order.order.id);
@@ -322,21 +322,21 @@ describeIfPg('Payment callback security on real PostgreSQL', () => {
 
     it('does NOT let a duplicate-charge refund reverse the order or the commission', async () => {
       const { result, reference } = await bookAndReachGateway();
-      await mock.settle(reference, true);
-      await checkout.handleCallback('mock', reference, { reference });
+      await sandbox.decide(reference, 'success');
+      await checkout.handleCallback('sandbox', reference, { reference });
 
       const secondReference = 'MOCK-SECOND-CHARGE-0002';
       await dataSource.query(
-        `INSERT INTO payment.mock_gateway_transactions (reference, amount_toman, outcome, settlement_reference)
+        `INSERT INTO payment.sandbox_transactions (reference, amount_toman, outcome, settlement_reference)
          VALUES ($1, $2, 'paid', 'MOCKTX-SECOND2')`,
         [secondReference, result.order.order.totalToman],
       );
       await dataSource.query(
         `INSERT INTO payment.payment_attempts (id, payment_intent_id, provider_key, provider_reference, status, requested_amount_toman)
-         VALUES (gen_random_uuid(), $1, 'mock', $2, 'initiated', $3)`,
+         VALUES (gen_random_uuid(), $1, 'sandbox', $2, 'initiated', $3)`,
         [result.paymentIntentId, secondReference, result.order.order.totalToman],
       );
-      await checkout.handleCallback('mock', secondReference, { reference: secondReference });
+      await checkout.handleCallback('sandbox', secondReference, { reference: secondReference });
 
       // Drain repeatedly so the RefundCompleted event is definitely consumed.
       for (let i = 0; i < 3; i++) await ctx.relay.drain();
@@ -353,12 +353,12 @@ describeIfPg('Payment callback security on real PostgreSQL', () => {
   describe('expiry', () => {
     it('refuses to verify an intent that has already expired', async () => {
       const { result, reference } = await bookAndReachGateway();
-      await mock.settle(reference, true);
+      await sandbox.decide(reference, 'success');
       await dataSource.query(`UPDATE payment.payment_intents SET expires_at = now() - interval '1 minute' WHERE id = $1`, [
         result.paymentIntentId,
       ]);
 
-      const callback = await checkout.handleCallback('mock', reference, { reference });
+      const callback = await checkout.handleCallback('sandbox', reference, { reference });
       expect(callback.outcome.status).toBe('failed');
       expect(callback.outcome.failureCode).toBe('intent_expired');
       expect((await orders.findById(result.order.order.id))?.status).toBe('pending');
@@ -368,7 +368,7 @@ describeIfPg('Payment callback security on real PostgreSQL', () => {
   describe('paid but unconfirmable -- the money must never be lost', () => {
     it('keeps the payment record and auto-refunds when the slot is gone', async () => {
       const { result, reference } = await bookAndReachGateway();
-      await mock.settle(reference, true);
+      await sandbox.decide(reference, 'success');
 
       // While the customer was at the gateway, the hold lapsed and the
       // booking expired -- the slot may now belong to somebody else.
@@ -376,7 +376,7 @@ describeIfPg('Payment callback security on real PostgreSQL', () => {
         result.bookingId,
       ]);
 
-      const callback = await checkout.handleCallback('mock', reference, { reference });
+      const callback = await checkout.handleCallback('sandbox', reference, { reference });
 
       // The payment DID happen and is recorded. Rolling it back would lose a
       // real charge.
@@ -394,13 +394,13 @@ describeIfPg('Payment callback security on real PostgreSQL', () => {
 
     it('does not issue a SECOND refund when the same callback is replayed', async () => {
       const { result, reference } = await bookAndReachGateway();
-      await mock.settle(reference, true);
+      await sandbox.decide(reference, 'success');
       await dataSource.query(`UPDATE booking.bookings SET status = 'expired', hold_expires_at = NULL WHERE id = $1`, [
         result.bookingId,
       ]);
 
-      await checkout.handleCallback('mock', reference, { reference });
-      await checkout.handleCallback('mock', reference, { reference });
+      await checkout.handleCallback('sandbox', reference, { reference });
+      await checkout.handleCallback('sandbox', reference, { reference });
 
       const refunds = await payments.listRefundsForOrder(result.order.order.id);
       expect(refunds).toHaveLength(1);
@@ -412,7 +412,7 @@ describeIfPg('Payment callback security on real PostgreSQL', () => {
       const { result, reference } = await bookAndReachGateway();
 
       const response = await request(app.getHttpServer())
-        .get(`/api/v1/payments/callback/mock?reference=${reference}&Status=OK`)
+        .get(`/api/v1/payments/callback/sandbox?reference=${reference}&Status=OK`)
         .expect(303);
 
       // Redirected to the failure result -- not "unauthorized", because the
@@ -424,10 +424,10 @@ describeIfPg('Payment callback security on real PostgreSQL', () => {
 
     it('redirects with 303 so a refresh of the result page cannot re-submit', async () => {
       const { reference } = await bookAndReachGateway();
-      await mock.settle(reference, true);
+      await sandbox.decide(reference, 'success');
 
       const response = await request(app.getHttpServer())
-        .post(`/api/v1/payments/callback/mock`)
+        .post(`/api/v1/payments/callback/sandbox`)
         .send({ reference })
         .expect(303);
       expect(response.headers.location).toContain('status=succeeded');
@@ -448,13 +448,13 @@ describeIfPg('Payment callback security on real PostgreSQL', () => {
     });
   });
 
-  describe('the mock gateway is production-gated', () => {
+  describe('the sandbox gateway is production-gated', () => {
     it('is enabled outside production', () => {
-      expect(mock.isEnabled()).toBe(true);
-      expect(app.get(PaymentProviderRegistry).enabledKeys()).toContain('mock');
+      expect(sandbox.isEnabled()).toBe(true);
+      expect(app.get(PaymentProviderRegistry).enabledKeys()).toContain('sandbox');
     });
 
-    it('fails CLOSED in production unless explicitly allowed', () => {
+    it('fails CLOSED in production, with NO override of any kind', () => {
       // Constructed directly with a stub config rather than mutating
       // process.env on the running app: @nestjs/config caches a validated
       // snapshot of the environment at boot (AppModule uses
@@ -462,17 +462,33 @@ describeIfPg('Payment callback security on real PostgreSQL', () => {
       // invisible to the live ConfigService. Testing the gate through that
       // cache would assert nothing about the gate's own logic.
       const gateWith = (env: Record<string, string>) =>
-        new MockGatewayProvider(
+        new SandboxPaymentProvider(
           null as never,
           { get: (key: string) => env[key] } as never,
         ).isEnabled();
 
+      // NODE_ENV=production is a HARD stop. The old provider honoured a
+      // PAYMENT_ALLOW_MOCK_GATEWAY=true escape hatch here; that hatch was
+      // deliberately REMOVED, so these must stay false no matter what else
+      // is set. A simulated bank that one environment variable can switch on
+      // in production is precisely the hazard this gate exists to prevent.
       expect(gateWith({ NODE_ENV: 'production' })).toBe(false);
-      expect(gateWith({ NODE_ENV: 'production', PAYMENT_ALLOW_MOCK_GATEWAY: 'false' })).toBe(false);
-      expect(gateWith({ NODE_ENV: 'production', PAYMENT_ALLOW_MOCK_GATEWAY: 'yes' })).toBe(false);
-      expect(gateWith({ NODE_ENV: 'production', PAYMENT_ALLOW_MOCK_GATEWAY: 'true' })).toBe(true);
+      expect(gateWith({ NODE_ENV: 'production', PAYMENT_ENVIRONMENT: 'sandbox' })).toBe(false);
+      expect(gateWith({ NODE_ENV: 'production', PAYMENT_ALLOW_MOCK_GATEWAY: 'true' })).toBe(false);
+      expect(gateWith({ NODE_ENV: 'production', PAYMENT_ALLOW_SANDBOX: 'true' })).toBe(false);
+      expect(gateWith({ NODE_ENV: 'production', PAYMENT_ENVIRONMENT: 'production' })).toBe(false);
+
+      // Outside production the SECOND condition still has to hold: the
+      // deployment must actually be pointed at the sandbox world.
+      expect(gateWith({ NODE_ENV: 'development', PAYMENT_ENVIRONMENT: 'sandbox' })).toBe(true);
+      expect(gateWith({ NODE_ENV: 'test', PAYMENT_ENVIRONMENT: 'sandbox' })).toBe(true);
+      expect(gateWith({ NODE_ENV: 'development', PAYMENT_ENVIRONMENT: 'production' })).toBe(false);
+      expect(gateWith({ NODE_ENV: 'staging', PAYMENT_ENVIRONMENT: 'live' })).toBe(false);
+
       // Unset NODE_ENV must not be treated as production-and-therefore-open,
-      // nor as production-and-therefore-closed: development defaults open.
+      // nor as production-and-therefore-closed: development defaults open,
+      // and PAYMENT_ENVIRONMENT defaults to sandbox so a developer need
+      // configure nothing to run locally.
       expect(gateWith({})).toBe(true);
     });
 

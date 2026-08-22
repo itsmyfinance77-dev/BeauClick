@@ -4,7 +4,7 @@ import { AuthenticatedUser, CurrentUser, SkipResponseEnvelope } from '@beauclick
 import { Public } from '@beauclick/auth';
 import { CreateBookingDto, toBookingShape, BookingService } from '@beauclick/booking';
 import { toOrderDetail } from '@beauclick/commerce';
-import { MockGatewayProvider, PaymentService } from '@beauclick/payment';
+import { SANDBOX_DECISIONS, SandboxDecision, SandboxPaymentProvider, PaymentService } from '@beauclick/payment';
 
 import { CheckoutService } from './checkout.service';
 
@@ -147,23 +147,39 @@ export class PaymentCallbackController {
 }
 
 /**
- * The local mock gateway's own checkout page -- the simulated BANK, not part
- * of BeauClick's payment domain.
+ * The sandbox gateway's own checkout page -- the simulated BANK, not part of
+ * BeauClick's payment domain.
  *
  * It stands in for the page a real gateway would host. Reachable only while
- * MockGatewayProvider itself is enabled, which fails closed in production.
+ * SandboxPaymentProvider itself is enabled, which fails closed in production
+ * on two independent conditions. The `isEnabled()` re-check here is NOT
+ * redundant with the registry's: this route is `@Public()` (a real gateway's
+ * page carries no BeauClick session), so it is reachable without
+ * authentication and must therefore refuse on its own rather than trusting
+ * that some earlier layer already did.
  */
-@Controller('v1/mock-gateway')
-export class MockGatewayController {
-  constructor(private readonly mock: MockGatewayProvider) {}
+@Controller('v1/sandbox-gateway')
+export class SandboxGatewayController {
+  constructor(private readonly sandbox: SandboxPaymentProvider) {}
 
   @Public()
-  @Post(':reference/settle')
-  async settle(@Param('reference') reference: string, @Body() body: { paid?: boolean }) {
-    if (!this.mock.isEnabled()) {
-      return { accepted: false, reason: 'mock_gateway_disabled' };
+  @Post(':reference/decide')
+  async decide(@Param('reference') reference: string, @Body() body: { decision?: string }) {
+    if (!this.sandbox.isEnabled()) {
+      return { accepted: false, reason: 'sandbox_gateway_disabled' };
     }
-    const accepted = await this.mock.settle(reference, body?.paid !== false);
+
+    // An unrecognised decision is REFUSED, never coerced to a default. The
+    // previous shape (`paid?: boolean`, where anything but an explicit
+    // `false` meant "paid") would have turned a typo'd field name into a
+    // successful payment -- the exact class of leniency a payment path
+    // should never have, sandbox or not.
+    const decision = body?.decision;
+    if (!decision || !SANDBOX_DECISIONS.includes(decision as SandboxDecision)) {
+      return { accepted: false, reason: 'unknown_decision' };
+    }
+
+    const accepted = await this.sandbox.decide(reference, decision as SandboxDecision);
     return { accepted };
   }
 }

@@ -5,7 +5,7 @@ import request from 'supertest';
 import { uuidv7 } from 'uuidv7';
 
 import { LedgerService, MyFinanceService, SettlementService } from '@beauclick/financial';
-import { MockGatewayProvider } from '@beauclick/payment';
+import { SandboxPaymentProvider } from '@beauclick/payment';
 import { OrderService } from '@beauclick/commerce';
 import { assertNoLeak } from '@beauclick/testing';
 import { CheckoutService } from '../src/checkout/checkout.service';
@@ -45,7 +45,7 @@ describeIfPg('Financial integrity on real PostgreSQL', () => {
   let myFinance: MyFinanceService;
   let orders: OrderService;
   let checkout: CheckoutService;
-  let mock: MockGatewayProvider;
+  let sandbox: SandboxPaymentProvider;
 
   beforeAll(async () => {
     ctx = await createPgTestApp();
@@ -57,7 +57,7 @@ describeIfPg('Financial integrity on real PostgreSQL', () => {
     myFinance = app.get(MyFinanceService);
     orders = app.get(OrderService);
     checkout = app.get(CheckoutService);
-    mock = app.get(MockGatewayProvider);
+    sandbox = app.get(SandboxPaymentProvider);
   });
 
   afterAll(async () => {
@@ -578,15 +578,15 @@ describeIfPg('Financial integrity on real PostgreSQL', () => {
         professionalId: professional.id,
         slotId,
         serviceId: professional.serviceId,
-        callbackUrl: 'http://localhost:3099/api/v1/payments/callback/mock',
+        callbackUrl: 'http://localhost:3099/api/v1/payments/callback/sandbox',
       });
 
       const [{ provider_reference }] = await dataSource.query(
         `SELECT provider_reference FROM payment.payment_attempts WHERE payment_intent_id = $1`,
         [result.paymentIntentId],
       );
-      await mock.settle(provider_reference, true);
-      await checkout.handleCallback('mock', provider_reference, { reference: provider_reference });
+      await sandbox.decide(provider_reference, 'success');
+      await checkout.handleCallback('sandbox', provider_reference, { reference: provider_reference });
 
       // The ledger is reached via the outbox, so drain it -- exactly what the
       // periodic sweep does in production.
@@ -613,14 +613,14 @@ describeIfPg('Financial integrity on real PostgreSQL', () => {
         professionalId: professional.id,
         slotId,
         serviceId: professional.serviceId,
-        callbackUrl: 'http://localhost:3099/api/v1/payments/callback/mock',
+        callbackUrl: 'http://localhost:3099/api/v1/payments/callback/sandbox',
       });
       const [{ provider_reference }] = await dataSource.query(
         `SELECT provider_reference FROM payment.payment_attempts WHERE payment_intent_id = $1`,
         [result.paymentIntentId],
       );
-      await mock.settle(provider_reference, true);
-      await checkout.handleCallback('mock', provider_reference, { reference: provider_reference });
+      await sandbox.decide(provider_reference, 'success');
+      await checkout.handleCallback('sandbox', provider_reference, { reference: provider_reference });
       await ctx.relay.drain();
 
       expect((await myFinance.mySummary(owner.id))?.outstandingToman).toBe(255_000);

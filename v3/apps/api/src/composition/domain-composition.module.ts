@@ -18,7 +18,7 @@ import { PHASE3_EVENT_HANDLERS, PHASE3_OUTBOX_SOURCES } from './phase3-tokens';
 
 import { DomainPortsModule } from './domain-ports.module';
 import { CheckoutService } from '../checkout/checkout.service';
-import { CheckoutController, MockGatewayController, PaymentCallbackController } from '../checkout/checkout.controller';
+import { CheckoutController, SandboxGatewayController, PaymentCallbackController } from '../checkout/checkout.controller';
 import { OutboxSweepScheduler } from '../events/outbox-sweep.scheduler';
 import {
   BookingCancelledRefundHandler,
@@ -80,7 +80,7 @@ import {
     // own tokens and merged into the single relay below.
     Phase3CompositionModule,
   ],
-  controllers: [CheckoutController, PaymentCallbackController, MockGatewayController, WaitlistAcceptanceController],
+  controllers: [CheckoutController, PaymentCallbackController, SandboxGatewayController, WaitlistAcceptanceController],
   providers: [
     CheckoutService,
     WaitlistAcceptanceService,
