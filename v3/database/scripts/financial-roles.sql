@@ -67,6 +67,22 @@ ALTER ROLE beauclick_financial_reader NOSUPERUSER NOCREATEDB NOCREATEROLE;
 -- bookkeeping row commit in ONE transaction (otherwise a crash between the
 -- two leaves a migration applied but unrecorded, and the re-run fails on
 -- "already exists").
+--
+-- This script's own usage note says "run BEFORE the financial migration" --
+-- which means BEFORE `migrate.ts` has ever run on a truly fresh database, so
+-- the table this GRANT targets does not exist yet. Every prior run of this
+-- script happened to find it already there (a persistent dev database that
+-- had been migrated before), which is exactly why a genuinely fresh CI
+-- database was the first environment to ever hit `relation "public.
+-- schema_migrations" does not exist`. Creating it here, with the identical
+-- DDL `migrate.ts` uses, makes this script correct regardless of which of
+-- the two runs first -- migrate.ts's own `CREATE TABLE IF NOT EXISTS` is a
+-- no-op against a table this already created.
+CREATE TABLE IF NOT EXISTS public.schema_migrations (
+    filename VARCHAR(255) PRIMARY KEY,
+    applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 GRANT CREATE ON DATABASE :"db_name" TO beauclick_financial_owner;
 GRANT SELECT, INSERT ON public.schema_migrations TO beauclick_financial_owner;
 
