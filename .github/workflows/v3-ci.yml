@@ -36,7 +36,13 @@ defaults:
 
 env:
   NODE_VERSION: '20'
-  PNPM_VERSION: '9'
+  # Pinned to match `packageManager` in v3/package.json. pnpm 9's
+  # frozen-lockfile check computes a different overrides-hash than pnpm 11
+  # produces, so a mismatched CI version rejects a lockfile the same
+  # workspace installs cleanly with locally (ERR_PNPM_LOCKFILE_CONFIG_MISMATCH,
+  # discovered failing on every push since Phase 3's CI landed -- see
+  # V3_PHASE4_IMPLEMENTATION.md).
+  PNPM_VERSION: '11.22.0'
 
 jobs:
   # --------------------------------------------------------------------------
