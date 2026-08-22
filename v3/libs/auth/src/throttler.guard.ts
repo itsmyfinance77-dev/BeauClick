@@ -44,35 +44,53 @@ export const THROTTLE_POLICIES = {
 
 export type ThrottlePolicyName = keyof typeof THROTTLE_POLICIES;
 
+function num(key: string, fallback: number): number {
+  const raw = Number(process.env[key]);
+  return Number.isFinite(raw) && raw > 0 ? raw : fallback;
+}
+
+/** A policy's live limit/ttl, re-read from the environment on every call. */
+export function policyLimit(name: ThrottlePolicyName): number {
+  return num(`THROTTLE_${name.toUpperCase()}_LIMIT`, THROTTLE_POLICIES[name].limit);
+}
+
+export function policyTtl(name: ThrottlePolicyName): number {
+  return num(`THROTTLE_${name.toUpperCase()}_TTL_MS`, THROTTLE_POLICIES[name].ttl);
+}
+
 /**
- * Skips EVERY named policy, for `@SkipThrottle(SKIP_ALL_THROTTLES)`.
+ * **Exactly ONE throttler is registered, named `default`.** This is not a
+ * simplification -- it is the only correct shape, and getting it wrong is a
+ * trap worth documenting.
  *
- * Bare `@SkipThrottle()` is a trap once more than one named throttler
- * exists: its default argument is `{ default: true }`, so it skips only the
- * policy literally named `default` and leaves every other one still
- * applying. That silently left `/health` subject to four of the five
- * policies -- a liveness probe that would eventually 429 and pull a healthy
- * instance from rotation. Caught by CI, not by review.
+ * `ThrottlerGuard.canActivate` loops over EVERY configured named throttler
+ * and requires all of them to pass (`continues.every(...)`). Registering five
+ * named policies therefore does NOT give each route its own limit: it
+ * applies all five to every route, so the effective limit everywhere becomes
+ * the MINIMUM of them. An earlier version of this file did exactly that, and
+ * the result was that `search` -- nominally 300/min -- would have been capped
+ * at `refresh`'s 20/min. Caught by CI when a window-reset test kept 429ing
+ * long after the `read` window had lapsed, because the `default` throttler
+ * was still blocking.
  *
- * Derived from `THROTTLE_POLICIES` rather than hand-listed so adding a
- * sixth policy cannot re-open the same hole.
+ * The correct shape: one throttler, with per-route overrides supplied by
+ * `@Throttle(policy('read'))`.
  */
-export const SKIP_ALL_THROTTLES: Record<ThrottlePolicyName, boolean> = Object.fromEntries(
-  (Object.keys(THROTTLE_POLICIES) as ThrottlePolicyName[]).map((name) => [name, true]),
-) as Record<ThrottlePolicyName, boolean>;
+export function throttlerOptionsFromEnv() {
+  return [{ name: 'default', limit: policyLimit('default'), ttl: policyTtl('default') }];
+}
 
-/** Reads each policy's limit/ttl from the environment, falling back to the default above. */
-export function throttlerOptionsFromEnv(env: NodeJS.ProcessEnv = process.env) {
-  const num = (key: string, fallback: number): number => {
-    const raw = Number(env[key]);
-    return Number.isFinite(raw) && raw > 0 ? raw : fallback;
-  };
-
-  return (Object.keys(THROTTLE_POLICIES) as ThrottlePolicyName[]).map((name) => ({
-    name,
-    limit: num(`THROTTLE_${name.toUpperCase()}_LIMIT`, THROTTLE_POLICIES[name].limit),
-    ttl: num(`THROTTLE_${name.toUpperCase()}_TTL_MS`, THROTTLE_POLICIES[name].ttl),
-  }));
+/**
+ * A per-route override of the single `default` throttler.
+ *
+ * `limit`/`ttl` are FUNCTIONS, not values, deliberately: the guard resolves
+ * them per request (`resolveValue`), so they read the current environment at
+ * request time. Baked-in constants would be captured when the decorator is
+ * evaluated -- at module import, long before a test harness can set its own
+ * limits -- which would make the whole configuration untestable.
+ */
+export function policy(name: ThrottlePolicyName) {
+  return { default: { limit: () => policyLimit(name), ttl: () => policyTtl(name) } };
 }
 
 /**

@@ -2,7 +2,7 @@ import { Body, Controller, Get, Headers, Param, Post, Query, Redirect } from '@n
 import { ConfigService } from '@nestjs/config';
 import { Throttle } from '@nestjs/throttler';
 import { AuthenticatedUser, CurrentUser, SkipResponseEnvelope } from '@beauclick/http';
-import { Public } from '@beauclick/auth';
+import { Public, policy } from '@beauclick/auth';
 import { CreateBookingDto, toBookingShape, BookingService } from '@beauclick/booking';
 import { toOrderDetail } from '@beauclick/commerce';
 import { SANDBOX_DECISIONS, SandboxDecision, SandboxPaymentProvider, PaymentService } from '@beauclick/payment';
@@ -24,7 +24,7 @@ import { CheckoutService } from './checkout.service';
  * opens a gateway attempt. No legitimate customer does that thirty times a
  * minute, and each one costs real downstream work.
  */
-@Throttle({ mutation: {} })
+@Throttle(policy('mutation'))
 @Controller('v1')
 export class CheckoutController {
   constructor(
@@ -99,7 +99,7 @@ export class CheckoutController {
  * gateway's. A real gateway's callback rate and source-IP behaviour must be
  * measured and this limit re-derived from it -- see V3_SECURITY_MODEL.md.
  */
-@Throttle({ read: {} })
+@Throttle(policy('read'))
 @Controller('v1/payments')
 export class PaymentCallbackController {
   constructor(

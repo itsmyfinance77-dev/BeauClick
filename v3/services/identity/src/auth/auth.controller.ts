@@ -17,7 +17,7 @@ import { Throttle } from '@nestjs/throttler';
 import { Request, Response } from 'express';
 import { CurrentUser, AuthenticatedUser } from '@beauclick/http';
 import { NotFoundOrNotYoursException } from '@beauclick/ownership';
-import { Public } from '@beauclick/auth';
+import { Public, policy } from '@beauclick/auth';
 import { AuthService } from './auth.service';
 import { RequestOtpDto } from './dto/request-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
@@ -72,7 +72,7 @@ export class AuthController {
   // high enough here that it never fires before OtpService's own limit
   // does under realistic traffic.
   @Public()
-  @Throttle({ auth: {} })
+  @Throttle(policy('auth'))
   @Post('request-otp')
   @HttpCode(HttpStatus.OK)
   async requestOtp(@Body() dto: RequestOtpDto, @Ip() ip: string): Promise<{ requested: true }> {
@@ -83,7 +83,7 @@ export class AuthController {
   }
 
   @Public()
-  @Throttle({ auth: {} })
+  @Throttle(policy('auth'))
   @Post('verify-otp')
   @HttpCode(HttpStatus.OK)
   async verifyOtp(
@@ -115,7 +115,7 @@ export class AuthController {
   }
 
   @Public()
-  @Throttle({ refresh: {} })
+  @Throttle(policy('refresh'))
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   async refresh(@Body() dto: RefreshDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {

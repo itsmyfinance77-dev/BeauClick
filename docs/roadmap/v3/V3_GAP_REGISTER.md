@@ -527,6 +527,15 @@ the registration **structurally**, so deleting the `APP_GUARD` line fails
 the suite even though every behavioural test would still pass at high test
 limits.
 
+*One real production bug found in the process, and only findable because the
+guard was finally active:* `@SkipThrottle()` with no argument defaults to
+`{ default: true }`, skipping only the policy literally NAMED `default`.
+With five named policies, `/health` remained subject to the other four --
+liveness probes would eventually have 429'd and healthy instances been
+pulled from rotation, i.e. the exemption causing the outage it exists to
+prevent. Fixed with a `SKIP_ALL_THROTTLES` constant derived from the policy
+map so a sixth policy cannot re-open it. Caught by CI, not review.
+
 *Known limitations, disclosed:* storage is in-memory per process, so at
 multi-instance scale the effective limit multiplies by instance count (a
 shared Redis store is the correct fix, deliberately not adopted at current

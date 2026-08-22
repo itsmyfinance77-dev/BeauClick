@@ -1,6 +1,6 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { Public } from '@beauclick/auth';
+import { Public, policy } from '@beauclick/auth';
 import { AuthenticatedUser, CurrentUser } from '@beauclick/http';
 import { RequireCapability } from '@beauclick/auth';
 import { AutocompleteDto, RecordProfileViewDto, SearchProvidersDto } from './dto/search.dto';
@@ -57,7 +57,7 @@ function toPublic(doc: ProviderSearchDocument): PublicProviderResult {
  * legitimately issue ~240 requests a minute. Under the default limit,
  * ordinary typing would rate-limit itself.
  */
-@Throttle({ read: {} })
+@Throttle(policy('read'))
 @Controller('v1/search')
 export class SearchController {
   constructor(

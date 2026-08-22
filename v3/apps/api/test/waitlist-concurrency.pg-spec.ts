@@ -229,7 +229,11 @@ describeIfPg('Waitlist concurrency on real PostgreSQL', () => {
     const { professional, slotId, firstCustomer, secondCustomer } = await scenario();
     const entry1 = await waitlist.join({ customerId: firstCustomer.id, professionalId: professional.id, serviceId: null });
     await new Promise((r) => setTimeout(r, 5));
-    await waitlist.join({ customerId: secondCustomer.id, professionalId: professional.id, serviceId: null });
+    const entry2 = await waitlist.join({
+      customerId: secondCustomer.id,
+      professionalId: professional.id,
+      serviceId: null,
+    });
 
     // Two concurrent matcher invocations for the identical slot -- simulates
     // an at-least-once redelivery racing the first dispatch.
@@ -250,9 +254,25 @@ describeIfPg('Waitlist concurrency on real PostgreSQL', () => {
       .map((r) => r.value)
       .filter((v): v is WaitlistEntryEntity => v !== null);
 
-    // Only ONE of the two concurrent calls actually created an offer.
+    // Only ONE of the two concurrent calls actually created an offer. THIS is
+    // the invariant redelivery must not break, and it holds.
     expect(offeredEntries).toHaveLength(1);
-    expect(offeredEntries[0].id).toBe(entry1.id);
+
+    // Deliberately NOT asserting the winner is entry1. Under genuine
+    // concurrency the FIFO ordering is not promised, by design: the matcher
+    // selects with `FOR UPDATE SKIP LOCKED`, so when call A has already
+    // locked the earliest row, call B is SUPPOSED to skip past it to the next
+    // candidate rather than block -- that skip is the whole point of the
+    // clause. Whichever transaction commits first wins, and the loser is
+    // rejected by the partial unique index on `offered_slot_id`.
+    //
+    // This originally asserted `entry1`, passed for several runs by timing
+    // luck, and then failed once unrelated load shifted the interleaving --
+    // i.e. it was testing a guarantee the system never made. FIFO ordering IS
+    // real and IS tested, in the non-concurrent case above ("offers a
+    // reopened slot to the EARLIEST waiting entry only"), which is where that
+    // property is actually well-defined.
+    expect([entry1.id, entry2.id]).toContain(offeredEntries[0].id);
 
     const activeOffersOnSlot = await dataSource
       .getRepository(WaitlistEntryEntity)

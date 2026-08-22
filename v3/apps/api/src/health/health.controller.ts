@@ -2,7 +2,7 @@ import { Controller, Get } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { SkipThrottle } from '@nestjs/throttler';
-import { Public, SKIP_ALL_THROTTLES } from '@beauclick/auth';
+import { Public } from '@beauclick/auth';
 
 /**
  * Backend foundation requirement: a real health endpoint -- V2 had NONE
@@ -23,12 +23,16 @@ import { Public, SKIP_ALL_THROTTLES } from '@beauclick/auth';
  * auth, and returns a fixed-shape status with no data of any kind -- there
  * is no amplification or enumeration to gain by flooding it.
  *
- * `SKIP_ALL_THROTTLES`, never a bare `@SkipThrottle()`: the bare form's
- * default argument is `{ default: true }`, which skips ONLY the policy
- * named `default` and leaves the other four still applying -- so health
- * probes were still being throttled. CI caught it; review did not.
+ * Bare `@SkipThrottle()` is correct here ONLY because exactly one throttler
+ * is registered, and it is named `default` -- the decorator's own default
+ * argument is `{ default: true }`, so it skips that one and there is no
+ * other. This was briefly wrong in development: an earlier design registered
+ * five named throttlers, and `@SkipThrottle()` then skipped only one of
+ * them, leaving health probes throttled by the other four. See
+ * `throttlerOptionsFromEnv`'s docblock for why one throttler is the only
+ * correct shape.
  */
-@SkipThrottle(SKIP_ALL_THROTTLES)
+@SkipThrottle()
 @Controller('health')
 export class HealthController {
   constructor(@InjectDataSource() private readonly dataSource: DataSource) {}

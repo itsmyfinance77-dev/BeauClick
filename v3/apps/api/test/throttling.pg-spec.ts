@@ -121,14 +121,19 @@ describeIfPg('Global rate limiting on real PostgreSQL', () => {
       expect(statuses).toContain(429);
     });
 
-    it('resolves its throttler options at the ROOT injector, not a feature module', () => {
-      // The second half of the original root cause: ThrottlerModule.forRoot()
-      // is not @Global in v6, and it used to live in IdentityModule -- so a
-      // root-level guard could not have resolved its storage even if someone
-      // had registered one.
-      const options = throttlerOptionsFromEnv(process.env);
-      expect(options.map((o) => o.name).sort()).toEqual(['auth', 'default', 'mutation', 'read', 'refresh']);
-      expect(options.every((o) => o.limit > 0 && o.ttl > 0)).toBe(true);
+    it('registers EXACTLY ONE throttler -- more than one silently ANDs the limits together', () => {
+      // Not a style preference. ThrottlerGuard.canActivate loops over every
+      // configured throttler and requires all to pass, so N named throttlers
+      // apply N limits to every route and the effective limit becomes their
+      // MINIMUM. An earlier design registered five, which would have capped
+      // search -- nominally 300/min -- at refresh's 20/min. Per-route limits
+      // come from @Throttle(policy(...)) overrides of this single throttler,
+      // never from registering more of them.
+      const options = throttlerOptionsFromEnv();
+      expect(options).toHaveLength(1);
+      expect(options[0].name).toBe('default');
+      expect(options[0].limit).toBeGreaterThan(0);
+      expect(options[0].ttl).toBeGreaterThan(0);
     });
   });
 
@@ -327,19 +332,29 @@ describeIfPg('Global rate limiting on real PostgreSQL', () => {
   describe('concurrency and normal usage', () => {
     it('handles a genuine concurrent burst without over- or under-counting', async () => {
       const ip = freshIp();
-      const burst = await Promise.all(
-        Array.from({ length: LIMIT * 3 }, () => hit('/api/v1/search/providers?q=burst', ip)),
+      // `allSettled`, not `all`: supertest spins up an ephemeral server per
+      // request, and a large simultaneous fan-out can drop a connection
+      // (ECONNRESET) for reasons that have nothing to do with throttling. A
+      // dropped connection must not be scored as either allowed or blocked,
+      // or the test measures the harness rather than the guard.
+      const settled = await Promise.allSettled(
+        Array.from({ length: LIMIT * 2 }, () => hit('/api/v1/search/providers?q=burst', ip)),
       );
-      const allowed = burst.filter((r) => r.status !== 429).length;
-      const blocked = burst.filter((r) => r.status === 429).length;
+      const statuses: number[] = [];
+      for (const outcome of settled) {
+        if (outcome.status === 'fulfilled') statuses.push(outcome.value.status);
+      }
 
-      // Some must be allowed and some blocked -- never all-or-nothing.
+      const allowed = statuses.filter((s) => s !== 429).length;
+      const blocked = statuses.filter((s) => s === 429).length;
+
+      // The property under test: under a genuine parallel burst the guard
+      // neither lets everything through nor blocks everything, and never
+      // allows more than the configured budget.
+      expect(statuses.length).toBeGreaterThan(LIMIT);
       expect(allowed).toBeGreaterThan(0);
       expect(blocked).toBeGreaterThan(0);
-      expect(allowed + blocked).toBe(LIMIT * 3);
-      // In-memory storage counts atomically enough that the allowance is not
-      // wildly exceeded under parallel load.
-      expect(allowed).toBeLessThanOrEqual(LIMIT * 2);
+      expect(allowed).toBeLessThanOrEqual(LIMIT);
     });
 
     it('does not break legitimate normal usage below the limit', async () => {
@@ -356,7 +371,17 @@ describeIfPg('Global rate limiting on real PostgreSQL', () => {
       // A dedicated app with a genuinely short window, so this asserts REAL
       // expiry against a real clock rather than mocking time.
       const ttlMs = 1000;
-      const shortCtx = await createPgTestApp({ ...THROTTLED_ENV, THROTTLE_READ_TTL_MS: String(ttlMs) });
+      // BOTH the read override and the default must be shortened. With a
+      // single registered throttler the `default` ttl is what
+      // ThrottlerModule was configured with at boot; the `read` override only
+      // changes what the search route resolves per request. Shortening just
+      // one leaves the other still blocking -- which is exactly how the
+      // five-throttler design was caught.
+      const shortCtx = await createPgTestApp({
+        ...THROTTLED_ENV,
+        THROTTLE_READ_TTL_MS: String(ttlMs),
+        THROTTLE_DEFAULT_TTL_MS: String(ttlMs),
+      });
       const shortApp = shortCtx.app;
       try {
         const ip = freshIp();
