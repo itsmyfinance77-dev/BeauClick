@@ -129,3 +129,13 @@ Named because each was avoided correctly in V2 and is worth stating as an anti-p
 - Do not treat "local development only" as a real security boundary unless it's also a hard, default-closed code gate.
 - Do not let audit logging be an opt-in convention per handler — it must be structurally enforced.
 - Do not conflate "can see a resource exists" with "can download/access its content" for privileged/moderator roles.
+
+---
+
+## 11. Phase 4 addendum — Business/Seller and Waitlist confirm the model, add one new primitive
+
+§3's ownership-derivation pattern held for both new domains without modification: `BusinessMembershipResolver.roleFor()` and `WaitlistEntryOwnerResolver`/`WaitlistProfessionalResolver` are the identical `session → resolved relationship` shape `BookingPartyResolver` established, re-verified adversarially (cross-business IDOR, forged staff-consent, cross-party financial leak — all proven against real PostgreSQL, not merely designed; see `V3_PHASE4_IMPLEMENTATION.md` §20).
+
+**One new primitive worth naming for future domains with a multi-actor relationship (more than the customer/professional pair booking already had): consent as a state-machine constraint, not a check.** A business invite is never active until the INVITED user's own session moves it there — there is no code path, including the inviting owner's own, that can activate it any other way. This is stronger than a permission check because it is not bypassable by a bug in a permission check: the state simply cannot reach `active` without the real actor's own authenticated call. Recommended as the default shape for any future feature where party A can grant party B something of B's own (access, earnings, data) — a direct write by A should not be structurally possible.
+
+§9's RBAC note is reconfirmed rather than changed: Business's owner/manager/staff tiers are **not** drawn from the platform's `identity.users.roles`/`CAPABILITIES_BY_ROLE` map — they are entirely local to `business_staff`, resolved per-business. This is consistent with `professional` already working the same way (ownership of a row, not a granted role), not a new inconsistency Phase 4 introduced.

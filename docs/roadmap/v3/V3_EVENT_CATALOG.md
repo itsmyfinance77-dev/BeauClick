@@ -1,5 +1,19 @@
 # V3 Event Catalog (draft)
 
+**Superseded for every event actually shipped in Phase 2 onward**: the
+catalog became executable in Phase 3 (`libs/event-contracts/src/catalog/*.ts`
+— versioned Zod schemas, one producer enforced per event, validated on the
+way into and out of the outbox). That code IS the authoritative contract for
+every real V3 event; this document remains as the Phase 0/1 planning
+artifact it always was, useful for the domains it covers that haven't shipped
+yet, but not updated event-by-event as new phases land. Business's
+(`BusinessCreated`, `StaffInvited`, `StaffAccepted`, `StaffDeactivated`,
+`BusinessUpdated`) and Waitlist's (`WaitlistJoined`, `WaitlistOffered`,
+`WaitlistAccepted`, `WaitlistDeclined`, `WaitlistExpired`, `WaitlistRemoved`)
+Phase 4 events are declared only in the executable catalog
+(`business.events.ts`, `waitlist.events.ts`) for exactly this reason — see
+ADR-023/ADR-024 for the design each contract serves.
+
 Status: Phase 11 output, first draft. **Important finding from Phase 2**: V2 has no formal event contract to migrate — `beauclick/*` action hooks are plain, unversioned WordPress `do_action()` calls (in-process only, nothing persisted, no schema), and the separate `wp_bc_events` analytics table has a free-text `event_type` string with an unvalidated JSON `meta` blob documented only in a code comment. These are two independent, ungoverned mechanisms that don't reference each other. This catalog is therefore **new formal structure**, not a migration of existing structure — grounded in the real event names, producers, and consumers V2 already has, so V3's version is a superset that closes real gaps rather than an invention disconnected from the actual domain.
 
 Each entry: **name**, **version**, **producer** (V3 service), **payload**, **consumers**, **idempotency strategy**, and **V2 precedent** (what it's based on, verified against real code — `none` where V3 needs genuinely new instrumentation).

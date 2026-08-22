@@ -255,3 +255,89 @@ formula handles that through its existing no-evidence path (the Bayesian term co
 to the platform mean; cold-start blending pulls toward neutral), so nothing is faked
 and nothing is penalised. Recorded here because a reader seeing a rating filter in the
 API could reasonably assume there is rating data behind it.
+
+---
+
+# Phase 4 addendum (2026-08-22) — Business/Seller, Waitlist, Financial Outbox
+
+## Closed in Phase 4
+
+**Business seller party — CLOSED.** See ADR-023. `services/business` is real,
+tested code: self-service business creation, a consent-gated staff roster, and
+`SellerPartyLookup` as the single place order creation and financial-party
+resolution agree on whether a professional's earnings belong to them or to a
+business they are actively affiliated with.
+
+**Waitlist — CLOSED.** See ADR-024. GAP-26's invariant ("offer, never reserve")
+is carried forward unchanged and, unlike V2, is now proven against real
+concurrency rather than only asserted: a waitlist `accept()` and a competing
+direct customer's booking attempt, fired with no `await` between them against
+real PostgreSQL, resolve to exactly one booking.
+
+**Financial outbox consumer — CLOSED.** See ADR-025. A second `OutboxRelay`
+instance, bound to `FINANCIAL_DATA_SOURCE`, drains `LedgerEntriesRecorded`,
+`SettlementRecorded`, and `SettlementReversed` into analytics facts and a real
+seller notification. This is the only path financial data can leave
+`services/financial` at all, since the main application role structurally
+cannot `SELECT` that schema (ADR-017).
+
+**`GAP-13`** (flat staff model) — **partially closed.** Business staff now has
+real roles (owner/manager/staff) with distinct capabilities, but this is
+`business_staff`, a separate table from `provider.professionals` — an
+independent professional (no business) still has no internal staff concept of
+their own. The gap's *product* concern (can a provider delegate access to
+someone else) is addressed for business-affiliated professionals; an
+independent solo professional's own delegation story is unchanged.
+
+## New findings, this phase
+
+**PHASE4-01 — CI has a real GitHub Actions runner and has been failing on every
+push since Phase 3's workflow was authored.** Phase 3's own report states "this
+repository has no configured remote runner, so the workflow has never executed
+on CI infrastructure" — untrue at the time it was written and never
+re-verified since. The real-Postgres job failed at progressively deeper points
+as each blocking bug was fixed in this phase: a pnpm-version lockfile mismatch,
+pnpm 11 requiring Node ≥22.13, `ts-node` never declared where the root
+`migrate` script actually needed it, `financial-roles.sql` assuming
+`public.schema_migrations` already existed, PostgreSQL 15+'s removal of the
+default `CREATE`-on-`public` grant, and a genuine missing DI binding
+(`WaitlistProfessionalResolver`'s port was declared but never bound) that
+broke the entire application boot for every real-Postgres suite. See
+V3_PHASE4_IMPLEMENTATION.md §16 for the full, ordered account and final
+outcome.
+
+**PHASE4-02 — `financial-role-contract.pg-spec.ts` (a Phase 1 artifact) targets
+a `financial_contract_check` schema the CI workflow's provisioning step never
+creates.** Found only because this is the first time CI ran far enough to
+reach it. The guarantee it was written to prove (GAP-01, an append-only ledger
+enforced by grants) is now proven for real by `financial-integrity.pg-spec.ts`
+against the actual `financial` schema — this older test appears to predate
+that and was seemingly validated only in some ad-hoc local environment.
+Recorded here rather than silently fixed: deciding whether it should be
+deleted, repointed at the real schema, or given its own provisioning step is a
+product/test-strategy decision outside this phase's remit, not an engineering
+oversight to quietly paper over.
+
+**PHASE4-03 — PostgreSQL 15+'s revoked default `public` schema `CREATE` grant
+is a real hosting consideration for production, not only a CI fixture.** Any
+managed PostgreSQL provider defaulting to 15+ (most now do) needs the
+application role explicitly granted `CREATE ON SCHEMA public` — this was
+invisible until a genuinely fresh database was provisioned, which V3's own
+disposable dev-database habit (Phase 1: "beauclick_v3_dev owned by ...
+beauclick_app") never exercised, since `beauclick_app` was made the DATABASE
+owner from the start in that flow, which happened to be sufficient there but
+is not guaranteed on every hosting provider's own database-creation
+convention. Flagged for `V3_INFRASTRUCTURE_PLAN.md`'s hosting decision.
+
+## Still open, unchanged
+
+**`GAP-06`** (no real payment gateway), **`GAP-10`** (provisional numeric
+policy), **`GAP-11`** (AI/SMS providers never exercised against a real API),
+**`GAP-12`** (AI conversation cardinality), **`GAP-18`** (automated payout),
+**`GAP-19`**–**`GAP-28`** — all unchanged and out of Phase 4 scope. RBAC
+remains code-based (`identity.users.roles` is still never populated
+dynamically for `professional`/`business`/either — both remain answered
+entirely by row ownership, exactly as Phase 1 designed); audit logging remains
+structured-logger-based, not DB-persisted. Hosting-specific PostgreSQL grants
+remain verified only against a CI-provisioned ephemeral database and the
+finding in PHASE4-03 above — never a real target hosting provider.
