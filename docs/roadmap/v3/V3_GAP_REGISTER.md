@@ -15,7 +15,9 @@ Classification: **REQUIRED** (must be resolved before V3 can be considered done 
 | GAP-03 | Booking→Order creation has no idempotency guard — a re-fired `beauclick/booking/after_create` filter always creates a second, distinct WooCommerce order for the same booking. Currently self-heals only by accident (the second order's `payment_complete()` lands in the "paid but unconfirmable" path and auto-refunds). | Commerce/Payment | `VERSION_2_ARCHITECTURE_PLAN.md:2695`; confirmed in `BookingOrderBridge::create_order_for_booking()` — no dedupe check before `wc_create_order()`. **RESOLVED (V2.4 Step 26 part 2):** the method now checks `wp_bc_bookings.wc_order_id` and returns the existing order if already set. Fixing this surfaced that `cancel_booking()`'s existing FIN-02 refund safety net now correctly reaches a booking's real linked order in a two-order edge case it previously didn't (the old bug's stale `wc_order_id` had been masking this) — a stronger guarantee, not a regression. See `PRODUCT_GAP_REGISTER.md` §53. |
 | GAP-04 | Campaign usage-cap enforcement (`usage_limit_total`/`usage_limit_per_customer`) has a confirmed, open TOCTOU race — the eligibility check and the usage-record insert are not atomic across different bookings under real concurrent load. | Campaign | `PRODUCT_GAP_REGISTER.md:792` (`CAMP-03`), open/unfixed. **RESOLVED (V2.4 Step 26 part 2):** `CampaignService::record_usage_within_cap()`, a single atomic `INSERT ... SELECT ... WHERE` statement, wired into `CampaignDiscount::apply()` in place of the plain `record_usage()` call. Empirically verified under genuine multi-process concurrent load (real separate MySQL connections racing the same cap) to never overshoot. See `PRODUCT_GAP_REGISTER.md` §53. |
 | GAP-05 | Financial cross-professional isolation is enforced only at the REST controller boundary (`MyFinanceController`), not at `LedgerService`'s own data-access layer — a future caller that reaches `LedgerService` without going through the gated controller would not be isolated by the service itself. | Financial | Confirmed by reading every public method on `LedgerService` — no row-level access control exists independent of caller discipline. **RESOLVED (post-v2.4.0):** `LedgerService::receivable_net_for_current_session()` and `SettlementService::my_party_summary()`/`my_outstanding_orders()` resolve the party identity entirely internally, accepting no caller-supplied party argument at all; `MyFinanceController` migrated to use them, so the isolation guarantee now lives on the data-access classes, not only the REST boundary. See `PRODUCT_GAP_REGISTER.md` §57. |
-| GAP-06 | No real payment gateway is configured or integrated in any environment — `ZARINPAL_MERCHANT_ID` is always empty; only a dev-only, environment-gated Cash-on-Delivery stand-in has ever been exercised. | Payment | `.env.example:29`; `PRODUCT_GAP_REGISTER.md:308,443`. Explicit precondition for a real V3 launch, not merely a code gap. |
+| GAP-06 | No real payment gateway is configured or integrated in any environment — `ZARINPAL_MERCHANT_ID` is always empty; only a dev-only, environment-gated Cash-on-Delivery stand-in has ever been exercised. | Payment | `.env.example:29`; `PRODUCT_GAP_REGISTER.md:308,443`. Explicit precondition for a real V3 launch, not merely a code gap. **SPLIT — this row is superseded and retained for history only.** See `GAP-06a` (sandbox lifecycle, RESOLVED/VERIFIED) and `GAP-06b` (real production gateway, OPEN/EXTERNAL_CONFIGURATION) in the "Phase 5 addendum II" section below, and the release-policy treatment in `V3_RELEASE_POLICY_EXCEPTIONS.md` (EXC-001). Do **not** read this row's original "precondition for a real V3 launch" wording as still governing the `v3.0.0` tag — it governs **production payment enablement**, which remains blocked. |
+| GAP-06a | **Sandbox payment lifecycle** — initiate → redirect → decide → callback → server-side verify → paid → booking confirmed → real ledger entry, plus refund → real ledger reversal. | Payment | **RESOLVED / VERIFIED.** Proven against real PostgreSQL in CI: `sandbox-payment-lifecycle.pg-spec.ts` (20 cases) + `payment-security.pg-spec.ts` (26 cases). Design: `V3_PAYMENT_SANDBOX.md`. Release impact: none. |
+| GAP-06b | **Real production payment gateway** — a real Iranian gateway adapter plus real merchant credentials. | Payment | **OPEN / EXTERNAL_CONFIGURATION.** No adapter exists, no credentials exist in this environment, none were fabricated. **Release impact on `v3.0.0`: NON-BLOCKING under the explicit release exception EXC-001** (`V3_RELEASE_POLICY_EXCEPTIONS.md`). **Production impact: BLOCKING for production payment activation** — unchanged and not waived. |
 | GAP-07 | No formal event contract exists anywhere. `beauclick/*` action hooks are plain, unversioned WordPress `do_action()` calls with zero production subscribers in at least one case (`otp_generated`); the separate `wp_bc_events` analytics table has a free-text `event_type` string and an unvalidated `meta` JSON blob, documented only in a code comment — no schema, no versioning, no producer/consumer registry. | Cross-cutting (Phase 11) | Confirmed by direct inspection of `EventLogger.php` and every `do_action('beauclick/...')` call site across all 10 plugins researched. See `V3_EVENT_CATALOG.md`. **PARTIALLY_RESOLVED (V2.4 Step 25):** the `wp_bc_events`/`event_type` half only — real PHP `EventLogger::EVENT_TYPES` constants replace the docblock-only list, plus a soft `WP_DEBUG`-only `_doing_it_wrong()` notice for an unregistered type (never blocking the write). Deliberately smaller than this row's own full scope: no versioning, no `meta` schema validation, no producer/consumer registry, and the `beauclick/*` `do_action()` hook contract (the OTHER half of this row) is untouched. See `PRODUCT_GAP_REGISTER.md` §56. |
 | GAP-08 | The shared ownership-check helper (`RestController::require_owner_or_capability()`) is dead code — defined but never called anywhere in the codebase, because most real ownership relationships are indirect (booking→provider→user, not booking→user directly) and the helper doesn't support that indirection. Every domain reimplements its own inline gate instead. **CORRECTION (V2.4 Step 26 re-audit):** the "dead code, zero call sites" claim was stale/incorrect — a fresh grep found 4 real call sites (`WaitlistController`, `JourneyController`, `MyProfileController`, `ReceiptController`), all direct-ownership. The actual, narrower gap (indirect ownership unsupported) was real and is **RESOLVED**: an optional `$owner_resolver` parameter added, `BookingController`'s two confirmed indirect cases migrated to it. See `PRODUCT_GAP_REGISTER.md` §51. | Authorization / cross-cutting | Confirmed by grep across every plugin extending `RestController` — zero call sites. |
 | GAP-09 | SEO was not covered by this Phase 2 discovery pass at all — no agent was scoped to investigate meta tags, structured data/JSON-LD, sitemaps, canonical URLs, or Persian-slug SEO behavior. | SEO | Self-identified gap in this discovery process, not a finding about the code. Required before `V3_ARCHITECTURE_PLAN.md`'s service boundaries can be considered final for provider-service/frontend. |
@@ -563,3 +565,85 @@ financial suite never surfaced this because it calls `ledger.recordRefund()`
 directly rather than going through the chain. Recorded because the *class* of
 mistake ("one drain is enough") will recur for any future multi-hop chain;
 fixed with a drain-until-quiet helper rather than a hardcoded second drain.
+
+---
+
+# Final release gate (2026-08-23) — v3.0.0 released under EXC-001
+
+**Release decision: V3.0.0 RELEASED — SANDBOX PAYMENT RELEASE EXCEPTION ACTIVE.**
+
+The blocker recorded by the Phase 5 audit was never a code defect; it was an
+unmet *policy* criterion that no engineering phase was permitted to waive on its
+own. `V3_PHASE5_IMPLEMENTATION.md` §9 said so explicitly — *"a release-policy
+decision for a human to make explicitly, not one this phase may take silently."*
+That decision has now been taken explicitly and recorded as **EXC-001** in
+`V3_RELEASE_POLICY_EXCEPTIONS.md`. Nothing was silently closed to reach it.
+
+**GAP-06 is now formally three rows** (see the REQUIRED table above): the
+original GAP-06 retained for history and marked superseded, `GAP-06a` RESOLVED /
+VERIFIED, `GAP-06b` OPEN / EXTERNAL_CONFIGURATION.
+
+**`GAP-06b` remains OPEN and was NOT closed by this release.** The exception
+waives it as a blocker for the `v3.0.0` **tag**, and for that tag only. It does
+not waive it for **production payment enablement**, which stays fully blocked.
+The two statements are different and the distinction is the substance of the
+exception — see `V3_RELEASE_POLICY_EXCEPTIONS.md` § "What this decision does and
+does not mean".
+
+**Production safety re-verified at the gate, not assumed.** The sandbox provider
+fails closed under `NODE_ENV=production` unconditionally; the former
+`PAYMENT_ALLOW_MOCK_GATEWAY` escape hatch does not exist and no equivalent
+bypass was found; the gate is asserted directly against the provider's own logic
+rather than through a cached config snapshot. A production deployment of
+`v3.0.0` today has **zero enabled payment providers** and checkout fails closed
+— which is what makes the exception acceptable rather than reckless.
+
+**Every other release criterion passed on its own merits**, not by waiver: no
+code-level blocker, no HIGH security finding, no financial-integrity finding,
+CI green on the release commit (19 suites / 375 real-PostgreSQL tests, 0
+skipped, with a CI step that makes a silent skip fatal), typecheck / lint /
+build clean, all nine historical V1/V2 tags byte-identical to their remote
+counterparts.
+
+**Items carried forward unchanged, explicitly not closed by this release:**
+
+- **`GAP-06b`** — OPEN / EXTERNAL_CONFIGURATION. Production-blocking.
+- **`HOSTING_GRANTS`** — EXTERNAL_CONFIGURATION. The append-only ledger role
+  contract is proven only against CI's ephemeral PostgreSQL 16 container, never
+  a real target hosting provider. Docker Desktop still does not start in this
+  environment and the local native PostgreSQL credentials in `.env` remain stale
+  (`password authentication failed`, re-confirmed this session), so CI remains
+  the only real-PostgreSQL evidence available. Production deployment
+  prerequisite, not a release blocker.
+- **`GAP-10`** — provisional numeric policy. **Business decision**, unchanged and
+  deliberately not taken by this release gate. Made visible rather than settled:
+  `GET /v1/admin/loyalty/policy` reports which values are still V2 placeholders.
+- **Business service catalogue** — a business still cannot own a service
+  catalogue independent of a staff professional's. **Business decision /
+  deferred scope**, ADR-023's disclosed consequence of not touching booking's
+  core identity concept. Not a defect.
+- **`GAP-11`** (AI/SMS never exercised live) — EXTERNAL_CONFIGURATION,
+  non-blocking; channels report `providerVerified: false` so a logging provider
+  can never be mistaken for a delivering one.
+- **`GAP-04`, `GAP-09`, `GAP-12`, `GAP-16`, `GAP-18`, `GAP-19`–`GAP-28`** —
+  deferred domains not yet built in V3, each individually justified above.
+  Out of scope, not overlooked.
+- **RBAC remains code-based** and **audit logging remains structured-logger-based**
+  rather than DB-persisted — deliberate, documented, unchanged since Phase 1.
+- **Throttling storage is in-memory per process**, so at multi-instance scale the
+  effective limit multiplies by instance count. Disclosed limitation; a shared
+  Redis store is the correct fix at that scale.
+- **`PHASE5-02`** — RESOLVED (global rate limiting enforced). Re-confirmed at this
+  gate, not re-litigated.
+
+**Live browser QA limitation, restated rather than papered over.** Authenticated
+and payment-flow browser QA was **not** performed at this gate. The API cannot
+boot locally — it refuses without a working `FINANCIAL_DATABASE_URL` (correct
+fail-closed behaviour per ADR-017) and the local credentials are stale. The
+unauthenticated frontend *was* driven in a real browser this session (homepage
+renders, RTL `dir="rtl"`/`lang="fa"` correct, Persian copy correct, login CTA
+present and sized); the only console errors were `ERR_CONNECTION_REFUSED` from
+the absent API, exactly as expected. Authenticated and payment flows are covered
+instead by the real-PostgreSQL CI suites, which boot the real `AppModule` and
+drive real HTTP through supertest — the same stack a browser would hit, minus
+the browser. This is stated as a limitation, not presented as equivalent.

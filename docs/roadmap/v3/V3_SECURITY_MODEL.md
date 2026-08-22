@@ -171,3 +171,52 @@ Two bugs this uncovered, both found by CI rather than review, and both only find
 ## 12. Phase 5 addendum — release audit, one real gap found and deliberately not closed
 
 Every ownership/authorization pattern in this document was re-verified against the full real-Postgres suite (342 tests) rather than re-derived — nothing here changed. One genuine gap was found in the platform-wide (not ownership-specific) defenses: `ThrottlerModule` is registered but its guard was never wired to `APP_GUARD`, so no route gets generic per-requester-IP flood protection. Deliberately not fixed in the same pass that found it — see `V3_RELEASE_AUDIT.md` §4 and `V3_GAP_REGISTER.md`'s PHASE5-02 for why a blind fix here risked the very test suite this document's guarantees are proven against, and what closing it safely requires (a test-environment bypass, mirroring `DISABLE_BACKGROUND_SWEEPS`). The security-critical surface this would most matter for — unauthenticated OTP requests — is unaffected: it already has its own dedicated, always-enforced, independently-tested limiter (`OtpService`'s own per-phone/per-IP counters), which this gap does not touch.
+
+## 14. Release-gate addendum (2026-08-23) — payment sandbox production lockout
+
+`v3.0.0` was released under an explicit release-policy exception (**EXC-001**,
+`V3_RELEASE_POLICY_EXCEPTIONS.md`) with `GAP-06b` — a real production payment gateway —
+still OPEN. That exception rests on a security property this document is the right place
+to state as a **standing invariant**, not merely a Phase 5 implementation detail:
+
+**INVARIANT — a payment simulator must never be reachable in production, and no
+configuration may make it so.**
+
+`SandboxPaymentProvider.isEnabled()` requires two independent conditions and fails closed:
+
+```
+NODE_ENV !== 'production'   AND   PAYMENT_ENVIRONMENT === 'sandbox'
+```
+
+`NODE_ENV=production` is an **unconditional hard stop**. The former
+`PAYMENT_ALLOW_MOCK_GATEWAY=true` escape hatch was **removed rather than carried forward** —
+the V2 precedent is instructive: that version's Cash-on-Delivery stand-in was "local
+development only" as *UI text with no mechanism behind it*, which a readiness audit caught.
+A simulated bank that one environment variable can switch on in production is exactly the
+hazard this gate exists to eliminate, so the gate deliberately has no off switch — the same
+reasoning that rejected a `DISABLE_THROTTLING` flag in §13.
+
+Three properties make the invariant hold rather than merely be asserted:
+
+1. **The registry consults `isEnabled()` on every resolution**, so the decision is not
+   frozen into a boot-time flag of our own, and it **refuses an unknown provider key**
+   rather than falling back to another gateway — a misconfigured
+   `PAYMENT_DEFAULT_PROVIDER` cannot silently reroute payments.
+2. **The unauthenticated sandbox checkout route re-checks the gate itself.** That route is
+   `@Public()` by necessity (a real gateway's page carries no BeauClick session), so it must
+   refuse on its own rather than assume an earlier layer did.
+3. **The gate is tested against the provider's own logic**, not through `@nestjs/config`'s
+   cached boot snapshot — testing it through that cache would assert nothing.
+   `payment-security.pg-spec.ts` enumerates every bypass an operator might reach for
+   (`PAYMENT_ALLOW_MOCK_GATEWAY=true`, `PAYMENT_ALLOW_SANDBOX=true`,
+   `PAYMENT_ENVIRONMENT=sandbox`, `PAYMENT_ENVIRONMENT=production`) and asserts each stays
+   shut.
+
+**Consequence, stated plainly:** in production today there are **zero enabled payment
+providers**, so checkout fails closed. That is correct — refusal, never a fabricated
+success — and it is what makes releasing with GAP-06b open a defensible decision rather
+than a reckless one.
+
+**If this invariant is ever weakened, EXC-001 must be re-decided.** The exception is
+explicitly conditioned on it (`V3_RELEASE_POLICY_EXCEPTIONS.md` § "Review condition"). This
+property is load-bearing for a release decision, not just for the payment domain.

@@ -367,3 +367,32 @@ A correlation id is an opaque identifier and nothing else. It is not derived fro
 ## Phase 5 addendum — release audit confirms the catalog, no new events
 
 The full producer/consumer registry (boot-time `assertConsumersHaveProducers()`, plus `outbox-transactional.pg-spec.ts` and `financial-outbox-consumer.pg-spec.ts`) was re-verified green against real PostgreSQL as part of Phase 5's release audit — no drift, no orphaned consumer, no undeclared producer found. No new event types were added this phase; this was an audit-and-close phase, not a feature phase. See `V3_RELEASE_AUDIT.md` for the full account of what was and was not verified, and why release remains blocked on a cause unrelated to the event system (`GAP-06`, payment gateway configuration).
+
+## Release-gate addendum (2026-08-23) — payment lifecycle event wording
+
+`v3.0.0` shipped under release exception **EXC-001** with `GAP-06b` (real production
+gateway) still open. No event contract changed, and no new event type was added — but one
+piece of **wording** in this catalog needs clarifying so a future reader does not
+over-read it.
+
+**`PaymentSucceeded` / `RefundCompleted` mean the gateway attested to the outcome — not
+that a real bank moved real money.** In `v3.0.0` the only registered provider is
+`SandboxPaymentProvider`, so every one of these events in any running V3 environment was
+produced by a **simulated** gateway. The events, their contracts, their idempotency keys,
+their consumers, and the ledger entries they cause are all completely real; the *gateway
+behind them* is not, and cannot be in production (`V3_SECURITY_MODEL.md` §14).
+
+The `GAP-06` note on `PaymentSucceeded` above — *"no real gateway ever integrated … this is
+the one payment-lifecycle sub-event set with no direct V2 precedent"* — remains accurate and
+should now be read against the split register: **`GAP-06a`** (sandbox lifecycle) is
+RESOLVED / VERIFIED, **`GAP-06b`** (real production gateway) is OPEN /
+EXTERNAL_CONFIGURATION.
+
+**What this means for the contracts themselves: nothing changes when a real adapter
+arrives.** That is the point of the provider abstraction, and it is the specific claim this
+addendum exists to make explicit. A real gateway produces the same events, with the same
+shapes, consumed by the same consumers. `RefundCompleted`'s two-hop chain
+(`RefundCompleted` on the payment outbox → `OrderRefunded` on the commerce outbox → ledger
+reversal, see PHASE5-03) is likewise provider-independent. Swapping the adapter is a new
+class implementing `PaymentProvider` plus one registry entry — no event contract, consumer,
+or catalog entry is affected.

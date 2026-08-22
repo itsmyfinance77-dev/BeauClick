@@ -1,6 +1,16 @@
 # V3 Release Audit — Phase 5
 
-**Release decision: V3 RELEASE BLOCKED — PAYMENT CONFIGURATION REQUIRED.**
+> **SUPERSEDED BY §18.** The Phase 5 decision below — *V3 RELEASE BLOCKED* — was correct
+> when written and is preserved unedited as the historical record. It has since been
+> **superseded by an explicit release-policy exception (EXC-001, 2026-08-23)**, under which
+> `v3.0.0` was released. The blocker was never a code defect; it was an unmet policy
+> criterion this phase was not permitted to waive on its own. See **§18** for the final
+> release gate, and `V3_RELEASE_POLICY_EXCEPTIONS.md` for the decision itself.
+>
+> Read §3 below as *"why this blocked release under the original policy"*, not as the
+> current status.
+
+**Release decision (Phase 5, superseded): V3 RELEASE BLOCKED — PAYMENT CONFIGURATION REQUIRED.**
 
 This is the mandatory outcome under this phase's own release-gate rule, applied honestly rather than argued around: real payment is a stated mandatory V3 release capability (§3 below), no gateway of any kind — sandbox or production — has ever been configured or verified in any V3 environment, and no credentials exist in this session to change that. Every other release condition genuinely passes; see §7 for the full account. No `v3.0.0` tag was created.
 
@@ -155,3 +165,101 @@ Global rate limiting is now enforced. Full design rationale lives in `V3_SECURIT
 **Live QA limitation, stated plainly.** Browser/HTTP throttling verification against a locally-running V3 app was **not** performed: the API refuses to boot without `FINANCIAL_DATABASE_URL` (correct fail-closed behaviour per ADR-017), the local PostgreSQL credentials remain stale, and the credential-recovery runbook is blocked by this environment's permission policy. The strongest available evidence is used instead, and it is genuinely strong: `throttling.pg-spec.ts` boots the **real `AppModule`** against **real PostgreSQL** in CI and drives **real HTTP** through supertest — the same stack a browser would hit, minus the browser.
 
 **Release impact: none.** This closes a medium-severity security gap. GAP-06b (real production payment gateway) remains the sole release blocker.
+
+---
+
+## 18. Final release gate (2026-08-23) — v3.0.0 RELEASED under EXC-001
+
+**Release decision: V3.0.0 RELEASED — SANDBOX PAYMENT RELEASE EXCEPTION ACTIVE.**
+
+This section supersedes the Phase 5 decision at the top of this document. Nothing in the
+underlying engineering changed to make it possible; what changed is that the release-policy
+question §3 identified — and deliberately refused to answer on its own authority — has now
+been answered explicitly by the project owner and recorded as **EXC-001** in
+`V3_RELEASE_POLICY_EXCEPTIONS.md`.
+
+### 18.1 What the exception does and does not do
+
+It waives **one** release criterion — *"the core loop runs against a real (even sandbox)
+payment gateway"* — for the **`v3.0.0` tag only**, on the strength of a verified sandbox
+lifecycle plus a production lockout that makes accidental use structurally impossible.
+
+It does **not** close GAP-06b, does not extend to any successor release, and does not
+authorize production payment. **Production payment enablement remains fully blocked** and
+carries its own seven-item activation checklist (`V3_RELEASE_POLICY_EXCEPTIONS.md`
+§ "Production activation requirements"). A `v3.0.0` production deployment today has **zero
+enabled payment providers** and checkout fails closed.
+
+### 18.2 GAP-06 reclassification
+
+| Row | Status | v3.0.0 release impact | Production impact |
+|---|---|---|---|
+| GAP-06 (original) | **SUPERSEDED** — retained for history | n/a | n/a |
+| **GAP-06a** — sandbox payment lifecycle | **RESOLVED / VERIFIED** | None | None |
+| **GAP-06b** — real production gateway | **OPEN / EXTERNAL_CONFIGURATION** | **NON-BLOCKING under EXC-001** | **BLOCKING for payment activation** |
+
+`GAP-06b` was **not** marked resolved, and nothing was silently closed.
+
+### 18.3 Production safety — re-verified, not assumed
+
+`SandboxPaymentProvider.isEnabled()` requires two independent conditions and fails closed.
+`NODE_ENV=production` is an unconditional hard stop: the former `PAYMENT_ALLOW_MOCK_GATEWAY`
+escape hatch was removed rather than carried forward, and no equivalent bypass exists.
+`payment-security.pg-spec.ts` asserts the gate stays shut under
+`PAYMENT_ALLOW_MOCK_GATEWAY=true`, `PAYMENT_ALLOW_SANDBOX=true`, `PAYMENT_ENVIRONMENT=sandbox`,
+and `PAYMENT_ENVIRONMENT=production` — every combination an operator might reach for — and
+does so against the provider's own logic rather than through `@nestjs/config`'s cached
+boot snapshot, which would have made the assertion vacuous. The registry additionally
+refuses an unknown provider key rather than falling back to another gateway, and the
+unauthenticated sandbox checkout route re-checks the gate independently.
+
+### 18.4 Gates at the release commit
+
+| Gate | Result | Evidence |
+|---|---|---|
+| Payment regression (success, failure, cancel, refund, duplicate callback, concurrent callback, amount tampering, wrong/unknown transaction, invalid verification, duplicate refund, concurrent refund) | **PASS** | `sandbox-payment-lifecycle.pg-spec.ts` (20), `payment-security.pg-spec.ts` (26) |
+| Security (auth, refresh replay, cross-user/professional/business, staff boundaries, forged callback, financial isolation, waitlist & booking races, event idempotency, throttling) | **PASS** | 19 real-PostgreSQL suites |
+| Financial integrity (append-only ledger via real role grants, refund reversal, no duplicate entries) | **PASS** | `financial-integrity.pg-spec.ts` |
+| CI on the release commit | **GREEN** — 3/3 jobs | run `32591448813` |
+| Real PostgreSQL + OpenSearch | **375/375, 19 suites, 0 skipped** | CI enforces skip-detection as fatal |
+| Unit / pg-mem, frontend unit | **48 passing, 21 projects** | run locally |
+| Typecheck · ESLint (incl. Nx boundaries) · build | **CLEAN** | run locally and in CI |
+| Historical V1/V2 tags | **UNTOUCHED** — all 9 byte-identical to remote | `git ls-remote --tags` |
+
+### 18.5 Live QA limitation — stated, not worked around
+
+Authenticated and payment-flow browser QA was **not** performed. The API refuses to boot
+locally without a working `FINANCIAL_DATABASE_URL` (correct fail-closed behaviour per
+ADR-017), the local PostgreSQL credentials remain stale, and Docker Desktop still does not
+start in this environment. The unauthenticated frontend was driven in a real browser this
+session and renders correctly (RTL, Persian, login CTA present); the only console errors
+were `ERR_CONNECTION_REFUSED` from the absent API. Authenticated and payment flows are
+covered instead by the real-PostgreSQL CI suites, which boot the real `AppModule` and drive
+real HTTP through supertest. **BROWSER QA LIMITATION** is recorded as a limitation, not
+presented as equivalent coverage, and nothing was fabricated to fill it.
+
+### 18.6 Hosting grants
+
+**`HOSTING_GRANTS = EXTERNAL_CONFIGURATION`**, unchanged. The append-only ledger role
+contract is proven only against CI's ephemeral PostgreSQL 16 container — never a real
+target hosting provider. This is a production deployment prerequisite and is **not**
+cancelled by EXC-001; it is item 5 of the production activation checklist.
+
+### 18.7 Release criteria — final
+
+| Criterion | Met |
+|---|---|
+| No code-level BLOCKER | ✅ |
+| No HIGH security issue | ✅ |
+| No financial integrity issue | ✅ |
+| Payment sandbox lifecycle fully verified | ✅ |
+| Production sandbox lockout verified | ✅ |
+| Throttling resolved | ✅ (PHASE5-02) |
+| CI green | ✅ |
+| Full tests green, none skipped | ✅ |
+| Historical V2 tags untouched | ✅ |
+| Documentation contains the release exception | ✅ (EXC-001) |
+| Working tree clean | ✅ |
+| Real payment gateway | ❌ **OPEN / EXTERNAL_CONFIGURATION — waived for `v3.0.0` only, under EXC-001** |
+
+**`v3.0.0` released.**
