@@ -86,6 +86,24 @@ const TEMPLATES: TemplateDefinition[] = [
     short: 'عضویت {planName} فعال شد.',
     deepLink: '/loyalty',
   },
+  {
+    key: 'waitlist_offered',
+    category: 'waitlist',
+    requiredVars: ['professionalName', 'expiresAtTime'],
+    subject: 'یک نوبت برای شما آزاد شد',
+    body: 'نوبتی نزد {professionalName} آزاد شد و به شما پیشنهاد شده است. تا ساعت {expiresAtTime} فرصت دارید آن را بپذیرید.',
+    short: 'نوبتی نزد {professionalName} به شما پیشنهاد شد -- تا {expiresAtTime} فرصت دارید.',
+    deepLink: '/waitlist',
+  },
+  {
+    key: 'settlement_recorded',
+    category: 'payment',
+    requiredVars: ['amountToman'],
+    subject: 'تسویه حساب شما ثبت شد',
+    body: 'مبلغ {amountToman} تومان برای شما تسویه و ثبت شد.',
+    short: 'مبلغ {amountToman} تومان تسویه شد.',
+    deepLink: '/dashboard',
+  },
 ];
 
 export class UnknownTemplateError extends Error {

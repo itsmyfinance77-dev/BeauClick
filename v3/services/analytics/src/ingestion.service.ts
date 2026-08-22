@@ -204,6 +204,47 @@ const FACT_MAPPINGS: Record<string, FactMapping> = {
     dimensions: (p) => ({ fromStatus: str(p.fromStatus), toStatus: str(p.toStatus) }),
     timestampOf: (p) => str(p.changedAt),
   },
+
+  // ---- financial (Phase 4: the financial outbox consumer, ADR-025).
+  // This is the ONLY way a financial fact can ever reach analytics --
+  // financial.ledger_entries and financial.settlement_* are not merely
+  // access-controlled, the main application role has REVOKE ALL on the
+  // schema entirely (ADR-017). These mappings are drained by a SEPARATE
+  // relay bound to FINANCIAL_DATA_SOURCE (financial-outbox.relay.ts), never
+  // the main one, for exactly that reason.
+  LedgerEntriesRecorded: {
+    subjectType: 'order',
+    subjectOf: (p) => str(p.orderId),
+    metricOf: (p) => num(p.receivableToman),
+    // `sellerPartyId` is NOT carried: analytics has no per-seller question
+    // this fact needs to answer today, and a seller's own earnings are
+    // already visible to them through MyFinanceService -- duplicating that
+    // identity into a shared analytics table would be a real party-identity
+    // leak for zero product benefit. `sellerPartyType` alone (an aggregate
+    // dimension) is safe.
+    dimensions: (p) => ({
+      referenceType: str(p.referenceType),
+      commissionToman: num(p.commissionToman),
+      sellerPartyType: str(p.sellerPartyType),
+    }),
+  },
+  // SettlementRecorded/SettlementReversed have no natural existing subject
+  // (no 'settlement' entry in AnalyticsSubjectType, and adding one is a
+  // schema CHECK-constraint change this phase does not need to make for one
+  // dimension-only dashboard question: total settled/reversed amount over
+  // time). subjectType stays null; the amount is still a real metric.
+  SettlementRecorded: {
+    subjectType: null,
+    subjectOf: () => null,
+    metricOf: (p) => num(p.amountToman),
+    dimensions: (p) => ({ partyType: str(p.partyType), orderCount: num(p.orderCount), method: str(p.method) }),
+  },
+  SettlementReversed: {
+    subjectType: null,
+    subjectOf: () => null,
+    metricOf: (p) => num(p.amountToman),
+    dimensions: (p) => ({ partyType: str(p.partyType) }),
+  },
 };
 
 /**

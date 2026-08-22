@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import { ProfessionalEntity } from '@beauclick/provider';
+import { BusinessEntity } from '@beauclick/business';
 import { BookingService } from '@beauclick/booking';
 import { TierService } from '@beauclick/loyalty';
 
@@ -39,9 +40,38 @@ export class NotificationEnricher {
 
   constructor(
     @InjectRepository(ProfessionalEntity) private readonly professionals: Repository<ProfessionalEntity>,
+    @InjectRepository(BusinessEntity) private readonly businesses: Repository<BusinessEntity>,
     private readonly bookings: BookingService,
     private readonly tiers: TierService,
   ) {}
+
+  /**
+   * The identity user id who should hear about money moving for this
+   * financial party -- resolved the SAME way `ProviderBackedFinancialPartyResolver`
+   * resolves a party FROM a user, just inverted (party -> user, since a
+   * settlement notification starts from the party financial-service already
+   * recorded). Returns null rather than throwing when the party's own row
+   * is gone (a deleted profile) -- a settlement notification is a courtesy,
+   * never something worth failing a financial fact's ingestion over.
+   */
+  async sellerUserId(partyType: string, partyId: string): Promise<string | null> {
+    try {
+      if (partyType === 'business') {
+        const business = await this.businesses.findOne({ where: { id: partyId, deletedAt: IsNull() }, select: { ownerId: true } });
+        return business?.ownerId ?? null;
+      }
+      if (partyType === 'professional') {
+        const professional = await this.professionals.findOne({
+          where: { id: partyId, deletedAt: IsNull() },
+          select: { ownerId: true },
+        });
+        return professional?.ownerId ?? null;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
 
   /**
    * The tier's display name, from its slug.
@@ -65,6 +95,11 @@ export class NotificationEnricher {
       // outright over a lookup would be worse.
       return slug;
     }
+  }
+
+  /** Public wrapper for waitlist notifications, which need only the name -- no booking id exists yet. */
+  async professionalDisplayName(professionalId: string): Promise<string> {
+    return this.professionalName(professionalId);
   }
 
   async bookingDetails(bookingId: string, professionalId: string): Promise<BookingNotificationDetails> {

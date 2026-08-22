@@ -31,6 +31,12 @@ import {
 import { WaitlistAcceptanceService } from '../waitlist/waitlist-acceptance.service';
 import { WaitlistAcceptanceController } from '../waitlist/waitlist-acceptance.controller';
 import { WaitlistMatcherHandler } from '../waitlist/waitlist-matcher.handler';
+import {
+  FINANCIAL_DOMAIN_EVENT_HANDLERS,
+  FINANCIAL_OUTBOX_RELAY,
+  financialDomainEventHandlersProvider,
+  financialOutboxRelayProvider,
+} from './financial-outbox-relay.provider';
 
 /**
  * The composition root for Phase 2's domains.
@@ -148,8 +154,10 @@ import { WaitlistMatcherHandler } from '../waitlist/waitlist-matcher.handler';
       ],
     },
     OutboxRelay,
+    financialDomainEventHandlersProvider,
+    financialOutboxRelayProvider,
   ],
-  exports: [CheckoutService, OutboxRelay, OutboxSweepScheduler, Phase3CompositionModule],
+  exports: [CheckoutService, OutboxRelay, OutboxSweepScheduler, Phase3CompositionModule, FINANCIAL_OUTBOX_RELAY],
 })
 export class DomainCompositionModule implements OnApplicationBootstrap {
   private readonly logger = new Logger('EventContracts');
@@ -163,6 +171,10 @@ export class DomainCompositionModule implements OnApplicationBootstrap {
     // consumer, which was simply untrue and would have sent somebody hunting
     // for a broken subscription that was working fine.
     @Inject(DOMAIN_EVENT_HANDLERS) private readonly handlers: DomainEventHandler[],
+    // The financial relay's own handlers, registered into the SAME registry
+    // so "no orphan consumer" is checked uniformly rather than the financial
+    // outbox being a blind spot this check does not cover.
+    @Inject(FINANCIAL_DOMAIN_EVENT_HANDLERS) private readonly financialHandlers: DomainEventHandler[],
   ) {}
 
   /**
@@ -179,7 +191,7 @@ export class DomainCompositionModule implements OnApplicationBootstrap {
    * same blind spot.
    */
   onApplicationBootstrap(): void {
-    for (const handler of this.handlers ?? []) {
+    for (const handler of [...(this.handlers ?? []), ...(this.financialHandlers ?? [])]) {
       this.contracts.registerConsumer({
         eventName: handler.eventType,
         // A handler that does not pin a version consumes v1 -- the only

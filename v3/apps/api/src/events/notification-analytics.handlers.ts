@@ -179,6 +179,41 @@ export const NOTIFICATION_RULES: NotificationRule[] = [
       vars: { planName: str(p.planSlug) },
     }),
   },
+  {
+    eventType: 'WaitlistOffered',
+    templateKey: 'waitlist_offered',
+    channels: ['in_app'],
+    entityType: 'waitlist_entry',
+    build: async (p, enricher) => ({
+      userId: str(p.customerId),
+      entityId: str(p.entryId),
+      vars: {
+        professionalName: await enricher.professionalDisplayName(str(p.professionalId)),
+        expiresAtTime: formatTime(new Date(str(p.offerExpiresAt))),
+      },
+    }),
+  },
+];
+
+/**
+ * Financial-outbox notification rules -- a separate list, deliberately,
+ * because these consume events on `financial.outbox_events` (drained by
+ * `financial-outbox.relay.ts` on the ISOLATED financial DataSource, never
+ * the main relay) and resolve their recipient by PARTY, not by a userId the
+ * payload already carries.
+ */
+export const FINANCIAL_NOTIFICATION_RULES: NotificationRule[] = [
+  {
+    eventType: 'SettlementRecorded',
+    templateKey: 'settlement_recorded',
+    channels: ['in_app'],
+    entityType: 'settlement',
+    build: async (p, enricher) => {
+      const userId = await enricher.sellerUserId(str(p.partyType), str(p.partyId));
+      if (!userId) return null; // the party's own profile is gone; nobody to tell.
+      return { userId, entityId: str(p.settlementId), vars: { amountToman: formatToman(num(p.amountToman)) } };
+    },
+  },
 ];
 
 /**
@@ -238,6 +273,16 @@ export function buildNotificationHandlers(
   return NOTIFICATION_RULES.map((rule) => new NotificationDispatchHandler(rule.eventType, rule, notifications, enricher));
 }
 
+/** Same handler class, the financial-only rule list -- see FINANCIAL_NOTIFICATION_RULES's own docblock for why it is separate. */
+export function buildFinancialNotificationHandlers(
+  notifications: NotificationService,
+  enricher: NotificationEnricher,
+): NotificationDispatchHandler[] {
+  return FINANCIAL_NOTIFICATION_RULES.map(
+    (rule) => new NotificationDispatchHandler(rule.eventType, rule, notifications, enricher),
+  );
+}
+
 /**
  * Ingests every contract-registered event into the analytics fact table.
  *
@@ -283,5 +328,25 @@ export function buildAnalyticsHandlers(
 ): AnalyticsIngestionHandler[] {
   return ingestion
     .ingestableEventTypes()
+    .filter((eventType) => !FINANCIAL_EVENT_TYPES.has(eventType))
     .map((eventType) => new AnalyticsIngestionHandler(eventType, ingestion, contracts));
+}
+
+/**
+ * The financial-only subset -- registered against the SEPARATE financial
+ * relay (`financial-outbox.relay.ts`), never the main one. Excluded from
+ * `buildAnalyticsHandlers()` above rather than merely also-included here:
+ * a handler registered on both relays would be harmless (the main relay
+ * simply never sees a `LedgerEntriesRecorded` row, since it lives on the
+ * isolated financial DataSource) but would register the SAME consumer
+ * twice against the boot-time contract check, which is confusing to read
+ * even though not incorrect.
+ */
+const FINANCIAL_EVENT_TYPES = new Set(['LedgerEntriesRecorded', 'SettlementRecorded', 'SettlementReversed']);
+
+export function buildFinancialAnalyticsHandlers(
+  ingestion: AnalyticsIngestionService,
+  contracts: EventContractRegistry,
+): AnalyticsIngestionHandler[] {
+  return Array.from(FINANCIAL_EVENT_TYPES).map((eventType) => new AnalyticsIngestionHandler(eventType, ingestion, contracts));
 }

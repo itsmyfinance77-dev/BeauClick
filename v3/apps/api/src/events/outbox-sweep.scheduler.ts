@@ -1,8 +1,9 @@
-import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OutboxRelay } from '@beauclick/events';
 import { BookingService } from '@beauclick/booking';
 import { WaitlistService } from '@beauclick/waitlist';
+import { FINANCIAL_OUTBOX_RELAY } from '../composition/financial-outbox-relay.provider';
 
 /**
  * Two periodic backstops, both deliberately backstops rather than mechanisms.
@@ -29,6 +30,7 @@ export class OutboxSweepScheduler implements OnApplicationBootstrap, OnApplicati
 
   constructor(
     private readonly relay: OutboxRelay,
+    @Inject(FINANCIAL_OUTBOX_RELAY) private readonly financialRelay: OutboxRelay,
     private readonly bookings: BookingService,
     private readonly waitlist: WaitlistService,
     private readonly config: ConfigService,
@@ -41,6 +43,9 @@ export class OutboxSweepScheduler implements OnApplicationBootstrap, OnApplicati
     }
 
     this.timers.push(this.every(this.intervalMs('OUTBOX_SWEEP_INTERVAL_MS', 5_000), () => this.sweepOutbox()));
+    this.timers.push(
+      this.every(this.intervalMs('FINANCIAL_OUTBOX_SWEEP_INTERVAL_MS', 5_000), () => this.sweepFinancialOutbox()),
+    );
     this.timers.push(this.every(this.intervalMs('HOLD_EXPIRY_SWEEP_INTERVAL_MS', 60_000), () => this.sweepHolds()));
     this.timers.push(
       this.every(this.intervalMs('WAITLIST_OFFER_EXPIRY_SWEEP_INTERVAL_MS', 60_000), () => this.sweepWaitlistOffers()),
@@ -74,6 +79,23 @@ export class OutboxSweepScheduler implements OnApplicationBootstrap, OnApplicati
     const result = await this.relay.drain();
     if (result.dispatched > 0 || result.failed > 0) {
       this.logger.log(`Outbox sweep: ${result.dispatched} dispatched, ${result.failed} failed`);
+    }
+  }
+
+  /**
+   * financial-service's own outbox (LedgerEntriesRecorded, SettlementRecorded,
+   * SettlementReversed) has no synchronous post-commit drain the way the main
+   * relay does in `CheckoutService.drainQuietly()` -- financial writes happen
+   * as REACTIONS to `OrderPaid`/order-refund handlers dispatched by the main
+   * relay, which has no handle on a second DataSource's relay to call
+   * afterward. This periodic sweep is therefore not a backstop here, it is
+   * THE mechanism financial facts ever reach analytics or a seller
+   * notification by.
+   */
+  private async sweepFinancialOutbox(): Promise<void> {
+    const result = await this.financialRelay.drain();
+    if (result.dispatched > 0 || result.failed > 0) {
+      this.logger.log(`Financial outbox sweep: ${result.dispatched} dispatched, ${result.failed} failed`);
     }
   }
 
