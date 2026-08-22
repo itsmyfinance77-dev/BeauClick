@@ -375,3 +375,71 @@ entirely by row ownership, exactly as Phase 1 designed); audit logging remains
 structured-logger-based, not DB-persisted. Hosting-specific PostgreSQL grants
 remain verified only against a CI-provisioned ephemeral database and the
 finding in PHASE4-03 above — never a real target hosting provider.
+
+---
+
+# Phase 5 addendum (2026-08-22) — Release audit, v3.0.0 readiness
+
+Full findings, the complete gap reconciliation table, and the release-gate
+reasoning live in `V3_RELEASE_AUDIT.md`. **Release decision: V3 RELEASE
+BLOCKED — PAYMENT CONFIGURATION REQUIRED.** No `v3.0.0` tag created. Summary
+of what changed in this register specifically:
+
+**`PHASE4-02` — CLOSED this phase.** `financial-role-contract.pg-spec.ts`
+and its setup script were deleted after confirming (not assuming) the
+collision risk: the script's own `DROP ROLE IF EXISTS
+beauclick_financial_writer/reader` targets the identical role names the
+real, CI-provisioned `financial-roles.sql` creates. The one piece of unique
+coverage it had (the read-only role's grants) was found already written,
+dormant, inside `financial-integrity.pg-spec.ts:161` — gated on
+`TEST_FINANCIAL_READER_URL`, which CI had simply never set despite the role
+already being provisioned with a known password. Wired it in. Net effect:
+one previously-dormant real assertion now runs against the real ledger; the
+stand-in table and its role-collision hazard are gone.
+
+**`GAP-06` — re-confirmed OPEN, and re-classified as RELEASE-BLOCKING.**
+Not a new finding, but a new determination: this phase investigated whether
+real payment is a *stated mandatory* V3 capability (it is, per this
+register's own GAP-06 wording — "explicit precondition for a real V3
+launch" — and per `V3_IMPLEMENTATION_ROADMAP.md`'s own Phase 2 acceptance
+criteria, which requires the core loop to run "against a real (even
+sandbox) payment gateway"). Confirmed still unsatisfied in every respect:
+`PAYMENT_DEFAULT_PROVIDER=mock`, no gateway credential of any kind in
+`.env` or `.env.example`, `MockGatewayProvider` the only registered
+`PaymentProvider`. This is the sole release blocker.
+
+**PHASE5-01 — a real, minor accessibility bug found and fixed.** The
+homepage's only interactive element (`apps/web/app/page.tsx`'s `/auth`
+link) had no touch-target sizing at all — 21×135px, under the 44px minimum
+this codebase's own `Button` component already enforces, and the same
+class of bug `PHASE2-06` already caught once. Fixed to match `Button`'s own
+convention; verified in a real browser, zero overflow introduced.
+
+**PHASE5-02 — a real gap found, deliberately NOT fixed this phase.**
+`ThrottlerModule` is registered (`services/identity/src/identity.module.ts`)
+but its guard was never wired to `APP_GUARD` — no route anywhere gets
+generic per-IP flood protection from it. Investigated for a same-session
+fix and declined: `ThrottlerGuard` rate-limits per requester IP, and every
+real-Postgres test file shares ONE Nest application instance (and
+therefore one throttle bucket) across dozens of `it()` blocks — wiring a
+global guard in without first adding a test-environment bypass (the same
+shape as the existing `DISABLE_BACKGROUND_SWEEPS` escape hatch) risked
+tripping false 429s across the exact 342-test-green suite this audit relies
+on as its own evidence. The actually security-critical surface — OTP
+request flooding, the unauthenticated entry point — already has its own
+dedicated, tested, always-enforced limiter, independent of this unused
+generic one. A safe fix requires the test-harness bypass to exist first;
+recorded here rather than either silently fixed or silently ignored.
+
+**Hosting grants — still unverified against a real target provider.** This
+phase additionally confirmed the local native PostgreSQL install's
+credentials in `.env` are stale (`password authentication failed`) and
+that Docker Desktop, though installed, did not start when launched in this
+environment (attempted; no process appeared after 10 minutes) — so CI's
+ephemeral container remains the only real-PostgreSQL verification available
+in this environment, exactly as Phase 4 recorded.
+
+**Everything else in this register is unchanged** — every GAP-19 through
+GAP-28 item, GAP-09/12/16/18's deferrals, and GAP-10's provisional-policy
+status all stand exactly as Phase 4 left them, re-confirmed rather than
+re-litigated.

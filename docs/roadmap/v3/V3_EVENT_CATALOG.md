@@ -363,3 +363,7 @@ The column is nullable **only** because rows written before the migration have n
 ### What the id must never become
 
 A correlation id is an opaque identifier and nothing else. It is not derived from a user id, a phone number, or a session, and nothing may be inferred from it — otherwise a value that travels into logs, response headers, and any future third-party aggregator quietly becomes a personal identifier. UUIDv7 is used for the same reason every other id here is: it sorts in creation order, which is useful, and encodes nothing else.
+
+## Phase 5 addendum — release audit confirms the catalog, no new events
+
+The full producer/consumer registry (boot-time `assertConsumersHaveProducers()`, plus `outbox-transactional.pg-spec.ts` and `financial-outbox-consumer.pg-spec.ts`) was re-verified green against real PostgreSQL as part of Phase 5's release audit — no drift, no orphaned consumer, no undeclared producer found. No new event types were added this phase; this was an audit-and-close phase, not a feature phase. See `V3_RELEASE_AUDIT.md` for the full account of what was and was not verified, and why release remains blocked on a cause unrelated to the event system (`GAP-06`, payment gateway configuration).
