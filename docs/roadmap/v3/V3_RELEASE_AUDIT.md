@@ -220,11 +220,20 @@ unauthenticated sandbox checkout route re-checks the gate independently.
 | Payment regression (success, failure, cancel, refund, duplicate callback, concurrent callback, amount tampering, wrong/unknown transaction, invalid verification, duplicate refund, concurrent refund) | **PASS** | `sandbox-payment-lifecycle.pg-spec.ts` (20), `payment-security.pg-spec.ts` (26) |
 | Security (auth, refresh replay, cross-user/professional/business, staff boundaries, forged callback, financial isolation, waitlist & booking races, event idempotency, throttling) | **PASS** | 19 real-PostgreSQL suites |
 | Financial integrity (append-only ledger via real role grants, refund reversal, no duplicate entries) | **PASS** | `financial-integrity.pg-spec.ts` |
-| CI on the release commit | **GREEN** — 3/3 jobs | run `32591448813` |
+| CI | **GREEN** — 3/3 jobs — on `6ddc015`, the release commit's parent | run `32591448813` |
 | Real PostgreSQL + OpenSearch | **375/375, 19 suites, 0 skipped** | CI enforces skip-detection as fatal |
 | Unit / pg-mem, frontend unit | **48 passing, 21 projects** | run locally |
 | Typecheck · ESLint (incl. Nx boundaries) · build | **CLEAN** | run locally and in CI |
 | Historical V1/V2 tags | **UNTOUCHED** — all 9 byte-identical to remote | `git ls-remote --tags` |
+
+**On the CI row, stated precisely rather than loosely.** The release commit is
+**documentation-only** — `git diff --name-only 6ddc015 cfecfdf` returns five `docs/` files
+and nothing else, verified with an explicit `:(exclude)docs/` pathspec that came back empty.
+The V3 CI workflow's `paths` filter is scoped to `v3/**`, so it correctly did not re-run on a
+commit that changed no code. The green run on `6ddc015` therefore covers the code in
+`cfecfdf` **identically** — the two commits have byte-identical trees outside `docs/`. This
+is stated explicitly because "CI green on the release commit" would have been a slightly
+false claim, and the distinction is exactly the kind that erodes trust in a release record.
 
 ### 18.5 Live QA limitation — stated, not worked around
 
