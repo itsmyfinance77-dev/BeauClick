@@ -1,10 +1,10 @@
 import { INestApplication } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerStorage } from '@nestjs/throttler';
 import { DataSource } from 'typeorm';
 import request from 'supertest';
 import { uuidv7 } from 'uuidv7';
 
-import { BeauClickThrottlerGuard, throttlerOptionsFromEnv } from '@beauclick/auth';
+import { throttlerOptionsFromEnv } from '@beauclick/auth';
 
 import { createPgTestApp, requiredPgEnv, resetDatabase, seedUser } from './pg-test-app.factory';
 
@@ -57,33 +57,68 @@ describeIfPg('Global rate limiting on real PostgreSQL', () => {
     await app?.close();
   });
 
-  beforeEach(async () => {
-    await resetDatabase(dataSource);
-  });
-
-  /** A fresh, unique source IP per case, so buckets never leak between tests. */
-  let ipSeq = 0;
-  function freshIp(): string {
-    ipSeq += 1;
-    return `10.77.${Math.floor(ipSeq / 250) % 250}.${ipSeq % 250}`;
+  /**
+   * Clears the throttler's counters between cases.
+   *
+   * Necessary because every supertest request originates from the SAME real
+   * socket (127.0.0.1) and `trust proxy` is deliberately off, so all
+   * unauthenticated traffic in this file legitimately shares ONE bucket --
+   * see the X-Forwarded-For case below, which proves exactly that and is a
+   * security property, not a limitation to work around. Without this reset,
+   * the first test to exhaust the bucket would fail every later one.
+   *
+   * Note this resets STORAGE, never the guard: the guard stays registered
+   * and enforcing throughout.
+   */
+  function resetThrottleCounters(): void {
+    const storage = app.get(ThrottlerStorage, { strict: false }) as { storage?: Map<string, unknown> };
+    storage?.storage?.clear();
   }
 
+  beforeEach(async () => {
+    await resetDatabase(dataSource);
+    resetThrottleCounters();
+  });
+
+  /**
+   * `ip` is accepted and sent as X-Forwarded-For for realism, but it does NOT
+   * create a separate bucket -- trust proxy is off, so every request here
+   * shares the 127.0.0.1 bucket. Per-case isolation comes from
+   * `resetThrottleCounters()`, and per-IDENTITY separation is proven with
+   * real authenticated users instead.
+   */
   async function hit(path: string, ip: string, token?: string) {
     const req = request(app.getHttpServer()).get(path).set('X-Forwarded-For', ip);
     if (token) req.set('Authorization', `Bearer ${token}`);
     return req;
   }
 
+  let ipSeq = 0;
+  function freshIp(): string {
+    ipSeq += 1;
+    return `10.77.${Math.floor(ipSeq / 250) % 250}.${ipSeq % 250}`;
+  }
+
   describe('the guard is genuinely registered (the regression this fix exists to prevent)', () => {
-    it('is present in the application\'s global APP_GUARD providers', () => {
-      // Asserted structurally, not by behaviour alone: if someone removes the
-      // APP_GUARD registration but leaves ThrottlerModule configured, every
-      // behavioural test below would still pass under high test limits while
-      // production silently lost all rate limiting -- exactly what happened
-      // for four phases.
-      const guard = app.get(BeauClickThrottlerGuard, { strict: false });
-      expect(guard).toBeInstanceOf(BeauClickThrottlerGuard);
-      expect(APP_GUARD).toBeDefined();
+    it('throttles a route that carries NO @Throttle decorator at all', async () => {
+      // THE structural proof that the guard is GLOBAL, expressed as behaviour
+      // because that is what actually cannot be faked. `/v1/me/waitlist` opts
+      // into nothing -- no @Throttle anywhere on it or its controller -- so it
+      // can only be rate-limited by a globally-registered guard applying the
+      // `default` policy. If someone deletes the APP_GUARD line, this fails
+      // even though every decorated route would keep working.
+      //
+      // (Asserting via `app.get(BeauClickThrottlerGuard)` was tried and is
+      // wrong: guards registered under the APP_GUARD multi-token are not
+      // retrievable by their class token, so that assertion failed while the
+      // guard was in fact correctly wired.)
+      const ip = freshIp();
+      const user = await seedUser(app, dataSource, `+98954${String(Date.now()).slice(-6)}`);
+      const statuses: number[] = [];
+      for (let i = 0; i < LIMIT + 2; i += 1) {
+        statuses.push((await hit('/api/v1/me/waitlist', ip, user.accessToken)).status);
+      }
+      expect(statuses).toContain(429);
     });
 
     it('resolves its throttler options at the ROOT injector, not a feature module', () => {
@@ -133,14 +168,22 @@ describeIfPg('Global rate limiting on real PostgreSQL', () => {
   });
 
   describe('identity key', () => {
-    it('throttles two DIFFERENT unauthenticated IPs independently', async () => {
-      const a = freshIp();
-      const b = freshIp();
-      for (let i = 0; i < LIMIT; i += 1) await hit('/api/v1/search/providers?q=a', a);
-      expect((await hit('/api/v1/search/providers?q=a', a)).status).toBe(429);
-
-      // B is untouched by A exhausting its own bucket.
-      expect((await hit('/api/v1/search/providers?q=a', b)).status).not.toBe(429);
+    it('keys UNAUTHENTICATED traffic by the real socket address, not a claimed one', async () => {
+      // Deliberately NOT "two different IPs get separate buckets": every
+      // supertest request comes from the same real socket, and the only way
+      // to claim otherwise is X-Forwarded-For, which is correctly ignored
+      // (proven below). Simulating distinct IPs would therefore require
+      // enabling `trust proxy` in tests -- which would test a configuration
+      // production does not have, and would assert the OPPOSITE of the
+      // security property that actually holds.
+      //
+      // What IS provable and matters: unauthenticated traffic shares one
+      // bucket per real source, and it is genuinely enforced.
+      const ip = freshIp();
+      for (let i = 0; i < LIMIT; i += 1) {
+        expect((await hit('/api/v1/search/providers?q=a', ip)).status).not.toBe(429);
+      }
+      expect((await hit('/api/v1/search/providers?q=a', ip)).status).toBe(429);
     });
 
     it('gives two authenticated users SEPARATE buckets even from the SAME IP', async () => {
@@ -310,9 +353,10 @@ describeIfPg('Global rate limiting on real PostgreSQL', () => {
 
   describe('window reset', () => {
     it('permits requests again once the window lapses', async () => {
-      // A dedicated app with a genuinely short window, so this asserts real
-      // expiry rather than mocking the clock.
-      const shortCtx = await createPgTestApp({ ...THROTTLED_ENV, THROTTLE_READ_TTL_MS: '1200' });
+      // A dedicated app with a genuinely short window, so this asserts REAL
+      // expiry against a real clock rather than mocking time.
+      const ttlMs = 1000;
+      const shortCtx = await createPgTestApp({ ...THROTTLED_ENV, THROTTLE_READ_TTL_MS: String(ttlMs) });
       const shortApp = shortCtx.app;
       try {
         const ip = freshIp();
@@ -322,12 +366,17 @@ describeIfPg('Global rate limiting on real PostgreSQL', () => {
         for (let i = 0; i < LIMIT; i += 1) await fire();
         expect((await fire()).status).toBe(429);
 
-        await new Promise((resolve) => setTimeout(resolve, 1600));
+        // Generous margin, deliberately. Two separate timers must lapse, not
+        // one: `blockDuration` defaults to `ttl` in v6, so exceeding the limit
+        // starts a block that runs from the moment of blocking, ON TOP of the
+        // per-hit decay timers. An earlier version waited only 1.3x the ttl
+        // and flaked in CI for exactly that reason.
+        await new Promise((resolve) => setTimeout(resolve, ttlMs * 3.5));
 
         expect((await fire()).status).not.toBe(429);
       } finally {
         await shortApp.close();
       }
-    }, 20_000);
+    }, 30_000);
   });
 });

@@ -44,6 +44,23 @@ export const THROTTLE_POLICIES = {
 
 export type ThrottlePolicyName = keyof typeof THROTTLE_POLICIES;
 
+/**
+ * Skips EVERY named policy, for `@SkipThrottle(SKIP_ALL_THROTTLES)`.
+ *
+ * Bare `@SkipThrottle()` is a trap once more than one named throttler
+ * exists: its default argument is `{ default: true }`, so it skips only the
+ * policy literally named `default` and leaves every other one still
+ * applying. That silently left `/health` subject to four of the five
+ * policies -- a liveness probe that would eventually 429 and pull a healthy
+ * instance from rotation. Caught by CI, not by review.
+ *
+ * Derived from `THROTTLE_POLICIES` rather than hand-listed so adding a
+ * sixth policy cannot re-open the same hole.
+ */
+export const SKIP_ALL_THROTTLES: Record<ThrottlePolicyName, boolean> = Object.fromEntries(
+  (Object.keys(THROTTLE_POLICIES) as ThrottlePolicyName[]).map((name) => [name, true]),
+) as Record<ThrottlePolicyName, boolean>;
+
 /** Reads each policy's limit/ttl from the environment, falling back to the default above. */
 export function throttlerOptionsFromEnv(env: NodeJS.ProcessEnv = process.env) {
   const num = (key: string, fallback: number): number => {
