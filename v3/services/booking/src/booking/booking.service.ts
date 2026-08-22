@@ -109,9 +109,24 @@ export class BookingService {
     try {
       return await this.runInTransaction(manager, (m) => this.createWithin(m, input, key));
     } catch (err) {
-      // A concurrent identical request won the race to insert the key row.
-      // Its booking is the authoritative one; return that rather than an error.
-      if (key && constraintNameOf(err)?.includes('idempotency')) {
+      // A concurrent identical request may have already won -- checked on
+      // ANY failure when a key was supplied, not only a caught unique
+      // violation on the idempotency-key insert itself.
+      //
+      // That narrower check alone MISSES a real case under N-way (N>2)
+      // concurrent identical retries: at most one of them can ever win
+      // claimSlot() (only one slot exists), so every other one throws
+      // SlotUnavailableException directly out of claimSlot() -- a plain JS
+      // exception with no `.constraint` -- WITHOUT ever reaching the
+      // idempotency-key insert whose violation this catch was watching
+      // for. Those callers got no idempotency protection at all: a losing
+      // retry with the exact key the winner used was told the slot was
+      // gone instead of being handed the winner's own booking, which is
+      // what "idempotent retry" is supposed to mean. The fix widens WHEN
+      // this check runs, not what it does -- findByIdempotencyKey() is
+      // already exact-key-scoped, so it can only ever return the real
+      // result of THIS key's request, never an unrelated booking.
+      if (key) {
         const replayed = await this.findByIdempotencyKey(input.customerId, key);
         if (replayed) return replayed;
       }
@@ -790,8 +805,4 @@ export { BOOKING_STATUSES, LEGAL_TRANSITIONS };
 
 function isUniqueViolation(err: unknown): boolean {
   return (err as { code?: string } | null)?.code === '23505';
-}
-
-function constraintNameOf(err: unknown): string | undefined {
-  return (err as { constraint?: string } | null)?.constraint;
 }
