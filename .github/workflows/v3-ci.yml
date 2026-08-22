@@ -35,7 +35,10 @@ defaults:
     working-directory: v3
 
 env:
-  NODE_VERSION: '20'
+  # pnpm 11.22 (below) refuses to run under anything older than Node 22.13.
+  # Bumped from '20' in the same pass as the pnpm pin -- the two versions are
+  # not independent choices.
+  NODE_VERSION: '22'
   # Pinned to match `packageManager` in v3/package.json. pnpm 9's
   # frozen-lockfile check computes a different overrides-hash than pnpm 11
   # produces, so a mismatched CI version rejects a lockfile the same

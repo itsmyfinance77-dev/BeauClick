@@ -4,7 +4,7 @@
   "private": true,
   "description": "BeauClick V3 monorepo — Phase 1: identity-service + provider-service foundation. See docs/roadmap/v3/V3_REPOSITORY_STRUCTURE.md (ADR-011) for the full architecture this workspace implements.",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.13"
   },
   "packageManager": "pnpm@11.22.0",
   "scripts": {
