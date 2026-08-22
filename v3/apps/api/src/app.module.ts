@@ -18,6 +18,8 @@ import { LOYALTY_ENTITIES } from '@beauclick/loyalty';
 import { JOURNEY_ENTITIES } from '@beauclick/journey';
 import { NOTIFICATION_ENTITIES } from '@beauclick/notification';
 import { ANALYTICS_ENTITIES } from '@beauclick/analytics';
+import { BUSINESS_ENTITIES } from '@beauclick/business';
+import { WAITLIST_ENTITIES } from '@beauclick/waitlist';
 import { EventContractsModule } from '@beauclick/event-contracts';
 import { DomainCompositionModule } from './composition/domain-composition.module';
 
@@ -59,6 +61,10 @@ import { HealthController } from './health/health.controller';
           ...JOURNEY_ENTITIES,
           ...NOTIFICATION_ENTITIES,
           ...ANALYTICS_ENTITIES,
+          // Phase 4. Both are ordinary application-role tables on this SAME
+          // shared pool -- neither needs financial's isolation treatment.
+          ...BUSINESS_ENTITIES,
+          ...WAITLIST_ENTITIES,
         ],
         // V3_DATABASE_BLUEPRINT.md §2 mandates lower_snake_case columns;
         // TypeORM's default naming strategy uses the JS property name
