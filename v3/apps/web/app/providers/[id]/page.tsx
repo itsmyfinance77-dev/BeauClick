@@ -14,6 +14,8 @@ import {
   type ProviderSummary,
   type ServiceOffering,
 } from '@/lib/booking-api';
+import { joinWaitlist } from '@/lib/phase4-api';
+import { ApiRequestError } from '@/lib/api-client';
 
 /**
  * The booking screen: choose a service, choose a time, confirm.
@@ -46,6 +48,7 @@ export default function ProviderBookingPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [waitlistState, setWaitlistState] = useState<'idle' | 'joining' | 'joined' | 'already'>('idle');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -91,6 +94,28 @@ export default function ProviderBookingPage() {
 
   const days = useMemo(() => groupSlotsByDay(slots), [slots]);
   const selectedService = services.find((s) => s.id === selectedServiceId) ?? null;
+
+  async function joinTheWaitlist() {
+    if (status !== 'authenticated') {
+      router.push('/auth');
+      return;
+    }
+    setWaitlistState('joining');
+    setError(null);
+    try {
+      await joinWaitlist(api, { professionalId, serviceId: selectedServiceId ?? undefined });
+      setWaitlistState('joined');
+    } catch (err) {
+      // Already on the waitlist for this (professional, service) is a
+      // normal, expected outcome -- shown as reassurance, not an error.
+      if (err instanceof ApiRequestError && err.code === 'ALREADY_ON_WAITLIST') {
+        setWaitlistState('already');
+        return;
+      }
+      setError(err instanceof Error ? err.message : 'خطایی رخ داد.');
+      setWaitlistState('idle');
+    }
+  }
 
   async function confirm() {
     if (!selectedSlotId || !selectedServiceId) return;
@@ -200,7 +225,20 @@ export default function ProviderBookingPage() {
       <Card>
         <h2 style={{ fontSize: 18, marginBlockEnd: 12 }}>انتخاب زمان</h2>
         {days.length === 0 ? (
-          <p style={{ color: 'var(--bc-color-ink-soft)' }}>در حال حاضر زمان آزادی برای رزرو وجود ندارد.</p>
+          <div>
+            <p style={{ color: 'var(--bc-color-ink-soft)', marginBlockEnd: 12 }}>در حال حاضر زمان آزادی برای رزرو وجود ندارد.</p>
+            {waitlistState === 'joined' || waitlistState === 'already' ? (
+              <Alert tone="success">
+                {waitlistState === 'already'
+                  ? 'شما قبلاً در لیست انتظار این متخصص ثبت‌نام کرده‌اید.'
+                  : 'به لیست انتظار اضافه شدید. به محض آزاد شدن یک نوبت، به شما اطلاع می‌دهیم.'}
+              </Alert>
+            ) : (
+              <Button variant="ghost" onClick={() => void joinTheWaitlist()} loading={waitlistState === 'joining'}>
+                عضویت در لیست انتظار
+              </Button>
+            )}
+          </div>
         ) : (
           <div style={{ display: 'grid', gap: 20 }}>
             {days.map((day) => (

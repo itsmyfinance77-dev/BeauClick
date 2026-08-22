@@ -117,6 +117,12 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <Link href="/loyalty" style={NAV_LINK_STYLE}>
                   باشگاه
                 </Link>
+                <Link href="/waitlist" style={NAV_LINK_STYLE}>
+                  لیست انتظار
+                </Link>
+                <Link href="/business" style={NAV_LINK_STYLE}>
+                  کسب‌وکار
+                </Link>
                 <Link
                   href="/notifications"
                   style={NAV_LINK_STYLE}
