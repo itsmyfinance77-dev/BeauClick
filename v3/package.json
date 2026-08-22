@@ -31,6 +31,7 @@
     "nx": "^23.1.1",
     "pg": "^8.23.0",
     "ts-jest": "^29.2.5",
+    "ts-node": "^10.9.2",
     "typeorm-naming-strategies": "^4.1.0",
     "typescript": "^5.6.3",
     "zod": "^4.4.3"
