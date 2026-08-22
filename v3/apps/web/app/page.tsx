@@ -16,7 +16,17 @@ export default function HomePage() {
       <p style={{ fontSize: 14, color: 'var(--bc-color-ink-faint)' }}>
         این صفحه بخشی از بنیان فنی فاز ۱ است؛ صفحات محصول در فازهای بعدی ساخته می‌شوند.
       </p>
-      <Link href="/auth" style={{ fontWeight: 600 }}>
+      <Link
+        href="/auth"
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontWeight: 600,
+          minHeight: 44, // accessibility: comfortable touch target on mobile -- matches Button's own minHeight
+          padding: '12px 20px',
+        }}
+      >
         ورود با شماره موبایل
       </Link>
     </Card>
