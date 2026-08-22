@@ -527,14 +527,22 @@ the registration **structurally**, so deleting the `APP_GUARD` line fails
 the suite even though every behavioural test would still pass at high test
 limits.
 
-*One real production bug found in the process, and only findable because the
-guard was finally active:* `@SkipThrottle()` with no argument defaults to
-`{ default: true }`, skipping only the policy literally NAMED `default`.
-With five named policies, `/health` remained subject to the other four --
-liveness probes would eventually have 429'd and healthy instances been
-pulled from rotation, i.e. the exemption causing the outage it exists to
-prevent. Fixed with a `SKIP_ALL_THROTTLES` constant derived from the policy
-map so a sixth policy cannot re-open it. Caught by CI, not review.
+*Two real bugs found in the process, both caught by CI rather than review,
+and both only findable once the guard was actually active:*
+
+1. **Registering one throttler per policy silently ANDs every limit
+   together.** `ThrottlerGuard.canActivate` loops over all configured
+   throttlers and requires each to pass, so five named policies applied all
+   five to every route and the effective limit became their MINIMUM --
+   search, documented as 300/min, would have been capped at `refresh`'s
+   20/min, as would everything else. Corrected to ONE registered throttler
+   with per-route `@Throttle(policy(...))` overrides, whose limits are
+   functions resolved per request so they stay environment-tunable.
+2. **`@SkipThrottle()` skips only the throttler literally named `default`.**
+   Under the intermediate five-throttler design that left `/health` subject
+   to the other four -- the exemption causing the very outage it exists to
+   prevent. Moot under the single-throttler design, but recorded as a trap
+   for anyone who later adds a second named throttler.
 
 *Known limitations, disclosed:* storage is in-memory per process, so at
 multi-instance scale the effective limit multiplies by instance count (a
