@@ -308,15 +308,28 @@ outcome.
 
 **PHASE4-02 — `financial-role-contract.pg-spec.ts` (a Phase 1 artifact) targets
 a `financial_contract_check` schema the CI workflow's provisioning step never
-creates.** Found only because this is the first time CI ran far enough to
-reach it. The guarantee it was written to prove (GAP-01, an append-only ledger
-enforced by grants) is now proven for real by `financial-integrity.pg-spec.ts`
-against the actual `financial` schema — this older test appears to predate
-that and was seemingly validated only in some ad-hoc local environment.
-Recorded here rather than silently fixed: deciding whether it should be
-deleted, repointed at the real schema, or given its own provisioning step is a
-product/test-strategy decision outside this phase's remit, not an engineering
-oversight to quietly paper over.
+creates, and its OWN setup script is actively unsafe to add to that same
+provisioning step.** Found only because this is the first time CI ran far
+enough to reach it. Investigated further, not just left as a missing-table
+error: `database/scripts/financial-role-contract.sql` (this test's real
+prerequisite) begins with `DROP ROLE IF EXISTS beauclick_financial_writer;
+DROP ROLE IF EXISTS beauclick_financial_reader;` — the SAME role names
+`database/scripts/financial-roles.sql` (the real, CI-provisioned script) also
+creates. Running both in the same database, in either order, means one
+script's `DROP ROLE` would tear down the other's roles mid-CI-run — a real
+collision, not a hypothetical one, and confirmation that this script was
+built for a standalone, disposable verification environment (its own docblock:
+"proves the INFRASTRUCTURE CONTRACT... before Phase 2 commits to it" —
+written when financial-service itself did not exist yet) and was never meant
+to coexist with the real financial-roles.sql. The guarantee this test was
+written to prove (GAP-01) is independently and completely proven for real by
+`financial-integrity.pg-spec.ts` against the actual `financial` schema.
+Deliberately NOT fixed by this phase: renaming the roles or giving this test
+its own isolated database is a real, low-but-nonzero-risk change to a
+pre-existing test's own infrastructure, and deciding whether it should
+instead simply be deleted (now redundant) is a product/test-strategy call,
+not an engineering oversight to quietly patch around a role-collision
+landmine.
 
 **PHASE4-03 — PostgreSQL 15+'s revoked default `public` schema `CREATE` grant
 is a real hosting consideration for production, not only a CI fixture.** Any
@@ -328,6 +341,27 @@ beauclick_app") never exercised, since `beauclick_app` was made the DATABASE
 owner from the start in that flow, which happened to be sufficient there but
 is not guaranteed on every hosting provider's own database-creation
 convention. Flagged for `V3_INFRASTRUCTURE_PLAN.md`'s hosting decision.
+
+**PHASE4-04 — `BookingService.create()`'s idempotency-key protection had a
+real gap under N-way (N>2) concurrent identical retries, found and fixed.**
+Also a "first real CI run reaches this for the first time" finding, not a
+Phase 4 regression: `booking-lifecycle.pg-spec.ts`'s own pre-existing
+"converges on ONE booking under concurrent identical retries" test (4
+simultaneous calls, one shared idempotency key) failed twice in a row before
+being diagnosed as real, not flaky. The replay check only ran when the
+caught error's `.constraint` name matched `'idempotency'` — true only when
+the failing transaction itself reached the idempotency-key insert and
+collided with an already-committed one. Since only one slot exists, at most
+ONE of N concurrent identical requests can ever win `claimSlot()`; every
+other one throws `SlotUnavailableException` directly out of `claimSlot()` —
+a plain JS exception carrying no `.constraint` — without ever reaching the
+insert whose collision the check was watching for. Those callers received no
+idempotency protection: a losing retry using the exact key the winner used
+was told the slot was gone, instead of being handed the winner's own
+booking. Fixed by widening WHEN the replay check runs (any failure, given a
+key), not what it does — `findByIdempotencyKey()` is already scoped to the
+exact key string, so it can only ever return the genuine result of that
+key's own request. Verified fixed: the same test passes on the next CI run.
 
 ## Still open, unchanged
 
