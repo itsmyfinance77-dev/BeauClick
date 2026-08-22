@@ -145,6 +145,17 @@ describe('WaitlistService (integration, pg-mem)', () => {
     });
   });
 
+  // offerNextFor() is NOT unit-tested here: it uses FOR UPDATE SKIP LOCKED,
+  // which pg-mem cannot parse at all ("AST which parts have not been read
+  // by the query planner... skip locked" -- confirmed directly, not assumed
+  // -- pg-mem's own README already documents it as work-in-progress). Real
+  // PostgreSQL is the only layer that can prove this method correct, and it
+  // does: waitlist-concurrency.pg-spec.ts covers earliest-first matching,
+  // idempotent redelivery, and every service-eligibility combination
+  // (any-service, generic-slot, and the non-matching case) against a real
+  // server. See PHASE2-01 in the gap register for the same class of
+  // pg-mem-cannot-prove-this limitation on FOR UPDATE-dependent code.
+
   describe('markMissed', () => {
     it('moves an offered entry to missed, a terminal state the matcher never re-offers', async () => {
       const entry = await service.join({ customerId: uuidv7(), professionalId: uuidv7(), serviceId: null });

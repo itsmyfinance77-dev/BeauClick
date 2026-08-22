@@ -1,5 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { uuidv7 } from 'uuidv7';
 import { BookingService, BookingEntity, AvailabilitySlotEntity } from '@beauclick/booking';
 import { WaitlistService, WaitlistEntryEntity, OfferNotAvailableException } from '@beauclick/waitlist';
 import { OutboxRelay } from '@beauclick/events';
@@ -236,6 +237,14 @@ describeIfPg('Waitlist concurrency on real PostgreSQL', () => {
       waitlist.offerNextFor(professional.id, slotId, null),
       waitlist.offerNextFor(professional.id, slotId, null),
     ]);
+    // Neither call should REJECT -- a genuine error here must fail loudly,
+    // not be silently filtered out by the 'fulfilled' check below (exactly
+    // the failure mode that hid this method's own real bugs during
+    // development: Promise.allSettled swallows a rejection's reason unless
+    // it is inspected directly).
+    for (const result of results) {
+      if (result.status === 'rejected') throw result.reason;
+    }
     const offeredEntries = results
       .filter((r): r is PromiseFulfilledResult<WaitlistEntryEntity | null> => r.status === 'fulfilled')
       .map((r) => r.value)
@@ -255,5 +264,32 @@ describeIfPg('Waitlist concurrency on real PostgreSQL', () => {
     const { professional, firstCustomer } = await scenario();
     await waitlist.join({ customerId: firstCustomer.id, professionalId: professional.id, serviceId: null });
     await expect(waitlist.join({ customerId: firstCustomer.id, professionalId: professional.id, serviceId: null })).rejects.toThrow();
+  });
+
+  describe('offerNextFor -- service eligibility (matching booking.service.ts\'s own claim rule)', () => {
+    it('matches an "any service" entry to a slot with a specific service', async () => {
+      const { professional, firstCustomer } = await scenario();
+      const entry = await waitlist.join({ customerId: firstCustomer.id, professionalId: professional.id, serviceId: null });
+      const offered = await waitlist.offerNextFor(professional.id, uuidv7(), professional.serviceId);
+      expect(offered?.id).toBe(entry.id);
+    });
+
+    it('matches a specific-service entry to a GENERIC (no-service) slot', async () => {
+      const { professional, firstCustomer } = await scenario();
+      const entry = await waitlist.join({
+        customerId: firstCustomer.id,
+        professionalId: professional.id,
+        serviceId: professional.serviceId,
+      });
+      const offered = await waitlist.offerNextFor(professional.id, uuidv7(), null);
+      expect(offered?.id).toBe(entry.id);
+    });
+
+    it('does NOT match a specific-service entry to a slot for a DIFFERENT service', async () => {
+      const { professional, firstCustomer } = await scenario();
+      await waitlist.join({ customerId: firstCustomer.id, professionalId: professional.id, serviceId: professional.serviceId });
+      const otherServiceId = '00000000-0000-7000-8000-000000000000';
+      expect(await waitlist.offerNextFor(professional.id, uuidv7(), otherServiceId)).toBeNull();
+    });
   });
 });

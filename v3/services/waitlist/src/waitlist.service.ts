@@ -99,43 +99,55 @@ export class WaitlistService {
       });
       if (alreadyOffered) return null;
 
-      const offerExpiresAt = new Date(Date.now() + this.config.offerWindowMinutes * 60_000);
-
-      // Raw SQL: the candidate-selection subquery needs FOR UPDATE SKIP LOCKED,
-      // which TypeORM's query builder cannot express against a correlated
-      // UPDATE ... WHERE id = (SELECT ...) shape.
+      // Step 1 -- select and lock the candidate. A plain top-level SELECT,
+      // not a subquery inside the UPDATE that follows: locking and mutating
+      // in one combined statement is the textbook SKIP LOCKED idiom, but
+      // splitting them removes any ambiguity about what a raw multi-clause
+      // RETURNING result actually shapes into, in favour of the exact same
+      // "plain SELECT via manager.query()" pattern LedgerService.sumAmount()
+      // already uses successfully. The row lock FOR UPDATE takes here is
+      // held for the rest of this transaction regardless -- the CAS in step
+      // 2 still targets this exact row.
       //
       // Eligibility, matching booking.service.ts's own claim rule (a slot
       // with no serviceId accepts ANY service, per `claimSlot`'s caller-side
       // check): an entry is eligible when it wants any service
       // (service_id IS NULL), OR the reopened slot itself has no fixed
-      // service ($4 IS NULL, so it can satisfy any entry), OR the two
+      // service ($2 IS NULL, so it can satisfy any entry), OR the two
       // service ids match exactly.
-      const rows: Array<{ id: string }> = await manager.query(
-        `UPDATE waitlist.entries
-           SET status = 'offered', offered_slot_id = $1, offered_at = now(), offer_expires_at = $2
-         WHERE id = (
-           SELECT id FROM waitlist.entries
-            WHERE professional_id = $3 AND status = 'waiting'
-              AND (service_id IS NULL OR $4::uuid IS NULL OR service_id = $4)
-            ORDER BY created_at ASC
-            LIMIT 1
-            FOR UPDATE SKIP LOCKED
-         )
-         RETURNING id`,
-        [slotId, offerExpiresAt, professionalId, serviceId],
+      const candidates: Array<{ id: string }> = await manager.query(
+        `SELECT id FROM waitlist.entries
+          WHERE professional_id = $1 AND status = 'waiting'
+            AND (service_id IS NULL OR $2::uuid IS NULL OR service_id = $2)
+          ORDER BY created_at ASC
+          LIMIT 1
+          FOR UPDATE SKIP LOCKED`,
+        [professionalId, serviceId],
       );
+      if (candidates.length === 0) return null;
+      const candidateId = candidates[0].id;
 
-      if (rows.length === 0) return null;
-      const entryId = rows[0].id;
-      const entry = await manager.findOneOrFail(WaitlistEntryEntity, { where: { id: entryId } });
+      // Step 2 -- the CAS. `status = 'waiting'` is defense in depth: the row
+      // lock from step 1 already makes this safe against a concurrent
+      // offerNextFor, but the explicit re-check is the same two-independent-
+      // guards discipline BookingService.claimSlot() uses.
+      const offerExpiresAt = new Date(Date.now() + this.config.offerWindowMinutes * 60_000);
+      const updated = await manager
+        .createQueryBuilder()
+        .update(WaitlistEntryEntity)
+        .set({ status: 'offered', offeredSlotId: slotId, offeredAt: () => 'now()', offerExpiresAt })
+        .where('id = :id AND status = :waiting', { id: candidateId, waiting: 'waiting' })
+        .execute();
+      if (updated.affected !== 1) return null;
+
+      const entry = await manager.findOneOrFail(WaitlistEntryEntity, { where: { id: candidateId } });
 
       await emitEvent(manager, WaitlistOutboxEntity, {
         aggregateType: 'waitlist_entry',
-        aggregateId: entryId,
+        aggregateId: candidateId,
         eventType: 'WaitlistOffered',
         payload: {
-          entryId,
+          entryId: candidateId,
           customerId: entry.customerId,
           professionalId,
           slotId,
@@ -143,7 +155,7 @@ export class WaitlistService {
         },
       });
 
-      this.auditLog.log({ action: 'waitlist.offered', entryId, professionalId, slotId });
+      this.auditLog.log({ action: 'waitlist.offered', entryId: candidateId, professionalId, slotId });
       return entry;
     }).catch((err) => {
       // A concurrent matcher invocation offered this exact slot a moment

@@ -117,13 +117,13 @@ describeIfPg('Business authorization on real PostgreSQL', () => {
 
       // The OWNER cannot accept on the invitee's behalf.
       await request(app.getHttpServer())
-        .post(`/api/v1/me/business-staff/${invited.body.id}/accept`)
+        .post(`/api/v1/me/business-staff/${invited.body.data.id}/accept`)
         .set('Authorization', `Bearer ${owner.accessToken}`)
         .expect(404);
 
       // Only the real invitee can.
       await request(app.getHttpServer())
-        .post(`/api/v1/me/business-staff/${invited.body.id}/accept`)
+        .post(`/api/v1/me/business-staff/${invited.body.data.id}/accept`)
         .set('Authorization', `Bearer ${invitee.accessToken}`)
         .expect(201);
 
