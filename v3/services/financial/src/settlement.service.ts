@@ -1,7 +1,7 @@
-import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
-import { emitEvent } from '@beauclick/events';
+import { emitEvent, AuditLogger } from '@beauclick/events';
 import { DomainException } from '@beauclick/http';
 import { sumAmounts } from '@beauclick/money';
 
@@ -55,7 +55,7 @@ export interface CreateSettlementInput {
  */
 @Injectable()
 export class SettlementService {
-  private readonly auditLog = new Logger('AUDIT:settlement');
+  private readonly auditLog = new AuditLogger('settlement');
 
   constructor(
     @Inject(FINANCIAL_DATA_SOURCE) private readonly dataSource: DataSource,

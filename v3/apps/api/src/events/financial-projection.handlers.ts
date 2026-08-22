@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { DomainEventHandler, EventEnvelope } from '@beauclick/events';
+import { DomainEventHandler, EventEnvelope, AuditLogger } from '@beauclick/events';
 import { LedgerService } from '@beauclick/financial';
 import { OrderService } from '@beauclick/commerce';
 import { PaymentService } from '@beauclick/payment';
@@ -233,7 +233,7 @@ export class BookingExpiredOrderHandler implements DomainEventHandler {
 @Injectable()
 export class BookingConfirmedLogHandler implements DomainEventHandler {
   readonly eventType = 'BookingConfirmed';
-  private readonly logger = new Logger('AUDIT:booking');
+  private readonly logger = new AuditLogger('booking');
 
   constructor(private readonly bookings: BookingService) {}
 

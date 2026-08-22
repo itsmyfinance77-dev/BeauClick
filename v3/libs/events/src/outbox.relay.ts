@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { DataSource, EntityTarget, IsNull } from 'typeorm';
+import { correlationIdOrNew, runWithCorrelation } from './correlation';
 import { EventEnvelope } from './event-envelope';
 import { DOMAIN_EVENT_HANDLERS, DomainEventHandler } from './event-handler';
 import { OutboxEventEntityBase } from './outbox-event.entity';
@@ -101,6 +102,13 @@ export class OutboxRelay {
     let failed = 0;
 
     for (const row of pending) {
+      // The stored id, not the sweep's own: a handler that emits a further
+      // event must produce it under the SAME correlation id, or the chain
+      // breaks at exactly the hop that made it worth tracing. This is the one
+      // place propagation happens, deliberately -- it is a visible line of
+      // code rather than something ambient that happens to work.
+      const correlationId = row.correlationId ?? correlationIdOrNew();
+
       const envelope: EventEnvelope = {
         id: row.id,
         aggregateType: row.aggregateType,
@@ -109,12 +117,15 @@ export class OutboxRelay {
         eventVersion: row.eventVersion,
         payload: row.payload,
         occurredAt: row.createdAt,
+        correlationId,
       };
 
       try {
-        for (const handler of this.handlersByType.get(row.eventType) ?? []) {
-          await handler.handle(envelope);
-        }
+        await runWithCorrelation(correlationId, async () => {
+          for (const handler of this.handlersByType.get(row.eventType) ?? []) {
+            await handler.handle(envelope);
+          }
+        });
         // Compare-and-swap on publishedAt: a concurrent relay that already
         // marked this row simply loses the update, it never double-marks.
         await repo.update({ id: row.id, publishedAt: IsNull() }, { publishedAt: new Date() });
@@ -127,7 +138,8 @@ export class OutboxRelay {
         // retrying invisibly forever.
         await repo.update({ id: row.id }, { attempts: row.attempts + 1, lastError: message.slice(0, 1000) });
         this.logger.error(
-          `Outbox dispatch failed [${source.name}] ${row.eventType} ${row.id} (attempt ${row.attempts + 1}): ${message}`,
+          `Outbox dispatch failed [${source.name}] ${row.eventType} ${row.id} ` +
+            `(attempt ${row.attempts + 1}, correlation ${correlationId}): ${message}`,
         );
       }
     }

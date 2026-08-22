@@ -1,7 +1,7 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
-import { emitEvent } from '@beauclick/events';
+import { emitEvent, AuditLogger } from '@beauclick/events';
 import { assertNonNegativeAmount, splitExact } from '@beauclick/money';
 
 import {
@@ -40,7 +40,7 @@ export interface RecordRefundInput {
  */
 @Injectable()
 export class LedgerService {
-  private readonly auditLog = new Logger('AUDIT:financial');
+  private readonly auditLog = new AuditLogger('financial');
 
   constructor(
     @Inject(FINANCIAL_DATA_SOURCE) private readonly dataSource: DataSource,

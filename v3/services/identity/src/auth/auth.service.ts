@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { DomainException } from '@beauclick/http';
 import { HttpStatus } from '@nestjs/common';
 import { OtpService } from '../otp/otp.service';
@@ -7,6 +7,7 @@ import { TokenService, TokenPair } from '../token/token.service';
 import { canonicalizePhone } from './phone.util';
 import { UserEntity } from '../entities/user.entity';
 import { capabilitiesForRoles } from '../rbac/capabilities';
+import { AuditLogger } from '@beauclick/events';
 
 export class InvalidPhoneException extends DomainException {
   constructor() {
@@ -35,7 +36,7 @@ export interface LoginResult {
 
 @Injectable()
 export class AuthService {
-  private readonly auditLog = new Logger('AUDIT:identity');
+  private readonly auditLog = new AuditLogger('identity');
 
   constructor(
     private readonly otp: OtpService,

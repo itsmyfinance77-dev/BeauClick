@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, LessThan, MoreThan, Repository } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
@@ -12,6 +12,7 @@ import {
   SlotOverlapsException,
 } from '../booking.errors';
 import { PLATFORM_TIMEZONE, isIsoDate, isIsoTime, localDateTimeToInstant, zonedWeekday } from './platform-time';
+import { AuditLogger } from '@beauclick/events';
 
 export interface CreateSlotInput {
   startAt: Date;
@@ -55,7 +56,7 @@ export interface AvailabilityWindow {
  */
 @Injectable()
 export class AvailabilityService {
-  private readonly auditLog = new Logger('AUDIT:availability');
+  private readonly auditLog = new AuditLogger('availability');
 
   constructor(
     @InjectRepository(AvailabilitySlotEntity) private readonly slots: Repository<AvailabilitySlotEntity>,

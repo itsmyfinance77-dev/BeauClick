@@ -1,8 +1,8 @@
-import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
-import { emitEvent } from '@beauclick/events';
+import { emitEvent, AuditLogger } from '@beauclick/events';
 import { DomainException } from '@beauclick/http';
 import { assertNonNegativeAmount } from '@beauclick/money';
 
@@ -47,7 +47,7 @@ export interface OrderWithDetail {
 
 @Injectable()
 export class OrderService {
-  private readonly auditLog = new Logger('AUDIT:commerce');
+  private readonly auditLog = new AuditLogger('commerce');
 
   constructor(
     @InjectRepository(OrderEntity) private readonly orders: Repository<OrderEntity>,

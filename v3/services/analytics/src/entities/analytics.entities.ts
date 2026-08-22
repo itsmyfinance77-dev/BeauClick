@@ -60,6 +60,17 @@ export class AnalyticsEventEntity {
   @Column({ type: 'uuid', nullable: true })
   actorId!: string | null;
 
+  /**
+   * The customer action this fact belongs to, carried from the producing
+   * event. Analytics is the only place that already sees every domain's
+   * events, so it is where a cross-domain trace is one query instead of nine.
+   *
+   * An identifier, never a dimension: grouping by it yields one bucket per
+   * action, which is a trace, not a metric.
+   */
+  @Column({ type: 'uuid', nullable: true })
+  correlationId!: string | null;
+
   /** Bounded, structured dimensions. Never a free-form blob. */
   @Column({ type: 'jsonb', default: () => "'{}'::jsonb" })
   dimensions!: Record<string, string | number | boolean | null>;

@@ -22,6 +22,7 @@ import { EventContractsModule } from '@beauclick/event-contracts';
 import { DomainCompositionModule } from './composition/domain-composition.module';
 
 import cookieParser from 'cookie-parser';
+import { CorrelationMiddleware } from './observability/correlation.middleware';
 
 import { validateEnv } from './config/env.validation';
 import { HealthController } from './health/health.controller';
@@ -135,6 +136,8 @@ export class AppModule implements NestModule {
    * module, so every consumer of AppModule gets it identically.
    */
   configure(consumer: MiddlewareConsumer): void {
-    consumer.apply(cookieParser()).forRoutes('*');
+    // Order matters: correlation first, so a request that fails inside cookie
+    // parsing is still traceable and still gets the response header.
+    consumer.apply(CorrelationMiddleware, cookieParser()).forRoutes('*');
   }
 }

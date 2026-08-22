@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, IsNull, LessThanOrEqual, Not, Repository } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
@@ -17,6 +17,7 @@ import {
   TierEntity,
 } from './entities/loyalty.entities';
 import { TierService } from './tier.service';
+import { AuditLogger } from '@beauclick/events';
 
 /**
  * Membership is account STATE, not a ledger: at most one row per user,
@@ -31,7 +32,7 @@ import { TierService } from './tier.service';
  */
 @Injectable()
 export class MembershipService {
-  private readonly auditLog = new Logger('AUDIT:loyalty');
+  private readonly auditLog = new AuditLogger('loyalty');
 
   constructor(
     private readonly dataSource: DataSource,

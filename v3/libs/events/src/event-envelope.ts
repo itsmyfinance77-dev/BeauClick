@@ -14,6 +14,12 @@ export interface EventEnvelope<TPayload = Record<string, unknown>> {
   eventVersion: number;
   payload: TPayload;
   occurredAt: Date;
+  /**
+   * The customer action this event belongs to. Optional on the type because a
+   * hand-built envelope in a test has no request behind it; always populated
+   * on anything that came out of an outbox table.
+   */
+  correlationId?: string;
 }
 
 /**

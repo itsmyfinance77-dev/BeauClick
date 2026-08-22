@@ -1,8 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, LessThan, Repository } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
-import { emitEvent } from '@beauclick/events';
+import { emitEvent, AuditLogger } from '@beauclick/events';
 
 import { AvailabilitySlotEntity } from '../entities/availability-slot.entity';
 import {
@@ -60,7 +60,7 @@ const SYSTEM_ACTOR: BookingActor = { type: 'system', id: null };
 
 @Injectable()
 export class BookingService {
-  private readonly auditLog = new Logger('AUDIT:booking');
+  private readonly auditLog = new AuditLogger('booking');
 
   constructor(
     @InjectRepository(BookingEntity) private readonly bookings: Repository<BookingEntity>,

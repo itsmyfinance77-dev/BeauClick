@@ -1,9 +1,9 @@
-import { HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
-import { emitEvent } from '@beauclick/events';
+import { emitEvent, AuditLogger } from '@beauclick/events';
 import { DomainException } from '@beauclick/http';
 import { assertNonNegativeAmount } from '@beauclick/money';
 
@@ -91,7 +91,7 @@ export interface RequestRefundInput {
 
 @Injectable()
 export class PaymentService {
-  private readonly auditLog = new Logger('AUDIT:payment');
+  private readonly auditLog = new AuditLogger('payment');
 
   constructor(
     @InjectRepository(PaymentIntentEntity) private readonly intents: Repository<PaymentIntentEntity>,

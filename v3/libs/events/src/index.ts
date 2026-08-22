@@ -1,3 +1,6 @@
+export * from './correlation';
+export * from './operation-log';
+export * from './audit-logger';
 export * from './event-envelope';
 export * from './outbox-event.entity';
 export * from './outbox.writer';

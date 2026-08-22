@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, IsNull, Repository } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
@@ -10,6 +10,7 @@ import { CreateProfessionalDto } from './dto/create-professional.dto';
 import { UpdateProfessionalDto } from './dto/update-professional.dto';
 import { ListProvidersDto } from './dto/list-providers.dto';
 import { ProviderEventsService } from './provider-events.service';
+import { AuditLogger } from '@beauclick/events';
 
 export class ProviderAlreadyExistsException extends DomainException {
   constructor() {
@@ -29,7 +30,7 @@ const VALID_TRANSITIONS: Record<VerificationStatus, VerificationStatus[]> = {
 
 @Injectable()
 export class ProviderService {
-  private readonly auditLog = new Logger('AUDIT:provider');
+  private readonly auditLog = new AuditLogger('provider');
 
   constructor(
     private readonly dataSource: DataSource,

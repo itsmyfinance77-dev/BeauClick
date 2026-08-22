@@ -1,5 +1,6 @@
 import { EntityManager, EntityTarget } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
+import { correlationIdOrNew } from './correlation';
 import { assertPayloadHasNoSecrets, EventEnvelope } from './event-envelope';
 import { OutboxEventEntityBase } from './outbox-event.entity';
 
@@ -9,6 +10,8 @@ export interface EmitEventInput<TPayload extends Record<string, unknown> = Recor
   eventType: string;
   eventVersion?: number;
   payload: TPayload;
+  /** Overrides the ambient correlation id. Only a relay replaying a stored event needs this. */
+  correlationId?: string;
 }
 
 /**
@@ -28,6 +31,11 @@ export async function emitEvent<TPayload extends Record<string, unknown>>(
 ): Promise<EventEnvelope<TPayload>> {
   assertPayloadHasNoSecrets(input.payload);
 
+  // Captured here rather than accepted as a required argument: the id must be
+  // on EVERY event, and a parameter every producer has to remember to pass is
+  // a guarantee that holds until the first author forgets. See `correlation.ts`.
+  const correlationId = input.correlationId ?? correlationIdOrNew();
+
   const repo = manager.getRepository(outboxEntity);
   const row = repo.create({
     id: uuidv7(),
@@ -36,6 +44,7 @@ export async function emitEvent<TPayload extends Record<string, unknown>>(
     eventType: input.eventType,
     eventVersion: input.eventVersion ?? 1,
     payload: input.payload,
+    correlationId,
     publishedAt: null,
     attempts: 0,
     lastError: null,
@@ -50,5 +59,6 @@ export async function emitEvent<TPayload extends Record<string, unknown>>(
     eventVersion: saved.eventVersion,
     payload: input.payload,
     occurredAt: saved.createdAt ?? new Date(),
+    correlationId,
   };
 }

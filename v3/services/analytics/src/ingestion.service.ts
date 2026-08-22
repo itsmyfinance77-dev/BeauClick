@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { EventEnvelope, insertOnce } from '@beauclick/events';
+import { EventEnvelope, insertOnce, logOperation } from '@beauclick/events';
 import { AnalyticsEventEntity, AnalyticsSubjectType } from './entities/analytics.entities';
 import { platformCalendarDay } from './platform-day';
 
@@ -240,7 +240,7 @@ export class AnalyticsIngestionService {
     const subjectId = mapping.subjectOf(payload);
     const occurredAt = this.resolveTimestamp(mapping, payload, envelope);
 
-    return insertOnce(
+    const inserted = await insertOnce(
       this.facts
       .createQueryBuilder()
       .insert()
@@ -257,6 +257,7 @@ export class AnalyticsIngestionService {
         subjectType: subjectId ? mapping.subjectType : null,
         subjectId: subjectId ?? null,
         actorId: mapping.actorOf?.(payload) ?? null,
+        correlationId: envelope.correlationId ?? null,
         dimensions: this.compact(mapping.dimensions?.(payload) ?? {}) as never,
         metricValue: mapping.metricOf?.(payload) ?? null,
         occurredAt,
@@ -264,6 +265,20 @@ export class AnalyticsIngestionService {
       }),
       'event_id',
     );
+
+    // `inserted=false` is the normal, correct outcome of a redelivery, not an
+    // error -- but it is the only way to see that dedupe is actually doing
+    // something, and a sudden run of them is how an upstream retry loop
+    // announces itself.
+    logOperation(this.logger, 'analytics.ingested', {
+      eventType: envelope.eventType,
+      eventId: envelope.id,
+      subjectType: subjectId ? mapping.subjectType : null,
+      inserted,
+      occurredOn: platformCalendarDay(occurredAt),
+    });
+
+    return inserted;
   }
 
   /**

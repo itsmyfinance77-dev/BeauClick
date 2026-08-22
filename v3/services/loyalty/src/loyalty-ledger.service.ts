@@ -1,8 +1,8 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
-import { insertOnce } from '@beauclick/events';
+import { insertOnce, AuditLogger } from '@beauclick/events';
 import {
   EVENT_CONTRACT_REGISTRY,
   EventContractRegistry,
@@ -58,7 +58,7 @@ export interface AwardResult {
  */
 @Injectable()
 export class LoyaltyLedgerService {
-  private readonly auditLog = new Logger('AUDIT:loyalty');
+  private readonly auditLog = new AuditLogger('loyalty');
 
   constructor(
     private readonly dataSource: DataSource,

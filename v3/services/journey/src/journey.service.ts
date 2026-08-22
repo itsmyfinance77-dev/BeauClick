@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
-import { insertOnce } from '@beauclick/events';
+import { AuditLogger, insertOnce } from '@beauclick/events';
 import {
   BeautyGoalCreated,
   BeautyGoalStatusChanged,
@@ -56,6 +56,16 @@ export interface TimelineAppendInput {
  */
 @Injectable()
 export class JourneyService {
+  /**
+   * Journey had no audit trail at all, which for the domain holding the most
+   * personal data in the system is the wrong way round. The records below are
+   * deliberately shape-only: which operation, whose id, what changed. Never
+   * the note, never the goal title -- the same rule ADR-019 enforces on the
+   * AI context and the event payloads applies here, because a log aggregator
+   * is a third place customer prose could end up.
+   */
+  private readonly auditLog = new AuditLogger('journey');
+
   constructor(
     private readonly dataSource: DataSource,
     @InjectRepository(BeautyProfileEntity) private readonly profiles: Repository<BeautyProfileEntity>,
@@ -115,6 +125,15 @@ export class JourneyService {
       )
       .execute();
 
+    this.auditLog.log({
+      action: 'journey.profile_updated',
+      userId,
+      // Whether a note is PRESENT is operational; what it says is not.
+      hasNotes: next.notes !== null && next.notes.length > 0,
+      specialties: next.preferredSpecialtyIds.length,
+      hasBudget: next.budgetMinToman !== null || next.budgetMaxToman !== null,
+    });
+
     return this.profiles.findOneOrFail({ where: { userId } });
   }
 
@@ -169,6 +188,17 @@ export class JourneyService {
         occurredAt: goal.createdAt,
       });
 
+      this.auditLog.log({
+        action: 'journey.goal_created',
+        userId,
+        goalId: id,
+        specialtyId: goal.specialtyId,
+        cityId: goal.cityId,
+        // The title is the customer's own prose and is absent here for the
+        // same reason it is absent from BeautyGoalCreated.
+        hasTargetDate: goal.targetDate !== null,
+      });
+
       return goal;
     });
   }
@@ -216,6 +246,14 @@ export class JourneyService {
           toStatus,
           changedAt: new Date().toISOString(),
         },
+      });
+
+      this.auditLog.log({
+        action: 'journey.goal_status_changed',
+        userId,
+        goalId,
+        from: before.status,
+        to: toStatus,
       });
 
       return m.getRepository(BeautyGoalEntity).findOneOrFail({ where: { id: goalId, userId } });

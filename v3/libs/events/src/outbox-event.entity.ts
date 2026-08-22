@@ -39,6 +39,16 @@ export abstract class OutboxEventEntityBase {
   payload!: Record<string, unknown>;
 
   /**
+   * Ties this event to the customer action that caused it, across every
+   * schema it fans out to. Nullable only because rows written before the
+   * column existed have no honest value to backfill -- every new row gets
+   * one, minted at the request edge or by the relay for a background sweep.
+   */
+  @Index()
+  @Column({ type: 'uuid', nullable: true })
+  correlationId!: string | null;
+
+  /**
    * Null until the relay has successfully dispatched this row to every
    * registered handler. The relay's claim query filters on this being
    * null, which is what makes redelivery-after-crash automatic.

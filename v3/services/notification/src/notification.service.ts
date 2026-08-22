@@ -2,7 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, IsNull, LessThanOrEqual, Repository } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
-import { insertOnce } from '@beauclick/events';
+import { insertOnce, logOperation, warnOperation } from '@beauclick/events';
 import {
   EVENT_CONTRACT_REGISTRY,
   EventContractRegistry,
@@ -224,6 +224,18 @@ export class NotificationService {
           sentAt: (row.sentAt ?? new Date()).toISOString(),
         },
       });
+      logOperation(this.logger, 'notification.delivered', {
+        notificationId,
+        channel,
+        provider: port.key,
+        category,
+        templateKey,
+        attempts: row.attempts,
+        // Whether this channel actually reaches a person. GAP-11: sms and
+        // email log rather than deliver, and a log line that says "delivered"
+        // without saying that is exactly the claim §16 forbids.
+        providerVerified: port.providerVerified,
+      });
       return 'sent' as NotifyOutcome;
     });
   }
@@ -276,12 +288,27 @@ export class NotificationService {
           aggregateId: notificationId,
           payload: { notificationId, userId, category, channel, errorCode, attempts, deadLetteredAt: new Date().toISOString() },
         });
-        this.logger.warn(
-          `Notification ${notificationId} dead-lettered after ${attempts} attempt(s): ${errorCode} (retryable=${retryable})`,
-        );
+        warnOperation(this.logger, 'notification.dead_lettered', {
+          notificationId,
+          channel,
+          category,
+          errorCode,
+          attempts,
+          // Distinguishes "the channel said never retry" from "we ran out of
+          // attempts". They need different operator responses, and a single
+          // dead_lettered status cannot tell them apart on its own.
+          reason: retryable ? 'attempts_exhausted' : 'permanent_failure',
+        });
         return 'dead_lettered' as NotifyOutcome;
       }
 
+      warnOperation(this.logger, 'notification.retry_scheduled', {
+        notificationId,
+        channel,
+        errorCode,
+        attempts,
+        retryInSeconds: RETRY_BACKOFF_SECONDS[attempts - 1],
+      });
       return 'failed' as NotifyOutcome;
     });
   }

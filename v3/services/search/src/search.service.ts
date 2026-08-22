@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { logOperation } from '@beauclick/events';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
@@ -65,7 +66,19 @@ export class SearchService {
       outcome = { ...(await this.degradedSearch(criteria)), degraded: true };
     }
 
-    await this.recordSearchPerformed(criteria, outcome, userId, Date.now() - startedAt);
+    const latencyMs = Date.now() - startedAt;
+    // Latency and shape, never the query text. A search query is customer
+    // free text and belongs in logs no more than it belongs in an event
+    // payload -- which is why the contract has no field able to hold it.
+    logOperation(this.logger, 'search.providers', {
+      latencyMs,
+      degraded: outcome.degraded,
+      results: outcome.total,
+      queryClass: this.classifyQuery(criteria),
+      filters: this.activeFilterKeys(criteria).length,
+    });
+
+    await this.recordSearchPerformed(criteria, outcome, userId, latencyMs);
     return outcome;
   }
 
@@ -121,13 +134,7 @@ export class SearchService {
   ): Promise<void> {
     const text = criteria.query?.trim() ?? '';
     const filterKeys = this.activeFilterKeys(criteria);
-    const queryClass = text
-      ? filterKeys.length > 0
-        ? 'text_and_filtered'
-        : 'text'
-      : filterKeys.length > 0
-        ? 'filtered'
-        : 'empty';
+    const queryClass = this.classifyQuery(criteria);
 
     try {
       await this.dataSource.transaction(async (manager) => {
@@ -154,6 +161,20 @@ export class SearchService {
       // are what they came for.
       this.logger.warn(`Failed to record SearchPerformed: ${err instanceof Error ? err.message : String(err)}`);
     }
+  }
+
+  /**
+   * The shape of a query, which is the most that may be recorded about it.
+   *
+   * Shared by the event and the log line deliberately: two independent
+   * classifications of the same thing drift, and the moment they disagree the
+   * tempting fix is to log the raw query "just to compare".
+   */
+  private classifyQuery(criteria: ProviderSearchCriteria): 'text_and_filtered' | 'text' | 'filtered' | 'empty' {
+    const hasText = (criteria.query?.trim() ?? '').length > 0;
+    const hasFilters = this.activeFilterKeys(criteria).length > 0;
+    if (hasText) return hasFilters ? 'text_and_filtered' : 'text';
+    return hasFilters ? 'filtered' : 'empty';
   }
 
   private activeFilterKeys(criteria: ProviderSearchCriteria): string[] {
