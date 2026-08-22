@@ -64,6 +64,16 @@ After the release audit above concluded, the sandbox half of GAP-06 was implemen
 
 **Release implication — the sandbox does not unblock v3.0.0, and was not treated as if it did.** See `V3_GAP_REGISTER.md`'s Phase 5 addendum II for the full reasoning: the roadmap's Phase 2 acceptance criterion ("against a real (even sandbox) payment gateway") sits alongside its own risk note describing the sandbox-test cycle as part of *building* the gateway integration, not a substitute for having one. Treating a locally-simulated bank as satisfying that gate would be the silent policy override this phase's brief explicitly forbids. **v3.0.0 remains uncreated, pending an explicit human release-policy decision.**
 
+## 10. Addendum — PHASE5-02 global rate limiting RESOLVED (later authorized pass)
+
+§4 recorded `ThrottlerGuard` as configured-but-unwired and deliberately deferred it. That is now closed. Design: `V3_SECURITY_MODEL.md` §13. Audit narrative and the superseded deferral reasoning: `V3_RELEASE_AUDIT.md` §17. Gap-register entry: `V3_GAP_REGISTER.md`, PHASE5-02.
+
+Two things worth carrying forward from it as *lessons*, not just outcomes:
+
+**An unwired guard is worse than a missing one.** Three auth routes already carried `@Throttle` decorators. Without a registered guard they were inert metadata — so the source read as protected while nothing enforced it. §4's own audit missed this because it checked for the guard's registration and stopped there, without asking whether anything *else* in the codebase was written as though the guard existed. "Is the mechanism wired?" and "does the code claim it is?" are two different questions, and the second is where the misleading signal lives.
+
+**The deferral was right to be cautious and wrong to stop there.** The risk §4 named — global throttling tripping false 429s across a suite sharing one app instance and IP — was real, not imagined. But the correct response was a test harness that keeps the guard active while varying its limits, which took one parameter on the test factory. Deferring a security fix on the strength of a test-harness concern is worth doing only as long as it takes to solve the test-harness concern.
+
 ## 6. Documentation
 
 This document, `V3_RELEASE_AUDIT.md` (the full audit, gap reconciliation table, and release reasoning), `V3_GAP_REGISTER.md`'s Phase 5 addendum, and brief addenda to `V3_SECURITY_MODEL.md` and `V3_EVENT_CATALOG.md`.

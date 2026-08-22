@@ -491,6 +491,50 @@ silent policy override Phase 5's brief forbids. **The release gate therefore
 still requires an explicit human release-policy decision** — see
 `V3_PHASE5_IMPLEMENTATION.md` §9.
 
+**PHASE5-02 — global rate limiting — RESOLVED.** Full design in
+`V3_SECURITY_MODEL.md` §13; audit narrative in `V3_RELEASE_AUDIT.md` §17.
+
+The original finding was correct but understated it. `ThrottlerGuard` was
+indeed never registered — but three auth routes (`request-otp`,
+`verify-otp`, `refresh`) already carried `@Throttle` decorators, which
+without a registered guard were **inert metadata**. That is worse than no
+protection: `auth.controller.ts` read as though its routes were limited,
+so an auditor reading that file alone would have concluded the
+unauthenticated auth surface was protected. It was not, for four phases.
+
+A second defect would have broken a naive fix: `ThrottlerModule.forRoot()`
+is not `@Global` in v6 and lived in `IdentityModule`, so a root-level
+`APP_GUARD` could not have resolved its storage — the identical DI trap
+Phase 4 hit with `PRICING_RULES`. Both had to be fixed together.
+
+Resolved with: a custom guard keyed on the verified-JWT user id (falling
+back to IP, with `trust proxy` deliberately off so `X-Forwarded-For` is
+unspoofable), registered after `JwtAuthGuard` so `req.user` exists; five
+environment-tunable named policies whose `read` limit is derived from a
+real workload fact (the search page's 250ms autocomplete debounce ⇒ ~240
+req/min legitimate) rather than invented; `/health` as the sole exemption,
+justified as infrastructure-critical rather than merely frequent; and V3's
+existing `RATE_LIMITED` Persian 429 contract, carrying no budget or policy
+details an attacker could use.
+
+The deferral reasoning recorded earlier is superseded, though the concern
+was legitimate. It is resolved rather than avoided: the guard stays fully
+active in every suite with only limits raised, and `throttling.pg-spec.ts`
+boots its own app at tiny limits to prove enforcement. A
+`DISABLE_THROTTLING` switch was explicitly rejected — an off switch is
+exactly why this survived four phases unnoticed. The new suite also asserts
+the registration **structurally**, so deleting the `APP_GUARD` line fails
+the suite even though every behavioural test would still pass at high test
+limits.
+
+*Known limitations, disclosed:* storage is in-memory per process, so at
+multi-instance scale the effective limit multiplies by instance count (a
+shared Redis store is the correct fix, deliberately not adopted at current
+single-instance scale). Live browser QA of throttling was not performed —
+the API cannot boot locally without a financial DB connection and the local
+credentials are stale — so CI, which boots the real `AppModule` against real
+PostgreSQL and drives real HTTP, is the evidence.
+
 **PHASE5-03 — a real outbox lesson, found by CI.** The sandbox refund test
 initially asserted a net-zero receivable and got the full un-reversed amount.
 Not a product bug: the refund path is a TWO-HOP event chain

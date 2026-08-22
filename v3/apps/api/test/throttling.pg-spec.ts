@@ -163,19 +163,20 @@ describeIfPg('Global rate limiting on real PostgreSQL', () => {
       for (let i = 0; i < LIMIT; i += 1) await hit('/api/v1/me/waitlist', ip, user.accessToken);
       expect((await hit('/api/v1/me/waitlist', ip, user.accessToken)).status).toBe(429);
 
-      // Every plausible spoof vector: headers and query claiming a different
-      // identity. The tracker reads req.user, populated only from a verified
-      // JWT, so none of these can create a fresh bucket.
-      for (const spoof of [
-        { 'X-User-Id': uuidv7() },
-        { 'X-User': uuidv7() },
-        { 'x-forwarded-user': uuidv7() },
-      ]) {
+      // Every plausible spoof vector: headers claiming a different identity.
+      // The tracker reads req.user, populated only from a verified JWT, so
+      // none of these can create a fresh bucket.
+      const spoofHeaders: Array<[string, string]> = [
+        ['X-User-Id', uuidv7()],
+        ['X-User', uuidv7()],
+        ['x-forwarded-user', uuidv7()],
+      ];
+      for (const [header, value] of spoofHeaders) {
         const res = await request(app.getHttpServer())
           .get('/api/v1/me/waitlist')
           .set('X-Forwarded-For', ip)
           .set('Authorization', `Bearer ${user.accessToken}`)
-          .set(spoof as Record<string, string>);
+          .set(header, value);
         expect(res.status).toBe(429);
       }
 

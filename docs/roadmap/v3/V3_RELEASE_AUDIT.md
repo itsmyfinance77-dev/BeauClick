@@ -114,7 +114,7 @@ No N+1 in any audited read path. Waitlist matching is one indexed query with `LI
 
 ## 12. Bugs discovered, NOT fixed (deliberately)
 
-- **PHASE5-02**: `ThrottlerGuard` never wired globally — see §4 for why fixing it blind in this same pass was judged too risky to the verified-green test suite, and what a safe fix requires (a test-environment escape hatch first).
+- ~~**PHASE5-02**: `ThrottlerGuard` never wired globally~~ — **RESOLVED in a later authorized pass.** See §17 below.
 
 ## 13. Remaining limitations
 
@@ -137,3 +137,21 @@ GAP-10's provisional numeric policy sign-off; whether GAP-04/09/12/18–28's def
 ---
 
 **Commit range this phase:** `582c606` → `250a720` (2 commits: `25371a3`, `250a720`). **Git status:** clean, `HEAD == origin/master`. **No `v3.0.0` tag exists.**
+
+---
+
+## 17. PHASE5-02 — RESOLVED (later authorized pass)
+
+Global rate limiting is now enforced. Full design rationale lives in `V3_SECURITY_MODEL.md` §13; what matters for this audit:
+
+**The finding recorded in §4 was correct but understated.** It said the guard was "never wired" — true — but the audit did not check whether route-level `@Throttle` decorators existed. They did: `request-otp`, `verify-otp`, and `refresh` each carried one. Without a registered guard those decorators were **inert metadata**, which is worse than no protection, because the source reads as though those routes are limited. A reader auditing `auth.controller.ts` alone would reasonably have concluded the auth surface was rate-limited. It was not.
+
+**A second defect would have defeated a naive fix.** `ThrottlerModule.forRoot()` is not `@Global` in v6 and was configured in `IdentityModule`, so simply adding `{ provide: APP_GUARD, useClass: ThrottlerGuard }` to `AppModule` would have failed to resolve `ThrottlerStorage` at boot. Both defects had to be fixed together.
+
+**The §4 deferral reasoning is superseded, and the concern it raised was legitimate.** §4 declined to fix this blind because global throttling could trip false 429s across a suite that shares one app instance and IP. That risk was real. It is resolved properly rather than avoided: the guard stays **fully active in every test suite**, with only the *limits* raised via environment overrides, and a dedicated `throttling.pg-spec.ts` boots its own app with deliberately tiny limits to prove enforcement. A `DISABLE_THROTTLING` switch was explicitly rejected — an off switch is precisely why this went unnoticed for four phases.
+
+**Regression-proofing.** The new suite asserts the guard is registered *structurally*, not only behaviourally. Removing the `APP_GUARD` line fails the suite even though every high-limit behavioural test would still pass — which is exactly the blind spot that let the original gap survive.
+
+**Live QA limitation, stated plainly.** Browser/HTTP throttling verification against a locally-running V3 app was **not** performed: the API refuses to boot without `FINANCIAL_DATABASE_URL` (correct fail-closed behaviour per ADR-017), the local PostgreSQL credentials remain stale, and the credential-recovery runbook is blocked by this environment's permission policy. The strongest available evidence is used instead, and it is genuinely strong: `throttling.pg-spec.ts` boots the **real `AppModule`** against **real PostgreSQL** in CI and drives **real HTTP** through supertest — the same stack a browser would hit, minus the browser.
+
+**Release impact: none.** This closes a medium-severity security gap. GAP-06b (real production payment gateway) remains the sole release blocker.
