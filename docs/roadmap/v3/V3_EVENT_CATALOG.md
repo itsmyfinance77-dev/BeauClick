@@ -333,3 +333,19 @@ Still an **in-process relay**, and now on evidence rather than deferral. `OrderP
 has five independent consumers (ledger, loyalty, journey timeline, notification,
 analytics) and runs correctly. See `ADR-022` for why nothing in the observed load
 argues for a broker yet, and what would change the answer.
+
+## Every event now carries a correlation ID
+
+This catalog required one from the start and the column did not exist. Phase 3 adds it, because Phase 3 is where it became load-bearing: a single completed booking now reaches five independent consumers in five schemas, several of which emit further events of their own. Without a correlation ID, *"why did this customer get this notification"* is answered by comparing timestamps across five schemas and hoping nothing else happened in the same second.
+
+- **At the edge.** Every HTTP request runs under a correlation id, taken from `X-Correlation-Id` when the client supplies a UUID-shaped one and minted otherwise. It is echoed back on the response, so a browser network log or a support ticket can name the exact request without server access. A non-UUID value is **replaced, not sanitised** — the id reaches nine outbox tables and every log line, and this system produces exactly one id shape.
+- **On the way out.** `emitEvent` and `emitContractEvent` stamp the ambient id onto the outbox row inside the producing transaction. It is captured rather than passed as an argument for the reason the rest of this project keeps rediscovering: a parameter every producer has to remember is a guarantee that holds until the first author forgets, and the failure mode here is a silent null.
+- **Across the fan-out.** The relay re-enters the context with the **stored** id before invoking handlers, so an event emitted by a consumer inherits the id of the event it was reacting to. This is the hop that makes the id worth having, and it is one explicit line in `outbox.relay.ts` rather than something ambient that happens to work.
+- **Into analytics.** `analytics.events.correlation_id` makes a cross-domain trace one query instead of nine. It is an identifier and never a dimension — grouping by it produces one bucket per action, which is a trace, not a metric.
+- **When there is no request.** A scheduler tick mints a fresh id rather than writing null. An unreliable column stops being used, and a sweep's own cascade is still worth tracing as a unit.
+
+The column is nullable **only** because rows written before the migration have no honest value to backfill. Every row written after it has one, and a test asserts that.
+
+### What the id must never become
+
+A correlation id is an opaque identifier and nothing else. It is not derived from a user id, a phone number, or a session, and nothing may be inferred from it — otherwise a value that travels into logs, response headers, and any future third-party aggregator quietly becomes a personal identifier. UUIDv7 is used for the same reason every other id here is: it sorts in creation order, which is useful, and encodes nothing else.
