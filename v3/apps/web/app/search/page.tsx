@@ -215,13 +215,47 @@ export default function SearchPage() {
         <LoadingState label="در حال جست‌وجو…" />
       ) : (
         <>
+          {/*
+            The status line reports exactly one of three distinct states, and
+            never conflates them. It used to collapse "the request failed" and
+            "the server answered, with nothing" into the same sentence, because
+            a null `result` fell through the ternary's else branch -- so a
+            failed search told the user "نتیجه‌ای یافت نشد", and, being inside
+            this aria-live region, announced it to a screen reader too. That
+            sends the user off rewording a perfectly good query to fix a
+            problem that was never theirs.
+
+            While a search is in flight the line reports THAT, instead of
+            leaving the previous count standing as though it still described
+            what is on screen. Only the very first search used to get any
+            loading feedback (`loading && !result` above); every filter
+            change, sort change, and page step after it appeared to do nothing.
+          */}
           <p aria-live="polite" style={{ fontSize: 14, color: 'var(--bc-color-ink-faint)', marginBlockEnd: 12 }}>
-            {result && result.pagination.total > 0
-              ? `${toPersianDigits(result.pagination.total)} نتیجه یافت شد`
-              : 'نتیجه‌ای یافت نشد'}
+            {loading
+              ? 'در حال جست‌وجو…'
+              : error
+                ? '' // The Alert above is already saying it; don't say it twice.
+                : result
+                  ? result.pagination.total > 0
+                    ? `${toPersianDigits(result.pagination.total)} نتیجه یافت شد`
+                    : 'نتیجه‌ای یافت نشد'
+                  : ''}
           </p>
 
-          {result && result.items.length === 0 && (
+          {/*
+            Results from the last search that DID succeed are kept on screen
+            rather than blanked -- but they are no longer an answer to the
+            query the user just ran, so they are labelled instead of left to
+            look current.
+          */}
+          {error && result && result.items.length > 0 && (
+            <p style={{ fontSize: 13, color: 'var(--bc-color-ink-faint)', marginBlockEnd: 12 }}>
+              نتایج زیر مربوط به جست‌وجوی قبلی است و ممکن است به‌روز نباشد.
+            </p>
+          )}
+
+          {!error && result && result.items.length === 0 && (
             <Card>
               <p style={{ margin: 0 }}>
                 جست‌وجوی شما نتیجه‌ای نداشت. می‌توانید فیلترها را بردارید یا عبارت دیگری امتحان کنید.
