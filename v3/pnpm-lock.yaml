@@ -618,6 +618,9 @@ importers:
       '@beauclick/ownership':
         specifier: workspace:*
         version: link:../../libs/ownership
+      '@beauclick/persian-utils':
+        specifier: workspace:*
+        version: link:../../packages/persian-utils
       '@nestjs/common':
         specifier: 10.4.22
         version: 10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1)
