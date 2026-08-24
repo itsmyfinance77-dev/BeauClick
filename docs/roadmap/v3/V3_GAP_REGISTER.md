@@ -776,3 +776,139 @@ not run these commits** — they are unpushed pending review — and the three n
 `payment-security.pg-spec.ts` cases have therefore never executed anywhere. That is the
 largest outstanding gap in this pass's evidence, and should be closed before any
 `v3.0.1` is cut.
+
+---
+
+# V3.1 planning addendum (2026-08-24) — post-v3.0.1 gap reconciliation
+
+**This addendum records only what changes *this register*.** The full reconciliation,
+prioritization, dependency graph, and roadmap live in `docs/roadmap/v3.1/`:
+`V3.1_GAP_RECONCILIATION.md`, `V3.1_PRODUCT_ROADMAP.md`, `V3.1_UIUX_BACKLOG.md`,
+`V3.1_RELEASE_STRATEGY.md`.
+
+**Nothing was implemented.** No code, no migration, no feature, no tag. `v3.0.1`
+(`68d3d5e`) and `v3.0.0` (`cfecfdf`) are untouched; all nine historical V1/V2 tags are
+untouched. This was a discovery / reconciliation / prioritization pass only.
+
+**Method note.** Every RESOLVED, OPEN, and DEFERRED disposition in this register was
+re-checked against source at `68d3d5e` rather than carried forward on its own claim — the
+same discipline the 2026-08-19 addendum used. That produced seven findings and two
+re-classifications no prior document records.
+
+## Seven new findings
+
+**`R31-01` — Privileged roles are ungrantable; the entire admin API is unreachable. OPEN /
+HIGH.** `AccountResolverService.resolveOrCreate()` creates every user with
+`roles: ['customer']`, and a repo-wide grep finds **no code path that ever writes
+`identity.users.roles` again** — `MeController.updateMe` touches `displayName` only, no
+migration or seed sets it, and `database/seeds/` contains reference data only. Every
+`/v1/admin/*` route is `@RequireCapability('bc_manage_platform')`, granted only to
+`platform_operator` and `administrator`. Consequently five admin controller groups are
+unreachable in any real deployment: platform analytics, cross-party financial totals,
+**settlement creation and reversal**, loyalty policy inspection (the endpoint `GAP-10`
+relies on for visibility), notification delivery status, and **search reindex /
+rebuild-projection — the only recovery path for a corrupted index**.
+`bc_moderate_verification` and `bc_moderate_reviews` are unreachable for the same reason.
+This register has recorded "RBAC remains code-based" since Phase 1 as a deliberate
+simplification; what was never recorded is that the simplification leaves the platform
+unadministrable.
+
+**`R31-02` — The verification workflow has no caller; the `verified` signal is inert.
+OPEN / MEDIUM-HIGH.** `ProviderService.transitionVerification()` is a complete,
+CAS-hardened, event-emitting state machine whose **only callers in the workspace are four
+lines in `apps/api/test/search-projection.pg-spec.ts`**. `ProviderController` exposes six
+routes and none is a verification route; no `verification_requests`/`_evidence`/`_history`
+table exists, though `V3_DOMAIN_BOUNDARIES.md` §provider names all three. Every
+professional is therefore `unverified` permanently: `verifiedOnly` matches nothing,
+`RankingConfig.WEIGHT_VERIFIED * verified` is always 0, and the `verified` badge can never
+be awarded. **This is structurally identical to `QA-18`** (rating signals with no writer)
+and was never recorded — the global QA pass found the rating half and not this one.
+
+**`R31-03` — No file-upload or object-storage capability exists anywhere. OPEN / HIGH as a
+prerequisite.** A repo-wide search of `v3/` for `S3`, `multer`, `presign`, and `upload`
+returns zero matches outside `node_modules`; there is no `public/` directory.
+`V3_IMPLEMENTATION_ROADMAP.md` Phase 1 lists *"Object storage wired for portfolio media +
+verification evidence"* as a deliverable; it was never built and **no phase report records
+dropping it**. This is the hard prerequisite behind the UI/UX audit's "zero images in the
+entire product" finding and behind `GAP-23` (Portfolio) — recorded here as a missing
+capability rather than a missing feature, because that is what blocks both.
+
+**`R31-04` — `EXC-001` does not cover `v3.0.1` and does not extend to `v3.1.x`. OPEN /
+BUSINESS DECISION.** `V3_RELEASE_POLICY_EXCEPTIONS.md` scopes EXC-001 to "the `v3.0.0`
+release only" and its Review condition fires on *"any subsequent release (`v3.0.x`,
+`v3.1.0`, …) … while GAP-06b is still open"*. The `v3.0.1` tag message records
+`EXC-001 = STILL ACTIVE, unchanged and unextended` — accurate about EXC-001, and, read
+against the scope clause, it means `v3.0.1` shipped **without a covering release
+exception**. No harm followed: `v3.0.1` changed no payment behaviour and the production
+gate still fails closed with no override, re-verified this pass. But the document that
+exists to prevent silent policy drift has drifted, and the condition fires again at
+`v3.1.0`. Resolution options in `V3.1_RELEASE_STRATEGY.md` §5. **Must be settled before any
+V3.1 tag; letting it lapse is the specific failure mode the exception forbids.**
+
+**`R31-05` — `identity` has four of the eight tables its own boundary document specifies.
+INFORMATIONAL.** Present: `users`, `otp_requests`, `refresh_tokens`, `phone_conflicts`.
+Absent: `roles`, `capabilities`, `sessions`, `business_account_approvals`. The first two
+are where `R31-01`'s fix lands. `sessions`' absence is why `QA-20` cannot be fixed without
+a JWT claim. `business_account_approvals` is genuinely unnecessary under ADR-023, which
+resolves business ownership by row rather than by an approval workflow — recorded so the
+divergence reads as deliberate rather than forgotten.
+
+**`R31-06` — Four fully-specified domains have no schema or module. INFORMATIONAL.**
+`referral`, `ai`, `admin` (`admin_audit_log`), and `privacy` (`data_requests`) each have a
+complete responsibility / schema / API / event / data-ownership specification in
+`V3_DOMAIN_BOUNDARIES.md` and zero implementation. Not a defect — none was in any delivered
+phase's scope — but four of fourteen designed domains are absent, and the design work for
+each is already done and does not need repeating.
+
+**`R31-07` — No campaign/promotion domain exists in V3 at all. OPEN / BUSINESS DECISION,
+and it supersedes two rows.** `commerce` has `orders`, `order_items`, `order_adjustments`,
+`outbox_events`. There is no `campaigns`, `campaign_usages`, or `b2b_price_tiers` table,
+and exactly one pricing rule is registered anywhere (`MembershipDiscountRule`). Every other
+"Campaign" mention in `v3/` is a comment describing the design.
+
+## Two re-classifications
+
+**`GAP-04` (campaign usage-cap TOCTOU) and `GAP-19` (B2B campaign eligibility) — SUPERSEDED
+by `R31-07`.** Both have been carried forward as OPEN through every phase addendum and
+through `V3_0_1_RELEASE_RECONCILIATION.md` §5. Both describe V2 `CampaignService`
+behaviour. **Neither can be true of V3, which has no campaign code to race.** Continuing to
+list them as open V3 gaps overstates V3's risk surface and understates its scope gap. The
+real question is a business one that no document records: does V3 want promotional pricing
+and B2B at all? Tracked as `R31-07`. `GAP-04`'s original V2 fix is unaffected and remains
+historically accurate.
+
+## One correction to a prior addendum's framing
+
+The Phase 3 addendum records *"No review domain exists in V3"* as a new finding, and the
+global QA pass added `QA-18` for the rating-signal consequence. Both are correct. What
+neither recorded is that **`verified` is dead for exactly the same reason** (`R31-02`) — so
+the ranking formula has two of five terms permanently at zero, not one. The formula's
+Bayesian shrinkage and cold-start blending handle it correctly and nothing is faked; the
+point is that the search quality ceiling is set by absent producers, not by the engine.
+
+## Carried forward unchanged, re-confirmed not re-litigated
+
+`GAP-06b` (OPEN / EXTERNAL_CONFIGURATION, production-blocking — re-verified:
+`PAYMENT_DEFAULT_PROVIDER=sandbox`, `PAYMENT_ENVIRONMENT=sandbox`, no adapter file, no
+credential in `.env` or `.env.example`, two-condition no-override production gate intact),
+`HOSTING_GRANTS`, `PHASE4-03`, `GAP-10`, `GAP-11`, `GAP-09`, `GAP-12`, `GAP-13`, `GAP-16`,
+`GAP-18`, `GAP-20`–`GAP-28`, code-based RBAC, logger-based audit logging, and in-memory
+throttler storage. `EXC-001` remains ACTIVE and correctly scoped — see `R31-04` for the
+question that raises. All seventeen `v3.0.1` fixes (`QA-01`–`QA-16`, `QA-24`) confirmed
+present as ancestors of the `v3.0.1` tag. The nine open QA findings (`QA-17`–`QA-23`,
+`QA-25`, `QA-26`) are re-confirmed open and each is assigned a V3.1 phase in
+`V3.1_GAP_RECONCILIATION.md` §4.
+
+**The hosting/region decision (`V3_INFRASTRUCTURE_PLAN.md` §1) is re-flagged, not merely
+carried forward.** It was declared a Phase 0 exit blocker. Phase 0 exited, five phases
+shipped, and two releases were cut without it. Four V3.1 items are downstream of it —
+object-storage provider, gateway callback reachability, AI reachability, and multi-instance
+throttling. It is the single highest-leverage unresolved decision in the project.
+
+## Verification status of this pass
+
+Read-only. No build, test, lint, or CI run was performed and none is claimed — nothing was
+changed that could affect them. Every finding above is grounded in direct inspection of
+source, migrations, tests, `.env.example`, the CI workflow, and the `v3.0.0`/`v3.0.1` tag
+objects at `68d3d5e`. Git state at the end of this pass is identical to the start except
+for the four new documents under `docs/roadmap/v3.1/` and this addendum.
