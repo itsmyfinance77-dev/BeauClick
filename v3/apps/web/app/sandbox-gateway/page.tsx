@@ -3,6 +3,7 @@
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
 import { API_BASE_URL } from '@/lib/config';
+import { isAllowedCallback } from '@/lib/sandbox-callback';
 import { Alert, Button, Card, LoadingState } from '@/components/ui';
 
 type Decision = 'success' | 'failure' | 'cancel';
@@ -44,6 +45,25 @@ function SandboxGatewayContent() {
       });
       if (!response.ok) throw new Error('درگاه آزمایشی پاسخ نداد.');
 
+      // The decide endpoint answers 200 with `{ accepted: false }` for every
+      // refusal it knows about -- the sandbox being disabled, an
+      // unrecognised decision, and (the one that shows up in ordinary QA) a
+      // transaction that was already decided, because `decide()` is a
+      // compare-and-swap on `outcome = 'pending'`.
+      //
+      // `response.ok` is TRUE in all of those cases, so checking only the
+      // HTTP status meant a refused decision was followed by a confident
+      // redirect to the "payment done" leg. Double-clicking a button was
+      // enough to reach it.
+      const body = (await response.json().catch(() => null)) as { accepted?: boolean; reason?: string } | null;
+      if (!body?.accepted) {
+        throw new Error(
+          body?.reason === 'sandbox_gateway_disabled'
+            ? 'درگاه آزمایشی در این محیط غیرفعال است.'
+            : 'این تراکنش پیش‌تر نهایی شده است و دوباره قابل تغییر نیست.',
+        );
+      }
+
       // Return the customer to the callback the merchant supplied, carrying
       // only the transaction reference -- exactly the shape of a real
       // gateway's return leg. Note what is NOT sent: the outcome. The API
@@ -59,6 +79,22 @@ function SandboxGatewayContent() {
 
   if (!reference || !callback) {
     return <Alert tone="error">پارامترهای درگاه ناقص است.</Alert>;
+  }
+
+  // `callback` is an ordinary query parameter, so it is entirely
+  // attacker-chosen. Navigating to it unchecked makes this page an open
+  // redirect: /sandbox-gateway?reference=x&callback=https://evil.example
+  // renders a plausible BeauClick payment screen that lands the visitor on
+  // someone else's site. The frontend route has no server-side gate of its
+  // own -- the sandbox PROVIDER is disabled in production, but this PAGE
+  // still renders -- so it must not rely on the API's gate to be safe.
+  //
+  // The legitimate value is always the API's own payment callback
+  // (`${PUBLIC_API_BASE_URL}/v1/payments/callback/<provider>`, built server
+  // side in SandboxPaymentProvider.initiate), so requiring the same origin
+  // as the configured API is exact rather than approximate.
+  if (!isAllowedCallback(callback, window.location.origin)) {
+    return <Alert tone="error">آدرس بازگشت درگاه معتبر نیست.</Alert>;
   }
 
   return (
