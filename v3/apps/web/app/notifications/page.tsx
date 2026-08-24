@@ -6,7 +6,7 @@ import { formatFullJalaliDate, toPersianDigits } from '@beauclick/persian-utils'
 import { useAuth } from '@/lib/auth-context';
 import { useUnread } from '@/lib/unread-context';
 import { ProtectedRoute } from '@/components/protected-route';
-import { Alert, Card, LoadingState } from '@/components/ui';
+import { Alert, Card, ErrorState, LoadingState } from '@/components/ui';
 import {
   listNotifications,
   markAllNotificationsRead,
@@ -45,6 +45,10 @@ function NotificationCenter() {
   const [preferences, setPreferences] = useState<NotificationPreference[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Distinguishes "the server said you have no notifications" from "we never
+  // heard back" -- both leave `items` empty, and only the first of them may
+  // show the empty state.
+  const [loaded, setLoaded] = useState(false);
   const [showPreferences, setShowPreferences] = useState(false);
 
   const load = useCallback(async () => {
@@ -55,6 +59,7 @@ function NotificationCenter() {
       setItems(list.data?.items ?? []);
       setUnread(list.data?.unreadCount ?? 0);
       setPreferences(prefs.data?.preferences ?? []);
+      setLoaded(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'اعلان‌ها بارگذاری نشد.');
     } finally {
@@ -103,6 +108,7 @@ function NotificationCenter() {
   };
 
   if (loading) return <LoadingState label="در حال بارگذاری اعلان‌ها…" />;
+  if (!loaded) return <ErrorState message={error ?? 'اعلان‌ها بارگذاری نشد.'} onRetry={() => void load()} />;
 
   return (
     <section>

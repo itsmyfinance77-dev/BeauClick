@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { ProtectedRoute } from '@/components/protected-route';
-import { Card, LoadingState } from '@/components/ui';
+import { Card, ErrorState, LoadingState } from '@/components/ui';
 import { formatFullJalaliDate } from '@beauclick/persian-utils';
 
 interface MeResponse {
@@ -25,8 +25,12 @@ function DashboardContent() {
   const [me, setMe] = useState<MeResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  // Extracted from an inline effect so the error state has something to
+  // retry. The cancelled-flag guard is kept: it stops a response that
+  // arrives after unmount from setting state.
+  const load = useCallback(() => {
     let cancelled = false;
+    setError(null);
     api
       .get<MeResponse>('/v1/me')
       .then((res) => {
@@ -40,7 +44,9 @@ function DashboardContent() {
     };
   }, [api]);
 
-  if (error) return <Card>{error}</Card>;
+  useEffect(() => load(), [load]);
+
+  if (error) return <ErrorState message={error} onRetry={() => void load()} />;
   if (!me) return <LoadingState />;
 
   return (

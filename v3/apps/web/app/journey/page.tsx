@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { formatFullJalaliDate, toPersianDigits } from '@beauclick/persian-utils';
 import { useAuth } from '@/lib/auth-context';
 import { ProtectedRoute } from '@/components/protected-route';
-import { Alert, Button, Card, Input, LoadingState } from '@/components/ui';
+import { Alert, Button, Card, ErrorState, Input, LoadingState } from '@/components/ui';
 import {
   createJourneyGoal,
   journeyGoals,
@@ -37,6 +37,12 @@ function Journey() {
   const [budget, setBudget] = useState('');
   const [newGoal, setNewGoal] = useState('');
   const [loading, setLoading] = useState(true);
+  // Not cosmetic here. On a failed load `notes`/`budget` keep their empty
+  // initial values, so rendering the profile editor anyway would show the
+  // user a blank form over data that still exists -- and submitting it sends
+  // notes: null, budgetMaxToman: null, destroying the real profile. The
+  // editor is not shown at all until a load has actually succeeded.
+  const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -51,6 +57,7 @@ function Journey() {
       setBudget(p.data?.budgetMaxToman ? String(p.data.budgetMaxToman) : '');
       setGoals(g.data ?? []);
       setTimeline(t.data?.items ?? []);
+      setLoaded(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'مسیر زیبایی بارگذاری نشد.');
     } finally {
@@ -109,6 +116,7 @@ function Journey() {
   };
 
   if (loading) return <LoadingState label="در حال بارگذاری…" />;
+  if (!loaded) return <ErrorState message={error ?? 'مسیر زیبایی بارگذاری نشد.'} onRetry={() => void load()} />;
 
   return (
     <section>

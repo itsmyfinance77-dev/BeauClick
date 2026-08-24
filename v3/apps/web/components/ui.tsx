@@ -128,6 +128,36 @@ export function Card({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * The state a page is in when its data never arrived: the request failed and
+ * there is nothing to show.
+ *
+ * This is deliberately NOT the same thing as an empty state, and the
+ * distinction is the whole point of the component. An empty state asserts
+ * something -- "the server answered, and the answer is that you have
+ * nothing" -- and several V3 pages were making that assertion after a
+ * request that never completed, because a failed fetch leaves the same
+ * empty array an genuinely-empty response does. "هنوز اعلانی ندارید" and
+ * "we could not reach the server" call for opposite responses from the
+ * user, so they must never be shown together or mistaken for each other.
+ *
+ * The retry closes the other half of the problem: every one of those pages
+ * previously left the user on a dead end whose only escape was a manual
+ * browser reload.
+ */
+export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  return (
+    <Card>
+      <Alert>{message}</Alert>
+      {onRetry ? (
+        <Button type="button" variant="ghost" onClick={onRetry}>
+          تلاش دوباره
+        </Button>
+      ) : null}
+    </Card>
+  );
+}
+
 /** Loading state primitive -- announced to assistive tech rather than a silent spinner. */
 export function LoadingState({ label = 'در حال بارگذاری…' }: { label?: string }) {
   return (

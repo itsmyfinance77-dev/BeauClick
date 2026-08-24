@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { formatFullJalaliDate } from '@beauclick/persian-utils';
 import { useAuth } from '@/lib/auth-context';
 import { ProtectedRoute } from '@/components/protected-route';
-import { Alert, Button, Card, Input, LoadingState } from '@/components/ui';
+import { Alert, Button, Card, ErrorState, Input, LoadingState } from '@/components/ui';
 import {
   acceptStaffInvite,
   createBusiness,
@@ -39,6 +39,11 @@ function BusinessDashboard() {
   const [staff, setStaff] = useState<BusinessStaffMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // A failed load leaves `owned` null, which is indistinguishable from
+  // "you don't own a business" -- and that branch renders the CREATE form.
+  // Offering to create a second business to someone who already has one,
+  // because we couldn't reach the server, is not an acceptable fallback.
+  const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -61,6 +66,7 @@ function BusinessDashboard() {
           setStaffBusiness(businessRes.data ?? null);
         }
       }
+      setLoaded(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'اطلاعات کسب‌وکار بارگذاری نشد.');
     } finally {
@@ -149,6 +155,7 @@ function BusinessDashboard() {
   }
 
   if (loading) return <LoadingState label="در حال بارگذاری…" />;
+  if (!loaded) return <ErrorState message={error ?? 'اطلاعات کسب‌وکار بارگذاری نشد.'} onRetry={() => void load()} />;
 
   const pendingInvites = memberships.filter((m) => m.status === 'invited');
   const activeMembership = memberships.find((m) => m.status === 'active');

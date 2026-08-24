@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { formatFullJalaliDate, formatTime, toPersianDigits } from '@beauclick/persian-utils';
 import { useAuth } from '@/lib/auth-context';
 import { ProtectedRoute } from '@/components/protected-route';
-import { Alert, Button, Card, LoadingState } from '@/components/ui';
+import { Alert, Button, Card, ErrorState, LoadingState } from '@/components/ui';
 import {
   acceptWaitlistOffer,
   declineWaitlistOffer,
@@ -49,6 +49,9 @@ function Waitlist() {
   const [entries, setEntries] = useState<WaitlistEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // See notifications/page.tsx: an empty list after a FAILED load must not
+  // claim the user is on no waitlists.
+  const [loaded, setLoaded] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -57,6 +60,7 @@ function Waitlist() {
     try {
       const res = await myWaitlistEntries(api);
       setEntries(res.data ?? []);
+      setLoaded(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'لیست انتظار بارگذاری نشد.');
     } finally {
@@ -112,6 +116,7 @@ function Waitlist() {
   }
 
   if (loading) return <LoadingState label="در حال بارگذاری…" />;
+  if (!loaded) return <ErrorState message={error ?? 'لیست انتظار بارگذاری نشد.'} onRetry={() => void load()} />;
 
   return (
     <section>
