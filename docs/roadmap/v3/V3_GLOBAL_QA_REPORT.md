@@ -121,7 +121,13 @@ limits blast radius to the badge and ranking quality. **MEDIUM / PRODUCT GAP.**
 
 ## 4. Findings
 
-Fifteen defects found and fixed; ten found and reported. IDs are `QA-nn`.
+**26 findings: 17 fixed, 9 open.** IDs are `QA-nn`.
+
+*(Corrected 2026-08-24 during the v3.0.1 reconciliation. This line previously read
+"Fifteen defects found and fixed; ten found and reported" -- 15 was a count of landed
+CHANGES, not findings (QA-03/04/05 shipped as one edit, QA-16/24 as another), and 25 was
+an arithmetic slip. The finding list below was always complete; only the headline
+arithmetic was wrong. See V3_0_1_RELEASE_RECONCILIATION.md section 0.)*
 
 ### Fixed this pass
 
@@ -145,8 +151,8 @@ Fifteen defects found and fixed; ten found and reported. IDs are `QA-nn`.
 | QA-16 | MEDIUM | UX | The **homepage** shipped in v3.0.0 still carrying Phase 1 scaffold copy telling visitors product pages would be built later. |
 | QA-24 | LOW | ACCESSIBILITY | No `aria-current` anywhere; the nav gave no current-page cue to anyone. |
 
-*(QA-16 and QA-24 are counted among the fifteen fixes; the table lists 17 rows because
-QA-03/04/05 landed as one change and QA-16/24 as another.)*
+*(17 finding IDs, delivered as 15 discrete changes -- QA-03/04/05 landed together, as did
+QA-16/24.)*
 
 ### Found, reported, not fixed
 
@@ -376,13 +382,28 @@ reviewed by **code**, not by browser.
 
 ### CI
 
-**Not run for this pass.** CI executes on GitHub Actions on push, and these seven commits
-are deliberately **unpushed** pending the review this report is written for (§10). The
-last recorded green CI run is on `cfecfdf` (19 suites / 375 real-PostgreSQL tests, 0
-skipped, with a step that makes a silent skip fatal). **The changes in this pass have not
-been through CI**, and the three new pg-spec cases have never executed anywhere. That is
-the single largest gap in this report's evidence and should be closed before any
-`v3.0.1` is cut.
+**RUN AND GREEN** *(updated 2026-08-24, after this report's first draft)*. The eight
+audit commits were pushed to `origin/master` and CI run **`32721273257`** executed
+against `5833610`. All three jobs succeeded:
+
+| Job | Result |
+|---|---|
+| `typecheck · lint · build` | **success** — typecheck 24 projects, lint clean (incl. Nx module boundaries), build 2 projects |
+| `unit · pg-mem` | **success** — 21 projects |
+| `real PostgreSQL · real OpenSearch` | **success** — **19 suites / 378 tests / 0 skipped** |
+
+378 is exactly **+3** over the 375 the `cfecfdf` release gate recorded, which are the
+three new `payment-security.pg-spec.ts` cases guarding QA-10. Their execution is directly
+evidenced in the job log by the audit lines the new check emits:
+`expectedCurrency: "IRT", reportedCurrency: "IRR"` (currency mismatch) and
+`expectedCurrency: "IRT", reportedCurrency: null` (missing currency, failing closed).
+
+The workflow's "Assert no suite was silently skipped" step also passed, so the 0-skipped
+figure is enforced rather than merely reported.
+
+*The original text of this section read "Not run for this pass ... the three new pg-spec
+cases have never executed anywhere," which was accurate when written. It is superseded by
+the run above.*
 
 ---
 
@@ -392,13 +413,18 @@ the single largest gap in this report's evidence and should be closed before any
 |---|---|---|---|
 | BLOCKER | 0 | — | 0 |
 | HIGH | 5 | 5 | 0 |
-| MEDIUM | 12 | 8 | 4 (QA-17, QA-18, QA-23, + QA-25 at LOW/MEDIUM boundary) |
-| LOW | 5 | 1 | 4 |
-| INFORMATIONAL | 2 | 0 | 2 |
+| MEDIUM | 12 | 9 | 3 (QA-17, QA-18, QA-23) |
+| LOW | 7 | 3 | 4 (QA-19, QA-20, QA-21, QA-25) |
+| INFORMATIONAL | 2 | 0 | 2 (QA-22, QA-26) |
 | EXTERNAL_CONFIGURATION | 2 | 0 | 2 (`GAP-06b`, `HOSTING_GRANTS`) |
 
-By class: BUG 7 · SECURITY 2 · DATA INTEGRITY 2 · UX 10 · ACCESSIBILITY 2 ·
-PERFORMANCE 0 · PRODUCT GAP 2 (plus the eleven unimplemented domains in §3).
+Totals: **26 findings, 17 fixed, 9 open.** By class: BUG 7 - SECURITY 2 -
+DATA INTEGRITY 2 - UX 10 - ACCESSIBILITY 3 - PERFORMANCE 0 - PRODUCT GAP 2
+(plus the eleven unimplemented domains in section 3).
+
+Per-item classification for every open finding -- and for each absent domain -- is in
+`V3_0_1_RELEASE_RECONCILIATION.md`. Its conclusion: **zero open items are
+v3.0.1-patch-eligible**, so the patch contains exactly the 17 landed fixes.
 
 **No BLOCKER was found.** No finding in this pass invalidates `v3.0.0` as a tag or
 `EXC-001` as a decision. The two HIGH security/data-integrity findings (QA-10, QA-14)
