@@ -74,8 +74,15 @@ export class NotificationController {
       // Covers three cases with one response, deliberately: not yours, does
       // not exist, and already read. Distinguishing the first two would leak
       // existence; distinguishing the third would be noise.
-      const stillOwned = await this.notifications.list(user.userId, 1, 0, false);
-      if (!stillOwned.items.some((n) => n.id === id)) throw new NotFoundOrNotYoursException();
+      //
+      // The ownership question is asked directly. It used to be answered by
+      // fetching a ONE-ROW page of the user's notifications and looking for
+      // the id in it, so only the single most recent notification could ever
+      // be recognised as owned -- re-reading any older already-read one
+      // returned 404, which is the opposite of what this branch intends.
+      if (!(await this.notifications.ownsNotification(user.userId, id))) {
+        throw new NotFoundOrNotYoursException();
+      }
     }
     return { read: true, unreadCount: await this.notifications.unreadCount(user.userId) };
   }

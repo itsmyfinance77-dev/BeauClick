@@ -171,6 +171,69 @@ describeIfPg('Payment callback security on real PostgreSQL', () => {
     });
   });
 
+  /**
+   * The amount check above is number-to-number. These assert that the UNIT of
+   * those numbers is checked too, rather than assumed from the field's name.
+   *
+   * This is aimed squarely at the real Iranian gateway adapter GAP-06b still
+   * requires. Iranian gateway APIs commonly denominate in RIALS, and 1 toman
+   * = 10 rials -- so an adapter that passed the gateway's own figure straight
+   * into `paidAmountToman` would settle a 200,000-toman order for 20,000
+   * tomans of real money while every amount assertion above still passed.
+   * The sandbox is IRT by construction and cannot surface that on its own,
+   * which is exactly why the contract is asserted here instead.
+   */
+  describe('currency / unit integrity', () => {
+    it('refuses a gateway success reported in a DIFFERENT currency, even when the number matches', async () => {
+      const { result, reference } = await bookAndReachGateway(200_000);
+      await sandbox.decide(reference, 'success');
+
+      // The number is left alone -- only the unit is wrong. This is the case
+      // a bare numeric equality cannot catch.
+      await dataSource.query(`UPDATE payment.sandbox_transactions SET currency = 'IRR' WHERE reference = $1`, [reference]);
+
+      const callback = await checkout.handleCallback('sandbox', reference, { reference });
+
+      expect(callback.outcome.status).toBe('failed');
+      expect(callback.outcome.failureCode).toBe('amount_mismatch');
+      expect((await orders.findById(result.order.order.id))?.status).toBe('pending');
+      expect((await bookings.findById(result.bookingId))?.status).toBe('pending');
+    });
+
+    it('still succeeds on the honest path, so the currency check is not simply refusing everything', async () => {
+      const { result, reference } = await bookAndReachGateway(200_000);
+      await sandbox.decide(reference, 'success');
+
+      const callback = await checkout.handleCallback('sandbox', reference, { reference });
+
+      expect(callback.outcome.status).toBe('succeeded');
+      expect((await orders.findById(result.order.order.id))?.status).toBe('paid');
+    });
+
+    it('refuses a provider that reports no currency at all, rather than assuming tomans', async () => {
+      // An adapter written against the older, looser contract returns no
+      // currency. Trusting it by default is the failure mode this check
+      // exists to prevent, so the absence must fail closed.
+      const { result, reference } = await bookAndReachGateway(200_000);
+      await sandbox.decide(reference, 'success');
+
+      const realVerify = sandbox.verify.bind(sandbox);
+      const spy = jest.spyOn(sandbox, 'verify').mockImplementation(async (req) => {
+        const actual = await realVerify(req);
+        return { ...actual, paidCurrency: undefined };
+      });
+
+      try {
+        const callback = await checkout.handleCallback('sandbox', reference, { reference });
+        expect(callback.outcome.status).toBe('failed');
+        expect(callback.outcome.failureCode).toBe('amount_mismatch');
+        expect((await orders.findById(result.order.order.id))?.status).toBe('pending');
+      } finally {
+        spy.mockRestore();
+      }
+    });
+  });
+
   describe('replay and duplicate delivery', () => {
     it('processes a duplicated callback exactly once', async () => {
       const { result, reference } = await bookAndReachGateway();

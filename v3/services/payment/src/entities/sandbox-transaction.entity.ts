@@ -1,5 +1,5 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryColumn, UpdateDateColumn } from 'typeorm';
-import { requiredMoneyTransformer } from '@beauclick/money';
+import { CurrencyCode, requiredMoneyTransformer } from '@beauclick/money';
 
 export const SANDBOX_OUTCOMES = ['pending', 'paid', 'declined', 'cancelled'] as const;
 export type SandboxOutcome = (typeof SANDBOX_OUTCOMES)[number];
@@ -32,8 +32,11 @@ export class SandboxTransactionEntity {
   @Column({ type: 'bigint', transformer: requiredMoneyTransformer })
   amountToman!: number;
 
+  // Typed as CurrencyCode, not string: verify() reports this value as the
+  // unit of the amount it returns, and the caller refuses a mismatch. A bare
+  // `string` here would let any three characters through as a currency.
   @Column({ type: 'varchar', length: 3, default: 'IRT' })
-  currency!: string;
+  currency!: CurrencyCode;
 
   /**
    * What the transaction was FOR, as the gateway was told at initiation.

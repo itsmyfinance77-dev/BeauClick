@@ -1,3 +1,5 @@
+import type { CurrencyCode } from '@beauclick/money';
+
 /**
  * The payment provider abstraction (ADR-006).
  *
@@ -17,6 +19,10 @@
  *  2. **`verify()` must report the amount the gateway actually captured**,
  *     so the caller can compare it against what was owed. An adapter that
  *     returns only success/failure makes amount-tampering undetectable.
+ *  3. **`verify()` must state the CURRENCY/unit of that amount**, and it must
+ *     be the platform unit. See `paidCurrency` -- a bare number cannot be
+ *     compared safely, and the `...Toman` suffix is a naming convention, not
+ *     an enforced one.
  */
 
 export interface InitiatePaymentRequest {
@@ -55,6 +61,25 @@ export interface VerifyPaymentResult {
   outcome: VerifyOutcome;
   /** What the gateway says was actually captured. Compared against the order total by the caller. */
   paidAmountToman: number | null;
+  /**
+   * The unit `paidAmountToman` is expressed in. Required on every successful
+   * verification; the caller REFUSES a success that does not state it.
+   *
+   * This exists because the amount check was previously a bare
+   * number-to-number equality, and the only thing asserting the unit was the
+   * field's NAME. That is a live trap for the real Iranian gateway adapter
+   * GAP-06b still requires: Iranian gateway APIs commonly denominate in
+   * RIALS, and 1 toman = 10 rials. An adapter that passed the gateway's rial
+   * figure straight through would make a 1,000,000-toman order settle for
+   * 100,000 tomans of real money and still pass an equality check -- silently,
+   * because both sides are just numbers.
+   *
+   * The sandbox cannot surface that class of bug on its own (it is IRT by
+   * construction, which is precisely the limitation recorded against
+   * GAP-06b), so the contract is made explicit now, while it is cheap, rather
+   * than after an adapter has been written against the looser one.
+   */
+  paidCurrency?: CurrencyCode | null;
   /** The gateway's settlement/reference id, printed on the customer's receipt. */
   providerTransactionId: string | null;
   failureCode: string | null;

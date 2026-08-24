@@ -406,6 +406,21 @@ export class NotificationService {
     return { items, total };
   }
 
+  /**
+   * Does this in-app notification exist AND belong to this user?
+   *
+   * Exists so callers can tell "already read" apart from "not yours" without
+   * paging the list looking for an id. `markRead` used to do exactly that,
+   * against a one-row page, so any already-read notification that was not the
+   * single most recent one looked unowned.
+   */
+  async ownsNotification(userId: string, notificationId: string): Promise<boolean> {
+    const count = await this.notifications.count({
+      where: { id: notificationId, userId, channel: 'in_app' },
+    });
+    return count > 0;
+  }
+
   async unreadCount(userId: string): Promise<number> {
     return this.notifications.count({
       where: { userId, channel: 'in_app', readAt: IsNull(), status: 'sent' },

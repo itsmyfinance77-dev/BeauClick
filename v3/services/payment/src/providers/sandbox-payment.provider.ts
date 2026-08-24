@@ -170,6 +170,10 @@ export class SandboxPaymentProvider implements PaymentProvider {
       // The gateway's own figure, reported independently of what the caller
       // expected. The caller compares -- this method never asserts a match.
       paidAmountToman: transaction.amountToman,
+      // Read from the transaction row rather than hardcoded, so this reports
+      // what the simulated bank actually recorded -- the same thing a real
+      // adapter must do with the gateway's own currency field.
+      paidCurrency: transaction.currency,
       providerTransactionId: transaction.settlementReference,
       failureCode: null,
       raw: { reference: transaction.reference, outcome: transaction.outcome },

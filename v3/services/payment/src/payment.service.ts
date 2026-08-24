@@ -372,8 +372,21 @@ export class PaymentService {
     // Amount tampering check. The gateway's own captured figure must match
     // what the intent recorded BEFORE the customer left for the gateway. A
     // mismatch is never treated as success, whatever the gateway said.
+    //
+    // The unit is checked, not assumed. This comparison is number-to-number,
+    // so without an explicit currency the only thing asserting that both
+    // sides mean TOMANS is the field's name -- and Iranian gateway APIs
+    // commonly denominate in rials (1 toman = 10 rials). An adapter passing a
+    // rial figure through would settle an order for a tenth of its value and
+    // pass this equality check. An adapter that does not state its unit is
+    // refused rather than trusted.
+    const currencyMatches =
+      providerResult.paidCurrency != null && providerResult.paidCurrency === intent.currency;
+
     const amountMatches =
-      providerResult.outcome === 'succeeded' && providerResult.paidAmountToman === intent.amountToman;
+      providerResult.outcome === 'succeeded' &&
+      currencyMatches &&
+      providerResult.paidAmountToman === intent.amountToman;
 
     if (providerResult.outcome === 'succeeded' && !amountMatches) {
       this.auditLog.error({
@@ -381,7 +394,11 @@ export class PaymentService {
         intentId: intent.id,
         attemptId: attempt.id,
         expected: intent.amountToman,
+        expectedCurrency: intent.currency,
         reported: providerResult.paidAmountToman,
+        // Distinguishes "wrong number" from "unit never stated / wrong unit",
+        // which need different investigations.
+        reportedCurrency: providerResult.paidCurrency ?? null,
       });
     }
 
