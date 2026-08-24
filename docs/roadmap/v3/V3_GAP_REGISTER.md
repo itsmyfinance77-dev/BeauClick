@@ -647,3 +647,132 @@ the absent API, exactly as expected. Authenticated and payment flows are covered
 instead by the real-PostgreSQL CI suites, which boot the real `AppModule` and
 drive real HTTP through supertest — the same stack a browser would hit, minus
 the browser. This is stated as a limitation, not presented as equivalent.
+
+
+---
+
+# Global QA + UI/UX audit addendum (2026-08-24) — post-v3.0.0 stabilization
+
+Full findings in `V3_GLOBAL_QA_REPORT.md` and `V3_GLOBAL_UIUX_AUDIT.md`. This
+addendum records only what changes *this register*.
+
+**`v3.0.0` was not touched.** All seven fix commits are after the tag, unpushed
+pending review. No historical tag was modified.
+
+## One correction to this register's own Phase 5 note
+
+The Phase 5 addendum records that no local real-PostgreSQL alternative to CI was
+available. That is **partly stale**: PostgreSQL 16.15 *is* installed and listening on
+5432 in this environment. The operative half remains true, and is why the conclusion
+is unchanged — the `beauclick_app`/`beauclick_financial_writer` credentials in
+`apps/api/.env` are stale, and `pg_hba.conf` requires `scram-sha-256` on every local
+connection. Recovery needs the `postgres` superuser password (absent from the repo) or
+an administrative single-user reset; both credential-guessing and rewriting
+`pg_hba.conf` were declined as out of bounds. Docker's daemon still does not run.
+**Net evidence position: unchanged. CI remains the only real-PostgreSQL evidence.**
+
+## New findings
+
+**`QA-01` / `QA-02` — HIGH, the authentication entry point rejected its own audience.
+CLOSED.** `canonicalizePhone()` was written to accept Persian (۰–۹) and Arabic-Indic
+(٠–٩) digits and documents that as its purpose; the `@Matches` validator standing in
+front of it did not, because `\d` in a JavaScript regex is ASCII-only. The
+canonicalizer's Persian support was therefore **unreachable over HTTP for the whole of
+V3**, in a product that is Persian-only by design and has no language switcher. The
+OTP `code` had the same root cause and a worse failure mode: it is HMAC'd verbatim, so
+a correct code retyped in Persian digits was scored wrong **and decremented
+`attemptsRemaining`**, killing the code after five tries behind a deliberately generic
+error. Fixed by folding both ranges before validation with `normalizeDigits` — the
+utility **search's own DTO already used**, for the same stated reason ("one
+implementation of the mapping ... so the two cannot disagree"). Auth had simply never
+adopted it. This is a new instance of the recurring class this register already
+tracks: a guarantee that reads as satisfied in one file while an adjacent layer
+silently negates it (cf. `PHASE5-02`'s inert `@Throttle` metadata).
+
+**`QA-10` — HIGH, the payment amount check was unit-blind. CLOSED, and it sharpens
+`GAP-06b`.** `applyVerification` compared `paidAmountToman` against
+`intent.amountToman` as bare numbers; `VerifyPaymentResult` carried no currency at
+all, so the only thing asserting the unit was a field **name**. Iranian gateway APIs
+commonly denominate in **rials** (1 toman = 10 rials), so a real adapter passing the
+gateway's own figure straight through would settle a 200,000-toman order for 20,000
+tomans of real money — and every existing amount-tampering test would still have
+passed. The sandbox is structurally incapable of catching this, which is precisely the
+limitation this register already records against `GAP-06b` ("leaves the money-unit and
+field semantics of any actual gateway entirely unexercised"). `paidCurrency` is now
+rule 3 of the provider contract, required and matched, failing **closed** when absent.
+Three new `payment-security.pg-spec.ts` cases cover it; they require CI's PostgreSQL
+and have **never executed**.
+
+**`QA-14` — HIGH, open redirect on `/sandbox-gateway`. CLOSED.** The page took its
+return address from a query parameter and navigated to it unchecked, so
+`?callback=https://evil.example` rendered a plausible BeauClick payment screen and
+then left the visitor on an attacker's site. **The sandbox production gate does not
+cover this**: that gate disables the payment *provider*, while this is a static
+frontend route that renders regardless of what the API decides. Now validated against
+the configured API's exact origin, with its own spec covering the lookalike-host and
+protocol-relative cases a naive prefix check would wave through.
+
+**`QA-06` — HIGH, a failed load could destroy real data. CLOSED.** Five surfaces
+treated "the request failed" and "the server says you have nothing" as the same state,
+because both leave an empty array or a null. Two were more than cosmetic: **journey**
+rendered its profile editor with empty initial values over data that still existed, so
+submitting sent `notes: null, budgetMaxToman: null` and destroyed the profile; and
+**business** rendered the *create-a-business* form to someone who may already own one.
+Also fixed: no retry affordance existed anywhere in the product.
+
+**`QA-12` — HIGH, the result page contradicted the customer's bank statement.
+CLOSED.** No `duplicate_refunded` entry existed in `OUTCOME_COPY`, so a customer whose
+second real charge had been automatically refunded was told "مبلغی از حساب شما کسر نشده است".
+
+**`QA-18` — MEDIUM, rating signals have no writer. OPEN / PRODUCT GAP.**
+`provider_search_signals.ratingSum` and `.reviewCount` are written by **nothing** in
+the codebase — confirmed against every insert, update, and migration. The review domain
+does not exist in V3 (`booking.service.ts:383` still describes reviews as something
+"later phases ... will consume"), so both are permanently 0. Consequently `ratingAvg`
+is always 0, the `high_rating` badge can never be awarded, and the ranking formula's
+rating term always collapses to its cold-start baseline. The frontend does not
+currently expose `minRating` or the `rating` sort, which limits blast radius. New here:
+the *consequence* was never recorded, though the missing review domain was implicit.
+
+**`QA-17` — MEDIUM, the Persian typeface is named but never shipped. OPEN.**
+`--bc-font-family` leads with `Vazirmatn`; there is no `@font-face`, no `next/font`, no
+font file, and no `public/` directory anywhere in the repo. Every user without it
+locally installed silently gets a Latin-first system fallback — in a Persian-only
+product, on every screen. Not fixed here: self-hosting versus a CDN has real
+availability implications for an Iranian audience, and is a deployment decision rather
+than a mechanical fix.
+
+**`QA-23` — MEDIUM, no footer exists. OPEN.** `AppShell` is header + main only; there
+is no `contentinfo` landmark, and therefore no route to terms, privacy, contact, or
+support from anywhere in a product that takes payments and holds personal data.
+
+Lower-severity items (`QA-03`/`04`/`05`/`07`/`08`/`09`/`11`/`13`/`15`/`16`/`24` closed;
+`QA-19`/`20`/`21`/`22`/`25`/`26` open) are itemised in `V3_GLOBAL_QA_REPORT.md` §4
+rather than duplicated here.
+
+## Scope reality, recorded so it is not mistaken for coverage
+
+The audit brief enumerates a far larger product than V3 implements. Verified absent by
+exhaustive search rather than assumed: **AI**, **reviews**, **referrals**, **wishlist**,
+**CRM**, **portfolio**, **B2B quotes**, **privacy export/deletion/anonymization**, **any
+admin UI**, and every **professional-specific** and most **business-specific** frontend
+surface. Most are already tracked (`GAP-12`, `GAP-13`, `GAP-22`, `GAP-23`, `GAP-28`);
+they are restated in the QA report because a report that silently omitted them would
+read as coverage.
+
+## Carried forward unchanged
+
+`GAP-06b` (OPEN / EXTERNAL_CONFIGURATION, production-blocking), `HOSTING_GRANTS`,
+`GAP-10`, `GAP-11`, `GAP-04`, `GAP-09`, `GAP-12`, `GAP-16`, `GAP-18`, `GAP-19`–`GAP-28`,
+code-based RBAC, logger-based audit logging, and in-memory throttler storage — all
+re-confirmed, none re-litigated, none closed by this pass. `EXC-001` remains active and
+correctly scoped; the sandbox provider's production gate was re-read and still fails
+closed with no override.
+
+## Verification status of this pass
+
+`typecheck`, `lint`, and `build` clean; **343/343 local tests pass** (21 new). **CI has
+not run these commits** — they are unpushed pending review — and the three new
+`payment-security.pg-spec.ts` cases have therefore never executed anywhere. That is the
+largest outstanding gap in this pass's evidence, and should be closed before any
+`v3.0.1` is cut.

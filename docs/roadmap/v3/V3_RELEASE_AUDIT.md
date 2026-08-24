@@ -272,3 +272,102 @@ cancelled by EXC-001; it is item 5 of the production activation checklist.
 | Real payment gateway | ❌ **OPEN / EXTERNAL_CONFIGURATION — waived for `v3.0.0` only, under EXC-001** |
 
 **`v3.0.0` released.**
+
+
+---
+
+## Post-release addendum (2026-08-24) — global QA + UI/UX audit of `v3.0.0`
+
+A product-wide stabilization pass was run against the released tag. Full results in
+`V3_GLOBAL_QA_REPORT.md` and `V3_GLOBAL_UIUX_AUDIT.md`; this section records only what
+bears on the **release**.
+
+### The tag is intact
+
+`v3.0.0` still resolves to `cfecfdf9789328066d53729c71bc7cd90a3cb126` via annotated tag
+`74024ab…`, matching its published remote counterpart. All nine historical V1/V2 tags
+re-verified byte-identical to their remotes. Nothing was moved, re-pointed, deleted, or
+re-signed. Every fix from this pass is a **new commit after** the tag.
+
+### Does anything found invalidate the release, or `EXC-001`?
+
+**No.** No BLOCKER was found. `EXC-001`'s reasoning was re-checked at its own terms and
+still holds: the sandbox provider fails closed under `NODE_ENV=production`
+unconditionally, no override flag exists, and a production deployment of this code has
+**zero enabled payment providers** with checkout failing closed. `GAP-06b` remains OPEN /
+EXTERNAL_CONFIGURATION and production-blocking, exactly as the exception scoped it.
+
+Five HIGH findings were fixed. Their bearing on the release decision, stated plainly:
+
+- **QA-01 / QA-02 (auth digit normalization).** The most serious finding of the pass in
+  user terms: for the whole of V3, a Persian-speaking user typing on a Persian keyboard
+  could not get past the login screen, and a correct OTP retyped in Persian digits was
+  scored wrong *and* burned an attempt toward lockout. In a Persian-only product with no
+  language switcher, this is the front door refusing its primary audience. It does not
+  invalidate the tag — no security property was breached — but it is the strongest single
+  argument for cutting `v3.0.1` promptly.
+- **QA-10 (payment currency).** Not a live defect: the sandbox is IRT by construction, so
+  nothing was mis-settled. It is a **latent production defect** removed before the adapter
+  that would have triggered it exists. This is a direct reduction of `GAP-06b`'s risk
+  surface and should be treated as a prerequisite that is now met rather than a bug that
+  was fixed.
+- **QA-14 (open redirect).** Reachable in a production deployment of `v3.0.0`, because it
+  lives in a statically-prerendered frontend route that the API's sandbox gate does not
+  and cannot cover. This is the one finding that was genuinely exploitable against the
+  released artifact, though it requires user interaction on a page explicitly labelled as
+  a test gateway.
+- **QA-06 (journey data loss)** and **QA-12 (double-charge copy)** are real user-facing
+  defects in the released build, neither security-relevant.
+
+### Evidence status — weaker than the release gate's, and stated as such
+
+The release gate for `cfecfdf` had **CI green on that commit**: 19 suites, 375
+real-PostgreSQL tests, 0 skipped, with a step making a silent skip fatal.
+
+This pass **cannot match that**, and does not claim to:
+
+| | Release gate (`cfecfdf`) | This pass |
+|---|---|---|
+| typecheck / lint / build | green | green |
+| local unit + e2e tests | — | **343/343** (21 new) |
+| real-PostgreSQL suites | **375, CI-verified** | **not run** — no local DB, commits unpushed |
+| production frontend build | — | green, 16 routes |
+| live browser QA | unauthenticated only | unauthenticated only, but against a **production build** across 4 viewports |
+
+The three new `payment-security.pg-spec.ts` cases guarding QA-10 have **never executed
+anywhere**. They typecheck and lint clean; that is compilation evidence, not execution
+evidence.
+
+**Consequence for release policy: no `v3.0.1` may be cut until CI has run these
+commits.** That is not a formality — QA-10 changes a payment verification predicate, and
+the only tests that exercise it are the ones that have not run.
+
+### The local-runtime limitation, corrected but not resolved
+
+Earlier phases recorded that no local PostgreSQL was available. More precisely:
+PostgreSQL 16.15 **is** installed and listening on 5432; the `beauclick_app` and
+`beauclick_financial_writer` credentials in `apps/api/.env` are stale, and `pg_hba.conf`
+mandates `scram-sha-256` for every local connection. Recovering access needs the
+`postgres` superuser password — which exists nowhere in the repository — or an
+administrative single-user reset. Credential guessing and rewriting `pg_hba.conf` were
+both declined as out of bounds for this pass. Docker Desktop remains installed with its
+daemon not running.
+
+**So the position is unchanged in substance:** the API cannot boot locally, authenticated
+and payment browser QA remain unavailable, and CI remains the only real-PostgreSQL
+evidence. No authenticated browser testing is claimed anywhere in this pass's reports.
+
+What did improve: the frontend was driven against `next build` + `next start` rather than
+only `next dev`. That mattered — the dev server invalidates its own stylesheet URL under
+rapid edits, which then 404s and silently drops every design token, and auditing CSS
+against it produces false findings.
+
+### Recommended next release
+
+**`v3.0.1`**, a patch release: seven commits, 29 files, +809/−61, every one a bug or UI
+fix. No feature added, no architecture changed, no contract broken — the single contract
+change (`VerifyPaymentResult.paidCurrency`) is additive and affects only the one provider
+that exists.
+
+**Not created.** Per the audit brief, tagging awaits explicit authorization after this
+report is reviewed. The commits are on `master` and **unpushed**.

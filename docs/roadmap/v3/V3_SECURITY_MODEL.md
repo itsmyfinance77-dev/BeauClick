@@ -220,3 +220,124 @@ than a reckless one.
 **If this invariant is ever weakened, EXC-001 must be re-decided.** The exception is
 explicitly conditioned on it (`V3_RELEASE_POLICY_EXCEPTIONS.md` § "Review condition"). This
 property is load-bearing for a release decision, not just for the payment domain.
+
+
+---
+
+## 15. Global QA security addendum (2026-08-24, post-v3.0.0)
+
+Findings from the global QA + UI/UX pass that change this document. Full narrative in
+`V3_GLOBAL_QA_REPORT.md`.
+
+### 15.1 Input canonicalization must happen BEFORE the validator, not after it
+
+§1 requires every phone number to be canonicalized to `+98XXXXXXXXX` before comparison,
+storage, or lookup, and `canonicalizePhone()` implements that — including Persian (۰–۹)
+and Arabic-Indic (٠–٩) digit folding.
+
+**That folding was unreachable over HTTP for the whole of V3.** The `@Matches`
+validator on `RequestOtpDto`/`VerifyOtpDto` runs *first*, and `\d` in a JavaScript regex
+is ASCII-only, so a Persian-digit phone number was rejected as malformed before the
+canonicalizer ever saw it. The security property was never violated — but the layer
+implementing it was dead code on the request path, which is its own kind of finding: a
+guarantee that reads as satisfied in the file that implements it while an adjacent layer
+silently negates it.
+
+**Rule this establishes, and which now holds:** canonicalization is part of *accepting*
+input, not part of processing it. Any DTO whose validator constrains a canonicalizable
+field must apply the canonical transform in a `@Transform` before validation. Both auth
+DTOs now do, using `normalizeDigits` from `@beauclick/persian-utils` — the same utility
+`SearchProvidersDto` already used for the same reason.
+
+The OTP **code** had the same shape and a materially worse consequence. `OtpService`
+HMACs the code verbatim, so `HMAC('۱۲۳۴۵۶') ≠ HMAC('123456')`: a correct code retyped in
+Persian digits was scored as wrong **and consumed one of the five attempts** §2 allots,
+reaching irreversible lockout in five tries. Because §2 also (correctly) requires every
+failure mode to return an identical generic error, the user had no way to discover why.
+Anti-enumeration and lockout are both still enforced exactly as specified; the code is
+now folded before either applies.
+
+### 15.2 Amount integrity requires a unit, not just a number (§ payment)
+
+The payment verification path compared the gateway's reported amount with the intent's
+amount as **bare numbers**. `VerifyPaymentResult` carried no currency field, so nothing
+but a field *name* (`paidAmountToman`) asserted that both sides meant the same unit.
+
+This is not a sandbox concern — it is a **production adapter** concern, and therefore
+part of `GAP-06b`'s risk surface. Iranian gateway APIs commonly denominate in **rials**,
+and 1 toman = 10 rials. An adapter that passed the gateway's own figure straight into
+`paidAmountToman` would settle a 200,000-toman order for 20,000 tomans of real money,
+and **every existing amount-tampering test would still have passed**, because both sides
+are just numbers. The sandbox cannot surface this class of defect: it is IRT by
+construction.
+
+**The contract now has a third mandatory rule**, alongside "verify() must talk to the
+gateway" and "verify() must report the captured amount":
+
+> **3. `verify()` must state the CURRENCY/unit of the amount it reports**, and it must
+> be the platform unit.
+
+Enforcement: verification requires `paidCurrency` to be **present and equal** to the
+intent's currency. An adapter that omits it **fails closed** rather than being assumed
+to mean tomans. The audit log records expected and reported currency separately, so
+"wrong number" and "wrong unit" are distinguishable incidents. Covered by three cases in
+`payment-security.pg-spec.ts`, including an honest-path control so the check cannot pass
+by refusing everything. **Those cases require CI's PostgreSQL and have not yet executed.**
+
+### 15.3 A frontend route is not covered by a backend feature gate
+
+The sandbox checkout page (`/sandbox-gateway`) took its return address from a query
+parameter and navigated to it unvalidated — an **open redirect** that rendered a
+plausible BeauClick payment screen and then delivered the visitor to an attacker's site,
+with BeauClick's own domain in the address bar throughout.
+
+The reasoning error worth recording is not the missing validation; it is the assumption
+behind it. `SandboxPaymentProvider.isEnabled()` fails closed in production, and that gate
+is genuinely sound — but it gates the payment **provider**, an API-side concern.
+`/sandbox-gateway` is a statically-prerendered Next.js route that renders in **any**
+environment regardless of what the API decides, and its redirect fires before any API
+response is even consulted. A production deployment with zero enabled payment providers
+still serves this page.
+
+**Rule:** a frontend route may not treat a backend capability gate as its own access
+control. Where a page performs a security-relevant action, it must validate
+independently. The page now requires the callback's origin to match the configured API
+exactly — the only legitimate destination, since the real value is built server-side in
+`SandboxPaymentProvider.initiate()`. `apps/web/test/sandbox-callback.spec.ts` pins it,
+including lookalike-host, protocol-relative, and non-HTTP-scheme cases.
+
+A second defect on the same page: `/decide` answers **HTTP 200** with
+`{ accepted: false }` for every refusal it knows about — disabled sandbox, unrecognised
+decision, and an already-decided transaction (its compare-and-swap losing). The page
+checked only `response.ok` and redirected to the payment-complete leg regardless.
+Reachable by double-clicking. The response body is now honoured.
+
+### 15.4 Authorization re-verification — no new findings
+
+Every route taking a resource identifier was enumerated and checked for an ownership
+boundary. Routes without `@ResolveOwner` were individually verified to enforce ownership
+in their own data access rather than assumed safe:
+
+| Route | Boundary | Verdict |
+|---|---|---|
+| `GET /v1/me/finance/orders/:orderId/ledger` | `myLedgerForOrder` filters entries to the caller's own party | Sound. A foreign `orderId` yields an empty list, never another party's rows. |
+| `DELETE /v1/me/availability/slots/:slotId` | `DELETE ... WHERE id AND professional_id AND status='open'` | Sound. Cross-professional deletion impossible. |
+| `PATCH /v1/me/journey/goals/:id` | `WHERE id AND user_id`, plus compare-and-swap on status | Sound. |
+| `POST /v1/me/notifications/:id/read` | `WHERE id AND user_id AND read_at IS NULL` | Sound. (An unrelated correctness bug in the *fallback* branch was fixed — it paged one row, so only the newest notification could be recognised as owned, returning a wrong 404 for older already-read ones.) |
+| `POST /v1/payments/intents/:intentId/initiate` | `intent.customerId !== user.userId` → null redirect | Sound. An intent id alone is never authority to pay, and the refusal shape is identical to a nonexistent intent. |
+
+`MyFinanceController` continues to take **no** party argument on any route, keeping §3's
+"unrepresentable rather than merely checked" property intact. Admin cross-party surfaces
+remain a separate controller and service behind `bc_manage_platform`.
+
+### 15.5 Unchanged and re-confirmed
+
+OTP storage/compare/consume semantics, anti-enumeration, phone+IP rate limits, refresh
+rotation with replay revocation, httpOnly refresh cookie with Origin-based CSRF on the
+cookie path only, `trust proxy` off, single-flight client refresh, global throttling
+(`PHASE5-02`), and the sandbox production gate with no override — all re-read this pass
+and all still hold as documented.
+
+**Still disclosed, unchanged:** throttler storage is in-memory per process, so at
+multi-instance scale the effective limit multiplies by instance count; RBAC is
+code-based; audit logging is structured-logger-based rather than DB-persisted.
