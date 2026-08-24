@@ -33,7 +33,23 @@ async function bootstrap() {
     // X-CSRF-Token is the double-submit header the refresh route requires.
     // A cross-origin attacker cannot set it without this allow-list naming it,
     // which is half of why the double-submit check works.
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Device-Label', 'X-CSRF-Token'],
+    //
+    // Idempotency-Key was MISSING here, and its absence broke customer
+    // checkout in every real browser: `POST /v1/bookings` requires the header
+    // (checkout.controller.ts:51) and `booking-api.ts:109` sends it, but a
+    // cross-origin request carrying a header the server does not allow is
+    // rejected at PREFLIGHT -- the actual POST is never issued. Found by
+    // driving the real booking flow in a real browser during V3.1 Task 1;
+    // invisible to every supertest suite, because supertest sets headers
+    // directly and no preflight exists. Exactly the class Phase 1 recorded
+    // when CORS was found entirely unconfigured: "API-only testing cannot
+    // surface browser-enforced policy."
+    //
+    // Widening the allow-list does not widen what an attacker can do: the
+    // key is a client-chosen opaque string whose only effect is to make a
+    // REPEAT of the caller's own request return the caller's own first
+    // result. `findByIdempotencyKey` is scoped by customer id as well as key.
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Device-Label', 'X-CSRF-Token', 'Idempotency-Key'],
   });
 
   // Backend foundation requirement: API versioning -- every controller
