@@ -45,6 +45,18 @@
       ],
       "port": 3100,
       "cwd": "v3/apps/web"
+    },
+    {
+      "name": "beauclick-v3-web-prod",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "next",
+        "start",
+        "-p",
+        "3200"
+      ],
+      "port": 3200,
+      "cwd": "v3/apps/web"
     }
   ]
 }

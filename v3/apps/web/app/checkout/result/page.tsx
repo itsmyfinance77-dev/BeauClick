@@ -30,6 +30,21 @@ const OUTCOME_COPY: Record<string, { tone: 'success' | 'error'; title: string; b
     title: 'پرداخت برگشت داده شد',
     body: 'زمان رزرو پیش از تکمیل پرداخت منقضی شد و مبلغ به‌صورت خودکار بازگردانده شد.',
   },
+  /**
+   * The API emits this status (checkout.controller.ts) when a SECOND real
+   * charge landed on an already-paid order and was automatically refunded.
+   *
+   * It was missing here, so it fell through to `failed` -- which tells the
+   * customer "مبلغی از حساب شما کسر نشده است". That is the opposite of what
+   * happened: they were charged twice, and the second charge was given back.
+   * Telling someone no money moved when their statement will show two
+   * debits and a credit is the worst possible copy for this state.
+   */
+  duplicate_refunded: {
+    tone: 'success',
+    title: 'رزرو شما تأیید شد',
+    body: 'به دلیل یک پرداخت تکراری، مبلغ دوم به‌صورت خودکار به حساب شما بازگردانده شد. بازگشت وجه معمولاً طی ۷۲ ساعت در صورت‌حساب بانکی شما ثبت می‌شود.',
+  },
 };
 
 /**
@@ -73,11 +88,26 @@ function ResultContent() {
       <Card>
         <h1 style={{ fontSize: 24, marginBlockEnd: 8 }}>{copy.title}</h1>
         <Alert tone={copy.tone}>{copy.body}</Alert>
+        {/*
+          These two are the ONLY ways forward from the payment result, and
+          they were 18px tall -- measured in a real 375px viewport, well under
+          the 44px baseline this project's own Button component enforces. Same
+          class of finding as the 25px nav links, the 43px logout button, the
+          21px homepage CTA, and the 24px search-result link before them; this
+          is the surface a customer lands on straight after paying, on a
+          phone.
+        */}
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBlockStart: 8 }}>
-          <Link href="/bookings" style={{ fontWeight: 600 }}>
+          <Link
+            href="/bookings"
+            style={{ fontWeight: 600, display: 'inline-flex', alignItems: 'center', minHeight: 44 }}
+          >
             رزروهای من
           </Link>
-          <Link href="/providers" style={{ fontWeight: 600 }}>
+          <Link
+            href="/providers"
+            style={{ fontWeight: 600, display: 'inline-flex', alignItems: 'center', minHeight: 44 }}
+          >
             بازگشت به فهرست متخصص‌ها
           </Link>
         </div>
