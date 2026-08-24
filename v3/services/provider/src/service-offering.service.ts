@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, IsNull, Repository } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
+import { NotFoundOrNotYoursException } from '@beauclick/ownership';
 import { ServiceOfferingEntity } from './entities/service-offering.entity';
 import { ProviderEventsService } from './provider-events.service';
 
@@ -50,9 +51,21 @@ export class ServiceOfferingService {
     return this.dataSource.transaction(async (manager: EntityManager) => {
       // professionalId in the WHERE clause: another provider's service id
       // resolves the same way a nonexistent one does.
+      //
+      // `findOne` + an explicit domain exception, NOT `findOneOrFail`. This
+      // method had no HTTP route until V3.1 Task 1, so TypeORM's own
+      // `EntityNotFoundError` had never reached the exception filter -- where
+      // it becomes a **500**. Found by the adversarial case in
+      // `professional-surface.pg-spec.ts`: a professional naming their own
+      // provider id (which the ownership guard correctly allows) together with
+      // ANOTHER professional's service id got an Internal Server Error, which
+      // both looks like a crash and is distinguishable from the response a
+      // well-formed nonexistent id gets -- the exact existence leak
+      // V3_SECURITY_MODEL.md §3 forbids.
       const entity = await manager
         .getRepository(ServiceOfferingEntity)
-        .findOneOrFail({ where: { id: serviceId, professionalId, deletedAt: IsNull() } });
+        .findOne({ where: { id: serviceId, professionalId, deletedAt: IsNull() } });
+      if (!entity) throw new NotFoundOrNotYoursException();
 
       if (input.name !== undefined) entity.name = input.name;
       if (input.durationMinutes !== undefined) entity.durationMinutes = input.durationMinutes;

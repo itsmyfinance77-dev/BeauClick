@@ -23,6 +23,7 @@ describe('ProviderService (integration, pg-mem)', () => {
       dataSource,
       dataSource.getRepository(ProfessionalEntity),
       dataSource.getRepository(SpecialtyEntity),
+      dataSource.getRepository(CityEntity),
       events,
     );
   });

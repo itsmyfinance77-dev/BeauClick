@@ -6,6 +6,7 @@ import { DomainException } from '@beauclick/http';
 import { HttpStatus } from '@nestjs/common';
 import { ProfessionalEntity, VERIFICATION_STATUSES, VerificationStatus } from './entities/professional.entity';
 import { SpecialtyEntity } from './entities/specialty.entity';
+import { CityEntity } from './entities/city.entity';
 import { CreateProfessionalDto } from './dto/create-professional.dto';
 import { UpdateProfessionalDto } from './dto/update-professional.dto';
 import { ListProvidersDto } from './dto/list-providers.dto';
@@ -36,6 +37,7 @@ export class ProviderService {
     private readonly dataSource: DataSource,
     @InjectRepository(ProfessionalEntity) private readonly repo: Repository<ProfessionalEntity>,
     @InjectRepository(SpecialtyEntity) private readonly specialtyRepo: Repository<SpecialtyEntity>,
+    @InjectRepository(CityEntity) private readonly cityRepo: Repository<CityEntity>,
     private readonly events: ProviderEventsService,
   ) {}
 
@@ -68,6 +70,27 @@ export class ProviderService {
       this.auditLog.log({ action: 'provider.created', ownerId, professionalId: saved.id });
       return manager.getRepository(ProfessionalEntity).findOneOrFail({ where: { id: saved.id }, relations: ['specialties'] });
     });
+  }
+
+  /**
+   * Reference data for the profile editor's city and specialty pickers.
+   *
+   * `V3_DOMAIN_BOUNDARIES.md` §provider lists `GET /v1/specialties` in this
+   * module's public API; it was never built, and there was no city equivalent
+   * either. Until now the only source of either was search's FACETS, which are
+   * derived from indexed providers -- so a marketplace with no indexed
+   * providers offered a new professional an empty city list and no way to
+   * complete their own profile. Reference lookups, not a search surface.
+   *
+   * Cities are filtered to launched ones: an unlaunched city in the picker is
+   * a profile nobody can be found in.
+   */
+  async listCities(): Promise<CityEntity[]> {
+    return this.cityRepo.find({ where: { isLaunched: true }, order: { name: 'ASC' } });
+  }
+
+  async listSpecialties(): Promise<SpecialtyEntity[]> {
+    return this.specialtyRepo.find({ order: { name: 'ASC' } });
   }
 
   async findById(id: string): Promise<ProfessionalEntity | null> {
