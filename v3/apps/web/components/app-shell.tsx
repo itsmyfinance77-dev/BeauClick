@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { toPersianDigits } from '@beauclick/persian-utils';
 import { useAuth } from '@/lib/auth-context';
@@ -35,6 +36,34 @@ const NAV_LINK_STYLE = {
   // enough to wrap at 375px.
   padding: '0 2px',
 } as const;
+
+/**
+ * One nav destination, marked as the current page when it is.
+ *
+ * The nav previously gave no indication of where the user was -- every link
+ * rendered identically on every page. `aria-current="page"` is the part a
+ * screen reader needs; the weight/colour change is the part everyone else
+ * needs, since colour alone is not a distinction every reader can make.
+ */
+function NavLink({ href, children, ...rest }: { href: string; children: ReactNode } & Record<string, unknown>) {
+  const pathname = usePathname();
+  // Exact match only: '/' would otherwise prefix-match every route.
+  const isCurrent = pathname === href;
+  return (
+    <Link
+      href={href}
+      aria-current={isCurrent ? 'page' : undefined}
+      style={{
+        ...NAV_LINK_STYLE,
+        fontWeight: isCurrent ? 800 : NAV_LINK_STYLE.fontWeight,
+        color: isCurrent ? 'var(--bc-color-primary)' : undefined,
+      }}
+      {...rest}
+    >
+      {children}
+    </Link>
+  );
+}
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { status, user, logout } = useAuth();
@@ -100,32 +129,31 @@ export function AppShell({ children }: { children: ReactNode }) {
               minWidth: 0,
             }}
           >
-            <Link href="/search" style={NAV_LINK_STYLE}>
+            <NavLink href="/search">
               جست‌وجو
-            </Link>
-            <Link href="/providers" style={NAV_LINK_STYLE}>
+            </NavLink>
+            <NavLink href="/providers">
               متخصص‌ها
-            </Link>
+            </NavLink>
             {status === 'authenticated' ? (
               <>
-                <Link href="/bookings" style={NAV_LINK_STYLE}>
+                <NavLink href="/bookings">
                   رزروهای من
-                </Link>
-                <Link href="/journey" style={NAV_LINK_STYLE}>
+                </NavLink>
+                <NavLink href="/journey">
                   مسیر من
-                </Link>
-                <Link href="/loyalty" style={NAV_LINK_STYLE}>
+                </NavLink>
+                <NavLink href="/loyalty">
                   باشگاه
-                </Link>
-                <Link href="/waitlist" style={NAV_LINK_STYLE}>
+                </NavLink>
+                <NavLink href="/waitlist">
                   لیست انتظار
-                </Link>
-                <Link href="/business" style={NAV_LINK_STYLE}>
+                </NavLink>
+                <NavLink href="/business">
                   کسب‌وکار
-                </Link>
-                <Link
+                </NavLink>
+                <NavLink
                   href="/notifications"
-                  style={NAV_LINK_STYLE}
                   // The count is in the accessible name, so a screen reader
                   // announces "اعلان‌ها، ۳ خوانده‌نشده" rather than reading a
                   // bare number next to a link.
@@ -148,10 +176,10 @@ export function AppShell({ children }: { children: ReactNode }) {
                       {toPersianDigits(unread)}
                     </span>
                   )}
-                </Link>
-                <Link href="/dashboard" style={NAV_LINK_STYLE}>
+                </NavLink>
+                <NavLink href="/dashboard">
                   داشبورد
-                </Link>
+                </NavLink>
                 <span style={{ fontSize: 13, color: 'var(--bc-color-ink-faint)' }}>{user?.displayName ?? user?.phone}</span>
                 <button
                   type="button"
@@ -176,9 +204,9 @@ export function AppShell({ children }: { children: ReactNode }) {
                 </button>
               </>
             ) : (
-              <Link href="/auth" style={NAV_LINK_STYLE}>
+              <NavLink href="/auth">
                 ورود
-              </Link>
+              </NavLink>
             )}
           </nav>
         </div>
