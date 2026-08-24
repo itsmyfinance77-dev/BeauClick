@@ -13,11 +13,20 @@ import { useId } from 'react';
  */
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: 'primary' | 'ghost';
+  /**
+   * `danger` is a ghost button in the error colour, added for the professional
+   * surface's destructive confirmations (release a slot, delete a service,
+   * mark a no-show). It is a real variant rather than a caller-supplied
+   * `style` override so that "this action is destructive" stays a design-system
+   * decision with one implementation, not a colour each screen picks.
+   */
+  variant?: 'primary' | 'ghost' | 'danger';
   loading?: boolean;
+  /** Sizing hook for rows where a full-width button would be absurd. Never below 44px. */
+  inline?: boolean;
 };
 
-export function Button({ variant = 'primary', loading = false, disabled, children, ...rest }: ButtonProps) {
+export function Button({ variant = 'primary', loading = false, inline = false, disabled, children, ...rest }: ButtonProps) {
   const isDisabled = disabled || loading;
   return (
     <button
@@ -27,14 +36,20 @@ export function Button({ variant = 'primary', loading = false, disabled, childre
       style={{
         font: 'inherit',
         fontWeight: 600,
-        padding: '12px 20px',
+        padding: inline ? '10px 16px' : '12px 20px',
         borderRadius: 'var(--bc-radius-button)',
-        border: variant === 'primary' ? 'none' : '1px solid var(--bc-color-line)',
+        border: variant === 'primary' ? 'none' : '1px solid',
+        borderColor: variant === 'danger' ? 'var(--bc-color-error)' : 'var(--bc-color-line)',
         background: variant === 'primary' ? 'var(--bc-color-primary)' : 'transparent',
-        color: variant === 'primary' ? 'var(--bc-color-surface)' : 'var(--bc-color-ink)',
+        color:
+          variant === 'primary'
+            ? 'var(--bc-color-surface)'
+            : variant === 'danger'
+              ? 'var(--bc-color-error)'
+              : 'var(--bc-color-ink)',
         cursor: isDisabled ? 'not-allowed' : 'pointer',
         opacity: isDisabled ? 0.6 : 1,
-        width: '100%',
+        width: inline ? 'auto' : '100%',
         minHeight: 44, // accessibility: comfortable touch target on mobile
       }}
     >

@@ -152,6 +152,22 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <NavLink href="/business">
                   کسب‌وکار
                 </NavLink>
+                {/*
+                  Shown to every authenticated user, and that is deliberate
+                  rather than an oversight: becoming a professional in V3 is
+                  self-service (`POST /v1/providers`, any session), so this is
+                  the entry point to a mode anyone may enter, not a link to
+                  something only some users have. `/pro` itself distinguishes
+                  "you have no professional profile" from "the request failed"
+                  and offers to create one.
+
+                  It is NOT the same situation as QA-25's business link, which
+                  is shown to everyone because no signal exists to condition it
+                  on. Here no condition is wanted.
+                */}
+                <NavLink href="/pro">
+                  حالت متخصص
+                </NavLink>
                 <NavLink
                   href="/notifications"
                   // The count is in the accessible name, so a screen reader
