@@ -166,8 +166,21 @@ export class ProviderService {
     toStatus: VerificationStatus,
     actorId: string | null,
     reason: string | null,
+    /**
+     * Join the caller's transaction when there is one.
+     *
+     * Phase A's verification workflow must move the professional's status, mark
+     * the queue row decided, and write the audit record atomically -- if any of
+     * the three fails, none may stand. Opening a nested transaction here would
+     * commit the status change independently of the audit row, which is exactly
+     * the "audit as best-effort side effect" shape GAP-02-V3 exists to remove.
+     *
+     * Behaviour is otherwise identical: the same CAS, the same legal-transition
+     * assertion, the same single event.
+     */
+    manager?: EntityManager,
   ): Promise<ProfessionalEntity> {
-    return this.dataSource.transaction(async (manager: EntityManager) => {
+    const run = async (manager: EntityManager): Promise<ProfessionalEntity> => {
       const before = await manager
         .getRepository(ProfessionalEntity)
         .findOneOrFail({ where: { id, deletedAt: IsNull() } });
@@ -190,7 +203,9 @@ export class ProviderService {
       await this.events.emitVerificationChanged(manager, id, before.verificationStatus, toStatus, actorId, reason);
       this.auditLog.log({ action: 'provider.verification_changed', professionalId: id, from: before.verificationStatus, to: toStatus, actorId });
       return manager.getRepository(ProfessionalEntity).findOneOrFail({ where: { id } });
-    });
+    };
+
+    return manager ? run(manager) : this.dataSource.transaction(run);
   }
 
   /** Foundation only -- no REST route calls this in Phase 1 (verification workflow/evidence/admin review is out of scope, per this phase's own "do not implement" list). Kept here so the state machine and its invariant (only legal transitions) exist and are tested from day one, per V3_MIGRATION_MATRIX.md's "verification state machine" BUSINESS-RULE EXTRACTION classification. */

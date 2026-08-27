@@ -8,3 +8,5 @@ export * from './service-offering.service';
 export * from './provider-owner.resolver';
 export * from './entities/provider-outbox.entity';
 export * from './provider-events.service';
+export * from './entities/verification-request.entity';
+export * from './verification/verification.service';
