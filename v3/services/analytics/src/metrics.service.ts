@@ -182,6 +182,20 @@ export class MetricsService {
         this.countEvents('OrderPaid', range.from, range.to),
       ]);
 
+    // Search click-through: profile views that CAME FROM a search result.
+    //
+    // `ProviderProfileViewed` already carries `source` ('search' | 'direct' |
+    // 'journey' | 'unknown') for exactly this reason -- the contract's own note
+    // calls it "the distinction that makes conversion meaningful rather than a
+    // raw ratio". Nothing new is collected and no query text is involved;
+    // `SearchPerformed` has no field that could carry one.
+    const searchSourcedViews = await this.facts
+      .createQueryBuilder('e')
+      .where('e.event_type = :t', { t: 'ProviderProfileViewed' })
+      .andWhere('e.occurred_on BETWEEN :from AND :to', range)
+      .andWhere("e.dimensions ->> 'source' = 'search'")
+      .getCount();
+
     const grossToman = await this.sumMetric('OrderPaid', range.from, range.to);
     const refundedToman = await this.sumMetric('OrderRefunded', range.from, range.to);
 
@@ -211,6 +225,23 @@ export class MetricsService {
         // A real operational signal: how often the marketplace served results
         // from the degraded fallback rather than the search engine.
         degradedSearches: { key: 'degraded_searches', value: degradedSearches, kind: 'event_derived' as MetricKind },
+        searchSourcedViews: {
+          key: 'search_sourced_profile_views',
+          value: searchSourcedViews,
+          kind: 'event_derived' as MetricKind,
+        },
+        clickThroughRate: {
+          key: 'search_click_through_rate',
+          value: this.ratio(searchSourcedViews, searches),
+          // `correlation_derived`, not `event_derived`, and the distinction is
+          // real: numerator and denominator are DIFFERENT event types, so a
+          // single search yielding three profile views produces a rate above
+          // 1.0. That is a true statement about engagement and a false one
+          // about "what fraction of searches led somewhere", and the note says
+          // so rather than leaving a reader to assume the friendlier reading.
+          kind: 'correlation_derived' as MetricKind,
+          note: 'نسبت بازدیدهای پروفایل با منشأ جست‌وجو به کل جست‌وجوها. چون یک جست‌وجو می‌تواند به چند بازدید منجر شود، این مقدار می‌تواند از ۱۰۰٪ بیشتر باشد.',
+        },
       },
       bookings: {
         created: { key: 'bookings_created', value: bookingsCreated, kind: 'event_derived' as MetricKind },

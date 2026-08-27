@@ -8,9 +8,15 @@ import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
 import { ThrottlerModule } from '@nestjs/throttler';
 
 import { BeauClickExceptionFilter, ResponseEnvelopeInterceptor } from '@beauclick/http';
-import { BeauClickThrottlerGuard, JwtAuthGuard, CapabilityGuard, throttlerOptionsFromEnv } from '@beauclick/auth';
+import {
+  BeauClickThrottlerGuard,
+  JwtAuthGuard,
+  CapabilityGuard,
+  PRIVILEGED_CAPABILITY_VERIFIER,
+  throttlerOptionsFromEnv,
+} from '@beauclick/auth';
 import { OwnershipGuard } from '@beauclick/ownership';
-import { IdentityModule, IDENTITY_ENTITIES } from '@beauclick/identity';
+import { IdentityModule, IDENTITY_ENTITIES, RoleService } from '@beauclick/identity';
 import { ProviderModule, PROVIDER_ENTITIES } from '@beauclick/provider';
 import { BOOKING_ENTITIES } from '@beauclick/booking';
 import { COMMERCE_ENTITIES } from '@beauclick/commerce';
@@ -23,6 +29,7 @@ import { ANALYTICS_ENTITIES } from '@beauclick/analytics';
 import { BUSINESS_ENTITIES } from '@beauclick/business';
 import { WAITLIST_ENTITIES } from '@beauclick/waitlist';
 import { EventContractsModule } from '@beauclick/event-contracts';
+import { AuditModule, AUDIT_ENTITIES } from '@beauclick/audit';
 import { DomainCompositionModule } from './composition/domain-composition.module';
 
 import cookieParser from 'cookie-parser';
@@ -67,6 +74,13 @@ import { HealthController } from './health/health.controller';
           // shared pool -- neither needs financial's isolation treatment.
           ...BUSINESS_ENTITIES,
           ...WAITLIST_ENTITIES,
+          // The administrative audit log. On the MAIN DataSource deliberately:
+          // the application role holds INSERT + SELECT on it and nothing else,
+          // so a single pool is both sufficient and safe -- unlike `financial`,
+          // where the role cannot even SELECT and a second pool is unavoidable.
+          // Sharing the pool is what lets an audit row commit in the same
+          // transaction as the mutation it records.
+          ...AUDIT_ENTITIES,
         ],
         // V3_DATABASE_BLUEPRINT.md §2 mandates lower_snake_case columns;
         // TypeORM's default naming strategy uses the JS property name
@@ -128,6 +142,11 @@ import { HealthController } from './health/health.controller';
     // Global: every event producer validates against it on the way into
     // its own outbox, and no domain may import another to obtain it.
     EventContractsModule,
+    // Global, so every module that registers a privileged mutation can write
+    // its audit record without importing anything -- and so the boot-time
+    // assertion has a home that does not depend on which modules a given
+    // composition happens to include.
+    AuditModule,
     IdentityModule,
     ProviderModule,
     DomainCompositionModule,
@@ -151,6 +170,17 @@ import { HealthController } from './health/health.controller';
     // bucket, which is precisely the bug this ordering avoids. Unauthenticated
     // and @Public() routes still reach it and are keyed by IP.
     { provide: APP_GUARD, useClass: BeauClickThrottlerGuard },
+    // The privileged re-check's implementation, bound here because libs/auth
+    // may not import a services/* package (ADR-011). Without this binding the
+    // guard falls back to token-only checking, which is exactly as strict as it
+    // was before -- never weaker.
+    {
+      provide: PRIVILEGED_CAPABILITY_VERIFIER,
+      useFactory: (roles: RoleService) => ({
+        hasCapability: (userId: string, capability: string) => roles.hasCapability(userId, capability),
+      }),
+      inject: [RoleService],
+    },
     { provide: APP_GUARD, useClass: CapabilityGuard },
     { provide: APP_GUARD, useClass: OwnershipGuard },
   ],

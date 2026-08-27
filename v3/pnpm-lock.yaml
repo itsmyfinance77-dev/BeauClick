@@ -85,6 +85,9 @@ importers:
       '@beauclick/analytics':
         specifier: workspace:*
         version: link:../../services/analytics
+      '@beauclick/audit':
+        specifier: workspace:*
+        version: link:../../libs/audit
       '@beauclick/auth':
         specifier: workspace:*
         version: link:../../libs/auth
@@ -265,6 +268,37 @@ importers:
         specifier: ^5.6.3
         version: 5.9.3
 
+  libs/audit:
+    dependencies:
+      '@beauclick/auth':
+        specifier: workspace:*
+        version: link:../auth
+      '@beauclick/events':
+        specifier: workspace:*
+        version: link:../events
+      '@nestjs/common':
+        specifier: 10.4.22
+        version: 10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1)
+      '@nestjs/core':
+        specifier: 10.4.22
+        version: 10.4.22(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/platform-express@10.4.22)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/typeorm':
+        specifier: 10.0.2
+        version: 10.0.2(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@10.4.22)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@0.3.31(babel-plugin-macros@3.1.0)(pg@8.23.0)(supports-color@8.1.1)(ts-node@10.9.2(@types/node@22.20.1)(typescript@5.9.3)))
+      reflect-metadata:
+        specifier: 0.2.2
+        version: 0.2.2
+      typeorm:
+        specifier: 0.3.31
+        version: 0.3.31(babel-plugin-macros@3.1.0)(pg@8.23.0)(supports-color@8.1.1)(ts-node@10.9.2(@types/node@22.20.1)(typescript@5.9.3))
+      uuidv7:
+        specifier: ^1.0.2
+        version: 1.2.1
+    devDependencies:
+      '@nestjs/testing':
+        specifier: 10.4.22
+        version: 10.4.22(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@10.4.22)(@nestjs/platform-express@10.4.22)
+
   libs/auth:
     dependencies:
       '@nestjs/common':
@@ -374,6 +408,9 @@ importers:
 
   services/analytics:
     dependencies:
+      '@beauclick/audit':
+        specifier: workspace:*
+        version: link:../../libs/audit
       '@beauclick/auth':
         specifier: workspace:*
         version: link:../../libs/auth
@@ -560,6 +597,9 @@ importers:
 
   services/financial:
     dependencies:
+      '@beauclick/audit':
+        specifier: workspace:*
+        version: link:../../libs/audit
       '@beauclick/auth':
         specifier: workspace:*
         version: link:../../libs/auth
@@ -606,6 +646,9 @@ importers:
 
   services/identity:
     dependencies:
+      '@beauclick/audit':
+        specifier: workspace:*
+        version: link:../../libs/audit
       '@beauclick/auth':
         specifier: workspace:*
         version: link:../../libs/auth
@@ -762,6 +805,9 @@ importers:
 
   services/notification:
     dependencies:
+      '@beauclick/audit':
+        specifier: workspace:*
+        version: link:../../libs/audit
       '@beauclick/auth':
         specifier: workspace:*
         version: link:../../libs/auth
@@ -857,6 +903,9 @@ importers:
 
   services/provider:
     dependencies:
+      '@beauclick/audit':
+        specifier: workspace:*
+        version: link:../../libs/audit
       '@beauclick/auth':
         specifier: workspace:*
         version: link:../../libs/auth
@@ -899,6 +948,9 @@ importers:
 
   services/search:
     dependencies:
+      '@beauclick/audit':
+        specifier: workspace:*
+        version: link:../../libs/audit
       '@beauclick/auth':
         specifier: workspace:*
         version: link:../../libs/auth

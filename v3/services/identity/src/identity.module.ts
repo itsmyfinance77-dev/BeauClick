@@ -6,6 +6,7 @@ import { UserEntity } from './entities/user.entity';
 import { OtpRequestEntity } from './entities/otp-request.entity';
 import { RefreshTokenEntity } from './entities/refresh-token.entity';
 import { PhoneConflictEntity } from './entities/phone-conflict.entity';
+import { CapabilityEntity, RoleCapabilityEntity, RoleEntity, UserRoleEntity } from './entities/role.entities';
 
 import { OtpService } from './otp/otp.service';
 import { AccountResolverService } from './account/account-resolver.service';
@@ -14,8 +15,22 @@ import { AuthService } from './auth/auth.service';
 import { AuthController } from './auth/auth.controller';
 import { MeController } from './me/me.controller';
 import { NoopOtpDebugObserver, OTP_DEBUG_OBSERVER } from './otp/otp-debug-observer';
+import { RoleService } from './rbac/role.service';
+import { AdminRolesController } from './admin/admin-roles.controller';
+import { AdminAuditController } from './admin/admin-audit.controller';
+import { AdminPhoneConflictsController } from './admin/admin-phone-conflicts.controller';
+import { PhoneConflictService } from './admin/phone-conflict.service';
 
-export const IDENTITY_ENTITIES = [UserEntity, OtpRequestEntity, RefreshTokenEntity, PhoneConflictEntity];
+export const IDENTITY_ENTITIES = [
+  UserEntity,
+  OtpRequestEntity,
+  RefreshTokenEntity,
+  PhoneConflictEntity,
+  RoleEntity,
+  CapabilityEntity,
+  RoleCapabilityEntity,
+  UserRoleEntity,
+];
 
 @Module({
   // ThrottlerModule is deliberately NOT configured here any more. It was,
@@ -27,14 +42,16 @@ export const IDENTITY_ENTITIES = [UserEntity, OtpRequestEntity, RefreshTokenEnti
   // where the global guard actually runs. (Same class of DI trap as Phase 4's
   // PRICING_RULES-in-the-wrong-module bug.)
   imports: [TypeOrmModule.forFeature(IDENTITY_ENTITIES), BeauClickJwtModule],
-  controllers: [AuthController, MeController],
+  controllers: [AuthController, MeController, AdminRolesController, AdminAuditController, AdminPhoneConflictsController],
   providers: [
     OtpService,
     AccountResolverService,
     TokenService,
     AuthService,
+    RoleService,
+    PhoneConflictService,
     { provide: OTP_DEBUG_OBSERVER, useClass: NoopOtpDebugObserver },
   ],
-  exports: [TokenService, AuthService, BeauClickJwtModule, TypeOrmModule, OTP_DEBUG_OBSERVER],
+  exports: [TokenService, AuthService, RoleService, BeauClickJwtModule, TypeOrmModule, OTP_DEBUG_OBSERVER],
 })
 export class IdentityModule {}

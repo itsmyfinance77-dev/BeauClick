@@ -9,3 +9,6 @@ export * from './auth/phone.util';
 export * from './otp/otp-debug-observer';
 export * from './auth/refresh-cookie';
 export * from './auth/csrf';
+export * from './entities/role.entities';
+export * from './rbac/role.service';
+export * from './admin/phone-conflict.service';

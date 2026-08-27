@@ -168,6 +168,23 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <NavLink href="/pro">
                   حالت متخصص
                 </NavLink>
+                {/*
+                  Shown ONLY to a session that actually holds the platform
+                  capability -- unlike the two links above, which are entry
+                  points to modes anyone may enter.
+
+                  The capability list on `user` is resolved LIVE by `/v1/me`
+                  from `identity.user_roles`, not echoed from the token, so a
+                  revoked operator loses the link at the next page load rather
+                  than at the next token. And hiding it is a courtesy, never the
+                  control: `CapabilityGuard` refuses the request regardless of
+                  what the nav shows.
+                */}
+                {user?.capabilities?.includes('bc_manage_platform') ? (
+                  <NavLink href="/admin">
+                    مدیریت
+                  </NavLink>
+                ) : null}
                 <NavLink
                   href="/notifications"
                   // The count is in the accessible name, so a screen reader

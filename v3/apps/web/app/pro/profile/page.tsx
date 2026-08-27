@@ -13,6 +13,7 @@ import {
   updateProvider,
   type ReferenceItem,
 } from '@/lib/pro-api';
+import { myVerification, submitVerification, type MyVerificationRequest } from '@/lib/admin-api';
 
 /**
  * Create or edit the professional profile.
@@ -46,6 +47,15 @@ export default function ProProfilePage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
+  // Verification is its own request lifecycle, separate from the profile's
+  // fields. `null` after a successful load means "you have never submitted",
+  // which is an answer; a failed load leaves it null too, so `verificationRead`
+  // is what distinguishes them.
+  const [verification, setVerification] = useState<MyVerificationRequest | null>(null);
+  const [verificationRead, setVerificationRead] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [verificationError, setVerificationError] = useState<string | null>(null);
+
   const loadReference = useCallback(async () => {
     setRefError(null);
     try {
@@ -61,6 +71,38 @@ export default function ProProfilePage() {
   useEffect(() => {
     void loadReference();
   }, [loadReference]);
+
+  const loadVerification = useCallback(async () => {
+    setVerificationError(null);
+    try {
+      const res = await myVerification(api);
+      setVerification(res.data ?? null);
+      setVerificationRead(true);
+    } catch (err) {
+      setVerificationError(err instanceof Error ? err.message : 'وضعیت درخواست احراز هویت خوانده نشد.');
+    }
+  }, [api]);
+
+  useEffect(() => {
+    if (state !== 'ready') return;
+    void loadVerification();
+  }, [state, loadVerification]);
+
+  async function requestVerification() {
+    setSubmitting(true);
+    setVerificationError(null);
+    try {
+      const res = await submitVerification(api);
+      setVerification(res.data ?? null);
+      // The profile's own verificationStatus moved to `pending` server-side, so
+      // the badge in the shell is now stale. Re-read rather than patch locally.
+      await reload();
+    } catch (err) {
+      setVerificationError(err instanceof Error ? err.message : 'ارسال درخواست احراز هویت انجام نشد.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   // Seed the form from the profile ONLY once it has genuinely arrived. The
   // dependency is `state`, not `profile`, precisely so a null profile from a
@@ -218,6 +260,43 @@ export default function ProProfilePage() {
           </Button>
         </form>
       </Card>
+
+      {profile ? (
+        <div style={{ marginBlockStart: 20 }}>
+          <Card>
+            <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 4px' }}>احراز هویت</h2>
+            <p style={{ fontSize: 13, color: 'var(--bc-color-ink-soft)', margin: '0 0 16px' }}>
+              پروفایل‌های تأییدشده نشان «تأیید شده» می‌گیرند و در نتایج جست‌وجو بالاتر دیده می‌شوند.
+            </p>
+
+            {verificationError ? <ErrorState message={verificationError} onRetry={() => void loadVerification()} /> : null}
+
+            {profile.verificationStatus === 'verified' ? (
+              <p style={{ margin: 0, fontSize: 14 }}>پروفایل شما تأیید شده است.</p>
+            ) : profile.verificationStatus === 'pending' ? (
+              <p style={{ margin: 0, fontSize: 14 }}>
+                درخواست شما در صف بررسی است. نتیجه از طریق همین صفحه اعلام می‌شود.
+              </p>
+            ) : profile.verificationStatus === 'suspended' || profile.verificationStatus === 'revoked' ? (
+              <p style={{ margin: 0, fontSize: 14 }}>
+                وضعیت پروفایل شما اجازه ارسال درخواست را نمی‌دهد. لطفاً با پشتیبانی تماس بگیرید.
+              </p>
+            ) : (
+              <>
+                {verificationRead && verification?.status === 'rejected' && verification.decisionReason ? (
+                  <Alert>درخواست قبلی رد شد: «{verification.decisionReason}»</Alert>
+                ) : null}
+                <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--bc-color-ink-soft)' }}>
+                  در این نسخه بارگذاری مدرک ممکن نیست؛ بررسی بر اساس اطلاعات پروفایل شما انجام می‌شود.
+                </p>
+                <Button type="button" loading={submitting} onClick={() => void requestVerification()}>
+                  ارسال درخواست احراز هویت
+                </Button>
+              </>
+            )}
+          </Card>
+        </div>
+      ) : null}
 
       {profile ? (
         <p style={{ fontSize: 12, color: 'var(--bc-color-ink-faint)', marginBlockStart: 16 }}>
