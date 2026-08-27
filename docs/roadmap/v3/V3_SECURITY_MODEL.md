@@ -120,6 +120,88 @@ The AI provider (LLM or rule-based fallback) then only ever sees this pre-curate
 
 ---
 
+## 9a. RBAC in practice — V3.1 Phase A (2026-08-27)
+
+§9 above states the required *mechanism*. This section records how V3 actually implements
+it, because Phase A changed where the data comes from and added one guarantee §9 does not
+ask for.
+
+### The data moved; the checks did not
+
+Roles and capabilities live in `identity.roles`, `identity.capabilities`,
+`identity.role_capabilities`, and `identity.user_roles`. Every authorization point still
+checks a **capability name** through `@RequireCapability` and `CapabilityGuard` — no guard,
+controller, or service tests a role string. This is exactly what Phase 1's own docblock
+promised would remain true when the tables arrived.
+
+Until Phase A, `identity.users.roles` was written once at account creation and never
+again, so `bc_manage_platform` was ungrantable and the entire admin surface was
+unreachable by any account the application could produce (`R31-01`).
+
+### The tiers, and what each holds
+
+| Role | Capabilities | Grantable via API? |
+|---|---|---|
+| `customer` | book, use AI assistant, view own orders | default at account creation |
+| `professional` / `business` | own profile, services, availability, bookings, finance | not used — both are answered by row ownership, not by this map |
+| `moderator` | moderate verification, moderate reviews | only by a holder of a superset (i.e. `administrator`) |
+| `platform_operator` | **manage platform, moderate verification** | yes, by another operator |
+| `administrator` | manage platform, moderate verification, moderate reviews, own profile | **never** — bootstrap only |
+
+`platform_operator` holding `bc_moderate_verification` is a deliberate widening over the
+Phase 1 static map: reviewing verifications is the operational tier's work, and the
+alternative (also granting `moderator`) would hand the first privileged account authority
+over a review domain that does not exist. §9's "narrowest sufficient tier", applied.
+
+### The escalation rule
+
+**A caller may only grant a role whose capabilities are a subset of their own.** One rule,
+computed from the data, rather than a hand-maintained who-may-grant-what matrix.
+
+`administrator` is additionally never grantable through the application, even by an
+administrator — it is reachable only the way the first operator is, through the documented
+bootstrap requiring database authority. No self-grant of a privileged role, ever.
+
+### Session invalidation window — stated, not left to inference
+
+Capabilities are baked into the access token at issue time. Therefore:
+
+- **Ordinary capabilities:** a grant or revocation takes effect at the next token issuance
+  — login or refresh — so the window is at most one access-token TTL (15 minutes by
+  default).
+- **Privileged capabilities** (`bc_manage_platform`, `bc_moderate_verification`,
+  `bc_moderate_reviews`): **immediate**. `CapabilityGuard` re-reads the role assignment
+  from the database on every request to a privileged route, through a port bound by the
+  composition root (`libs/auth` may not import a `services/*` package — ADR-011). A revoked
+  operator is refused on their next request even holding an unexpired token, verified live:
+  `200 → 403 → 200` with the same token, driven only by the database.
+
+The cost is one indexed lookup per privileged request — the admin surface and nothing else.
+It fails closed: a verifier that throws denies. Where no verifier is bound, the guard is
+exactly as strict as it was before the re-check existed, never weaker.
+
+### The administrative audit log
+
+`admin.admin_audit_log` is owned by `beauclick_admin_audit_owner`, a role the application
+never connects as; the application holds **INSERT + SELECT and nothing else** and, not
+being the owner, cannot grant itself back UPDATE. The same reasoning ADR-009/ADR-017 apply
+to the financial ledger, and proven the same way — `UPDATE` and `DELETE` both return
+`permission denied`.
+
+Audit rows commit **inside the mutation's own transaction** wherever that is physically
+possible, so an administrative action that cannot be recorded does not happen. Where it is
+not possible — a settlement (separate DataSource, ADR-017) or a search reindex (an external
+index) — the route must declare `transactional: false` with a stated reason, and the
+declaration is required: a privileged mutation carrying neither `@AuditAction` nor
+`@AuditExempt` **prevents the application from booting**, naming the offender.
+
+That structural enforcement is the V3 successor to the boot-time check that finally closed
+V2's `GAP-02`, where the same bug — a capability-gated admin mutation that skipped its
+audit call — was found three separate times across two plugins before being made
+impossible rather than merely discouraged.
+
+---
+
 ## 10. What to explicitly NOT do
 
 Named because each was avoided correctly in V2 and is worth stating as an anti-pattern for V3 too:
