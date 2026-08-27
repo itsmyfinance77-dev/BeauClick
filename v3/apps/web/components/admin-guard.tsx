@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { LoadingState } from './ui';
-import { EmptyState, TextLink } from './pro-ui';
+import { EmptyState, TextLink } from './kit';
 import { useAuth } from '@/lib/auth-context';
 
 /**

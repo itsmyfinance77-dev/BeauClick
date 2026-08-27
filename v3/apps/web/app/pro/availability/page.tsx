@@ -12,7 +12,7 @@ import {
   zonedIsoDate,
 } from '@beauclick/persian-utils';
 import { Alert, Button, Card, ErrorState, Input, LoadingState } from '@/components/ui';
-import { Badge, ConfirmDialog, EmptyState, PageHeader, Select } from '@/components/pro-ui';
+import { Badge, ConfirmDialog, EmptyState, PageHeader, Select } from '@/components/kit';
 import { ProGuard } from '@/components/pro-guard';
 import { useAuth } from '@/lib/auth-context';
 import {

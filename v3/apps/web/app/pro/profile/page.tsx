@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Button, Card, ErrorState, Input, LoadingState } from '@/components/ui';
-import { PageHeader, Select, Textarea } from '@/components/pro-ui';
+import { PageHeader, Select, Textarea } from '@/components/kit';
 import { VerificationBadge } from '@/components/pro-shell';
 import { useAuth } from '@/lib/auth-context';
 import { useProProfile } from '@/lib/pro-context';

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { normalizeDigits, toPersianDigits } from '@beauclick/persian-utils';
 import { Alert, Button, Card, Input, LoadingState } from '@/components/ui';
-import { Badge, ConfirmDialog, EmptyState, PageHeader, Textarea } from '@/components/pro-ui';
+import { Badge, ConfirmDialog, EmptyState, PageHeader, Textarea } from '@/components/kit';
 import { useAuth } from '@/lib/auth-context';
 import {
   findUserByPhone,

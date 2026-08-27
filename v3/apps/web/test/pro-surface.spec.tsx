@@ -6,7 +6,7 @@ import ProAvailabilityPage from '@/app/pro/availability/page';
 import ProBookingsPage from '@/app/pro/bookings/page';
 import { AuthProvider } from '@/lib/auth-context';
 import { ProProvider } from '@/lib/pro-context';
-import { ConfirmDialog, TextLink } from '@/components/pro-ui';
+import { ConfirmDialog, TextLink } from '@/components/kit';
 import { tokenStorage } from '@/lib/token-storage';
 
 jest.mock('next/navigation', () => ({

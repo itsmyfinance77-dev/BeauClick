@@ -1,9 +1,7 @@
 'use client';
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
-import { Badge } from './pro-ui';
+import { Badge, ContextBand, NavLink } from './kit';
 import { useProProfile } from '@/lib/pro-context';
 import type { MyProviderProfile } from '@/lib/pro-api';
 
@@ -11,17 +9,18 @@ import type { MyProviderProfile } from '@/lib/pro-api';
  * The professional context bar.
  *
  * The UI/UX audit's §4 finding was that V3 has "no visual distinction between
- * customer, business, and (absent) professional contexts". This surface adds
- * the third context, so it establishes the pattern rather than inheriting one:
- * a tinted band, directly under the app header, that names the mode, shows who
- * you are operating as, carries the mode's own navigation, and always offers
- * the way back out to the customer surfaces.
+ * customer, business, and (absent) professional contexts". Task 1 added the
+ * third context here and established the pattern: a tinted band, directly under
+ * the app header, that names the mode, shows who you are operating as, carries
+ * the mode's own navigation, and always offers the way back out.
  *
- * It deliberately sits INSIDE the existing `AppShell` rather than replacing
- * it. A separate chrome would mean a second header, a second nav, a second
- * skip-link target and a second place for the notification badge to drift out
- * of sync — a second design system by accretion, which §4 of this task's brief
- * explicitly forbids.
+ * Phase A then copied that pattern into `AdminShell`. Phase G moved the
+ * pattern itself into `ContextBand` in the kit, so this file is now the
+ * professional context's CONTENT and nothing else -- which is what it always
+ * should have been. The band still sits INSIDE the existing `AppShell` rather
+ * than replacing it: a separate chrome would mean a second header, a second
+ * nav, a second skip-link target and a second place for the notification badge
+ * to drift out of sync.
  */
 
 const PRO_NAV: { href: string; label: string }[] = [
@@ -53,107 +52,39 @@ const VERIFICATION_TONE = {
 } as const;
 
 /**
- * The verification badge is honest about a real product gap rather than
- * decorative. No route anywhere in V3 moves a professional past `unverified`
- * — `ProviderService.transitionVerification()` exists, is tested, and has no
- * caller outside a spec file — so every professional sees "تأیید نشده"
- * permanently. Showing the true status is correct; implying the user can do
- * something about it would not be, so the badge carries no call to action.
+ * The professional's real verification status.
+ *
+ * When Task 1 wrote this, no route anywhere in V3 moved a professional past
+ * `unverified`, so the badge deliberately carried no call to action -- showing
+ * a true status is correct, implying the user can act on one they cannot is
+ * not. Phase A closed that gap (`R31-02`): `/pro/profile` now offers a real
+ * submission and this badge tracks a status that actually moves.
  */
 export function VerificationBadge({ status }: { status: MyProviderProfile['verificationStatus'] }) {
   return <Badge tone={VERIFICATION_TONE[status]}>{VERIFICATION_LABELS[status]}</Badge>;
 }
 
-function ProNavLink({ href, label }: { href: string; label: string }) {
-  const pathname = usePathname();
-  // Exact match: '/pro' would otherwise prefix-match every child route and
-  // mark two links current at once.
-  const isCurrent = pathname === href;
-  return (
-    <Link
-      href={href}
-      aria-current={isCurrent ? 'page' : undefined}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        minHeight: 44,
-        padding: '0 2px',
-        fontSize: 14,
-        fontWeight: isCurrent ? 800 : 600,
-        color: isCurrent ? 'var(--bc-color-primary)' : 'var(--bc-color-ink)',
-        // Weight AND colour, never colour alone -- the same reasoning the
-        // customer nav's own aria-current fix used in v3.0.1.
-        borderBlockEnd: isCurrent ? '2px solid var(--bc-color-primary)' : '2px solid transparent',
-      }}
-    >
-      {label}
-    </Link>
-  );
-}
-
 export function ProShell({ children }: { children: ReactNode }) {
   const { profile, state } = useProProfile();
+  const ready = state === 'ready' && profile;
 
   return (
     <div>
-      <div
-        style={{
-          background: 'var(--bc-color-primary-soft)',
-          border: '1px solid var(--bc-color-line)',
-          borderRadius: 'var(--bc-radius-card)',
-          padding: 'clamp(12px, 2vw, 16px)',
-          marginBlockEnd: 20,
-        }}
+      <ContextBand
+        tone="primary"
+        modeLabel="حالت متخصص"
+        identity={ready ? profile.displayName : undefined}
+        status={ready ? <VerificationBadge status={profile.verificationStatus} /> : undefined}
+        exitHref="/"
+        exitLabel="بازگشت به نمای مشتری"
+        navLabel="ناوبری متخصص"
       >
-        <div
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 'var(--bc-spacing-chip-gap)',
-            marginBlockEnd: 8,
-          }}
-        >
-          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, minWidth: 0 }}>
-            <Badge tone="primary">حالت متخصص</Badge>
-            {state === 'ready' && profile ? (
-              <>
-                <span style={{ fontSize: 14, fontWeight: 700 }}>{profile.displayName}</span>
-                <VerificationBadge status={profile.verificationStatus} />
-              </>
-            ) : null}
-          </div>
-          <Link
-            href="/"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              minHeight: 44,
-              fontSize: 13,
-              fontWeight: 600,
-              color: 'var(--bc-color-ink-soft)',
-            }}
-          >
-            بازگشت به نمای مشتری
-          </Link>
-        </div>
-
-        <nav
-          aria-label="ناوبری متخصص"
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 'var(--bc-spacing-chip-gap)',
-            rowGap: 0,
-            minWidth: 0,
-          }}
-        >
-          {PRO_NAV.map((item) => (
-            <ProNavLink key={item.href} href={item.href} label={item.label} />
-          ))}
-        </nav>
-      </div>
+        {PRO_NAV.map((item) => (
+          <NavLink key={item.href} href={item.href} underline>
+            {item.label}
+          </NavLink>
+        ))}
+      </ContextBand>
 
       {children}
     </div>

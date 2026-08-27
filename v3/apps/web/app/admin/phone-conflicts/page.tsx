@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { formatZonedDateTime, toPersianDigits } from '@beauclick/persian-utils';
 import { Alert, Button, Card, ErrorState, LoadingState } from '@/components/ui';
-import { Badge, ConfirmDialog, EmptyState, PageHeader, Textarea } from '@/components/pro-ui';
+import { Badge, ConfirmDialog, EmptyState, PageHeader, Textarea } from '@/components/kit';
 import { useAuth } from '@/lib/auth-context';
 import { phoneConflicts, resolvePhoneConflict, type PhoneConflict } from '@/lib/admin-api';
 

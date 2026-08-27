@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { formatToman, toPersianDigits } from '@beauclick/persian-utils';
 import { Alert, Button, Card, Input, LoadingState } from '@/components/ui';
-import { ConfirmDialog, EmptyState, PageHeader, Select, Textarea } from '@/components/pro-ui';
+import { ConfirmDialog, EmptyState, PageHeader, Select, StatCard, StatGrid, Textarea } from '@/components/kit';
 import { useAuth } from '@/lib/auth-context';
 import {
   createSettlement,
@@ -155,26 +155,12 @@ export default function AdminSettlementsPage() {
       {loading && !loaded ? (
         <LoadingState label="در حال بارگذاری…" />
       ) : totals ? (
-        <div
-          style={{
-            display: 'grid',
-            gap: 'var(--bc-spacing-card-gap)',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-            marginBlockEnd: 20,
-          }}
-        >
-          <Card>
-            <p style={{ margin: 0, fontSize: 13, color: 'var(--bc-color-ink-soft)' }}>کارمزد پلتفرم</p>
-            <p style={{ margin: '6px 0 0', fontSize: 20, fontWeight: 800 }}>{formatToman(totals.commissionToman)}</p>
-          </Card>
-          <Card>
-            <p style={{ margin: 0, fontSize: 13, color: 'var(--bc-color-ink-soft)' }}>سهم فروشندگان</p>
-            <p style={{ margin: '6px 0 0', fontSize: 20, fontWeight: 800 }}>{formatToman(totals.receivableToman)}</p>
-          </Card>
-          <Card>
-            <p style={{ margin: 0, fontSize: 13, color: 'var(--bc-color-ink-soft)' }}>سفارش‌های پرداخت‌شده</p>
-            <p style={{ margin: '6px 0 0', fontSize: 20, fontWeight: 800 }}>{toPersianDigits(totals.orderCount)}</p>
-          </Card>
+        <div style={{ marginBlockEnd: 20 }}>
+          <StatGrid>
+            <StatCard label="کارمزد پلتفرم" value={formatToman(totals.commissionToman)} />
+            <StatCard label="سهم فروشندگان" value={formatToman(totals.receivableToman)} />
+            <StatCard label="سفارش‌های پرداخت‌شده" value={toPersianDigits(totals.orderCount)} />
+          </StatGrid>
         </div>
       ) : null}
 

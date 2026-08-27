@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { formatToman, toPersianDigits, zonedIsoDate } from '@beauclick/persian-utils';
 import { Card, ErrorState, LoadingState } from '@/components/ui';
-import { EmptyState, PageHeader, Select } from '@/components/pro-ui';
+import { EmptyState, PageHeader, Select, StatCard, StatGrid } from '@/components/kit';
 import { ProGuard } from '@/components/pro-guard';
 import { useAuth } from '@/lib/auth-context';
 import {
@@ -57,6 +57,7 @@ function Analytics() {
   const [metrics, setMetrics] = useState<ProviderMetrics | null>(null);
   const [series, setSeries] = useState<SeriesResponse | null>(null);
   const [event, setEvent] = useState<SeriesEvent>('BookingCompleted');
+  const [days, setDays] = useState<RangeDays>(30);
   const [loading, setLoading] = useState(true);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -64,13 +65,13 @@ function Analytics() {
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
-    // Thirty platform-local days. `zonedIsoDate` rather than
+    // Platform-local days. `zonedIsoDate` rather than
     // `toISOString().slice(0,10)`: the analytics range is a PLATFORM day
     // boundary (`analytics/platform-day.ts` uses Asia/Tehran), so a browser
     // west of Iran computing "today" in its own zone would silently ask for
     // the wrong window.
     const to = zonedIsoDate(new Date());
-    const from = zonedIsoDate(new Date(Date.now() - 30 * 86_400_000));
+    const from = zonedIsoDate(new Date(Date.now() - days * 86_400_000));
     try {
       const [metricsRes, seriesRes] = await Promise.all([
         myMetrics(api, { from, to }),
@@ -84,7 +85,7 @@ function Analytics() {
     } finally {
       setLoading(false);
     }
-  }, [api, event]);
+  }, [api, event, days]);
 
   useEffect(() => {
     void load();
@@ -97,73 +98,77 @@ function Analytics() {
   const totalActivity = funnel
     ? funnel.created.value + funnel.completed.value + funnel.cancelled.value + funnel.profileViews.value
     : 0;
+  // `loaded` is load-succeeded, not merely load-attempted, so this can never be
+  // true because a request failed -- that path returned above.
+  const isEmpty = loaded && totalActivity === 0;
   const maxPoint = series?.points.reduce((max, p) => Math.max(max, p.count), 0) ?? 0;
 
   return (
     <>
-      <PageHeader title="آمار" subtitle="عملکرد ۳۰ روز گذشته شما." />
+      <PageHeader
+        title="آمار"
+        subtitle={`عملکرد ${toPersianDigits(days)} روز گذشته شما.`}
+        action={
+          <RangePicker
+            value={days}
+            onChange={setDays}
+            // The whole screen re-requests on change, so blocking the control
+            // while that is in flight stops a second range landing on top of a
+            // first one still on the wire.
+            disabled={loading}
+          />
+        }
+      />
 
       {/* An honest empty state: the server ANSWERED and every counter is zero.
           That is a real fact about a new professional, not a failure, and it
-          is deliberately not dressed up with placeholder numbers. */}
-      {loaded && totalActivity === 0 ? (
+          is deliberately not dressed up with placeholder numbers.
+
+          It is EXCLUSIVE with the figures below, which it previously was not:
+          the message "there is no activity to show" rendered directly above a
+          grid of cards showing activity, all of them zero. Saying nothing and
+          then showing something is a contradiction whichever half the reader
+          believes. */}
+      {isEmpty ? (
         <EmptyState message="هنوز فعالیتی برای نمایش نیست. با ثبت زمان‌های آزاد و دریافت اولین رزرو، آمار شما اینجا ظاهر می‌شود." />
-      ) : null}
-
-      {funnel ? (
-        <div
-          style={{
-            display: 'grid',
-            gap: 'var(--bc-spacing-card-gap)',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-            marginBlockEnd: 20,
-          }}
-        >
-          {Object.entries(FUNNEL_LABELS).map(([key, label]) => {
-            const metric = funnel[key as keyof typeof funnel];
-            if (!metric) return null;
-            return (
-              <Card key={key}>
-                <p style={{ margin: 0, fontSize: 13, color: 'var(--bc-color-ink-soft)' }}>{label}</p>
-                <p style={{ margin: '6px 0 0', fontSize: 22, fontWeight: 800 }}>
-                  {toPersianDigits(metric.value)}
-                </p>
-              </Card>
-            );
-          })}
-          <Card>
-            <p style={{ margin: 0, fontSize: 13, color: 'var(--bc-color-ink-soft)' }}>نرخ انجام</p>
-            <p style={{ margin: '6px 0 0', fontSize: 22, fontWeight: 800 }}>
-              {toPersianDigits(Math.round(funnel.completionRate.value * 100))}٪
-            </p>
-          </Card>
-        </div>
-      ) : null}
-
-      {metrics && Object.keys(metrics.revenue ?? {}).length > 0 ? (
+      ) : (
         <>
-          <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 12px' }}>درآمد</h2>
-          <div
-            style={{
-              display: 'grid',
-              gap: 'var(--bc-spacing-card-gap)',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-              marginBlockEnd: 20,
-            }}
-          >
-            {Object.entries(metrics.revenue).map(([key, metric]) => (
-              <Card key={key}>
-                <p style={{ margin: 0, fontSize: 13, color: 'var(--bc-color-ink-soft)' }}>{revenueLabel(key)}</p>
-                <p style={{ margin: '6px 0 0', fontSize: 20, fontWeight: 800 }}>
-                  {key.toLowerCase().includes('toman') || metric.key.includes('toman')
-                    ? formatToman(metric.value)
-                    : toPersianDigits(metric.value)}
-                </p>
-              </Card>
-            ))}
-          </div>
+          {funnel ? (
+            <div style={{ marginBlockEnd: 20 }}>
+              <StatGrid min={150}>
+                {Object.entries(FUNNEL_LABELS).map(([key, label]) => {
+                  const metric = funnel[key as keyof typeof funnel];
+                  if (!metric) return null;
+                  return <StatCard key={key} label={label} value={toPersianDigits(metric.value)} />;
+                })}
+                <StatCard
+                  label="نرخ انجام"
+                  value={`${toPersianDigits(Math.round(funnel.completionRate.value * 100))}٪`}
+                />
+              </StatGrid>
+            </div>
+          ) : null}
+
+          {metrics && Object.keys(metrics.revenue ?? {}).length > 0 ? (
+            <div style={{ marginBlockEnd: 20 }}>
+              <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 12px' }}>درآمد</h2>
+              <StatGrid>
+                {Object.entries(metrics.revenue).map(([key, metric]) => (
+                  <StatCard
+                    key={key}
+                    label={revenueLabel(key)}
+                    value={
+                      key.toLowerCase().includes('toman') || metric.key.includes('toman')
+                        ? formatToman(metric.value)
+                        : toPersianDigits(metric.value)
+                    }
+                  />
+                ))}
+              </StatGrid>
+            </div>
+          ) : null}
         </>
-      ) : null}
+      )}
 
       <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 12px' }}>روند روزانه</h2>
       <Card>
@@ -211,6 +216,74 @@ function Analytics() {
         )}
       </Card>
     </>
+  );
+}
+
+/**
+ * The reporting window, in platform-local days.
+ *
+ * The screen was previously hard-wired to 30 and offered no way to ask a
+ * different question, even though `/v1/me/analytics` and its `/series` sibling
+ * have both accepted `from`/`to` since Phase 3. Three fixed windows rather than
+ * two date fields: a professional wants "this week" or "this quarter", not a
+ * date-arithmetic exercise, and fixed options cannot produce an inverted or
+ * absurdly wide range for the server to reject.
+ */
+const RANGE_OPTIONS = [
+  { days: 7, label: '۷ روز' },
+  { days: 30, label: '۳۰ روز' },
+  { days: 90, label: '۹۰ روز' },
+] as const;
+
+type RangeDays = (typeof RANGE_OPTIONS)[number]['days'];
+
+function RangePicker({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: RangeDays;
+  onChange: (days: RangeDays) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label="بازه زمانی"
+      style={{ display: 'flex', gap: 'var(--bc-spacing-chip-gap)', flexWrap: 'wrap' }}
+    >
+      {RANGE_OPTIONS.map((option) => {
+        const isCurrent = option.days === value;
+        return (
+          <button
+            key={option.days}
+            type="button"
+            // `aria-pressed` rather than `aria-selected`: these are toggle
+            // buttons in a group, not tabs in a tablist, and claiming the
+            // wrong role would promise keyboard behaviour (arrow-key
+            // traversal) that is not implemented here.
+            aria-pressed={isCurrent}
+            disabled={disabled}
+            onClick={() => onChange(option.days)}
+            style={{
+              font: 'inherit',
+              fontSize: 13,
+              fontWeight: isCurrent ? 800 : 600,
+              minHeight: 44,
+              padding: '0 14px',
+              borderRadius: 999,
+              cursor: disabled ? 'not-allowed' : 'pointer',
+              opacity: disabled ? 0.6 : 1,
+              border: `1px solid ${isCurrent ? 'var(--bc-color-primary)' : 'var(--bc-color-line)'}`,
+              background: isCurrent ? 'var(--bc-color-primary-soft)' : 'transparent',
+              color: isCurrent ? 'var(--bc-color-primary)' : 'var(--bc-color-ink)',
+            }}
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 

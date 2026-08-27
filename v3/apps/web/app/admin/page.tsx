@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { formatToman, toPersianDigits, zonedIsoDate } from '@beauclick/persian-utils';
-import { Card, ErrorState, LoadingState } from '@/components/ui';
-import { Badge, PageHeader, TextLink } from '@/components/pro-ui';
+import { ErrorState, LoadingState } from '@/components/ui';
+import { Badge, PageHeader, StatCard, StatGrid, TextLink } from '@/components/kit';
 import { useAuth } from '@/lib/auth-context';
 import {
   notificationStatus,
@@ -93,71 +93,43 @@ export default function AdminOverviewPage() {
         <LoadingState label="در حال بارگذاری…" />
       ) : (
         <>
-          <div
-            style={{
-              display: 'grid',
-              gap: 'var(--bc-spacing-card-gap)',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
-            }}
-          >
+          <StatGrid min={190}>
+            {/* `null` means the request FAILED -- not zero. Showing a confident
+                "۰" for a queue we could not read would tell an operator there
+                is no work when there may be plenty. */}
             {queues.map((queue) => (
-              <Card key={queue.href}>
-                <p style={{ margin: 0, fontSize: 13, color: 'var(--bc-color-ink-soft)' }}>{queue.label}</p>
-                <p style={{ margin: '6px 0 0', fontSize: 24, fontWeight: 800 }}>
-                  {/* `null` means the request FAILED -- not zero. Showing a
-                      confident "۰" for a queue we could not read would tell an
-                      operator there is no work when there may be plenty. */}
-                  {queue.count === null ? '—' : toPersianDigits(queue.count)}
-                </p>
-                <div style={{ marginBlockStart: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  {queue.count === null ? (
-                    <Badge tone="neutral">خوانده نشد</Badge>
-                  ) : queue.count > queue.urgentAbove ? (
-                    <Badge tone="warning">نیازمند بررسی</Badge>
-                  ) : (
-                    <Badge tone="success">بدون مورد</Badge>
-                  )}
-                  <TextLink href={queue.href}>مشاهده</TextLink>
-                </div>
-              </Card>
+              <StatCard
+                key={queue.href}
+                label={queue.label}
+                value={queue.count === null ? '—' : toPersianDigits(queue.count)}
+                footer={
+                  <>
+                    {queue.count === null ? (
+                      <Badge tone="neutral">خوانده نشد</Badge>
+                    ) : queue.count > queue.urgentAbove ? (
+                      <Badge tone="warning">نیازمند بررسی</Badge>
+                    ) : (
+                      <Badge tone="success">بدون مورد</Badge>
+                    )}
+                    <TextLink href={queue.href}>مشاهده</TextLink>
+                  </>
+                }
+              />
             ))}
-          </div>
+          </StatGrid>
 
           {metrics ? (
             <div style={{ marginBlockStart: 24 }}>
               <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 12px' }}>پلتفرم در ۳۰ روز گذشته</h2>
-              <div
-                style={{
-                  display: 'grid',
-                  gap: 'var(--bc-spacing-card-gap)',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
-                }}
-              >
-                <Card>
-                  <p style={{ margin: 0, fontSize: 13, color: 'var(--bc-color-ink-soft)' }}>رزروهای ثبت‌شده</p>
-                  <p style={{ margin: '6px 0 0', fontSize: 22, fontWeight: 800 }}>
-                    {toPersianDigits(metrics.bookings.created.value)}
-                  </p>
-                </Card>
-                <Card>
-                  <p style={{ margin: 0, fontSize: 13, color: 'var(--bc-color-ink-soft)' }}>نوبت‌های انجام‌شده</p>
-                  <p style={{ margin: '6px 0 0', fontSize: 22, fontWeight: 800 }}>
-                    {toPersianDigits(metrics.bookings.completed.value)}
-                  </p>
-                </Card>
-                <Card>
-                  <p style={{ margin: 0, fontSize: 13, color: 'var(--bc-color-ink-soft)' }}>فروش ناخالص</p>
-                  <p style={{ margin: '6px 0 0', fontSize: 20, fontWeight: 800 }}>
-                    {formatToman(metrics.commerce.grossToman.value)}
-                  </p>
-                </Card>
-                <Card>
-                  <p style={{ margin: 0, fontSize: 13, color: 'var(--bc-color-ink-soft)' }}>جست‌وجوی بدون نتیجه</p>
-                  <p style={{ margin: '6px 0 0', fontSize: 22, fontWeight: 800 }}>
-                    {toPersianDigits(Math.round(metrics.search.emptyResultRate.value * 100))}٪
-                  </p>
-                </Card>
-              </div>
+              <StatGrid min={170}>
+                <StatCard label="رزروهای ثبت‌شده" value={toPersianDigits(metrics.bookings.created.value)} />
+                <StatCard label="نوبت‌های انجام‌شده" value={toPersianDigits(metrics.bookings.completed.value)} />
+                <StatCard label="فروش ناخالص" value={formatToman(metrics.commerce.grossToman.value)} />
+                <StatCard
+                  label="جست‌وجوی بدون نتیجه"
+                  value={`${toPersianDigits(Math.round(metrics.search.emptyResultRate.value * 100))}٪`}
+                />
+              </StatGrid>
             </div>
           ) : null}
         </>

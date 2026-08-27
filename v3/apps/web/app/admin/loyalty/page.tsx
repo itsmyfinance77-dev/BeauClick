@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toPersianDigits } from '@beauclick/persian-utils';
 import { Alert, Card, ErrorState, LoadingState } from '@/components/ui';
-import { Badge, PageHeader } from '@/components/pro-ui';
+import { Badge, PageHeader } from '@/components/kit';
 import { useAuth } from '@/lib/auth-context';
 import { loyaltyPolicy, type LoyaltyPolicy } from '@/lib/admin-api';
 

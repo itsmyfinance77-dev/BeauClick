@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { toPersianDigits } from '@beauclick/persian-utils';
+import { NavLink } from './kit';
 import { useAuth } from '@/lib/auth-context';
 import { useUnread } from '@/lib/unread-context';
 import { ErrorBoundary } from './error-boundary';
@@ -18,53 +18,6 @@ import { ErrorBoundary } from './error-boundary';
  * at the token-defined breakpoint (see the clamp below). Mobile-first --
  * the base rules ARE the mobile rules.
  */
-/**
- * Header nav links get a real 44px touch target.
- *
- * They were 25px tall, which is comfortably tappable for a mouse and
- * genuinely awkward on a phone -- and below the 44px baseline this project's
- * own frontend foundation set for itself. Measured directly in a 375px
- * viewport during Phase 2 live QA rather than eyeballed.
- */
-const NAV_LINK_STYLE = {
-  fontSize: 14,
-  fontWeight: 600,
-  display: 'inline-flex',
-  alignItems: 'center',
-  minHeight: 44,
-  // Vertical padding only: horizontal padding here would push the nav wide
-  // enough to wrap at 375px.
-  padding: '0 2px',
-} as const;
-
-/**
- * One nav destination, marked as the current page when it is.
- *
- * The nav previously gave no indication of where the user was -- every link
- * rendered identically on every page. `aria-current="page"` is the part a
- * screen reader needs; the weight/colour change is the part everyone else
- * needs, since colour alone is not a distinction every reader can make.
- */
-function NavLink({ href, children, ...rest }: { href: string; children: ReactNode } & Record<string, unknown>) {
-  const pathname = usePathname();
-  // Exact match only: '/' would otherwise prefix-match every route.
-  const isCurrent = pathname === href;
-  return (
-    <Link
-      href={href}
-      aria-current={isCurrent ? 'page' : undefined}
-      style={{
-        ...NAV_LINK_STYLE,
-        fontWeight: isCurrent ? 800 : NAV_LINK_STYLE.fontWeight,
-        color: isCurrent ? 'var(--bc-color-primary)' : undefined,
-      }}
-      {...rest}
-    >
-      {children}
-    </Link>
-  );
-}
-
 export function AppShell({ children }: { children: ReactNode }) {
   const { status, user, logout } = useAuth();
   // Shared with the notification centre, so marking everything read updates

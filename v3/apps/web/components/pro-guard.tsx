@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { ErrorState, LoadingState } from './ui';
-import { EmptyState, TextLink } from './pro-ui';
+import { EmptyState, TextLink } from './kit';
 import { useProProfile } from '@/lib/pro-context';
 import type { MyProviderProfile } from '@/lib/pro-api';
 

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toPersianDigits, zonedIsoDate } from '@beauclick/persian-utils';
 import { Alert, Button, Card, ErrorState, LoadingState } from '@/components/ui';
-import { Badge, ConfirmDialog, PageHeader } from '@/components/pro-ui';
+import { Badge, ConfirmDialog, PageHeader, StatCard, StatGrid } from '@/components/kit';
 import { useAuth } from '@/lib/auth-context';
 import {
   platformMetrics,
@@ -128,47 +128,36 @@ export default function AdminSearchPage() {
           {search ? (
             <div style={{ marginBlockStart: 20 }}>
               <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 12px' }}>کیفیت نتایج</h2>
-              <div
-                style={{
-                  display: 'grid',
-                  gap: 'var(--bc-spacing-card-gap)',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
-                }}
-              >
-                <Card>
-                  <p style={{ margin: 0, fontSize: 13, color: 'var(--bc-color-ink-soft)' }}>جست‌وجوها</p>
-                  <p style={{ margin: '6px 0 0', fontSize: 22, fontWeight: 800 }}>
-                    {toPersianDigits(search.searches.value)}
-                  </p>
-                </Card>
-                <Card>
-                  <p style={{ margin: 0, fontSize: 13, color: 'var(--bc-color-ink-soft)' }}>بدون نتیجه</p>
-                  <p style={{ margin: '6px 0 0', fontSize: 22, fontWeight: 800 }}>
-                    {toPersianDigits(Math.round(search.emptyResultRate.value * 100))}٪
-                  </p>
-                  <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--bc-color-ink-faint)' }}>
-                    {toPersianDigits(search.emptyResultSearches.value)} از {toPersianDigits(search.searches.value)}
-                  </p>
-                </Card>
-                <Card>
-                  <p style={{ margin: 0, fontSize: 13, color: 'var(--bc-color-ink-soft)' }}>نرخ کلیک</p>
-                  <p style={{ margin: '6px 0 0', fontSize: 22, fontWeight: 800 }}>
-                    {toPersianDigits(Math.round(search.clickThroughRate.value * 100))}٪
-                  </p>
-                  <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--bc-color-ink-faint)' }}>
-                    {toPersianDigits(search.searchSourcedViews.value)} بازدید با منشأ جست‌وجو
-                  </p>
-                </Card>
-                <Card>
-                  <p style={{ margin: 0, fontSize: 13, color: 'var(--bc-color-ink-soft)' }}>حالت اضطراری</p>
-                  <p style={{ margin: '6px 0 0', fontSize: 22, fontWeight: 800 }}>
-                    {toPersianDigits(search.degradedSearches.value)}
-                  </p>
-                  <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--bc-color-ink-faint)' }}>
-                    نتایج سرو‌شده بدون موتور جست‌وجو
-                  </p>
-                </Card>
-              </div>
+              <StatGrid min={170}>
+                <StatCard label="جست‌وجوها" value={toPersianDigits(search.searches.value)} />
+                <StatCard
+                  label="بدون نتیجه"
+                  value={`${toPersianDigits(Math.round(search.emptyResultRate.value * 100))}٪`}
+                  footer={
+                    <span style={{ fontSize: 12, color: 'var(--bc-color-ink-faint)' }}>
+                      {toPersianDigits(search.emptyResultSearches.value)} از {toPersianDigits(search.searches.value)}
+                    </span>
+                  }
+                />
+                <StatCard
+                  label="نرخ کلیک"
+                  value={`${toPersianDigits(Math.round(search.clickThroughRate.value * 100))}٪`}
+                  footer={
+                    <span style={{ fontSize: 12, color: 'var(--bc-color-ink-faint)' }}>
+                      {toPersianDigits(search.searchSourcedViews.value)} بازدید با منشأ جست‌وجو
+                    </span>
+                  }
+                />
+                <StatCard
+                  label="حالت اضطراری"
+                  value={toPersianDigits(search.degradedSearches.value)}
+                  footer={
+                    <span style={{ fontSize: 12, color: 'var(--bc-color-ink-faint)' }}>
+                      نتایج سرو‌شده بدون موتور جست‌وجو
+                    </span>
+                  }
+                />
+              </StatGrid>
               {/* The server's own caveat, shown rather than dropped: numerator
                   and denominator are different event types, so one search
                   yielding three views produces a rate above 100%. */}

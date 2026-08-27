@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { formatToman, formatZonedFullDate, formatZonedTime, toPersianDigits } from '@beauclick/persian-utils';
 import { Card, ErrorState, LoadingState } from '@/components/ui';
-import { Badge, EmptyState, PageHeader, TextLink } from '@/components/pro-ui';
+import { Badge, EmptyState, PageHeader, StatCard, StatGrid, TextLink } from '@/components/kit';
 import { useProProfile } from '@/lib/pro-context';
 import { useAuth } from '@/lib/auth-context';
 import {
@@ -139,34 +139,15 @@ export default function ProOverviewPage() {
       ) : null}
 
       {loaded ? (
-        <div
-          style={{
-            display: 'grid',
-            gap: 'var(--bc-spacing-card-gap)',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-            marginBlockStart: remaining.length > 0 ? 20 : 0,
-          }}
-        >
-          <Card>
-            <p style={{ margin: 0, fontSize: 13, color: 'var(--bc-color-ink-soft)' }}>نوبت‌های ۲۴ ساعت آینده</p>
-            <p style={{ margin: '6px 0 0', fontSize: 22, fontWeight: 800 }}>{toPersianDigits(today.length)}</p>
-          </Card>
-          <Card>
-            <p style={{ margin: 0, fontSize: 13, color: 'var(--bc-color-ink-soft)' }}>زمان‌های آزاد</p>
-            <p style={{ margin: '6px 0 0', fontSize: 22, fontWeight: 800 }}>{toPersianDigits(openSlots.length)}</p>
-          </Card>
-          <Card>
-            <p style={{ margin: 0, fontSize: 13, color: 'var(--bc-color-ink-soft)' }}>خدمات</p>
-            <p style={{ margin: '6px 0 0', fontSize: 22, fontWeight: 800 }}>{toPersianDigits(services.length)}</p>
-          </Card>
-          {finance ? (
-            <Card>
-              <p style={{ margin: 0, fontSize: 13, color: 'var(--bc-color-ink-soft)' }}>خالص قابل دریافت</p>
-              <p style={{ margin: '6px 0 0', fontSize: 18, fontWeight: 800 }}>
-                {formatToman(finance.receivableNetToman)}
-              </p>
-            </Card>
-          ) : null}
+        <div style={{ marginBlockStart: remaining.length > 0 ? 20 : 0 }}>
+          <StatGrid min={160}>
+            <StatCard label="نوبت‌های ۲۴ ساعت آینده" value={toPersianDigits(today.length)} />
+            <StatCard label="زمان‌های آزاد" value={toPersianDigits(openSlots.length)} />
+            <StatCard label="خدمات" value={toPersianDigits(services.length)} />
+            {finance ? (
+              <StatCard label="خالص قابل دریافت" value={formatToman(finance.receivableNetToman)} />
+            ) : null}
+          </StatGrid>
         </div>
       ) : null}
 

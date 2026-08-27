@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { formatToman, formatZonedFullDate, toPersianDigits } from '@beauclick/persian-utils';
 import { Button, Card, ErrorState, LoadingState } from '@/components/ui';
-import { Badge, EmptyState, PageHeader } from '@/components/pro-ui';
+import { Badge, EmptyState, PageHeader, StatCard, StatGrid } from '@/components/kit';
 import { ProGuard } from '@/components/pro-guard';
 import { useAuth } from '@/lib/auth-context';
 import {
@@ -112,28 +112,12 @@ function Finance() {
       />
 
       {summary ? (
-        <div
-          style={{
-            display: 'grid',
-            gap: 'var(--bc-spacing-card-gap)',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-            marginBlockEnd: 20,
-          }}
-        >
-          <Card>
-            <p style={{ margin: 0, fontSize: 13, color: 'var(--bc-color-ink-soft)' }}>خالص قابل دریافت</p>
-            <p style={{ margin: '6px 0 0', fontSize: 20, fontWeight: 800 }}>
-              {formatToman(summary.receivableNetToman)}
-            </p>
-          </Card>
-          <Card>
-            <p style={{ margin: 0, fontSize: 13, color: 'var(--bc-color-ink-soft)' }}>تسویه‌شده</p>
-            <p style={{ margin: '6px 0 0', fontSize: 20, fontWeight: 800 }}>{formatToman(summary.settledToman)}</p>
-          </Card>
-          <Card>
-            <p style={{ margin: 0, fontSize: 13, color: 'var(--bc-color-ink-soft)' }}>در انتظار تسویه</p>
-            <p style={{ margin: '6px 0 0', fontSize: 20, fontWeight: 800 }}>{formatToman(summary.outstandingToman)}</p>
-          </Card>
+        <div style={{ marginBlockEnd: 20 }}>
+          <StatGrid>
+            <StatCard label="خالص قابل دریافت" value={formatToman(summary.receivableNetToman)} />
+            <StatCard label="تسویه‌شده" value={formatToman(summary.settledToman)} />
+            <StatCard label="در انتظار تسویه" value={formatToman(summary.outstandingToman)} />
+          </StatGrid>
         </div>
       ) : null}
 
