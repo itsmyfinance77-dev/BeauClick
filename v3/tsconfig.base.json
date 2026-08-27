@@ -22,6 +22,7 @@
     "paths": {
       "@beauclick/auth": ["libs/auth/src/index.ts"],
       "@beauclick/ownership": ["libs/ownership/src/index.ts"],
+      "@beauclick/audit": ["libs/audit/src/index.ts"],
       "@beauclick/http": ["libs/http/src/index.ts"],
       "@beauclick/testing": ["libs/testing/src/index.ts"],
       "@beauclick/persian-utils": ["packages/persian-utils/src/index.ts"],

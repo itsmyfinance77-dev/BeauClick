@@ -1,0 +1,11 @@
+{
+  "name": "audit",
+  "sourceRoot": "libs/audit/src",
+  "projectType": "library",
+  "tags": ["type:lib", "scope:shared"],
+  "targets": {
+    "typecheck": { "executor": "nx:run-commands", "options": { "command": "tsc -p libs/audit/tsconfig.json --noEmit" } },
+    "test": { "executor": "nx:run-commands", "options": { "command": "jest --config libs/audit/jest.config.js" } },
+    "lint": { "executor": "nx:run-commands", "options": { "command": "eslint libs/audit/src --resolve-plugins-relative-to ." } }
+  }
+}

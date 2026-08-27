@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // No `rootDir`, for the same reason `libs/events` and `libs/event-contracts`
+    // omit it: this library imports two sibling shared libs by path mapping
+    // (`@beauclick/events` for the correlation id, `@beauclick/auth` for the
+    // capability metadata key and the privileged-capability list). Pinning
+    // rootDir to src/ makes tsc reject those cross-project imports outright,
+    // even though the mapping resolves them correctly.
+    //
+    // Both are `scope:shared` -> `scope:shared`, which Nx's
+    // enforce-module-boundaries permits and lints on every run, so the real
+    // boundary check is not weakened by this.
+    "outDir": "../../dist/libs/audit"
+  },
+  "include": ["src/**/*.ts"]
+}

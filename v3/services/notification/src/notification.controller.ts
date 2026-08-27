@@ -2,6 +2,7 @@ import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patc
 import { Transform } from 'class-transformer';
 import { IsBoolean, IsObject, IsOptional } from 'class-validator';
 import { RequireCapability } from '@beauclick/auth';
+import { AdminAuditService, AuditAction } from '@beauclick/audit';
 import { AuthenticatedUser, CurrentUser, PageQueryDto } from '@beauclick/http';
 import { NotFoundOrNotYoursException } from '@beauclick/ownership';
 import { NotificationCategory, NotificationEntity } from './entities/notification.entities';
@@ -143,7 +144,10 @@ export class NotificationController {
 
 @Controller('v1/admin/notifications')
 export class NotificationAdminController {
-  constructor(private readonly notifications: NotificationService) {}
+  constructor(
+    private readonly notifications: NotificationService,
+    private readonly audit: AdminAuditService,
+  ) {}
 
   /**
    * Dead letters and channel truthfulness in one place.
@@ -178,9 +182,25 @@ export class NotificationAdminController {
   }
 
   @RequireCapability('bc_manage_platform')
+  @AuditAction('notification.retry_due_triggered', {
+    transactional: false,
+    because:
+      'retryDue() dispatches to external channels; a PostgreSQL transaction cannot span an SMS or email send, so the audit row records that an operator triggered the sweep and how many rows it touched, not a state the database could roll back.',
+  })
   @Post('retry-due')
   @HttpCode(HttpStatus.OK)
-  async retryDue() {
-    return this.notifications.retryDue();
+  async retryDue(@CurrentUser() user: AuthenticatedUser) {
+    const result = await this.notifications.retryDue();
+    await this.audit.recordDetached({
+      actorUserId: user.userId,
+      action: 'notification.retry_due_triggered',
+      targetType: 'notification_sweep',
+      targetId: null,
+      // The sweep's own real figures, so an operator can see what a trigger
+      // actually did rather than only that it happened.
+      after: { attempted: result.attempted, sent: result.sent, deadLettered: result.deadLettered },
+      reason: null,
+    });
+    return result;
   }
 }

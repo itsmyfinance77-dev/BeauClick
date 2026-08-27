@@ -3,6 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import helmet from 'helmet';
 import { ValidationException } from '@beauclick/http';
+import { assertPrivilegedMutationsAreAudited } from '@beauclick/audit';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -70,6 +71,19 @@ async function bootstrap() {
       exceptionFactory: (errors) => new ValidationException(errors),
     }),
   );
+
+  /**
+   * GAP-02-V3's structural half: a privileged mutation that declares no audit
+   * intent stops the process here, before it can serve a request.
+   *
+   * Placed after `init()` (which `listen()` performs, and which
+   * `app.init()` performs in the test factory) so every controller Nest will
+   * actually route to has been instantiated -- a check that runs before the
+   * modules are up would find nothing and pass vacuously, which is the failure
+   * mode this whole mechanism exists to avoid.
+   */
+  await app.init();
+  assertPrivilegedMutationsAreAudited(app);
 
   const port = process.env.PORT ? Number(process.env.PORT) : 3000;
   await app.listen(port);

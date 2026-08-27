@@ -3,6 +3,7 @@ import { Throttle } from '@nestjs/throttler';
 import { Public, policy } from '@beauclick/auth';
 import { AuthenticatedUser, CurrentUser } from '@beauclick/http';
 import { RequireCapability } from '@beauclick/auth';
+import { AdminAuditService, AuditAction } from '@beauclick/audit';
 import { AutocompleteDto, RecordProfileViewDto, SearchProvidersDto } from './dto/search.dto';
 import { SearchIndexerService } from './indexing/search-indexer.service';
 import { SearchService } from './search.service';
@@ -148,7 +149,10 @@ export class SearchController {
  */
 @Controller('v1/admin/search')
 export class SearchAdminController {
-  constructor(private readonly indexer: SearchIndexerService) {}
+  constructor(
+    private readonly indexer: SearchIndexerService,
+    private readonly audit: AdminAuditService,
+  ) {}
 
   @RequireCapability('bc_manage_platform')
   @Get('status')
@@ -161,19 +165,46 @@ export class SearchAdminController {
   }
 
   @RequireCapability('bc_manage_platform')
+  @AuditAction('search.reindex_triggered', {
+    transactional: false,
+    because:
+      'A reindex writes to OpenSearch. No PostgreSQL transaction can span an external index, so the record follows the operation rather than accompanying it.',
+  })
   @Post('reindex')
   @HttpCode(HttpStatus.OK)
-  async reindex() {
-    return this.indexer.fullReindex();
+  async reindex(@CurrentUser() user: AuthenticatedUser) {
+    const result = await this.indexer.fullReindex();
+    await this.audit.recordDetached({
+      actorUserId: user.userId,
+      action: 'search.reindex_triggered',
+      targetType: 'search_index',
+      targetId: 'provider_index',
+      after: { indexed: Number(result?.indexed ?? 0) },
+      reason: null,
+    });
+    return result;
   }
 
   /** The deeper recovery: rebuild the projection itself from provider-service. */
   @RequireCapability('bc_manage_platform')
+  @AuditAction('search.projection_rebuilt', {
+    transactional: false,
+    because:
+      'Rebuilds the projection AND reindexes OpenSearch -- the deeper of the two recovery actions, and the same external-system boundary as reindex.',
+  })
   @Post('rebuild-projection')
   @HttpCode(HttpStatus.OK)
-  async rebuildProjection() {
+  async rebuildProjection(@CurrentUser() user: AuthenticatedUser) {
     const rebuilt = await this.indexer.rebuildProjectionFromSource();
     const reindexed = await this.indexer.fullReindex();
+    await this.audit.recordDetached({
+      actorUserId: user.userId,
+      action: 'search.projection_rebuilt',
+      targetType: 'search_index',
+      targetId: 'provider_index',
+      after: { projectionRows: Number(rebuilt ?? 0), indexed: Number(reindexed?.indexed ?? 0) },
+      reason: null,
+    });
     return { projectionRows: rebuilt, ...reindexed };
   }
 }

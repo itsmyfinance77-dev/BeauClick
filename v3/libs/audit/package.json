@@ -1,0 +1,20 @@
+{
+  "name": "@beauclick/audit",
+  "version": "0.0.0",
+  "private": true,
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "dependencies": {
+    "@nestjs/common": "^10.4.4",
+    "@nestjs/core": "^10.4.4",
+    "@nestjs/typeorm": "^10.0.2",
+    "reflect-metadata": "^0.2.2",
+    "typeorm": "^0.3.20",
+    "uuidv7": "^1.0.2",
+    "@beauclick/events": "workspace:*",
+    "@beauclick/auth": "workspace:*"
+  },
+  "devDependencies": {
+    "@nestjs/testing": "^10.4.4"
+  }
+}

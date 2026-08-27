@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { AuthenticatedUser, CurrentUser } from '@beauclick/http';
 import { NotFoundOrNotYoursException } from '@beauclick/ownership';
 import { RequireCapability } from '@beauclick/auth';
+import { AdminAuditService, AuditAction } from '@beauclick/audit';
 
 import { MyFinanceService } from './my-finance.service';
 import { LedgerService } from './ledger.service';
@@ -88,6 +89,7 @@ export class FinancialAdminController {
   constructor(
     private readonly ledger: LedgerService,
     private readonly settlements: SettlementService,
+    private readonly audit: AdminAuditService,
   ) {}
 
   @RequireCapability('bc_manage_platform')
@@ -109,6 +111,11 @@ export class FinancialAdminController {
   }
 
   @RequireCapability('bc_manage_platform')
+  @AuditAction('financial.settlement_created', {
+    transactional: false,
+    because:
+      'financial is a physically separate DataSource connected as the append-only writer role (ADR-017), so a settlement and an admin.admin_audit_log row have no shared transaction to commit in. The AUTHORITATIVE record of this action is financial.settlement_batches itself, which is append-only at the database-role level and already carries the actor; the admin row is written afterwards so an operator has one place to look.',
+  })
   @Post('settlements')
   async createSettlement(@Body() dto: CreateSettlementDto, @CurrentUser() user: AuthenticatedUser) {
     const batch = await this.settlements.createSettlement({
@@ -120,10 +127,29 @@ export class FinancialAdminController {
       note: dto.note ?? null,
       actorId: user.userId,
     });
+    await this.audit.recordDetached({
+      actorUserId: user.userId,
+      action: 'financial.settlement_created',
+      targetType: 'settlement_batch',
+      targetId: batch.id,
+      after: {
+        partyType: dto.partyType,
+        partyId: dto.partyId,
+        amountToman: batch.amountToman,
+        orderCount: dto.orderIds.length,
+        method: dto.method ?? null,
+      },
+      reason: dto.note ?? null,
+    });
     return { id: batch.id, amountToman: batch.amountToman, createdAt: batch.createdAt.toISOString() };
   }
 
   @RequireCapability('bc_manage_platform')
+  @AuditAction('financial.settlement_reversed', {
+    transactional: false,
+    because:
+      'Same separate-DataSource boundary as settlement creation (ADR-017). financial.settlement_items records the reversal append-only with its actor and reason; the admin row follows.',
+  })
   @Post('settlements/:id/reverse')
   async reverseSettlement(
     @Param('id') id: string,
@@ -131,6 +157,14 @@ export class FinancialAdminController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     const reversal = await this.settlements.reverseSettlement(id, user.userId, dto.reason);
+    await this.audit.recordDetached({
+      actorUserId: user.userId,
+      action: 'financial.settlement_reversed',
+      targetType: 'settlement_batch',
+      targetId: id,
+      after: { reversalId: reversal.id, amountToman: reversal.amountToman },
+      reason: dto.reason,
+    });
     return { id: reversal.id, reversesSettlementId: reversal.reversesSettlementId, amountToman: reversal.amountToman };
   }
 }
