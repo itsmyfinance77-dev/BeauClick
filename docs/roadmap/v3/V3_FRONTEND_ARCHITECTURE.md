@@ -82,6 +82,70 @@ Carried forward as an existing design-system property, not re-derived — **flag
 
 Whether `apps/admin` is a fully separate Next.js application or a capability-gated route group within `apps/web` — both are workable; the decision depends on how separate the admin team's deploy cadence needs to be relative to the customer-facing app, which is a Phase 1-2 operational question, not an architectural one this blueprint needs to force now.
 
+
+---
+
+## 11. As-built addendum (V3.1 Phase G, 2026-08-27)
+
+This blueprint was written before any V3 frontend existed. Recording what was actually
+built, because two of its assumptions turned out differently and a reader should not have
+to reconstruct that from commits.
+
+### §4's `packages/ui` was never created
+
+The blueprint anticipated porting V2's design-system primitives near-verbatim into
+`packages/ui`. That did not happen and should not now. V3's primitives live in
+`apps/web/components/` — `ui.tsx` (Button, Input, Alert, Card, ErrorState, LoadingState)
+and `kit.tsx` (TextLink, NavLink, PageHeader, EmptyState, Badge, Select, Textarea,
+ConfirmDialog, ContextBand, SegmentedControl, StatGrid, StatCard) — and every one of them
+was **extracted from at least two real call sites** rather than ported ahead of a consumer.
+
+The rule that produced that set, and which the next phase should keep: extract when a
+pattern is used more than once, the behaviour is genuinely shared, and extraction reduces
+an inconsistency that already exists. Phase G's four extractions each replaced two to
+eight hand-written implementations **that had already drifted apart**; none was
+anticipatory.
+
+`packages/ui` becomes worth creating when a second application needs these components.
+One does not exist.
+
+### §10's open question is closed: a route group, not a second application
+
+Both `/pro` (V3.1 Task 1) and `/admin` (V3.1 Phase A) are capability-gated route groups
+inside `apps/web`. Reasons, in the order they mattered: one design system, one auth and
+refresh implementation, one deploy, and — decisively — **the real authorization is
+server-side on every request regardless of which bundle asked.** A separate application
+would have bought deploy independence at the cost of a second copy of everything above.
+
+`V3.1_PRODUCT_ROADMAP.md` §8 sets the revisit threshold at roughly fifteen admin screens.
+There are eight.
+
+### Two conventions the blueprint did not anticipate
+
+**Role context is a `ContextBand`.** A user can be a customer, a professional, and an
+operator in one session, and §6's RTL discipline says nothing about telling them which they
+are acting as. The convention is a tinted band under the app header carrying a mode badge,
+who you are operating as, context-specific status, the mode's own `<nav>` landmark, and a
+**required** exit — one component, one implementation, and the colour left to the caller
+because it carries meaning (a professional in the wrong context edits their own catalogue;
+an operator in the wrong context settles somebody else's money).
+
+**§7's Jalali handling has a timezone half the blueprint does not mention.** Every instant
+this platform stores is materialized from an `Asia/Tehran` wall clock, so *reading a `Date`
+in the ambient zone is always wrong* — in the browser and, as `R31-09` proved, in the API
+process too. `packages/persian-utils/src/zoned.ts` is the single implementation; `format.ts`
+delegates to it. Never `getHours()`, never a hardcoded `+03:30` (Iran abolished DST in 2022
+and that is reversible), and never a locally-constructed `Intl.DateTimeFormat` naming the
+zone inline — that last one had produced four independent copies of one rule.
+
+### Accessibility is asserted, not measured
+
+The 44px interaction baseline and every colour-contrast ratio are enforced by tests
+(`apps/web/test/kit.spec.tsx`, `packages/design-tokens/src/contrast.spec.ts`) rather than
+recorded from a one-off audit. §4's note that only `Modal` had real a11y coverage in V2 is
+the failure mode this replaces: coverage that lives in a document decays, coverage that
+lives in CI does not.
+
 ---
 
 ## Cross-references
