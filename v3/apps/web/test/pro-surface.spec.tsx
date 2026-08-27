@@ -47,6 +47,33 @@ function fail() {
   return Promise.reject(new TypeError('Failed to fetch'));
 }
 
+/** A paginated response, carrying the `meta.pagination.total` the real API sends. */
+function page(data: unknown, total: number) {
+  return Promise.resolve({
+    ok: true,
+    status: 200,
+    json: async () => ({ data, meta: { pagination: { page: 1, limit: 50, total } }, error: null }),
+  });
+}
+
+/** `count` bookings, all in the past and completed, so they land in one tab. */
+function bookings(count: number, offset = 0) {
+  return Array.from({ length: count }, (_, i) => ({
+    id: `b${offset + i}`,
+    customerId: '11111111-2222-3333-4444-555555555555',
+    professionalId: 'prof-1',
+    serviceId: 's1',
+    slotId: `slot-${offset + i}`,
+    startAt: new Date(Date.now() - (i + 1) * 86_400_000).toISOString(),
+    endAt: new Date(Date.now() - (i + 1) * 86_400_000 + 3_600_000).toISOString(),
+    status: 'completed' as const,
+    holdExpiresAt: null,
+    rescheduleCount: 0,
+    cancellationReason: null,
+    createdAt: new Date().toISOString(),
+  }));
+}
+
 /**
  * Routes every request the surface makes. `overrides` is consulted first, so a
  * test names only the endpoint it is actually about.
@@ -454,5 +481,152 @@ describe('UI primitives', () => {
       />,
     );
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase B — the completions Task 1's screens could not reach.
+// ---------------------------------------------------------------------------
+
+describe('bookings — pagination', () => {
+  it('offers more when the server says more exist, and says how many are held', async () => {
+    mockApi({ '/v1/me/professional-bookings': () => page(bookings(50), 120) });
+    renderPro(<ProBookingsPage />);
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'بارگذاری رزروهای بیشتر' })).toBeInTheDocument());
+    // The regression this exists for: the list used to ask for one page of 50
+    // and stop, so booking 51 was unreachable AND the list looked complete.
+    expect(screen.getByText(/۵۰ از ۱۲۰ رزرو بارگذاری شده است/)).toBeInTheDocument();
+  });
+
+  it('offers nothing more when everything is already held', async () => {
+    mockApi({ '/v1/me/professional-bookings': () => page(bookings(3), 3) });
+    renderPro(<ProBookingsPage />);
+
+    await waitFor(() => expect(screen.getByText(/گذشته/)).toBeInTheDocument());
+    expect(screen.queryByRole('button', { name: 'بارگذاری رزروهای بیشتر' })).not.toBeInTheDocument();
+  });
+
+  it('APPENDS the next page rather than replacing the current one', async () => {
+    let call = 0;
+    mockApi({
+      '/v1/me/professional-bookings': () => {
+        call += 1;
+        return page(call === 1 ? bookings(2) : bookings(2, 100), 4);
+      },
+    });
+    const user = userEvent.setup();
+    renderPro(<ProBookingsPage />);
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'بارگذاری رزروهای بیشتر' })).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'بارگذاری رزروهای بیشتر' }));
+
+    // Replacing rather than appending would empty the "upcoming" tab the moment
+    // a professional paged into their history, because the list is ordered
+    // slotStart DESC and the partition is computed from what is held.
+    await waitFor(() => expect(screen.getByText(/۴ از ۴ رزرو بارگذاری شده است|گذشته \(۴\)/)).toBeInTheDocument());
+  });
+
+  it('marks the tab counts as partial while pages remain unread', async () => {
+    mockApi({ '/v1/me/professional-bookings': () => page(bookings(2), 99) });
+    renderPro(<ProBookingsPage />);
+
+    // "+" rather than the server total: `total` counts EVERY booking, not the
+    // past half of them, so printing it on this tab would answer a different
+    // question than the tab asks.
+    await waitFor(() => expect(screen.getByRole('tab', { name: /گذشته \(۲\+\)/ })).toBeInTheDocument());
+  });
+});
+
+describe('availability — the visible window', () => {
+  it('lets the professional look further ahead than the default horizon', async () => {
+    mockApi();
+    const user = userEvent.setup();
+    renderPro(<ProAvailabilityPage />);
+
+    await waitFor(() => expect(screen.getByRole('group', { name: 'بازه نمایش' })).toBeInTheDocument());
+    const before = (global.fetch as jest.Mock).mock.calls.filter((c) =>
+      String(c[0]).includes('/v1/me/availability'),
+    ).length;
+
+    await user.click(screen.getByRole('button', { name: '۱۲۰ روز' }));
+
+    // The regression: the window was a hard-coded 60 days, so slots a bulk
+    // generation had created past day 60 were invisible and a professional
+    // could publish the same availability twice.
+    await waitFor(() => {
+      const after = (global.fetch as jest.Mock).mock.calls.filter((c) =>
+        String(c[0]).includes('/v1/me/availability'),
+      ).length;
+      expect(after).toBeGreaterThan(before);
+    });
+  });
+
+  it('names the window in the empty state rather than claiming you have no slots at all', async () => {
+    mockApi({ '/v1/me/availability': () => ok([]) });
+    renderPro(<ProAvailabilityPage />);
+
+    // "you have no free slots" and "you have no free slots in the next 60 days"
+    // are different facts, and only the second one was ever asked.
+    await waitFor(() => expect(screen.getByText(/در ۶۰ روز آینده زمان آزادی ثبت نکرده‌اید/)).toBeInTheDocument());
+  });
+});
+
+describe('services — saving', () => {
+  it('confirms a successful save rather than leaving the form silent', async () => {
+    mockApi({
+      '/services': (init) =>
+        init?.method === 'POST'
+          ? ok({ id: 's-new', professionalId: 'prof-1', name: 'کوتاهی مو', durationMinutes: 60, priceToman: 250000 })
+          : ok([]),
+    });
+    const user = userEvent.setup();
+    renderPro(<ProServicesPage />);
+
+    await waitFor(() => expect(screen.getByLabelText('نام خدمت')).toBeInTheDocument());
+    await user.type(screen.getByLabelText('نام خدمت'), 'کوتاهی مو');
+    await user.type(screen.getByLabelText('مدت (دقیقه)'), '60');
+    await user.type(screen.getByLabelText('قیمت (تومان)'), '250000');
+    await user.click(screen.getByRole('button', { name: 'افزودن خدمت' }));
+
+    await waitFor(() => expect(screen.getByText('خدمت جدید اضافه شد.')).toBeInTheDocument());
+  });
+
+  it('refuses to merge a response that is not a service', async () => {
+    // The real defect behind a React key warning that fired on every test run:
+    // `res.data as ServiceOffering` asserted rather than checked, so a wrongly
+    // shaped response was spliced into the list and rendered as a row with no
+    // `id`. Here the POST answers with the LIST shape, exactly as the old mock
+    // did by accident.
+    mockApi({ '/services': () => ok([]) });
+    const user = userEvent.setup();
+    renderPro(<ProServicesPage />);
+
+    await waitFor(() => expect(screen.getByLabelText('نام خدمت')).toBeInTheDocument());
+    await user.type(screen.getByLabelText('نام خدمت'), 'کوتاهی مو');
+    await user.type(screen.getByLabelText('مدت (دقیقه)'), '60');
+    await user.type(screen.getByLabelText('قیمت (تومان)'), '250000');
+    await user.click(screen.getByRole('button', { name: 'افزودن خدمت' }));
+
+    // It falls back to re-reading the list from the server, which answers with
+    // an empty catalogue -- so the empty state, never a phantom row.
+    await waitFor(() => expect(screen.getByText(/هنوز هیچ خدمتی ثبت نکرده‌اید/)).toBeInTheDocument());
+  });
+
+  it('keeps the typed values when the server refuses the save', async () => {
+    mockApi({ '/services': (init) => (init?.method === 'POST' ? fail() : ok([])) });
+    const user = userEvent.setup();
+    renderPro(<ProServicesPage />);
+
+    await waitFor(() => expect(screen.getByLabelText('نام خدمت')).toBeInTheDocument());
+    await user.type(screen.getByLabelText('نام خدمت'), 'کوتاهی مو');
+    await user.type(screen.getByLabelText('مدت (دقیقه)'), '45');
+    await user.click(screen.getByRole('button', { name: 'افزودن خدمت' }));
+
+    // Clearing a form on failure makes the user retype work the server never
+    // took, which is the opposite of helping.
+    await waitFor(() => expect(screen.getAllByRole('alert').length).toBeGreaterThan(0));
+    expect(screen.getByLabelText('نام خدمت')).toHaveValue('کوتاهی مو');
+    expect(screen.getByLabelText('مدت (دقیقه)')).toHaveValue('45');
   });
 });

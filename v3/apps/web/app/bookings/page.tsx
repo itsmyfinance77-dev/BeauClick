@@ -1,12 +1,12 @@
 'use client';
 
-import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { formatFullJalaliDate, toPersianDigits } from '@beauclick/persian-utils';
 
 import { useAuth } from '@/lib/auth-context';
 import { ProtectedRoute } from '@/components/protected-route';
 import { Alert, Button, Card, LoadingState } from '@/components/ui';
+import { ConfirmDialog, EmptyState, PageHeader, TextLink } from '@/components/kit';
 import { bookingApi, slotTimeLabel, type BookingSummary } from '@/lib/booking-api';
 
 const STATUS_FA: Record<BookingSummary['status'], { label: string; tone: string }> = {
@@ -31,6 +31,7 @@ function BookingsContent() {
   const [bookings, setBookings] = useState<BookingSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [pendingCancel, setPendingCancel] = useState<BookingSummary | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -50,8 +51,13 @@ function BookingsContent() {
     setError(null);
     try {
       await bookingApi.cancelBooking(api, bookingId, 'لغو توسط مشتری');
+      setPendingCancel(null);
       await load();
     } catch (err) {
+      // The dialog closes and the error surfaces on the page: leaving a modal
+      // open over an error the user cannot act on inside it is a trap. Same
+      // contract the professional surface's destructive actions use.
+      setPendingCancel(null);
       setError(err instanceof Error ? err.message : 'خطایی رخ داد.');
     } finally {
       setBusyId(null);
@@ -63,21 +69,29 @@ function BookingsContent() {
 
   if (bookings.length === 0) {
     return (
-      <Card>
-        <h1 style={{ fontSize: 22, marginBlockEnd: 8 }}>رزروهای من</h1>
-        <p style={{ color: 'var(--bc-color-ink-soft)' }}>هنوز رزروی ثبت نکرده‌اید.</p>
-        <div style={{ marginBlockStart: 16 }}>
-          <Link href="/providers" style={{ fontWeight: 600 }}>
-            مشاهده‌ی متخصص‌ها
-          </Link>
-        </div>
-      </Card>
+      <>
+        <PageHeader title="رزروهای من" />
+        {/* Was a bare `<Link style={{ fontWeight: 600 }}>` -- roughly 29px tall,
+            and the SIXTH recorded instance of the touch-target class the UI/UX
+            audit tracks as TOUCH-CLASS (25px nav, 43px logout, 21px homepage
+            CTA, 24px search result, 18px payment result). `TextLink` exists
+            precisely so the baseline is inherited instead of rediscovered;
+            this surface simply predates it.
+
+            The heading also dropped from `<h1>` at 22px to 24px via
+            `PageHeader`, so the empty and populated states no longer disagree
+            about the size of the same page's title. */}
+        <EmptyState
+          message="هنوز رزروی ثبت نکرده‌اید."
+          action={<TextLink href="/providers">مشاهده‌ی متخصص‌ها</TextLink>}
+        />
+      </>
     );
   }
 
   return (
     <section>
-      <h1 style={{ fontSize: 24, marginBlockEnd: 16 }}>رزروهای من</h1>
+      <PageHeader title="رزروهای من" />
       {error ? <Alert tone="error">{error}</Alert> : null}
 
       <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 'var(--bc-spacing-card-gap)' }}>
@@ -101,8 +115,21 @@ function BookingsContent() {
                 </div>
 
                 {cancellable ? (
-                  <div style={{ marginBlockStart: 16, maxWidth: 200 }}>
-                    <Button variant="ghost" loading={busyId === booking.id} onClick={() => void cancel(booking.id)}>
+                  <div style={{ marginBlockStart: 16 }}>
+                    {/* Was a single click straight to `cancel()`. Cancelling a
+                        booking is irreversible, releases the slot to whoever
+                        takes it next, and on a paid booking starts a refund --
+                        the most consequential action a customer can take in
+                        this product, and the only destructive one anywhere in
+                        it that had no confirmation. The professional surface
+                        confirms every one of its destructive actions through
+                        this same dialog. */}
+                    <Button
+                      variant="danger"
+                      inline
+                      disabled={busyId === booking.id}
+                      onClick={() => setPendingCancel(booking)}
+                    >
                       لغو رزرو
                     </Button>
                   </div>
@@ -112,6 +139,27 @@ function BookingsContent() {
           );
         })}
       </ul>
+
+      <ConfirmDialog
+        open={pendingCancel !== null}
+        title="لغو رزرو"
+        tone="danger"
+        confirmLabel="بله، لغو کن"
+        busy={busyId !== null}
+        onConfirm={() => pendingCancel && void cancel(pendingCancel.id)}
+        onCancel={() => setPendingCancel(null)}
+        body={
+          pendingCancel ? (
+            <>
+              <p style={{ margin: '0 0 8px' }}>
+                رزرو {formatFullJalaliDate(new Date(pendingCancel.startAt))} ساعت{' '}
+                {toPersianDigits(slotTimeLabel(pendingCancel.startAt))} لغو می‌شود.
+              </p>
+              <p style={{ margin: 0 }}>این زمان دوباره برای دیگران آزاد می‌شود و این عملیات برگشت‌پذیر نیست.</p>
+            </>
+          ) : null
+        }
+      />
     </section>
   );
 }

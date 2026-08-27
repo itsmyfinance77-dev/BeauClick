@@ -1,3 +1,5 @@
+import { zonedIsoDate, zonedIsoTime } from '@beauclick/persian-utils';
+
 import type { ApiClient } from './api-client';
 
 /**
@@ -128,12 +130,10 @@ export function groupSlotsByDay(slots: AvailableSlot[]): { dayKey: string; date:
 
   for (const slot of slots) {
     const at = new Date(slot.startAt);
-    const dayKey = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'Asia/Tehran',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(at);
+    // `zonedIsoDate` rather than a locally-built `Intl.DateTimeFormat` naming
+    // the zone inline -- the fourth copy of that conversion in this repo, and
+    // the second in this file. Same reasoning as `slotTimeLabel` below.
+    const dayKey = zonedIsoDate(at);
 
     const bucket = buckets.get(dayKey);
     if (bucket) bucket.slots.push(slot);
@@ -145,12 +145,18 @@ export function groupSlotsByDay(slots: AvailableSlot[]): { dayKey: string; date:
     .map(([dayKey, value]) => ({ dayKey, ...value }));
 }
 
-/** Tehran-local HH:mm for a slot, so a customer sees the time they will actually turn up at. */
+/**
+ * Platform-local HH:mm for a slot, so a customer sees the time they will
+ * actually turn up at.
+ *
+ * This was right about the CONCEPT and wrong about the implementation: it built
+ * its own `Intl.DateTimeFormat` with the zone name spelled out inline, which
+ * made it the third independent copy of the platform-timezone conversion in
+ * this repository (`zoned.ts`, booking-service's `platform-time.ts`, and this).
+ * Three copies is how two of them end up disagreeing after a change only one of
+ * them hears about -- and this one hardcoded the zone rather than reading
+ * `PLATFORM_TIMEZONE`, so it would not have heard.
+ */
 export function slotTimeLabel(iso: string): string {
-  return new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Asia/Tehran',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).format(new Date(iso));
+  return zonedIsoTime(new Date(iso));
 }
