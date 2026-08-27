@@ -34,6 +34,10 @@ function Services({ profile }: { profile: MyProviderProfile }) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  // "The server accepted this", stated rather than left to be inferred from the
+  // list below changing. On edit in particular the row can be far enough down
+  // the page to be off-screen, so the form gave no acknowledgement at all.
+  const [saved, setSaved] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<ServiceOffering | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -63,6 +67,7 @@ function Services({ profile }: { profile: MyProviderProfile }) {
       priceToman: String(service.priceToman),
     });
     setFormError(null);
+    setSaved(null);
   }
 
   function cancelEdit() {
@@ -75,6 +80,7 @@ function Services({ profile }: { profile: MyProviderProfile }) {
     event.preventDefault();
     setSaving(true);
     setFormError(null);
+    setSaved(null);
     try {
       // Digits are normalized before Number(): a professional typing on a
       // Persian keyboard produces '۶۰', which Number() turns into NaN and the
@@ -88,14 +94,22 @@ function Services({ profile }: { profile: MyProviderProfile }) {
 
       if (editingId) {
         const res = await updateService(api, profile.id, editingId, payload);
-        if (res.data) {
-          const updated = res.data;
-          setServices((current) => current.map((s) => (s.id === updated.id ? updated : s)));
-        }
+        const updated = asService(res.data);
+        if (updated) setServices((current) => current.map((s) => (s.id === updated.id ? updated : s)));
       } else {
         const res = await createService(api, profile.id, payload);
-        if (res.data) setServices((current) => [...current, res.data as ServiceOffering]);
+        const created = asService(res.data);
+        // Only merge a response that is actually a service. The previous
+        // `res.data as ServiceOffering` was an assertion, not a check, and a
+        // response of the wrong shape was spliced into the list unexamined --
+        // producing a row with no `id`, which React then rendered without a
+        // key. Same class as the two response-shape defects Task 1 recorded
+        // (`OutstandingOrder`, `SeriesResponse`): a hand-written type describes
+        // the server, it does not verify it.
+        if (created) setServices((current) => [...current, created]);
+        else await load();
       }
+      setSaved(editingId ? 'تغییرات خدمت ذخیره شد.' : 'خدمت جدید اضافه شد.');
       cancelEdit();
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'ذخیره خدمت انجام نشد.');
@@ -138,6 +152,7 @@ function Services({ profile }: { profile: MyProviderProfile }) {
         </h2>
         <form onSubmit={submit} noValidate>
           {formError ? <Alert>{formError}</Alert> : null}
+          {saved ? <Alert tone="success">{saved}</Alert> : null}
           <Input
             label="نام خدمت"
             value={form.name}
@@ -245,4 +260,19 @@ function Services({ profile }: { profile: MyProviderProfile }) {
  */
 function digitsOnly(value: string): string {
   return normalizeDigits(value).replace(/[^0-9]/g, '');
+}
+
+/**
+ * A runtime check that a response really is a service, rather than a cast that
+ * says so.
+ *
+ * Narrow on purpose: it asks only for the field this screen would break
+ * without. Validating every field would be a second copy of the DTO living in
+ * the browser, which is the duplication the API contract exists to avoid; the
+ * server remains the authority on what a valid service is.
+ */
+function asService(data: unknown): ServiceOffering | null {
+  if (!data || typeof data !== 'object') return null;
+  const id = (data as { id?: unknown }).id;
+  return typeof id === 'string' && id.length > 0 ? (data as ServiceOffering) : null;
 }

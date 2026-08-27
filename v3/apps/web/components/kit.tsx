@@ -563,6 +563,74 @@ export function ContextBand({
 }
 
 /**
+ * A row of mutually exclusive options, as buttons.
+ *
+ * Extracted when the analytics reporting window and the availability horizon
+ * both needed one and the second would otherwise have copied the first. It is
+ * NOT a tablist: `role="tablist"` promises arrow-key traversal between tabs and
+ * an associated tabpanel, and claiming a role whose keyboard contract is not
+ * implemented is worse for a screen-reader user than claiming no role at all.
+ * A labelled `group` of `aria-pressed` toggle buttons is what this actually is,
+ * and Tab-then-Enter is exactly how it behaves.
+ *
+ * `/pro/bookings` keeps its own real tablist. That one genuinely switches
+ * between two panels of content and is a different component with a different
+ * contract; merging them would mean one of the two lying about itself.
+ */
+export function SegmentedControl<T extends string | number>({
+  label,
+  value,
+  options,
+  onChange,
+  disabled,
+}: {
+  /** Accessible name for the group. Never omitted -- an unlabelled group of buttons is a puzzle. */
+  label: string;
+  value: T;
+  options: readonly { value: T; label: string }[];
+  onChange: (value: T) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label={label}
+      style={{ display: 'flex', gap: 'var(--bc-spacing-chip-gap)', flexWrap: 'wrap' }}
+    >
+      {options.map((option) => {
+        const isCurrent = option.value === value;
+        return (
+          <button
+            key={String(option.value)}
+            type="button"
+            aria-pressed={isCurrent}
+            disabled={disabled}
+            onClick={() => onChange(option.value)}
+            style={{
+              font: 'inherit',
+              fontSize: 13,
+              // Weight as well as colour, so the selection survives a reader
+              // who cannot make the colour distinction.
+              fontWeight: isCurrent ? 800 : 600,
+              minHeight: 44,
+              padding: '0 14px',
+              borderRadius: 999,
+              cursor: disabled ? 'not-allowed' : 'pointer',
+              opacity: disabled ? 0.6 : 1,
+              border: `1px solid ${isCurrent ? 'var(--bc-color-primary)' : 'var(--bc-color-line)'}`,
+              background: isCurrent ? 'var(--bc-color-primary-soft)' : 'transparent',
+              color: isCurrent ? 'var(--bc-color-primary)' : 'var(--bc-color-ink)',
+            }}
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
  * A responsive row of figures.
  *
  * Eight hand-written `repeat(auto-fit, minmax(N, 1fr))` grids existed across

@@ -12,7 +12,7 @@ import {
   zonedIsoDate,
 } from '@beauclick/persian-utils';
 import { Alert, Button, Card, ErrorState, Input, LoadingState } from '@/components/ui';
-import { Badge, ConfirmDialog, EmptyState, PageHeader, Select } from '@/components/kit';
+import { Badge, ConfirmDialog, EmptyState, PageHeader, SegmentedControl, Select } from '@/components/kit';
 import { ProGuard } from '@/components/pro-guard';
 import { useAuth } from '@/lib/auth-context';
 import {
@@ -45,6 +45,18 @@ const STATUS_TONE = {
 } as const;
 
 /**
+ * How far ahead the slot list looks. 60 is the default the screen has always
+ * used; the other two exist because bulk generation can reach past it.
+ */
+const HORIZON_OPTIONS = [
+  { value: 30, label: '۳۰ روز' },
+  { value: 60, label: '۶۰ روز' },
+  { value: 120, label: '۱۲۰ روز' },
+] as const;
+
+type HorizonDays = (typeof HORIZON_OPTIONS)[number]['value'];
+
+/**
  * Availability management.
  *
  * THE TIMEZONE RULE, stated once and applied everywhere below: this screen
@@ -70,6 +82,15 @@ function Availability({ profile }: { profile: MyProviderProfile }) {
   const [loading, setLoading] = useState(true);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // How far ahead the list looks, in platform-local days.
+  //
+  // The window was a hard-coded 60 days with no control and nothing saying so,
+  // which quietly broke the screen's own most-used feature: bulk generation
+  // happily accepts a 90-day range, and the slots past day 60 were then
+  // invisible here -- a professional could publish availability, see no trace
+  // of it, and publish it again.
+  const [horizon, setHorizon] = useState<HorizonDays>(60);
 
   const today = useMemo(() => zonedIsoDate(new Date()), []);
   const inThirtyDays = useMemo(() => zonedIsoDate(new Date(Date.now() + 30 * 86_400_000)), []);
@@ -105,7 +126,10 @@ function Availability({ profile }: { profile: MyProviderProfile }) {
       // A failure to load them is NOT a failure to load availability, so they
       // are tolerated independently rather than failing the whole screen.
       const [slotRes, serviceRes] = await Promise.all([
-        listMySlots(api, { from: new Date().toISOString(), to: new Date(Date.now() + 60 * 86_400_000).toISOString() }),
+        listMySlots(api, {
+          from: new Date().toISOString(),
+          to: new Date(Date.now() + horizon * 86_400_000).toISOString(),
+        }),
         listMyServices(api, profile.id).catch(() => ({ data: [] as ServiceOffering[] })),
       ]);
       setSlots(slotRes.data ?? []);
@@ -116,7 +140,7 @@ function Availability({ profile }: { profile: MyProviderProfile }) {
     } finally {
       setLoading(false);
     }
-  }, [api, profile.id]);
+  }, [api, profile.id, horizon]);
 
   useEffect(() => {
     void load();
@@ -317,11 +341,34 @@ function Availability({ profile }: { profile: MyProviderProfile }) {
       </div>
 
       <div style={{ marginBlockStart: 20 }}>
-        <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 12px' }}>زمان‌های ثبت‌شده</h2>
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 'var(--bc-spacing-chip-gap)',
+            marginBlockEnd: 12,
+          }}
+        >
+          <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>زمان‌های ثبت‌شده</h2>
+          <SegmentedControl
+            label="بازه نمایش"
+            value={horizon}
+            options={HORIZON_OPTIONS}
+            onChange={setHorizon}
+            disabled={loading}
+          />
+        </div>
         {loading && !loaded ? (
           <LoadingState label="در حال بارگذاری زمان‌های آزاد…" />
         ) : loaded && slots.length === 0 ? (
-          <EmptyState message="هنوز هیچ زمان آزادی ثبت نکرده‌اید. تا زمانی که زمان آزادی نداشته باشید، کسی نمی‌تواند شما را رزرو کند." />
+          // The message names the WINDOW, because "you have no slots" and "you
+          // have no slots in the next 30 days" are different facts and only the
+          // second one is what was actually asked.
+          <EmptyState
+            message={`در ${toPersianDigits(horizon)} روز آینده زمان آزادی ثبت نکرده‌اید. تا زمانی که زمان آزادی نداشته باشید، کسی نمی‌تواند شما را رزرو کند.`}
+          />
         ) : (
           <div style={{ display: 'grid', gap: 'var(--bc-spacing-card-gap)' }}>
             {grouped.map(([day, daySlots]) => (

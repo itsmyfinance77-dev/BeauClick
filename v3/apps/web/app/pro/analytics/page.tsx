@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { formatToman, toPersianDigits, zonedIsoDate } from '@beauclick/persian-utils';
 import { Card, ErrorState, LoadingState } from '@/components/ui';
-import { EmptyState, PageHeader, Select, StatCard, StatGrid } from '@/components/kit';
+import { EmptyState, PageHeader, SegmentedControl, Select, StatCard, StatGrid } from '@/components/kit';
 import { ProGuard } from '@/components/pro-guard';
 import { useAuth } from '@/lib/auth-context';
 import {
@@ -109,8 +109,10 @@ function Analytics() {
         title="آمار"
         subtitle={`عملکرد ${toPersianDigits(days)} روز گذشته شما.`}
         action={
-          <RangePicker
+          <SegmentedControl
+            label="بازه زمانی"
             value={days}
+            options={RANGE_OPTIONS}
             onChange={setDays}
             // The whole screen re-requests on change, so blocking the control
             // while that is in flight stops a second range landing on top of a
@@ -230,62 +232,12 @@ function Analytics() {
  * absurdly wide range for the server to reject.
  */
 const RANGE_OPTIONS = [
-  { days: 7, label: '۷ روز' },
-  { days: 30, label: '۳۰ روز' },
-  { days: 90, label: '۹۰ روز' },
+  { value: 7, label: '۷ روز' },
+  { value: 30, label: '۳۰ روز' },
+  { value: 90, label: '۹۰ روز' },
 ] as const;
 
-type RangeDays = (typeof RANGE_OPTIONS)[number]['days'];
-
-function RangePicker({
-  value,
-  onChange,
-  disabled,
-}: {
-  value: RangeDays;
-  onChange: (days: RangeDays) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <div
-      role="group"
-      aria-label="بازه زمانی"
-      style={{ display: 'flex', gap: 'var(--bc-spacing-chip-gap)', flexWrap: 'wrap' }}
-    >
-      {RANGE_OPTIONS.map((option) => {
-        const isCurrent = option.days === value;
-        return (
-          <button
-            key={option.days}
-            type="button"
-            // `aria-pressed` rather than `aria-selected`: these are toggle
-            // buttons in a group, not tabs in a tablist, and claiming the
-            // wrong role would promise keyboard behaviour (arrow-key
-            // traversal) that is not implemented here.
-            aria-pressed={isCurrent}
-            disabled={disabled}
-            onClick={() => onChange(option.days)}
-            style={{
-              font: 'inherit',
-              fontSize: 13,
-              fontWeight: isCurrent ? 800 : 600,
-              minHeight: 44,
-              padding: '0 14px',
-              borderRadius: 999,
-              cursor: disabled ? 'not-allowed' : 'pointer',
-              opacity: disabled ? 0.6 : 1,
-              border: `1px solid ${isCurrent ? 'var(--bc-color-primary)' : 'var(--bc-color-line)'}`,
-              background: isCurrent ? 'var(--bc-color-primary-soft)' : 'transparent',
-              color: isCurrent ? 'var(--bc-color-primary)' : 'var(--bc-color-ink)',
-            }}
-          >
-            {option.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
+type RangeDays = (typeof RANGE_OPTIONS)[number]['value'];
 
 const REVENUE_LABELS: Record<string, string> = {
   grossToman: 'فروش ناخالص',

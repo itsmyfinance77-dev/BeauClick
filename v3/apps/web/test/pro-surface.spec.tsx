@@ -51,10 +51,14 @@ function fail() {
  * Routes every request the surface makes. `overrides` is consulted first, so a
  * test names only the endpoint it is actually about.
  */
-function mockApi(overrides: Record<string, () => Promise<unknown>> = {}) {
-  (global.fetch as jest.Mock).mockImplementation((url: string) => {
+function mockApi(overrides: Record<string, (init?: RequestInit) => Promise<unknown>> = {}) {
+  (global.fetch as jest.Mock).mockImplementation((url: string, init?: RequestInit) => {
     for (const [fragment, handler] of Object.entries(overrides)) {
-      if (url.includes(fragment)) return handler();
+      // `init` is passed through so a handler can answer a GET and its POST
+      // differently -- the same path frequently has two response SHAPES (a
+      // list and a created entity), and answering both with one of them makes
+      // the mock disagree with the API it stands in for.
+      if (url.includes(fragment)) return handler(init);
     }
     if (url.includes('/v1/auth/refresh')) return ok({ accessToken: 'a', csrfToken: 'c' });
     if (/\/v1\/me(\?|$)/.test(url)) {
@@ -185,7 +189,18 @@ describe('services', () => {
   });
 
   it('sends ASCII numbers even when the professional types Persian digits', async () => {
-    mockApi({ '/services': () => ok([]) });
+    // The GET answers with an empty catalogue and the POST answers with the
+    // created service, because those are two different shapes and the mock
+    // previously returned the LIST shape for both. The screen then merged an
+    // array into its own service list, producing a row with no `id` -- a real
+    // React key warning on every run of this suite, caused by the fixture
+    // rather than by the product.
+    mockApi({
+      '/services': (init) =>
+        init?.method === 'POST'
+          ? ok({ id: 's-new', professionalId: 'prof-1', name: 'کوتاهی مو', durationMinutes: 60, priceToman: 250000 })
+          : ok([]),
+    });
     const user = userEvent.setup();
     renderPro(<ProServicesPage />);
 

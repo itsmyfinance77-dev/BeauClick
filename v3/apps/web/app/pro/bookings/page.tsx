@@ -52,6 +52,9 @@ const STATUS_TONE = {
 const MAX_RESCHEDULES = 2;
 const RESCHEDULE_MIN_HOURS = 6;
 
+/** `PageQueryDto` caps `limit` at 100; 50 keeps a comfortable margin under it. */
+const PAGE_SIZE = 50;
+
 type Tab = 'upcoming' | 'past';
 
 function ProBookings({ profile }: { profile: MyProviderProfile }) {
@@ -63,6 +66,18 @@ function ProBookings({ profile }: { profile: MyProviderProfile }) {
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('upcoming');
+
+  // How many pages are currently held, and how many bookings exist in total.
+  //
+  // The screen previously asked for `(1, 50)` and stopped there, so a
+  // professional with more than fifty bookings simply could not reach the
+  // fifty-first -- and nothing said so, which is the worse half: the list
+  // ended and looked complete. `total` comes from the response's own
+  // pagination meta, so "you have more" is the server's claim rather than an
+  // inference from a full-looking page.
+  const [pages, setPages] = useState(1);
+  const [total, setTotal] = useState<number | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -78,15 +93,29 @@ function ProBookings({ profile }: { profile: MyProviderProfile }) {
   const [targetSlot, setTargetSlot] = useState('');
   const [slotsError, setSlotsError] = useState<string | null>(null);
 
+  /**
+   * Re-reads every page currently held, not just the first.
+   *
+   * Every state-changing action on this screen calls this, and resetting to
+   * page 1 would silently discard pages the professional had already asked
+   * for -- completing a booking on page 3 would drop them back to page 1. The
+   * pages are re-read rather than patched because a completion can move a
+   * booking between the upcoming and past partitions and the server is the
+   * authority on where it landed.
+   */
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [bookingRes, serviceRes] = await Promise.all([
-        listProfessionalBookings(api, 1, 50),
+      const pageNumbers = Array.from({ length: pages }, (_, i) => i + 1);
+      const [bookingPages, serviceRes] = await Promise.all([
+        Promise.all(pageNumbers.map((page) => listProfessionalBookings(api, page, PAGE_SIZE))),
         listMyServices(api, profile.id).catch(() => ({ data: [] as ServiceOffering[] })),
       ]);
-      setBookings(bookingRes.data ?? []);
+      setBookings(bookingPages.flatMap((res) => res.data ?? []));
+      // The LAST page's meta, because an earlier page's total could have been
+      // computed before a concurrent write.
+      setTotal(bookingPages[bookingPages.length - 1]?.meta?.pagination?.total ?? null);
       setServices(serviceRes.data ?? []);
       setLoaded(true);
     } catch (err) {
@@ -94,11 +123,37 @@ function ProBookings({ profile }: { profile: MyProviderProfile }) {
     } finally {
       setLoading(false);
     }
-  }, [api, profile.id]);
+  }, [api, profile.id, pages]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  /**
+   * Appends the next page.
+   *
+   * Deliberately additive rather than a page-swap. The upcoming/past split is
+   * computed from what is held, and `listForProfessional` orders by
+   * `slotStart DESC`, so future bookings sit at the head of the list and past
+   * ones accumulate behind them. Replacing the held page with the next one
+   * would empty the "upcoming" tab the moment a professional paged into their
+   * history, which is not what "next page" means to a reader looking at tabs.
+   */
+  async function loadMore() {
+    setLoadingMore(true);
+    setError(null);
+    try {
+      const next = pages + 1;
+      const res = await listProfessionalBookings(api, next, PAGE_SIZE);
+      setBookings((current) => [...current, ...(res.data ?? [])]);
+      setTotal(res.meta?.pagination?.total ?? total);
+      setPages(next);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'بارگذاری رزروهای بیشتر انجام نشد.');
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   const serviceName = useCallback(
     (id: string | null) => (id ? services.find((s) => s.id === id)?.name ?? null : null),
@@ -222,6 +277,7 @@ function ProBookings({ profile }: { profile: MyProviderProfile }) {
   }
 
   const visible = tab === 'upcoming' ? upcoming : past;
+  const hasMore = total !== null && bookings.length < total;
 
   return (
     <>
@@ -258,9 +314,15 @@ function ProBookings({ profile }: { profile: MyProviderProfile }) {
               color: tab === key ? 'var(--bc-color-primary)' : 'var(--bc-color-ink)',
             }}
           >
+            {/* These are counts of what is HELD, not of what exists. With
+                more pages unread the honest suffix is "+", not a total the
+                screen cannot substantiate for this partition -- the server's
+                `total` counts every booking, not the upcoming or past half of
+                them, and printing it here would be a different number
+                answering a different question. */}
             {key === 'upcoming'
-              ? `پیش‌رو (${toPersianDigits(upcoming.length)})`
-              : `گذشته (${toPersianDigits(past.length)})`}
+              ? `پیش‌رو (${toPersianDigits(upcoming.length)}${hasMore ? '+' : ''})`
+              : `گذشته (${toPersianDigits(past.length)}${hasMore ? '+' : ''})`}
           </button>
         ))}
       </div>
@@ -421,6 +483,21 @@ function ProBookings({ profile }: { profile: MyProviderProfile }) {
           })}
         </div>
       )}
+
+      {/* Outside the tab partition on purpose: the next page can contain rows
+          for either tab, so hiding this while the past tab is open would leave
+          a professional unable to reach older bookings from the very tab that
+          holds them. */}
+      {loaded && hasMore ? (
+        <div style={{ marginBlockStart: 16, display: 'grid', gap: 8, justifyItems: 'center' }}>
+          <Button type="button" variant="ghost" inline loading={loadingMore} onClick={() => void loadMore()}>
+            بارگذاری رزروهای بیشتر
+          </Button>
+          <p style={{ margin: 0, fontSize: 12, color: 'var(--bc-color-ink-faint)' }}>
+            {toPersianDigits(bookings.length)} از {toPersianDigits(total ?? 0)} رزرو بارگذاری شده است.
+          </p>
+        </div>
+      ) : null}
 
       <ConfirmDialog
         open={confirming !== null}
