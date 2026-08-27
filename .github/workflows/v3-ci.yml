@@ -183,12 +183,26 @@ jobs:
             -v db_name=beauclick_v3_ci \
             -v app_role=beauclick_app \
             -f database/scripts/financial-roles.sql
+          # The administrative audit log's owner role (V3.1 Phase A). Same
+          # reasoning as the financial roles above and, critically, the same
+          # requirement: `admin.admin_audit_log` must NOT be owned by the
+          # application role, because an owner can always grant itself back
+          # UPDATE. Without this step the admin migration would run as
+          # beauclick_app, the app would own its own audit trail, and
+          # operability-foundation.pg-spec's immutability case would fail --
+          # which is the test doing its job, but the provisioning is the fix.
+          psql -h localhost -U postgres -d beauclick_v3_ci -v ON_ERROR_STOP=1 \
+            -v owner_password=ci_audit_owner \
+            -v db_name=beauclick_v3_ci \
+            -v app_role=beauclick_app \
+            -f database/scripts/admin-audit-roles.sql
 
       - name: Migrate
         run: pnpm migrate
         env:
           DATABASE_URL: postgres://beauclick_app:ci_app@localhost:5432/beauclick_v3_ci
           MIGRATION_URL_FINANCIAL: postgres://beauclick_financial_owner:ci_owner@localhost:5432/beauclick_v3_ci
+          MIGRATION_URL_ADMIN: postgres://beauclick_admin_audit_owner:ci_audit_owner@localhost:5432/beauclick_v3_ci
 
       - name: Verify migrations are idempotent
         # Re-running must apply nothing. A migration that is not re-runnable is
@@ -200,6 +214,7 @@ jobs:
         env:
           DATABASE_URL: postgres://beauclick_app:ci_app@localhost:5432/beauclick_v3_ci
           MIGRATION_URL_FINANCIAL: postgres://beauclick_financial_owner:ci_owner@localhost:5432/beauclick_v3_ci
+          MIGRATION_URL_ADMIN: postgres://beauclick_admin_audit_owner:ci_audit_owner@localhost:5432/beauclick_v3_ci
 
       - name: Real-PostgreSQL and OpenSearch suite
         run: pnpm test:pg
