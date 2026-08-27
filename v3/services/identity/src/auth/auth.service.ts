@@ -29,6 +29,14 @@ export class TooManyAttemptsException extends DomainException {
   }
 }
 
+export class DevQaLoginNotAvailableException extends DomainException {
+  constructor() {
+    // 404, not 403: a route that only exists in development should not even
+    // confirm it exists in production. Same reasoning as an ownership miss.
+    super('NOT_FOUND', 'یافت نشد.', HttpStatus.NOT_FOUND);
+  }
+}
+
 export interface LoginResult {
   user: { id: string; phone: string; roles: string[]; capabilities: string[] };
   tokens: TokenPair;
@@ -73,6 +81,49 @@ export class AuthService {
     // with can never disagree about what the user may do.
     const access = await this.roles.resolveAccess(user.id);
 
+    return {
+      user: { id: user.id, phone: user.phone, roles: access.roles, capabilities: access.capabilities },
+      tokens: tokenPair,
+    };
+  }
+
+  /**
+   * DEVELOPMENT-ONLY. Establishes a normal session for a QA account WITHOUT an
+   * OTP, so the authenticated browser Definition-of-Done can be run in an
+   * environment that (correctly) never exposes OTP codes.
+   *
+   * It is deliberately identical to `verifyOtpAndLogin` from the account
+   * resolution onward -- same `resolveOrCreate`, same `issuePair`, same
+   * `resolveAccess` -- so the session it returns is indistinguishable from a
+   * real one to every guard and resolver downstream. The ONLY thing it omits
+   * is `otp.verifyOtp`, which is the single step that cannot run here.
+   *
+   * The caller (AuthController) is responsible for the production guard and the
+   * allow-list; this method refuses to act on a phone the controller did not
+   * vet, as a second line of defence. It audits under a distinct action so a
+   * QA session is never mistaken for a real login in any trail.
+   */
+  async devLoginForQa(
+    rawPhone: string,
+    allowedPhones: string[],
+    deviceLabel: string | null,
+    userAgent: string | null,
+  ): Promise<LoginResult> {
+    const phone = canonicalizePhone(rawPhone);
+    if (!phone) throw new InvalidPhoneException();
+    // Second check of the allow-list, on the CANONICAL phone. The controller
+    // checks the raw input; this checks what it actually resolves to, so a
+    // formatting trick cannot smuggle a non-QA number past the list.
+    const allowedCanonical = allowedPhones.map((p) => canonicalizePhone(p)).filter(Boolean);
+    if (!allowedCanonical.includes(phone)) throw new DevQaLoginNotAvailableException();
+
+    const user: UserEntity = await this.accountResolver.resolveOrCreate(phone);
+    const tokenPair = await this.tokens.issuePair(user, deviceLabel, userAgent);
+    // A DISTINCT audit action, never `auth.login`, so a QA session is
+    // traceable as one and never pollutes a real authentication trail.
+    this.auditLog.log({ action: 'auth.dev_qa_login', userId: user.id });
+
+    const access = await this.roles.resolveAccess(user.id);
     return {
       user: { id: user.id, phone: user.phone, roles: access.roles, capabilities: access.capabilities },
       tokens: tokenPair,

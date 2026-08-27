@@ -198,4 +198,80 @@ describe('Authentication flow (e2e)', () => {
       expect(afterReplay.status).toBe(401);
     });
   });
+
+  /**
+   * DEVELOPMENT-ONLY QA login (`V3.1_DEV_QA_AUTH.md`). The route reads its
+   * policy from `process.env` on every request, so these cases drive the env
+   * around each call. The production case is the load-bearing one and is
+   * restored in a `finally` so a failure cannot leave the process marked
+   * production for the rest of the suite.
+   */
+  describe('dev-login (development-only QA auth)', () => {
+    const QA_PHONE = '09121110009';
+    const QA_CANONICAL = '+98' + QA_PHONE.slice(1);
+
+    afterEach(() => {
+      delete process.env.DEV_QA_LOGIN;
+      delete process.env.DEV_QA_LOGIN_PHONES;
+      delete process.env.NODE_ENV;
+    });
+
+    it('is UNAVAILABLE in production even with the flag AND the phone allow-listed (the mandatory guard)', async () => {
+      const prior = process.env.NODE_ENV;
+      try {
+        process.env.NODE_ENV = 'production';
+        process.env.DEV_QA_LOGIN = '1';
+        process.env.DEV_QA_LOGIN_PHONES = QA_CANONICAL;
+
+        const res = await request(app.getHttpServer()).post('/api/v1/auth/dev-login').send({ phone: QA_PHONE });
+        expect(res.status).toBe(404);
+        expect(res.body?.data?.accessToken).toBeUndefined();
+      } finally {
+        if (prior === undefined) delete process.env.NODE_ENV;
+        else process.env.NODE_ENV = prior;
+      }
+    });
+
+    it('is UNAVAILABLE when the flag is unset, even in development', async () => {
+      process.env.NODE_ENV = 'development';
+      process.env.DEV_QA_LOGIN_PHONES = QA_CANONICAL;
+      const res = await request(app.getHttpServer()).post('/api/v1/auth/dev-login').send({ phone: QA_PHONE });
+      expect(res.status).toBe(404);
+    });
+
+    it('REJECTS a phone that is not on the allow-list, even when enabled', async () => {
+      process.env.NODE_ENV = 'development';
+      process.env.DEV_QA_LOGIN = '1';
+      process.env.DEV_QA_LOGIN_PHONES = '+989120000000';
+      const res = await request(app.getHttpServer()).post('/api/v1/auth/dev-login').send({ phone: QA_PHONE });
+      expect(res.status).toBe(404);
+    });
+
+    it('issues a NORMAL session for an allow-listed phone in development, usable against a protected route', async () => {
+      process.env.NODE_ENV = 'development';
+      process.env.DEV_QA_LOGIN = '1';
+      process.env.DEV_QA_LOGIN_PHONES = QA_CANONICAL;
+
+      const res = await request(app.getHttpServer()).post('/api/v1/auth/dev-login').send({ phone: QA_PHONE });
+      expect(res.status).toBe(200);
+      expect(res.body.data.accessToken).toBeDefined();
+      expect(res.body.data.refreshToken).toBeDefined();
+      expect(res.body.data.csrfToken).toBeDefined();
+      expect(res.body.data.user.phone).toBe(QA_CANONICAL);
+      // Roles/capabilities come from `resolveAccess`, identical to the real
+      // login. Their concrete values are asserted against a REAL database in
+      // operability-foundation.pg-spec (the in-memory DataSource here does not
+      // round-trip the default-role grant); what this e2e proves is the session
+      // itself, below.
+
+      // The produced session is a NORMAL one: it authenticates a protected
+      // route with no special handling, proving the token is issued through the
+      // same path as a real login.
+      const me = await request(app.getHttpServer())
+        .get('/api/v1/me')
+        .set('Authorization', `Bearer ${res.body.data.accessToken}`);
+      expect(me.status).toBe(200);
+      expect(me.body.data.phone).toBe(QA_CANONICAL);
+    });
+  });
 });

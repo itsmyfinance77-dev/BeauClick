@@ -22,6 +22,7 @@ import { AuthService } from './auth.service';
 import { RequestOtpDto } from './dto/request-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { RefreshDto } from './dto/refresh.dto';
+import { DevQaLoginDto } from './dto/dev-qa-login.dto';
 import { TokenService } from '../token/token.service';
 import {
   CookieSettings,
@@ -32,6 +33,9 @@ import {
   setRefreshCookie,
 } from './refresh-cookie';
 import { CsrfPolicy, csrfPolicyFromEnv, evaluateCsrf } from './csrf';
+import { DevQaLoginPolicy, devQaLoginPolicyFromEnv } from './dev-qa-login';
+import { DevQaLoginNotAvailableException } from './auth.service';
+import { canonicalizePhone } from './phone.util';
 
 /**
  * V3_API_CONTRACT_BLUEPRINT.md §2 -- the authentication flow. Every route
@@ -108,6 +112,58 @@ export class AuthController {
       // clients that have no cookie jar. A browser client must ignore it and
       // keep nothing in localStorage -- and apps/web does exactly that, which
       // is asserted by its own test rather than left to convention.
+      refreshToken: result.tokens.refreshToken,
+      csrfToken,
+      user: result.user,
+    };
+  }
+
+  /**
+   * DEVELOPMENT-ONLY QA login. Establishes a normal session for a configured QA
+   * phone without an OTP, so the authenticated browser Definition-of-Done can be
+   * run where OTP codes are (correctly) never exposed. Full rationale and the
+   * security boundary in `V3.1_DEV_QA_AUTH.md`.
+   *
+   * The production guarantee is enforced HERE, on every request, by re-reading
+   * the policy from the environment rather than trusting a cached flag: when
+   * `NODE_ENV === 'production'` the policy is disabled unconditionally and this
+   * route responds exactly as if it did not exist (404), so it can neither be
+   * probed nor activated in production by any means. The allow-list is checked
+   * here and again in the service on the canonical phone.
+   */
+  @Public()
+  @Throttle(policy('auth'))
+  @Post('dev-login')
+  @HttpCode(HttpStatus.OK)
+  async devLogin(@Body() dto: DevQaLoginDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    // Re-evaluated per request: no cached flag can outlive a config change, and
+    // production is checked first inside the policy.
+    const policyNow: DevQaLoginPolicy = devQaLoginPolicyFromEnv(process.env);
+    if (!policyNow.enabled) throw new DevQaLoginNotAvailableException();
+    // Allow-list check on the CANONICAL phone, so the list is form-independent:
+    // an operator may list `+98912...` or `0912...` and either works, and the
+    // raw request form cannot slip past by not matching the list's spelling.
+    // The service re-checks canonically too (defence in depth).
+    const canonical = canonicalizePhone(dto.phone);
+    if (!canonical || !policyNow.allowedPhones.map((p) => canonicalizePhone(p)).includes(canonical)) {
+      throw new DevQaLoginNotAvailableException();
+    }
+
+    const result = await this.auth.devLoginForQa(
+      dto.phone,
+      policyNow.allowedPhones,
+      (req.headers['x-device-label'] as string) ?? null,
+      req.headers['user-agent'] ?? null,
+    );
+
+    // Identical session establishment to verifyOtp: same refresh cookie, same
+    // CSRF token, same response shape. Nothing about the produced session is
+    // special.
+    setRefreshCookie(res, result.tokens.refreshToken, this.cookieSettings);
+    const csrfToken = issueCsrfToken(res, this.cookieSettings);
+
+    return {
+      accessToken: result.tokens.accessToken,
       refreshToken: result.tokens.refreshToken,
       csrfToken,
       user: result.user,
