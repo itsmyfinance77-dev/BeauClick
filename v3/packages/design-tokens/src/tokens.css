@@ -11,7 +11,7 @@
   /* color */
   --bc-color-ink: oklch(0.2 0.02 290);
   --bc-color-ink-soft: oklch(0.48 0.02 290);
-  --bc-color-ink-faint: oklch(0.6 0.02 290);
+  --bc-color-ink-faint: oklch(0.535 0.02 290);
   --bc-color-line: oklch(0.9 0.012 290);
   --bc-color-background: oklch(0.985 0.006 280);
   --bc-color-surface: oklch(1 0 0);
@@ -23,10 +23,10 @@
   --bc-color-accent-soft: oklch(0.95 0.035 335);
   --bc-color-success: oklch(0.5 0.13 150);
   --bc-color-success-soft: oklch(0.94 0.04 150);
-  --bc-color-warning: oklch(0.55 0.13 70);
+  --bc-color-warning: oklch(0.53 0.115 70);
   --bc-color-warning-soft: oklch(0.95 0.045 80);
-  --bc-color-error: oklch(0.55 0.19 25);
-  --bc-color-error-soft: oklch(0.95 0.05 25);
+  --bc-color-error: oklch(0.535 0.19 25);
+  --bc-color-error-soft: oklch(0.935 0.032 26);
 
   /* gradient */
   --bc-gradient-brand: linear-gradient(135deg, var(--bc-color-primary), var(--bc-color-accent));

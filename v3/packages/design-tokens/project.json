@@ -5,6 +5,7 @@
   "tags": ["type:lib", "scope:shared"],
   "targets": {
     "typecheck": { "executor": "nx:run-commands", "options": { "command": "tsc -p packages/design-tokens/tsconfig.json --noEmit" } },
+    "test": { "executor": "nx:run-commands", "options": { "command": "jest --config packages/design-tokens/jest.config.js" } },
     "lint": { "executor": "nx:run-commands", "options": { "command": "eslint packages/design-tokens/src --resolve-plugins-relative-to ." } }
   }
 }
