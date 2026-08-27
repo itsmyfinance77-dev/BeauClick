@@ -6,6 +6,7 @@ import { DataSource } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
 
 import { ValidationException } from '@beauclick/http';
+import { assertPrivilegedMutationsAreAudited } from '@beauclick/audit';
 import { OTP_DEBUG_OBSERVER, OtpDebugObserver, capabilitiesForRoles } from '@beauclick/identity';
 import { OutboxRelay } from '@beauclick/events';
 import { FINANCIAL_DATA_SOURCE } from '@beauclick/financial';
@@ -175,6 +176,12 @@ export async function createPgTestApp(envOverrides: Record<string, string> = {})
   );
   await app.init();
 
+  // The same structural assertion `main.ts` makes, so an unaudited privileged
+  // mutation fails the TEST SUITE as well as the boot. Without this the check
+  // would only run in production -- the one place where discovering it is most
+  // expensive.
+  assertPrivilegedMutationsAreAudited(app);
+
   return {
     app,
     dataSource: app.get<DataSource>(getDataSourceToken()),
@@ -250,8 +257,26 @@ export const RESETTABLE_TABLES = [
   'identity.refresh_tokens',
   'identity.phone_conflicts',
   'identity.otp_requests',
+  // user_roles cascades from users, but naming it keeps the truncate explicit
+  // rather than relying on a cascade to do the right thing.
+  'identity.user_roles',
   'identity.users',
+  'provider.verification_requests',
 ];
+
+/**
+ * The audit log is TRUNCATED SEPARATELY, and cannot be.
+ *
+ * `admin.admin_audit_log` is owned by a role the application never connects as
+ * and the application holds INSERT + SELECT only -- so the test's own
+ * TRUNCATE would be refused, exactly as a tampering attempt would. Rows
+ * therefore accumulate across cases in a suite run, which is why every
+ * assertion in `operability-foundation.pg-spec.ts` filters by `target_id`
+ * rather than counting the table.
+ *
+ * That is the correct trade. Granting the test role DELETE would mean the
+ * suite proves immutability against a role that does not have it.
+ */
 
 export async function resetDatabase(dataSource: DataSource): Promise<void> {
   await dataSource.query(`TRUNCATE ${RESETTABLE_TABLES.join(', ')} CASCADE`);
@@ -293,6 +318,22 @@ export async function seedUser(
     `INSERT INTO identity.users (id, phone, roles, is_verified_professional) VALUES ($1, $2, $3, false)`,
     [id, phone, `{${roles.join(',')}}`],
   );
+
+  // The role ASSIGNMENT rows, not only the denormalized column.
+  //
+  // Phase A moved authorization's source of truth to `identity.user_roles`
+  // (R31-01). This helper writes the user row directly rather than going
+  // through AccountResolverService, so without these inserts every seeded user
+  // would resolve to zero capabilities -- and every pre-Phase-A test assuming a
+  // working customer session would fail for a reason unrelated to what it
+  // tests.
+  for (const role of roles) {
+    await dataSource.query(
+      `INSERT INTO identity.user_roles (user_id, role_slug, granted_by, reason)
+       VALUES ($1, $2, NULL, 'test seed') ON CONFLICT DO NOTHING`,
+      [id, role],
+    );
+  }
 
   const jwt = app.get(JwtService);
   const accessToken = jwt.sign({ sub: id, roles, capabilities: capabilitiesForRoles(roles) });

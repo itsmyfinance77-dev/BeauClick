@@ -12,6 +12,7 @@ import { OwnershipGuard } from '@beauclick/ownership';
 import { IdentityModule, IDENTITY_ENTITIES, OTP_DEBUG_OBSERVER, OtpDebugObserver } from '@beauclick/identity';
 import { ProviderModule, PROVIDER_ENTITIES } from '@beauclick/provider';
 import { EventContractsModule } from '@beauclick/event-contracts';
+import { AuditModule, AUDIT_ENTITIES } from '@beauclick/audit';
 import { createInMemoryDataSource } from '@beauclick/testing';
 import { TypeOrmTestingModule } from './typeorm-testing.module';
 
@@ -84,7 +85,10 @@ function applyHermeticTestEnv(): void {
 
 export async function createTestApp(): Promise<TestApp> {
   applyHermeticTestEnv();
-  const entities = [...IDENTITY_ENTITIES, ...PROVIDER_ENTITIES];
+  // AUDIT_ENTITIES joins the list because Phase A made an audit record part of
+  // a privileged mutation's own transaction -- identity and provider now depend
+  // on AdminAuditService, so a module graph without it cannot resolve them.
+  const entities = [...IDENTITY_ENTITIES, ...PROVIDER_ENTITIES, ...AUDIT_ENTITIES];
   // Built and initialized BEFORE the testing module is compiled -- see
   // TypeOrmTestingModule's docblock for why this must be synchronous, not
   // an async dynamic module.
@@ -107,6 +111,9 @@ export async function createTestApp(): Promise<TestApp> {
       // Global, and required: provider-service now validates every event it
       // produces against the registry on the way into its own outbox.
       EventContractsModule,
+      // @Global, but a global module still has to be imported ONCE somewhere in
+      // the graph to be registered. This is that once, for the pg-mem layer.
+      AuditModule,
       IdentityModule,
       ProviderModule,
     ],
