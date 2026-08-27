@@ -13,7 +13,12 @@ import { join } from 'path';
 describe('Persian utilities are wired into the frontend', () => {
   it('renders Jalali dates, not Gregorian', () => {
     // 2024-03-20 Gregorian = 1403-01-01 Jalali (Nowruz).
-    expect(formatFullJalaliDate(new Date(2024, 2, 20))).toBe('چهارشنبه، ۱ فروردین ۱۴۰۳');
+    //
+    // An absolute instant, not `new Date(2024, 2, 20)`. The helpers read the
+    // PLATFORM timezone (R31-09), so a local-time constructor would build a
+    // different instant on every host and this assertion would hold in Tehran,
+    // hold in UTC by luck, and fail anywhere east of Iran.
+    expect(formatFullJalaliDate(new Date(Date.UTC(2024, 2, 20, 12, 0)))).toBe('چهارشنبه، ۱ فروردین ۱۴۰۳');
   });
 
   it('renders Persian digits', () => {

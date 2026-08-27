@@ -1,36 +1,35 @@
 /**
  * Timezone-explicit Jalali/Persian date formatting.
  *
- * WHY THIS EXISTS, stated plainly because the distinction is easy to lose:
- * `format.ts`'s `formatShortDate`/`formatFullJalaliDate`/`formatTime` read a
- * `Date` through `getFullYear()`/`getHours()`/etc., which resolve in
- * **whatever timezone the browser or server happens to be running in**. That
- * is a deliberate, documented choice there and is correct for a user sitting
- * in Iran on a machine set to Iran.
+ * This is the ONE implementation of "what wall clock does this instant read as
+ * in the platform's timezone". `format.ts`'s `formatShortDate` /
+ * `formatFullJalaliDate` / `formatTime` are thin delegates to the three
+ * formatters below.
  *
- * It is NOT correct for the professional availability surface. Booking's
- * `AvailabilityService` materializes every slot from a local wall clock in
- * `Asia/Tehran` (`services/booking/src/availability/platform-time.ts`) — a
- * professional publishing "09:00–17:00" means 09:00 in Tehran, not 09:00
- * wherever their laptop's clock is set. A professional travelling, a machine
- * with a misconfigured zone, or a QA browser in UTC would each see a
- * different, silently-wrong time for the same slot, and would generate slots
- * they did not intend.
+ * That was not always so, and the history is the reason this module names its
+ * zone so insistently. Those three helpers originally resolved a `Date`
+ * through `getFullYear()` / `getHours()`, which read whatever timezone the
+ * browser or server process happened to be running in. Task 1 added this
+ * module for the professional availability surface, where the defect was
+ * obvious -- a professional publishing "09:00" means 09:00 in Tehran, and
+ * booking-service materializes the slot from exactly that wall clock
+ * (`services/booking/src/availability/platform-time.ts`) -- and deliberately
+ * left the customer surfaces alone, recording the inconsistency as `R31-09`.
  *
- * So the professional surface formats and parses through THIS module, which
- * names the zone rather than inheriting it. The customer-facing surfaces keep
- * using `format.ts` unchanged — changing their behaviour is not this task's
- * to make, and the discrepancy is recorded as a finding instead.
+ * Phase G closed it, having found the bug was live rather than latent: the API
+ * builds the `date` and `time` variables of its booking notifications with
+ * those same helpers, server-side, in a process where nothing sets `TZ`. Every
+ * customer on a UTC-hosted deployment was told an appointment time three and a
+ * half hours early.
  *
  * The conversion mechanics deliberately mirror the backend's own
  * `platform-time.ts` (IANA rules via `Intl`, two-pass offset resolution)
  * rather than a hardcoded +03:30. Iran abolished DST in 2022, so a fixed
- * offset is right today and would produce silently one-hour-wrong slots for
+ * offset is right today and would produce silently one-hour-wrong times for
  * every affected day if that is ever reversed.
  */
-
 import { JALALI_MONTHS, toJalali } from './jalali';
-import { toPersianDigits } from './format';
+import { toPersianDigits } from './digits';
 
 /** The platform's operating timezone. Must match booking-service's `PLATFORM_TIMEZONE`. */
 export const PLATFORM_TIMEZONE = 'Asia/Tehran';

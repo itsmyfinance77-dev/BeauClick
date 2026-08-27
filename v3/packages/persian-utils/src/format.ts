@@ -14,40 +14,10 @@
  * file, preserved here as a regression test (format.spec.ts).
  */
 
-import { JALALI_MONTHS, toJalali } from './jalali';
+import { formatZonedFullDate, formatZonedShortDate, formatZonedTime } from './zoned';
 
-const PERSIAN_DIGITS = [ '۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹' ];
-
-export function toPersianDigits( input: string | number ): string {
-	return String( input ).replace( /[0-9]/g, ( d ) => PERSIAN_DIGITS[ Number( d ) ] );
-}
-
-/**
- * The inverse of `toPersianDigits`: Persian (۰–۹, U+06F0–U+06F9) and
- * Arabic-Indic (٠–٩, U+0660–U+0669) digits folded to ASCII.
- *
- * Added in Phase 3 for the input direction. Every number a Persian-speaking
- * user types — a price filter, a page number, a budget — arrives in Persian
- * digits, and `Number('۵۰۰')` is `NaN`. Without this, a perfectly valid
- * filter is rejected as malformed, which reads to the user as the feature
- * being broken.
- *
- * BOTH digit ranges are folded, not just the Persian one: Arabic-Indic
- * digits arrive from Arabic-locale keyboards and mobile IMEs that Persian
- * speakers genuinely use, and V2's own search normalizer had exactly this
- * pair for exactly that reason.
- *
- * Note the asymmetry with `toPersianDigits`, which is deliberate: output is
- * always Persian, input accepts anything. A user must never have to know
- * which numeral system the system prefers.
- */
-export function normalizeDigits( input: string ): string {
-	return input.replace( /[۰-۹٠-٩]/g, ( d ) => {
-		const code = d.charCodeAt( 0 );
-		const base = code >= 0x06f0 ? 0x06f0 : 0x0660;
-		return String( code - base );
-	} );
-}
+export { normalizeDigits, toPersianDigits } from './digits';
+import { toPersianDigits } from './digits';
 
 /** Tomans, grouped by thousands, rendered in Persian digits — e.g. 350000 -> "۳۵۰٬۰۰۰". */
 export function formatToman( amount: number ): string {
@@ -63,32 +33,53 @@ export function formatCount( count: number ): string {
 	return toPersianDigits( count );
 }
 
-const PERSIAN_WEEKDAYS = [ 'یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه', 'شنبه' ];
-
 /**
- * Weekday name + Jalali day-of-month + Jalali month name, used by every
- * date-chip/table display. `date.getDay()`/`getFullYear()`/`getMonth()`/
- * `getDate()` (not the UTC variants) deliberately read the Date object in
- * the local timezone the server/browser is running in.
+ * THE TIMEZONE RULE for every date this package formats, stated once.
+ *
+ * These three helpers used to read a `Date` through `getFullYear()` /
+ * `getDate()` / `getHours()`, which resolve in whatever timezone the browser
+ * or server process happens to be running in. That was recorded as a
+ * deliberate choice and it was correct for exactly one situation: a user in
+ * Iran on a machine set to Iran.
+ *
+ * It was wrong everywhere else, and `R31-09` recorded it as a latent bug in
+ * the customer surfaces. Phase G found it is not latent. `notification-
+ * analytics.handlers.ts` builds the `date` and `time` variables of the
+ * booking-confirmed, booking-cancelled, and booking-rescheduled notifications
+ * with `formatFullJalaliDate` and `formatTime` -- SERVER-side, in the API
+ * process, where nothing sets `TZ`. On the ordinary UTC host a container runs
+ * on, every customer was being told an appointment time three and a half hours
+ * earlier than their actual appointment, and the wrong DAY whenever the
+ * appointment fell before 03:30 Tehran. That is not a display inconsistency;
+ * it is telling somebody the wrong time to turn up.
+ *
+ * So the platform zone is now the default rather than an opt-in. Every instant
+ * this platform stores is materialized from an `Asia/Tehran` wall clock
+ * (`services/booking/src/availability/platform-time.ts`), so the zone the
+ * process runs in was never a meaningful input -- reading it was the defect,
+ * not a feature these functions offered.
+ *
+ * The implementation is `zoned.ts` rather than a second copy of it: IANA rules
+ * via `Intl`, never a hardcoded +03:30, because Iran abolished DST in 2022 and
+ * that policy can be reversed. `timeZone` remains a parameter for the rare
+ * caller that genuinely means a different zone; it is not how correctness is
+ * achieved.
  */
-export function formatShortDate( date: Date ): { weekday: string; day: string; month: string } {
-	const { jm, jd } = toJalali( date.getFullYear(), date.getMonth() + 1, date.getDate() );
-	return {
-		weekday: PERSIAN_WEEKDAYS[ date.getDay() ],
-		day: toPersianDigits( jd ),
-		month: JALALI_MONTHS[ jm - 1 ],
-	};
+
+/** Weekday name + Jalali day-of-month + Jalali month name, read in the platform timezone. */
+export function formatShortDate(
+	date: Date,
+	timeZone?: string,
+): { weekday: string; day: string; month: string } {
+	return formatZonedShortDate( date, timeZone );
 }
 
 /** Complete "چهارشنبه، ۲۲ مرداد ۱۴۰۵" — for surfaces that need the year. */
-export function formatFullJalaliDate( date: Date ): string {
-	const { jy, jm, jd } = toJalali( date.getFullYear(), date.getMonth() + 1, date.getDate() );
-	const weekday = PERSIAN_WEEKDAYS[ date.getDay() ];
-	return `${ weekday }، ${ toPersianDigits( jd ) } ${ JALALI_MONTHS[ jm - 1 ] } ${ toPersianDigits( jy ) }`;
+export function formatFullJalaliDate( date: Date, timeZone?: string ): string {
+	return formatZonedFullDate( date, timeZone );
 }
 
-export function formatTime( date: Date ): string {
-	const hours = date.getHours().toString().padStart( 2, '0' );
-	const minutes = date.getMinutes().toString().padStart( 2, '0' );
-	return toPersianDigits( `${ hours }:${ minutes }` );
+/** "۰۹:۳۰", read in the platform timezone. */
+export function formatTime( date: Date, timeZone?: string ): string {
+	return formatZonedTime( date, timeZone );
 }

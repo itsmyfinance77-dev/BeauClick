@@ -49,17 +49,26 @@ describe( 'zoned wall-clock conversion', () => {
 	} );
 
 	it( 'is independent of the host timezone', () => {
-		// The regression this whole module exists to prevent. `formatTime`
-		// reads host-local time by design; `formatZonedTime` must not, so the
-		// two agree ONLY when the host happens to be in Tehran.
+		// The regression this whole module exists to prevent.
+		//
+		// This case previously asserted the OPPOSITE relationship: that
+		// `formatTime` must DISAGREE with `formatZonedTime` on any host outside
+		// Tehran, because `formatTime` read host-local time "by design". That
+		// made the defect a requirement, and it is why the assertion had to be
+		// rewritten rather than merely re-run when Phase G closed `R31-09` --
+		// `formatTime` now delegates here, so the two agree everywhere.
+		//
+		// The replacement is strictly stronger: it pins the absolute answer,
+		// asserts the delegation holds on EVERY host rather than conditionally,
+		// and keeps a case that would still fail if either function started
+		// reading the ambient clock again.
 		const instant = new Date( '2026-09-15T06:30:00.000Z' );
-		const hostOffsetMinutes = -instant.getTimezoneOffset();
 		const zoned = formatZonedTime( instant );
 
 		expect( zoned ).toBe( '۱۰:۰۰' );
-		if ( hostOffsetMinutes !== 210 ) {
-			expect( formatTime( instant ) ).not.toBe( zoned );
-		}
+		expect( formatTime( instant ) ).toBe( zoned );
+		// Not trivially true: a genuinely different zone still reads differently.
+		expect( formatZonedTime( instant, 'UTC' ) ).toBe( '۰۶:۳۰' );
 	} );
 
 	it( 'assigns a late-evening Tehran instant to the correct Tehran DAY', () => {
