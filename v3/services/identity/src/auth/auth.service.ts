@@ -6,7 +6,7 @@ import { AccountResolverService } from '../account/account-resolver.service';
 import { TokenService, TokenPair } from '../token/token.service';
 import { canonicalizePhone } from './phone.util';
 import { UserEntity } from '../entities/user.entity';
-import { capabilitiesForRoles } from '../rbac/capabilities';
+import { RoleService } from '../rbac/role.service';
 import { AuditLogger } from '@beauclick/events';
 
 export class InvalidPhoneException extends DomainException {
@@ -42,6 +42,7 @@ export class AuthService {
     private readonly otp: OtpService,
     private readonly accountResolver: AccountResolverService,
     private readonly tokens: TokenService,
+    private readonly roles: RoleService,
   ) {}
 
   async requestOtp(rawPhone: string, purpose: 'login' | 'change_phone' | 'confirm_deletion', ip: string, sessionUserId: string | null): Promise<void> {
@@ -68,8 +69,12 @@ export class AuthService {
     const tokenPair = await this.tokens.issuePair(user, deviceLabel, userAgent);
     this.auditLog.log({ action: 'auth.login', userId: user.id });
 
+    // Resolved from the database, so the login response and the token it comes
+    // with can never disagree about what the user may do.
+    const access = await this.roles.resolveAccess(user.id);
+
     return {
-      user: { id: user.id, phone: user.phone, roles: user.roles, capabilities: capabilitiesForRoles(user.roles) },
+      user: { id: user.id, phone: user.phone, roles: access.roles, capabilities: access.capabilities },
       tokens: tokenPair,
     };
   }

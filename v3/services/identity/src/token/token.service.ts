@@ -8,7 +8,7 @@ import { returningRows } from '@beauclick/events';
 import { uuidv7 } from 'uuidv7';
 import { RefreshTokenEntity } from '../entities/refresh-token.entity';
 import { UserEntity } from '../entities/user.entity';
-import { capabilitiesForRoles } from '../rbac/capabilities';
+import { RoleService } from '../rbac/role.service';
 
 export interface TokenPair {
   accessToken: string;
@@ -43,6 +43,7 @@ export class TokenService {
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
     @InjectRepository(RefreshTokenEntity) private readonly refreshRepo: Repository<RefreshTokenEntity>,
+    private readonly roles: RoleService,
   ) {
     this.refreshTtlDays = Number(this.config.get('REFRESH_TOKEN_TTL_DAYS') ?? 30);
   }
@@ -52,10 +53,16 @@ export class TokenService {
   }
 
   async issuePair(user: UserEntity, deviceLabel: string | null, userAgent: string | null): Promise<TokenPair> {
+    // Roles and capabilities come from `identity.user_roles` /
+    // `identity.role_capabilities`, not from the static map and not from the
+    // denormalized `users.roles` column. This is the point at which a grant or
+    // revocation made since the last token becomes effective -- see the
+    // session-invalidation window in V3_SECURITY_MODEL.md §9a.
+    const access = await this.roles.resolveAccess(user.id);
     const accessToken = this.jwt.sign({
       sub: user.id,
-      roles: user.roles,
-      capabilities: capabilitiesForRoles(user.roles),
+      roles: access.roles,
+      capabilities: access.capabilities,
     });
 
     const rawRefreshToken = randomBytes(48).toString('base64url');
