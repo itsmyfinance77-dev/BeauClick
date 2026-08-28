@@ -1,0 +1,19 @@
+{
+  // ts-node reads the tsconfig from its working directory, and this workspace
+  // has no root `tsconfig.json` -- only `tsconfig.base.json`, which ts-node
+  // does not look for. Without a project it falls back to its own defaults,
+  // emits ES-module syntax, and Node then reparses the file as ESM. A
+  // standalone script survives that (`migrate.ts` has always run this way);
+  // a script that imports a sibling does not, because ESM resolution requires
+  // an explicit file extension and TypeScript forbids writing `.ts` in an
+  // import. That is not a constraint worth designing scripts around, so the
+  // module system is pinned here instead.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "noEmit": true,
+    "types": ["node", "jest"]
+  },
+  "include": ["**/*.ts"]
+}

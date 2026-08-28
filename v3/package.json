@@ -10,10 +10,13 @@
   "scripts": {
     "build": "nx run-many -t build",
     "test": "nx run-many -t test",
-    "lint": "eslint \"apps/**/src/**/*.ts\" \"apps/**/test/**/*.ts\" \"services/**/src/**/*.ts\" \"libs/**/src/**/*.ts\" \"packages/**/src/**/*.ts\" --no-error-on-unmatched-pattern",
+    "lint": "eslint \"apps/**/src/**/*.ts\" \"apps/**/test/**/*.ts\" \"services/**/src/**/*.ts\" \"libs/**/src/**/*.ts\" \"packages/**/src/**/*.ts\" \"database/scripts/**/*.ts\" --no-error-on-unmatched-pattern",
     "typecheck": "nx run-many -t typecheck",
     "test:pg": "nx run api:test:pg",
-    "migrate": "ts-node database/scripts/migrate.ts",
+    "migrate": "ts-node --project database/scripts/tsconfig.json database/scripts/migrate.ts",
+    "verify:roles": "ts-node --project database/scripts/tsconfig.json database/scripts/verify-roles.ts",
+    "backup": "ts-node --project database/scripts/tsconfig.json database/scripts/backup.ts",
+    "restore:rehearse": "ts-node --project database/scripts/tsconfig.json database/scripts/restore-rehearsal.ts",
     "api:dev": "nx run api:dev"
   },
   "devDependencies": {

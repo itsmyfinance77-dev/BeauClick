@@ -3,7 +3,18 @@ module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
   rootDir: '.',
-  testMatch: ['<rootDir>/src/**/*.spec.ts', '<rootDir>/test/**/*.e2e-spec.ts'],
+  // `database/scripts` is workspace infrastructure rather than an Nx project
+  // -- it has no package.json and is not a pnpm workspace member, so it cannot
+  // carry its own runner without also carrying its own dependency tree. Its
+  // pure logic is tested HERE instead, by the project that already has `pg`,
+  // ts-jest, and a fast suite. The alternative was a script whose only
+  // verification is that somebody ran it once.
+  roots: ['<rootDir>', '<rootDir>/../../database'],
+  testMatch: [
+    '<rootDir>/src/**/*.spec.ts',
+    '<rootDir>/test/**/*.e2e-spec.ts',
+    '<rootDir>/../../database/scripts/**/*.spec.ts',
+  ],
   transform: { '^.+\\.ts$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.json' }] },
   moduleNameMapper: {
     '^@beauclick/http$': '<rootDir>/../../libs/http/src/index.ts',
