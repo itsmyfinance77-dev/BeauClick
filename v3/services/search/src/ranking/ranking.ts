@@ -13,13 +13,14 @@
  *      about that provider arrives, which is O(1) per event rather than
  *      O(providers) per hour.
  *
- *   2. Ratings have no V3 producer yet. Reviews are not a V3 domain as of
- *      Phase 3, so `ratingAvg`/`reviewCount` arrive as 0/0. That is handled
- *      CORRECTLY rather than specially: the Bayesian term already collapses
- *      to the platform mean at zero reviews, and cold-start blending already
- *      pulls a no-evidence provider toward the neutral baseline. Nothing is
- *      faked and nothing is special-cased -- the formula simply receives the
- *      evidence that exists.
+ *   2. Ratings had no V3 producer until V3.1 Phase D. From Phase 3 to Phase C
+ *      `ratingAvg`/`reviewCount` arrived as 0/0, and that was handled CORRECTLY
+ *      rather than specially: the Bayesian term collapses to the platform mean
+ *      at zero reviews, and cold-start blending pulls a no-evidence provider
+ *      toward the neutral baseline. Nothing was faked and nothing was
+ *      special-cased -- the formula simply received the evidence that existed,
+ *      which is why turning the producer on in Phase D required no change to
+ *      any line below.
  */
 
 export const RankingConfig = {

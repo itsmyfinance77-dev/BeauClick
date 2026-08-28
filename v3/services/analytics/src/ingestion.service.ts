@@ -74,6 +74,30 @@ const FACT_MAPPINGS: Record<string, FactMapping> = {
     dimensions: (p) => ({ rescheduleCount: num(p.rescheduleCount) }),
   },
 
+  // ---- reviews (V3.1 Phase D)
+  //
+  // The RATING is a dimension; the review TEXT is not carried at all.
+  // `V3_DOMAIN_BOUNDARIES.md` §ai puts raw review text on the
+  // excluded-by-construction list, and the event does not carry it either, so
+  // there is nothing here to forget to strip.
+  ReviewCreated: {
+    subjectType: 'provider',
+    subjectOf: (p) => str(p.professionalId),
+    actorOf: (p) => str(p.customerId),
+    dimensions: (p) => ({ rating: num(p.rating) }),
+    timestampOf: (p) => str(p.createdAt),
+  },
+  ReviewModerated: {
+    subjectType: 'provider',
+    subjectOf: (p) => str(p.professionalId),
+    actorOf: (p) => str(p.actorId),
+    // WHICH WAY the decision went is the analytically interesting part -- a
+    // takedown rate is an operational health metric. The moderator's free-text
+    // reason is not carried, matching BookingCancelled's treatment of its own.
+    dimensions: (p) => ({ fromStatus: str(p.fromStatus), toStatus: str(p.toStatus), rating: num(p.rating) }),
+    timestampOf: (p) => str(p.moderatedAt),
+  },
+
   // ---- commerce funnel
   OrderCreated: {
     subjectType: 'order',

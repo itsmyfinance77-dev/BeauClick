@@ -233,6 +233,96 @@ export class SearchIndexerService {
   }
 
   /**
+   * Applies a RATING signal, exactly once per source event (QA-18).
+   *
+   * The gap this closes, stated as the register stated it: `rating_sum` and
+   * `review_count` have existed since Phase 3 and "are written by nothing". The
+   * Bayesian shrinkage term, the `high_rating` badge, the `minRating` filter,
+   * and the `rating` sort were all built against them and have all been inert
+   * at 0/0 ever since. The fix was never a feature -- it is this writer.
+   *
+   * Separate from `applySignal` because the shape is genuinely different: the
+   * counter signals move one column by one, while a rating moves TWO columns
+   * by an amount the event carries. Folding a value-carrying signal into a
+   * fixed column map would have meant either a fake column name or a second
+   * meaning for the same parameter.
+   *
+   * `signalName` distinguishes creation from moderation, so a `ReviewCreated`
+   * and a later `ReviewModerated` for the same review each get their own row in
+   * `signal_applications` and neither can suppress the other.
+   *
+   * `GREATEST(0, ...)` on the subtraction, deliberately. The CHECK constraint
+   * forbids a negative `rating_sum`, and a compensating signal can legitimately
+   * arrive with no matching increment applied -- most obviously after a
+   * projection rebuild that reset the counters, or if the creation event was
+   * consumed before this build shipped. Without the clamp that case raises a
+   * constraint violation, the handler throws, the outbox row is never marked
+   * published, and the relay retries it forever: one impossible subtraction
+   * would wedge every subsequent event behind it. Clamping degrades to a
+   * slightly-wrong counter that the next rebuild corrects, and says so in the
+   * log, which is strictly better than a stalled pipeline.
+   */
+  async applyRatingSignal(input: {
+    eventId: string;
+    signalName: 'review_created' | 'review_hidden' | 'review_restored';
+    professionalId: string;
+    ratingDelta: number;
+    countDelta: number;
+  }): Promise<boolean> {
+    return this.dataSource.transaction(async (manager) => {
+      const claimed = await insertOnce(
+        manager
+          .createQueryBuilder()
+          .insert()
+          .into(SignalApplicationEntity)
+          .values({
+            eventId: input.eventId,
+            signal: input.signalName,
+            professionalId: input.professionalId,
+            appliedAt: new Date(),
+          }),
+        'event_id',
+      );
+      if (!claimed) return false;
+
+      await insertOnce(
+        manager.createQueryBuilder().insert().into(RankingSignalsEntity).values({ professionalId: input.professionalId }),
+        'professional_id',
+      );
+
+      const before: Array<{ rating_sum: number; review_count: number }> = await manager.query(
+        `UPDATE search.ranking_signals
+            SET rating_sum = GREATEST(0, rating_sum + $2),
+                review_count = GREATEST(0, review_count + $3),
+                updated_at = now()
+          WHERE professional_id = $1
+        RETURNING rating_sum, review_count`,
+        [input.professionalId, input.ratingDelta, input.countDelta],
+      );
+
+      const row = returningRows<{ rating_sum: number; review_count: number }>(before)[0];
+      if (row && Number(row.review_count) === 0 && Number(row.rating_sum) !== 0) {
+        // Zero reviews with a non-zero sum is arithmetically impossible and
+        // means the two counters have drifted apart. Repaired rather than
+        // logged and left, because `ratingAvg` divides one by the other.
+        this.logger.warn(
+          `Rating counters for ${input.professionalId} were inconsistent after ${input.signalName}; resetting the sum to 0.`,
+        );
+        await manager.query('UPDATE search.ranking_signals SET rating_sum = 0 WHERE professional_id = $1', [
+          input.professionalId,
+        ]);
+      }
+
+      await this.rescore(
+        input.professionalId,
+        manager.getRepository(ProviderDocumentEntity),
+        manager.getRepository(RankingSignalsEntity),
+      );
+      return true;
+    });
+  }
+
+  /**
    * Applies a ranking-signal increment, exactly once per source event.
    *
    * `eventId` is the outbox row's id -- stable across redeliveries of the same

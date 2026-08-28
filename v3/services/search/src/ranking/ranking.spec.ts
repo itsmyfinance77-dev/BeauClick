@@ -55,8 +55,9 @@ describe('Bayesian shrinkage', () => {
   });
 
   it('collapses to the platform mean when there are no reviews at all', () => {
-    // The state V3 is actually in: no review domain exists yet, so every
-    // provider arrives with 0/0. That must be neutral, not a penalty.
+    // The state every provider starts in, and the one the whole platform was
+    // in until V3.1 Phase D shipped a review domain: 0/0 must be neutral, not
+    // a penalty.
     const c = RankingConfig.RATING_CONFIDENCE_C;
     const mean = 4.2;
     expect((c * mean + 0 * 0) / (c + 0)).toBeCloseTo(mean, 10);
