@@ -3,6 +3,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { SkipThrottle } from '@nestjs/throttler';
 import { Public } from '@beauclick/auth';
+import { MediaService } from '@beauclick/media';
 
 /**
  * Backend foundation requirement: a real health endpoint -- V2 had NONE
@@ -35,7 +36,10 @@ import { Public } from '@beauclick/auth';
 @SkipThrottle()
 @Controller('health')
 export class HealthController {
-  constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
+  constructor(
+    @InjectDataSource() private readonly dataSource: DataSource,
+    private readonly media: MediaService,
+  ) {}
 
   @Public()
   @Get()
@@ -47,10 +51,28 @@ export class HealthController {
       database = 'error';
     }
 
+    /**
+     * Which object-storage driver this deployment is actually running, and
+     * whether it is durable (V3.1 Phase C).
+     *
+     * Reported for the same reason `NotificationChannelPort.providerVerified`
+     * is: a driver writing to one container's own disk must never be
+     * indistinguishable from one writing to real object storage. V2 shipped a
+     * "local development only" payment stand-in whose production-safety was a
+     * sentence in the UI with no mechanism behind it, and Phase 2 found it
+     * still reachable. This is the mechanism.
+     *
+     * Deliberately NOT part of the `status` verdict: a development machine on
+     * the local driver is healthy, not degraded. The fact is surfaced; the
+     * judgement about whether it is acceptable belongs to whoever is reading.
+     */
+    const storage = this.media.describeDriver();
+
     return {
       status: database === 'ok' ? 'ok' : 'degraded',
       timestamp: new Date().toISOString(),
       checks: { database },
+      storage,
     };
   }
 }

@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { OutboxRelay } from '@beauclick/events';
 import { BookingService } from '@beauclick/booking';
 import { WaitlistService } from '@beauclick/waitlist';
+import { MediaService } from '@beauclick/media';
 import { FINANCIAL_OUTBOX_RELAY } from '../composition/financial-outbox-relay.provider';
 
 /**
@@ -33,6 +34,7 @@ export class OutboxSweepScheduler implements OnApplicationBootstrap, OnApplicati
     @Inject(FINANCIAL_OUTBOX_RELAY) private readonly financialRelay: OutboxRelay,
     private readonly bookings: BookingService,
     private readonly waitlist: WaitlistService,
+    private readonly media: MediaService,
     private readonly config: ConfigService,
   ) {}
 
@@ -49,6 +51,9 @@ export class OutboxSweepScheduler implements OnApplicationBootstrap, OnApplicati
     this.timers.push(this.every(this.intervalMs('HOLD_EXPIRY_SWEEP_INTERVAL_MS', 60_000), () => this.sweepHolds()));
     this.timers.push(
       this.every(this.intervalMs('WAITLIST_OFFER_EXPIRY_SWEEP_INTERVAL_MS', 60_000), () => this.sweepWaitlistOffers()),
+    );
+    this.timers.push(
+      this.every(this.intervalMs('MEDIA_GRANT_REAP_INTERVAL_MS', 300_000), () => this.sweepMediaGrants()),
     );
   }
 
@@ -117,5 +122,23 @@ export class OutboxSweepScheduler implements OnApplicationBootstrap, OnApplicati
   private async sweepWaitlistOffers(): Promise<void> {
     const expired = await this.waitlist.expireStaleOffers();
     if (expired > 0) this.logger.log(`Waitlist offer expiry sweep: ${expired} offer(s) expired`);
+  }
+
+  /**
+   * Expired upload grants (V3.1 Phase C).
+   *
+   * Unlike the three above, this one IS the mechanism rather than a backstop.
+   * Media quota counts `stored` objects, so a grant that is issued and never
+   * uploaded consumes none of it -- which is why there is a separate bound on
+   * outstanding PENDING grants. Nothing else ever clears those rows, so
+   * without this sweep a user whose upload failed ten times would be
+   * permanently unable to request another grant, with no error explaining why.
+   *
+   * Five minutes rather than the others' one: the grant TTL is fifteen, so
+   * anything more frequent is polling for work that cannot yet exist.
+   */
+  private async sweepMediaGrants(): Promise<void> {
+    const reaped = await this.media.reapExpiredGrants();
+    if (reaped > 0) this.logger.log(`Media grant reap: ${reaped} expired upload grant(s) cleared`);
   }
 }

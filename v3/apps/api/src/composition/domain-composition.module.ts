@@ -12,6 +12,7 @@ import { PaymentModule, PaymentOutboxEntity } from '@beauclick/payment';
 import { FinancialModule } from '@beauclick/financial';
 import { BusinessModule, BusinessOutboxEntity } from '@beauclick/business';
 import { WaitlistModule, WaitlistOutboxEntity, WaitlistService } from '@beauclick/waitlist';
+import { MediaModule } from '@beauclick/media';
 
 import { Phase3CompositionModule } from './phase3-composition.module';
 import { PHASE3_EVENT_HANDLERS, PHASE3_OUTBOX_SOURCES } from './phase3-tokens';
@@ -76,6 +77,8 @@ import {
     FinancialModule,
     BusinessModule,
     WaitlistModule,
+    // V3.1 Phase C: the sweep scheduler reaps expired upload grants.
+    MediaModule,
     // Phase 3's domains and their handlers/outboxes, contributed under their
     // own tokens and merged into the single relay below.
     Phase3CompositionModule,
