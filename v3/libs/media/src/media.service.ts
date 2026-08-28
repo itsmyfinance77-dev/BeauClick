@@ -364,11 +364,35 @@ export class MediaService {
     ownerUserId: string,
     mediaId: string,
   ): Promise<MediaObjectEntity> {
+    const row = await this.markDeletedOwnedIfLive(manager, ownerUserId, mediaId);
+    if (!row) throw new MediaNotFoundOrNotYoursException();
+    return row;
+  }
+
+  /**
+   * The same thing, but "it was already gone" is an answer rather than a
+   * failure. Returns `null` in that case.
+   *
+   * This exists because of a real, reachable dead end. A moderator upholding
+   * an abuse report marks the media object `deleted` while the portfolio item
+   * referencing it survives with `media: null`. With only the throwing
+   * variant, the professional could then never remove that leftover item --
+   * `removeItem` would refuse on the object, not the item -- and replacing a
+   * taken-down avatar would fail the same way. The owner's ability to tidy up
+   * after a takedown must not depend on the object still existing.
+   *
+   * Ownership is still checked: a `null` here means "gone or not yours", and
+   * the caller decides which of those is acceptable for its own operation.
+   */
+  async markDeletedOwnedIfLive(
+    manager: EntityManager,
+    ownerUserId: string,
+    mediaId: string,
+  ): Promise<MediaObjectEntity | null> {
     const repo = manager.getRepository(MediaObjectEntity);
     const row = await repo.findOne({ where: { id: mediaId } });
-    if (!row || row.ownerUserId !== ownerUserId || row.status === 'deleted') {
-      throw new MediaNotFoundOrNotYoursException();
-    }
+    if (!row || row.ownerUserId !== ownerUserId) return null;
+    if (row.status === 'deleted') return null;
     await repo.update({ id: mediaId }, { status: 'deleted', deletedAt: () => 'now()' });
     return row;
   }

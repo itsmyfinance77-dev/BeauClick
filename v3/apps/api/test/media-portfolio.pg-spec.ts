@@ -887,6 +887,75 @@ describePg('V3.1 Phase C -- media, portfolio, imagery (real PostgreSQL)', () => 
         .expect(403);
     });
 
+    it('lets the professional remove a portfolio item whose image a moderator took down', async () => {
+      // BUG-C-05. Upholding a report deletes the media object and leaves the
+      // item behind with `media: null`. If item removal insisted on deleting a
+      // LIVE object, the professional could never clear the leftover -- a dead
+      // end reachable entirely through supported actions, and one the owner
+      // cannot get out of.
+      const { user, professional, mediaId, publicPath } = await publishedItem('+989120000181');
+      const reporter = await seedUser(app, dataSource, '+989120000182', ['customer']);
+      const moderator = await seedUser(app, dataSource, '+989120000183', ['customer']);
+      await bootstrapRole(moderator.id, 'moderator');
+      const moderatorToken = await tokenFor(moderator.id);
+
+      const report = await request(app.getHttpServer())
+        .post(`/api/v1/media/${mediaId}/report`)
+        .set('Authorization', `Bearer ${reporter.accessToken}`)
+        .send({ reason: 'explicit' })
+        .expect(201);
+      await request(app.getHttpServer())
+        .post(`/api/v1/admin/media/reports/${report.body.data.id}/decide`)
+        .set('Authorization', `Bearer ${moderatorToken}`)
+        .send({ decision: 'uphold', reason: 'محتوای نامناسب' })
+        .expect(201);
+      await request(app.getHttpServer()).get(publicPath).expect(404);
+
+      // The item survives the takedown, with no image.
+      const afterTakedown = await request(app.getHttpServer())
+        .get(`/api/v1/providers/${professional.id}/portfolio`)
+        .expect(200);
+      expect(afterTakedown.body.data).toHaveLength(1);
+      expect(afterTakedown.body.data[0].media).toBeNull();
+
+      await request(app.getHttpServer())
+        .delete(`/api/v1/providers/${professional.id}/portfolio/${afterTakedown.body.data[0].id}`)
+        .set('Authorization', `Bearer ${user.accessToken}`)
+        .expect(204);
+
+      const afterRemoval = await request(app.getHttpServer())
+        .get(`/api/v1/providers/${professional.id}/portfolio`)
+        .expect(200);
+      expect(afterRemoval.body.data).toHaveLength(0);
+    });
+
+    it('lets the professional replace an avatar a moderator took down', async () => {
+      const user = await seedUser(app, dataSource, '+989120000184', ['professional']);
+      const professional = await seedProfessional(dataSource, user.id, 'متخصص');
+      const first = await upload(user.accessToken, 'avatar', pngFixture(512, 512));
+      await request(app.getHttpServer())
+        .patch(`/api/v1/providers/${professional.id}/avatar`)
+        .set('Authorization', `Bearer ${user.accessToken}`)
+        .send({ mediaId: first.mediaId })
+        .expect(204);
+
+      // Taken down out from under the professional.
+      await dataSource.query(
+        "UPDATE media.objects SET status = 'deleted', deleted_at = now(), taken_down_by = $1 WHERE id = $2",
+        [user.id, first.mediaId],
+      );
+
+      const second = await upload(user.accessToken, 'avatar', pngFixture(600, 600));
+      await request(app.getHttpServer())
+        .patch(`/api/v1/providers/${professional.id}/avatar`)
+        .set('Authorization', `Bearer ${user.accessToken}`)
+        .send({ mediaId: second.mediaId })
+        .expect(204);
+
+      const profile = await request(app.getHttpServer()).get(`/api/v1/providers/${professional.id}`).expect(200);
+      expect(profile.body.data.images.avatar).toMatchObject({ width: 600, height: 600 });
+    });
+
     it('refuses a report against a protected object, so the endpoint is no existence oracle', async () => {
       const user = await seedUser(app, dataSource, '+989120000177', ['professional']);
       await seedProfessional(dataSource, user.id, 'متخصص');

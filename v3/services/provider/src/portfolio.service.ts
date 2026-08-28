@@ -195,14 +195,17 @@ export class PortfolioService {
       }
 
       await repo.update({ id: itemId }, { deletedAt: () => 'now()' });
-      const object = await this.media.markDeletedOwned(manager, ownerUserId, row.mediaId);
+      // Tolerant of an object that is already gone: a moderator upholding an
+      // abuse report deletes the object and leaves the item behind, and the
+      // professional must still be able to remove the leftover.
+      const object = await this.media.markDeletedOwnedIfLive(manager, ownerUserId, row.mediaId);
       await this.events.emitMediaChanged(manager, professionalId, await this.mediaSnapshot(manager, professionalId));
       return object;
     });
 
     // Bytes after the commit. If the transaction had rolled back, the item
     // would still be live and its image must still load.
-    await this.media.purgeBytes([purge]);
+    if (purge) await this.media.purgeBytes([purge]);
   }
 
   /**
@@ -234,7 +237,10 @@ export class PortfolioService {
 
       let previous: MediaObjectEntity | null = null;
       if (previousId && previousId !== mediaId) {
-        previous = await this.media.markDeletedOwned(manager, ownerUserId, previousId);
+        // Same tolerance as `removeItem`: replacing an avatar a moderator has
+        // already taken down must succeed, not fail on the object that is
+        // being replaced anyway.
+        previous = await this.media.markDeletedOwnedIfLive(manager, ownerUserId, previousId);
       }
 
       await this.events.emitMediaChanged(manager, professionalId, await this.mediaSnapshot(manager, professionalId));

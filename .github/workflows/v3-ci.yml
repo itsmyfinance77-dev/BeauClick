@@ -127,25 +127,6 @@ jobs:
           --health-timeout=5s
           --health-retries=20
 
-      # V3.1 Phase C. The S3 driver's request signing is hand-written (see
-      # libs/media/src/storage/sigv4.ts for why), so the ONLY thing that can
-      # vouch for a signature is a server that either accepts it or does not.
-      # MinIO is the reference implementation of the S3 API; it is NOT the
-      # vendor this platform will deploy against, which is undecided and
-      # downstream of the hosting decision. GAP-C-01 records that distinction
-      # rather than letting a green job here imply it is closed.
-      minio:
-        image: minio/minio:latest
-        env:
-          MINIO_ROOT_USER: beauclick_test
-          MINIO_ROOT_PASSWORD: beauclick_test_secret
-        ports: ['9000:9000']
-        options: >-
-          --health-cmd="curl -sf http://localhost:9000/minio/health/live || exit 1"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=20
-
       opensearch:
         image: opensearchproject/opensearch:2.19.1
         env:
@@ -172,6 +153,37 @@ jobs:
           cache-dependency-path: v3/pnpm-lock.yaml
       - name: Install
         run: pnpm install --frozen-lockfile
+
+      # V3.1 Phase C. The S3 driver's request signing is hand-written (see
+      # libs/media/src/storage/sigv4.ts for why), so the ONLY thing that can
+      # vouch for a signature is a server that either accepts it or does not.
+      # MinIO is the reference implementation of the S3 API; it is NOT the
+      # vendor this platform will deploy against, which is undecided and
+      # downstream of the hosting decision. GAP-C-01 records that distinction
+      # rather than letting a green job here imply it is closed.
+      #
+      # A STEP rather than a `services:` entry, and that is not a style
+      # preference: a service container cannot be given a COMMAND, and
+      # `minio/minio`'s entrypoint requires `server <path>`. Declared as a
+      # service it starts with no arguments, prints its usage text, and the
+      # job fails at "Failed to initialize container" before a single test
+      # runs -- which is exactly what happened the first time this landed.
+      - name: Start object storage
+        run: |
+          docker run -d --name bc-ci-minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=beauclick_test \
+            -e MINIO_ROOT_PASSWORD=beauclick_test_secret \
+            minio/minio:latest server /data
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:9000/minio/health/live > /dev/null; then
+              echo "MinIO is live"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "MinIO did not become live"
+          docker logs bc-ci-minio
+          exit 1
 
       - name: Provision roles and the application database
         # The financial roles must exist BEFORE the financial migration runs,
