@@ -423,3 +423,128 @@ and all still hold as documented.
 **Still disclosed, unchanged:** throttler storage is in-memory per process, so at
 multi-instance scale the effective limit multiplies by instance count; RBAC is
 code-based; audit logging is structured-logger-based rather than DB-persisted.
+
+---
+
+## 16. V3.1 Phase E addendum (2026-08-28) — privacy, the session claim, and the SMS provider
+
+### 16.1 Privacy: authorization by construction, not by check
+
+**There is no user id anywhere in `PrivacyController`.** All four self-service routes derive
+the subject from `@CurrentUser()`, so "export somebody else's data" and "delete somebody
+else's account" are requests this API cannot express — the same construction `/v1/me` uses,
+and the strongest available form of §3's rule: there is nothing to forge because there is no
+parameter.
+
+Request ids appear in paths, and every lookup is scoped by **both** id and subject. Another
+user's request id, a nonexistent one, an export that is not generated yet, and one that has
+expired all produce a **byte-identical** 404 (`NOT_FOUND_OR_NOT_YOURS`) — asserted by
+comparing whole response bodies, not by reading the code. A caller who could distinguish them
+would have an oracle over other people's privacy requests.
+
+### 16.2 The export payload is structurally unreachable by an operator
+
+Phase E's requirement is unqualified: *no admin route may ever download another user's export
+file.* Rather than enforce it with a `SELECT` somebody must remember not to write, the request
+row and the document live in **different tables**. `GET /v1/admin/privacy/requests` reads
+`privacy.data_requests`; the payload is not on the row it read.
+
+Two related properties, both asserted from an authenticated `platform_operator` session
+rather than only from an anonymous one — because the operator is the caller who could
+plausibly have been granted the ability:
+
+- an operator is refused another user's export download;
+- **there is no administrative cancel route for an erasure at all.** An operator who can
+  cancel a deletion can silently keep an account its owner asked to be rid of. When a request
+  is stuck, a `failed` status plus a stable `failureCode` is what an operator acts on.
+
+The document is stored in PostgreSQL rather than object storage on purpose: a presigned URL to
+a complete personal-data export is a bearer credential that survives being forwarded, logged
+by a proxy, or left in browser history. An authenticated route re-verifies the session on
+every byte delivered. On expiry the payload row is **destroyed**, not merely made unreachable
+— and the DELETE commits before the status flip, in one transaction, so a crash between them
+cannot leave an `expired` request beside a live copy of somebody's data.
+
+### 16.3 What an export deliberately withholds
+
+Being the subject's own data does not make everything about them safe to hand over in one
+file:
+
+| Withheld | Why |
+|---|---|
+| `identity.refresh_tokens.token_hash` | A credential. The subject gains nothing; anyone who obtains the document gains hashes to attack offline |
+| `payment.payment_attempts.provider_response` | A vendor diagnostic blob whose shape differs per provider and which routinely carries a masked card number or a third party's account reference |
+| `media.objects.storage_key` | The object store's key layout, published to whoever obtains the file |
+| `admin.admin_audit_log`, in full | Almost every row about a subject records what an OPERATOR did to them, and the snapshots name the operator or quote a moderator's private reasoning. Handing somebody the internal reasoning behind a takedown, including who triggered it, is how a moderation system becomes a retaliation tool |
+| Another party's side of a shared record | A professional's export does not contain the list of every customer who has booked them |
+
+### 16.4 Erasure is bounded by the database, not only by policy
+
+`financial.*` is retained by legal obligation — and the application role holds no `UPDATE` and
+no `DELETE` there (ADR-017), so an erasure that tried would fail. `admin.admin_audit_log` is
+append-only under its own owner role for the same reason: an erasure able to touch it would be
+a way for an operator to launder their own history.
+
+The compliance record (`privacy.data_requests`) survives the erasure it proves happened, so it
+carries **counts and timestamps only, never content** — a test serializes the row after
+execution and asserts the erased phone number is not in it.
+
+Erasure is also **atomic across every module**: one transaction on the application DataSource
+covers all sixteen contracts, the request row, the audit row, and the event. A subject whose
+identity was destroyed but whose reviews still carried their text would be both un-notifiable
+and un-retryable, because nothing would record how far it got.
+
+### 16.5 The `sid` claim (`QA-20`) — what it is and what it is not
+
+Every access token now carries `sid`: **the refresh row's UUID, never the refresh token.** The
+token itself is stored only as a SHA-256 hash and is not recoverable from anything the client
+holds. Knowing the id lets a bearer identify which of their own sessions is speaking; it does
+not let them use it, and every route acting on a session id still resolves ownership from
+`userId` — a test revokes across users to prove it.
+
+The claim is **optional**, and that is load-bearing: tokens minted before it existed stay valid
+for their full 15 minutes across a deploy, so requiring it would 401 every signed-in user.
+Those report `current: false`, which is the honest answer rather than a guess.
+
+### 16.6 `QA-19`'s new fields are not an enumeration oracle
+
+`POST /v1/auth/request-otp` gains `cooldownRemaining` and `expiresInSeconds`. Both are policy
+constants, identical for every caller, so neither varies with account existence — asserted by
+comparing the **whole response body** for a phone with an account against one without.
+
+A refusal inside the resend window carries `retryAfterSeconds`; a refusal from the **hourly**
+window deliberately carries none, because when that window resets depends on when each of up
+to five earlier requests landed. A plausible number there would have a client count down to a
+moment that still fails, which is worse than no number because it looks reliable.
+
+### 16.7 SMS provider (`GAP-11`) — §6's rule, extended
+
+§6's provider-abstraction safety rule now has a third instance. `SmsChannel` reports
+`providerVerified` **derived** from the configured provider's `deliversExternally` rather than
+declared, so the two cannot drift: a deployment that has wired a real gateway stops being
+described on the health surface as one that has not, and an unconfigured one cannot claim it
+is sending.
+
+Three security properties of `HttpSmsProvider`, all exercised against a real HTTP server:
+
+- **https only, enforced at configuration time.** The request body carries a one-time login
+  code and a phone number; a plaintext endpoint hands both to anyone on the path.
+- **Partial configuration is treated as NO configuration.** An endpoint with no credential
+  would 401 every OTP and fill the dead-letter queue with unauthenticated attempts while the
+  operator debugged delivery instead of reading "no provider configured".
+- **A gateway's error body never leaves the provider.** Gateways routinely quote the
+  recipient's number back in an error string, which would otherwise flow into the notification
+  row, the `NotificationFailed` event, and every log line downstream. Only a stable code
+  escapes, and a test asserts the number is absent from the outcome.
+
+**GAP-11 remains open.** No vendor is selected and no live send has occurred; what closed is
+the code side.
+
+### 16.8 Unchanged and re-confirmed
+
+Everything in §15.5 was re-read this pass and still holds. The one change to token shape is
+§16.5's additive optional claim; no existing claim was removed or retyped, and no guard's
+behaviour changed.
+
+**Still disclosed, unchanged:** throttler storage is in-memory per process (`THROTTLE-STORE`),
+so at multi-instance scale the effective limit multiplies by instance count.

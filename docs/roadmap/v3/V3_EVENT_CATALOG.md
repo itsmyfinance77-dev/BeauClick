@@ -396,3 +396,64 @@ shapes, consumed by the same consumers. `RefundCompleted`'s two-hop chain
 reversal, see PHASE5-03) is likewise provider-independent. Swapping the adapter is a new
 class implementing `PaymentProvider` plus one registry entry — no event contract, consumer,
 or catalog entry is affected.
+
+---
+
+## V3.1 Phase E addendum (2026-08-28) — the privacy contracts
+
+Five new contracts, producer `privacy`, all v1. `ServiceName` gains `privacy`; the
+executable registry is the authority, as §"The catalog is now executable" records.
+
+| Event | Consumers | Idempotency |
+|---|---|---|
+| `DataExportRequested` v1 | notification, analytics | partial UNIQUE — one open request per subject per kind |
+| `DataExportCompleted` v1 | notification, analytics | status CAS `processing → ready` |
+| `DataErasureRequested` v1 | notification, analytics | same partial UNIQUE |
+| `DataErasureCancelled` v1 | notification, analytics | status CAS `pending → cancelled` |
+| `DataErasureCompleted` v1 | **analytics only** | status CAS `processing → completed`, inside the erasure's own transaction |
+
+### The rule every payload here obeys, and why it needed stating
+
+A privacy event carries the **fact** that a request changed state and nothing about what it
+contains: no document, no counts of what was erased, no phone number, no name.
+
+That is stricter than the no-secrets rule already enforced by a throw, and the reason is
+specific to this domain. These events fan out to analytics — which stores them permanently —
+and to notification, which persists a row per delivery. An event whose job is to announce that
+somebody's data was destroyed must not be the reason a copy of it survives in two more
+schemas. A test asserts the erased subject's phone number appears in no payload.
+
+`DataErasureCompleted` carries `subjectUserId`, and by the time it publishes that id
+identifies nobody — which is the whole point of anonymization with referential integrity
+(ADR-027). A consumer needs it to reconcile its own rows against a subject who no longer has
+a name or a phone number.
+
+### `DataErasureCompleted` has no notification consumer, deliberately
+
+By the time it publishes, the subject's phone number is a tombstone and every session is
+revoked. There is no channel left to reach them on, and an in-app notification would be
+addressed to an account nobody can sign into. The "your account will be deleted, and here is
+until when" message goes out on `DataErasureRequested`, while the grace window is open and the
+subject can still act on it — which is the moment the message is actually useful.
+
+### Analytics ingests all five with NO subject and NO actor
+
+`actorOf` is absent from every one of the five fact mappings, so the allow-listed `dimensions`
+shape means the subject id never reaches `analytics.events`. "How many people asked to be
+erased this month" is a real operational number and needs no identity to answer; an analytics
+store that permanently recorded *who* asked to be forgotten would be an unusually pointed
+thing to get wrong.
+
+### One additive widening of five existing v1 contracts
+
+`NOTIFICATION_CATEGORIES` gains `privacy`, which appears in the schemas of
+`NotificationRequested`, `NotificationSent`, `NotificationFailed`,
+`NotificationDeadLettered`, and `NotificationRead`.
+
+The project's rule is "a payload change is a NEW version, never an edit", and that rule exists
+to protect deployed consumers. Adding an enum member breaks none: no field changes type, none
+is removed, and every value a consumer already understood still arrives. Cutting v2 of every
+notification contract for a category label would cost real churn across every consumer and
+buy nothing. **A member removed from that list would be the breaking change, and would deserve
+the version.** The reasoning is recorded in `notification.events.ts` beside the member itself,
+so a future reader meets it where the decision lives rather than only here.
