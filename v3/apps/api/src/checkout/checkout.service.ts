@@ -77,7 +77,7 @@ export class CheckoutService {
    * "book" button therefore converges on ONE booking and ONE order, and a
    * network retry returns the same pair rather than a second slot claim.
    */
-  async checkout(input: CreateBookingInput & { callbackUrl: string }): Promise<CheckoutResult> {
+  async checkout(input: CreateBookingInput & { callbackBaseUrl: string }): Promise<CheckoutResult> {
     const { bookingId, order } = await this.dataSource.transaction(async (manager) => {
       const booking = await this.bookings.create(
         {
@@ -115,7 +115,7 @@ export class CheckoutService {
 
     let redirectUrl: string | null = null;
     if (order.order.totalToman > 0) {
-      const initiated = await this.payments.initiate(intent.id, input.callbackUrl, `رزرو نوبت — سفارش ${order.order.id}`);
+      const initiated = await this.payments.initiate(intent.id, input.callbackBaseUrl, `رزرو نوبت — سفارش ${order.order.id}`);
       redirectUrl = initiated.redirectUrl;
     }
 

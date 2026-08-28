@@ -141,7 +141,7 @@ describeIfPg('Transactional outbox on real PostgreSQL', () => {
       professionalId: professional.id,
       slotId,
       serviceId: professional.serviceId,
-      callbackUrl: 'http://x/cb',
+      callbackBaseUrl: 'http://x/cb',
     });
 
     // checkout already drained post-commit; every staged row across booking,
@@ -165,7 +165,7 @@ describeIfPg('Transactional outbox on real PostgreSQL', () => {
     const slotId = await seedSlot(dataSource, professional.id, professional.serviceId, futureSlotTime(64));
 
     const checkout = app.get(await import('../src/checkout/checkout.service').then((m) => m.CheckoutService));
-    await checkout.checkout({ customerId: customer.id, professionalId: professional.id, slotId, serviceId: professional.serviceId, callbackUrl: 'http://x/cb' });
+    await checkout.checkout({ customerId: customer.id, professionalId: professional.id, slotId, serviceId: professional.serviceId, callbackBaseUrl: 'http://x/cb' });
 
     const rows = await dataSource.query(`
       SELECT payload FROM booking.outbox_events

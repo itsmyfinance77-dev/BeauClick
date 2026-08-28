@@ -33,9 +33,16 @@ export class CheckoutController {
     private readonly config: ConfigService,
   ) {}
 
-  private callbackUrl(): string {
+  /**
+   * The callback ROUTE PREFIX, without a provider segment. `PaymentService.initiate`
+   * appends the intent's own provider key, so the return leg always addresses
+   * the provider that will verify it. `R31-17`: this previously returned a full
+   * URL hardcoding `/callback/mock`, which never matched the `sandbox`-keyed
+   * attempt and left every browser payment stuck pending.
+   */
+  private callbackBaseUrl(): string {
     const base = this.config.get<string>('PUBLIC_API_BASE_URL') ?? 'http://localhost:3099/api';
-    return `${base}/v1/payments/callback/mock`;
+    return `${base}/v1/payments/callback`;
   }
 
   /**
@@ -56,7 +63,7 @@ export class CheckoutController {
       slotId: dto.slotId,
       serviceId: dto.serviceId ?? null,
       idempotencyKey: idempotencyKey ?? null,
-      callbackUrl: this.callbackUrl(),
+      callbackBaseUrl: this.callbackBaseUrl(),
     });
 
     const booking = await this.bookings.findById(result.bookingId);
@@ -165,9 +172,10 @@ export class PaymentCallbackController {
       return { redirectUrl: null };
     }
     const base = this.config.get<string>('PUBLIC_API_BASE_URL') ?? 'http://localhost:3099/api';
+    // Pass the base only; `initiate` appends the intent's own provider key.
     const initiated = await this.payments.initiate(
       intentId,
-      `${base}/v1/payments/callback/${intent.providerKey}`,
+      `${base}/v1/payments/callback`,
       `پرداخت سفارش ${intent.orderId}`,
     );
     return { redirectUrl: initiated.redirectUrl };

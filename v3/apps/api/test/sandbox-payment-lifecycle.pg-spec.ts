@@ -97,7 +97,10 @@ describeIfPg('Sandbox payment lifecycle on real PostgreSQL', () => {
       professionalId: professional.id,
       slotId,
       serviceId: professional.serviceId,
-      callbackUrl: 'http://localhost:3099/api/v1/payments/callback/sandbox',
+      // A callback BASE, not a full URL: `initiate` appends the intent's own
+      // provider key. This mirrors the real controller, which is where R31-17
+      // lived -- it used to hand a full URL hardcoding `/callback/mock`.
+      callbackBaseUrl: 'http://localhost:3099/api/v1/payments/callback',
     });
 
     const [attempt] = await dataSource.query(
@@ -130,6 +133,43 @@ describeIfPg('Sandbox payment lifecycle on real PostgreSQL', () => {
       const { result, reference } = await reachGateway();
       expect(result.redirectUrl).toContain('/sandbox-gateway');
       expect(result.redirectUrl).toContain(encodeURIComponent(reference));
+    });
+
+    /**
+     * R31-17 regression. The embedded callback the gateway will return the
+     * browser to MUST address the intent's own provider (`sandbox`), because
+     * the callback resolves the attempt by `(providerKey, reference)`. The bug
+     * was a hardcoded `/callback/mock` in the checkout controller, which the
+     * automated suite never caught because every other test called
+     * `handleCallback('sandbox', ...)` directly and skipped the URL
+     * construction. This asserts the URL construction itself.
+     */
+    it('embeds a callback that addresses the payment provider, never a hardcoded one', async () => {
+      const { result } = await reachGateway();
+      // The redirect carries `callback=<encoded callback URL>`.
+      const decoded = decodeURIComponent(result.redirectUrl ?? '');
+      expect(decoded).toContain('/v1/payments/callback/sandbox');
+      // The exact bug: it must NOT point at a `mock` provider the attempt is
+      // not keyed under.
+      expect(decoded).not.toContain('/v1/payments/callback/mock');
+    });
+
+    /**
+     * §4: the old mock callback path cannot accidentally verify a sandbox
+     * payment. Even with the decision recorded as paid, `handleCallback('mock',
+     * ...)` cannot resolve the `sandbox`-keyed attempt -- it is refused with the
+     * same generic not-found a forged reference gets, and the order stays
+     * unpaid. This is the failure that left every browser payment pending.
+     */
+    it('refuses to verify a sandbox payment through the WRONG provider callback', async () => {
+      const { result, reference } = await reachGateway(220_000);
+      expect(await sandbox.decide(reference, 'success')).toBe(true);
+
+      await expect(checkout.handleCallback('mock', reference, { reference })).rejects.toBeDefined();
+
+      // The order is untouched: no cross-provider callback can mark it paid.
+      const order = await orders.findById(result.order.order.id);
+      expect(order?.status).not.toBe('paid');
     });
   });
 

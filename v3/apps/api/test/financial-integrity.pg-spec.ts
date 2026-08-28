@@ -578,7 +578,7 @@ describeIfPg('Financial integrity on real PostgreSQL', () => {
         professionalId: professional.id,
         slotId,
         serviceId: professional.serviceId,
-        callbackUrl: 'http://localhost:3099/api/v1/payments/callback/sandbox',
+        callbackBaseUrl: 'http://localhost:3099/api/v1/payments/callback',
       });
 
       const [{ provider_reference }] = await dataSource.query(
@@ -613,7 +613,7 @@ describeIfPg('Financial integrity on real PostgreSQL', () => {
         professionalId: professional.id,
         slotId,
         serviceId: professional.serviceId,
-        callbackUrl: 'http://localhost:3099/api/v1/payments/callback/sandbox',
+        callbackBaseUrl: 'http://localhost:3099/api/v1/payments/callback',
       });
       const [{ provider_reference }] = await dataSource.query(
         `SELECT provider_reference FROM payment.payment_attempts WHERE payment_intent_id = $1`,

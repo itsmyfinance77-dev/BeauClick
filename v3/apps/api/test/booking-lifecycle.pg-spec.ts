@@ -285,8 +285,8 @@ describeIfPg('Booking lifecycle, idempotency and authorization on real PostgreSQ
       const { customer, professional, slotId } = await scenario();
       const key = 'checkout-retry';
 
-      const first = await checkout.checkout({ customerId: customer.id, professionalId: professional.id, slotId, serviceId: professional.serviceId, idempotencyKey: key, callbackUrl: 'http://x/cb' });
-      const second = await checkout.checkout({ customerId: customer.id, professionalId: professional.id, slotId, serviceId: professional.serviceId, idempotencyKey: key, callbackUrl: 'http://x/cb' });
+      const first = await checkout.checkout({ customerId: customer.id, professionalId: professional.id, slotId, serviceId: professional.serviceId, idempotencyKey: key, callbackBaseUrl: 'http://x/cb' });
+      const second = await checkout.checkout({ customerId: customer.id, professionalId: professional.id, slotId, serviceId: professional.serviceId, idempotencyKey: key, callbackBaseUrl: 'http://x/cb' });
 
       expect(second.bookingId).toBe(first.bookingId);
       expect(second.order.order.id).toBe(first.order.order.id);
@@ -297,8 +297,8 @@ describeIfPg('Booking lifecycle, idempotency and authorization on real PostgreSQ
     it('creates exactly ONE payment intent for an order, however many times checkout is retried', async () => {
       const { customer, professional, slotId } = await scenario();
       const key = 'intent-retry';
-      await checkout.checkout({ customerId: customer.id, professionalId: professional.id, slotId, serviceId: professional.serviceId, idempotencyKey: key, callbackUrl: 'http://x/cb' });
-      await checkout.checkout({ customerId: customer.id, professionalId: professional.id, slotId, serviceId: professional.serviceId, idempotencyKey: key, callbackUrl: 'http://x/cb' });
+      await checkout.checkout({ customerId: customer.id, professionalId: professional.id, slotId, serviceId: professional.serviceId, idempotencyKey: key, callbackBaseUrl: 'http://x/cb' });
+      await checkout.checkout({ customerId: customer.id, professionalId: professional.id, slotId, serviceId: professional.serviceId, idempotencyKey: key, callbackBaseUrl: 'http://x/cb' });
 
       const [{ count }] = await dataSource.query(`SELECT COUNT(*)::int AS count FROM payment.payment_intents`);
       expect(count).toBe(1);
@@ -308,7 +308,7 @@ describeIfPg('Booking lifecycle, idempotency and authorization on real PostgreSQ
   describe('order creation and pricing integrity', () => {
     it('prices the order from the catalogue, never from the client', async () => {
       const { customer, professional, slotId } = await scenario(345_000);
-      const result = await checkout.checkout({ customerId: customer.id, professionalId: professional.id, slotId, serviceId: professional.serviceId, callbackUrl: 'http://x/cb' });
+      const result = await checkout.checkout({ customerId: customer.id, professionalId: professional.id, slotId, serviceId: professional.serviceId, callbackBaseUrl: 'http://x/cb' });
 
       expect(result.order.order.subtotalToman).toBe(345_000);
       expect(result.order.order.totalToman).toBe(345_000);
@@ -345,7 +345,7 @@ describeIfPg('Booking lifecycle, idempotency and authorization on real PostgreSQ
           professionalId: professional.id,
           slotId: genericSlot,
           serviceId: otherProfessional.serviceId, // not theirs to sell
-          callbackUrl: 'http://x/cb',
+          callbackBaseUrl: 'http://x/cb',
         }),
       ).rejects.toMatchObject({ response: { code: 'SERVICE_UNAVAILABLE_FOR_SALE' } });
 
@@ -366,7 +366,7 @@ describeIfPg('Booking lifecycle, idempotency and authorization on real PostgreSQ
           professionalId: professional.id,
           slotId,
           serviceId: otherProfessional.serviceId,
-          callbackUrl: 'http://x/cb',
+          callbackBaseUrl: 'http://x/cb',
         }),
       ).rejects.toMatchObject({ response: { code: 'SLOT_UNAVAILABLE' } });
 
@@ -386,7 +386,7 @@ describeIfPg('Booking lifecycle, idempotency and authorization on real PostgreSQ
           professionalId: professional.id,
           slotId: genericSlot,
           serviceId: uuidv7(),
-          callbackUrl: 'http://x/cb',
+          callbackBaseUrl: 'http://x/cb',
         }),
       ).rejects.toMatchObject({ response: { code: 'SERVICE_UNAVAILABLE_FOR_SALE' } });
 

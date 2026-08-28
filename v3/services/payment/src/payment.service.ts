@@ -173,7 +173,22 @@ export class PaymentService {
    * connection and row locks open. The attempt row is written after the
    * gateway responds, keyed by the reference it gave us.
    */
-  async initiate(intentId: string, callbackUrl: string, description: string): Promise<InitiateResult> {
+  /**
+   * `callbackBaseUrl` is the callback ROUTE PREFIX (`.../v1/payments/callback`),
+   * NOT a full URL. The provider segment is appended HERE, from the intent's
+   * own `provider.key`, so the return leg always addresses the same provider
+   * that will verify it.
+   *
+   * `R31-17`: this used to receive a full callback URL, and the initial
+   * checkout path hardcoded `.../callback/mock` in the controller while the
+   * provider key is `sandbox`. The browser therefore returned to
+   * `/callback/mock`, `handleCallback('mock', ref)` could not resolve the
+   * `sandbox`-keyed attempt, and the payment never verified -- the order sat
+   * pending. Deriving the segment from `provider.key` fixes it for the sandbox
+   * and, crucially, makes any future real provider produce its own correct
+   * callback path with no controller change.
+   */
+  async initiate(intentId: string, callbackBaseUrl: string, description: string): Promise<InitiateResult> {
     const intent = await this.intents.findOne({ where: { id: intentId } });
     if (!intent) throw new PaymentIntentNotFoundException();
 
@@ -208,6 +223,9 @@ export class PaymentService {
     }
 
     const provider = this.providers.get(intent.providerKey);
+    // The callback's provider segment is the intent's OWN provider key --
+    // trusted server-side state, never a hardcoded literal or a client value.
+    const callbackUrl = `${callbackBaseUrl.replace(/\/+$/, '')}/${provider.key}`;
     const initiated = await provider.initiate({
       paymentIntentId: intent.id,
       orderId: intent.orderId,
@@ -327,7 +345,12 @@ export class PaymentService {
       };
     }
 
-    const provider = this.providers.get(providerKey);
+    // The provider used to VERIFY comes from the attempt's own record, never
+    // from the caller's path parameter. The lookup above already required
+    // `attempt.providerKey === providerKey`, so this is the same provider --
+    // but reading it from trusted state rather than the request makes the
+    // authority explicit and cannot be spoofed by a crafted callback URL.
+    const provider = this.providers.get(attempt.providerKey);
     const providerResult = await provider.verify({
       providerReference,
       expectedAmountToman: intent.amountToman,

@@ -75,7 +75,7 @@ describeIfPg('Payment callback security on real PostgreSQL', () => {
       professionalId: professional.id,
       slotId,
       serviceId: professional.serviceId,
-      callbackUrl: 'http://localhost:3099/api/v1/payments/callback/sandbox',
+      callbackBaseUrl: 'http://localhost:3099/api/v1/payments/callback',
     });
 
     const attempts = await dataSource.query(
@@ -325,7 +325,7 @@ describeIfPg('Payment callback security on real PostgreSQL', () => {
         slotId,
         serviceId: professional.serviceId,
         idempotencyKey: 'retry-me',
-        callbackUrl: 'http://localhost:3099/api/v1/payments/callback/sandbox',
+        callbackBaseUrl: 'http://localhost:3099/api/v1/payments/callback',
       };
       const first = await checkout.checkout(args);
       const second = await checkout.checkout(args);
