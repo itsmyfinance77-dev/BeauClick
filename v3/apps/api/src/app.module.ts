@@ -12,11 +12,10 @@ import {
   BeauClickThrottlerGuard,
   JwtAuthGuard,
   CapabilityGuard,
-  PRIVILEGED_CAPABILITY_VERIFIER,
   throttlerOptionsFromEnv,
 } from '@beauclick/auth';
 import { OwnershipGuard } from '@beauclick/ownership';
-import { IdentityModule, IDENTITY_ENTITIES, RoleService } from '@beauclick/identity';
+import { IdentityModule, IDENTITY_ENTITIES } from '@beauclick/identity';
 import { ProviderModule, PROVIDER_ENTITIES } from '@beauclick/provider';
 import { BOOKING_ENTITIES } from '@beauclick/booking';
 import { COMMERCE_ENTITIES } from '@beauclick/commerce';
@@ -30,7 +29,9 @@ import { BUSINESS_ENTITIES } from '@beauclick/business';
 import { WAITLIST_ENTITIES } from '@beauclick/waitlist';
 import { EventContractsModule } from '@beauclick/event-contracts';
 import { AuditModule, AUDIT_ENTITIES } from '@beauclick/audit';
+import { MediaModule, MEDIA_ENTITIES } from '@beauclick/media';
 import { DomainCompositionModule } from './composition/domain-composition.module';
+import { PrivilegedCapabilityModule } from './composition/privileged-capability.module';
 
 import cookieParser from 'cookie-parser';
 import { CorrelationMiddleware } from './observability/correlation.middleware';
@@ -81,6 +82,11 @@ import { HealthController } from './health/health.controller';
           // Sharing the pool is what lets an audit row commit in the same
           // transaction as the mutation it records.
           ...AUDIT_ENTITIES,
+          // V3.1 Phase C. Ordinary application-role tables on the shared pool:
+          // `media.objects` is an authorization record the application both
+          // reads and writes on every upload, so it needs neither `financial`'s
+          // second DataSource nor `admin`'s owner-role isolation.
+          ...MEDIA_ENTITIES,
         ],
         // V3_DATABASE_BLUEPRINT.md §2 mandates lower_snake_case columns;
         // TypeORM's default naming strategy uses the JS property name
@@ -147,6 +153,16 @@ import { HealthController } from './health/health.controller';
     // assertion has a home that does not depend on which modules a given
     // composition happens to include.
     AuditModule,
+    // Global, so every module that needs the live privileged-capability
+    // re-check can reach it -- see that module's note on why an AppModule
+    // provider was not enough.
+    PrivilegedCapabilityModule,
+    // V3.1 Phase C. Imported at the root for the same reason AuditModule is:
+    // it is infrastructure several domains reference (provider today; privacy
+    // exports and, eventually, review imagery next), and the driver choice is
+    // one boot-time decision the whole application shares. Not `@Global()`,
+    // though -- a module that needs `MediaService` imports it and says so.
+    MediaModule,
     IdentityModule,
     ProviderModule,
     DomainCompositionModule,
@@ -170,17 +186,12 @@ import { HealthController } from './health/health.controller';
     // bucket, which is precisely the bug this ordering avoids. Unauthenticated
     // and @Public() routes still reach it and are keyed by IP.
     { provide: APP_GUARD, useClass: BeauClickThrottlerGuard },
-    // The privileged re-check's implementation, bound here because libs/auth
-    // may not import a services/* package (ADR-011). Without this binding the
-    // guard falls back to token-only checking, which is exactly as strict as it
-    // was before -- never weaker.
-    {
-      provide: PRIVILEGED_CAPABILITY_VERIFIER,
-      useFactory: (roles: RoleService) => ({
-        hasCapability: (userId: string, capability: string) => roles.hasCapability(userId, capability),
-      }),
-      inject: [RoleService],
-    },
+    // The privileged re-check's implementation now lives in
+    // `PrivilegedCapabilityModule` (imported above and `@Global()`), because a
+    // provider declared HERE is invisible to every imported module -- which
+    // silently denied `MediaService` the verifier it needs to authorize a
+    // protected download. Same binding, same fail-closed behaviour, one scope
+    // wider.
     { provide: APP_GUARD, useClass: CapabilityGuard },
     { provide: APP_GUARD, useClass: OwnershipGuard },
   ],
