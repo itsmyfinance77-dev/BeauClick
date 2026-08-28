@@ -288,6 +288,10 @@ export const RESETTABLE_TABLES = [
   // children-first convention the rest of this list follows.
   'provider.verification_request_evidence',
   'provider.portfolio_items',
+  // V3.1 Phase D. Reviews reference eligibility by FK, so children first --
+  // the same convention the rest of this list follows.
+  'provider.reviews',
+  'provider.review_eligibility',
   'media.abuse_reports',
   'media.objects',
 ];
