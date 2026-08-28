@@ -27,6 +27,7 @@
       "@beauclick/testing": ["libs/testing/src/index.ts"],
       "@beauclick/persian-utils": ["packages/persian-utils/src/index.ts"],
       "@beauclick/money": ["libs/money/src/index.ts"],
+      "@beauclick/media": ["libs/media/src/index.ts"],
       "@beauclick/events": ["libs/events/src/index.ts"],
       "@beauclick/event-contracts": ["libs/event-contracts/src/index.ts"],
       "@beauclick/identity": ["services/identity/src/index.ts"],

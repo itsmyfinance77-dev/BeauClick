@@ -1,0 +1,11 @@
+{
+  "name": "media",
+  "sourceRoot": "libs/media/src",
+  "projectType": "library",
+  "tags": ["type:lib", "scope:shared"],
+  "targets": {
+    "typecheck": { "executor": "nx:run-commands", "options": { "command": "tsc -p libs/media/tsconfig.json --noEmit" } },
+    "test": { "executor": "nx:run-commands", "options": { "command": "jest --config libs/media/jest.config.js" } },
+    "lint": { "executor": "nx:run-commands", "options": { "command": "eslint libs/media/src --resolve-plugins-relative-to ." } }
+  }
+}

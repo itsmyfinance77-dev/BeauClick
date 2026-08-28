@@ -7,6 +7,10 @@ dist/
 coverage/
 .next/
 
+# The local object-storage driver's default root (V3.1 Phase C). Real uploaded
+# bytes, written by a developer running the API against MEDIA_STORAGE_DRIVER=local.
+.media-store/
+
 # The repo root .gitignore excludes *.sql (V2's local MySQL dump
 # convention) -- these are real, versioned SQL sources, not local dumps,
 # so they're explicitly un-ignored here.
