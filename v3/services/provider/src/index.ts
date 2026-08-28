@@ -10,3 +10,6 @@ export * from './entities/provider-outbox.entity';
 export * from './provider-events.service';
 export * from './entities/verification-request.entity';
 export * from './verification/verification.service';
+export * from './entities/portfolio-item.entity';
+export * from './entities/verification-evidence.entity';
+export * from './portfolio.service';

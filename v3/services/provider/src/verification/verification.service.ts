@@ -5,9 +5,11 @@ import { uuidv7 } from 'uuidv7';
 import { DomainException } from '@beauclick/http';
 import { AdminAuditService } from '@beauclick/audit';
 import { NotFoundOrNotYoursException } from '@beauclick/ownership';
+import { MediaService } from '@beauclick/media';
 import { ProviderService } from '../provider.service';
 import { ProfessionalEntity } from '../entities/professional.entity';
 import { VerificationRequestEntity } from '../entities/verification-request.entity';
+import { VerificationEvidenceEntity } from '../entities/verification-evidence.entity';
 
 export class VerificationAlreadyPendingException extends DomainException {
   constructor() {
@@ -28,6 +30,15 @@ export class VerificationRequestNotFoundException extends DomainException {
 }
 
 export type VerificationDecision = 'approve' | 'reject';
+
+/**
+ * How many documents may back one verification request.
+ *
+ * Small on purpose. A reviewer reads these by hand, and a request carrying
+ * thirty images is a request nobody reviews carefully. The media quota is a
+ * storage bound; this is the review-workload bound.
+ */
+export const MAX_EVIDENCE_PER_REQUEST = 5;
 
 /**
  * The verification review workflow.
@@ -60,6 +71,9 @@ export class VerificationService {
     private readonly requests: Repository<VerificationRequestEntity>,
     @InjectRepository(ProfessionalEntity)
     private readonly professionals: Repository<ProfessionalEntity>,
+    @InjectRepository(VerificationEvidenceEntity)
+    private readonly evidence: Repository<VerificationEvidenceEntity>,
+    private readonly media: MediaService,
     private readonly audit: AdminAuditService,
   ) {}
 
@@ -147,6 +161,84 @@ export class VerificationService {
     );
 
     return { items, total };
+  }
+
+  // ------------------------------------------------------------- evidence
+
+  /**
+   * Attaches a document to the caller's own OPEN request.
+   *
+   * `R31-02`'s migration recorded that evidence was deliberately absent
+   * because no file-upload capability existed, and said Phase C would
+   * introduce it. This is that. Nothing about the verification STATE MACHINE
+   * changes -- evidence is an attachment to a request, not a new state, and
+   * a request with no evidence is still a valid request a moderator may
+   * decide on the strength of the note alone.
+   *
+   * Only a `pending` request accepts evidence. Attaching to a decided request
+   * would change what a moderator's decision was based on after they made it.
+   */
+  async addEvidence(ownerUserId: string, mediaId: string): Promise<VerificationEvidenceEntity> {
+    const professional = await this.providers.findByOwnerId(ownerUserId);
+    if (!professional) throw new NotFoundOrNotYoursException();
+
+    return this.dataSource.transaction(async (manager) => {
+      const request = await manager.getRepository(VerificationRequestEntity).findOne({
+        where: { professionalId: professional.id, status: 'pending' },
+      });
+      if (!request) {
+        throw new VerificationNotSubmittableException('ابتدا درخواست احراز هویت خود را ثبت کنید.');
+      }
+
+      const existing = await manager.getRepository(VerificationEvidenceEntity).count({
+        where: { requestId: request.id },
+      });
+      if (existing >= MAX_EVIDENCE_PER_REQUEST) {
+        throw new VerificationNotSubmittableException(
+          `حداکثر ${MAX_EVIDENCE_PER_REQUEST} مدرک برای هر درخواست پذیرفته می‌شود.`,
+        );
+      }
+
+      // Ownership, status, and PURPOSE re-derived from the media row. The
+      // purpose check is what stops a professional attaching a public
+      // portfolio image as evidence -- which would be harmless -- and, far
+      // more importantly, stops the inverse: a `verification_evidence` object
+      // is created `protected` and can never become publicly addressable by
+      // being attached somewhere that expects a public one.
+      await this.media.claimForAttachment(manager, ownerUserId, mediaId, 'verification_evidence');
+
+      const row = manager.getRepository(VerificationEvidenceEntity).create({
+        id: uuidv7(),
+        requestId: request.id,
+        mediaId,
+        uploadedBy: ownerUserId,
+      });
+      await manager.getRepository(VerificationEvidenceEntity).save(row);
+      return row;
+    });
+  }
+
+  /** The caller's own evidence for their latest request. */
+  async myEvidence(ownerUserId: string): Promise<VerificationEvidenceEntity[]> {
+    const latest = await this.latestFor(ownerUserId);
+    if (!latest) return [];
+    return this.evidence.find({ where: { requestId: latest.id }, order: { createdAt: 'ASC' } });
+  }
+
+  /**
+   * The evidence attached to one request, for a moderator.
+   *
+   * Returns only ids and timestamps. The BYTES are reached through
+   * `MediaService.issueProtectedDownloadUrl`, which mints a short-lived URL
+   * whose bearer is re-authorized on every request -- so listing evidence and
+   * reading it are two separate authorizations, exactly as
+   * `V3_SECURITY_MODEL.md` §8 asks ("visibility of metadata and access to raw
+   * content are different privilege levels; don't conflate them").
+   */
+  async evidenceForRequest(requestId: string): Promise<VerificationEvidenceEntity[]> {
+    const request = await this.requests.findOne({ where: { id: requestId } });
+    if (!request) throw new VerificationRequestNotFoundException();
+    return this.evidence.find({ where: { requestId }, order: { createdAt: 'ASC' } });
   }
 
   /**

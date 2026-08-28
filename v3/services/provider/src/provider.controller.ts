@@ -8,10 +8,24 @@ import { CreateProfessionalDto } from './dto/create-professional.dto';
 import { UpdateProfessionalDto } from './dto/update-professional.dto';
 import { ListProvidersDto } from './dto/list-providers.dto';
 import { CreateServiceOfferingDto, UpdateServiceOfferingDto } from './dto/create-service-offering.dto';
+import { AddPortfolioItemDto, SetProfileImageDto } from './dto/portfolio.dto';
+import { PortfolioService } from './portfolio.service';
 import { Public } from '@beauclick/auth';
 import { ProfessionalEntity } from './entities/professional.entity';
+import type { MediaDescriptor } from '@beauclick/media';
 
-function toPublicShape(p: ProfessionalEntity) {
+/**
+ * `images` is present on every professional shape from V3.1 Phase C onward,
+ * and is `{ avatar: null, cover: null }` rather than absent when a
+ * professional has uploaded nothing.
+ *
+ * Deliberately not an optional field: a consumer that has to distinguish
+ * "this response predates imagery" from "this professional has no imagery"
+ * ends up writing the same `?? null` at every call site, and one of them
+ * eventually forgets. An always-present shape with explicit nulls is an
+ * additive change no existing client notices.
+ */
+function toPublicShape(p: ProfessionalEntity, images: ProfileImages = EMPTY_IMAGES) {
   return {
     id: p.id,
     displayName: p.displayName,
@@ -19,9 +33,17 @@ function toPublicShape(p: ProfessionalEntity) {
     cityId: p.cityId,
     specialties: p.specialties?.map((s) => ({ id: s.id, name: s.name })) ?? [],
     verificationStatus: p.verificationStatus,
+    images,
     createdAt: p.createdAt,
   };
 }
+
+interface ProfileImages {
+  avatar: MediaDescriptor | null;
+  cover: MediaDescriptor | null;
+}
+
+const EMPTY_IMAGES: ProfileImages = { avatar: null, cover: null };
 
 /**
  * Public reference data: launched cities and the specialty taxonomy.
@@ -72,12 +94,16 @@ export class ReferenceDataController {
  */
 @Controller('v1/me')
 export class MyProviderController {
-  constructor(private readonly providers: ProviderService) {}
+  constructor(
+    private readonly providers: ProviderService,
+    private readonly portfolio: PortfolioService,
+  ) {}
 
   @Get('provider')
   async myProvider(@CurrentUser() user: AuthenticatedUser) {
     const professional = await this.providers.findByOwnerId(user.userId);
-    return professional ? toPublicShape(professional) : null;
+    if (!professional) return null;
+    return toPublicShape(professional, await this.portfolio.imagesFor(professional));
   }
 }
 
@@ -87,14 +113,18 @@ export class ProviderController {
   constructor(
     private readonly providers: ProviderService,
     private readonly services: ServiceOfferingService,
+    private readonly portfolio: PortfolioService,
   ) {}
 
   @Public()
   @Get()
   async list(@Query() query: ListProvidersDto): Promise<PaginatedResult<ReturnType<typeof toPublicShape>[]>> {
     const { items, total } = await this.providers.list(query);
+    // One batched describe for the whole page rather than one per row: a
+    // 20-item listing must not become 20 sequential lookups.
+    const images = await this.portfolio.imagesForMany(items);
     return {
-      value: items.map(toPublicShape),
+      value: items.map((p) => toPublicShape(p, images.get(p.id) ?? EMPTY_IMAGES)),
       meta: { pagination: { page: query.page, limit: query.limit, total } },
     };
   }
@@ -107,7 +137,7 @@ export class ProviderController {
     // "exists but isn't yours" elsewhere -- consistent NOT_FOUND_OR_NOT_YOURS
     // shape even on a route with no ownership check at all.
     if (!provider) throw new NotFoundOrNotYoursException();
-    return toPublicShape(provider);
+    return toPublicShape(provider, await this.portfolio.imagesFor(provider));
   }
 
   @Post()
@@ -121,7 +151,7 @@ export class ProviderController {
   @Patch(':id')
   async update(@Param('id') id: string, @Body() dto: UpdateProfessionalDto, @CurrentUser() user: AuthenticatedUser) {
     const updated = await this.providers.update(id, user.userId, dto);
-    return toPublicShape(updated);
+    return toPublicShape(updated, await this.portfolio.imagesFor(updated));
   }
 
   @Public()
@@ -171,5 +201,72 @@ export class ProviderController {
     // is already deleted. Same generic response as everywhere else -- never a
     // distinct shape that would confirm the row exists for someone else.
     if (!removed) throw new NotFoundOrNotYoursException();
+  }
+
+  // ------------------------------------------------------- portfolio (C)
+
+  /**
+   * The gallery. Public, because it is the point: a beauty marketplace where
+   * a visitor cannot see a professional's work is the gap `IMAGERY` records.
+   */
+  @Public()
+  @Get(':id/portfolio')
+  async listPortfolio(@Param('id') id: string) {
+    const provider = await this.providers.findById(id);
+    if (!provider) throw new NotFoundOrNotYoursException();
+    return this.portfolio.listForProfessional(id);
+  }
+
+  /**
+   * Attach an already-uploaded, already-finalized media object.
+   *
+   * Two independent ownership checks, the same pairing every mutating route
+   * on this controller uses: `OwnershipGuard` proves `:id` is the session's
+   * own professional, and `MediaService.claimForAttachment` proves the media
+   * object is the session's own upload. Neither implies the other -- the
+   * first would happily attach somebody else's image, the second would
+   * happily attach your own image to somebody else's profile.
+   */
+  @ResolveOwner(ProviderOwnerResolver)
+  @Post(':id/portfolio')
+  async addPortfolioItem(
+    @Param('id') id: string,
+    @Body() dto: AddPortfolioItemDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.portfolio.addItem(id, user.userId, { mediaId: dto.mediaId, caption: dto.caption?.trim() || null });
+  }
+
+  @ResolveOwner(ProviderOwnerResolver)
+  @Delete(':id/portfolio/:itemId')
+  @HttpCode(204)
+  async removePortfolioItem(
+    @Param('id') id: string,
+    @Param('itemId') itemId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    await this.portfolio.removeItem(id, user.userId, itemId);
+  }
+
+  @ResolveOwner(ProviderOwnerResolver)
+  @Patch(':id/avatar')
+  @HttpCode(204)
+  async setAvatar(
+    @Param('id') id: string,
+    @Body() dto: SetProfileImageDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    await this.portfolio.setProfileImage(id, user.userId, 'avatar', dto.mediaId);
+  }
+
+  @ResolveOwner(ProviderOwnerResolver)
+  @Patch(':id/cover')
+  @HttpCode(204)
+  async setCover(
+    @Param('id') id: string,
+    @Body() dto: SetProfileImageDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    await this.portfolio.setProfileImage(id, user.userId, 'cover', dto.mediaId);
   }
 }

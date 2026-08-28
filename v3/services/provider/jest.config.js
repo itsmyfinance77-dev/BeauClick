@@ -12,5 +12,7 @@ module.exports = {
     '^@beauclick/auth$': '<rootDir>/../../libs/auth/src/index.ts',
     '^@beauclick/ownership$': '<rootDir>/../../libs/ownership/src/index.ts',
     '^@beauclick/testing$': '<rootDir>/../../libs/testing/src/index.ts',
+    '^@beauclick/audit$': '<rootDir>/../../libs/audit/src/index.ts',
+    '^@beauclick/media$': '<rootDir>/../../libs/media/src/index.ts',
   },
 };

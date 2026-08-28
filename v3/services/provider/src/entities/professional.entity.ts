@@ -66,6 +66,21 @@ export class ProfessionalEntity {
   @Column({ type: 'bigint', default: 1, transformer: { to: (v: number) => v, from: (v: string) => Number(v) } })
   revision!: number;
 
+  /**
+   * Profile imagery, as references into `media.objects` (V3.1 Phase C).
+   *
+   * Nullable and to-one on purpose: a professional has at most one avatar and
+   * at most one cover, and modelling a to-one as a to-many means every read
+   * has to decide what "the newest of several avatars" means. Replacing an
+   * avatar swaps the id and deletes the old object -- there is no history
+   * here, because a superseded avatar is not a fact anybody needs.
+   */
+  @Column({ type: 'uuid', nullable: true })
+  avatarMediaId!: string | null;
+
+  @Column({ type: 'uuid', nullable: true })
+  coverMediaId!: string | null;
+
   @Column({ type: 'timestamptz', nullable: true })
   deletedAt!: Date | null;
 

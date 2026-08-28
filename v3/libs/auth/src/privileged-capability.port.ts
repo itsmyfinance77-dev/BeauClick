@@ -43,4 +43,9 @@ export const PRIVILEGED_CAPABILITIES: readonly string[] = [
   'bc_manage_platform',
   'bc_moderate_verification',
   'bc_moderate_reviews',
+  // V3.1 Phase C. Authority to remove another professional's published work
+  // from the marketplace, so it carries both properties this list confers:
+  // the live revocation re-check, and `libs/audit`'s refusal to boot when a
+  // mutation gated on it declares no audit record.
+  'bc_moderate_media',
 ];

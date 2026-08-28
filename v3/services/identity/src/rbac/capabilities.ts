@@ -32,12 +32,22 @@ export const CAPABILITIES_BY_ROLE: Record<Role, string[]> = {
     'bc_manage_own_availability',
     'bc_view_own_finance',
   ],
-  moderator: ['bc_moderate_verification', 'bc_moderate_reviews'],
+  // `bc_moderate_media` (V3.1 Phase C) sits with the other content-moderation
+  // capabilities and deliberately NOT with platform_operator's -- the roles
+  // migration records the reasoning: removing somebody's published work is
+  // content moderation, not operational administration.
+  moderator: ['bc_moderate_verification', 'bc_moderate_reviews', 'bc_moderate_media'],
   // V3_SECURITY_MODEL.md §9: a narrower tier below full administrator that
   // V2 built but never actually used for a real account -- V3 should
   // default new privileged accounts to this, not full admin.
   platform_operator: ['bc_manage_platform'],
-  administrator: ['bc_manage_platform', 'bc_moderate_verification', 'bc_moderate_reviews', 'bc_manage_own_profile'],
+  administrator: [
+    'bc_manage_platform',
+    'bc_moderate_verification',
+    'bc_moderate_reviews',
+    'bc_moderate_media',
+    'bc_manage_own_profile',
+  ],
 };
 
 export function capabilitiesForRoles(roles: string[]): string[] {

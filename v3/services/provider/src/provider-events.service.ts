@@ -4,6 +4,7 @@ import { returningRows } from '@beauclick/events';
 import {
   EVENT_CONTRACT_REGISTRY,
   EventContractRegistry,
+  ProfessionalMediaChanged,
   ProfessionalUpdated,
   ProfessionalVerificationChanged,
   ServiceOfferingUpdated,
@@ -175,6 +176,49 @@ export class ProviderEventsService {
     // The professional document embeds the service catalogue, so the profile
     // event is what actually carries the change into the index.
     await this.emitProfessionalUpdated(manager, service.professionalId, revision);
+  }
+
+  /**
+   * Emits `ProfessionalMediaChanged` with the professional's whole current
+   * imagery.
+   *
+   * The SNAPSHOT IS PASSED IN rather than read here, and that is a deliberate
+   * dependency direction: `PortfolioService` owns the query that answers
+   * "what images does this professional have", and it is the same query the
+   * reindex source uses. If this service read it independently there would be
+   * two implementations of one question, free to disagree about a
+   * professional whose avatar was taken down between them.
+   */
+  async emitMediaChanged(
+    manager: EntityManager,
+    professionalId: string,
+    snapshot: {
+      avatarUrl: string | null;
+      avatarWidth: number | null;
+      avatarHeight: number | null;
+      portfolioCount: number;
+      portfolioPreviewUrls: string[];
+    },
+  ): Promise<void> {
+    // Same counter `ProfessionalUpdated` uses, for the same reason: the search
+    // document is per-professional, so every change to it must be orderable
+    // against every other change to it. A separate counter for imagery would
+    // give the consumer two sequences it cannot reconcile.
+    const revision = await this.bumpRevision(manager, professionalId);
+
+    await emitContractEvent(this.contracts, manager, ProviderOutboxEntity, ProfessionalMediaChanged, {
+      aggregateId: professionalId,
+      payload: {
+        professionalId,
+        revision,
+        avatarUrl: snapshot.avatarUrl,
+        avatarWidth: snapshot.avatarWidth,
+        avatarHeight: snapshot.avatarHeight,
+        portfolioCount: snapshot.portfolioCount,
+        portfolioPreviewUrls: snapshot.portfolioPreviewUrls,
+        changedAt: new Date().toISOString(),
+      },
+    });
   }
 
   /** Convenience for callers with no transaction of their own. */
