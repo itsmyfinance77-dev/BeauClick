@@ -3,7 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 
-import { ProfessionalEntity, ServiceOfferingEntity } from '@beauclick/provider';
+import { ProfessionalEntity, ProviderModule, ServiceOfferingEntity } from '@beauclick/provider';
 import { UserEntity } from '@beauclick/identity';
 import { PROFESSIONAL_DIRECTORY } from '@beauclick/booking';
 import { PRICING_RULES, SERVICE_CATALOG } from '@beauclick/commerce';
@@ -50,6 +50,11 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     TypeOrmModule.forFeature([ProfessionalEntity, ServiceOfferingEntity, UserEntity, BusinessEntity, BusinessStaffEntity]),
     // Imported so the membership pricing rule can resolve BenefitService.
     LoyaltyModule,
+    // V3.1 Phase C: the reindex source reads a professional's imagery through
+    // `PortfolioService`, deliberately reusing the SAME query the live event
+    // uses rather than growing a second implementation of "what images does
+    // this professional have".
+    ProviderModule,
   ],
   providers: [
     SellerPartyLookup,

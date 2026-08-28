@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, Repository } from 'typeorm';
-import { ProfessionalEntity, ServiceOfferingEntity } from '@beauclick/provider';
+import { PortfolioService, ProfessionalEntity, ServiceOfferingEntity } from '@beauclick/provider';
 import { UserEntity } from '@beauclick/identity';
 import { ProviderReindexSourcePort } from '@beauclick/search';
 import { RecipientResolverPort } from '@beauclick/notification';
@@ -33,6 +33,7 @@ export class ProviderBackedReindexSource implements ProviderReindexSourcePort {
   constructor(
     @InjectRepository(ProfessionalEntity) private readonly professionals: Repository<ProfessionalEntity>,
     @InjectRepository(ServiceOfferingEntity) private readonly services: Repository<ServiceOfferingEntity>,
+    private readonly portfolio: PortfolioService,
   ) {}
 
   async fetchProfessionalsForReindex(afterId: string | null, limit: number) {
@@ -62,6 +63,22 @@ export class ProviderBackedReindexSource implements ProviderReindexSourcePort {
       byProfessional.set(offering.professionalId, list);
     }
 
+    // Imagery, per professional (V3.1 Phase C). A rebuild must produce the
+    // SAME document the live event stream would, or it silently strips every
+    // avatar and portfolio until each professional next edits something.
+    //
+    // Sequential rather than batched, unlike the services query above, and
+    // that is a deliberate, disclosed trade: `mediaSnapshot` is the single
+    // query that also backs the live event, and duplicating it as a batched
+    // variant here would create a second implementation of "what images does
+    // this professional have" -- exactly the divergence `mediaSnapshot`'s own
+    // docblock exists to prevent. A rebuild is a rare, planned operation over
+    // a page of 200; the live path, which runs on every request, is batched.
+    const media = new Map<string, Awaited<ReturnType<PortfolioService['mediaSnapshot']>>>();
+    for (const p of rows) {
+      media.set(p.id, await this.portfolio.mediaSnapshot(null, p.id));
+    }
+
     return rows.map((p) => ({
       professionalId: p.id,
       revision: p.revision,
@@ -80,6 +97,13 @@ export class ProviderBackedReindexSource implements ProviderReindexSourcePort {
         priceToman: s.priceToman,
         durationMinutes: s.durationMinutes,
       })),
+      media: media.get(p.id) ?? {
+        avatarUrl: null,
+        avatarWidth: null,
+        avatarHeight: null,
+        portfolioCount: 0,
+        portfolioPreviewUrls: [],
+      },
     }));
   }
 }

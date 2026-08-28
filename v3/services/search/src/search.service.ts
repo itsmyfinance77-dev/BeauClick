@@ -243,6 +243,13 @@ export class SearchService {
         ratingAvg: 0,
         reviewCount: 0,
         completedBookings: 0,
+        // Imagery is served from the projection on the degraded path too:
+        // an engine outage should cost relevance, not pictures.
+        avatarUrl: row.avatarUrl ?? null,
+        avatarWidth: row.avatarWidth ?? null,
+        avatarHeight: row.avatarHeight ?? null,
+        portfolioCount: row.portfolioCount ?? 0,
+        portfolioPreviewUrls: row.portfolioPreviewUrls ?? [],
         rankingScore: row.rankingScore,
         rankingSignalKeys: row.rankingSignalKeys ?? [],
         indexedAt: (row.indexedAt ?? row.updatedAt).toISOString(),

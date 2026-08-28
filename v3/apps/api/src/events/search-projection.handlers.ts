@@ -3,6 +3,7 @@ import { DomainEventHandler, EventEnvelope } from '@beauclick/events';
 import {
   EVENT_CONTRACT_REGISTRY,
   EventContractRegistry,
+  ProfessionalMediaChanged,
   ProfessionalUpdated,
   ProviderProfileViewed,
   ServiceOfferingUpdated,
@@ -16,6 +17,7 @@ import { ServiceOfferingService } from '@beauclick/provider';
  *
  *   ProfessionalUpdated               -> upsert the document (revision-guarded)
  *   ProfessionalVerificationChanged   -> (also emits ProfessionalUpdated)
+ *   ProfessionalMediaChanged          -> imagery columns only (revision-guarded)
  *   ServiceOfferingUpdated            -> refresh the embedded catalogue
  *   BookingCompleted/Cancelled/Created-> ranking signal, once per event
  *   ProviderProfileViewed             -> ranking signal, once per event
@@ -79,6 +81,50 @@ export class ProfessionalUpdatedSearchHandler implements DomainEventHandler {
 
     if (!applied) {
       this.logger.debug(`Skipped stale revision ${payload.revision} for ${payload.professionalId}`);
+    }
+  }
+}
+
+/**
+ * Imagery changes (V3.1 Phase C).
+ *
+ * A separate handler writing a DISJOINT set of columns, which is why this is
+ * not folded into `ProfessionalUpdatedSearchHandler`. The two events carry the
+ * same per-professional revision counter, so they are still ordered against
+ * each other -- they simply own different fields, and neither can blank the
+ * other's.
+ *
+ * The alternative would have been adding imagery to `ProfessionalUpdated`'s
+ * payload, which the contract registry forbids: a payload change is a new
+ * version, and bumping that contract to v2 would force a migration on every
+ * one of its consumers for a change none of them care about.
+ */
+@Injectable()
+export class ProfessionalMediaSearchHandler implements DomainEventHandler {
+  readonly eventType = ProfessionalMediaChanged.name;
+  readonly eventVersion = ProfessionalMediaChanged.version;
+  private readonly logger = new Logger('ProfessionalMediaSearchHandler');
+
+  constructor(
+    private readonly indexer: SearchIndexerService,
+    @Inject(EVENT_CONTRACT_REGISTRY) private readonly contracts: EventContractRegistry,
+  ) {}
+
+  async handle(envelope: EventEnvelope): Promise<void> {
+    const payload = parseEnvelope(this.contracts, ProfessionalMediaChanged, envelope);
+
+    const applied = await this.indexer.applyMedia({
+      professionalId: payload.professionalId,
+      revision: payload.revision,
+      avatarUrl: payload.avatarUrl,
+      avatarWidth: payload.avatarWidth,
+      avatarHeight: payload.avatarHeight,
+      portfolioCount: payload.portfolioCount,
+      portfolioPreviewUrls: payload.portfolioPreviewUrls,
+    });
+
+    if (!applied) {
+      this.logger.debug(`Skipped media revision ${payload.revision} for ${payload.professionalId}`);
     }
   }
 }

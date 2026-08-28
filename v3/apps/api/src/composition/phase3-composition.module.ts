@@ -18,6 +18,7 @@ import { AnalyticsIngestionService, AnalyticsModule } from '@beauclick/analytics
 import { NotificationEnricher } from '../events/notification-enricher';
 import {
   BookingSignalSearchHandler,
+  ProfessionalMediaSearchHandler,
   ProfessionalUpdatedSearchHandler,
   ProfileViewSignalHandler,
   ServiceOfferingSearchHandler,
@@ -72,6 +73,7 @@ import { PHASE3_EVENT_HANDLERS, PHASE3_OUTBOX_SOURCES } from './phase3-tokens';
 
     // ---- event handlers
     ProfessionalUpdatedSearchHandler,
+    ProfessionalMediaSearchHandler,
     ServiceOfferingSearchHandler,
     ProfileViewSignalHandler,
     BookingCompletedLoyaltyHandler,
@@ -81,6 +83,7 @@ import { PHASE3_EVENT_HANDLERS, PHASE3_OUTBOX_SOURCES } from './phase3-tokens';
       provide: PHASE3_EVENT_HANDLERS,
       inject: [
         ProfessionalUpdatedSearchHandler,
+        ProfessionalMediaSearchHandler,
         ServiceOfferingSearchHandler,
         ProfileViewSignalHandler,
         BookingCompletedLoyaltyHandler,
@@ -94,6 +97,7 @@ import { PHASE3_EVENT_HANDLERS, PHASE3_OUTBOX_SOURCES } from './phase3-tokens';
       ],
       useFactory: (
         professionalUpdated: ProfessionalUpdatedSearchHandler,
+        professionalMedia: ProfessionalMediaSearchHandler,
         serviceUpdated: ServiceOfferingSearchHandler,
         profileView: ProfileViewSignalHandler,
         bookingLoyalty: BookingCompletedLoyaltyHandler,
@@ -106,6 +110,7 @@ import { PHASE3_EVENT_HANDLERS, PHASE3_OUTBOX_SOURCES } from './phase3-tokens';
         contracts: EventContractRegistry,
       ): DomainEventHandler[] => [
         professionalUpdated,
+        professionalMedia,
         serviceUpdated,
         profileView,
         bookingLoyalty,

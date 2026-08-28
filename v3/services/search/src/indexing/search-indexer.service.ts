@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { insertOnce } from '@beauclick/events';
+import { insertOnce, returningRows } from '@beauclick/events';
 import { DataSource, IsNull, LessThan, Not, Repository } from 'typeorm';
 import {
   IndexedService,
@@ -37,6 +37,17 @@ export interface ProfessionalProjection {
   updatedAt: Date;
   /** Absent when the event only described the profile; the stored services are then kept. */
   services?: IndexedService[];
+}
+
+/** What `ProfessionalMediaChanged` carries (V3.1 Phase C). */
+export interface ProfessionalMediaProjection {
+  professionalId: string;
+  revision: number;
+  avatarUrl: string | null;
+  avatarWidth: number | null;
+  avatarHeight: number | null;
+  portfolioCount: number;
+  portfolioPreviewUrls: string[];
 }
 
 export type RankingSignalName =
@@ -154,6 +165,65 @@ export class SearchIndexerService {
     if (result.length === 0) {
       this.logger.debug(
         `Discarded stale revision ${projection.revision} for ${projection.professionalId}`,
+      );
+      return false;
+    }
+
+    await this.rescore(projection.professionalId);
+    return true;
+  }
+
+  /**
+   * Applies an imagery change.
+   *
+   * An UPDATE, not an upsert, and that is the deliberate half of the design.
+   * The columns it touches are disjoint from the ones `applyProfessional`
+   * owns, so a profile edit cannot blank an avatar and an avatar change cannot
+   * blank a bio -- but a media event for a professional who has NO document
+   * yet is dropped rather than allowed to create one. An earlier draft
+   * inserted a placeholder row for that case, and that is the same mistake
+   * `applyProfessional`'s own docblock records: a document with an empty
+   * display name is a live, searchable, wrong result. Media can only be
+   * attached to a professional who already exists, so the producer always
+   * emits the profile event first; if delivery reorders them badly enough to
+   * lose one, `rebuildProjectionFromSource` recovers it -- and it now carries
+   * imagery for exactly this reason.
+   *
+   * `revision <= :incoming` rather than `<`, which is the one place this
+   * differs from every other ordering guard here. Two DIFFERENT events never
+   * share a revision -- the counter is an atomic increment -- so the equal
+   * case arises in exactly two situations, and both want the write to happen:
+   * a redelivery of the same event (idempotent, the values are identical),
+   * and the rebuild path, which applies a professional and their imagery at
+   * one revision because they were read from one snapshot.
+   */
+  async applyMedia(projection: ProfessionalMediaProjection): Promise<boolean> {
+    const result: Array<unknown> = await this.documents.query(
+      `UPDATE search.provider_documents
+          SET revision = GREATEST(revision, $2),
+              avatar_url = $3,
+              avatar_width = $4,
+              avatar_height = $5,
+              portfolio_count = $6,
+              portfolio_preview_urls = $7::text[],
+              index_dirty_since = now(),
+              updated_at = now()
+        WHERE professional_id = $1 AND revision <= $2
+        RETURNING professional_id`,
+      [
+        projection.professionalId,
+        projection.revision,
+        projection.avatarUrl,
+        projection.avatarWidth,
+        projection.avatarHeight,
+        projection.portfolioCount,
+        projection.portfolioPreviewUrls,
+      ],
+    );
+
+    if (returningRows(result).length === 0) {
+      this.logger.debug(
+        `Discarded media revision ${projection.revision} for ${projection.professionalId} (stale, or no document yet)`,
       );
       return false;
     }
@@ -296,13 +366,48 @@ export class SearchIndexerService {
    * that would otherwise be silent.
    */
   private async ensureAliasReady(): Promise<string> {
+    // A mapping bump has to be acted on BEFORE any write, because the old
+    // index's strict mapping rejects the new document shape outright. See
+    // `currentPhysicalIndex`'s note on BUG-C-01.
+    if (await this.staleMappingVersion()) {
+      this.logger.warn(
+        `Index mapping version is behind ${PROVIDER_INDEX_MAPPING_VERSION}; rebuilding into a new physical index before writing.`,
+      );
+      const { physicalIndex } = await this.fullReindex();
+      return physicalIndex;
+    }
+
     const physical = await this.currentPhysicalIndex();
     await this.engine.ensureIndex(physical);
     await this.engine.swapAlias(PROVIDER_INDEX_ALIAS, physical);
     return physical;
   }
 
-  /** The current physical index behind the alias, creating state on first use. */
+  /**
+   * The current physical index behind the alias, creating state on first use.
+   *
+   * **BUG-C-01, found while bumping the mapping for Phase C and fixed here.**
+   * This method used to return `existing.physicalIndex` unconditionally and
+   * never look at `existing.mappingVersion`. That made
+   * `PROVIDER_INDEX_MAPPING_VERSION` inert on any deployment that had already
+   * created its index: bumping the constant would leave every write going to
+   * the OLD physical index, whose mapping is `dynamic: 'strict'` and therefore
+   * REJECTS a document carrying a field the old mapping never declared. The
+   * failure mode was a permanently failing flush -- not a stale index that
+   * self-heals, which is the degradation the rest of this class is designed
+   * around, but a hard error on every sweep with the projection silently
+   * accumulating dirty rows behind it.
+   *
+   * It was latent rather than harmless: the constant existed from Phase 3, was
+   * documented as "bumped whenever the mapping changes in a way that requires
+   * a reindex", and the machinery to act on it (`fullReindex`, which already
+   * writes the new version into the state row) was fully built. Nothing
+   * connected the two.
+   *
+   * `staleMappingVersion()` is what connects them. `ensureAliasReady` consults
+   * it and rebuilds rather than writing into an index that cannot accept the
+   * documents.
+   */
   async currentPhysicalIndex(): Promise<string> {
     const existing = await this.indexState.findOne({ where: { indexKey: PROVIDER_INDEX_ALIAS } });
     if (existing) return existing.physicalIndex;
@@ -319,6 +424,29 @@ export class SearchIndexerService {
       .orIgnore()
       .execute();
     return physical;
+  }
+
+  /**
+   * True when the live index was built under an older mapping than this
+   * build expects.
+   *
+   * Only ever OLDER. A recorded version NEWER than this constant means a
+   * newer application version has already reindexed and an older instance is
+   * still running beside it -- rolling back the mapping under it would be far
+   * worse than serving slightly incomplete documents, so that case is left
+   * alone and logged.
+   */
+  async staleMappingVersion(): Promise<boolean> {
+    const existing = await this.indexState.findOne({ where: { indexKey: PROVIDER_INDEX_ALIAS } });
+    if (!existing) return false;
+    if (existing.mappingVersion > PROVIDER_INDEX_MAPPING_VERSION) {
+      this.logger.warn(
+        `Index mapping version ${existing.mappingVersion} is NEWER than this build expects (${PROVIDER_INDEX_MAPPING_VERSION}). ` +
+          'Leaving it alone: a newer instance has already reindexed.',
+      );
+      return false;
+    }
+    return existing.mappingVersion < PROVIDER_INDEX_MAPPING_VERSION;
   }
 
   /**
@@ -452,6 +580,11 @@ export class SearchIndexerService {
         // `revision` comes from the source, so a rebuild cannot resurrect a
         // document that a newer live event has already superseded.
         await this.applyProfessional(row);
+        // Imagery lives in different columns and would otherwise be blanked by
+        // a rebuild until each professional next edited something. Applied at
+        // the SAME revision, so it is accepted or discarded together with the
+        // profile it belongs to.
+        await this.applyMedia({ professionalId: row.professionalId, revision: row.revision, ...row.media });
         count += 1;
       }
       after = page[page.length - 1].professionalId;
@@ -514,6 +647,11 @@ export class SearchIndexerService {
         completedBookings: signal?.completedBookings ?? 0,
         rankingScore: row.rankingScore,
         rankingSignalKeys: row.rankingSignalKeys ?? [],
+        avatarUrl: row.avatarUrl ?? null,
+        avatarWidth: row.avatarWidth ?? null,
+        avatarHeight: row.avatarHeight ?? null,
+        portfolioCount: row.portfolioCount ?? 0,
+        portfolioPreviewUrls: row.portfolioPreviewUrls ?? [],
         indexedAt: new Date().toISOString(),
       };
     });

@@ -34,6 +34,19 @@ export interface ProviderSearchDocument {
   completedBookings: number;
   rankingScore: number;
   rankingSignalKeys: string[];
+  /**
+   * Imagery (V3.1 Phase C).
+   *
+   * URLs rather than media ids: the consumer of this shape is a browser
+   * rendering a result card, and resolving an id would mean search-service
+   * knowing about the media module -- a dependency ADR-011 forbids -- or a
+   * second round trip per result.
+   */
+  avatarUrl: string | null;
+  avatarWidth: number | null;
+  avatarHeight: number | null;
+  portfolioCount: number;
+  portfolioPreviewUrls: string[];
   indexedAt: string;
 }
 
@@ -139,6 +152,21 @@ export interface ProviderReindexSourcePort {
       isDeleted: boolean;
       updatedAt: Date;
       services: Array<{ serviceId: string; name: string; priceToman: number; durationMinutes: number }>;
+      /**
+       * Imagery, carried through the rebuild path (V3.1 Phase C).
+       *
+       * Present here for the same reason `services` is: a projection rebuilt
+       * from source must produce the SAME document a live event stream would,
+       * or a rebuild silently strips every professional's avatar and portfolio
+       * until each of them next edits something.
+       */
+      media: {
+        avatarUrl: string | null;
+        avatarWidth: number | null;
+        avatarHeight: number | null;
+        portfolioCount: number;
+        portfolioPreviewUrls: string[];
+      };
     }>
   >;
 }

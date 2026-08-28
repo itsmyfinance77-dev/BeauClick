@@ -33,8 +33,23 @@
  * it forward was a named requirement of ADR-005.
  */
 
-/** Bumped whenever the mapping below changes in a way that requires a reindex. */
-export const PROVIDER_INDEX_MAPPING_VERSION = 1;
+/**
+ * Bumped whenever the mapping below changes in a way that requires a reindex.
+ *
+ * **2** — V3.1 Phase C added the five imagery fields. The bump is mandatory
+ * rather than tidy: `dynamic: 'strict'` below means an index created under
+ * version 1 REJECTS a document carrying `avatarUrl`, so writing the new shape
+ * into the old index would fail every bulk write with a mapping error rather
+ * than silently ignoring the extra fields.
+ *
+ * `SearchIndexerService.currentPhysicalIndex()` compares this constant against
+ * the version recorded in `search.index_state` and rebuilds when they differ.
+ * Before Phase C it did not -- it returned whatever physical index the state
+ * row named and never looked at the version, so a bump would have been
+ * inert and every flush would have failed against a stale mapping. That is
+ * recorded as `BUG-C-01`.
+ */
+export const PROVIDER_INDEX_MAPPING_VERSION = 2;
 
 /** The alias every query and write goes through. The physical index behind it is swappable. */
 export const PROVIDER_INDEX_ALIAS = 'beauclick-providers';
@@ -199,6 +214,18 @@ export const PROVIDER_INDEX_MAPPINGS = {
     completedBookings: { type: 'integer' },
     rankingScore: { type: 'float' },
     rankingSignalKeys: { type: 'keyword' },
+    // Imagery (V3.1 Phase C). All five are `index: false` where they are not
+    // queried: a URL is something a result card renders, never something a
+    // user searches for, and indexing it would build an analyzed inverted
+    // index nobody reads.
+    avatarUrl: { type: 'keyword', index: false },
+    avatarWidth: { type: 'integer', index: false },
+    avatarHeight: { type: 'integer', index: false },
+    // `portfolioCount` IS indexed: "providers who have shown work" is a
+    // filter and a ranking input, which is the whole reason the roadmap calls
+    // a provider with a portfolio a different search result.
+    portfolioCount: { type: 'integer' },
+    portfolioPreviewUrls: { type: 'keyword', index: false },
     indexedAt: { type: 'date' },
   },
 } as const;

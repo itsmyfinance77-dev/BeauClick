@@ -60,6 +60,32 @@ export class ProviderDocumentEntity {
   @Column({ type: 'boolean', default: false })
   isDeleted!: boolean;
 
+  /**
+   * Imagery (V3.1 Phase C), written by `ProfessionalMediaChanged` and NOT by
+   * `ProfessionalUpdated`.
+   *
+   * The two events carry the same per-professional `revision`, so ordering
+   * still works; they simply own different columns. `applyProfessional`'s
+   * upsert names its own columns explicitly and does not touch these, which is
+   * what stops a profile edit from blanking a professional's avatar -- exactly
+   * the treatment `services` already gets.
+   */
+  @Column({ type: 'text', nullable: true })
+  avatarUrl!: string | null;
+
+  /** Intrinsic dimensions, so a result card can reserve space before the image loads. */
+  @Column({ type: 'int', nullable: true })
+  avatarWidth!: number | null;
+
+  @Column({ type: 'int', nullable: true })
+  avatarHeight!: number | null;
+
+  @Column({ type: 'int', default: 0 })
+  portfolioCount!: number;
+
+  @Column({ type: 'text', array: true, default: () => "'{}'" })
+  portfolioPreviewUrls!: string[];
+
   @Column({ type: 'numeric', precision: 9, scale: 4, default: 0, transformer: { to: (v: number) => v, from: (v: string) => Number(v) } })
   rankingScore!: number;
 
