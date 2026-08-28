@@ -13,6 +13,7 @@ import { PaymentOutboxEntity } from './entities/payment-outbox.entity';
 import { RefundEntity, RefundKind, RefundStatus } from './entities/refund.entity';
 import { PaymentProviderRegistry } from './providers/payment-provider.registry';
 import { VerifyPaymentResult } from './providers/payment-provider.interface';
+import { PaymentFailureReason, toPublicFailureReason, unresolvedVerification } from './payment-failure';
 
 export class PaymentIntentNotFoundException extends DomainException {
   constructor() {
@@ -29,6 +30,21 @@ export class PaymentIntentNotPayableException extends DomainException {
 export class PaymentAmountMismatchException extends DomainException {
   constructor() {
     super('PAYMENT_AMOUNT_MISMATCH', 'مبلغ پرداخت‌شده با مبلغ سفارش مطابقت ندارد.', HttpStatus.CONFLICT);
+  }
+}
+
+/**
+ * Internal only -- never thrown out of the service.
+ *
+ * Deliberately NOT a `DomainException`: a verification deadline is not an
+ * error the CUSTOMER should see, it is a fact about the gateway that turns
+ * into an `unresolved` outcome and an honest result page. Making it a domain
+ * exception would put a 4xx in front of somebody whose money may have moved.
+ */
+export class VerificationTimeoutError extends Error {
+  constructor(timeoutMs: number) {
+    super(`Gateway verification exceeded ${timeoutMs}ms`);
+    this.name = 'VerificationTimeoutError';
   }
 }
 
@@ -60,14 +76,26 @@ export interface PreparedVerification {
 }
 
 export interface VerificationOutcome {
-  status: 'succeeded' | 'failed' | 'replayed';
+  /**
+   * `unresolved` is a real terminal-for-this-request state and NOT a failure:
+   * the gateway could not be asked, or could not answer. Nothing was written,
+   * the attempt is still open, and the caller must not settle, refund, or
+   * confirm anything on it.
+   */
+  status: 'succeeded' | 'failed' | 'replayed' | 'unresolved';
   orderId: string;
   customerId: string;
   intentId: string;
   attemptId: string;
   amountToman: number;
   providerTransactionId: string | null;
+  /** The gateway's own code. Stored and logged; never published to a browser. */
   failureCode: string | null;
+  /**
+   * The same fact narrowed to the closed public vocabulary (`QA-21`). This is
+   * what the redirect contract carries and what the frontend renders.
+   */
+  failureReason: PaymentFailureReason | null;
 }
 
 export interface RequestRefundInput {
@@ -105,6 +133,27 @@ export class PaymentService {
   private get intentTtlMinutes(): number {
     const raw = Number(this.config.get('PAYMENT_INTENT_TTL_MINUTES'));
     return Number.isFinite(raw) && raw > 0 ? raw : 30;
+  }
+
+  /**
+   * How long a server-to-server verification may take before it is treated as
+   * unresolved.
+   *
+   * A deadline is mandatory rather than defensive. `prepareVerification` runs
+   * inside an HTTP request the CUSTOMER'S BROWSER is waiting on, having just
+   * been redirected back from a bank; an adapter that awaits a gateway which
+   * accepted the connection and never answers holds that request, its
+   * connection, and the customer, until something else gives up. `verify()`'s
+   * contract does not require an adapter to impose its own timeout, so the
+   * caller imposes one and every adapter inherits it.
+   *
+   * 15s by default: comfortably above a healthy Iranian gateway's round trip
+   * and comfortably below the point at which a customer assumes the site is
+   * broken.
+   */
+  private get verifyTimeoutMs(): number {
+    const raw = Number(this.config.get('PAYMENT_VERIFY_TIMEOUT_MS'));
+    return Number.isFinite(raw) && raw > 0 ? raw : 15_000;
   }
 
   // ---------------------------------------------------------------------
@@ -234,6 +283,17 @@ export class PaymentService {
       description,
     });
 
+    // The reference is the callback's ONLY key back to this attempt, so unlike
+    // the diagnostic fields below it must never be silently shortened -- a
+    // truncated reference would produce an attempt no callback can ever find,
+    // and the customer's payment would be unreconcilable. An adapter returning
+    // one this long is broken, and saying so beats a `22001` from PostgreSQL.
+    if (initiated.providerReference.length > 128) {
+      throw new Error(
+        `Payment provider "${provider.key}" returned a ${initiated.providerReference.length}-character reference; the column holds 128.`,
+      );
+    }
+
     const attemptId = uuidv7();
     try {
       await this.dataSource.transaction(async (m) => {
@@ -351,13 +411,71 @@ export class PaymentService {
     // but reading it from trusted state rather than the request makes the
     // authority explicit and cannot be spoofed by a crafted callback URL.
     const provider = this.providers.get(attempt.providerKey);
-    const providerResult = await provider.verify({
-      providerReference,
-      expectedAmountToman: intent.amountToman,
-      callbackParams,
-    });
+
+    // Every way this call can fail to produce an answer converges on ONE
+    // shape: `unknown`. A timeout, a refused connection, a gateway 5xx an
+    // adapter chose to throw on, and an adapter bug all mean the same thing
+    // operationally -- nobody knows whether the money moved -- and the only
+    // safe response to all four is identical: write nothing, keep the attempt
+    // open, tell the customer the truth.
+    //
+    // Note what is NOT done here: this does not swallow the error silently and
+    // report `failed`. That was the shape before, by omission, because
+    // `failed` was the only word available; a thrown adapter produced a 500
+    // and a customer staring at a stack-trace page after their card was
+    // charged.
+    let providerResult: VerifyPaymentResult;
+    try {
+      providerResult = await this.withVerifyDeadline(
+        provider.verify({
+          providerReference,
+          expectedAmountToman: intent.amountToman,
+          callbackParams,
+        }),
+      );
+    } catch (err) {
+      const timedOut = err instanceof VerificationTimeoutError;
+      this.auditLog.error({
+        action: 'payment.verification_unresolved',
+        intentId: intent.id,
+        attemptId: attempt.id,
+        orderId: intent.orderId,
+        provider: attempt.providerKey,
+        // The adapter's message, not the gateway's response body: a transport
+        // error names a host and a port, which is what an operator needs, and
+        // carries none of the customer's data.
+        cause: timedOut ? 'timeout' : String((err as Error)?.message ?? err).slice(0, 200),
+      });
+      providerResult = unresolvedVerification(timedOut ? 'verification_timeout' : 'verification_transport_error');
+    }
 
     return { attempt, intent, providerResult, alreadyProcessed: false };
+  }
+
+  /**
+   * Races a verification against the configured deadline.
+   *
+   * The adapter's own promise is deliberately NOT cancelled -- a `Promise`
+   * cannot be, and an adapter that later resolves simply resolves into
+   * nothing. What matters is that the customer's request stops waiting, and
+   * that the attempt row is left in a state a later callback can still
+   * resolve. It can: nothing was written.
+   */
+  private async withVerifyDeadline(pending: Promise<VerifyPaymentResult>): Promise<VerifyPaymentResult> {
+    const deadlineMs = this.verifyTimeoutMs;
+    let timer: NodeJS.Timeout | undefined;
+    try {
+      return await Promise.race([
+        pending,
+        new Promise<never>((_resolve, reject) => {
+          timer = setTimeout(() => reject(new VerificationTimeoutError(deadlineMs)), deadlineMs);
+          // Do not hold the process open for a deadline nobody is waiting on.
+          timer.unref?.();
+        }),
+      ]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
   }
 
   /**
@@ -389,6 +507,40 @@ export class PaymentService {
         status: 'replayed',
         providerTransactionId: attempt.providerTransactionId,
         failureCode: attempt.failureCode,
+        failureReason: toPublicFailureReason(attempt.failureCode),
+      };
+    }
+
+    // AMBIGUOUS: the gateway was not reached, or did not answer definitively.
+    //
+    // Every line below this point writes something -- the attempt's terminal
+    // status, the intent's, an outbox event that five consumers act on, an
+    // append-only ledger entry downstream. None of it may happen on a guess,
+    // so this returns FIRST and writes NOTHING. The attempt stays `initiated`,
+    // which is exactly the state a later callback, a customer retry, or an
+    // operator's reconciliation needs it to be in.
+    if (providerResult.outcome === 'unknown') {
+      this.auditLog.warn({
+        action: 'payment.verification_unresolved_applied',
+        intentId: intent.id,
+        attemptId: attempt.id,
+        orderId: intent.orderId,
+        failureCode: providerResult.failureCode,
+      });
+      return {
+        ...base,
+        status: 'unresolved',
+        providerTransactionId: null,
+        // The adapter's own code is kept for the operator...
+        failureCode: providerResult.failureCode,
+        // ...but the PUBLIC reason is `unresolved` unconditionally, never
+        // derived from that code. An adapter reporting `outcome: 'unknown'`
+        // with `failureCode: 'gateway_5xx'` would otherwise narrow to
+        // `gateway_error`, whose copy promises the customer that any money
+        // taken will come back -- a promise nobody can make about a payment
+        // whose outcome is genuinely unknown. The outcome decides the public
+        // reason here; the code only annotates it.
+        failureReason: 'unresolved',
       };
     }
 
@@ -431,11 +583,14 @@ export class PaymentService {
     // an earlier version reported 'amount_mismatch' for every failure
     // (including a plain declined card), which would send a support engineer
     // hunting a tampering incident that never happened.
-    const failureCode = succeeded
-      ? null
-      : providerResult.outcome === 'failed'
-        ? providerResult.failureCode
-        : 'amount_mismatch';
+    const failureCode = fitToColumn(
+      succeeded
+        ? null
+        : providerResult.outcome === 'failed'
+          ? providerResult.failureCode
+          : 'amount_mismatch',
+      60,
+    );
 
     const claimed = await manager
       .createQueryBuilder()
@@ -443,7 +598,7 @@ export class PaymentService {
       .set({
         status: succeeded ? 'succeeded' : 'failed',
         verifiedAmountToman: providerResult.paidAmountToman,
-        providerTransactionId: providerResult.providerTransactionId,
+        providerTransactionId: fitToColumn(providerResult.providerTransactionId, 128),
         failureCode,
         providerResponse: sanitizeProviderResponse(providerResult.raw),
         verifiedAt: new Date(),
@@ -458,6 +613,7 @@ export class PaymentService {
         status: 'replayed',
         providerTransactionId: current.providerTransactionId,
         failureCode: current.failureCode,
+        failureReason: toPublicFailureReason(current.failureCode),
       };
     }
 
@@ -502,6 +658,7 @@ export class PaymentService {
       status: succeeded ? 'succeeded' : 'failed',
       providerTransactionId: providerResult.providerTransactionId,
       failureCode,
+      failureReason: toPublicFailureReason(failureCode),
     };
   }
 
@@ -582,8 +739,8 @@ export class PaymentService {
     await this.completeRefund(
       refundId,
       result.outcome === 'succeeded' ? 'succeeded' : 'failed',
-      result.providerRefundReference,
-      result.failureCode,
+      fitToColumn(result.providerRefundReference, 128),
+      fitToColumn(result.failureCode, 60),
     );
 
     this.auditLog.log({
@@ -646,6 +803,30 @@ export class PaymentService {
   async findAttemptById(attemptId: string): Promise<PaymentAttemptEntity | null> {
     return this.attempts.findOne({ where: { id: attemptId } });
   }
+}
+
+/**
+ * Fits an adapter-supplied string into the column that receives it.
+ *
+ * Not tidiness. `payment_attempts.failure_code` is `varchar(60)` and
+ * `provider_transaction_id` is `varchar(128)`; PostgreSQL does not truncate an
+ * oversized value, it raises `22001 value too long`. That error is raised
+ * INSIDE the callback's transaction, which means an adapter returning a
+ * longer-than-60-character failure message -- a free-text Persian bank
+ * message, say, which is exactly what several Iranian gateways return --
+ * aborts the whole transaction and hands the customer a 500 instead of a
+ * result page. Worse, it does so on the FAILURE path, where the customer is
+ * already having a bad time.
+ *
+ * The bound belongs here, at the boundary where an external system's data
+ * enters ours, rather than in each adapter: no adapter can be trusted to know
+ * this schema's widths, and every one of them would have to remember.
+ *
+ * Found by `payment-verification-contract.pg-spec.ts`.
+ */
+function fitToColumn(value: string | null, maxLength: number): string | null {
+  if (value === null) return null;
+  return value.length <= maxLength ? value : value.slice(0, maxLength);
 }
 
 /**

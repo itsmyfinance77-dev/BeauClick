@@ -55,11 +55,38 @@ export interface VerifyPaymentRequest {
   callbackParams: Record<string, string>;
 }
 
-export type VerifyOutcome = 'succeeded' | 'failed';
+/**
+ * What a verification established.
+ *
+ * `unknown` is the third state and it is load-bearing, not defensive
+ * completeness. Before it existed an adapter whose gateway call timed out had
+ * exactly two words available, and both were lies: `succeeded` would settle an
+ * order nobody confirmed, and `failed` would mark a transaction failed that
+ * may well have taken the customer's money. A network timeout does not tell
+ * you the payment failed; it tells you nothing at all, and the honest answer
+ * to "did this payment succeed?" is sometimes "I could not find out".
+ *
+ * The caller treats it accordingly: **nothing is written**, the attempt stays
+ * `initiated` so a later callback or a reconciliation can still resolve it,
+ * and no `PaymentSucceeded`/`PaymentFailed` event is emitted. Emitting
+ * `PaymentFailed` on an unknown would fan out to five consumers, and the
+ * financial ledger is append-only — an entry written on a guess cannot be
+ * withdrawn.
+ *
+ * An adapter MUST return `unknown` for: a request timeout, a connection
+ * failure, a gateway 5xx, and any response it cannot parse into a definite
+ * outcome. It must return `failed` only when the gateway itself said the
+ * transaction did not succeed.
+ */
+export type VerifyOutcome = 'succeeded' | 'failed' | 'unknown';
 
 export interface VerifyPaymentResult {
   outcome: VerifyOutcome;
-  /** What the gateway says was actually captured. Compared against the order total by the caller. */
+  /**
+   * What the gateway says was actually captured. Compared against the order
+   * total by the caller. Null on `failed` and ALWAYS null on `unknown` --
+   * an ambiguous verification learned no amount by definition.
+   */
   paidAmountToman: number | null;
   /**
    * The unit `paidAmountToman` is expressed in. Required on every successful
@@ -82,6 +109,13 @@ export interface VerifyPaymentResult {
   paidCurrency?: CurrencyCode | null;
   /** The gateway's settlement/reference id, printed on the customer's receipt. */
   providerTransactionId: string | null;
+  /**
+   * The gateway's own code, stored for support and NEVER published.
+   *
+   * `payment-failure.ts` narrows it to the closed public vocabulary the
+   * redirect contract and the frontend see. A gateway code routinely embeds a
+   * reference or a bank message; a redirect URL is browser history.
+   */
   failureCode: string | null;
   raw?: Record<string, unknown>;
 }

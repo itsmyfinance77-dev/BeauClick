@@ -110,7 +110,27 @@ export function Input({ label, error, hint, id, ...rest }: InputProps) {
   );
 }
 
-export function Alert({ tone = 'error', children }: { tone?: 'error' | 'success'; children: ReactNode }) {
+/**
+ * `warning` was added for the payment result page's `unresolved` state
+ * (V3.1 Phase F): a verification the gateway never answered is neither a
+ * success nor a failure, and rendering it in the error colour would tell a
+ * customer their payment failed when nobody knows whether it did.
+ *
+ * It uses the EXISTING measured `warning` / `warning-soft` token pair rather
+ * than a new colour -- that pair is already asserted against WCAG AA in
+ * `packages/design-tokens/src/contrast.spec.ts`, so this variant inherits a
+ * recorded ratio instead of introducing an unmeasured one.
+ */
+type AlertTone = 'error' | 'success' | 'warning';
+
+const ALERT_TONE_TOKENS: Record<AlertTone, { fg: string; bg: string }> = {
+  error: { fg: 'var(--bc-color-error)', bg: 'var(--bc-color-error-soft)' },
+  success: { fg: 'var(--bc-color-success)', bg: 'var(--bc-color-success-soft)' },
+  warning: { fg: 'var(--bc-color-warning)', bg: 'var(--bc-color-warning-soft)' },
+};
+
+export function Alert({ tone = 'error', children }: { tone?: AlertTone; children: ReactNode }) {
+  const { fg, bg } = ALERT_TONE_TOKENS[tone];
   return (
     <div
       role="alert"
@@ -119,8 +139,8 @@ export function Alert({ tone = 'error', children }: { tone?: 'error' | 'success'
         borderRadius: 'var(--bc-radius-row)',
         marginBlockEnd: 16,
         fontSize: 14,
-        background: tone === 'error' ? 'var(--bc-color-error-soft)' : 'var(--bc-color-success-soft)',
-        color: tone === 'error' ? 'var(--bc-color-error)' : 'var(--bc-color-success)',
+        background: bg,
+        color: fg,
       }}
     >
       {children}

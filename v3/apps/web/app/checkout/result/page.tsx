@@ -9,7 +9,7 @@ import { useAuth } from '@/lib/auth-context';
 import { Alert, Card, LoadingState } from '@/components/ui';
 import { bookingApi, type OrderDetail } from '@/lib/booking-api';
 
-const OUTCOME_COPY: Record<string, { tone: 'success' | 'error'; title: string; body: string }> = {
+const OUTCOME_COPY: Record<string, { tone: 'success' | 'error' | 'warning'; title: string; body: string }> = {
   succeeded: {
     tone: 'success',
     title: 'پرداخت انجام شد',
@@ -45,6 +45,54 @@ const OUTCOME_COPY: Record<string, { tone: 'success' | 'error'; title: string; b
     title: 'رزرو شما تأیید شد',
     body: 'به دلیل یک پرداخت تکراری، مبلغ دوم به‌صورت خودکار به حساب شما بازگردانده شد. بازگشت وجه معمولاً طی ۷۲ ساعت در صورت‌حساب بانکی شما ثبت می‌شود.',
   },
+  /**
+   * The gateway could not be reached, or did not answer definitively
+   * (`VerifyOutcome = 'unknown'`). The server wrote NOTHING, so the payment is
+   * genuinely undecided.
+   *
+   * The copy therefore promises nothing in either direction. Saying "پرداخت
+   * انجام نشد / مبلغی کسر نشده" here would be the single worst sentence on
+   * this page: the money may well have moved, and a customer told otherwise
+   * will retry and be charged a second time.
+   */
+  unresolved: {
+    tone: 'warning',
+    title: 'وضعیت پرداخت هنوز مشخص نیست',
+    body: 'ارتباط با بانک برقرار نشد و نتیجه پرداخت هنوز قطعی نیست. لطفاً چند دقیقه صبر کنید و وضعیت رزرو خود را بررسی کنید؛ اگر مبلغی کسر شده باشد، به‌صورت خودکار تعیین تکلیف می‌شود. تا مشخص شدن نتیجه، دوباره پرداخت نکنید.',
+  },
+};
+
+/**
+ * `QA-21`: why the payment did not succeed, from the `reason` query parameter
+ * the redirect contract now carries.
+ *
+ * The gap this closes is small to describe and large to experience: `cancel`
+ * and `decline` were one message. A customer who pressed "انصراف" at their
+ * bank was told their payment had been REFUSED, which sends them to their
+ * bank looking for a problem that does not exist; and a customer whose card
+ * was genuinely declined was given no hint that a different card would work.
+ *
+ * Keys are the server's closed public vocabulary (`PAYMENT_FAILURE_REASONS`).
+ * They are duplicated as strings here rather than imported, deliberately: this
+ * is a Next.js client bundle and `@beauclick/payment` is a NestJS module with
+ * TypeORM entities. The URL parameter IS the contract between them, and an
+ * unrecognised value falls back to the generic copy rather than rendering
+ * nothing.
+ */
+const FAILURE_REASON_COPY: Record<string, string> = {
+  cancelled_by_user: 'شما پرداخت را در صفحه بانک لغو کردید. مبلغی از حساب شما کسر نشده است و می‌توانید دوباره تلاش کنید.',
+  declined: 'بانک این تراکنش را تأیید نکرد. مبلغی کسر نشده است؛ لطفاً موجودی یا محدودیت‌های کارت خود را بررسی کنید یا با کارت دیگری تلاش کنید.',
+  expired: 'مهلت پرداخت این سفارش به پایان رسید. مبلغی کسر نشده است؛ برای رزرو دوباره اقدام کنید.',
+  not_completed: 'پرداخت در صفحه بانک تکمیل نشد. مبلغی کسر نشده است و می‌توانید دوباره تلاش کنید.',
+  unknown_reference: 'این تراکنش نزد درگاه پرداخت شناسایی نشد. اگر مبلغی از حساب شما کسر شده است، با پشتیبانی تماس بگیرید.',
+  /**
+   * A gateway-reported success whose amount or currency disagreed with the
+   * order -- a security event, not an ordinary decline. The customer is told
+   * plainly that support must look at it, and is NOT invited to retry.
+   */
+  amount_mismatch: 'مبلغ تأییدشده توسط درگاه با مبلغ سفارش مطابقت نداشت و پرداخت ثبت نشد. لطفاً پیش از تلاش دوباره با پشتیبانی تماس بگیرید.',
+  unresolved: 'نتیجه پرداخت از سوی بانک دریافت نشد. تا مشخص شدن وضعیت، دوباره پرداخت نکنید.',
+  gateway_error: 'درگاه پرداخت خطایی گزارش کرد. اگر مبلغی از حساب شما کسر شده است، به‌صورت خودکار بازگردانده می‌شود.',
 };
 
 /**
@@ -61,6 +109,7 @@ function ResultContent() {
   const { api, status: authStatus } = useAuth();
   const outcome = params.get('status') ?? 'failed';
   const orderId = params.get('orderId') ?? '';
+  const failureReason = params.get('reason');
 
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -82,12 +131,16 @@ function ResultContent() {
   }, [api, orderId, authStatus]);
 
   const copy = OUTCOME_COPY[outcome] ?? OUTCOME_COPY.failed;
+  // The reason REPLACES the generic body when one is present and recognised.
+  // It never appends: two sentences that both explain the same failure, one of
+  // them generic, reads as though the page is unsure what happened.
+  const body = (failureReason && FAILURE_REASON_COPY[failureReason]) || copy.body;
 
   return (
     <section style={{ display: 'grid', gap: 'var(--bc-spacing-card-gap)' }}>
       <Card>
         <h1 style={{ fontSize: 24, marginBlockEnd: 8 }}>{copy.title}</h1>
-        <Alert tone={copy.tone}>{copy.body}</Alert>
+        <Alert tone={copy.tone}>{body}</Alert>
         {/*
           These two are the ONLY ways forward from the payment result, and
           they were 18px tall -- measured in a real 375px viewport, well under
