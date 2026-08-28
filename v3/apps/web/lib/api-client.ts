@@ -107,6 +107,16 @@ export class ApiClient {
       throw new ApiRequestError('NETWORK_ERROR', GENERIC_NETWORK_ERROR, 0);
     }
 
+    // `204 No Content` is a SUCCESSFUL response with no body, and every DELETE
+    // route answers with it. `R31-18`: calling `response.json()` on that empty
+    // body threw, so the client reported "پاسخ سرور نامعتبر بود" and skipped its
+    // state update even though the deletion had succeeded server-side.
+    // Short-circuiting here is the standard No-Content handling and leaves the
+    // JSON path (200/201 envelopes, 4xx/5xx error envelopes) untouched.
+    if (response.status === 204) {
+      return { data: null as T, meta: null, error: null };
+    }
+
     let payload: ApiResponse<T>;
     try {
       payload = (await response.json()) as ApiResponse<T>;
