@@ -17,6 +17,30 @@ export interface AccessTokenPayload {
   sub: string;
   roles: string[];
   capabilities: string[];
+  /**
+   * The refresh-token row this access token was minted from (`QA-20`).
+   *
+   * WHY THE ACCESS TOKEN CARRIES IT. `GET /v1/auth/sessions` has to answer
+   * "which of these is the device I am holding right now" -- otherwise the
+   * device-management screen offers a list of indistinguishable rows and the
+   * one button that matters, "sign out my other devices", cannot be built
+   * without the risk of signing yourself out. The access token is the only
+   * artifact the request actually presents, so it is the only place that
+   * question can be answered from.
+   *
+   * WHY IT IS SAFE TO PUT HERE. `sid` is the refresh row's UUID, not the
+   * refresh TOKEN -- the token itself is stored only as a SHA-256 hash and
+   * never leaves `TokenService.issuePair`. Knowing the id lets a bearer
+   * identify their own session; it does not let them use it, and every route
+   * that acts on a session id re-checks ownership against the caller.
+   *
+   * OPTIONAL, and that is load-bearing rather than defensive. Tokens minted
+   * before this claim existed are still valid for their full 15 minutes, so a
+   * deploy must not 401 every signed-in user. `current` reads `false` for
+   * those, which is the honest answer -- it is not known -- and self-corrects
+   * on the next refresh.
+   */
+  sid?: string;
 }
 
 /**
@@ -49,7 +73,7 @@ export class JwtAuthGuard implements CanActivate {
 
     try {
       const payload = this.jwt.verify<AccessTokenPayload>(token);
-      request.user = { userId: payload.sub, roles: payload.roles, capabilities: payload.capabilities };
+      request.user = { userId: payload.sub, roles: payload.roles, capabilities: payload.capabilities, sessionId: payload.sid ?? null };
       return true;
     } catch {
       if (isPublic) return true;

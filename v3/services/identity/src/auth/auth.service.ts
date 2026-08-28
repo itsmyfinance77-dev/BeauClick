@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DomainException } from '@beauclick/http';
 import { HttpStatus } from '@nestjs/common';
-import { OtpService } from '../otp/otp.service';
+import { OtpService, OtpRequestResult } from '../otp/otp.service';
 import { AccountResolverService } from '../account/account-resolver.service';
 import { TokenService, TokenPair } from '../token/token.service';
 import { canonicalizePhone } from './phone.util';
@@ -53,14 +53,22 @@ export class AuthService {
     private readonly roles: RoleService,
   ) {}
 
-  async requestOtp(rawPhone: string, purpose: 'login' | 'change_phone' | 'confirm_deletion', ip: string, sessionUserId: string | null): Promise<void> {
+  async requestOtp(
+    rawPhone: string,
+    purpose: 'login' | 'change_phone' | 'confirm_deletion',
+    ip: string,
+    sessionUserId: string | null,
+  ): Promise<OtpRequestResult> {
     const phone = canonicalizePhone(rawPhone);
     if (!phone) throw new InvalidPhoneException();
     // No branch on "does this phone have an account" anywhere in this
     // method -- the identical requestOtp() call happens either way
-    // (V3_SECURITY_MODEL.md §2 anti-enumeration).
-    await this.otp.requestOtp(phone, purpose, ip, sessionUserId);
+    // (V3_SECURITY_MODEL.md §2 anti-enumeration). The returned cooldown is
+    // likewise derived only from request TIMING, never from whether an account
+    // exists, so QA-19's additive field cannot become an enumeration oracle.
+    const result = await this.otp.requestOtp(phone, purpose, ip, sessionUserId);
     this.auditLog.log({ action: 'otp.requested', purpose, ip });
+    return result;
   }
 
   async verifyOtpAndLogin(rawPhone: string, code: string, purpose: 'login' | 'change_phone' | 'confirm_deletion', deviceLabel: string | null, userAgent: string | null): Promise<LoginResult> {

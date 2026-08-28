@@ -25,8 +25,26 @@ export class ValidationException extends DomainException {
 }
 
 export class RateLimitedException extends DomainException {
-  constructor() {
-    super('RATE_LIMITED', 'تعداد درخواست‌ها بیش از حد مجاز است. کمی بعد دوباره تلاش کنید.', HttpStatus.TOO_MANY_REQUESTS);
+  /**
+   * `retryAfterSeconds` (`QA-19`) -- how long until the caller may try again,
+   * when the limit that fired can answer that question.
+   *
+   * Optional, and absent means "not known" rather than "zero". A per-hour
+   * window's remaining time depends on when each of several earlier requests
+   * landed, and reporting a made-up number would be worse than reporting none:
+   * a client would count down to a moment that still fails.
+   *
+   * A resend cooldown CAN answer it exactly, and that is the case the UI needs
+   * -- QA-19 exists because the resend button currently fails with an
+   * unanticipated 429 instead of counting down.
+   */
+  constructor(retryAfterSeconds?: number) {
+    super(
+      'RATE_LIMITED',
+      'تعداد درخواست‌ها بیش از حد مجاز است. کمی بعد دوباره تلاش کنید.',
+      HttpStatus.TOO_MANY_REQUESTS,
+      retryAfterSeconds === undefined ? undefined : { retryAfterSeconds },
+    );
   }
 }
 

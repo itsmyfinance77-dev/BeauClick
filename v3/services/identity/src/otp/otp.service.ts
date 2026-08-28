@@ -11,6 +11,23 @@ import { NoopOtpDebugObserver, OTP_DEBUG_OBSERVER, OtpDebugObserver } from './ot
 export type OtpVerifyResult = { ok: true } | { ok: false; reason: 'invalid_or_expired' | 'too_many_attempts' };
 
 /**
+ * What a successful request tells the caller (`QA-19`).
+ *
+ * `cooldownRemaining` is how many seconds until a RESEND would be accepted --
+ * not how long the code is valid. The two are different numbers and confusing
+ * them is the bug this exists to prevent: a UI counting the expiry down would
+ * enable its resend button while the cooldown is still running, and the user
+ * would tap it into a 429.
+ *
+ * `expiresInSeconds` is the other one, returned alongside so a client never
+ * has to guess either.
+ */
+export interface OtpRequestResult {
+  cooldownRemaining: number;
+  expiresInSeconds: number;
+}
+
+/**
  * V3_SECURITY_MODEL.md §2 -- every rule below is a REQUIRED baseline
  * extracted from V2's proven design (GAP-10: the exact numeric values are
  * provisional, not the shape). Preserved exactly:
@@ -63,7 +80,12 @@ export class OtpService {
    * (rate-limit disclosure is an accepted, standard tradeoff; it does not
    * reveal account existence, only request volume).
    */
-  async requestOtp(phone: string, purpose: OtpPurpose, ip: string, sessionUserId: string | null = null): Promise<void> {
+  async requestOtp(
+    phone: string,
+    purpose: OtpPurpose,
+    ip: string,
+    sessionUserId: string | null = null,
+  ): Promise<OtpRequestResult> {
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
 
     const [phoneCount, ipCount, recentForCooldown] = await Promise.all([
@@ -72,6 +94,11 @@ export class OtpService {
       this.otpRepo.find({ where: { phone, purpose }, order: { createdAt: 'DESC' }, take: 1 }),
     ]);
 
+    // NO `retryAfterSeconds` on the hourly windows, deliberately. When the
+    // limit resets depends on when each of up to five earlier requests landed,
+    // and the honest answer here is "not known". Reporting a plausible number
+    // would have the client count down to a moment that still fails -- worse
+    // than reporting nothing, because it looks reliable.
     if (phoneCount >= this.maxPerPhonePerHour || ipCount >= this.maxPerIpPerHour) {
       throw new RateLimitedException();
     }
@@ -80,7 +107,10 @@ export class OtpService {
     if (mostRecent) {
       const secondsSinceLast = (Date.now() - mostRecent.createdAt.getTime()) / 1000;
       if (secondsSinceLast < this.resendCooldownSeconds) {
-        throw new RateLimitedException();
+        // The cooldown CAN answer it exactly -- one timestamp, one constant --
+        // which is the whole of QA-19. Rounded UP so a client that counts down
+        // and retries at zero is never one millisecond early.
+        throw new RateLimitedException(Math.ceil(this.resendCooldownSeconds - secondsSinceLast));
       }
     }
 
@@ -107,6 +137,8 @@ export class OtpService {
     // `beauclick/auth/otp_generated`, confirmed zero production
     // subscribers -- same shape, same guarantee).
     this.debugObserver.onCodeGenerated(phone, code);
+
+    return { cooldownRemaining: this.resendCooldownSeconds, expiresInSeconds: this.expirySeconds };
   }
 
   /**

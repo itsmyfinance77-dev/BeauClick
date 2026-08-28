@@ -38,6 +38,20 @@ export class RefreshTokenEntity {
   @Column({ type: 'timestamptz', nullable: true })
   lastUsedAt!: Date | null;
 
+  /**
+   * When this DEVICE first signed in, carried across every rotation in the
+   * chain (`QA-20`).
+   *
+   * Distinct from `createdAt`, which is when this particular row was written --
+   * eleven minutes ago for a session started three weeks ago. See the
+   * migration for why the distinction is not cosmetic.
+   *
+   * Nullable for rows that predate the column; the API falls back to
+   * `createdAt` rather than inventing one.
+   */
+  @Column({ type: 'timestamptz', nullable: true })
+  sessionStartedAt!: Date | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 }

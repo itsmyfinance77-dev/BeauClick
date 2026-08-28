@@ -79,11 +79,21 @@ export class AuthController {
   @Throttle(policy('auth'))
   @Post('request-otp')
   @HttpCode(HttpStatus.OK)
-  async requestOtp(@Body() dto: RequestOtpDto, @Ip() ip: string): Promise<{ requested: true }> {
-    await this.auth.requestOtp(dto.phone, dto.purpose, ip, null);
+  async requestOtp(
+    @Body() dto: RequestOtpDto,
+    @Ip() ip: string,
+  ): Promise<{ requested: true; cooldownRemaining: number; expiresInSeconds: number }> {
+    const result = await this.auth.requestOtp(dto.phone, dto.purpose, ip, null);
     // Always the same shape/status regardless of whether the phone has an
     // account -- anti-enumeration (V3_SECURITY_MODEL.md §2).
-    return { requested: true };
+    //
+    // `cooldownRemaining` and `expiresInSeconds` are QA-19's additive fields.
+    // Both are constants of the OTP policy, identical for every caller, so
+    // neither varies with account existence and neither is an oracle. What
+    // they buy is a resend button that counts down instead of failing into an
+    // unanticipated 429 -- which is the reason QA-19 was excluded from v3.0.1
+    // rather than fixed cheaply.
+    return { requested: true, cooldownRemaining: result.cooldownRemaining, expiresInSeconds: result.expiresInSeconds };
   }
 
   @Public()
@@ -236,7 +246,21 @@ export class AuthController {
     return { loggedOut: true };
   }
 
-  /** Device management: a self-scoped list of the caller's own live/past sessions -- never another user's. */
+  /**
+   * Device management: a self-scoped list of the caller's own sessions -- never
+   * another user's.
+   *
+   * `current` is real now (`QA-20`). It was hardcoded `false`, which made the
+   * list a set of indistinguishable rows and the one action that matters --
+   * "sign out my other devices" -- impossible to offer without the user risking
+   * signing themselves out. It compares the `sid` claim on the presented access
+   * token against each row; see `AccessTokenPayload.sid` for why that claim is
+   * safe to carry and why it is optional.
+   *
+   * `current: false` on EVERY row is still a legitimate outcome, for a token
+   * minted before the claim existed. That is the honest answer -- it is not
+   * known -- and it corrects itself on the next refresh rather than guessing.
+   */
   @Get('sessions')
   async listSessions(@CurrentUser() user: AuthenticatedUser) {
     const sessions = await this.tokens.listSessionsForUser(user.userId);
@@ -244,10 +268,13 @@ export class AuthController {
       id: s.id,
       deviceLabel: s.deviceLabel,
       userAgent: s.userAgent,
-      createdAt: s.createdAt,
+      // When this DEVICE first signed in, carried across every rotation --
+      // not when the current token was minted 12 minutes ago. See
+      // `TokenService.issuePair`.
+      createdAt: s.sessionStartedAt ?? s.createdAt,
       lastUsedAt: s.lastUsedAt,
       revoked: Boolean(s.revokedAt),
-      current: false,
+      current: user.sessionId !== null && s.id === user.sessionId,
     }));
   }
 

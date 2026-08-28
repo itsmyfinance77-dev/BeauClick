@@ -2,7 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import { createHash, randomBytes } from 'crypto';
 import { returningRows } from '@beauclick/events';
 import { uuidv7 } from 'uuidv7';
@@ -52,21 +52,44 @@ export class TokenService {
     return createHash('sha256').update(token).digest('hex');
   }
 
-  async issuePair(user: UserEntity, deviceLabel: string | null, userAgent: string | null): Promise<TokenPair> {
+  async issuePair(
+    user: UserEntity,
+    deviceLabel: string | null,
+    userAgent: string | null,
+    /**
+     * The chain's original sign-in time, when this pair CONTINUES a session
+     * rather than starting one. `rotate` passes the claimed row's value
+     * forward; a fresh login passes nothing and this row starts the chain.
+     */
+    sessionStartedAt: Date | null = null,
+  ): Promise<TokenPair> {
     // Roles and capabilities come from `identity.user_roles` /
     // `identity.role_capabilities`, not from the static map and not from the
     // denormalized `users.roles` column. This is the point at which a grant or
     // revocation made since the last token becomes effective -- see the
     // session-invalidation window in V3_SECURITY_MODEL.md §9a.
     const access = await this.roles.resolveAccess(user.id);
+
+    // The session id is minted BEFORE the access token, not after, because the
+    // access token now carries it (`sid`, QA-20). Order matters here in a way
+    // it did not before: signing first and generating the id afterwards would
+    // produce a token whose claim named a row that did not exist yet, or --
+    // worse -- would quietly omit the claim and leave `GET /v1/auth/sessions`
+    // reporting `current: false` for the very session asking the question.
+    const rawRefreshToken = randomBytes(48).toString('base64url');
+    const refreshTokenId = uuidv7();
+
     const accessToken = this.jwt.sign({
       sub: user.id,
       roles: access.roles,
       capabilities: access.capabilities,
+      // NOT the refresh token -- the row's id. The token itself exists in
+      // exactly two places: this function's local variable and the caller's
+      // response body. It is stored as a SHA-256 hash and is never recoverable
+      // from anything the client holds.
+      sid: refreshTokenId,
     });
 
-    const rawRefreshToken = randomBytes(48).toString('base64url');
-    const refreshTokenId = uuidv7();
     await this.refreshRepo.save(
       this.refreshRepo.create({
         id: refreshTokenId,
@@ -78,6 +101,7 @@ export class TokenService {
         revokedAt: null,
         expiresAt: new Date(Date.now() + this.refreshTtlDays * 24 * 60 * 60 * 1000),
         lastUsedAt: null,
+        sessionStartedAt: sessionStartedAt ?? new Date(),
       }),
     );
 
@@ -116,7 +140,7 @@ export class TokenService {
         `UPDATE identity.refresh_tokens
             SET revoked_at = now(), last_used_at = now()
           WHERE token_hash = $1 AND revoked_at IS NULL AND expires_at > now()
-      RETURNING id, user_id, device_label, user_agent`,
+      RETURNING id, user_id, device_label, user_agent, session_started_at`,
       [tokenHash],
     );
 
@@ -128,6 +152,7 @@ export class TokenService {
       user_id: string;
       device_label: string | null;
       user_agent: string | null;
+      session_started_at: Date | string | null;
     }>(raw);
 
     if (claimed.length === 0) {
@@ -141,7 +166,17 @@ export class TokenService {
       throw new UnauthorizedException({ code: 'UNAUTHORIZED', message: 'نشست شما نامعتبر است. دوباره وارد شوید.' });
     }
 
-    const next = await this.issuePair(user, deviceLabel ?? claim.device_label, userAgent ?? claim.user_agent);
+    // The chain's start travels forward. Dropping it here would restart the
+    // clock on every refresh, which is precisely the bug `session_started_at`
+    // exists to fix -- and it would be invisible, because every value would
+    // still look like a plausible timestamp.
+    const chainStart = claim.session_started_at === null ? null : new Date(claim.session_started_at);
+    const next = await this.issuePair(
+      user,
+      deviceLabel ?? claim.device_label,
+      userAgent ?? claim.user_agent,
+      chainStart,
+    );
 
     // The rotation chain, written after the replacement exists so the pointer
     // is never dangling.
@@ -208,9 +243,24 @@ export class TokenService {
       .execute();
   }
 
+  /**
+   * The caller's own sessions, one row per DEVICE rather than one per
+   * rotation.
+   *
+   * `replaced_by_token_id IS NULL` selects the tip of each rotation chain: the
+   * live token for an active session, or the last one issued before a logout.
+   * Without that filter the list grows by one row every fifteen minutes of
+   * ordinary use, so a week-old phone contributes several hundred
+   * indistinguishable entries and the device-management screen QA-20 exists to
+   * enable is unusable -- not because of a bug, but because rotation is
+   * working exactly as designed.
+   *
+   * Superseded rows are not hidden data: each is already revoked, and the tip
+   * is the only one that can be presented, rotated, or revoked.
+   */
   async listSessionsForUser(userId: string): Promise<RefreshTokenEntity[]> {
     return this.refreshRepo.find({
-      where: { userId },
+      where: { userId, replacedByTokenId: IsNull() },
       order: { createdAt: 'DESC' },
     });
   }
