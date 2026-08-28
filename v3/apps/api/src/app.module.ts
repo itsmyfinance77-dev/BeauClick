@@ -41,6 +41,7 @@ import { CorrelationMiddleware } from './observability/correlation.middleware';
 
 import { validateEnv } from './config/env.validation';
 import { HealthController } from './health/health.controller';
+import { ReadinessService } from './health/readiness.service';
 
 @Module({
   imports: [
@@ -185,6 +186,14 @@ import { HealthController } from './health/health.controller';
   ],
   controllers: [HealthController],
   providers: [
+    // V3.1 Phase F. Declared at the ROOT because that is the only injector
+    // that can see every module's exports at once -- the readiness report has
+    // to reach the payment registry, the search engine, the SMS provider, and
+    // the financial DataSource, which live in four different modules. Each is
+    // injected `@Optional()`, so a composition that omits one reports it as
+    // `not_configured` rather than refusing to boot: a health surface that can
+    // take the process down is worse than no health surface.
+    ReadinessService,
     { provide: APP_FILTER, useClass: BeauClickExceptionFilter },
     { provide: APP_INTERCEPTOR, useClass: ResponseEnvelopeInterceptor },
     // Order matters: Jwt populates req.user first, then Capability checks

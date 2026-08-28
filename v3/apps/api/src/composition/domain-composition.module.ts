@@ -170,7 +170,18 @@ import {
     financialDomainEventHandlersProvider,
     financialOutboxRelayProvider,
   ],
-  exports: [CheckoutService, OutboxRelay, OutboxSweepScheduler, Phase3CompositionModule, FINANCIAL_OUTBOX_RELAY, PrivacyModule],
+  exports: [
+    CheckoutService,
+    OutboxRelay,
+    OutboxSweepScheduler,
+    Phase3CompositionModule,
+    FINANCIAL_OUTBOX_RELAY,
+    PrivacyModule,
+    // V3.1 Phase F. Re-exported so the root injector can resolve
+    // `PaymentProviderRegistry` for the readiness report -- which is the only
+    // place that can answer "is this deployment pointed at a simulated bank?".
+    PaymentModule,
+  ],
 })
 export class DomainCompositionModule implements OnApplicationBootstrap {
   private readonly logger = new Logger('EventContracts');
