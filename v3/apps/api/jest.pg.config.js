@@ -24,6 +24,9 @@ module.exports = {
     '^@beauclick/commerce$': '<rootDir>/../../services/commerce/src/index.ts',
     '^@beauclick/payment$': '<rootDir>/../../services/payment/src/index.ts',
     '^@beauclick/financial$': '<rootDir>/../../services/financial/src/index.ts',
+    '^@beauclick/search$': '<rootDir>/../../services/search/src/index.ts',
+    '^@beauclick/media$': '<rootDir>/../../libs/media/src/index.ts',
+    '^@beauclick/audit$': '<rootDir>/../../libs/audit/src/index.ts',
   },
   testTimeout: 30000,
   // Real DB tests share one server; run serially so TRUNCATE between cases

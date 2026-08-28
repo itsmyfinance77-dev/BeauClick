@@ -1,3 +1,6 @@
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { Test } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -100,6 +103,24 @@ const HERMETIC_ENV: Record<string, string> = {
   // The CSRF policy reads the same allow-list CORS does -- one source of
   // truth for "who may drive this API".
   CORS_ALLOWED_ORIGINS: 'http://localhost:3100',
+  /**
+   * Media runs on the LOCAL driver in this harness, which is the honest
+   * choice: it is a real implementation whose bytes land on a real disk and
+   * come back off it, so every content, size, quota, and authorization
+   * property is exercised against real behaviour rather than a fake.
+   *
+   * The S3 driver is verified separately, against a real S3-compatible server
+   * (`media-s3.pg-spec.ts`). Two suites because they prove two different
+   * things: this one proves the media MODEL, that one proves the PROTOCOL.
+   */
+  MEDIA_STORAGE_DRIVER: 'local',
+  // A throwaway directory outside the repository. The default root is
+  // `cwd/.media-store`, which is correct for a developer running the API and
+  // wrong for a test suite -- a suite that writes into the working tree leaves
+  // artefacts behind and eventually one of them gets committed.
+  MEDIA_LOCAL_ROOT: join(tmpdir(), 'beauclick-pg-test-media'),
+  MEDIA_UPLOAD_TOKEN_SECRET: 'pg-test-media-upload-secret',
+  MEDIA_DOWNLOAD_TOKEN_SECRET: 'pg-test-media-download-secret',
   /**
    * Rate limiting stays FULLY ACTIVE in tests -- the guard is registered and
    * runs on every request here exactly as it does in production. Only the
@@ -262,6 +283,13 @@ export const RESETTABLE_TABLES = [
   'identity.user_roles',
   'identity.users',
   'provider.verification_requests',
+  // V3.1 Phase C. Evidence and portfolio items reference media objects by
+  // value, so they are cleared before the objects they point at -- the same
+  // children-first convention the rest of this list follows.
+  'provider.verification_request_evidence',
+  'provider.portfolio_items',
+  'media.abuse_reports',
+  'media.objects',
 ];
 
 /**

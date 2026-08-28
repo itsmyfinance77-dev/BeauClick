@@ -110,7 +110,7 @@ jobs:
   # this platform's correctness rests on is proved here or nowhere.
   # --------------------------------------------------------------------------
   real-postgres:
-    name: real PostgreSQL · real OpenSearch
+    name: real PostgreSQL · real OpenSearch · real object storage
     runs-on: ubuntu-latest
 
     services:
@@ -124,6 +124,25 @@ jobs:
         options: >-
           --health-cmd="pg_isready -U postgres"
           --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+      # V3.1 Phase C. The S3 driver's request signing is hand-written (see
+      # libs/media/src/storage/sigv4.ts for why), so the ONLY thing that can
+      # vouch for a signature is a server that either accepts it or does not.
+      # MinIO is the reference implementation of the S3 API; it is NOT the
+      # vendor this platform will deploy against, which is undecided and
+      # downstream of the hosting decision. GAP-C-01 records that distinction
+      # rather than letting a green job here imply it is closed.
+      minio:
+        image: minio/minio:latest
+        env:
+          MINIO_ROOT_USER: beauclick_test
+          MINIO_ROOT_PASSWORD: beauclick_test_secret
+        ports: ['9000:9000']
+        options: >-
+          --health-cmd="curl -sf http://localhost:9000/minio/health/live || exit 1"
+          --health-interval=10s
           --health-timeout=5s
           --health-retries=20
 
@@ -233,6 +252,15 @@ jobs:
           # was written in Phase 2 and has never once actually executed.
           TEST_FINANCIAL_READER_URL: postgres://beauclick_financial_reader:ci_reader@localhost:5432/beauclick_v3_ci
           TEST_OPENSEARCH_URL: http://localhost:9200
+          # Present, so `media-s3.pg-spec.ts` RUNS rather than skipping -- the
+          # same reasoning the financial reader URL above carries. The suite
+          # creates its own bucket using this codebase's own signer, so there
+          # is no provisioning step to drift: a wrong signature fails in the
+          # suite rather than being mistaken for a setup problem.
+          TEST_S3_ENDPOINT: http://localhost:9000
+          TEST_S3_ACCESS_KEY_ID: beauclick_test
+          TEST_S3_SECRET_ACCESS_KEY: beauclick_test_secret
+          TEST_S3_BUCKET: beauclick-media-ci
 
       - name: Assert no suite was silently skipped
         # A `describe.skip` triggered by a missing environment variable looks
@@ -251,3 +279,12 @@ jobs:
           TEST_FINANCIAL_OWNER_URL: postgres://beauclick_financial_owner:ci_owner@localhost:5432/beauclick_v3_ci
           TEST_FINANCIAL_READER_URL: postgres://beauclick_financial_reader:ci_reader@localhost:5432/beauclick_v3_ci
           TEST_OPENSEARCH_URL: http://localhost:9200
+          # Present, so `media-s3.pg-spec.ts` RUNS rather than skipping -- the
+          # same reasoning the financial reader URL above carries. The suite
+          # creates its own bucket using this codebase's own signer, so there
+          # is no provisioning step to drift: a wrong signature fails in the
+          # suite rather than being mistaken for a setup problem.
+          TEST_S3_ENDPOINT: http://localhost:9000
+          TEST_S3_ACCESS_KEY_ID: beauclick_test
+          TEST_S3_SECRET_ACCESS_KEY: beauclick_test_secret
+          TEST_S3_BUCKET: beauclick-media-ci
