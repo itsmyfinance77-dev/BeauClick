@@ -140,6 +140,20 @@ export const SECRET_CONTRACT: readonly SecretContractEntry[] = [
     protects: 'the SMS gateway account that sends every login code',
     requiredInProduction: false, // GAP-11: no vendor selected. EXTERNAL.
   },
+  {
+    name: 'METRICS_AUTH_TOKEN',
+    protects:
+      'the /metrics scrape, which describes every route, its volume, its latency, and the payment-outcome counts',
+    // Not required: unset means the endpoint is 404, which is the correct
+    // fail-closed behaviour and costs only a dashboard.
+    requiredInProduction: false,
+    minLength: 32,
+  },
+  {
+    name: 'ERROR_REPORTER_AUTH_VALUE',
+    protects: 'the error-tracking account that receives stack traces and user identifiers',
+    requiredInProduction: false, // OPS-04: no backend selected. EXTERNAL.
+  },
 ] as const;
 
 /**

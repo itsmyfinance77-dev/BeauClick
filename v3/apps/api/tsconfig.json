@@ -24,7 +24,8 @@
       "@beauclick/payment": ["services/payment/src/index.ts"],
       "@beauclick/financial": ["services/financial/src/index.ts"],
       "@beauclick/money": ["libs/money/src/index.ts"],
-      "@beauclick/events": ["libs/events/src/index.ts"]
+      "@beauclick/events": ["libs/events/src/index.ts"],
+      "@beauclick/observability": ["libs/observability/src/index.ts"]
     }
   },
   "include": ["src/**/*.ts"]

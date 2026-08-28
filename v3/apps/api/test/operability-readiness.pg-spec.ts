@@ -86,6 +86,16 @@ describeIfPg('Readiness reporting on real PostgreSQL', () => {
     expect(dependency(report, 'ledger').state).toBe('reachable');
   });
 
+  it('names an error reporter that transmits nothing as simulated', async () => {
+    // Errors are logged, and nothing leaves the process. A deployment that
+    // believes it has error tracking and does not must not look like one that
+    // does -- the third time this codebase has needed that distinction, after
+    // `providerVerified` and `describeDriver().durable`.
+    const reporting = dependency(await readiness(), 'error_reporting');
+    expect(reporting.state).toBe('simulated');
+    expect(reporting.blockedBy).toBe('OPS-04');
+  });
+
   it('reports the per-process throttle store, which no code here can judge', async () => {
     // THROTTLE-STORE is topology-dependent: correct at one instance, silently
     // wrong at two. The fact is surfaced; the judgement belongs to whoever

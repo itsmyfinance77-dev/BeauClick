@@ -24,6 +24,7 @@ module.exports = {
     '^@beauclick/commerce$': '<rootDir>/../../services/commerce/src/index.ts',
     '^@beauclick/payment$': '<rootDir>/../../services/payment/src/index.ts',
     '^@beauclick/financial$': '<rootDir>/../../services/financial/src/index.ts',
+    '^@beauclick/observability$': '<rootDir>/../../libs/observability/src/index.ts',
     '^@beauclick/notification$': '<rootDir>/../../services/notification/src/index.ts',
     '^@beauclick/subject-data$': '<rootDir>/../../libs/subject-data/src/index.ts',
     '^@beauclick/privacy$': '<rootDir>/../../services/privacy/src/index.ts',

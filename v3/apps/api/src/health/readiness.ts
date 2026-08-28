@@ -69,6 +69,7 @@ export const DEPENDENCIES = [
   'storage',
   'payment',
   'sms',
+  'error_reporting',
   'throttle_store',
 ] as const;
 export type DependencyName = (typeof DEPENDENCIES)[number];
@@ -152,6 +153,11 @@ export const EXTERNAL_VERIFICATION_LEDGER: Readonly<Record<DependencyName, Exter
     gap: 'GAP-11',
     evidence: 'One real OTP delivered to a real phone through the selected production path.',
   },
+  error_reporting: {
+    verified: false,
+    gap: 'OPS-04',
+    evidence: 'A real production error received by the selected error-tracking backend.',
+  },
   throttle_store: {
     verified: false,
     gap: 'THROTTLE-STORE',
@@ -184,6 +190,9 @@ export const REQUIRED_FOR_TRAFFIC: Readonly<Record<DependencyName, boolean>> = {
   // it is down.
   payment: false,
   sms: false,
+  // Errors are still logged when the reporter transmits nothing. Losing the
+  // dashboard is not a reason to stop serving customers.
+  error_reporting: false,
   throttle_store: false,
 } as const;
 

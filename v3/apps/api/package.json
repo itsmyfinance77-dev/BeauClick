@@ -47,7 +47,8 @@
     "@beauclick/audit": "workspace:*",
     "@beauclick/media": "workspace:*",
     "@beauclick/subject-data": "workspace:*",
-    "@beauclick/privacy": "workspace:*"
+    "@beauclick/privacy": "workspace:*",
+    "@beauclick/observability": "workspace:*"
   },
   "devDependencies": {
     "@beauclick/testing": "workspace:*",

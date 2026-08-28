@@ -8,6 +8,7 @@ import { MediaService } from '@beauclick/media';
 import { PaymentProviderRegistry, SANDBOX_PROVIDER_KEY } from '@beauclick/payment';
 import { SEARCH_ENGINE, SearchEnginePort } from '@beauclick/search';
 import { SMS_PROVIDER, SmsProvider } from '@beauclick/notification';
+import { ERROR_REPORTER, ErrorReporterPort } from '@beauclick/observability';
 
 import { productionConfigurationErrors } from '../config/env.validation';
 import {
@@ -86,6 +87,7 @@ export class ReadinessService {
     @Optional() @Inject(SEARCH_ENGINE) private readonly search?: SearchEnginePort,
     @Optional() private readonly payments?: PaymentProviderRegistry,
     @Optional() @Inject(SMS_PROVIDER) private readonly sms?: SmsProvider,
+    @Optional() @Inject(ERROR_REPORTER) private readonly errorReporter?: ErrorReporterPort,
   ) {}
 
   private get isProduction(): boolean {
@@ -100,6 +102,7 @@ export class ReadinessService {
       this.describeStorage(),
       this.describePayment(),
       this.describeSms(),
+      this.describeErrorReporting(),
       this.describeThrottleStore(),
     ]);
 
@@ -182,6 +185,15 @@ export class ReadinessService {
     return this.describe('sms', this.sms.deliversExternally ? 'configured' : 'simulated');
   }
 
+  private describeErrorReporting(): DependencyReadiness {
+    if (!this.errorReporter) return this.describe('error_reporting', 'not_configured');
+    // `reportsExternally` is the reporter's own statement about whether
+    // reports leave the process. The default logs and transmits nothing, which
+    // is right for development and must never look like a working error
+    // tracker -- the third time this codebase has needed that distinction.
+    return this.describe('error_reporting', this.errorReporter.reportsExternally ? 'configured' : 'simulated');
+  }
+
   private describeThrottleStore(): DependencyReadiness {
     // `THROTTLE-STORE`. Storage is in-memory per process, which is CORRECT at
     // single-instance scale and silently wrong the moment a second instance
@@ -217,6 +229,8 @@ const VALIDATED_KEYS = [
   'MEDIA_S3_ENDPOINT',
   'MEDIA_S3_BUCKET',
   'SMS_HTTP_AUTH_VALUE',
+  'METRICS_AUTH_TOKEN',
+  'ERROR_REPORTER_AUTH_VALUE',
   'PUBLIC_API_BASE_URL',
   'PUBLIC_WEB_BASE_URL',
   'CORS_ALLOWED_ORIGINS',

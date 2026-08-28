@@ -4,10 +4,24 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import helmet from 'helmet';
 import { ValidationException } from '@beauclick/http';
 import { assertPrivilegedMutationsAreAudited } from '@beauclick/audit';
+import { StructuredLogger, logFormatFromEnv } from '@beauclick/observability';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { logger: ['log', 'warn', 'error'] });
+  /**
+   * V3.1 Phase F. One JSON object per line in production, Nest's own output
+   * everywhere else -- see `StructuredLogger` for why the format is chosen by
+   * environment rather than fixed.
+   *
+   * Passed to `NestFactory.create` rather than set afterwards with
+   * `app.useLogger`, so the framework's OWN boot lines -- module
+   * initialisation, route mapping, and above all a dependency-resolution
+   * failure -- go through it too. A logger installed after creation misses
+   * exactly the lines that matter when an application will not start.
+   */
+  const app = await NestFactory.create(AppModule, {
+    logger: new StructuredLogger(logFormatFromEnv(process.env)),
+  });
 
   app.use(helmet());
 

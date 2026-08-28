@@ -76,6 +76,7 @@ describe('readiness vocabulary', () => {
       expect(EXTERNAL_VERIFICATION_LEDGER.sms.gap).toBe('GAP-11');
       expect(EXTERNAL_VERIFICATION_LEDGER.database.gap).toBe('HOSTING_GRANTS');
       expect(EXTERNAL_VERIFICATION_LEDGER.throttle_store.gap).toBe('THROTTLE-STORE');
+      expect(EXTERNAL_VERIFICATION_LEDGER.error_reporting.gap).toBe('OPS-04');
     });
   });
 

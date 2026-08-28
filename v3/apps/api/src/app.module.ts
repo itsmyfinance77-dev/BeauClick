@@ -31,6 +31,7 @@ import { EventContractsModule } from '@beauclick/event-contracts';
 import { AuditModule, AUDIT_ENTITIES } from '@beauclick/audit';
 import { MediaModule, MEDIA_ENTITIES } from '@beauclick/media';
 import { SubjectDataModule } from '@beauclick/subject-data';
+import { HttpMetricsMiddleware, ObservabilityModule } from '@beauclick/observability';
 import { PRIVACY_ENTITIES } from '@beauclick/privacy';
 import { DomainCompositionModule } from './composition/domain-composition.module';
 import { PrivilegedCapabilityModule } from './composition/privileged-capability.module';
@@ -42,6 +43,7 @@ import { CorrelationMiddleware } from './observability/correlation.middleware';
 import { validateEnv } from './config/env.validation';
 import { HealthController } from './health/health.controller';
 import { ReadinessService } from './health/readiness.service';
+import { MetricsController } from './observability/metrics.controller';
 
 @Module({
   imports: [
@@ -172,6 +174,11 @@ import { ReadinessService } from './health/readiness.service';
     // one boot-time decision the whole application shares. Not `@Global()`,
     // though -- a module that needs `MediaService` imports it and says so.
     MediaModule,
+    // V3.1 Phase F. `@Global()`, for the reason AuditModule records: metrics
+    // and error reporting are infrastructure several domains reference, and
+    // requiring each one to import them would mean the ones that should count
+    // something quietly do not.
+    ObservabilityModule,
     // Global, so the boot-time subject-data coverage assertion is reachable
     // from the composition that knows the full contract list -- the same
     // reasoning AuditModule records for its own enforcement service.
@@ -184,7 +191,7 @@ import { ReadinessService } from './health/readiness.service';
     // coverage assertion runs over the contracts they registered.
     PrivacyCompositionModule,
   ],
-  controllers: [HealthController],
+  controllers: [HealthController, MetricsController],
   providers: [
     // V3.1 Phase F. Declared at the ROOT because that is the only injector
     // that can see every module's exports at once -- the readiness report has
@@ -236,8 +243,16 @@ export class AppModule implements NestModule {
    * module, so every consumer of AppModule gets it identically.
    */
   configure(consumer: MiddlewareConsumer): void {
-    // Order matters: correlation first, so a request that fails inside cookie
-    // parsing is still traceable and still gets the response header.
-    consumer.apply(CorrelationMiddleware, cookieParser()).forRoutes('*');
+    // Order matters. Metrics FIRST, so a request that fails in correlation or
+    // cookie parsing is still counted -- and, more importantly, so are the
+    // ones that never reach a controller at all. `HttpMetricsMiddleware`
+    // records why it cannot be an interceptor: a guard rejection (401, 403,
+    // 429) and an unmatched route (404) both bypass every interceptor, which
+    // would leave an error-rate dashboard reporting zero of exactly the
+    // failures it exists to surface.
+    //
+    // Correlation next, so anything that fails inside cookie parsing is still
+    // traceable and still gets the response header.
+    consumer.apply(HttpMetricsMiddleware, CorrelationMiddleware, cookieParser()).forRoutes('*');
   }
 }
