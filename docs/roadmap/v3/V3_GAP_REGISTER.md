@@ -912,3 +912,117 @@ changed that could affect them. Every finding above is grounded in direct inspec
 source, migrations, tests, `.env.example`, the CI workflow, and the `v3.0.0`/`v3.0.1` tag
 objects at `68d3d5e`. Git state at the end of this pass is identical to the start except
 for the four new documents under `docs/roadmap/v3.1/` and this addendum.
+
+---
+
+# V3.1 governance addendum — `R31-04` RESOLVED by `EXC-002` (2026-08-28)
+
+Recorded at the `v3.1.0` release gate. This addendum changes **one** gap status —
+`R31-04` — and deliberately changes no other. Nothing here closes `GAP-06b`.
+
+## `R31-04` — RESOLVED
+
+**`R31-04` — "`EXC-001` does not cover `v3.0.1` and does not extend to `v3.1.x`" —
+RESOLVED by `EXC-002`.**
+
+The project owner selected **Option A** of `V3.1_RELEASE_STRATEGY.md` §5 by explicit written
+direction dated 2026-08-28: record a new exception rather than amend `EXC-001`.
+
+`EXC-002` (`V3_RELEASE_POLICY_EXCEPTIONS.md`) is scoped to *"every release in the `v3.0.x`
+and `v3.1.x` lines while GAP-06b remains open"*, retrospectively covering `v3.0.1` and
+covering `v3.1.0`. It carries its own decision date, unmet criterion, re-verified
+acceptability reasons, accepted risks, ten named safeguards, production-activation
+requirements, review conditions, owner, and a dated retirement condition.
+
+**`EXC-001` is unchanged and unamended** — byte-identical to its `v3.0.0`-era text, verified
+at the release gate. It remains ACTIVE and correctly scoped to the `v3.0.0` release only.
+The `v3.0.0` and `v3.0.1` release documents and tag objects were **not** rewritten; `EXC-002`
+states its retrospective coverage of `v3.0.1` in its own text rather than by editing history
+to imply it existed at that time.
+
+**What this does not do:** it does not close `GAP-06b`, does not narrow or downgrade it, and
+does not assert that a real payment gateway exists.
+
+## `GAP-06b` — OPEN / EXTERNAL_CONFIGURATION (unchanged, independently re-verified)
+
+**`GAP-06b` — real production payment gateway — remains OPEN / EXTERNAL_CONFIGURATION,
+production-blocking.** Re-verified from source at the `v3.1.0` gate, not carried forward on
+trust:
+
+- `PAYMENT_DEFAULT_PROVIDER=sandbox`, `PAYMENT_ENVIRONMENT=sandbox`.
+- `SandboxPaymentProvider` is the only registered provider — `payment.module.ts` provides
+  exactly `[sandbox]`. No real gateway adapter file exists; `mock-gateway.provider.ts` is
+  gone from source entirely.
+- No merchant credential of any kind in `.env`, `.env.example`, or anywhere in tracked
+  source. None were fabricated.
+- `isEnabled()` returns `false` under `NODE_ENV=production` **unconditionally and first**,
+  AND-ed with `PAYMENT_ENVIRONMENT === 'sandbox'`. Neither condition alone enables it.
+- **`PAYMENT_ALLOW_MOCK_GATEWAY` does not exist in tracked source.** It survives only in
+  comments recording its removal and in the regression test asserting its absence. No
+  equivalent override was reintroduced.
+- Production therefore resolves **zero** enabled payment providers and checkout fails
+  closed. That refusal is the intended behaviour.
+
+**Revenue impact: absolute — no real money can move. Production payment activation stays
+blocked.** `EXC-002` waives the release criterion for a *tag*, never for enablement.
+
+## Status after this addendum
+
+| Item | Status |
+|---|---|
+| `R31-04` | **RESOLVED** by `EXC-002` |
+| `GAP-06b` | **OPEN / EXTERNAL_CONFIGURATION** — production-blocking, unchanged |
+| `EXC-001` | ACTIVE, historical, unchanged, scoped to `v3.0.0` only |
+| `EXC-002` | ACTIVE — `v3.0.x` and `v3.1.x` lines while `GAP-06b` is open; retires at `v3.2.0` or earlier |
+| `GAP-06a` | RESOLVED / VERIFIED (unchanged) |
+
+Every other gap, exception, and finding in this register is unchanged by this addendum and
+was neither re-litigated nor re-classified at this gate.
+
+## One new finding recorded at this gate
+
+**`R31-19` — `GET /v1/providers/{non-uuid}` returns 500 rather than 400/404. NEW / LOW /
+PRE-EXISTING.** The public provider-detail route takes its `:id` path parameter without a
+UUID-parsing pipe, so a malformed identifier surfaces as `INTERNAL_ERROR` instead of a
+client error. The response body is the generic Persian server error with no stack or detail,
+so **nothing leaks** and there is no security or data-integrity impact — but a 500 on
+malformed client input is wrong and will pollute error monitoring. Present unchanged since
+the original V3 provider foundation (`2599af3`) and therefore in `v3.0.0` and `v3.0.1`:
+**not a V3.1 regression, and not release-blocking.** The fix is the same `ParseUuidPipe`
+V3.1 already added for the admin routes. Phase: whichever phase next touches
+`provider.controller.ts`.
+
+**`R31-20` — the sandbox gateway never returned the browser to the callback. NEW / HIGH /
+RELEASE-BLOCKING / PRE-EXISTING — FIXED at this gate.** Found by the `v3.1.0` release
+audit's own browser re-verification, after `R31-17` had already been fixed and signed off.
+
+`POST /v1/sandbox-gateway/:reference/decide` is an ordinary JSON route, so its answer
+arrives inside the standard `{ data, meta, error }` envelope — the two callback routes
+beside it carry `@SkipResponseEnvelope()` precisely because they are redirects and this one
+is not. `apps/web/app/sandbox-gateway/page.tsx` read `body.accepted` off the **envelope**,
+where it is permanently `undefined`, so the "was this decision refused?" guard fired on
+**every** response including a successful one. The gateway recorded `outcome = paid`, and
+the customer was then shown the false error «این تراکنش پیش‌تر نهایی شده است» and **never
+returned to the callback** — so verification never ran, the order stayed `pending`, and the
+slot stayed on hold until expiry.
+
+The same browser-only shape as `R31-17`, a different root cause, and invisible to every
+automated suite for the same reason: the API specs call `handleCallback` directly and never
+drive the gateway page, and `sandbox-callback.spec.ts` asserted the return-URL **allowlist**
+— "is this address safe to navigate to", never "do we navigate".
+
+Why it survived the earlier browser QA: both the previous QA pass and this audit's first
+browser run completed the return leg **by navigating to the callback URL by hand**, and read
+the resulting `paid` order as success. The manual step masked the missing automatic one.
+This gate's re-run was performed hands-off — one click, no manual navigation — which is what
+exposed it.
+
+**Fix:** read `envelope.data` rather than the envelope. **Regression:**
+`apps/web/test/sandbox-gateway-page.spec.tsx` (5 cases) asserts the success path navigates
+to the callback carrying only the reference — and that the outcome is *not* carried — and
+that each genuine refusal (already-settled, sandbox-disabled, gateway error) still refuses
+without navigating. The suite was verified to FAIL (3 of 5) with the fix reverted.
+**Verified end to end in a real browser against the rebuilt production bundle: one click on
+«پرداخت موفق» → self-redirect to `/callback/sandbox` → order `paid`, booking `confirmed`,
+ledger commission 45,000 + receivable 255,000 exactly once.** This is the first time the
+browser payment loop has completed with no manual step.
