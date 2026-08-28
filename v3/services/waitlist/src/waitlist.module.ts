@@ -9,6 +9,7 @@ import { WaitlistConfig } from './waitlist.config';
 import { WaitlistService } from './waitlist.service';
 import { WaitlistController } from './waitlist.controller';
 import { WaitlistEntryOwnerResolver, WaitlistProfessionalResolver } from './waitlist-owner.resolver';
+import { WaitlistSubjectDataContract } from './waitlist-subject-data.contract';
 
 export const WAITLIST_ENTITIES = [WaitlistEntryEntity, WaitlistOutboxEntity];
 
@@ -21,7 +22,9 @@ export const WAITLIST_ENTITIES = [WaitlistEntryEntity, WaitlistOutboxEntity];
 @Module({
   imports: [ConfigModule, TypeOrmModule.forFeature(WAITLIST_ENTITIES)],
   controllers: [WaitlistController],
-  providers: [WaitlistConfig, WaitlistService, WaitlistEntryOwnerResolver, WaitlistProfessionalResolver],
-  exports: [WaitlistService, WaitlistConfig, TypeOrmModule],
+  providers: [
+    WaitlistSubjectDataContract,WaitlistConfig, WaitlistService, WaitlistEntryOwnerResolver, WaitlistProfessionalResolver],
+  exports: [
+    WaitlistSubjectDataContract,WaitlistService, WaitlistConfig, TypeOrmModule],
 })
 export class WaitlistModule {}

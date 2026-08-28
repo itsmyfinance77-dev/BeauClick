@@ -6,6 +6,7 @@ import { JOURNEY_ENTITIES } from './entities/journey.entities';
 import { JourneyContextProvider } from './journey-context.provider';
 import { JourneyController } from './journey.controller';
 import { JourneyService } from './journey.service';
+import { JourneySubjectDataContract } from './journey-subject-data.contract';
 
 /**
  * Journey is a top-level domain module, not a sub-module of AI (ADR-019).
@@ -18,7 +19,9 @@ import { JourneyService } from './journey.service';
 @Module({
   imports: [ConfigModule, TypeOrmModule.forFeature(JOURNEY_ENTITIES)],
   controllers: [JourneyController],
-  providers: [JourneyService, JourneyContextProvider],
-  exports: [JourneyService, JourneyContextProvider, TypeOrmModule],
+  providers: [
+    JourneySubjectDataContract,JourneyService, JourneyContextProvider],
+  exports: [
+    JourneySubjectDataContract,JourneyService, JourneyContextProvider, TypeOrmModule],
 })
 export class JourneyModule {}

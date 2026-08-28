@@ -9,6 +9,7 @@ import { AdminMediaController, MediaController } from './media.controller';
 import { OBJECT_STORAGE_DRIVER, ObjectStorageDriver } from './storage/object-storage.port';
 import { LocalObjectStorageDriver } from './storage/local-object-storage.driver';
 import { S3ObjectStorageDriver } from './storage/s3-object-storage.driver';
+import { MediaSubjectDataContract } from './media-subject-data.contract';
 
 export const MEDIA_ENTITIES = [MediaObjectEntity, MediaAbuseReportEntity];
 
@@ -55,6 +56,7 @@ function createStorageDriver(config: ConfigService): ObjectStorageDriver {
   imports: [ConfigModule, TypeOrmModule.forFeature(MEDIA_ENTITIES)],
   controllers: [MediaController, AdminMediaController],
   providers: [
+    MediaSubjectDataContract,
     MediaService,
     {
       provide: OBJECT_STORAGE_DRIVER,
@@ -62,6 +64,7 @@ function createStorageDriver(config: ConfigService): ObjectStorageDriver {
       useFactory: createStorageDriver,
     },
   ],
-  exports: [MediaService, OBJECT_STORAGE_DRIVER, TypeOrmModule],
+  exports: [
+    MediaSubjectDataContract,MediaService, OBJECT_STORAGE_DRIVER, TypeOrmModule],
 })
 export class MediaModule {}

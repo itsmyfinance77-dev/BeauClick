@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AdminAuditLogEntity } from './admin-audit-log.entity';
 import { AdminAuditService } from './admin-audit.service';
 import { AuditEnforcementService } from './audit-enforcement';
+import { AuditSubjectDataContract } from './audit-subject-data.contract';
 
 /**
  * Global on purpose.
@@ -20,8 +21,10 @@ import { AuditEnforcementService } from './audit-enforcement';
 @Global()
 @Module({
   imports: [DiscoveryModule, TypeOrmModule.forFeature([AdminAuditLogEntity])],
-  providers: [AdminAuditService, AuditEnforcementService],
-  exports: [AdminAuditService, AuditEnforcementService, TypeOrmModule],
+  providers: [
+    AuditSubjectDataContract,AdminAuditService, AuditEnforcementService],
+  exports: [
+    AuditSubjectDataContract,AdminAuditService, AuditEnforcementService, TypeOrmModule],
 })
 export class AuditModule {}
 

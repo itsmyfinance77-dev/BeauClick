@@ -5,3 +5,6 @@ export * from './templates/template.registry';
 export * from './channels/notification-channel.port';
 export * from './channels/channels';
 export * from './entities/notification.entities';
+export * from './notification-subject-data.contract';
+export * from './channels/sms/sms-provider.port';
+export * from './channels/sms/http-sms-provider';

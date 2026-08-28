@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DeliveryRequest, DeliveryResult, NotificationChannelPort } from './notification-channel.port';
+import { SmsProvider } from './sms/sms-provider.port';
 
 /**
  * In-app delivery.
@@ -36,26 +37,44 @@ export interface RecipientResolverPort {
 export const RECIPIENT_RESOLVER = Symbol('BEAUCLICK_RECIPIENT_RESOLVER');
 
 /**
- * SMS delivery through a provider abstraction, with a logging provider behind
- * it in this environment.
+ * SMS delivery, through the `SmsProvider` sub-port.
  *
- * **No real SMS is sent, and this class says so** (`providerVerified: false`).
- * GAP-11 remains open: no SMS credentials exist anywhere this project has
- * run, so a real adapter's field and encoding semantics could not be
- * exercised. Shipping one unverified would be a liability rather than an
- * asset -- the same judgement Phase 2 made about a payment gateway adapter.
+ * WHAT CHANGED IN PHASE E AND WHAT DID NOT. This class used to log and return
+ * success unconditionally. It now delegates to a configured provider, and
+ * reports `providerVerified` from that provider rather than from a hardcoded
+ * `false` -- so a deployment that has wired a real gateway stops being
+ * described on `/health` as one that has not.
  *
- * What IS real here: the recipient lookup, the missing-recipient failure
- * classification, the retryable/permanent distinction, and the fact that the
- * message body never reaches a persisted field.
+ * What did NOT change is the honesty rule this file was written around: with
+ * no provider configured the channel gets `NullSmsProvider`,
+ * `providerVerified` is `false`, and nothing leaves the building. `GAP-11`
+ * stays open until a real vendor endpoint has been exercised -- see
+ * `sms-provider.port.ts` for exactly which half of it this closes.
+ *
+ * Everything the channel already owned it still owns: the recipient lookup,
+ * the permanent-vs-transient classification, and the guarantee that neither
+ * the number nor the message body reaches a persisted field or a log line.
  */
 @Injectable()
-export class LoggingSmsChannel implements NotificationChannelPort {
+export class SmsChannel implements NotificationChannelPort {
   readonly key = 'sms';
-  readonly providerVerified = false;
   private readonly logger = new Logger('SmsChannel');
 
-  constructor(private readonly recipients: RecipientResolverPort) {}
+  constructor(
+    private readonly recipients: RecipientResolverPort,
+    private readonly provider: SmsProvider,
+  ) {}
+
+  /**
+   * True only when the configured provider actually transmits.
+   *
+   * Derived rather than declared, so the two cannot drift: there is no way to
+   * configure a real gateway and leave the health surface saying otherwise,
+   * and no way to claim verification without a provider that transmits.
+   */
+  get providerVerified(): boolean {
+    return this.provider.deliversExternally;
+  }
 
   async send(request: DeliveryRequest): Promise<DeliveryResult> {
     const { phone } = await this.recipients.resolve(request.userId);
@@ -66,13 +85,19 @@ export class LoggingSmsChannel implements NotificationChannelPort {
       return { delivered: false, errorCode: 'no_phone_on_file', retryable: false };
     }
 
-    // The number is deliberately NOT logged. An SMS log line containing a
-    // phone number is a personal-data leak into every log aggregator that
-    // ever ingests it.
-    this.logger.log(
-      `[SIMULATED SMS] notification=${request.notificationId} template=${request.templateKey} chars=${request.rendered.short.length}`,
-    );
-    return { delivered: true };
+    const outcome = await this.provider.send(phone, request.rendered.short);
+    if (outcome.accepted) {
+      // The number is deliberately NOT logged. An SMS log line containing a
+      // phone number is a personal-data leak into every log aggregator that
+      // ever ingests it -- and with a real provider configured, the body is a
+      // one-time login code.
+      this.logger.log(
+        `SMS accepted by provider=${this.provider.key} notification=${request.notificationId} template=${request.templateKey} chars=${request.rendered.short.length}`,
+      );
+      return { delivered: true };
+    }
+
+    return { delivered: false, errorCode: outcome.errorCode, retryable: outcome.retryable };
   }
 }
 

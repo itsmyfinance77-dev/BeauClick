@@ -5,3 +5,4 @@ export * from './rollup.service';
 export * from './platform-day';
 export * from './ports';
 export * from './entities/analytics.entities';
+export * from './analytics-subject-data.contract';

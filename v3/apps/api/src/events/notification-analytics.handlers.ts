@@ -193,6 +193,56 @@ export const NOTIFICATION_RULES: NotificationRule[] = [
       },
     }),
   },
+
+  // ---- privacy (V3.1 Phase E)
+  //
+  // `DataErasureCompleted` is deliberately NOT here, and its absence is the
+  // considered answer rather than an omission. By the time it is published the
+  // subject's phone number is a tombstone and every session is revoked -- there
+  // is no channel left to reach them on, and an in-app notification would be
+  // addressed to an account nobody can sign into. The message that matters goes
+  // out on the REQUEST, while the grace window is open and the user can still
+  // act on it.
+  {
+    eventType: 'DataExportRequested',
+    templateKey: 'privacy_export_requested',
+    channels: ['in_app'],
+    entityType: 'data_request',
+    build: async (p) => ({ userId: str(p.subjectUserId), entityId: str(p.requestId), vars: {} }),
+  },
+  {
+    eventType: 'DataExportCompleted',
+    templateKey: 'privacy_export_ready',
+    channels: ['in_app'],
+    entityType: 'data_request',
+    build: async (p) => ({
+      userId: str(p.subjectUserId),
+      entityId: str(p.requestId),
+      // The DEADLINE, not the completion time. "Your export is ready" is not
+      // actionable on its own; "until when" is the part the user has to plan
+      // around, and an export that quietly expires unmentioned is an export
+      // the subject never got.
+      vars: { expiresAtDate: formatFullJalaliDate(new Date(str(p.expiresAt))) },
+    }),
+  },
+  {
+    eventType: 'DataErasureRequested',
+    templateKey: 'privacy_erasure_requested',
+    channels: ['in_app'],
+    entityType: 'data_request',
+    build: async (p) => ({
+      userId: str(p.subjectUserId),
+      entityId: str(p.requestId),
+      vars: { executeAfterDate: formatFullJalaliDate(new Date(str(p.executeAfter))) },
+    }),
+  },
+  {
+    eventType: 'DataErasureCancelled',
+    templateKey: 'privacy_erasure_cancelled',
+    channels: ['in_app'],
+    entityType: 'data_request',
+    build: async (p) => ({ userId: str(p.subjectUserId), entityId: str(p.requestId), vars: {} }),
+  },
 ];
 
 /**

@@ -23,6 +23,21 @@ export const NOTIFICATION_CATEGORIES = [
   'retention',
   'referral',
   'loyalty',
+  // V3.1 Phase E. An ADDITIVE widening of a v1 enum, and the one place in this
+  // catalogue where that judgement is made rather than a new version cut.
+  //
+  // The rule this project follows -- "a payload change is a NEW version, never
+  // an edit" -- exists to protect deployed consumers. Adding an enum member
+  // breaks none: no field changes type, no field is removed, and every value a
+  // consumer already understood still arrives. What a v2 would cost is real --
+  // every notification contract versioned in lockstep, every consumer pinned
+  // forward, for a category label -- and what it would buy is nothing, because
+  // the only consumers of `category` here store it or branch on the two
+  // mandatory ones.
+  //
+  // A member REMOVED from this list would be the breaking change, and it would
+  // deserve the version.
+  'privacy',
 ] as const;
 
 export const NOTIFICATION_CHANNELS = ['in_app', 'email', 'sms'] as const;

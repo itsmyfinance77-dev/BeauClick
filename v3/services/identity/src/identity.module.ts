@@ -20,6 +20,7 @@ import { AdminRolesController } from './admin/admin-roles.controller';
 import { AdminAuditController } from './admin/admin-audit.controller';
 import { AdminPhoneConflictsController } from './admin/admin-phone-conflicts.controller';
 import { PhoneConflictService } from './admin/phone-conflict.service';
+import { IdentitySubjectDataContract } from './identity-subject-data.contract';
 
 export const IDENTITY_ENTITIES = [
   UserEntity,
@@ -44,6 +45,7 @@ export const IDENTITY_ENTITIES = [
   imports: [TypeOrmModule.forFeature(IDENTITY_ENTITIES), BeauClickJwtModule],
   controllers: [AuthController, MeController, AdminRolesController, AdminAuditController, AdminPhoneConflictsController],
   providers: [
+    IdentitySubjectDataContract,
     OtpService,
     AccountResolverService,
     TokenService,
@@ -52,6 +54,7 @@ export const IDENTITY_ENTITIES = [
     PhoneConflictService,
     { provide: OTP_DEBUG_OBSERVER, useClass: NoopOtpDebugObserver },
   ],
-  exports: [TokenService, AuthService, RoleService, BeauClickJwtModule, TypeOrmModule, OTP_DEBUG_OBSERVER],
+  exports: [
+    IdentitySubjectDataContract,TokenService, AuthService, RoleService, BeauClickJwtModule, TypeOrmModule, OTP_DEBUG_OBSERVER],
 })
 export class IdentityModule {}

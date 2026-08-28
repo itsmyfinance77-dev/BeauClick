@@ -11,6 +11,7 @@ import { PricingService } from './pricing/pricing.service';
 import { OrderService } from './order/order.service';
 import { OrderOwnerResolver } from './order/order-owner.resolver';
 import { OrderController } from './order/order.controller';
+import { CommerceSubjectDataContract } from './commerce-subject-data.contract';
 
 export const COMMERCE_ENTITIES = [OrderEntity, OrderItemEntity, OrderAdjustmentEntity, CommerceOutboxEntity];
 
@@ -28,7 +29,9 @@ export const COMMERCE_ENTITIES = [OrderEntity, OrderItemEntity, OrderAdjustmentE
 @Module({
   imports: [ConfigModule, TypeOrmModule.forFeature(COMMERCE_ENTITIES)],
   controllers: [OrderController],
-  providers: [PricingService, OrderService, OrderOwnerResolver],
-  exports: [OrderService, PricingService, TypeOrmModule],
+  providers: [
+    CommerceSubjectDataContract,PricingService, OrderService, OrderOwnerResolver],
+  exports: [
+    CommerceSubjectDataContract,OrderService, PricingService, TypeOrmModule],
 })
 export class CommerceModule {}

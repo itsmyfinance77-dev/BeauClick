@@ -10,6 +10,7 @@ import { OpenSearchAdapter } from './opensearch/opensearch.adapter';
 import { SEARCH_ENGINE } from './ports';
 import { SearchAdminController, SearchController } from './search.controller';
 import { SearchService } from './search.service';
+import { SearchSubjectDataContract } from './search-subject-data.contract';
 
 export const OPENSEARCH_CLIENT = Symbol('BEAUCLICK_OPENSEARCH_CLIENT');
 
@@ -17,6 +18,7 @@ export const OPENSEARCH_CLIENT = Symbol('BEAUCLICK_OPENSEARCH_CLIENT');
   imports: [ConfigModule, TypeOrmModule.forFeature(SEARCH_ENTITIES)],
   controllers: [SearchController, SearchAdminController],
   providers: [
+    SearchSubjectDataContract,
     SearchService,
     SearchIndexerService,
     {
@@ -57,6 +59,7 @@ export const OPENSEARCH_CLIENT = Symbol('BEAUCLICK_OPENSEARCH_CLIENT');
       },
     },
   ],
-  exports: [SearchService, SearchIndexerService, SEARCH_ENGINE, TypeOrmModule],
+  exports: [
+    SearchSubjectDataContract,SearchService, SearchIndexerService, SEARCH_ENGINE, TypeOrmModule],
 })
 export class SearchModule {}

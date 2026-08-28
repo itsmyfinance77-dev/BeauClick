@@ -14,6 +14,7 @@ import { BookingService } from './booking/booking.service';
 import { BookingPartyResolver, BookingProfessionalResolver } from './booking/booking-party.resolver';
 import { BookingController } from './booking/booking.controller';
 import { MyAvailabilityController, PublicAvailabilityController } from './availability/availability.controller';
+import { BookingSubjectDataContract } from './booking-subject-data.contract';
 
 export const BOOKING_ENTITIES = [
   AvailabilitySlotEntity,
@@ -34,7 +35,9 @@ export const BOOKING_ENTITIES = [
 @Module({
   imports: [ConfigModule, TypeOrmModule.forFeature(BOOKING_ENTITIES)],
   controllers: [BookingController, PublicAvailabilityController, MyAvailabilityController],
-  providers: [BookingConfig, AvailabilityService, BookingService, BookingPartyResolver, BookingProfessionalResolver],
-  exports: [BookingService, AvailabilityService, BookingConfig, BookingPartyResolver, TypeOrmModule],
+  providers: [
+    BookingSubjectDataContract,BookingConfig, AvailabilityService, BookingService, BookingPartyResolver, BookingProfessionalResolver],
+  exports: [
+    BookingSubjectDataContract,BookingService, AvailabilityService, BookingConfig, BookingPartyResolver, TypeOrmModule],
 })
 export class BookingModule {}

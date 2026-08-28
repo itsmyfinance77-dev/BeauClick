@@ -1,0 +1,11 @@
+{
+  "name": "subject-data",
+  "sourceRoot": "libs/subject-data/src",
+  "projectType": "library",
+  "tags": ["type:lib", "scope:shared"],
+  "targets": {
+    "typecheck": { "executor": "nx:run-commands", "options": { "command": "tsc -p libs/subject-data/tsconfig.json --noEmit" } },
+    "test": { "executor": "nx:run-commands", "options": { "command": "jest --config libs/subject-data/jest.config.js" } },
+    "lint": { "executor": "nx:run-commands", "options": { "command": "eslint libs/subject-data/src --resolve-plugins-relative-to ." } }
+  }
+}

@@ -15,6 +15,7 @@ import {
   BusinessOwnerResolver,
   BusinessStaffSelfResolver,
 } from './business-membership.resolver';
+import { BusinessSubjectDataContract } from './business-subject-data.contract';
 
 export const BUSINESS_ENTITIES = [BusinessEntity, BusinessStaffEntity, BusinessOutboxEntity];
 
@@ -22,6 +23,7 @@ export const BUSINESS_ENTITIES = [BusinessEntity, BusinessStaffEntity, BusinessO
   imports: [ConfigModule, TypeOrmModule.forFeature(BUSINESS_ENTITIES)],
   controllers: [BusinessController],
   providers: [
+    BusinessSubjectDataContract,
     BusinessService,
     StaffService,
     BusinessMembershipResolver,
@@ -29,6 +31,7 @@ export const BUSINESS_ENTITIES = [BusinessEntity, BusinessStaffEntity, BusinessO
     BusinessManagerResolver,
     BusinessStaffSelfResolver,
   ],
-  exports: [BusinessService, StaffService, BusinessMembershipResolver, TypeOrmModule],
+  exports: [
+    BusinessSubjectDataContract,BusinessService, StaffService, BusinessMembershipResolver, TypeOrmModule],
 })
 export class BusinessModule {}

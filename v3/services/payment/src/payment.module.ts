@@ -12,6 +12,7 @@ import { PaymentService } from './payment.service';
 import { PaymentProviderRegistry } from './providers/payment-provider.registry';
 import { SandboxPaymentProvider } from './providers/sandbox-payment.provider';
 import { PAYMENT_PROVIDERS } from './providers/payment-provider.interface';
+import { PaymentSubjectDataContract } from './payment-subject-data.contract';
 
 export const PAYMENT_ENTITIES = [
   PaymentIntentEntity,
@@ -37,6 +38,7 @@ export const PAYMENT_ENTITIES = [
 @Module({
   imports: [ConfigModule, TypeOrmModule.forFeature(PAYMENT_ENTITIES)],
   providers: [
+    PaymentSubjectDataContract,
     PaymentService,
     PaymentProviderRegistry,
     SandboxPaymentProvider,
@@ -46,6 +48,7 @@ export const PAYMENT_ENTITIES = [
       inject: [SandboxPaymentProvider],
     },
   ],
-  exports: [PaymentService, PaymentProviderRegistry, SandboxPaymentProvider, TypeOrmModule],
+  exports: [
+    PaymentSubjectDataContract,PaymentService, PaymentProviderRegistry, SandboxPaymentProvider, TypeOrmModule],
 })
 export class PaymentModule {}

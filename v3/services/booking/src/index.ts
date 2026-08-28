@@ -14,3 +14,4 @@ export * from './booking/booking-party.resolver';
 export * from './booking/booking.controller';
 export * from './dto/booking.dto';
 export * from './dto/create-slot.dto';
+export * from './booking-subject-data.contract';

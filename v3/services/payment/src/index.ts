@@ -8,3 +8,4 @@ export * from './entities/sandbox-transaction.entity';
 export * from './providers/payment-provider.interface';
 export * from './providers/payment-provider.registry';
 export * from './providers/sandbox-payment.provider';
+export * from './payment-subject-data.contract';

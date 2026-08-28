@@ -57,7 +57,8 @@
               "scope:notification",
               "scope:analytics",
               "scope:business",
-              "scope:waitlist"
+              "scope:waitlist",
+              "scope:privacy"
             ]
           },
           {
@@ -77,7 +78,8 @@
               "scope:notification",
               "scope:analytics",
               "scope:business",
-              "scope:waitlist"
+              "scope:waitlist",
+              "scope:privacy"
             ]
           },
           {
@@ -97,7 +99,8 @@
               "scope:notification",
               "scope:analytics",
               "scope:business",
-              "scope:waitlist"
+              "scope:waitlist",
+              "scope:privacy"
             ]
           },
           {
@@ -117,7 +120,8 @@
               "scope:notification",
               "scope:analytics",
               "scope:business",
-              "scope:waitlist"
+              "scope:waitlist",
+              "scope:privacy"
             ]
           },
           {
@@ -137,7 +141,8 @@
               "scope:notification",
               "scope:analytics",
               "scope:business",
-              "scope:waitlist"
+              "scope:waitlist",
+              "scope:privacy"
             ]
           },
           {
@@ -157,7 +162,8 @@
               "scope:notification",
               "scope:analytics",
               "scope:business",
-              "scope:waitlist"
+              "scope:waitlist",
+              "scope:privacy"
             ]
           },
           {
@@ -177,7 +183,8 @@
               "scope:notification",
               "scope:analytics",
               "scope:business",
-              "scope:waitlist"
+              "scope:waitlist",
+              "scope:privacy"
             ]
           },
           {
@@ -197,7 +204,8 @@
               "scope:notification",
               "scope:analytics",
               "scope:business",
-              "scope:waitlist"
+              "scope:waitlist",
+              "scope:privacy"
             ]
           },
           {
@@ -217,7 +225,8 @@
               "scope:notification",
               "scope:analytics",
               "scope:business",
-              "scope:waitlist"
+              "scope:waitlist",
+              "scope:privacy"
             ]
           },
           {
@@ -237,7 +246,8 @@
               "scope:journey",
               "scope:analytics",
               "scope:business",
-              "scope:waitlist"
+              "scope:waitlist",
+              "scope:privacy"
             ]
           },
           {
@@ -257,7 +267,8 @@
               "scope:journey",
               "scope:notification",
               "scope:business",
-              "scope:waitlist"
+              "scope:waitlist",
+              "scope:privacy"
             ]
           },
           {
@@ -277,7 +288,8 @@
               "scope:journey",
               "scope:notification",
               "scope:analytics",
-              "scope:waitlist"
+              "scope:waitlist",
+              "scope:privacy"
             ]
           },
           {
@@ -297,7 +309,29 @@
               "scope:journey",
               "scope:notification",
               "scope:analytics",
-              "scope:business"
+              "scope:business",
+              "scope:privacy"
+            ]
+          },
+          {
+            "sourceTag": "scope:privacy",
+            "onlyDependOnLibsWithTags": [
+              "scope:shared"
+            ],
+            "notDependOnLibsWithTags": [
+              "scope:identity",
+              "scope:provider",
+              "scope:booking",
+              "scope:commerce",
+              "scope:payment",
+              "scope:financial",
+              "scope:search",
+              "scope:loyalty",
+              "scope:journey",
+              "scope:notification",
+              "scope:analytics",
+              "scope:business",
+              "scope:waitlist"
             ]
           },
           {
@@ -319,7 +353,8 @@
               "scope:analytics",
               "scope:business",
               "scope:waitlist",
-              "scope:app"
+              "scope:app",
+              "scope:privacy"
             ]
           },
           {
@@ -338,7 +373,8 @@
               "scope:notification",
               "scope:analytics",
               "scope:business",
-              "scope:waitlist"
+              "scope:waitlist",
+              "scope:privacy"
             ]
           }
         ]

@@ -29,6 +29,7 @@ import {
 } from './review.controller';
 import { VerificationService } from './verification/verification.service';
 import { AdminVerificationController, VerificationController } from './verification/verification.controller';
+import { ProviderSubjectDataContract } from './provider-subject-data.contract';
 
 export const PROVIDER_ENTITIES = [
   ProfessionalEntity,
@@ -60,6 +61,7 @@ export const PROVIDER_ENTITIES = [
     AdminReviewController,
   ],
   providers: [
+    ProviderSubjectDataContract,
     ProviderService,
     ServiceOfferingService,
     ProviderOwnerResolver,
@@ -69,6 +71,7 @@ export const PROVIDER_ENTITIES = [
     ReviewService,
   ],
   exports: [
+    ProviderSubjectDataContract,
     ProviderService,
     ServiceOfferingService,
     ProviderEventsService,

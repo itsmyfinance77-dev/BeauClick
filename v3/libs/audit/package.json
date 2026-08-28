@@ -12,7 +12,8 @@
     "typeorm": "^0.3.20",
     "uuidv7": "^1.0.2",
     "@beauclick/events": "workspace:*",
-    "@beauclick/auth": "workspace:*"
+    "@beauclick/auth": "workspace:*",
+    "@beauclick/subject-data": "workspace:*"
   },
   "devDependencies": {
     "@nestjs/testing": "^10.4.4"

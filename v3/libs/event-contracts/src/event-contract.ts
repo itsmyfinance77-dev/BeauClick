@@ -35,7 +35,8 @@ export type ServiceName =
   | 'notification'
   | 'analytics'
   | 'business'
-  | 'waitlist';
+  | 'waitlist'
+  | 'privacy';
 
 export interface EventContract<TSchema extends z.ZodType = z.ZodType> {
   /** Wire name, e.g. `BookingCompleted`. Unique per version. */

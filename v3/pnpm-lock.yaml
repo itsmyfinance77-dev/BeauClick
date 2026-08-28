@@ -139,12 +139,18 @@ importers:
       '@beauclick/persian-utils':
         specifier: workspace:*
         version: link:../../packages/persian-utils
+      '@beauclick/privacy':
+        specifier: workspace:*
+        version: link:../../services/privacy
       '@beauclick/provider':
         specifier: workspace:*
         version: link:../../services/provider
       '@beauclick/search':
         specifier: workspace:*
         version: link:../../services/search
+      '@beauclick/subject-data':
+        specifier: workspace:*
+        version: link:../../libs/subject-data
       '@beauclick/waitlist':
         specifier: workspace:*
         version: link:../../services/waitlist
@@ -279,6 +285,9 @@ importers:
       '@beauclick/events':
         specifier: workspace:*
         version: link:../events
+      '@beauclick/subject-data':
+        specifier: workspace:*
+        version: link:../subject-data
       '@nestjs/common':
         specifier: 10.4.22
         version: 10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1)
@@ -387,6 +396,9 @@ importers:
       '@beauclick/http':
         specifier: workspace:*
         version: link:../http
+      '@beauclick/subject-data':
+        specifier: workspace:*
+        version: link:../subject-data
       '@nestjs/common':
         specifier: 10.4.22
         version: 10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1)
@@ -433,6 +445,15 @@ importers:
         specifier: 0.2.2
         version: 0.2.2
 
+  libs/subject-data:
+    dependencies:
+      '@nestjs/common':
+        specifier: 10.4.22
+        version: 10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1)
+      typeorm:
+        specifier: 0.3.31
+        version: 0.3.31(babel-plugin-macros@3.1.0)(pg@8.23.0)(supports-color@8.1.1)(ts-node@10.9.2(@types/node@22.20.1)(typescript@5.9.3))
+
   libs/testing:
     dependencies:
       pg-mem:
@@ -475,6 +496,9 @@ importers:
       '@beauclick/ownership':
         specifier: workspace:*
         version: link:../../libs/ownership
+      '@beauclick/subject-data':
+        specifier: workspace:*
+        version: link:../../libs/subject-data
       '@nestjs/common':
         specifier: 10.4.22
         version: 10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1)
@@ -521,6 +545,9 @@ importers:
       '@beauclick/ownership':
         specifier: workspace:*
         version: link:../../libs/ownership
+      '@beauclick/subject-data':
+        specifier: workspace:*
+        version: link:../../libs/subject-data
       '@nestjs/common':
         specifier: 10.4.22
         version: 10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1)
@@ -567,6 +594,9 @@ importers:
       '@beauclick/ownership':
         specifier: workspace:*
         version: link:../../libs/ownership
+      '@beauclick/subject-data':
+        specifier: workspace:*
+        version: link:../../libs/subject-data
       '@nestjs/common':
         specifier: 10.4.22
         version: 10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1)
@@ -612,6 +642,9 @@ importers:
       '@beauclick/ownership':
         specifier: workspace:*
         version: link:../../libs/ownership
+      '@beauclick/subject-data':
+        specifier: workspace:*
+        version: link:../../libs/subject-data
       '@nestjs/common':
         specifier: 10.4.22
         version: 10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1)
@@ -661,6 +694,9 @@ importers:
       '@beauclick/ownership':
         specifier: workspace:*
         version: link:../../libs/ownership
+      '@beauclick/subject-data':
+        specifier: workspace:*
+        version: link:../../libs/subject-data
       '@nestjs/common':
         specifier: 10.4.22
         version: 10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1)
@@ -710,6 +746,9 @@ importers:
       '@beauclick/persian-utils':
         specifier: workspace:*
         version: link:../../packages/persian-utils
+      '@beauclick/subject-data':
+        specifier: workspace:*
+        version: link:../../libs/subject-data
       '@nestjs/common':
         specifier: 10.4.22
         version: 10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1)
@@ -771,6 +810,9 @@ importers:
       '@beauclick/ownership':
         specifier: workspace:*
         version: link:../../libs/ownership
+      '@beauclick/subject-data':
+        specifier: workspace:*
+        version: link:../../libs/subject-data
       '@nestjs/common':
         specifier: 10.4.22
         version: 10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1)
@@ -820,6 +862,9 @@ importers:
       '@beauclick/ownership':
         specifier: workspace:*
         version: link:../../libs/ownership
+      '@beauclick/subject-data':
+        specifier: workspace:*
+        version: link:../../libs/subject-data
       '@nestjs/common':
         specifier: 10.4.22
         version: 10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1)
@@ -872,6 +917,9 @@ importers:
       '@beauclick/persian-utils':
         specifier: workspace:*
         version: link:../../packages/persian-utils
+      '@beauclick/subject-data':
+        specifier: workspace:*
+        version: link:../../libs/subject-data
       '@nestjs/common':
         specifier: 10.4.22
         version: 10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1)
@@ -918,6 +966,9 @@ importers:
       '@beauclick/ownership':
         specifier: workspace:*
         version: link:../../libs/ownership
+      '@beauclick/subject-data':
+        specifier: workspace:*
+        version: link:../../libs/subject-data
       '@nestjs/common':
         specifier: 10.4.22
         version: 10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1)
@@ -947,6 +998,57 @@ importers:
         specifier: workspace:*
         version: link:../../libs/testing
 
+  services/privacy:
+    dependencies:
+      '@beauclick/audit':
+        specifier: workspace:*
+        version: link:../../libs/audit
+      '@beauclick/auth':
+        specifier: workspace:*
+        version: link:../../libs/auth
+      '@beauclick/event-contracts':
+        specifier: workspace:*
+        version: link:../../libs/event-contracts
+      '@beauclick/events':
+        specifier: workspace:*
+        version: link:../../libs/events
+      '@beauclick/http':
+        specifier: workspace:*
+        version: link:../../libs/http
+      '@beauclick/ownership':
+        specifier: workspace:*
+        version: link:../../libs/ownership
+      '@beauclick/subject-data':
+        specifier: workspace:*
+        version: link:../../libs/subject-data
+      '@nestjs/common':
+        specifier: 10.4.22
+        version: 10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1)
+      '@nestjs/config':
+        specifier: 3.3.0
+        version: 3.3.0(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(rxjs@7.8.2)
+      '@nestjs/core':
+        specifier: 10.4.22
+        version: 10.4.22(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/platform-express@10.4.22)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/throttler':
+        specifier: 6.2.1
+        version: 6.2.1(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@10.4.22)(reflect-metadata@0.2.2)
+      '@nestjs/typeorm':
+        specifier: 10.0.2
+        version: 10.0.2(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@10.4.22)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@0.3.31(babel-plugin-macros@3.1.0)(pg@8.23.0)(supports-color@8.1.1)(ts-node@10.9.2(@types/node@22.20.1)(typescript@5.9.3)))
+      class-transformer:
+        specifier: 0.5.1
+        version: 0.5.1
+      class-validator:
+        specifier: 0.14.4
+        version: 0.14.4
+      typeorm:
+        specifier: 0.3.31
+        version: 0.3.31(babel-plugin-macros@3.1.0)(pg@8.23.0)(supports-color@8.1.1)(ts-node@10.9.2(@types/node@22.20.1)(typescript@5.9.3))
+      uuidv7:
+        specifier: ^1.0.2
+        version: 1.2.1
+
   services/provider:
     dependencies:
       '@beauclick/audit':
@@ -970,6 +1072,9 @@ importers:
       '@beauclick/ownership':
         specifier: workspace:*
         version: link:../../libs/ownership
+      '@beauclick/subject-data':
+        specifier: workspace:*
+        version: link:../../libs/subject-data
       '@nestjs/common':
         specifier: 10.4.22
         version: 10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1)
@@ -1021,6 +1126,9 @@ importers:
       '@beauclick/persian-utils':
         specifier: workspace:*
         version: link:../../packages/persian-utils
+      '@beauclick/subject-data':
+        specifier: workspace:*
+        version: link:../../libs/subject-data
       '@nestjs/common':
         specifier: 10.4.22
         version: 10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1)
@@ -1073,6 +1181,9 @@ importers:
       '@beauclick/ownership':
         specifier: workspace:*
         version: link:../../libs/ownership
+      '@beauclick/subject-data':
+        specifier: workspace:*
+        version: link:../../libs/subject-data
       '@nestjs/common':
         specifier: 10.4.22
         version: 10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1)

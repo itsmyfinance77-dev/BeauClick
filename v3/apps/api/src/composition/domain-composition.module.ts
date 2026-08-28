@@ -13,6 +13,7 @@ import { FinancialModule } from '@beauclick/financial';
 import { BusinessModule, BusinessOutboxEntity } from '@beauclick/business';
 import { WaitlistModule, WaitlistOutboxEntity, WaitlistService } from '@beauclick/waitlist';
 import { MediaModule } from '@beauclick/media';
+import { PrivacyModule, PrivacyOutboxEntity } from '@beauclick/privacy';
 
 import { Phase3CompositionModule } from './phase3-composition.module';
 import { PHASE3_EVENT_HANDLERS, PHASE3_OUTBOX_SOURCES } from './phase3-tokens';
@@ -79,6 +80,11 @@ import {
     WaitlistModule,
     // V3.1 Phase C: the sweep scheduler reaps expired upload grants.
     MediaModule,
+    // V3.1 Phase E. Imported for its outbox table and its sweep, both of which
+    // the shared relay and the shared scheduler own -- the privacy DOMAIN is
+    // composed in `PrivacyCompositionModule`, which is where its contracts and
+    // the coverage assertion live.
+    PrivacyModule,
     // Phase 3's domains and their handlers/outboxes, contributed under their
     // own tokens and merged into the single relay below.
     Phase3CompositionModule,
@@ -108,6 +114,10 @@ import {
         { name: 'payment', entity: PaymentOutboxEntity },
         { name: 'business', entity: BusinessOutboxEntity },
         { name: 'waitlist', entity: WaitlistOutboxEntity },
+        // V3.1 Phase E. On the shared DataSource like every source here except
+        // financial's, so `DataErasureRequested` reaches notification and
+        // analytics through the one relay rather than a second mechanism.
+        { name: 'privacy', entity: PrivacyOutboxEntity },
         ...phase3,
       ],
     },
@@ -160,7 +170,7 @@ import {
     financialDomainEventHandlersProvider,
     financialOutboxRelayProvider,
   ],
-  exports: [CheckoutService, OutboxRelay, OutboxSweepScheduler, Phase3CompositionModule, FINANCIAL_OUTBOX_RELAY],
+  exports: [CheckoutService, OutboxRelay, OutboxSweepScheduler, Phase3CompositionModule, FINANCIAL_OUTBOX_RELAY, PrivacyModule],
 })
 export class DomainCompositionModule implements OnApplicationBootstrap {
   private readonly logger = new Logger('EventContracts');

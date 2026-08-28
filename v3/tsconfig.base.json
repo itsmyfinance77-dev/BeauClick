@@ -28,6 +28,7 @@
       "@beauclick/persian-utils": ["packages/persian-utils/src/index.ts"],
       "@beauclick/money": ["libs/money/src/index.ts"],
       "@beauclick/media": ["libs/media/src/index.ts"],
+      "@beauclick/subject-data": ["libs/subject-data/src/index.ts"],
       "@beauclick/events": ["libs/events/src/index.ts"],
       "@beauclick/event-contracts": ["libs/event-contracts/src/index.ts"],
       "@beauclick/identity": ["services/identity/src/index.ts"],
@@ -42,7 +43,8 @@
       "@beauclick/notification": ["services/notification/src/index.ts"],
       "@beauclick/analytics": ["services/analytics/src/index.ts"],
       "@beauclick/business": ["services/business/src/index.ts"],
-      "@beauclick/waitlist": ["services/waitlist/src/index.ts"]
+      "@beauclick/waitlist": ["services/waitlist/src/index.ts"],
+      "@beauclick/privacy": ["services/privacy/src/index.ts"]
     }
   }
 }

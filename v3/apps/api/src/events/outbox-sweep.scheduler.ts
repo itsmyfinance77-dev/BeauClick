@@ -4,6 +4,7 @@ import { OutboxRelay } from '@beauclick/events';
 import { BookingService } from '@beauclick/booking';
 import { WaitlistService } from '@beauclick/waitlist';
 import { MediaService } from '@beauclick/media';
+import { PrivacyConfig, PrivacySweepService } from '@beauclick/privacy';
 import { FINANCIAL_OUTBOX_RELAY } from '../composition/financial-outbox-relay.provider';
 
 /**
@@ -35,6 +36,8 @@ export class OutboxSweepScheduler implements OnApplicationBootstrap, OnApplicati
     private readonly bookings: BookingService,
     private readonly waitlist: WaitlistService,
     private readonly media: MediaService,
+    private readonly privacySweep: PrivacySweepService,
+    private readonly privacyConfig: PrivacyConfig,
     private readonly config: ConfigService,
   ) {}
 
@@ -54,6 +57,12 @@ export class OutboxSweepScheduler implements OnApplicationBootstrap, OnApplicati
     );
     this.timers.push(
       this.every(this.intervalMs('MEDIA_GRANT_REAP_INTERVAL_MS', 300_000), () => this.sweepMediaGrants()),
+    );
+    // V3.1 Phase E. Reads its interval from PrivacyConfig rather than from
+    // ConfigService directly, so the one place that owns privacy's tunables
+    // owns this one too -- and the floor below still applies.
+    this.timers.push(
+      this.every(Math.max(1_000, this.privacyConfig.sweepIntervalMs), () => this.sweepPrivacy()),
     );
   }
 
@@ -140,5 +149,17 @@ export class OutboxSweepScheduler implements OnApplicationBootstrap, OnApplicati
   private async sweepMediaGrants(): Promise<void> {
     const reaped = await this.media.reapExpiredGrants();
     if (reaped > 0) this.logger.log(`Media grant reap: ${reaped} expired upload grant(s) cleared`);
+  }
+
+  /**
+   * Generates due exports, expires stale ones, and executes erasures whose
+   * grace window has closed.
+   *
+   * The sweep logs its own summary, so nothing is echoed here -- and note this
+   * is the ONLY path by which an erasure ever executes. There is no route, no
+   * administrative action, and no event consumer that can bring one forward.
+   */
+  private async sweepPrivacy(): Promise<void> {
+    await this.privacySweep.runOnce();
   }
 }

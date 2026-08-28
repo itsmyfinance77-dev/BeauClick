@@ -8,6 +8,7 @@ import { PROVIDER_EVENTS } from './provider.events';
 import { SEARCH_EVENTS } from './search.events';
 import { BUSINESS_EVENTS } from './business.events';
 import { WAITLIST_EVENTS } from './waitlist.events';
+import { PRIVACY_EVENTS } from './privacy.events';
 
 export * from './common';
 export * from './booking.events';
@@ -19,6 +20,7 @@ export * from './provider.events';
 export * from './search.events';
 export * from './business.events';
 export * from './waitlist.events';
+export * from './privacy.events';
 
 /**
  * Every contract V3 has published, in one list.
@@ -41,4 +43,5 @@ export const ALL_EVENT_CONTRACTS: EventContract[] = [
   ...SEARCH_EVENTS,
   ...BUSINESS_EVENTS,
   ...WAITLIST_EVENTS,
+  ...PRIVACY_EVENTS,
 ];

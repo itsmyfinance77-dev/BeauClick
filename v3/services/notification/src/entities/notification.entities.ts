@@ -10,6 +10,10 @@ export const NOTIFICATION_CATEGORIES = [
   'retention',
   'referral',
   'loyalty',
+  // V3.1 Phase E. Additive: no existing payload shape changes and no consumer
+  // loses a value it understood. See privacy.events.ts for why these messages
+  // exist and 20260828300002 for why the category is mandatory.
+  'privacy',
 ] as const;
 export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
 
@@ -23,7 +27,7 @@ export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
  * via a CHECK constraint -- stronger, because a bug in the preference-update
  * path then cannot suppress a receipt either.
  */
-export const MANDATORY_CATEGORIES: readonly NotificationCategory[] = ['booking', 'payment'];
+export const MANDATORY_CATEGORIES: readonly NotificationCategory[] = ['booking', 'payment', 'privacy'];
 
 export const NOTIFICATION_CHANNELS = ['in_app', 'email', 'sms'] as const;
 export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];

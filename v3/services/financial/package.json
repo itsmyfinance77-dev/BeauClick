@@ -18,7 +18,8 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "uuidv7": "^1.0.2",
-    "@beauclick/audit": "workspace:*"
+    "@beauclick/audit": "workspace:*",
+    "@beauclick/subject-data": "workspace:*"
   },
   "devDependencies": {
     "@beauclick/testing": "workspace:*"

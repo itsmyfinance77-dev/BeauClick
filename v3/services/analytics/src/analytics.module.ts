@@ -7,11 +7,14 @@ import { AdminAnalyticsController, MyAnalyticsController } from './analytics.con
 import { AnalyticsIngestionService } from './ingestion.service';
 import { MetricsService } from './metrics.service';
 import { RollupService } from './rollup.service';
+import { AnalyticsSubjectDataContract } from './analytics-subject-data.contract';
 
 @Module({
   imports: [ConfigModule, TypeOrmModule.forFeature(ANALYTICS_ENTITIES)],
   controllers: [MyAnalyticsController, AdminAnalyticsController],
-  providers: [AnalyticsIngestionService, MetricsService, RollupService],
-  exports: [AnalyticsIngestionService, MetricsService, RollupService, TypeOrmModule],
+  providers: [
+    AnalyticsSubjectDataContract,AnalyticsIngestionService, MetricsService, RollupService],
+  exports: [
+    AnalyticsSubjectDataContract,AnalyticsIngestionService, MetricsService, RollupService, TypeOrmModule],
 })
 export class AnalyticsModule {}

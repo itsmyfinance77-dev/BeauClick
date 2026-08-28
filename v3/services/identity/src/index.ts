@@ -12,3 +12,4 @@ export * from './auth/csrf';
 export * from './entities/role.entities';
 export * from './rbac/role.service';
 export * from './admin/phone-conflict.service';
+export * from './identity-subject-data.contract';

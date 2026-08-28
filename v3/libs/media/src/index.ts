@@ -11,3 +11,4 @@ export * from './storage/s3-object-storage.driver';
 export * from './storage/upload-grant.token';
 export * from './storage/sigv4';
 export * from './testing/image-fixtures';
+export * from './media-subject-data.contract';

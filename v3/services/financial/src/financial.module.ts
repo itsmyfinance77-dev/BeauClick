@@ -10,6 +10,7 @@ import { LedgerService } from './ledger.service';
 import { SettlementService } from './settlement.service';
 import { MyFinanceService } from './my-finance.service';
 import { FinancialAdminController, MyFinanceController } from './financial.controller';
+import { FinancialSubjectDataContract } from './financial-subject-data.contract';
 
 export const FINANCIAL_ENTITIES = [
   LedgerEntryEntity,
@@ -35,7 +36,9 @@ export const FINANCIAL_ENTITIES = [
 @Module({
   imports: [ConfigModule],
   controllers: [MyFinanceController, FinancialAdminController],
-  providers: [FinancialConfig, LedgerService, SettlementService, MyFinanceService],
-  exports: [LedgerService, SettlementService, MyFinanceService, FinancialConfig],
+  providers: [
+    FinancialSubjectDataContract,FinancialConfig, LedgerService, SettlementService, MyFinanceService],
+  exports: [
+    FinancialSubjectDataContract,LedgerService, SettlementService, MyFinanceService, FinancialConfig],
 })
 export class FinancialModule {}

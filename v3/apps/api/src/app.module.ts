@@ -30,8 +30,11 @@ import { WAITLIST_ENTITIES } from '@beauclick/waitlist';
 import { EventContractsModule } from '@beauclick/event-contracts';
 import { AuditModule, AUDIT_ENTITIES } from '@beauclick/audit';
 import { MediaModule, MEDIA_ENTITIES } from '@beauclick/media';
+import { SubjectDataModule } from '@beauclick/subject-data';
+import { PRIVACY_ENTITIES } from '@beauclick/privacy';
 import { DomainCompositionModule } from './composition/domain-composition.module';
 import { PrivilegedCapabilityModule } from './composition/privileged-capability.module';
+import { PrivacyCompositionModule } from './composition/privacy-composition.module';
 
 import cookieParser from 'cookie-parser';
 import { CorrelationMiddleware } from './observability/correlation.middleware';
@@ -87,6 +90,11 @@ import { HealthController } from './health/health.controller';
           // reads and writes on every upload, so it needs neither `financial`'s
           // second DataSource nor `admin`'s owner-role isolation.
           ...MEDIA_ENTITIES,
+          // V3.1 Phase E. `privacy.data_requests` and `privacy.export_payloads`
+          // are ordinary application-role tables on the shared pool: privacy
+          // orchestrates other modules' erasures inside ONE transaction on this
+          // DataSource, which it could not do from an isolated connection.
+          ...PRIVACY_ENTITIES,
         ],
         // V3_DATABASE_BLUEPRINT.md §2 mandates lower_snake_case columns;
         // TypeORM's default naming strategy uses the JS property name
@@ -163,9 +171,17 @@ import { HealthController } from './health/health.controller';
     // one boot-time decision the whole application shares. Not `@Global()`,
     // though -- a module that needs `MediaService` imports it and says so.
     MediaModule,
+    // Global, so the boot-time subject-data coverage assertion is reachable
+    // from the composition that knows the full contract list -- the same
+    // reasoning AuditModule records for its own enforcement service.
+    SubjectDataModule,
     IdentityModule,
     ProviderModule,
     DomainCompositionModule,
+    // V3.1 Phase E. Imported AFTER DomainCompositionModule so the boot-order
+    // is the honest one: every domain module is instantiated before the
+    // coverage assertion runs over the contracts they registered.
+    PrivacyCompositionModule,
   ],
   controllers: [HealthController],
   providers: [

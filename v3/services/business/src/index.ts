@@ -6,3 +6,4 @@ export * from './business.service';
 export * from './staff.service';
 export * from './business-membership.resolver';
 export * from './business.errors';
+export * from './business-subject-data.contract';

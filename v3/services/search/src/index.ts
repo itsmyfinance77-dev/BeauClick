@@ -7,3 +7,4 @@ export * from './index/provider-index.definition';
 export * from './ranking/ranking';
 export * from './opensearch/in-memory-search.engine';
 export * from './opensearch/opensearch.adapter';
+export * from './search-subject-data.contract';

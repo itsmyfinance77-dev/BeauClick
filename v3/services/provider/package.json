@@ -20,6 +20,7 @@
     "uuidv7": "^1.0.2",
     "@beauclick/audit": "workspace:*",
     "@beauclick/media": "workspace:*",
-    "@nestjs/config": "^3.2.3"
+    "@nestjs/config": "^3.2.3",
+    "@beauclick/subject-data": "workspace:*"
   }
 }

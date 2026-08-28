@@ -269,6 +269,45 @@ const FACT_MAPPINGS: Record<string, FactMapping> = {
     metricOf: (p) => num(p.amountToman),
     dimensions: (p) => ({ partyType: str(p.partyType) }),
   },
+
+  // ---- privacy (V3.1 Phase E)
+  //
+  // Counted, deliberately, and with NO subject. "How many people asked to be
+  // erased this month" is a real operational number -- it is how a platform
+  // notices that something it shipped made people leave -- and it needs no
+  // identity at all to answer.
+  //
+  // `actorOf` is therefore absent rather than mapped to `subjectUserId`. The
+  // allow-list shape of `dimensions` means the id simply never reaches the
+  // fact table: an analytics store that recorded WHO asked to be forgotten,
+  // permanently, would be an unusually pointed thing to get wrong.
+  DataExportRequested: {
+    subjectType: null,
+    subjectOf: () => null,
+    timestampOf: (p) => str(p.requestedAt),
+  },
+  DataExportCompleted: {
+    subjectType: null,
+    subjectOf: () => null,
+    timestampOf: (p) => str(p.completedAt),
+  },
+  DataErasureRequested: {
+    subjectType: null,
+    subjectOf: () => null,
+    timestampOf: (p) => str(p.requestedAt),
+  },
+  DataErasureCancelled: {
+    subjectType: null,
+    subjectOf: () => null,
+    // The cancellation rate is the number that actually says whether the
+    // grace window (GAP-21) is doing anything.
+    timestampOf: (p) => str(p.cancelledAt),
+  },
+  DataErasureCompleted: {
+    subjectType: null,
+    subjectOf: () => null,
+    timestampOf: (p) => str(p.completedAt),
+  },
 };
 
 /**
