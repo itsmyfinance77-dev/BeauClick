@@ -1,0 +1,1749 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+<template id="__bundler_thumbnail" data-bg-color="#efece6">
+<svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+<rect width="1200" height="800" fill="#efece6"/>
+<rect x="150" y="120" width="900" height="560" rx="16" fill="#ffffff" stroke="#d9d3c9" stroke-width="4"/>
+<circle cx="230" cy="190" r="18" fill="#7a2140"/>
+<rect x="270" y="178" width="140" height="24" rx="4" fill="#3a3138"/>
+<rect x="200" y="260" width="800" height="90" rx="10" fill="#f5eef1"/>
+<rect x="200" y="380" width="250" height="220" rx="14" fill="#f8f5ee"/>
+<rect x="470" y="380" width="250" height="220" rx="14" fill="#f8f5ee"/>
+<rect x="740" y="380" width="260" height="220" rx="14" fill="#f8f5ee"/>
+</svg>
+</template>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas" />
+<style>
+  @font-face { font-family: 'Vazirmatn'; src: url('fonts/Vazir-Light.ttf') format('truetype'); font-weight: 300; font-display: swap; }
+  @font-face { font-family: 'Vazirmatn'; src: url('fonts/Vazir-Regular.ttf') format('truetype'); font-weight: 400; font-display: swap; }
+  @font-face { font-family: 'Vazirmatn'; src: url('fonts/Vazir-Medium.ttf') format('truetype'); font-weight: 500; font-display: swap; }
+  @font-face { font-family: 'Vazirmatn'; src: url('fonts/Vazir-Bold.ttf') format('truetype'); font-weight: 600 700; font-display: swap; }
+  @font-face { font-family: 'Vazirmatn'; src: url('fonts/Vazir-Black.ttf') format('truetype'); font-weight: 800 900; font-display: swap; }
+  @font-face { font-family: 'Anjoman'; src: url('fonts/Anjoman-Medium.ttf') format('truetype'); font-weight: 500; font-display: swap; }
+  @font-face { font-family: 'Anjoman'; src: url('fonts/Anjoman-SemiBold.ttf') format('truetype'); font-weight: 600; font-display: swap; }
+  @font-face { font-family: 'Anjoman'; src: url('fonts/Anjoman-Bold.ttf') format('truetype'); font-weight: 700; font-display: swap; }
+  @font-face { font-family: 'Anjoman'; src: url('fonts/Anjoman-ExtraBold.ttf') format('truetype'); font-weight: 800; font-display: swap; }
+  @font-face { font-family: 'Anjoman'; src: url('fonts/Anjoman-Black.ttf') format('truetype'); font-weight: 900; font-display: swap; }
+  @font-face { font-family: 'Peyda'; src: url('fonts/Peyda-Medium.ttf') format('truetype'); font-weight: 500; font-display: swap; }
+  @font-face { font-family: 'Peyda'; src: url('fonts/Peyda-SemiBold.ttf') format('truetype'); font-weight: 600; font-display: swap; }
+  @font-face { font-family: 'Peyda'; src: url('fonts/Peyda-Bold.ttf') format('truetype'); font-weight: 700 900; font-display: swap; }
+  body { margin: 0; background: oklch(0.94 0.005 60); font-family: 'Vazirmatn', system-ui, sans-serif; }
+  a { color: oklch(0.42 0.13 340); text-decoration: none; }
+  a:hover { color: oklch(0.34 0.12 340); }
+  code { font-family: ui-monospace, Menlo, monospace; font-size: 0.85em; direction: ltr; unicode-bidi: isolate; }
+</style>
+</helmet>
+
+<div dir="rtl" style="padding: 40px; display: flex; flex-direction: column; gap: 56px;">
+
+  <div style="max-width: 900px; display: flex; flex-direction: column; gap: 10px;">
+    <div style="font-size: 13px; font-weight: 700; letter-spacing: 0.04em; color: oklch(0.58 0.015 330);">BEAUCLICK V3.1 — نمونه بصری، بستر مشتری</div>
+    <h1 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 44px; font-weight: 900; line-height: 1.15; color: oklch(0.22 0.02 330);">صفحه اصلی و جست‌وجو</h1>
+    <p style="margin: 0; font-size: 16px; line-height: 1.85; color: oklch(0.46 0.02 330);">در زبان جدید، در دو عرضِ ۱۲۸۰ و ۳۹۰. هر فیلد به یک پاسخِ واقعیِ API نگاشت دارد؛ جای تصویر جای‌نگهدار است چون خط لوله رسانه ساخته نشده. آنچه پشتوانه داده ندارد در سند با برچسبِ «شکاف» علامت خورده و در نما ساخته نشده است.</p>
+  </div>
+
+  <section style="display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.42 0.13 340); color: #fff;">۰۱</span>
+      <h2 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 24px; font-weight: 800; color: oklch(0.22 0.02 330);">صفحه اصلی — دسکتاپ</h2>
+      <code style="color: oklch(0.58 0.015 330);">/ — app/page.tsx</code>
+    </div>
+
+    <div style="width: 1280px; background: oklch(0.985 0.008 75); border: 1px solid oklch(0.82 0.014 60); border-radius: 6px; overflow: hidden; color: oklch(0.22 0.02 330); line-height: 1.85;">
+
+      <header style="background: oklch(1 0 0); border-bottom: 1px solid oklch(0.9 0.008 60);">
+        <div style="max-width: 1280px; margin: 0 auto; padding: 14px 48px; display: flex; align-items: center; gap: 32px;">
+          <a href="#" style="display: inline-flex; align-items: center; gap: 9px; min-height: 44px;">
+            <img src="uploads/icon-circle.svg" alt="BeauClick" width="26" height="26" style="display: block; border-radius: 999px;" />
+            <span style="font-family: 'Anjoman', sans-serif; font-size: 21px; font-weight: 800; color: oklch(0.22 0.02 330);">BeauClick</span>
+          </a>
+          <nav aria-label="ناوبری اصلی" style="display: flex; align-items: center; gap: 24px; flex: 1;">
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; font-size: 15px; font-weight: 500; color: oklch(0.22 0.02 330);">خدمات</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; font-size: 15px; font-weight: 500; color: oklch(0.22 0.02 330);">متخصص‌ها</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; font-size: 15px; font-weight: 500; color: oklch(0.22 0.02 330);">رزروهای من</a>
+          </nav>
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <a href="#" style="display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 0 14px; font-size: 14px; font-weight: 500; color: oklch(0.46 0.02 330);">حالت متخصص</a>
+            <a href="#" style="display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 8px 0 14px; border: 1px solid oklch(0.9 0.008 60); border-radius: 999px; font-size: 14px; font-weight: 500; color: oklch(0.22 0.02 330);">
+              <span>مینا رضایی</span>
+              <span style="width: 28px; height: 28px; border-radius: 999px; background: repeating-linear-gradient(135deg, oklch(0.963 0.012 340) 0 4px, oklch(0.945 0.026 340) 4px 8px);"></span>
+            </a>
+          </div>
+        </div>
+      </header>
+
+      <section style="padding: 64px 48px 56px; background: oklch(1 0 0); border-bottom: 1px solid oklch(0.9 0.008 60);">
+        <div style="max-width: 1184px; margin: 0 auto; display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 56px; align-items: center;">
+          <div>
+            <div style="display: inline-flex; align-items: center; gap: 7px; padding: 5px 13px; border-radius: 999px; background: oklch(0.955 0.028 70); font-size: 13px; font-weight: 600; color: oklch(0.4 0.06 65); margin-bottom: 20px;">
+              <span style="width: 6px; height: 6px; border-radius: 999px; background: oklch(0.62 0.095 65);"></span>
+              یزد و به‌زودی سراسر ایران
+            </div>
+            <h1 style="margin: 0 0 16px; font-family: 'Peyda', sans-serif; font-size: 52px; font-weight: 800; line-height: 1.65; letter-spacing: -0.01em;">متخصص زیبایی‌تان را<br />با اطمینان انتخاب کنید</h1>
+            <p style="margin: 0 0 28px; font-size: 17px; line-height: 1.8; color: oklch(0.46 0.02 330); max-width: 46ch;">قیمت‌ها پیش از رزرو مشخص است، زمان‌ها واقعی‌اند و هویت متخصص‌ها بررسی می‌شود. پرداخت پس از انتخاب زمان، در همان صفحه.</p>
+
+            <div style="background: oklch(1 0 0); border: 1px solid oklch(0.82 0.014 60); border-radius: 16px; padding: 10px; display: flex; gap: 8px; align-items: stretch; box-shadow: 0 10px 28px oklch(0.3 0.04 340 / 0.07);">
+              <div style="flex: 1; display: flex; align-items: center; gap: 10px; padding: 0 12px;">
+                <span aria-hidden="true" style="width: 18px; height: 18px; border: 2px solid oklch(0.58 0.015 330); border-radius: 999px; flex-shrink: 0;"></span>
+                <input placeholder="چه خدمتی می‌خواهید؟ مثلاً میکاپ عروس" style="width: 100%; font: inherit; font-size: 16px; border: none; outline: none; background: transparent; color: oklch(0.22 0.02 330); min-height: 52px;" />
+              </div>
+              <div style="width: 1px; background: oklch(0.9 0.008 60); margin: 8px 0;"></div>
+              <button type="button" style="font: inherit; font-size: 16px; font-weight: 500; min-height: 52px; padding: 0 16px; border: none; background: transparent; color: oklch(0.46 0.02 330); cursor: pointer; display: inline-flex; align-items: center; gap: 8px;">
+                یزد
+                <span aria-hidden="true" style="width: 7px; height: 7px; border-inline-start: 2px solid oklch(0.58 0.015 330); border-block-end: 2px solid oklch(0.58 0.015 330); transform: rotate(-45deg); margin-bottom: 3px;"></span>
+              </button>
+              <button type="submit" style="font: inherit; font-size: 16px; font-weight: 600; min-height: 52px; padding: 0 30px; border: none; border-radius: 10px; background: oklch(0.42 0.13 340); color: oklch(1 0 0); cursor: pointer;" style-hover="background: oklch(0.34 0.12 340);">جست‌وجو</button>
+            </div>
+
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; align-items: center;">
+              <span style="font-size: 13px; color: oklch(0.58 0.015 330); margin-inline-end: 4px;">پرجست‌وجوترین:</span>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 34px; padding: 0 13px; border: 1px solid oklch(0.9 0.008 60); border-radius: 999px; font-size: 14px; font-weight: 500; color: oklch(0.46 0.02 330);" style-hover="border-color: oklch(0.42 0.13 340); color: oklch(0.42 0.13 340);">میکاپ عروس</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 34px; padding: 0 13px; border: 1px solid oklch(0.9 0.008 60); border-radius: 999px; font-size: 14px; font-weight: 500; color: oklch(0.46 0.02 330);" style-hover="border-color: oklch(0.42 0.13 340); color: oklch(0.42 0.13 340);">شینیون</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 34px; padding: 0 13px; border: 1px solid oklch(0.9 0.008 60); border-radius: 999px; font-size: 14px; font-weight: 500; color: oklch(0.46 0.02 330);" style-hover="border-color: oklch(0.42 0.13 340); color: oklch(0.42 0.13 340);">رنگ و لایت</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 34px; padding: 0 13px; border: 1px solid oklch(0.9 0.008 60); border-radius: 999px; font-size: 14px; font-weight: 500; color: oklch(0.46 0.02 330);" style-hover="border-color: oklch(0.42 0.13 340); color: oklch(0.42 0.13 340);">اصلاح ابرو</a>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 200px 140px; gap: 12px;">
+            <div style="grid-column: span 2; border-radius: 20px; border: 1px solid oklch(0.9 0.008 60); background: repeating-linear-gradient(135deg, oklch(0.963 0.012 340) 0 10px, oklch(0.945 0.026 340) 10px 20px); display: flex; align-items: center; justify-content: center;">
+              <span style="font-family: ui-monospace, monospace; font-size: 12px; color: oklch(0.46 0.02 330); background: oklch(1 0 0 / 0.82); padding: 6px 12px; border-radius: 999px;">تصویر قهرمان — کار واقعی یک متخصص</span>
+            </div>
+            <div style="border-radius: 16px; border: 1px solid oklch(0.9 0.008 60); background: repeating-linear-gradient(135deg, oklch(0.963 0.012 340) 0 10px, oklch(0.945 0.026 340) 10px 20px); display: flex; align-items: center; justify-content: center;">
+              <span style="font-family: ui-monospace, monospace; font-size: 11px; color: oklch(0.46 0.02 330); background: oklch(1 0 0 / 0.82); padding: 5px 10px; border-radius: 999px;">نمونه کار</span>
+            </div>
+            <div style="border-radius: 16px; border: 1px solid oklch(0.9 0.008 60); background: repeating-linear-gradient(135deg, oklch(0.955 0.028 70) 0 10px, oklch(0.94 0.04 70) 10px 20px); display: flex; align-items: center; justify-content: center;">
+              <span style="font-family: ui-monospace, monospace; font-size: 11px; color: oklch(0.4 0.06 65); background: oklch(1 0 0 / 0.82); padding: 5px 10px; border-radius: 999px;">نمونه کار</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section style="padding: 56px 48px;">
+        <div style="max-width: 1184px; margin: 0 auto;">
+          <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 24px;">
+            <div>
+              <h2 style="margin: 0 0 4px; font-family: 'Anjoman', sans-serif; font-size: 32px; font-weight: 800; line-height: 1.3;">از کجا شروع کنیم؟</h2>
+              <p style="margin: 0; font-size: 15px; color: oklch(0.46 0.02 330);">تخصص‌های ثبت‌شده متخصص‌های یزد، با کمترین قیمتِ موجود در هر تخصص.</p>
+            </div>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; font-size: 15px; font-weight: 600;">همه خدمات</a>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;">
+            <a href="#" style="border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; overflow: hidden; background: oklch(1 0 0); display: block;" style-hover="border-color: oklch(0.82 0.014 60); box-shadow: 0 2px 6px oklch(0.3 0.04 340 / 0.06);">
+              <div style="height: 132px; background: repeating-linear-gradient(135deg, oklch(0.963 0.012 340) 0 8px, oklch(0.945 0.026 340) 8px 16px); display: flex; align-items: center; justify-content: center;"><span style="font-family: ui-monospace, monospace; font-size: 11px; color: oklch(0.46 0.02 330);">تصویر دسته</span></div>
+              <div style="padding: 14px 16px;">
+                <div style="font-family: 'Anjoman', sans-serif; font-size: 20px; font-weight: 700; color: oklch(0.22 0.02 330); line-height: 1.4;">میکاپ عروس</div>
+                <div style="font-size: 14px; color: oklch(0.58 0.015 330);">از ۸۵۰٬۰۰۰ تومان · ۹ متخصص</div>
+              </div>
+            </a>
+            <a href="#" style="border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; overflow: hidden; background: oklch(1 0 0); display: block;" style-hover="border-color: oklch(0.82 0.014 60); box-shadow: 0 2px 6px oklch(0.3 0.04 340 / 0.06);">
+              <div style="height: 132px; background: repeating-linear-gradient(135deg, oklch(0.955 0.028 70) 0 8px, oklch(0.94 0.04 70) 8px 16px); display: flex; align-items: center; justify-content: center;"><span style="font-family: ui-monospace, monospace; font-size: 11px; color: oklch(0.4 0.06 65);">تصویر دسته</span></div>
+              <div style="padding: 14px 16px;">
+                <div style="font-family: 'Anjoman', sans-serif; font-size: 20px; font-weight: 700; color: oklch(0.22 0.02 330); line-height: 1.4;">شینیون</div>
+                <div style="font-size: 14px; color: oklch(0.58 0.015 330);">از ۴۲۰٬۰۰۰ تومان · ۱۴ متخصص</div>
+              </div>
+            </a>
+            <a href="#" style="border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; overflow: hidden; background: oklch(1 0 0); display: block;" style-hover="border-color: oklch(0.82 0.014 60); box-shadow: 0 2px 6px oklch(0.3 0.04 340 / 0.06);">
+              <div style="height: 132px; background: repeating-linear-gradient(135deg, oklch(0.963 0.012 340) 0 8px, oklch(0.945 0.026 340) 8px 16px); display: flex; align-items: center; justify-content: center;"><span style="font-family: ui-monospace, monospace; font-size: 11px; color: oklch(0.46 0.02 330);">تصویر دسته</span></div>
+              <div style="padding: 14px 16px;">
+                <div style="font-family: 'Anjoman', sans-serif; font-size: 20px; font-weight: 700; color: oklch(0.22 0.02 330); line-height: 1.4;">رنگ و لایت</div>
+                <div style="font-size: 14px; color: oklch(0.58 0.015 330);">از ۱٬۲۰۰٬۰۰۰ تومان · ۷ متخصص</div>
+              </div>
+            </a>
+            <a href="#" style="border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; overflow: hidden; background: oklch(1 0 0); display: block;" style-hover="border-color: oklch(0.82 0.014 60); box-shadow: 0 2px 6px oklch(0.3 0.04 340 / 0.06);">
+              <div style="height: 132px; background: repeating-linear-gradient(135deg, oklch(0.955 0.028 70) 0 8px, oklch(0.94 0.04 70) 8px 16px); display: flex; align-items: center; justify-content: center;"><span style="font-family: ui-monospace, monospace; font-size: 11px; color: oklch(0.4 0.06 65);">تصویر دسته</span></div>
+              <div style="padding: 14px 16px;">
+                <div style="font-family: 'Anjoman', sans-serif; font-size: 20px; font-weight: 700; color: oklch(0.22 0.02 330); line-height: 1.4;">اصلاح ابرو</div>
+                <div style="font-size: 14px; color: oklch(0.58 0.015 330);">از ۱۲۰٬۰۰۰ تومان · ۲۱ متخصص</div>
+              </div>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <section style="padding: 56px 48px; background: oklch(1 0 0); border-block: 1px solid oklch(0.9 0.008 60);">
+        <div style="max-width: 1184px; margin: 0 auto;">
+          <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 24px;">
+            <div>
+              <h2 style="margin: 0 0 4px; font-family: 'Anjoman', sans-serif; font-size: 32px; font-weight: 800; line-height: 1.3;">متخصص‌های تأییدشده</h2>
+              <p style="margin: 0; font-size: 15px; color: oklch(0.46 0.02 330);">هویت و مجوز صنفی این متخصص‌ها توسط تیم بیوکلیک بررسی شده است.</p>
+            </div>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; font-size: 15px; font-weight: 600;">دیدن همه</a>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
+            <div style="border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; background: oklch(1 0 0); overflow: hidden;" style-hover="border-color: oklch(0.82 0.014 60); box-shadow: 0 2px 6px oklch(0.3 0.04 340 / 0.06);">
+              <div style="height: 168px; background: repeating-linear-gradient(135deg, oklch(0.963 0.012 340) 0 9px, oklch(0.945 0.026 340) 9px 18px); position: relative; display: flex; align-items: center; justify-content: center;">
+                <span style="font-family: ui-monospace, monospace; font-size: 11px; color: oklch(0.46 0.02 330);">نمونه کار</span>
+                <span style="position: absolute; inset-block-start: 12px; inset-inline-start: 12px; font-size: 13px; font-weight: 700; padding: 4px 11px; border-radius: 999px; background: oklch(0.945 0.036 155); color: oklch(0.4 0.1 155);">تأیید شده</span>
+              </div>
+              <div style="padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+                <div>
+                  <div style="font-family: 'Anjoman', sans-serif; font-size: 23px; font-weight: 700; line-height: 1.35;">آتلیه سارا محمدی</div>
+                  <div style="font-size: 14px; color: oklch(0.58 0.015 330);">یزد · صفاییه</div>
+                </div>
+                <div style="font-size: 14px; color: oklch(0.46 0.02 330);">میکاپ عروس، شینیون، اصلاح ابرو</div>
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 12px; border-top: 1px solid oklch(0.9 0.008 60);">
+                  <div>
+                    <div style="font-size: 13px; color: oklch(0.58 0.015 330); line-height: 1.4;">شروع از</div>
+                    <div style="font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.4;">۸۵۰٬۰۰۰ <span style="font-size: 14px; font-weight: 500; color: oklch(0.46 0.02 330);">تومان</span></div>
+                  </div>
+                  <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 18px; border-radius: 10px; background: oklch(0.42 0.13 340); color: oklch(1 0 0); font-size: 15px; font-weight: 600;" style-hover="background: oklch(0.34 0.12 340); color: oklch(1 0 0);">زمان‌های آزاد</a>
+                </div>
+              </div>
+            </div>
+
+            <div style="border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; background: oklch(1 0 0); overflow: hidden;" style-hover="border-color: oklch(0.82 0.014 60); box-shadow: 0 2px 6px oklch(0.3 0.04 340 / 0.06);">
+              <div style="height: 168px; background: repeating-linear-gradient(135deg, oklch(0.955 0.028 70) 0 9px, oklch(0.94 0.04 70) 9px 18px); position: relative; display: flex; align-items: center; justify-content: center;">
+                <span style="font-family: ui-monospace, monospace; font-size: 11px; color: oklch(0.4 0.06 65);">نمونه کار</span>
+                <span style="position: absolute; inset-block-start: 12px; inset-inline-start: 12px; font-size: 13px; font-weight: 700; padding: 4px 11px; border-radius: 999px; background: oklch(0.945 0.036 155); color: oklch(0.4 0.1 155);">تأیید شده</span>
+              </div>
+              <div style="padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+                <div>
+                  <div style="font-family: 'Anjoman', sans-serif; font-size: 23px; font-weight: 700; line-height: 1.35;">سالن زیبایی نگین</div>
+                  <div style="font-size: 14px; color: oklch(0.58 0.015 330);">یزد · مهدی‌آباد</div>
+                </div>
+                <div style="font-size: 14px; color: oklch(0.46 0.02 330);">رنگ و لایت، کراتین</div>
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 12px; border-top: 1px solid oklch(0.9 0.008 60);">
+                  <div>
+                    <div style="font-size: 13px; color: oklch(0.58 0.015 330); line-height: 1.4;">شروع از</div>
+                    <div style="font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.4;">۱٬۲۰۰٬۰۰۰ <span style="font-size: 14px; font-weight: 500; color: oklch(0.46 0.02 330);">تومان</span></div>
+                  </div>
+                  <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 18px; border-radius: 10px; background: oklch(0.42 0.13 340); color: oklch(1 0 0); font-size: 15px; font-weight: 600;" style-hover="background: oklch(0.34 0.12 340); color: oklch(1 0 0);">زمان‌های آزاد</a>
+                </div>
+              </div>
+            </div>
+
+            <div style="border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; background: oklch(1 0 0); overflow: hidden;" style-hover="border-color: oklch(0.82 0.014 60); box-shadow: 0 2px 6px oklch(0.3 0.04 340 / 0.06);">
+              <div style="height: 168px; background: repeating-linear-gradient(135deg, oklch(0.963 0.012 340) 0 9px, oklch(0.945 0.026 340) 9px 18px); position: relative; display: flex; align-items: center; justify-content: center;">
+                <span style="font-family: ui-monospace, monospace; font-size: 11px; color: oklch(0.46 0.02 330);">نمونه کار</span>
+                <span style="position: absolute; inset-block-start: 12px; inset-inline-start: 12px; font-size: 13px; font-weight: 700; padding: 4px 11px; border-radius: 999px; background: oklch(0.945 0.036 155); color: oklch(0.4 0.1 155);">تأیید شده</span>
+              </div>
+              <div style="padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+                <div>
+                  <div style="font-family: 'Anjoman', sans-serif; font-size: 23px; font-weight: 700; line-height: 1.35;">استودیو مهسا</div>
+                  <div style="font-size: 14px; color: oklch(0.58 0.015 330);">یزد · شهرک دانشگاه</div>
+                </div>
+                <div style="font-size: 14px; color: oklch(0.46 0.02 330);">میکاپ مجلسی</div>
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 12px; border-top: 1px solid oklch(0.9 0.008 60);">
+                  <div>
+                    <div style="font-size: 13px; color: oklch(0.58 0.015 330); line-height: 1.4;">شروع از</div>
+                    <div style="font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.4;">۶۲۰٬۰۰۰ <span style="font-size: 14px; font-weight: 500; color: oklch(0.46 0.02 330);">تومان</span></div>
+                  </div>
+                  <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 18px; border-radius: 10px; background: oklch(0.42 0.13 340); color: oklch(1 0 0); font-size: 15px; font-weight: 600;" style-hover="background: oklch(0.34 0.12 340); color: oklch(1 0 0);">زمان‌های آزاد</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section style="padding: 56px 48px;">
+        <div style="max-width: 1184px; margin: 0 auto;">
+          <h2 style="margin: 0 0 24px; font-family: 'Anjoman', sans-serif; font-size: 32px; font-weight: 800; line-height: 1.3;">رزرو در سه قدم</h2>
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
+            <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; padding: 24px;">
+              <div style="font-family: 'Anjoman', sans-serif; font-size: 40px; font-weight: 900; color: oklch(0.945 0.026 340); line-height: 1; margin-bottom: 12px;">۱</div>
+              <h3 style="margin: 0 0 6px; font-size: 19px; font-weight: 700;">خدمت را انتخاب کنید</h3>
+              <p style="margin: 0; font-size: 15px; color: oklch(0.46 0.02 330);">قیمت و مدت هر خدمت پیش از رزرو مشخص است. مبلغ نهایی را سرور محاسبه می‌کند.</p>
+            </div>
+            <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; padding: 24px;">
+              <div style="font-family: 'Anjoman', sans-serif; font-size: 40px; font-weight: 900; color: oklch(0.945 0.026 340); line-height: 1; margin-bottom: 12px;">۲</div>
+              <h3 style="margin: 0 0 6px; font-size: 19px; font-weight: 700;">زمان آزاد را بردارید</h3>
+              <p style="margin: 0; font-size: 15px; color: oklch(0.46 0.02 330);">زمان‌ها به وقت تهران و واقعی‌اند. تا پرداخت نشود، زمان برای شما نگه داشته می‌شود.</p>
+            </div>
+            <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; padding: 24px;">
+              <div style="font-family: 'Anjoman', sans-serif; font-size: 40px; font-weight: 900; color: oklch(0.945 0.026 340); line-height: 1; margin-bottom: 12px;">۳</div>
+              <h3 style="margin: 0 0 6px; font-size: 19px; font-weight: 700;">پرداخت و تأیید</h3>
+              <p style="margin: 0; font-size: 15px; color: oklch(0.46 0.02 330);">پس از پرداخت، رسید و زمان نوبت در «رزروهای من» ثبت می‌شود و اعلان می‌گیرید.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <footer style="background: oklch(0.22 0.02 330); color: oklch(0.9 0.01 330); padding: 48px 48px 32px;">
+        <div style="max-width: 1184px; margin: 0 auto;">
+          <div style="display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 40px; padding-bottom: 32px; border-bottom: 1px solid oklch(0.34 0.02 330);">
+            <div>
+              <div style="display: flex; align-items: center; gap: 9px; margin-bottom: 12px;">
+                <span style="width: 24px; height: 24px; border-radius: 999px; background: oklch(0.62 0.095 65);"></span>
+                <span style="font-family: 'Anjoman', sans-serif; font-size: 20px; font-weight: 800; color: oklch(1 0 0);">BeauClick</span>
+              </div>
+              <p style="margin: 0; font-size: 14px; line-height: 1.8; color: oklch(0.72 0.015 330); max-width: 38ch;">مارکت‌پلیس خدمات زیبایی. رزرو آنلاین از متخصص‌های تأییدشده، با قیمت شفاف و زمان واقعی.</p>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <div style="font-size: 14px; font-weight: 700; color: oklch(1 0 0); margin-bottom: 6px;">مشتری‌ها</div>
+              <a href="#" style="font-size: 14px; color: oklch(0.8 0.012 330); min-height: 32px; display: inline-flex; align-items: center;">جست‌وجوی متخصص</a>
+              <a href="#" style="font-size: 14px; color: oklch(0.8 0.012 330); min-height: 32px; display: inline-flex; align-items: center;">رزروهای من</a>
+              <a href="#" style="font-size: 14px; color: oklch(0.8 0.012 330); min-height: 32px; display: inline-flex; align-items: center;">باشگاه مشتریان</a>
+              <a href="#" style="font-size: 14px; color: oklch(0.8 0.012 330); min-height: 32px; display: inline-flex; align-items: center;">مسیر زیبایی من</a>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <div style="font-size: 14px; font-weight: 700; color: oklch(1 0 0); margin-bottom: 6px;">متخصص‌ها</div>
+              <a href="#" style="font-size: 14px; color: oklch(0.8 0.012 330); min-height: 32px; display: inline-flex; align-items: center;">ثبت‌نام متخصص</a>
+              <a href="#" style="font-size: 14px; color: oklch(0.8 0.012 330); min-height: 32px; display: inline-flex; align-items: center;">احراز هویت</a>
+              <a href="#" style="font-size: 14px; color: oklch(0.8 0.012 330); min-height: 32px; display: inline-flex; align-items: center;">ثبت کسب‌وکار</a>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <div style="font-size: 14px; font-weight: 700; color: oklch(1 0 0); margin-bottom: 6px;">بیوکلیک</div>
+              <a href="#" style="font-size: 14px; color: oklch(0.8 0.012 330); min-height: 32px; display: inline-flex; align-items: center;">درباره ما</a>
+              <a href="#" style="font-size: 14px; color: oklch(0.8 0.012 330); min-height: 32px; display: inline-flex; align-items: center;">قوانین و مقررات</a>
+              <a href="#" style="font-size: 14px; color: oklch(0.8 0.012 330); min-height: 32px; display: inline-flex; align-items: center;">حریم خصوصی</a>
+              <a href="#" style="font-size: 14px; color: oklch(0.8 0.012 330); min-height: 32px; display: inline-flex; align-items: center;">پشتیبانی</a>
+            </div>
+          </div>
+          <div style="padding-top: 20px; display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; font-size: 13px; color: oklch(0.66 0.015 330);">
+            <span>© ۱۴۰۴ بیوکلیک. تمام حقوق محفوظ است.</span>
+            <span>ساخته شده در یزد</span>
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <div style="max-width: 1280px; background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 20px 24px;">
+      <h3 style="margin: 0 0 10px; font-size: 16px; font-weight: 700; color: oklch(0.22 0.02 330);">پشتوانه داده</h3>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; font-size: 14px; color: oklch(0.46 0.02 330); line-height: 1.8;">
+        <div><strong style="color: oklch(0.4 0.1 155); font-weight: 700;">داده موجود:</strong> جست‌وجو و تکمیل خودکار (<code>autocomplete</code>)، نامِ متخصص، شهر، تخصص‌ها، کمترین قیمت و نشان‌ها (<code>searchProviders</code>)، نشانِ تأیید (<code>verificationStatus</code>).</div>
+        <div><strong style="color: oklch(0.44 0.09 245); font-weight: 700;">قابل استخراج:</strong> شمارِ متخصص در هر تخصص و کمترین قیمتِ آن — از همان <code>facets</code> و فیلترِ تخصصِ جست‌وجو، بدون هیچ مسیر تازه‌ای در API.</div>
+        <div><strong style="color: oklch(0.46 0.09 75); font-weight: 700;">شکاف:</strong> محله (فقط <code>city</code> موجود است — «صفاییه» در این نما جای‌نگهدارِ فیلدِ آینده <code>district</code> است)، و امتیاز و دیدگاه که در نما عمداً ساخته نشده. تصویر و نمونه‌کار دیگر شکاف نیست — <code>avatarUrl</code> و <code>portfolioCount</code> واقعاً در پاسخ <code>searchProviders</code> هستند (فاز C).</div>
+        <div><strong style="color: oklch(0.47 0.17 25); font-weight: 700;">ساخته نشد:</strong> هیچ آمارِ پلتفرم («۵۰۰۰ رزرو موفق») و هیچ دیدگاهِ مشتری در صفحه نیست — <code>platformMetrics</code> فقط برای اپراتور است و سیستم دیدگاه وجود ندارد.</div>
+      </div>
+    </div>
+  </section>
+
+  <section style="display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.42 0.13 340); color: #fff;">۰۲</span>
+      <h2 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 24px; font-weight: 800; color: oklch(0.22 0.02 330);">صفحه اصلی — موبایل ۳۹۰</h2>
+    </div>
+
+    <div style="width: 390px; background: oklch(0.985 0.008 75); border: 1px solid oklch(0.82 0.014 60); border-radius: 6px; overflow: hidden; color: oklch(0.22 0.02 330); line-height: 1.85;">
+      <header style="background: oklch(1 0 0); border-bottom: 1px solid oklch(0.9 0.008 60); padding: 10px 16px; display: flex; align-items: center; justify-content: space-between;">
+        <a href="#" style="display: inline-flex; align-items: center; gap: 8px; min-height: 44px;">
+          <img src="uploads/icon-circle.svg" alt="BeauClick" width="24" height="24" style="display: block; border-radius: 999px;" />
+          <span style="font-family: 'Anjoman', sans-serif; font-size: 19px; font-weight: 800; color: oklch(0.22 0.02 330);">BeauClick</span>
+        </a>
+        <span style="width: 34px; height: 34px; border-radius: 999px; background: repeating-linear-gradient(135deg, oklch(0.963 0.012 340) 0 4px, oklch(0.945 0.026 340) 4px 8px); border: 1px solid oklch(0.9 0.008 60);"></span>
+      </header>
+
+      <section style="padding: 24px 16px 28px; background: oklch(1 0 0); border-bottom: 1px solid oklch(0.9 0.008 60);">
+        <div style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border-radius: 999px; background: oklch(0.955 0.028 70); font-size: 13px; font-weight: 600; color: oklch(0.4 0.06 65); margin-bottom: 14px;">
+          <span style="width: 5px; height: 5px; border-radius: 999px; background: oklch(0.62 0.095 65);"></span>
+          یزد
+        </div>
+        <h1 style="margin: 0 0 10px; font-family: 'Peyda', sans-serif; font-size: 32px; font-weight: 800; line-height: 1.6;">متخصص زیبایی‌تان را با اطمینان انتخاب کنید</h1>
+        <p style="margin: 0 0 18px; font-size: 15px; line-height: 1.75; color: oklch(0.46 0.02 330);">قیمت‌ها پیش از رزرو مشخص است و زمان‌ها واقعی‌اند.</p>
+
+        <div style="background: oklch(1 0 0); border: 1px solid oklch(0.82 0.014 60); border-radius: 14px; padding: 8px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 10px 28px oklch(0.3 0.04 340 / 0.07);">
+          <div style="display: flex; align-items: center; gap: 10px; padding: 0 10px;">
+            <span aria-hidden="true" style="width: 16px; height: 16px; border: 2px solid oklch(0.58 0.015 330); border-radius: 999px; flex-shrink: 0;"></span>
+            <input placeholder="مثلاً میکاپ عروس" style="width: 100%; font: inherit; font-size: 16px; border: none; outline: none; background: transparent; min-height: 48px; color: oklch(0.22 0.02 330);" />
+          </div>
+          <button type="submit" style="font: inherit; font-size: 16px; font-weight: 600; min-height: 50px; border: none; border-radius: 10px; background: oklch(0.42 0.13 340); color: oklch(1 0 0); cursor: pointer;">جست‌وجو در یزد</button>
+        </div>
+
+        <div style="display: flex; gap: 8px; overflow-x: auto; margin-top: 14px; padding-bottom: 4px;">
+          <a href="#" style="flex-shrink: 0; display: inline-flex; align-items: center; min-height: 36px; padding: 0 13px; border: 1px solid oklch(0.9 0.008 60); border-radius: 999px; font-size: 14px; font-weight: 500; color: oklch(0.46 0.02 330);">میکاپ عروس</a>
+          <a href="#" style="flex-shrink: 0; display: inline-flex; align-items: center; min-height: 36px; padding: 0 13px; border: 1px solid oklch(0.9 0.008 60); border-radius: 999px; font-size: 14px; font-weight: 500; color: oklch(0.46 0.02 330);">شینیون</a>
+          <a href="#" style="flex-shrink: 0; display: inline-flex; align-items: center; min-height: 36px; padding: 0 13px; border: 1px solid oklch(0.9 0.008 60); border-radius: 999px; font-size: 14px; font-weight: 500; color: oklch(0.46 0.02 330);">رنگ و لایت</a>
+        </div>
+      </section>
+
+      <section style="padding: 24px 16px;">
+        <h2 style="margin: 0 0 4px; font-family: 'Anjoman', sans-serif; font-size: 24px; font-weight: 800; line-height: 1.35;">از کجا شروع کنیم؟</h2>
+        <p style="margin: 0 0 16px; font-size: 14px; color: oklch(0.46 0.02 330);">تخصص‌های ثبت‌شده متخصص‌های یزد.</p>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <a href="#" style="border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; overflow: hidden; background: oklch(1 0 0); display: block;">
+            <div style="height: 92px; background: repeating-linear-gradient(135deg, oklch(0.963 0.012 340) 0 8px, oklch(0.945 0.026 340) 8px 16px);"></div>
+            <div style="padding: 10px 12px;">
+              <div style="font-family: 'Anjoman', sans-serif; font-size: 17px; font-weight: 700; line-height: 1.4;">میکاپ عروس</div>
+              <div style="font-size: 13px; color: oklch(0.58 0.015 330);">از ۸۵۰ هزار · ۹ متخصص</div>
+            </div>
+          </a>
+          <a href="#" style="border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; overflow: hidden; background: oklch(1 0 0); display: block;">
+            <div style="height: 92px; background: repeating-linear-gradient(135deg, oklch(0.955 0.028 70) 0 8px, oklch(0.94 0.04 70) 8px 16px);"></div>
+            <div style="padding: 10px 12px;">
+              <div style="font-family: 'Anjoman', sans-serif; font-size: 17px; font-weight: 700; line-height: 1.4;">شینیون</div>
+              <div style="font-size: 13px; color: oklch(0.58 0.015 330);">از ۴۲۰ هزار · ۱۴ متخصص</div>
+            </div>
+          </a>
+          <a href="#" style="border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; overflow: hidden; background: oklch(1 0 0); display: block;">
+            <div style="height: 92px; background: repeating-linear-gradient(135deg, oklch(0.963 0.012 340) 0 8px, oklch(0.945 0.026 340) 8px 16px);"></div>
+            <div style="padding: 10px 12px;">
+              <div style="font-family: 'Anjoman', sans-serif; font-size: 17px; font-weight: 700; line-height: 1.4;">رنگ و لایت</div>
+              <div style="font-size: 13px; color: oklch(0.58 0.015 330);">از ۱٫۲ میلیون · ۷ متخصص</div>
+            </div>
+          </a>
+          <a href="#" style="border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; overflow: hidden; background: oklch(1 0 0); display: block;">
+            <div style="height: 92px; background: repeating-linear-gradient(135deg, oklch(0.955 0.028 70) 0 8px, oklch(0.94 0.04 70) 8px 16px);"></div>
+            <div style="padding: 10px 12px;">
+              <div style="font-family: 'Anjoman', sans-serif; font-size: 17px; font-weight: 700; line-height: 1.4;">اصلاح ابرو</div>
+              <div style="font-size: 13px; color: oklch(0.58 0.015 330);">از ۱۲۰ هزار · ۲۱ متخصص</div>
+            </div>
+          </a>
+        </div>
+      </section>
+
+      <section style="padding: 24px 16px; background: oklch(1 0 0); border-block: 1px solid oklch(0.9 0.008 60);">
+        <h2 style="margin: 0 0 16px; font-family: 'Anjoman', sans-serif; font-size: 24px; font-weight: 800; line-height: 1.35;">متخصص‌های تأییدشده</h2>
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+          <div style="border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; overflow: hidden;">
+            <div style="height: 150px; background: repeating-linear-gradient(135deg, oklch(0.963 0.012 340) 0 9px, oklch(0.945 0.026 340) 9px 18px); position: relative;">
+              <span style="position: absolute; inset-block-start: 10px; inset-inline-start: 10px; font-size: 13px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.945 0.036 155); color: oklch(0.4 0.1 155);">تأیید شده</span>
+            </div>
+            <div style="padding: 14px; display: flex; flex-direction: column; gap: 10px;">
+              <div>
+                <div style="font-family: 'Anjoman', sans-serif; font-size: 21px; font-weight: 700; line-height: 1.35;">آتلیه سارا محمدی</div>
+                <div style="font-size: 14px; color: oklch(0.58 0.015 330);">یزد · میکاپ عروس، شینیون</div>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 10px; border-top: 1px solid oklch(0.9 0.008 60);">
+                <div>
+                  <div style="font-size: 13px; color: oklch(0.58 0.015 330); line-height: 1.4;">شروع از</div>
+                  <div style="font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.4;">۸۵۰٬۰۰۰</div>
+                </div>
+                <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 10px; background: oklch(0.42 0.13 340); color: oklch(1 0 0); font-size: 15px; font-weight: 600;">زمان‌ها</a>
+              </div>
+            </div>
+          </div>
+          <div style="border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; overflow: hidden;">
+            <div style="height: 150px; background: repeating-linear-gradient(135deg, oklch(0.955 0.028 70) 0 9px, oklch(0.94 0.04 70) 9px 18px); position: relative;">
+              <span style="position: absolute; inset-block-start: 10px; inset-inline-start: 10px; font-size: 13px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.945 0.036 155); color: oklch(0.4 0.1 155);">تأیید شده</span>
+            </div>
+            <div style="padding: 14px; display: flex; flex-direction: column; gap: 10px;">
+              <div>
+                <div style="font-family: 'Anjoman', sans-serif; font-size: 21px; font-weight: 700; line-height: 1.35;">سالن زیبایی نگین</div>
+                <div style="font-size: 14px; color: oklch(0.58 0.015 330);">یزد · رنگ و لایت، کراتین</div>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 10px; border-top: 1px solid oklch(0.9 0.008 60);">
+                <div>
+                  <div style="font-size: 13px; color: oklch(0.58 0.015 330); line-height: 1.4;">شروع از</div>
+                  <div style="font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.4;">۱٬۲۰۰٬۰۰۰</div>
+                </div>
+                <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 10px; background: oklch(0.42 0.13 340); color: oklch(1 0 0); font-size: 15px; font-weight: 600;">زمان‌ها</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <footer style="background: oklch(0.22 0.02 330); color: oklch(0.8 0.012 330); padding: 28px 16px 90px;">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 14px;">
+          <span style="width: 22px; height: 22px; border-radius: 999px; background: oklch(0.62 0.095 65);"></span>
+          <span style="font-family: 'Anjoman', sans-serif; font-size: 18px; font-weight: 800; color: oklch(1 0 0);">BeauClick</span>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px 20px; margin-bottom: 18px;">
+          <a href="#" style="font-size: 14px; color: oklch(0.8 0.012 330); min-height: 36px; display: inline-flex; align-items: center;">جست‌وجوی متخصص</a>
+          <a href="#" style="font-size: 14px; color: oklch(0.8 0.012 330); min-height: 36px; display: inline-flex; align-items: center;">ثبت‌نام متخصص</a>
+          <a href="#" style="font-size: 14px; color: oklch(0.8 0.012 330); min-height: 36px; display: inline-flex; align-items: center;">رزروهای من</a>
+          <a href="#" style="font-size: 14px; color: oklch(0.8 0.012 330); min-height: 36px; display: inline-flex; align-items: center;">قوانین و مقررات</a>
+          <a href="#" style="font-size: 14px; color: oklch(0.8 0.012 330); min-height: 36px; display: inline-flex; align-items: center;">باشگاه مشتریان</a>
+          <a href="#" style="font-size: 14px; color: oklch(0.8 0.012 330); min-height: 36px; display: inline-flex; align-items: center;">پشتیبانی</a>
+        </div>
+        <div style="font-size: 13px; color: oklch(0.66 0.015 330); padding-top: 14px; border-top: 1px solid oklch(0.34 0.02 330);">© ۱۴۰۴ بیوکلیک · ساخته شده در یزد</div>
+      </footer>
+
+      <nav aria-label="ناوبری موبایل" style="margin-top: -74px; position: relative; background: oklch(1 0 0); border-top: 1px solid oklch(0.9 0.008 60); box-shadow: 0 -6px 20px oklch(0.3 0.04 340 / 0.08); display: grid; grid-template-columns: repeat(5, 1fr); padding: 6px 4px 10px;">
+        <a href="#" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 56px; font-size: 12px; font-weight: 700; color: oklch(0.42 0.13 340);">
+          <span style="width: 20px; height: 20px; border-radius: 6px; background: oklch(0.42 0.13 340);"></span>خانه
+        </a>
+        <a href="#" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 56px; font-size: 12px; font-weight: 500; color: oklch(0.46 0.02 330);">
+          <span style="width: 20px; height: 20px; border-radius: 999px; border: 2px solid oklch(0.58 0.015 330);"></span>جست‌وجو
+        </a>
+        <a href="#" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 56px; font-size: 12px; font-weight: 500; color: oklch(0.46 0.02 330);">
+          <span style="width: 20px; height: 20px; border-radius: 5px; border: 2px solid oklch(0.58 0.015 330);"></span>رزروها
+        </a>
+        <a href="#" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 56px; font-size: 12px; font-weight: 500; color: oklch(0.46 0.02 330);">
+          <span style="width: 20px; height: 20px; border-radius: 999px; border: 2px solid oklch(0.58 0.015 330);"></span>باشگاه
+        </a>
+        <a href="#" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 56px; font-size: 12px; font-weight: 500; color: oklch(0.46 0.02 330);">
+          <span style="width: 20px; height: 20px; border-radius: 999px; background: repeating-linear-gradient(135deg, oklch(0.963 0.012 340) 0 3px, oklch(0.945 0.026 340) 3px 6px);"></span>حساب
+        </a>
+      </nav>
+    </div>
+
+    <p style="margin: 0; max-width: 1280px; font-size: 14px; line-height: 1.85; color: oklch(0.46 0.02 330);">در موبایل، هفت پیوندِ سربرگ به نوارِ پایینِ پنج‌مقصدی می‌رود — همان مشکلی که <code>app-shell.tsx</code> با عرضِ ۶۰۶ پیکسل در نمای واردشده ثبت کرده. «حالت متخصص»، «کسب‌وکار» و «لیست انتظار» زیر «حساب» می‌روند، چون مقصدِ روزانه نیستند. جست‌وجو در موبایل دو سطر است نه چهار ستون، و ردیفِ خدماتِ پرجست‌وجو افقی می‌لغزد.</p>
+  </section>
+
+  <section style="display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.42 0.13 340); color: #fff;">۰۳</span>
+      <h2 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 24px; font-weight: 800; color: oklch(0.22 0.02 330);">نتایج جست‌وجو — دسکتاپ</h2>
+      <code style="color: oklch(0.58 0.015 330);">/search — app/search/page.tsx</code>
+    </div>
+
+    <div style="width: 1280px; background: oklch(0.985 0.008 75); border: 1px solid oklch(0.82 0.014 60); border-radius: 6px; overflow: hidden; color: oklch(0.22 0.02 330); line-height: 1.85;">
+      <header style="background: oklch(1 0 0); border-bottom: 1px solid oklch(0.9 0.008 60);">
+        <div style="max-width: 1280px; margin: 0 auto; padding: 12px 48px; display: flex; align-items: center; gap: 24px;">
+          <a href="#" style="display: inline-flex; align-items: center; gap: 9px; min-height: 44px; flex-shrink: 0;">
+            <img src="uploads/icon-circle.svg" alt="BeauClick" width="26" height="26" style="display: block; border-radius: 999px;" />
+            <span style="font-family: 'Anjoman', sans-serif; font-size: 21px; font-weight: 800; color: oklch(0.22 0.02 330);">BeauClick</span>
+          </a>
+          <div style="flex: 1; max-width: 560px; display: flex; align-items: stretch; gap: 6px; border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 4px; background: oklch(0.985 0.008 75);">
+            <div style="flex: 1; display: flex; align-items: center; gap: 9px; padding: 0 10px;">
+              <span aria-hidden="true" style="width: 16px; height: 16px; border: 2px solid oklch(0.58 0.015 330); border-radius: 999px; flex-shrink: 0;"></span>
+              <input value="میکاپ" style="width: 100%; font: inherit; font-size: 15px; border: none; outline: none; background: transparent; min-height: 40px; color: oklch(0.22 0.02 330);" />
+            </div>
+            <span style="width: 1px; background: oklch(0.9 0.008 60); margin: 6px 0;"></span>
+            <button type="button" style="font: inherit; font-size: 15px; min-height: 40px; padding: 0 12px; border: none; background: transparent; color: oklch(0.46 0.02 330); cursor: pointer;">یزد</button>
+            <button type="submit" style="font: inherit; font-size: 15px; font-weight: 600; min-height: 40px; padding: 0 20px; border: none; border-radius: 9px; background: oklch(0.42 0.13 340); color: oklch(1 0 0); cursor: pointer;">جست‌وجو</button>
+          </div>
+          <nav aria-label="ناوبری اصلی" style="display: flex; align-items: center; gap: 20px; margin-inline-start: auto;">
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; font-size: 15px; font-weight: 500; color: oklch(0.22 0.02 330);">رزروهای من</a>
+            <a href="#" style="display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 8px 0 14px; border: 1px solid oklch(0.9 0.008 60); border-radius: 999px; font-size: 14px; font-weight: 500; color: oklch(0.22 0.02 330);">
+              <span>مینا رضایی</span>
+              <span style="width: 28px; height: 28px; border-radius: 999px; background: repeating-linear-gradient(135deg, oklch(0.963 0.012 340) 0 4px, oklch(0.945 0.026 340) 4px 8px);"></span>
+            </a>
+          </nav>
+        </div>
+      </header>
+
+      <div style="max-width: 1280px; margin: 0 auto; padding: 28px 48px 48px; display: grid; grid-template-columns: 268px 1fr; gap: 32px; align-items: start;">
+
+        <aside aria-label="فیلترها" style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 24px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+            <h2 style="margin: 0; font-size: 17px; font-weight: 700;">فیلترها</h2>
+            <button type="button" style="font: inherit; font-size: 14px; font-weight: 500; border: none; background: transparent; color: oklch(0.42 0.13 340); cursor: pointer; padding: 0; min-height: 32px;">پاک کردن</button>
+          </div>
+
+          <div>
+            <h3 style="margin: 0 0 10px; font-size: 15px; font-weight: 700;">اعتبار</h3>
+            <label style="display: flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; font-size: 15px;">
+              <input type="checkbox" checked="checked" style="width: 18px; height: 18px; accent-color: oklch(0.42 0.13 340);" />
+              <span>فقط متخصص‌های تأییدشده</span>
+              <span style="margin-inline-start: auto; font-size: 14px; color: oklch(0.58 0.015 330); font-variant-numeric: tabular-nums;">۲</span>
+            </label>
+          </div>
+
+          <div style="border-top: 1px solid oklch(0.9 0.008 60); padding-top: 20px;">
+            <h3 style="margin: 0 0 10px; font-size: 15px; font-weight: 700;">محدوده قیمت</h3>
+            <div style="display: flex; flex-direction: column; gap: 2px;">
+              <label style="display: flex; align-items: center; gap: 10px; min-height: 42px; cursor: pointer; font-size: 15px;">
+                <input type="checkbox" style="width: 18px; height: 18px; accent-color: oklch(0.42 0.13 340);" />
+                <span style="color: oklch(0.68 0.012 330);">تا ۵۰۰ هزار تومان</span>
+                <span style="margin-inline-start: auto; font-size: 14px; color: oklch(0.68 0.012 330); font-variant-numeric: tabular-nums;">۰</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 10px; min-height: 42px; cursor: pointer; font-size: 15px;">
+                <input type="checkbox" style="width: 18px; height: 18px; accent-color: oklch(0.42 0.13 340);" />
+                <span>۵۰۰ هزار تا ۱ میلیون</span>
+                <span style="margin-inline-start: auto; font-size: 14px; color: oklch(0.58 0.015 330); font-variant-numeric: tabular-nums;">۱</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 10px; min-height: 42px; cursor: pointer; font-size: 15px;">
+                <input type="checkbox" checked="checked" style="width: 18px; height: 18px; accent-color: oklch(0.42 0.13 340);" />
+                <span>۱ تا ۲ میلیون</span>
+                <span style="margin-inline-start: auto; font-size: 14px; color: oklch(0.58 0.015 330); font-variant-numeric: tabular-nums;">۲</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 10px; min-height: 42px; cursor: pointer; font-size: 15px;">
+                <input type="checkbox" style="width: 18px; height: 18px; accent-color: oklch(0.42 0.13 340);" />
+                <span>بیش از ۲ میلیون</span>
+                <span style="margin-inline-start: auto; font-size: 14px; color: oklch(0.58 0.015 330); font-variant-numeric: tabular-nums;">۱</span>
+              </label>
+            </div>
+          </div>
+
+          <div style="border-top: 1px solid oklch(0.9 0.008 60); padding-top: 20px;">
+            <h3 style="margin: 0 0 10px; font-size: 15px; font-weight: 700;">تخصص</h3>
+            <div style="display: flex; flex-direction: column; gap: 2px;">
+              <label style="display: flex; align-items: center; gap: 10px; min-height: 42px; cursor: pointer; font-size: 15px;">
+                <input type="checkbox" checked="checked" style="width: 18px; height: 18px; accent-color: oklch(0.42 0.13 340);" />
+                <span>میکاپ عروس</span>
+                <span style="margin-inline-start: auto; font-size: 14px; color: oklch(0.58 0.015 330); font-variant-numeric: tabular-nums;">۲</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 10px; min-height: 42px; cursor: pointer; font-size: 15px;">
+                <input type="checkbox" style="width: 18px; height: 18px; accent-color: oklch(0.42 0.13 340);" />
+                <span>میکاپ مجلسی</span>
+                <span style="margin-inline-start: auto; font-size: 14px; color: oklch(0.58 0.015 330); font-variant-numeric: tabular-nums;">۱</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 10px; min-height: 42px; cursor: pointer; font-size: 15px;">
+                <input type="checkbox" style="width: 18px; height: 18px; accent-color: oklch(0.42 0.13 340);" />
+                <span>شینیون</span>
+                <span style="margin-inline-start: auto; font-size: 14px; color: oklch(0.58 0.015 330); font-variant-numeric: tabular-nums;">۱</span>
+              </label>
+            </div>
+          </div>
+
+          <div style="border-top: 1px solid oklch(0.9 0.008 60); padding-top: 20px;">
+            <h3 style="margin: 0 0 10px; font-size: 15px; font-weight: 700;">شهر</h3>
+            <button type="button" style="font: inherit; width: 100%; font-size: 15px; text-align: start; min-height: 46px; padding: 0 14px; border: 1px solid oklch(0.9 0.008 60); border-radius: 10px; background: oklch(1 0 0); color: oklch(0.22 0.02 330); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+              یزد
+              <span aria-hidden="true" style="width: 7px; height: 7px; border-inline-start: 2px solid oklch(0.58 0.015 330); border-block-end: 2px solid oklch(0.58 0.015 330); transform: rotate(-45deg); margin-bottom: 3px;"></span>
+            </button>
+          </div>
+        </aside>
+
+        <div>
+          <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 24px; margin-bottom: 8px; flex-wrap: wrap;">
+            <h1 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 30px; font-weight: 800; line-height: 1.5;">میکاپ در یزد</h1>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span style="font-size: 14px; color: oklch(0.58 0.015 330);">ترتیب:</span>
+              <button type="button" style="font: inherit; font-size: 15px; font-weight: 500; min-height: 42px; padding: 0 14px; border: 1px solid oklch(0.9 0.008 60); border-radius: 10px; background: oklch(1 0 0); color: oklch(0.22 0.02 330); cursor: pointer; display: inline-flex; align-items: center; gap: 8px;">
+                مرتبط‌ترین
+                <span aria-hidden="true" style="width: 7px; height: 7px; border-inline-start: 2px solid oklch(0.58 0.015 330); border-block-end: 2px solid oklch(0.58 0.015 330); transform: rotate(-45deg); margin-bottom: 3px;"></span>
+              </button>
+            </div>
+          </div>
+          <p style="margin: 0 0 18px; font-size: 15px; color: oklch(0.46 0.02 330);">۳ متخصص یافت شد</p>
+
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px;">
+            <span style="display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 8px 0 13px; border-radius: 999px; background: oklch(0.945 0.026 340); font-size: 14px; font-weight: 600; color: oklch(0.36 0.11 340);">
+              فقط تأییدشده
+              <button type="button" aria-label="حذف فیلتر" style="font: inherit; width: 22px; height: 22px; border: none; border-radius: 999px; background: oklch(0.9 0.04 340); color: oklch(0.36 0.11 340); cursor: pointer; line-height: 1; font-size: 14px;">×</button>
+            </span>
+            <span style="display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 8px 0 13px; border-radius: 999px; background: oklch(0.945 0.026 340); font-size: 14px; font-weight: 600; color: oklch(0.36 0.11 340);">
+              ۱ تا ۲ میلیون
+              <button type="button" aria-label="حذف فیلتر" style="font: inherit; width: 22px; height: 22px; border: none; border-radius: 999px; background: oklch(0.9 0.04 340); color: oklch(0.36 0.11 340); cursor: pointer; line-height: 1; font-size: 14px;">×</button>
+            </span>
+            <span style="display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 8px 0 13px; border-radius: 999px; background: oklch(0.945 0.026 340); font-size: 14px; font-weight: 600; color: oklch(0.36 0.11 340);">
+              میکاپ عروس
+              <button type="button" aria-label="حذف فیلتر" style="font: inherit; width: 22px; height: 22px; border: none; border-radius: 999px; background: oklch(0.9 0.04 340); color: oklch(0.36 0.11 340); cursor: pointer; line-height: 1; font-size: 14px;">×</button>
+            </span>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 16px;">
+
+            <article style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; padding: 18px; display: grid; grid-template-columns: 188px 1fr auto; gap: 20px; align-items: start;" style-hover="border-color: oklch(0.82 0.014 60); box-shadow: 0 2px 8px oklch(0.3 0.04 340 / 0.06);">
+              <div style="height: 148px; border-radius: 12px; background: repeating-linear-gradient(135deg, oklch(0.963 0.012 340) 0 9px, oklch(0.945 0.026 340) 9px 18px); position: relative; display: flex; align-items: center; justify-content: center;">
+                <span style="font-family: ui-monospace, monospace; font-size: 11px; color: oklch(0.46 0.02 330);">نمونه کار</span>
+                <span style="position: absolute; inset-block-end: 8px; inset-inline-start: 8px; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: oklch(1 0 0 / 0.92); color: oklch(0.46 0.02 330);">۳ نمونه</span>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 10px; min-width: 0;">
+                <div>
+                  <div style="display: flex; align-items: center; gap: 9px; flex-wrap: wrap;">
+                    <h2 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 25px; font-weight: 700; line-height: 1.45;"><a href="#" style="color: oklch(0.22 0.02 330);">آتلیه سارا محمدی</a></h2>
+                    <span style="display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.945 0.036 155); color: oklch(0.4 0.1 155);">
+                      <span aria-hidden="true" style="width: 5px; height: 5px; border-radius: 999px; background: oklch(0.5 0.12 155);"></span>
+                      تأیید شده
+                    </span>
+                  </div>
+                  <div style="font-size: 14px; color: oklch(0.58 0.015 330);">یزد</div>
+                </div>
+                <p style="margin: 0; font-size: 15px; color: oklch(0.46 0.02 330); line-height: 1.75;">میکاپ عروس و مجلسی، با ده سال سابقه در یزد.</p>
+                <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                  <span style="font-size: 13px; padding: 3px 10px; border-radius: 999px; border: 1px solid oklch(0.9 0.008 60); color: oklch(0.46 0.02 330);">میکاپ عروس</span>
+                  <span style="font-size: 13px; padding: 3px 10px; border-radius: 999px; border: 1px solid oklch(0.9 0.008 60); color: oklch(0.46 0.02 330);">شینیون</span>
+                  <span style="font-size: 13px; padding: 3px 10px; border-radius: 999px; border: 1px solid oklch(0.9 0.008 60); color: oklch(0.46 0.02 330);">اصلاح ابرو</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px; font-size: 14px; color: oklch(0.4 0.1 155); font-weight: 600;">
+                  <span aria-hidden="true" style="width: 6px; height: 6px; border-radius: 999px; background: oklch(0.5 0.12 155);"></span>
+                  نزدیک‌ترین زمان آزاد: امروز ۱۶:۳۰
+                </div>
+              </div>
+              <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 12px; text-align: end; min-width: 168px;">
+                <div>
+                  <div style="font-size: 13px; color: oklch(0.58 0.015 330); line-height: 1.5;">شروع از</div>
+                  <div style="font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.4;">۸۵۰٬۰۰۰</div>
+                  <div style="font-size: 14px; color: oklch(0.46 0.02 330);">تومان</div>
+                </div>
+                <a href="#" style="display: inline-flex; align-items: center; justify-content: center; width: 100%; min-height: 46px; padding: 0 20px; border-radius: 10px; background: oklch(0.42 0.13 340); color: oklch(1 0 0); font-size: 15px; font-weight: 600;" style-hover="background: oklch(0.34 0.12 340); color: oklch(1 0 0);">دیدن زمان‌ها</a>
+              </div>
+            </article>
+
+            <article style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; padding: 18px; display: grid; grid-template-columns: 188px 1fr auto; gap: 20px; align-items: start;" style-hover="border-color: oklch(0.82 0.014 60); box-shadow: 0 2px 8px oklch(0.3 0.04 340 / 0.06);">
+              <div style="height: 148px; border-radius: 12px; background: repeating-linear-gradient(135deg, oklch(0.955 0.028 70) 0 9px, oklch(0.94 0.04 70) 9px 18px); display: flex; align-items: center; justify-content: center;">
+                <span style="font-family: ui-monospace, monospace; font-size: 11px; color: oklch(0.4 0.06 65);">نمونه کار</span>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 10px; min-width: 0;">
+                <div>
+                  <div style="display: flex; align-items: center; gap: 9px; flex-wrap: wrap;">
+                    <h2 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 25px; font-weight: 700; line-height: 1.45;"><a href="#" style="color: oklch(0.22 0.02 330);">سالن زیبایی نگین</a></h2>
+                    <span style="display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.945 0.036 155); color: oklch(0.4 0.1 155);">
+                      <span aria-hidden="true" style="width: 5px; height: 5px; border-radius: 999px; background: oklch(0.5 0.12 155);"></span>
+                      تأیید شده
+                    </span>
+                  </div>
+                  <div style="font-size: 14px; color: oklch(0.58 0.015 330);">یزد</div>
+                </div>
+                <p style="margin: 0; font-size: 15px; color: oklch(0.46 0.02 330); line-height: 1.75;">رنگ و لایت تخصصی، کراتین و احیای مو.</p>
+                <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                  <span style="font-size: 13px; padding: 3px 10px; border-radius: 999px; border: 1px solid oklch(0.9 0.008 60); color: oklch(0.46 0.02 330);">رنگ و لایت</span>
+                  <span style="font-size: 13px; padding: 3px 10px; border-radius: 999px; border: 1px solid oklch(0.9 0.008 60); color: oklch(0.46 0.02 330);">کراتین</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px; font-size: 14px; color: oklch(0.46 0.02 330); font-weight: 500;">
+                  <span aria-hidden="true" style="width: 6px; height: 6px; border-radius: 999px; background: oklch(0.78 0.015 330);"></span>
+                  نزدیک‌ترین زمان آزاد: پنجشنبه ۷ شهریور
+                </div>
+              </div>
+              <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 12px; text-align: end; min-width: 168px;">
+                <div>
+                  <div style="font-size: 13px; color: oklch(0.58 0.015 330); line-height: 1.5;">شروع از</div>
+                  <div style="font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.4;">۱٬۲۰۰٬۰۰۰</div>
+                  <div style="font-size: 14px; color: oklch(0.46 0.02 330);">تومان</div>
+                </div>
+                <a href="#" style="display: inline-flex; align-items: center; justify-content: center; width: 100%; min-height: 46px; padding: 0 20px; border-radius: 10px; background: oklch(0.42 0.13 340); color: oklch(1 0 0); font-size: 15px; font-weight: 600;" style-hover="background: oklch(0.34 0.12 340); color: oklch(1 0 0);">دیدن زمان‌ها</a>
+              </div>
+            </article>
+
+            <article style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; padding: 18px; display: grid; grid-template-columns: 188px 1fr auto; gap: 20px; align-items: start;" style-hover="border-color: oklch(0.82 0.014 60); box-shadow: 0 2px 8px oklch(0.3 0.04 340 / 0.06);">
+              <div style="height: 148px; border-radius: 12px; border: 1px dashed oklch(0.86 0.01 60); background: oklch(0.975 0.006 75); display: flex; align-items: center; justify-content: center;">
+                <span style="font-family: ui-monospace, monospace; font-size: 11px; color: oklch(0.68 0.012 330); text-align: center; padding: 0 8px;">بدون نمونه کار</span>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 10px; min-width: 0;">
+                <div>
+                  <h2 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 25px; font-weight: 700; line-height: 1.45;"><a href="#" style="color: oklch(0.22 0.02 330);">استودیو مهسا</a></h2>
+                  <div style="font-size: 14px; color: oklch(0.58 0.015 330);">یزد</div>
+                </div>
+                <p style="margin: 0; font-size: 15px; color: oklch(0.68 0.012 330); line-height: 1.75;">این متخصص هنوز معرفی‌نامه‌ای ثبت نکرده است.</p>
+                <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                  <span style="font-size: 13px; padding: 3px 10px; border-radius: 999px; border: 1px solid oklch(0.9 0.008 60); color: oklch(0.46 0.02 330);">میکاپ مجلسی</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px; font-size: 14px; color: oklch(0.68 0.012 330);">
+                  <span aria-hidden="true" style="width: 6px; height: 6px; border-radius: 999px; background: oklch(0.86 0.01 60);"></span>
+                  زمان آزادی ثبت نشده است
+                </div>
+              </div>
+              <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 12px; text-align: end; min-width: 168px;">
+                <div>
+                  <div style="font-size: 13px; color: oklch(0.58 0.015 330); line-height: 1.5;">شروع از</div>
+                  <div style="font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.4;">۶۲۰٬۰۰۰</div>
+                  <div style="font-size: 14px; color: oklch(0.46 0.02 330);">تومان</div>
+                </div>
+                <a href="#" style="display: inline-flex; align-items: center; justify-content: center; width: 100%; min-height: 46px; padding: 0 20px; border-radius: 10px; border: 1px solid oklch(0.9 0.008 60); background: oklch(1 0 0); color: oklch(0.22 0.02 330); font-size: 15px; font-weight: 600;" style-hover="border-color: oklch(0.42 0.13 340); color: oklch(0.42 0.13 340);">دیدن پروفایل</a>
+              </div>
+            </article>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="max-width: 1280px; background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 20px 24px;">
+      <h3 style="margin: 0 0 10px; font-size: 16px; font-weight: 700; color: oklch(0.22 0.02 330);">پشتوانه داده</h3>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; font-size: 14px; color: oklch(0.46 0.02 330); line-height: 1.8;">
+        <div><strong style="color: oklch(0.4 0.1 155); font-weight: 700;">داده موجود:</strong> کل ستون فیلترها از <code>facets</code> می‌آید که امروز هم در پاسخ هست — <code>priceBuckets</code>، <code>specialties</code>، <code>verifiedCount</code>؛ شمارِ کنارِ هر گزینه همان مقدارِ facet است. ترتیب‌ها همان چهار گزینه <code>sort</code>ِ موجودند.</div>
+        <div><strong style="color: oklch(0.44 0.09 245); font-weight: 700;">قابل استخراج:</strong> «نزدیک‌ترین زمان آزاد» از <code>listAvailability</code> با محدودیت ۱ برای هر متخصص — بدون فیلد تازه، ولی نیازمند یک فراخوانِ جمعی در سرور.</div>
+        <div><strong style="color: oklch(0.46 0.09 75); font-weight: 700;">شکاف:</strong> شمارنده «۳ نمونه» و تصویرِ کارت‌ها به فاز C وابسته است. کارتِ سوم عمداً حالتِ نبودِ تصویر، نبودِ معرفی‌نامه و نبودِ زمانِ آزاد را نشان می‌دهد — همان چیزی که امروز برای بیشترِ متخصص‌ها درست است.</div>
+        <div><strong style="color: oklch(0.47 0.17 25); font-weight: 700;">ساخته نشد:</strong> ستاره و امتیاز در کارت‌ها نیست. نشانِ «امتیاز بالا» که امروز از <code>badges</code> می‌آید هم استفاده نشده، چون بدون سیستمِ دیدگاه معنایش برای مشتری روشن نیست.</div>
+      </div>
+    </div>
+  </section>
+
+  <section style="display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.42 0.13 340); color: #fff;">۰۴</span>
+      <h2 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 24px; font-weight: 800; color: oklch(0.22 0.02 330);">نتایج جست‌وجو — موبایل ۳۹۰</h2>
+    </div>
+
+    <div style="width: 390px; background: oklch(0.985 0.008 75); border: 1px solid oklch(0.82 0.014 60); border-radius: 6px; overflow: hidden; color: oklch(0.22 0.02 330); line-height: 1.85;">
+      <header style="background: oklch(1 0 0); border-bottom: 1px solid oklch(0.9 0.008 60); padding: 10px 16px; display: flex; flex-direction: column; gap: 10px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <button type="button" aria-label="بازگشت" style="font: inherit; width: 40px; height: 40px; flex-shrink: 0; border: 1px solid oklch(0.9 0.008 60); border-radius: 10px; background: oklch(1 0 0); cursor: pointer; display: inline-flex; align-items: center; justify-content: center;">
+            <span aria-hidden="true" style="width: 8px; height: 8px; border-top: 2px solid oklch(0.22 0.02 330); border-inline-end: 2px solid oklch(0.22 0.02 330); transform: rotate(45deg); margin-inline-start: -2px;"></span>
+          </button>
+          <div style="flex: 1; display: flex; align-items: center; gap: 8px; border: 1px solid oklch(0.9 0.008 60); border-radius: 10px; background: oklch(0.985 0.008 75); padding: 0 12px; min-height: 44px;">
+            <span aria-hidden="true" style="width: 15px; height: 15px; border: 2px solid oklch(0.58 0.015 330); border-radius: 999px; flex-shrink: 0;"></span>
+            <input value="میکاپ" style="width: 100%; font: inherit; font-size: 15px; border: none; outline: none; background: transparent; min-height: 42px; color: oklch(0.22 0.02 330);" />
+          </div>
+        </div>
+        <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px;">
+          <button type="button" style="font: inherit; flex-shrink: 0; display: inline-flex; align-items: center; gap: 7px; min-height: 38px; padding: 0 13px; border-radius: 999px; border: none; background: oklch(0.22 0.02 330); color: oklch(1 0 0); font-size: 14px; font-weight: 600; cursor: pointer;">
+            <span aria-hidden="true" style="width: 12px; height: 2px; background: oklch(1 0 0); box-shadow: 0 4px 0 oklch(1 0 0), 0 -4px 0 oklch(1 0 0);"></span>
+            فیلترها
+            <span style="font-variant-numeric: tabular-nums;">۳</span>
+          </button>
+          <button type="button" style="font: inherit; flex-shrink: 0; min-height: 38px; padding: 0 13px; border-radius: 999px; border: 1px solid oklch(0.9 0.008 60); background: oklch(1 0 0); color: oklch(0.22 0.02 330); font-size: 14px; font-weight: 500; cursor: pointer;">مرتبط‌ترین</button>
+          <button type="button" style="font: inherit; flex-shrink: 0; min-height: 38px; padding: 0 13px; border-radius: 999px; border: 1px solid oklch(0.9 0.008 60); background: oklch(1 0 0); color: oklch(0.46 0.02 330); font-size: 14px; font-weight: 500; cursor: pointer;">ارزان‌ترین</button>
+          <button type="button" style="font: inherit; flex-shrink: 0; min-height: 38px; padding: 0 13px; border-radius: 999px; border: 1px solid oklch(0.9 0.008 60); background: oklch(1 0 0); color: oklch(0.46 0.02 330); font-size: 14px; font-weight: 500; cursor: pointer;">یزد</button>
+        </div>
+      </header>
+
+      <div style="padding: 16px;">
+        <p style="margin: 0 0 14px; font-size: 14px; color: oklch(0.46 0.02 330);">۳ متخصص برای «میکاپ» در یزد</p>
+
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+          <article style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; overflow: hidden;">
+            <div style="height: 160px; background: repeating-linear-gradient(135deg, oklch(0.963 0.012 340) 0 9px, oklch(0.945 0.026 340) 9px 18px); position: relative; display: flex; align-items: center; justify-content: center;">
+              <span style="font-family: ui-monospace, monospace; font-size: 11px; color: oklch(0.46 0.02 330);">نمونه کار</span>
+              <span style="position: absolute; inset-block-start: 10px; inset-inline-start: 10px; font-size: 13px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.945 0.036 155); color: oklch(0.4 0.1 155);">تأیید شده</span>
+            </div>
+            <div style="padding: 14px; display: flex; flex-direction: column; gap: 10px;">
+              <div>
+                <h2 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 22px; font-weight: 700; line-height: 1.45;">آتلیه سارا محمدی</h2>
+                <div style="font-size: 14px; color: oklch(0.58 0.015 330);">یزد · میکاپ عروس، شینیون</div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 7px; font-size: 14px; color: oklch(0.4 0.1 155); font-weight: 600;">
+                <span aria-hidden="true" style="width: 6px; height: 6px; border-radius: 999px; background: oklch(0.5 0.12 155);"></span>
+                نزدیک‌ترین زمان: امروز ۱۶:۳۰
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 12px; border-top: 1px solid oklch(0.9 0.008 60);">
+                <div>
+                  <div style="font-size: 13px; color: oklch(0.58 0.015 330); line-height: 1.4;">شروع از</div>
+                  <div style="font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.4;">۸۵۰٬۰۰۰ <span style="font-size: 13px; font-weight: 500; color: oklch(0.46 0.02 330);">تومان</span></div>
+                </div>
+                <a href="#" style="display: inline-flex; align-items: center; min-height: 46px; padding: 0 18px; border-radius: 10px; background: oklch(0.42 0.13 340); color: oklch(1 0 0); font-size: 15px; font-weight: 600;">دیدن زمان‌ها</a>
+              </div>
+            </div>
+          </article>
+
+          <article style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; overflow: hidden;">
+            <div style="height: 160px; background: repeating-linear-gradient(135deg, oklch(0.955 0.028 70) 0 9px, oklch(0.94 0.04 70) 9px 18px); position: relative; display: flex; align-items: center; justify-content: center;">
+              <span style="font-family: ui-monospace, monospace; font-size: 11px; color: oklch(0.4 0.06 65);">نمونه کار</span>
+              <span style="position: absolute; inset-block-start: 10px; inset-inline-start: 10px; font-size: 13px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.945 0.036 155); color: oklch(0.4 0.1 155);">تأیید شده</span>
+            </div>
+            <div style="padding: 14px; display: flex; flex-direction: column; gap: 10px;">
+              <div>
+                <h2 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 22px; font-weight: 700; line-height: 1.45;">سالن زیبایی نگین</h2>
+                <div style="font-size: 14px; color: oklch(0.58 0.015 330);">یزد · رنگ و لایت، کراتین</div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 7px; font-size: 14px; color: oklch(0.46 0.02 330);">
+                <span aria-hidden="true" style="width: 6px; height: 6px; border-radius: 999px; background: oklch(0.78 0.015 330);"></span>
+                نزدیک‌ترین زمان: پنجشنبه ۷ شهریور
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 12px; border-top: 1px solid oklch(0.9 0.008 60);">
+                <div>
+                  <div style="font-size: 13px; color: oklch(0.58 0.015 330); line-height: 1.4;">شروع از</div>
+                  <div style="font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.4;">۱٬۲۰۰٬۰۰۰ <span style="font-size: 13px; font-weight: 500; color: oklch(0.46 0.02 330);">تومان</span></div>
+                </div>
+                <a href="#" style="display: inline-flex; align-items: center; min-height: 46px; padding: 0 18px; border-radius: 10px; background: oklch(0.42 0.13 340); color: oklch(1 0 0); font-size: 15px; font-weight: 600;">دیدن زمان‌ها</a>
+              </div>
+            </div>
+          </article>
+        </div>
+      </div>
+    </div>
+
+    <p style="margin: 0; max-width: 1280px; font-size: 14px; line-height: 1.85; color: oklch(0.46 0.02 330);">در موبایل، ستونِ فیلترها به یک دکمه تیره با شمارنده فیلترهای فعال تبدیل می‌شود که یک برگه پایین‌کشیدنی باز می‌کند؛ ترتیب و شهر در همان نوارِ لغزان کنارش می‌آیند. تفاوتِ اصلی با نمای امروز این است که فیلتر و ترتیب دو چیزِ جدا شده‌اند، نه هفت دکمه هم‌شکل در یک ردیف.</p>
+  </section>
+
+  <section style="display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.42 0.13 340); color: #fff;">۰۵</span>
+      <h2 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 24px; font-weight: 800; color: oklch(0.22 0.02 330);">پروفایل متخصص — دسکتاپ</h2>
+      <code style="color: oklch(0.58 0.015 330);">/providers/[id]</code>
+    </div>
+
+    <div style="width: 1280px; background: oklch(0.985 0.008 75); border: 1px solid oklch(0.82 0.014 60); border-radius: 6px; overflow: hidden; color: oklch(0.22 0.02 330); line-height: 1.85;">
+      <header style="background: oklch(1 0 0); border-bottom: 1px solid oklch(0.9 0.008 60);">
+        <div style="max-width: 1280px; margin: 0 auto; padding: 14px 48px; display: flex; align-items: center; gap: 32px;">
+          <a href="#" style="display: inline-flex; align-items: center; gap: 9px; min-height: 44px;">
+            <img src="uploads/icon-circle.svg" alt="BeauClick" width="26" height="26" style="display: block; border-radius: 999px;" />
+            <span style="font-family: 'Anjoman', sans-serif; font-size: 21px; font-weight: 800; color: oklch(0.22 0.02 330);">BeauClick</span>
+          </a>
+          <nav aria-label="ناوبری اصلی" style="display: flex; align-items: center; gap: 24px; flex: 1;">
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; font-size: 15px; font-weight: 500; color: oklch(0.22 0.02 330);">خدمات</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; font-size: 15px; font-weight: 500; color: oklch(0.22 0.02 330);">متخصص‌ها</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; font-size: 15px; font-weight: 500; color: oklch(0.22 0.02 330);">رزروهای من</a>
+          </nav>
+          <a href="#" style="display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 8px 0 14px; border: 1px solid oklch(0.9 0.008 60); border-radius: 999px; font-size: 14px; font-weight: 500; color: oklch(0.22 0.02 330);">
+            <span>مینا رضایی</span>
+            <span style="width: 28px; height: 28px; border-radius: 999px; background: repeating-linear-gradient(135deg, oklch(0.963 0.012 340) 0 4px, oklch(0.945 0.026 340) 4px 8px);"></span>
+          </a>
+        </div>
+      </header>
+
+      <div style="max-width: 1280px; margin: 0 auto; padding: 16px 48px 0;">
+        <nav aria-label="مسیر" style="display: flex; align-items: center; gap: 8px; font-size: 14px; color: oklch(0.58 0.015 330); min-height: 40px;">
+          <a href="#" style="color: oklch(0.58 0.015 330);">خانه</a>
+          <span aria-hidden="true">/</span>
+          <a href="#" style="color: oklch(0.58 0.015 330);">میکاپ در یزد</a>
+          <span aria-hidden="true">/</span>
+          <span style="color: oklch(0.22 0.02 330); font-weight: 500;">آتلیه سارا محمدی</span>
+        </nav>
+      </div>
+
+      <section style="padding: 12px 48px 32px;">
+        <div style="max-width: 1184px; margin: 0 auto; display: grid; grid-template-columns: 2fr 1fr; gap: 12px; height: 320px;">
+          <div style="border-radius: 18px; background: repeating-linear-gradient(135deg, oklch(0.963 0.012 340) 0 11px, oklch(0.945 0.026 340) 11px 22px); display: flex; align-items: center; justify-content: center; position: relative;">
+            <span style="font-family: ui-monospace, monospace; font-size: 12px; color: oklch(0.46 0.02 330); background: oklch(1 0 0 / 0.85); padding: 6px 12px; border-radius: 999px;">نمونه کار اصلی</span>
+          </div>
+          <div style="display: grid; grid-template-rows: 1fr 1fr; gap: 12px;">
+            <div style="border-radius: 18px; background: repeating-linear-gradient(135deg, oklch(0.955 0.028 70) 0 10px, oklch(0.94 0.04 70) 10px 20px); display: flex; align-items: center; justify-content: center;">
+              <span style="font-family: ui-monospace, monospace; font-size: 11px; color: oklch(0.4 0.06 65); background: oklch(1 0 0 / 0.85); padding: 5px 10px; border-radius: 999px;">نمونه کار</span>
+            </div>
+            <div style="border-radius: 18px; background: repeating-linear-gradient(135deg, oklch(0.963 0.012 340) 0 10px, oklch(0.945 0.026 340) 10px 20px); display: flex; align-items: flex-end; justify-content: center; padding: 16px; position: relative;">
+              <button type="button" style="font: inherit; font-size: 14px; font-weight: 600; min-height: 42px; padding: 0 18px; border: none; border-radius: 999px; background: oklch(1 0 0); color: oklch(0.22 0.02 330); cursor: pointer; box-shadow: 0 2px 10px oklch(0.3 0.04 340 / 0.14);">دیدن همه ۳ نمونه</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div style="max-width: 1184px; margin: 0 auto; padding: 0 48px 56px; display: grid; grid-template-columns: 1fr 380px; gap: 40px; align-items: start;">
+
+        <div style="display: flex; flex-direction: column; gap: 32px; min-width: 0;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px;">
+              <h1 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 38px; font-weight: 800; line-height: 1.45;">آتلیه سارا محمدی</h1>
+              <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; padding: 4px 12px; border-radius: 999px; background: oklch(0.945 0.036 155); color: oklch(0.4 0.1 155);">
+                <span aria-hidden="true" style="width: 6px; height: 6px; border-radius: 999px; background: oklch(0.5 0.12 155);"></span>
+                هویت تأیید شده
+              </span>
+            </div>
+            <p style="margin: 0 0 14px; font-size: 16px; color: oklch(0.46 0.02 330);">یزد · میکاپ عروس، شینیون، اصلاح ابرو</p>
+            <p style="margin: 0; font-size: 17px; line-height: 1.9; color: oklch(0.34 0.02 330); max-width: 62ch;">میکاپ عروس و مجلسی، با ده سال سابقه در یزد.</p>
+          </div>
+
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 168px; background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 16px;">
+              <div style="font-size: 14px; color: oklch(0.58 0.015 330);">سابقه همکاری</div>
+              <div style="font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums;">از مرداد ۱۴۰۴</div>
+            </div>
+            <div style="flex: 1; min-width: 168px; background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 16px;">
+              <div style="font-size: 14px; color: oklch(0.58 0.015 330);">نوبت‌های انجام‌شده</div>
+              <div style="font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums;">۴۸ نوبت</div>
+            </div>
+            <div style="flex: 1; min-width: 168px; background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 16px;">
+              <div style="font-size: 14px; color: oklch(0.58 0.015 330);">خدمات فعال</div>
+              <div style="font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums;">۳ خدمت</div>
+            </div>
+          </div>
+
+          <div>
+            <h2 style="margin: 0 0 16px; font-family: 'Anjoman', sans-serif; font-size: 26px; font-weight: 800; line-height: 1.45;">خدمات و قیمت‌ها</h2>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              <div style="background: oklch(1 0 0); border: 2px solid oklch(0.42 0.13 340); border-radius: 14px; padding: 18px 20px; display: flex; align-items: center; justify-content: space-between; gap: 20px;">
+                <div style="min-width: 0;">
+                  <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                    <div style="font-size: 19px; font-weight: 700;">میکاپ عروس</div>
+                    <span style="font-size: 13px; font-weight: 600; padding: 2px 9px; border-radius: 999px; background: oklch(0.945 0.026 340); color: oklch(0.36 0.11 340);">انتخاب شد</span>
+                  </div>
+                  <div style="font-size: 15px; color: oklch(0.58 0.015 330);">۱۸۰ دقیقه · شامل تست میکاپ</div>
+                </div>
+                <div style="text-align: end; flex-shrink: 0;">
+                  <div style="font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.4;">۸۵۰٬۰۰۰</div>
+                  <div style="font-size: 14px; color: oklch(0.46 0.02 330);">تومان</div>
+                </div>
+              </div>
+              <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 18px 20px; display: flex; align-items: center; justify-content: space-between; gap: 20px;" style-hover="border-color: oklch(0.42 0.13 340);">
+                <div style="min-width: 0;">
+                  <div style="font-size: 19px; font-weight: 700;">شینیون</div>
+                  <div style="font-size: 15px; color: oklch(0.58 0.015 330);">۹۰ دقیقه</div>
+                </div>
+                <div style="text-align: end; flex-shrink: 0;">
+                  <div style="font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.4;">۴۲۰٬۰۰۰</div>
+                  <div style="font-size: 14px; color: oklch(0.46 0.02 330);">تومان</div>
+                </div>
+              </div>
+              <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 18px 20px; display: flex; align-items: center; justify-content: space-between; gap: 20px;" style-hover="border-color: oklch(0.42 0.13 340);">
+                <div style="min-width: 0;">
+                  <div style="font-size: 19px; font-weight: 700;">اصلاح ابرو</div>
+                  <div style="font-size: 15px; color: oklch(0.58 0.015 330);">۳۰ دقیقه</div>
+                </div>
+                <div style="text-align: end; flex-shrink: 0;">
+                  <div style="font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.4;">۱۲۰٬۰۰۰</div>
+                  <div style="font-size: 14px; color: oklch(0.46 0.02 330);">تومان</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style="border-top: 1px solid oklch(0.9 0.008 60); padding-top: 28px;">
+            <h2 style="margin: 0 0 14px; font-family: 'Anjoman', sans-serif; font-size: 26px; font-weight: 800; line-height: 1.45;">اعتبار این متخصص</h2>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <div style="display: flex; gap: 12px; align-items: flex-start; background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 16px;">
+                <span aria-hidden="true" style="width: 22px; height: 22px; border-radius: 999px; background: oklch(0.945 0.036 155); flex-shrink: 0; margin-top: 4px;"></span>
+                <div>
+                  <div style="font-size: 16px; font-weight: 700;">هویت بررسی شده</div>
+                  <div style="font-size: 14px; color: oklch(0.46 0.02 330); line-height: 1.7;">مدارک هویتی و مجوز صنفی توسط تیم بیوکلیک تأیید شده است.</div>
+                </div>
+              </div>
+              <div style="display: flex; gap: 12px; align-items: flex-start; background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 16px;">
+                <span aria-hidden="true" style="width: 22px; height: 22px; border-radius: 999px; background: oklch(0.945 0.026 340); flex-shrink: 0; margin-top: 4px;"></span>
+                <div>
+                  <div style="font-size: 16px; font-weight: 700;">پرداخت با پشتوانه</div>
+                  <div style="font-size: 14px; color: oklch(0.46 0.02 330); line-height: 1.7;">مبلغ تا پس از انجام نوبت نزد پلتفرم می‌ماند و در صورت لغو بازگردانده می‌شود.</div>
+                </div>
+              </div>
+              <div style="display: flex; gap: 12px; align-items: flex-start; background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 16px;">
+                <span aria-hidden="true" style="width: 22px; height: 22px; border-radius: 999px; background: oklch(0.955 0.028 70); flex-shrink: 0; margin-top: 4px;"></span>
+                <div>
+                  <div style="font-size: 16px; font-weight: 700;">۴۸ نوبت انجام‌شده</div>
+                  <div style="font-size: 14px; color: oklch(0.46 0.02 330); line-height: 1.7;">شمار نوبت‌هایی که این متخصص در بیوکلیک به پایان رسانده است.</div>
+                </div>
+              </div>
+              <div style="display: flex; gap: 12px; align-items: flex-start; background: oklch(0.975 0.006 75); border: 1px dashed oklch(0.86 0.01 60); border-radius: 14px; padding: 16px;">
+                <span aria-hidden="true" style="width: 22px; height: 22px; border-radius: 999px; background: oklch(0.93 0.008 60); flex-shrink: 0; margin-top: 4px;"></span>
+                <div>
+                  <div style="font-size: 16px; font-weight: 700; color: oklch(0.58 0.015 330);">دیدگاه مشتریان</div>
+                  <div style="font-size: 14px; color: oklch(0.68 0.012 330); line-height: 1.7;">به‌زودی. جای این بخش در چیدمان از حالا نگه داشته شده است.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <aside style="position: sticky; top: 20px; background: oklch(1 0 0); border: 1px solid oklch(0.82 0.014 60); border-radius: 18px; padding: 22px; box-shadow: 0 10px 32px oklch(0.3 0.04 340 / 0.08); display: flex; flex-direction: column; gap: 18px;">
+          <div>
+            <div style="font-size: 14px; color: oklch(0.58 0.015 330);">میکاپ عروس · ۱۸۰ دقیقه</div>
+            <div style="display: flex; align-items: baseline; gap: 8px;">
+              <span style="font-size: 30px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.4;">۸۵۰٬۰۰۰</span>
+              <span style="font-size: 16px; color: oklch(0.46 0.02 330);">تومان</span>
+            </div>
+          </div>
+
+          <div style="border-top: 1px solid oklch(0.9 0.008 60); padding-top: 18px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px;">
+              <div style="font-size: 16px; font-weight: 700;">زمان‌های آزاد</div>
+              <div style="display: flex; gap: 4px;">
+                <button type="button" aria-label="هفته قبل" style="font: inherit; width: 34px; height: 34px; border: 1px solid oklch(0.9 0.008 60); border-radius: 8px; background: oklch(1 0 0); cursor: pointer; display: inline-flex; align-items: center; justify-content: center;">
+                  <span aria-hidden="true" style="width: 7px; height: 7px; border-top: 2px solid oklch(0.68 0.012 330); border-inline-start: 2px solid oklch(0.68 0.012 330); transform: rotate(-45deg);"></span>
+                </button>
+                <button type="button" aria-label="هفته بعد" style="font: inherit; width: 34px; height: 34px; border: 1px solid oklch(0.9 0.008 60); border-radius: 8px; background: oklch(1 0 0); cursor: pointer; display: inline-flex; align-items: center; justify-content: center;">
+                  <span aria-hidden="true" style="width: 7px; height: 7px; border-top: 2px solid oklch(0.22 0.02 330); border-inline-end: 2px solid oklch(0.22 0.02 330); transform: rotate(45deg);"></span>
+                </button>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 16px;">
+              <button type="button" style="font: inherit; display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 62px; padding: 8px 0; border: none; border-radius: 10px; background: oklch(0.42 0.13 340); color: oklch(1 0 0); cursor: pointer;">
+                <span style="font-size: 12px; opacity: 0.85;">چهارشنبه</span>
+                <span style="font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums;">۶</span>
+                <span style="font-size: 11px; opacity: 0.85;">۳ زمان</span>
+              </button>
+              <button type="button" style="font: inherit; display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 62px; padding: 8px 0; border: 1px solid oklch(0.9 0.008 60); border-radius: 10px; background: oklch(1 0 0); color: oklch(0.22 0.02 330); cursor: pointer;">
+                <span style="font-size: 12px; color: oklch(0.58 0.015 330);">پنجشنبه</span>
+                <span style="font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums;">۷</span>
+                <span style="font-size: 11px; color: oklch(0.4 0.1 155);">۲ زمان</span>
+              </button>
+              <button type="button" disabled="disabled" style="font: inherit; display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 62px; padding: 8px 0; border: 1px solid oklch(0.94 0.006 60); border-radius: 10px; background: oklch(0.982 0.004 75); color: oklch(0.78 0.012 330); cursor: not-allowed;">
+                <span style="font-size: 12px;">جمعه</span>
+                <span style="font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums;">۸</span>
+                <span style="font-size: 11px;">—</span>
+              </button>
+              <button type="button" style="font: inherit; display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 62px; padding: 8px 0; border: 1px solid oklch(0.9 0.008 60); border-radius: 10px; background: oklch(1 0 0); color: oklch(0.22 0.02 330); cursor: pointer;">
+                <span style="font-size: 12px; color: oklch(0.58 0.015 330);">شنبه</span>
+                <span style="font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums;">۹</span>
+                <span style="font-size: 11px; color: oklch(0.4 0.1 155);">۴ زمان</span>
+              </button>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
+              <button type="button" style="font: inherit; min-height: 46px; border: 1px solid oklch(0.9 0.008 60); border-radius: 10px; background: oklch(1 0 0); color: oklch(0.22 0.02 330); font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; cursor: pointer;" style-hover="border-color: oklch(0.42 0.13 340); color: oklch(0.42 0.13 340);">۰۹:۳۰</button>
+              <button type="button" style="font: inherit; min-height: 46px; border: none; border-radius: 10px; background: oklch(0.42 0.13 340); color: oklch(1 0 0); font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; cursor: pointer;">۱۲:۰۰</button>
+              <button type="button" style="font: inherit; min-height: 46px; border: 1px solid oklch(0.9 0.008 60); border-radius: 10px; background: oklch(1 0 0); color: oklch(0.22 0.02 330); font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; cursor: pointer;" style-hover="border-color: oklch(0.42 0.13 340); color: oklch(0.42 0.13 340);">۱۶:۳۰</button>
+            </div>
+          </div>
+
+          <div style="border-top: 1px solid oklch(0.9 0.008 60); padding-top: 18px; display: flex; flex-direction: column; gap: 8px;">
+            <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 15px;">
+              <span style="color: oklch(0.46 0.02 330);">زمان انتخابی</span>
+              <span style="font-weight: 600;">چهارشنبه ۶ شهریور، ۱۲:۰۰</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 15px;">
+              <span style="color: oklch(0.46 0.02 330);">پایان تقریبی</span>
+              <span style="font-weight: 600; font-variant-numeric: tabular-nums;">۱۵:۰۰</span>
+            </div>
+          </div>
+
+          <a href="#" style="display: inline-flex; align-items: center; justify-content: center; min-height: 54px; border-radius: 12px; background: oklch(0.42 0.13 340); color: oklch(1 0 0); font-size: 17px; font-weight: 700;" style-hover="background: oklch(0.34 0.12 340); color: oklch(1 0 0);">ادامه به پرداخت</a>
+          <p style="margin: 0; font-size: 13px; color: oklch(0.58 0.015 330); text-align: center; line-height: 1.7;">مبلغ نهایی را سرور محاسبه می‌کند. تا پرداخت نشود، زمان قطعی نیست.</p>
+        </aside>
+      </div>
+    </div>
+
+    <div style="max-width: 1280px; background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 20px 24px;">
+      <h3 style="margin: 0 0 10px; font-size: 16px; font-weight: 700; color: oklch(0.22 0.02 330);">پشتوانه داده</h3>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; font-size: 14px; color: oklch(0.46 0.02 330); line-height: 1.8;">
+        <div><strong style="color: oklch(0.4 0.1 155); font-weight: 700;">داده موجود:</strong> نام، معرفی‌نامه، شهر، تخصص‌ها، وضعیت تأیید، فهرست خدمات با قیمت و مدت، و زمان‌های آزاد با <code>listAvailability</code> — همه امروز در پاسخ هستند.</div>
+        <div><strong style="color: oklch(0.44 0.09 245); font-weight: 700;">قابل استخراج:</strong> «۴۸ نوبت انجام‌شده» و «از مرداد ۱۴۰۴» از رزروهای <code>completed</code> و <code>createdAt</code>ِ متخصص شمردنی‌اند؛ شمارِ زمان در هر روز از همان پاسخِ زمان‌ها. پایانِ تقریبی از <code>durationMinutes</code>.</div>
+        <div><strong style="color: oklch(0.46 0.09 75); font-weight: 700;">شکاف:</strong> بخشِ دیدگاه مشتریان به‌عمد به‌صورت جای‌خالیِ خط‌چین ساخته شده تا معماری صفحه برای افزودنش نشکند. نگارخانهٔ تصاویر دیگر شکاف نیست — <code>GET /v1/providers/:id/portfolio</code> و <code>images.avatar/cover</code> واقعی‌اند (فاز C)؛ «۳ نمونه» از <code>portfolioCount</code> واقعی می‌آید.</div>
+        <div><strong style="color: oklch(0.47 0.17 25); font-weight: 700;">ساخته نشد:</strong> نقشه و نشانی دقیق، ستاره و امتیاز، و «۱۲ نفر امروز دیده‌اند» — هیچ‌کدام پشتوانه داده ندارند.</div>
+      </div>
+    </div>
+  </section>
+
+  <section style="display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.42 0.13 340); color: #fff;">۰۶</span>
+      <h2 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 24px; font-weight: 800; color: oklch(0.22 0.02 330);">جریان رزرو — موبایل ۳۹۰</h2>
+      <span style="font-size: 13px; color: oklch(0.58 0.015 330);">پروفایل، پرداخت، رسید و حالت خطا</span>
+    </div>
+
+    <div style="display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start;">
+
+      <div style="width: 390px; background: oklch(0.985 0.008 75); border: 1px solid oklch(0.82 0.014 60); border-radius: 6px; overflow: hidden; color: oklch(0.22 0.02 330); line-height: 1.85;">
+        <div style="padding: 8px 16px; font-size: 12px; font-weight: 700; color: oklch(0.58 0.015 330); background: oklch(1 0 0); border-bottom: 1px solid oklch(0.9 0.008 60);">قدم ۱ — پروفایل و انتخاب زمان</div>
+        <div style="height: 190px; background: repeating-linear-gradient(135deg, oklch(0.963 0.012 340) 0 10px, oklch(0.945 0.026 340) 10px 20px); position: relative; display: flex; align-items: center; justify-content: center;">
+          <span style="font-family: ui-monospace, monospace; font-size: 11px; color: oklch(0.46 0.02 330);">نمونه کار</span>
+          <button type="button" aria-label="بازگشت" style="font: inherit; position: absolute; inset-block-start: 12px; inset-inline-end: 12px; width: 38px; height: 38px; border: none; border-radius: 999px; background: oklch(1 0 0 / 0.92); cursor: pointer; display: inline-flex; align-items: center; justify-content: center;">
+            <span aria-hidden="true" style="width: 8px; height: 8px; border-top: 2px solid oklch(0.22 0.02 330); border-inline-end: 2px solid oklch(0.22 0.02 330); transform: rotate(45deg); margin-inline-start: -2px;"></span>
+          </button>
+          <span style="position: absolute; inset-block-end: 12px; inset-inline-start: 12px; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: oklch(1 0 0 / 0.92); color: oklch(0.46 0.02 330);">۱ از ۳</span>
+        </div>
+
+        <div style="background: oklch(1 0 0); padding: 16px; border-bottom: 1px solid oklch(0.9 0.008 60);">
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px;">
+            <h1 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 25px; font-weight: 800; line-height: 1.45;">آتلیه سارا محمدی</h1>
+            <span style="font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: oklch(0.945 0.036 155); color: oklch(0.4 0.1 155);">تأیید شده</span>
+          </div>
+          <p style="margin: 0; font-size: 14px; color: oklch(0.58 0.015 330);">یزد · ۴۸ نوبت انجام‌شده</p>
+        </div>
+
+        <div style="padding: 16px; display: flex; flex-direction: column; gap: 18px;">
+          <div>
+            <h2 style="margin: 0 0 10px; font-size: 17px; font-weight: 700;">خدمت را انتخاب کنید</h2>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <button type="button" style="font: inherit; text-align: start; background: oklch(1 0 0); border: 2px solid oklch(0.42 0.13 340); border-radius: 12px; padding: 13px 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; min-height: 44px;">
+                <span>
+                  <span style="display: block; font-size: 16px; font-weight: 700;">میکاپ عروس</span>
+                  <span style="display: block; font-size: 13px; color: oklch(0.58 0.015 330);">۱۸۰ دقیقه</span>
+                </span>
+                <strong style="font-size: 16px; font-variant-numeric: tabular-nums; white-space: nowrap;">۸۵۰٬۰۰۰</strong>
+              </button>
+              <button type="button" style="font: inherit; text-align: start; background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 13px 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; min-height: 44px;">
+                <span>
+                  <span style="display: block; font-size: 16px; font-weight: 700;">شینیون</span>
+                  <span style="display: block; font-size: 13px; color: oklch(0.58 0.015 330);">۹۰ دقیقه</span>
+                </span>
+                <strong style="font-size: 16px; font-variant-numeric: tabular-nums; white-space: nowrap;">۴۲۰٬۰۰۰</strong>
+              </button>
+              <button type="button" style="font: inherit; text-align: start; background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 13px 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; min-height: 44px;">
+                <span>
+                  <span style="display: block; font-size: 16px; font-weight: 700;">اصلاح ابرو</span>
+                  <span style="display: block; font-size: 13px; color: oklch(0.58 0.015 330);">۳۰ دقیقه</span>
+                </span>
+                <strong style="font-size: 16px; font-variant-numeric: tabular-nums; white-space: nowrap;">۱۲۰٬۰۰۰</strong>
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <h2 style="margin: 0 0 10px; font-size: 17px; font-weight: 700;">زمان را انتخاب کنید</h2>
+            <div style="display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 12px;">
+              <button type="button" style="font: inherit; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 66px; min-height: 62px; padding: 8px 0; border: none; border-radius: 10px; background: oklch(0.42 0.13 340); color: oklch(1 0 0); cursor: pointer;">
+                <span style="font-size: 12px; opacity: 0.85;">چهارشنبه</span>
+                <span style="font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums;">۶</span>
+                <span style="font-size: 11px; opacity: 0.85;">۳ زمان</span>
+              </button>
+              <button type="button" style="font: inherit; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 66px; min-height: 62px; padding: 8px 0; border: 1px solid oklch(0.9 0.008 60); border-radius: 10px; background: oklch(1 0 0); cursor: pointer;">
+                <span style="font-size: 12px; color: oklch(0.58 0.015 330);">پنجشنبه</span>
+                <span style="font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums;">۷</span>
+                <span style="font-size: 11px; color: oklch(0.4 0.1 155);">۲ زمان</span>
+              </button>
+              <button type="button" disabled="disabled" style="font: inherit; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 66px; min-height: 62px; padding: 8px 0; border: 1px solid oklch(0.94 0.006 60); border-radius: 10px; background: oklch(0.982 0.004 75); color: oklch(0.78 0.012 330); cursor: not-allowed;">
+                <span style="font-size: 12px;">جمعه</span>
+                <span style="font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums;">۸</span>
+                <span style="font-size: 11px;">—</span>
+              </button>
+              <button type="button" style="font: inherit; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 66px; min-height: 62px; padding: 8px 0; border: 1px solid oklch(0.9 0.008 60); border-radius: 10px; background: oklch(1 0 0); cursor: pointer;">
+                <span style="font-size: 12px; color: oklch(0.58 0.015 330);">شنبه</span>
+                <span style="font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums;">۹</span>
+                <span style="font-size: 11px; color: oklch(0.4 0.1 155);">۴ زمان</span>
+              </button>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
+              <button type="button" style="font: inherit; min-height: 48px; border: 1px solid oklch(0.9 0.008 60); border-radius: 10px; background: oklch(1 0 0); font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; cursor: pointer;">۰۹:۳۰</button>
+              <button type="button" style="font: inherit; min-height: 48px; border: none; border-radius: 10px; background: oklch(0.42 0.13 340); color: oklch(1 0 0); font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; cursor: pointer;">۱۲:۰۰</button>
+              <button type="button" style="font: inherit; min-height: 48px; border: 1px solid oklch(0.9 0.008 60); border-radius: 10px; background: oklch(1 0 0); font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; cursor: pointer;">۱۶:۳۰</button>
+            </div>
+          </div>
+        </div>
+
+        <div style="position: sticky; bottom: 0; background: oklch(1 0 0); border-top: 1px solid oklch(0.9 0.008 60); box-shadow: 0 -6px 20px oklch(0.3 0.04 340 / 0.08); padding: 12px 16px 16px; display: flex; align-items: center; gap: 14px;">
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-size: 13px; color: oklch(0.58 0.015 330); line-height: 1.4;">میکاپ عروس · چهارشنبه ۱۲:۰۰</div>
+            <div style="font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.4;">۸۵۰٬۰۰۰ <span style="font-size: 13px; font-weight: 500; color: oklch(0.46 0.02 330);">تومان</span></div>
+          </div>
+          <a href="#" style="display: inline-flex; align-items: center; justify-content: center; min-height: 50px; padding: 0 24px; border-radius: 11px; background: oklch(0.42 0.13 340); color: oklch(1 0 0); font-size: 16px; font-weight: 700; flex-shrink: 0;">ادامه</a>
+        </div>
+      </div>
+
+      <div style="width: 390px; background: oklch(0.985 0.008 75); border: 1px solid oklch(0.82 0.014 60); border-radius: 6px; overflow: hidden; color: oklch(0.22 0.02 330); line-height: 1.85;">
+        <div style="padding: 8px 16px; font-size: 12px; font-weight: 700; color: oklch(0.58 0.015 330); background: oklch(1 0 0); border-bottom: 1px solid oklch(0.9 0.008 60);">قدم ۲ — تأیید و پرداخت</div>
+        <header style="background: oklch(1 0 0); border-bottom: 1px solid oklch(0.9 0.008 60); padding: 10px 16px; display: flex; align-items: center; gap: 12px;">
+          <button type="button" aria-label="بازگشت" style="font: inherit; width: 40px; height: 40px; flex-shrink: 0; border: 1px solid oklch(0.9 0.008 60); border-radius: 10px; background: oklch(1 0 0); cursor: pointer; display: inline-flex; align-items: center; justify-content: center;">
+            <span aria-hidden="true" style="width: 8px; height: 8px; border-top: 2px solid oklch(0.22 0.02 330); border-inline-end: 2px solid oklch(0.22 0.02 330); transform: rotate(45deg); margin-inline-start: -2px;"></span>
+          </button>
+          <div style="flex: 1;">
+            <div style="font-size: 16px; font-weight: 700;">تأیید و پرداخت</div>
+            <div style="font-size: 12px; color: oklch(0.58 0.015 330);">۲ از ۳</div>
+          </div>
+        </header>
+
+        <div style="padding: 16px; display: flex; flex-direction: column; gap: 14px;">
+          <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 16px;">
+            <div style="display: flex; align-items: center; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid oklch(0.9 0.008 60);">
+              <span style="width: 46px; height: 46px; border-radius: 12px; background: repeating-linear-gradient(135deg, oklch(0.963 0.012 340) 0 5px, oklch(0.945 0.026 340) 5px 10px); flex-shrink: 0;"></span>
+              <div style="min-width: 0;">
+                <div style="font-size: 16px; font-weight: 700;">آتلیه سارا محمدی</div>
+                <div style="font-size: 13px; color: oklch(0.58 0.015 330);">یزد</div>
+              </div>
+            </div>
+            <dl style="margin: 14px 0 0; display: grid; grid-template-columns: auto 1fr; gap: 10px 16px; font-size: 15px;">
+              <dt style="color: oklch(0.58 0.015 330);">خدمت</dt>
+              <dd style="margin: 0; text-align: end; font-weight: 500;">میکاپ عروس</dd>
+              <dt style="color: oklch(0.58 0.015 330);">تاریخ</dt>
+              <dd style="margin: 0; text-align: end; font-weight: 500;">چهارشنبه ۶ شهریور ۱۴۰۴</dd>
+              <dt style="color: oklch(0.58 0.015 330);">ساعت</dt>
+              <dd style="margin: 0; text-align: end; font-weight: 500; font-variant-numeric: tabular-nums;">۱۲:۰۰ تا ۱۵:۰۰</dd>
+              <dt style="color: oklch(0.58 0.015 330);">مدت</dt>
+              <dd style="margin: 0; text-align: end; font-weight: 500;">۱۸۰ دقیقه</dd>
+            </dl>
+          </div>
+
+          <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 16px;">
+            <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 15px; margin-bottom: 8px;">
+              <span style="color: oklch(0.46 0.02 330);">مبلغ خدمت</span>
+              <span style="font-variant-numeric: tabular-nums;">۸۵۰٬۰۰۰</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 15px; margin-bottom: 8px;">
+              <span style="color: oklch(0.46 0.02 330);">تخفیف باشگاه (نقره‌ای ۵٪)</span>
+              <span style="font-variant-numeric: tabular-nums; color: oklch(0.4 0.1 155);">−۴۲٬۵۰۰</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; gap: 12px; padding-top: 12px; border-top: 1px solid oklch(0.9 0.008 60);">
+              <span style="font-size: 16px; font-weight: 700;">مبلغ قابل پرداخت</span>
+              <span style="font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums;">۸۰۷٬۵۰۰</span>
+            </div>
+            <p style="margin: 10px 0 0; font-size: 12px; color: oklch(0.58 0.015 330); line-height: 1.7;">مبلغ نهایی توسط سرور محاسبه می‌شود و در صفحه رسید نمایش داده خواهد شد.</p>
+          </div>
+
+          <div style="background: oklch(0.955 0.028 70); border-radius: 12px; padding: 13px 15px; display: flex; gap: 11px; align-items: flex-start;">
+            <span aria-hidden="true" style="width: 18px; height: 18px; border-radius: 999px; background: oklch(0.62 0.095 65); flex-shrink: 0; margin-top: 5px;"></span>
+            <p style="margin: 0; font-size: 14px; line-height: 1.75; color: oklch(0.34 0.05 65);">تا پایان پرداخت، این زمان برای شما نگه داشته می‌شود. لغو تا ۶ ساعت پیش از نوبت امکان‌پذیر است.</p>
+          </div>
+        </div>
+
+        <div style="position: sticky; bottom: 0; background: oklch(1 0 0); border-top: 1px solid oklch(0.9 0.008 60); box-shadow: 0 -6px 20px oklch(0.3 0.04 340 / 0.08); padding: 12px 16px 16px;">
+          <a href="#" style="display: flex; align-items: center; justify-content: center; min-height: 54px; border-radius: 12px; background: oklch(0.42 0.13 340); color: oklch(1 0 0); font-size: 17px; font-weight: 700;">پرداخت ۸۰۷٬۵۰۰ تومان</a>
+        </div>
+      </div>
+
+      <div style="width: 390px; background: oklch(0.985 0.008 75); border: 1px solid oklch(0.82 0.014 60); border-radius: 6px; overflow: hidden; color: oklch(0.22 0.02 330); line-height: 1.85;">
+        <div style="padding: 8px 16px; font-size: 12px; font-weight: 700; color: oklch(0.58 0.015 330); background: oklch(1 0 0); border-bottom: 1px solid oklch(0.9 0.008 60);">قدم ۳ — رسید</div>
+        <div style="padding: 32px 16px 24px; background: oklch(1 0 0); border-bottom: 1px solid oklch(0.9 0.008 60); text-align: center;">
+          <div style="width: 62px; height: 62px; border-radius: 999px; background: oklch(0.945 0.036 155); margin: 0 auto 16px; display: flex; align-items: center; justify-content: center;">
+            <span aria-hidden="true" style="width: 20px; height: 11px; border-left: 3px solid oklch(0.4 0.1 155); border-bottom: 3px solid oklch(0.4 0.1 155); transform: rotate(-45deg); margin-top: -5px;"></span>
+          </div>
+          <h1 style="margin: 0 0 8px; font-family: 'Anjoman', sans-serif; font-size: 27px; font-weight: 800; line-height: 1.45;">نوبت شما ثبت شد</h1>
+          <p style="margin: 0; font-size: 15px; color: oklch(0.46 0.02 330); line-height: 1.75;">چهارشنبه ۶ شهریور، ساعت ۱۲:۰۰<br />آتلیه سارا محمدی — یزد</p>
+        </div>
+
+        <div style="padding: 16px; display: flex; flex-direction: column; gap: 14px;">
+          <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 16px;">
+            <div style="font-size: 15px; font-weight: 700; margin-bottom: 12px;">رسید پرداخت</div>
+            <dl style="margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 9px 16px; font-size: 14px;">
+              <dt style="color: oklch(0.58 0.015 330);">شماره رسید</dt>
+              <dd style="margin: 0; text-align: end; font-family: ui-monospace, monospace; direction: ltr;">4c8e1baf</dd>
+              <dt style="color: oklch(0.58 0.015 330);">مبلغ پرداخت‌شده</dt>
+              <dd style="margin: 0; text-align: end; font-weight: 700; font-variant-numeric: tabular-nums;">۸۰۷٬۵۰۰ تومان</dd>
+              <dt style="color: oklch(0.58 0.015 330);">امتیاز باشگاه</dt>
+              <dd style="margin: 0; text-align: end; color: oklch(0.4 0.1 155); font-weight: 600;">+۱۰۲ پس از انجام نوبت</dd>
+            </dl>
+          </div>
+
+          <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 16px;">
+            <div style="font-size: 15px; font-weight: 700; margin-bottom: 10px;">بعد از این چه می‌شود؟</div>
+            <ol style="margin: 0; padding-inline-start: 18px; display: flex; flex-direction: column; gap: 7px; font-size: 14px; color: oklch(0.46 0.02 330); line-height: 1.75;">
+              <li>یک روز پیش از نوبت یادآوری می‌گیرید.</li>
+              <li>در روز نوبت، نشانی و شماره تماس متخصص در «رزروهای من» است.</li>
+              <li>پس از انجام نوبت، امتیاز باشگاه به حساب شما اضافه می‌شود.</li>
+            </ol>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <a href="#" style="display: flex; align-items: center; justify-content: center; min-height: 50px; border-radius: 11px; background: oklch(0.42 0.13 340); color: oklch(1 0 0); font-size: 16px; font-weight: 600;">دیدن رزروهای من</a>
+            <a href="#" style="display: flex; align-items: center; justify-content: center; min-height: 50px; border-radius: 11px; border: 1px solid oklch(0.9 0.008 60); background: oklch(1 0 0); color: oklch(0.22 0.02 330); font-size: 16px; font-weight: 600;">افزودن به تقویم</a>
+          </div>
+        </div>
+      </div>
+
+      <div style="width: 390px; background: oklch(0.985 0.008 75); border: 1px solid oklch(0.82 0.014 60); border-radius: 6px; overflow: hidden; color: oklch(0.22 0.02 330); line-height: 1.85;">
+        <div style="padding: 8px 16px; font-size: 12px; font-weight: 700; color: oklch(0.58 0.015 330); background: oklch(1 0 0); border-bottom: 1px solid oklch(0.9 0.008 60);">حالت خطا — زمان از دست رفت</div>
+        <header style="background: oklch(1 0 0); border-bottom: 1px solid oklch(0.9 0.008 60); padding: 10px 16px; display: flex; align-items: center; gap: 12px;">
+          <button type="button" aria-label="بازگشت" style="font: inherit; width: 40px; height: 40px; flex-shrink: 0; border: 1px solid oklch(0.9 0.008 60); border-radius: 10px; background: oklch(1 0 0); cursor: pointer; display: inline-flex; align-items: center; justify-content: center;">
+            <span aria-hidden="true" style="width: 8px; height: 8px; border-top: 2px solid oklch(0.22 0.02 330); border-inline-end: 2px solid oklch(0.22 0.02 330); transform: rotate(45deg); margin-inline-start: -2px;"></span>
+          </button>
+          <div style="font-size: 16px; font-weight: 700;">تأیید و پرداخت</div>
+        </header>
+
+        <div style="padding: 16px; display: flex; flex-direction: column; gap: 14px;">
+          <div style="background: oklch(0.965 0.035 25); border: 1px solid oklch(0.86 0.075 25); border-radius: 14px; padding: 16px; display: flex; gap: 12px; align-items: flex-start;">
+            <span aria-hidden="true" style="width: 20px; height: 20px; border-radius: 999px; background: oklch(0.55 0.17 25); flex-shrink: 0; margin-top: 4px;"></span>
+            <div>
+              <div style="font-size: 16px; font-weight: 700; color: oklch(0.4 0.13 25); margin-bottom: 4px;">این زمان دیگر آزاد نیست</div>
+              <p style="margin: 0; font-size: 14px; line-height: 1.75; color: oklch(0.42 0.09 25);">ساعت ۱۲:۰۰ چهارشنبه ۶ شهریور در همین چند لحظه توسط مشتری دیگری رزرو شد. پرداختی از شما انجام نشده است.</p>
+            </div>
+          </div>
+
+          <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 16px;">
+            <div style="font-size: 15px; font-weight: 700; margin-bottom: 12px;">زمان‌های نزدیک به انتخاب شما</div>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <button type="button" style="font: inherit; text-align: start; min-height: 52px; padding: 0 14px; border: 1px solid oklch(0.9 0.008 60); border-radius: 11px; background: oklch(1 0 0); cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+                <span style="font-size: 15px;">چهارشنبه ۶ شهریور</span>
+                <strong style="font-size: 16px; font-variant-numeric: tabular-nums;">۱۶:۳۰</strong>
+              </button>
+              <button type="button" style="font: inherit; text-align: start; min-height: 52px; padding: 0 14px; border: 1px solid oklch(0.9 0.008 60); border-radius: 11px; background: oklch(1 0 0); cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+                <span style="font-size: 15px;">پنجشنبه ۷ شهریور</span>
+                <strong style="font-size: 16px; font-variant-numeric: tabular-nums;">۱۰:۰۰</strong>
+              </button>
+              <button type="button" style="font: inherit; text-align: start; min-height: 52px; padding: 0 14px; border: 1px solid oklch(0.9 0.008 60); border-radius: 11px; background: oklch(1 0 0); cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+                <span style="font-size: 15px;">شنبه ۹ شهریور</span>
+                <strong style="font-size: 16px; font-variant-numeric: tabular-nums;">۰۹:۰۰</strong>
+              </button>
+            </div>
+          </div>
+
+          <a href="#" style="display: flex; align-items: center; justify-content: center; min-height: 50px; border-radius: 11px; border: 1px solid oklch(0.9 0.008 60); background: oklch(1 0 0); color: oklch(0.22 0.02 330); font-size: 16px; font-weight: 600;">دیدن همه زمان‌های آزاد</a>
+        </div>
+      </div>
+    </div>
+
+    <div style="max-width: 1280px; background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 20px 24px;">
+      <h3 style="margin: 0 0 10px; font-size: 16px; font-weight: 700; color: oklch(0.22 0.02 330);">پشتوانه داده</h3>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; font-size: 14px; color: oklch(0.46 0.02 330); line-height: 1.8;">
+        <div><strong style="color: oklch(0.4 0.1 155); font-weight: 700;">داده موجود:</strong> خدمت، مدت، زمان و شناسه سفارش همه از <code>createBooking</code> و <code>listAvailability</code> می‌آیند. تخفیفِ سطحِ باشگاه هم مقدارِ واقعیِ <code>discountPercent</code>ِ سطح است.</div>
+        <div><strong style="color: oklch(0.44 0.09 245); font-weight: 700;">قابل استخراج:</strong> «+۱۰۲ امتیاز پس از انجام نوبت» از فرمول امتیازِ موجود (پایه × ضریب سطح) پیش‌بینی‌شدنی است — همان محاسبه‌ای که امروز پس از انجام نوبت اجرا می‌شود.</div>
+        <div><strong style="color: oklch(0.46 0.09 75); font-weight: 700;">حالت خطا:</strong> این دقیقاً همان تعارضی است که سرور امروز با کد ۴۰۹ برمی‌گرداند. نمای فعلی آن را به‌صورت یک پیام کلی نشان می‌دهد؛ اینجا به سه زمانِ جانشین تبدیل شده که از همان پاسخِ زمان‌های آزاد می‌آید.</div>
+        <div><strong style="color: oklch(0.47 0.17 25); font-weight: 700;">ساخته نشد:</strong> «افزودن به تقویم» به یک فایل ICS نیاز دارد که وجود ندارد — در سند به‌عنوان کارِ کوچکِ سمتِ کلاینت علامت خورده، نه قابلیتِ سرور. نشانی و شماره تماسِ متخصص هم امروز در پاسخ نیست.</div>
+      </div>
+    </div>
+  </section>
+
+  <section style="display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.42 0.13 340); color: #fff;">۰۷</span>
+      <h2 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 24px; font-weight: 800; color: oklch(0.22 0.02 330);">داشبورد مشتری — دسکتاپ</h2>
+      <code style="color: oklch(0.58 0.015 330);">/dashboard + /bookings + /journey + /loyalty</code>
+    </div>
+
+    <div style="width: 1280px; background: oklch(0.985 0.008 75); border: 1px solid oklch(0.82 0.014 60); border-radius: 6px; overflow: hidden; color: oklch(0.22 0.02 330); line-height: 1.85;">
+      <header style="background: oklch(1 0 0); border-bottom: 1px solid oklch(0.9 0.008 60);">
+        <div style="max-width: 1280px; margin: 0 auto; padding: 14px 48px; display: flex; align-items: center; gap: 32px;">
+          <a href="#" style="display: inline-flex; align-items: center; gap: 9px; min-height: 44px;">
+            <img src="uploads/icon-circle.svg" alt="BeauClick" width="26" height="26" style="display: block; border-radius: 999px;" />
+            <span style="font-family: 'Anjoman', sans-serif; font-size: 21px; font-weight: 800; color: oklch(0.22 0.02 330);">BeauClick</span>
+          </a>
+          <nav aria-label="ناوبری اصلی" style="display: flex; align-items: center; gap: 24px; flex: 1;">
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; font-size: 15px; font-weight: 500; color: oklch(0.22 0.02 330);">خدمات</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; font-size: 15px; font-weight: 500; color: oklch(0.22 0.02 330);">متخصص‌ها</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; font-size: 15px; font-weight: 700; color: oklch(0.42 0.13 340); border-bottom: 2px solid oklch(0.42 0.13 340);">حساب من</a>
+          </nav>
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <button type="button" aria-label="اعلان‌ها" style="font: inherit; position: relative; width: 42px; height: 42px; border: 1px solid oklch(0.9 0.008 60); border-radius: 999px; background: oklch(1 0 0); cursor: pointer;">
+              <span aria-hidden="true" style="position: absolute; inset: 0; margin: auto; width: 16px; height: 16px; border: 2px solid oklch(0.46 0.02 330); border-radius: 5px;"></span>
+              <span style="position: absolute; inset-block-start: 6px; inset-inline-start: 6px; min-width: 17px; height: 17px; border-radius: 999px; background: oklch(0.42 0.13 340); color: oklch(1 0 0); font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center;">۳</span>
+            </button>
+            <a href="#" style="display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 8px 0 14px; border: 1px solid oklch(0.9 0.008 60); border-radius: 999px; font-size: 14px; font-weight: 500; color: oklch(0.22 0.02 330);">
+              <span>مینا رضایی</span>
+              <span style="width: 28px; height: 28px; border-radius: 999px; background: repeating-linear-gradient(135deg, oklch(0.963 0.012 340) 0 4px, oklch(0.945 0.026 340) 4px 8px);"></span>
+            </a>
+          </div>
+        </div>
+      </header>
+
+      <div style="max-width: 1280px; margin: 0 auto; padding: 32px 48px 56px;">
+        <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 28px;">
+          <div>
+            <h1 style="margin: 0 0 4px; font-family: 'Anjoman', sans-serif; font-size: 36px; font-weight: 800; line-height: 1.45;">سلام مینا</h1>
+            <p style="margin: 0; font-size: 16px; color: oklch(0.46 0.02 330);">یک نوبت پیش‌رو دارید و ۳۵۰ امتیاز تا سطح طلایی.</p>
+          </div>
+          <a href="#" style="display: inline-flex; align-items: center; min-height: 46px; padding: 0 22px; border-radius: 11px; background: oklch(0.42 0.13 340); color: oklch(1 0 0); font-size: 15px; font-weight: 600;" style-hover="background: oklch(0.34 0.12 340); color: oklch(1 0 0);">رزرو نوبت تازه</a>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 344px; gap: 24px; align-items: start;">
+
+          <div style="display: flex; flex-direction: column; gap: 28px; min-width: 0;">
+
+            <section>
+              <h2 style="margin: 0 0 12px; font-family: 'Anjoman', sans-serif; font-size: 22px; font-weight: 800; line-height: 1.45;">نوبت پیش‌رو</h2>
+              <div style="background: oklch(1 0 0); border: 1px solid oklch(0.82 0.014 60); border-radius: 18px; overflow: hidden; box-shadow: 0 4px 16px oklch(0.3 0.04 340 / 0.06);">
+                <div style="background: oklch(0.945 0.026 340); padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+                  <span style="font-size: 15px; font-weight: 700; color: oklch(0.36 0.11 340);">فردا · چهارشنبه ۶ شهریور، ۱۲:۰۰</span>
+                  <span style="font-size: 13px; font-weight: 700; padding: 3px 11px; border-radius: 999px; background: oklch(1 0 0); color: oklch(0.36 0.11 340);">تأیید شده</span>
+                </div>
+                <div style="padding: 20px; display: flex; gap: 18px; align-items: flex-start;">
+                  <span style="width: 66px; height: 66px; border-radius: 14px; background: repeating-linear-gradient(135deg, oklch(0.963 0.012 340) 0 6px, oklch(0.945 0.026 340) 6px 12px); flex-shrink: 0;"></span>
+                  <div style="flex: 1; min-width: 0;">
+                    <div style="font-family: 'Anjoman', sans-serif; font-size: 23px; font-weight: 700; line-height: 1.45;">میکاپ عروس</div>
+                    <div style="font-size: 15px; color: oklch(0.46 0.02 330);">آتلیه سارا محمدی · یزد</div>
+                    <div style="font-size: 15px; color: oklch(0.58 0.015 330); font-variant-numeric: tabular-nums;">۱۲:۰۰ تا ۱۵:۰۰ · ۱۸۰ دقیقه</div>
+                  </div>
+                  <div style="text-align: end; flex-shrink: 0;">
+                    <div style="font-size: 13px; color: oklch(0.58 0.015 330);">پرداخت‌شده</div>
+                    <div style="font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums;">۸۰۷٬۵۰۰</div>
+                  </div>
+                </div>
+                <div style="padding: 0 20px 20px; display: flex; gap: 8px; flex-wrap: wrap;">
+                  <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 18px; border-radius: 10px; border: 1px solid oklch(0.9 0.008 60); background: oklch(1 0 0); color: oklch(0.22 0.02 330); font-size: 15px; font-weight: 600;">جزئیات و رسید</a>
+                  <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 18px; border-radius: 10px; border: 1px solid oklch(0.9 0.008 60); background: oklch(1 0 0); color: oklch(0.22 0.02 330); font-size: 15px; font-weight: 600;">درخواست تغییر زمان</a>
+                  <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 18px; border-radius: 10px; border: 1px solid oklch(0.9 0.03 25); background: oklch(1 0 0); color: oklch(0.5 0.16 25); font-size: 15px; font-weight: 600; margin-inline-start: auto;">لغو رزرو</a>
+                </div>
+              </div>
+            </section>
+
+            <section>
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 12px;">
+                <h2 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 22px; font-weight: 800; line-height: 1.45;">نوبت‌های گذشته</h2>
+                <a href="#" style="font-size: 15px; font-weight: 600;">همه (۱۲)</a>
+              </div>
+              <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; overflow: hidden;">
+                <div style="padding: 16px 20px; display: flex; align-items: center; gap: 16px; border-bottom: 1px solid oklch(0.94 0.006 60);">
+                  <span style="width: 46px; height: 46px; border-radius: 11px; background: repeating-linear-gradient(135deg, oklch(0.963 0.012 340) 0 5px, oklch(0.945 0.026 340) 5px 10px); flex-shrink: 0;"></span>
+                  <div style="flex: 1; min-width: 0;">
+                    <div style="font-size: 16px; font-weight: 600;">میکاپ عروس · آتلیه سارا محمدی</div>
+                    <div style="font-size: 14px; color: oklch(0.58 0.015 330);">شنبه ۲ شهریور ۱۴۰۴، ۱۰:۰۰</div>
+                  </div>
+                  <span style="font-size: 13px; font-weight: 700; padding: 3px 11px; border-radius: 999px; background: oklch(0.945 0.036 155); color: oklch(0.4 0.1 155); flex-shrink: 0;">انجام شده</span>
+                  <span style="font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; min-width: 96px; text-align: end;">۸۵۰٬۰۰۰</span>
+                  <a href="#" style="font-size: 15px; font-weight: 600; flex-shrink: 0;">رزرو دوباره</a>
+                </div>
+                <div style="padding: 16px 20px; display: flex; align-items: center; gap: 16px;">
+                  <span style="width: 46px; height: 46px; border-radius: 11px; background: repeating-linear-gradient(135deg, oklch(0.955 0.028 70) 0 5px, oklch(0.94 0.04 70) 5px 10px); flex-shrink: 0;"></span>
+                  <div style="flex: 1; min-width: 0;">
+                    <div style="font-size: 16px; font-weight: 600;">اصلاح ابرو · استودیو مهسا</div>
+                    <div style="font-size: 14px; color: oklch(0.58 0.015 330);">یکشنبه ۲۷ مرداد ۱۴۰۴، ۱۸:۳۰</div>
+                  </div>
+                  <span style="font-size: 13px; font-weight: 700; padding: 3px 11px; border-radius: 999px; background: oklch(0.955 0.01 60); color: oklch(0.58 0.015 330); flex-shrink: 0;">منقضی شده</span>
+                  <span style="font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; min-width: 96px; text-align: end; color: oklch(0.68 0.012 330);">۱۲۰٬۰۰۰</span>
+                  <a href="#" style="font-size: 15px; font-weight: 600; flex-shrink: 0;">رزرو دوباره</a>
+                </div>
+              </div>
+            </section>
+
+            <section>
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 12px;">
+                <h2 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 22px; font-weight: 800; line-height: 1.45;">مسیر زیبایی من</h2>
+                <a href="#" style="font-size: 15px; font-weight: 600;">ویرایش</a>
+              </div>
+              <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; padding: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+                <div>
+                  <div style="font-size: 15px; font-weight: 700; margin-bottom: 10px;">اهداف فعال</div>
+                  <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <label style="display: flex; align-items: center; gap: 10px; font-size: 15px; min-height: 38px; cursor: pointer;">
+                      <input type="checkbox" style="width: 18px; height: 18px; accent-color: oklch(0.42 0.13 340);" />
+                      <span>آماده شدن برای عروسی خواهرم</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 10px; font-size: 15px; min-height: 38px; cursor: pointer; color: oklch(0.68 0.012 330);">
+                      <input type="checkbox" checked="checked" style="width: 18px; height: 18px; accent-color: oklch(0.42 0.13 340);" />
+                      <span style="text-decoration: line-through;">مراقبت ماهانه پوست</span>
+                    </label>
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size: 15px; font-weight: 700; margin-bottom: 10px;">ترجیح‌های من</div>
+                  <dl style="margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 15px;">
+                    <dt style="color: oklch(0.58 0.015 330);">حداکثر بودجه</dt>
+                    <dd style="margin: 0; font-variant-numeric: tabular-nums;">۲٬۰۰۰٬۰۰۰ تومان</dd>
+                    <dt style="color: oklch(0.58 0.015 330);">یادداشت</dt>
+                    <dd style="margin: 0; color: oklch(0.46 0.02 330);">پوست حساس. رنگ مو روشن‌تر از قبل نباشد.</dd>
+                  </dl>
+                  <p style="margin: 10px 0 0; font-size: 13px; color: oklch(0.58 0.015 330);">این یادداشت‌ها خصوصی است و به دستیار هوشمند ارسال نمی‌شود.</p>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <aside style="display: flex; flex-direction: column; gap: 20px;">
+
+            <div style="background: oklch(0.22 0.02 330); border-radius: 18px; padding: 22px; color: oklch(1 0 0);">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px;">
+                <span style="font-size: 15px; font-weight: 600; color: oklch(0.86 0.012 330);">باشگاه مشتریان</span>
+                <span style="font-size: 13px; font-weight: 700; padding: 3px 11px; border-radius: 999px; background: oklch(0.62 0.095 65); color: oklch(0.18 0.03 65);">نقره‌ای</span>
+              </div>
+              <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px;">
+                <span style="font-size: 40px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.2;">۴۲۰</span>
+                <span style="font-size: 15px; color: oklch(0.8 0.012 330);">امتیاز قابل استفاده</span>
+              </div>
+              <div style="font-size: 14px; color: oklch(0.72 0.015 330); margin-bottom: 18px;">مجموع کسب‌شده: ۱٬۱۵۰</div>
+
+              <div style="margin-bottom: 8px; display: flex; justify-content: space-between; gap: 12px; font-size: 14px; color: oklch(0.86 0.012 330);">
+                <span>۳۵۰ امتیاز تا طلایی</span>
+                <span style="font-variant-numeric: tabular-nums;">۶۸٪</span>
+              </div>
+              <div role="progressbar" aria-valuenow="68" style="height: 8px; border-radius: 999px; background: oklch(0.34 0.02 330); overflow: hidden; margin-bottom: 18px;">
+                <div style="width: 68%; height: 100%; border-radius: 999px; background: oklch(0.62 0.095 65);"></div>
+              </div>
+
+              <div style="border-top: 1px solid oklch(0.34 0.02 330); padding-top: 16px; display: flex; flex-direction: column;">
+                <div style="font-size: 14px; font-weight: 600; color: oklch(0.86 0.012 330); margin-bottom: 8px;">مزایای فعال شما</div>
+                <div style="display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: oklch(0.8 0.012 330);">
+                  <div style="display: flex; gap: 9px; align-items: center;"><span aria-hidden="true" style="width: 5px; height: 5px; border-radius: 999px; background: oklch(0.62 0.095 65);"></span>۵٪ تخفیف روی همه خدمات</div>
+                  <div style="display: flex; gap: 9px; align-items: center;"><span aria-hidden="true" style="width: 5px; height: 5px; border-radius: 999px; background: oklch(0.62 0.095 65);"></span>ضریب ۱٫۲ برابری امتیاز</div>
+                </div>
+              </div>
+            </div>
+
+            <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; padding: 20px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px;">
+                <h2 style="margin: 0; font-size: 17px; font-weight: 700;">اعلان‌ها</h2>
+                <span style="font-size: 12px; font-weight: 700; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: oklch(0.42 0.13 340); color: oklch(1 0 0); display: inline-flex; align-items: center; justify-content: center;">۳</span>
+              </div>
+              <div style="display: flex; flex-direction: column;">
+                <a href="#" style="display: flex; gap: 11px; align-items: flex-start; padding: 12px 0; border-bottom: 1px solid oklch(0.94 0.006 60); color: oklch(0.22 0.02 330);">
+                  <span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 999px; background: oklch(0.42 0.13 340); flex-shrink: 0; margin-top: 8px;"></span>
+                  <span>
+                    <span style="display: block; font-size: 15px; font-weight: 600; line-height: 1.6;">نوبت شما فردا ساعت ۱۲:۰۰ است</span>
+                    <span style="display: block; font-size: 13px; color: oklch(0.58 0.015 330);">۲ ساعت پیش</span>
+                  </span>
+                </a>
+                <a href="#" style="display: flex; gap: 11px; align-items: flex-start; padding: 12px 0; border-bottom: 1px solid oklch(0.94 0.006 60); color: oklch(0.22 0.02 330);">
+                  <span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 999px; background: oklch(0.42 0.13 340); flex-shrink: 0; margin-top: 8px;"></span>
+                  <span>
+                    <span style="display: block; font-size: 15px; font-weight: 600; line-height: 1.6;">۱۰۲ امتیاز به حساب شما اضافه شد</span>
+                    <span style="display: block; font-size: 13px; color: oklch(0.58 0.015 330);">دیروز</span>
+                  </span>
+                </a>
+                <a href="#" style="display: flex; gap: 11px; align-items: flex-start; padding: 12px 0; color: oklch(0.22 0.02 330);">
+                  <span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 999px; background: oklch(0.42 0.13 340); flex-shrink: 0; margin-top: 8px;"></span>
+                  <span>
+                    <span style="display: block; font-size: 15px; font-weight: 600; line-height: 1.6;">پرداخت شما تأیید شد</span>
+                    <span style="display: block; font-size: 13px; color: oklch(0.58 0.015 330);">۳ روز پیش</span>
+                  </span>
+                </a>
+              </div>
+            </div>
+
+            <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; padding: 20px;">
+              <h2 style="margin: 0 0 12px; font-size: 17px; font-weight: 700;">حساب من</h2>
+              <dl style="margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 8px 14px; font-size: 15px;">
+                <dt style="color: oklch(0.58 0.015 330);">شماره موبایل</dt>
+                <dd style="margin: 0; font-variant-numeric: tabular-nums;">۰۹۱۳۱۲۳۴۵۶۷</dd>
+                <dt style="color: oklch(0.58 0.015 330);">عضویت</dt>
+                <dd style="margin: 0;">از تیر ۱۴۰۴</dd>
+              </dl>
+              <div style="margin-top: 14px; padding-top: 14px; border-top: 1px solid oklch(0.94 0.006 60); display: flex; flex-direction: column; gap: 2px;">
+                <a href="#" style="font-size: 15px; min-height: 40px; display: inline-flex; align-items: center;">لیست انتظار من</a>
+                <a href="#" style="font-size: 15px; min-height: 40px; display: inline-flex; align-items: center;">ثبت‌نام به‌عنوان متخصص</a>
+                <a href="#" style="font-size: 15px; min-height: 40px; display: inline-flex; align-items: center; color: oklch(0.5 0.16 25);">خروج از حساب</a>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </div>
+
+    <div style="max-width: 1280px; background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 20px 24px;">
+      <h3 style="margin: 0 0 10px; font-size: 16px; font-weight: 700; color: oklch(0.22 0.02 330);">پشتوانه داده</h3>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; font-size: 14px; color: oklch(0.46 0.02 330); line-height: 1.8;">
+        <div><strong style="color: oklch(0.4 0.1 155); font-weight: 700;">داده موجود:</strong> هر چهار صفحه امروز — <code>/dashboard</code>، <code>/bookings</code>، <code>/journey</code>، <code>/loyalty</code> — و اعلان‌ها در یک صفحه جمع شده‌اند. امتیاز، سطح، مزایا و درصد پیشرفت همه در پاسخِ باشگاه هستند.</div>
+        <div><strong style="color: oklch(0.44 0.09 245); font-weight: 700;">قابل استخراج:</strong> نامِ متخصص و نامِ خدمت روی کارتِ رزرو — امروز کارتِ رزرو فقط تاریخ و وضعیت دارد، ولی <code>providerId</code> و <code>serviceId</code> در همان رکورد هستند و یک اتصال در سرور کافی است. «عضویت از تیر ۱۴۰۴» از <code>createdAt</code>ِ کاربر.</div>
+        <div><strong style="color: oklch(0.46 0.09 75); font-weight: 700;">تغییر ناوبری:</strong> «مسیر من» و «باشگاه» از ناوبری اصلی حذف و به این صفحه منتقل می‌شوند؛ مسیرهای فعلی می‌مانند و از این صفحه پیوند می‌گیرند. این تنها تغییرِ مسیرِ پیشنهادی در بستر مشتری است.</div>
+        <div><strong style="color: oklch(0.47 0.17 25); font-weight: 700;">ساخته نشد:</strong> «درخواست تغییر زمان» از سمتِ مشتری امروز در API نیست — فقط متخصص می‌تواند زمان را جابه‌جا کند. دکمه در نما هست چون معماری صفحه باید جایش را داشته باشد، و در ماتریس شکاف به‌عنوان وابستگیِ سرور علامت خورده است.</div>
+      </div>
+    </div>
+  </section>
+
+  <section style="display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.42 0.13 340); color: #fff;">۱۵</span>
+      <h2 style="margin: 0; font-family: 'Peyda', sans-serif; font-size: 24px; font-weight: 800; color: oklch(0.22 0.02 330);">ورود — دسکتاپ و موبایل</h2>
+      <code style="color: oklch(0.58 0.015 330);">/auth — app/auth/page.tsx</code>
+    </div>
+
+    <div style="display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap;">
+      <div style="width: 460px; background: oklch(0.985 0.008 75); border: 1px solid oklch(0.82 0.014 60); border-radius: 6px; padding: 48px 40px; display: flex; flex-direction: column; align-items: center;">
+        <img src="uploads/icon-circle.svg" alt="BeauClick" width="30" height="30" style="display: block; border-radius: 999px; margin-bottom: 20px;" />
+        <h1 style="margin: 0 0 24px; font-family: 'Peyda', sans-serif; font-size: 22px; font-weight: 800;">ورود به بیوکلیک</h1>
+        <div style="width: 100%; display: flex; flex-direction: column; gap: 14px;">
+          <div>
+            <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 7px;">شماره موبایل</label>
+            <input style="width: 100%; box-sizing: border-box; min-height: 46px; padding: 0 14px; border: 1px solid oklch(0.82 0.014 60); border-radius: 10px; font: inherit; font-size: 15px; direction: ltr; text-align: right;" value="۰۹۱۳۱۲۳۴۵۶۷" />
+          </div>
+          <button type="button" style="font: inherit; min-height: 46px; border: none; border-radius: 10px; background: oklch(0.42 0.13 340); color: #fff; font-size: 15px; font-weight: 700; cursor: pointer;">ارسال کد یک‌بارمصرف</button>
+        </div>
+        <p style="margin: 20px 0 0; font-size: 13px; color: oklch(0.58 0.015 330); text-align: center;">با ورود، شرایط استفاده بیوکلیک را می‌پذیرید.</p>
+      </div>
+
+      <div style="width: 460px; background: oklch(0.985 0.008 75); border: 1px solid oklch(0.82 0.014 60); border-radius: 6px; padding: 48px 40px; display: flex; flex-direction: column; align-items: center;">
+        <img src="uploads/icon-circle.svg" alt="BeauClick" width="30" height="30" style="display: block; border-radius: 999px; margin-bottom: 20px;" />
+        <h1 style="margin: 0 0 6px; font-family: 'Peyda', sans-serif; font-size: 22px; font-weight: 800;">کد را وارد کنید</h1>
+        <p style="margin: 0 0 22px; font-size: 14px; color: oklch(0.58 0.015 330);">کد چهاررقمی به <span style="direction: ltr; unicode-bidi: isolate;">۰۹۱۳۱۲۳۴۵۶۷</span> پیامک شد.</p>
+        <div style="display: flex; gap: 10px; direction: ltr; margin-bottom: 18px;">
+          <div style="width: 48px; height: 52px; border: 2px solid oklch(0.42 0.13 340); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700;">۴</div>
+          <div style="width: 48px; height: 52px; border: 2px solid oklch(0.42 0.13 340); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700;">۷</div>
+          <div style="width: 48px; height: 52px; border: 1px solid oklch(0.82 0.014 60); border-radius: 10px;"></div>
+          <div style="width: 48px; height: 52px; border: 1px solid oklch(0.82 0.014 60); border-radius: 10px;"></div>
+        </div>
+        <button type="button" style="width: 100%; font: inherit; min-height: 46px; border: none; border-radius: 10px; background: oklch(0.42 0.13 340); color: #fff; font-size: 15px; font-weight: 700; cursor: pointer; margin-bottom: 14px;">تأیید و ورود</button>
+        <span style="font-size: 13px; color: oklch(0.68 0.012 330);">ارسال دوباره کد تا ۰۰:۴۵ دیگر</span>
+      </div>
+
+      <div style="width: 390px; background: #fff; border-radius: 40px; padding: 10px; box-shadow: 0 18px 48px oklch(0.25 0.04 340 / 0.22);">
+        <div style="border-radius: 32px; overflow: hidden; background: oklch(0.985 0.008 75); min-height: 640px; padding: 40px 24px; display: flex; flex-direction: column; align-items: center; box-sizing: border-box;">
+          <img src="uploads/icon-circle.svg" alt="BeauClick" width="26" height="26" style="display: block; border-radius: 999px; margin-bottom: 18px;" />
+          <h1 style="margin: 0 0 20px; font-family: 'Peyda', sans-serif; font-size: 19px; font-weight: 800;">ورود به بیوکلیک</h1>
+          <div style="width: 100%; display: flex; flex-direction: column; gap: 12px;">
+            <input style="width: 100%; box-sizing: border-box; min-height: 46px; padding: 0 14px; border: 1px solid oklch(0.82 0.014 60); border-radius: 10px; font: inherit; font-size: 14px; direction: ltr; text-align: right;" value="۰۹۱۳۱۲۳۴۵۶۷" />
+            <div role="alert" style="display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 9px; background: oklch(0.935 0.032 26); color: oklch(0.5 0.16 25); font-size: 13px;">
+              <span aria-hidden="true" style="width: 6px; height: 6px; border-radius: 999px; background: oklch(0.5 0.16 25); flex-shrink: 0;"></span>
+              شماره موبایل نامعتبر است.
+            </div>
+            <button type="button" style="font: inherit; min-height: 46px; border: none; border-radius: 10px; background: oklch(0.42 0.13 340); color: #fff; font-size: 14px; font-weight: 700; cursor: pointer;">ارسال کد یک‌بارمصرف</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="max-width: 1280px; background: oklch(1 0 0); border: 1px solid oklch(0.82 0.014 60); border-radius: 14px; padding: 20px 24px;">
+      <h3 style="margin: 0 0 10px; font-size: 16px; font-weight: 700; color: oklch(0.22 0.02 330);">پشتوانه داده</h3>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; font-size: 14px; color: oklch(0.46 0.02 330); line-height: 1.8;">
+        <div><strong style="color: oklch(0.4 0.1 155); font-weight: 700;">داده موجود:</strong> ورود فقط با شماره موبایل و کد یک‌بارمصرف — بدون رمز عبور در هیچ حالت. این مدل واقعی احراز هویت V3 است.</div>
+        <div><strong style="color: oklch(0.46 0.09 75); font-weight: 700;">تصمیم طراحی:</strong> پیام «کد ارسال شد» باید گونهٔ <code>info</code> بگیرد نه <code>success</code>/<code>error</code> — نبودِ این گونه امروز باعث رنگ نامناسب می‌شود.</div>
+        <div><strong style="color: oklch(0.47 0.17 25); font-weight: 700;">شکاف:</strong> شمارش معکوس ارسال دوباره — کول‌داون در سرور اجرا می‌شود اما زمان دقیق در پاسخ نیست؛ نمایش «۰۰:۴۵» در این نما تخمینی است، نه فیلد واقعی.</div>
+      </div>
+    </div>
+  </section>
+
+  <section style="display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.42 0.13 340); color: #fff;">۱۶</span>
+      <h2 style="margin: 0; font-family: 'Peyda', sans-serif; font-size: 24px; font-weight: 800; color: oklch(0.22 0.02 330);">نتیجه پرداخت — سه حالت</h2>
+      <code style="color: oklch(0.58 0.015 330);">/checkout/result — app/checkout/result/page.tsx</code>
+    </div>
+
+    <div style="display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap;">
+      <div style="width: 390px; background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; overflow: hidden;">
+        <div style="background: oklch(0.945 0.036 155); padding: 20px; text-align: center;">
+          <div style="width: 44px; height: 44px; border-radius: 999px; background: oklch(0.4 0.1 155); margin: 0 auto 10px; display: flex; align-items: center; justify-content: center;"><span aria-hidden="true" style="width: 18px; height: 10px; border-left: 3px solid #fff; border-bottom: 3px solid #fff; transform: rotate(-45deg); margin-top: -4px;"></span></div>
+          <div style="font-size: 16px; font-weight: 800; color: oklch(0.4 0.1 155);">پرداخت موفق</div>
+        </div>
+        <div style="padding: 16px 18px; font-size: 14px;">
+          <dl style="margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 8px 14px;">
+            <dt style="color: oklch(0.58 0.015 330);">شناسه سفارش</dt><dd style="margin: 0; direction: ltr; text-align: end; font-family: ui-monospace, monospace;">4c8e1baf</dd>
+            <dt style="color: oklch(0.58 0.015 330);">مبلغ پرداخت‌شده</dt><dd style="margin: 0; font-variant-numeric: tabular-nums;">۸۰۷٬۵۰۰ تومان</dd>
+          </dl>
+        </div>
+      </div>
+
+      <div style="width: 390px; background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; overflow: hidden;">
+        <div style="background: oklch(0.935 0.032 26); padding: 20px; text-align: center;">
+          <div style="width: 44px; height: 44px; border-radius: 999px; background: oklch(0.535 0.19 25); margin: 0 auto 10px;"></div>
+          <div style="font-size: 16px; font-weight: 800; color: oklch(0.535 0.19 25);">پرداخت ناموفق</div>
+          <p style="margin: 6px 0 0; font-size: 13px; color: oklch(0.5 0.16 25);">مبلغی از حساب شما کسر نشد.</p>
+        </div>
+        <div style="padding: 16px 18px;">
+          <button type="button" style="width: 100%; font: inherit; min-height: 46px; border: none; border-radius: 10px; background: oklch(0.42 0.13 340); color: #fff; font-size: 15px; font-weight: 700; cursor: pointer;">تلاش دوباره</button>
+        </div>
+      </div>
+
+      <div style="width: 390px; background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; overflow: hidden;">
+        <div style="background: oklch(0.968 0.018 245); padding: 20px; text-align: center;">
+          <div style="width: 44px; height: 44px; border-radius: 999px; background: oklch(0.52 0.11 245); margin: 0 auto 10px;"></div>
+          <div style="font-size: 16px; font-weight: 800; color: oklch(0.52 0.11 245);">این سفارش قبلاً پرداخت شده</div>
+          <p style="margin: 6px 0 0; font-size: 13px; color: oklch(0.44 0.09 245);">پرداخت تکراری تشخیص داده و برگشت زده شد.</p>
+        </div>
+        <div style="padding: 16px 18px; font-size: 14px;">
+          <dl style="margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 8px 14px;">
+            <dt style="color: oklch(0.58 0.015 330);">مبلغ برگشتی</dt><dd style="margin: 0; font-variant-numeric: tabular-nums;">۸۰۷٬۵۰۰ تومان</dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+
+    <div style="max-width: 1280px; background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 20px 24px;">
+      <h3 style="margin: 0 0 10px; font-size: 16px; font-weight: 700; color: oklch(0.22 0.02 330);">پشتوانه داده</h3>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; font-size: 14px; color: oklch(0.46 0.02 330); line-height: 1.8;">
+        <div><strong style="color: oklch(0.4 0.1 155); font-weight: 700;">داده موجود:</strong> پنج حالت نتیجه (succeeded، replayed، failed، refunded، duplicate_refunded) از <code>getOrder</code>؛ ارقام همیشه از سرور تازه خوانده می‌شود، جعل با ادیت آدرس ممکن نیست.</div>
+        <div><strong style="color: oklch(0.44 0.09 245); font-weight: 700;">قابل استخراج:</strong> دکمه «تلاش دوباره» — endpoint آن (<code>initiate</code>) موجود است، فقط اتصال کلاینت لازم دارد.</div>
+        <div><strong style="color: oklch(0.46 0.09 75); font-weight: 700;">شکاف:</strong> تمایز متن مشتری-لغو-کرده در برابر بانک-رد-کرده — هر دو امروز یک متن یکسان دارند («مبلغی کسر نشد») چون <code>failureCode</code> در پاسخ نیست.</div>
+      </div>
+    </div>
+  </section>
+
+  <section style="display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.42 0.13 340); color: #fff;">۰۸</span>
+      <h2 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 24px; font-weight: 800; color: oklch(0.22 0.02 330);">دیدگاه و امتیاز — فاز D</h2>
+      <span style="font-size: 13px; color: oklch(0.58 0.015 330);">افزودن به پروفایل متخصص (۰۵)، نتایج جست‌وجو (۰۳) و رزروهای من (۰۷)</span>
+    </div>
+
+    <div style="max-width: 1280px; display: flex; flex-direction: column; gap: 28px;">
+
+      <div>
+        <h3 style="margin: 0 0 10px; font-size: 16px; font-weight: 700;">پروفایل متخصص — خلاصهٔ امتیاز و فهرست دیدگاه</h3>
+        <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; padding: 24px; max-width: 720px;">
+          <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
+            <span aria-hidden="true" style="font-size: 20px; color: oklch(0.62 0.13 75);">★★★★☆</span>
+            <span style="font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums;">۴٫۶</span>
+            <span style="font-size: 14px; color: oklch(0.58 0.015 330);">از ۲۳ دیدگاه</span>
+          </div>
+          <p style="margin: 0 0 18px; font-size: 13px; color: oklch(0.58 0.015 330);">حالت بدون‌نظر (متخصص تازه‌وارد): <span style="color: oklch(0.4 0.02 330); font-weight: 600;">«هنوز نظری ثبت نشده»</span> — بدون ستاره، بدون عدد صفر.</p>
+
+          <div style="border-top: 1px solid oklch(0.94 0.006 60); padding-top: 16px; display: flex; flex-direction: column; gap: 16px;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+                <span style="font-size: 14px; font-weight: 700;">کاربر BeauClick</span>
+                <span aria-hidden="true" style="font-size: 13px; color: oklch(0.62 0.13 75);">★★★★★</span>
+                <span style="font-size: 12px; color: oklch(0.58 0.015 330);">۳ هفته پیش · خدمت: میکاپ عروس</span>
+              </div>
+              <p style="margin: 0; font-size: 14px; line-height: 1.8; color: oklch(0.3 0.02 330);">دقیق و حرفه‌ای، سر وقت شروع کرد و نتیجه دقیقاً همون چیزی بود که می‌خواستم.</p>
+              <div style="margin: 10px 0 0; margin-inline-start: 20px; padding: 10px 14px; border-inline-start: 3px solid oklch(0.42 0.13 340); background: oklch(0.978 0.008 340); border-radius: 0 10px 10px 0; font-size: 13px; line-height: 1.75;">
+                <strong style="font-weight: 700;">پاسخ متخصص:</strong> ممنون از اعتمادتون 🙏 منتظر دیدارِ بعدی هستم.
+              </div>
+            </div>
+            <div>
+              <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+                <span style="font-size: 14px; font-weight: 700;">کاربر BeauClick</span>
+                <span aria-hidden="true" style="font-size: 13px; color: oklch(0.62 0.13 75);">★★★☆☆</span>
+                <span style="font-size: 12px; color: oklch(0.58 0.015 330);">۲ ماه پیش · خدمت: شینیون</span>
+              </div>
+              <p style="margin: 0; font-size: 14px; line-height: 1.8; color: oklch(0.3 0.02 330);">کار خوب بود ولی حدود ۲۰ دقیقه دیرتر شروع شد.</p>
+            </div>
+          </div>
+        </div>
+        <p style="margin: 10px 0 0; max-width: 720px; font-size: 13px; line-height: 1.8; color: oklch(0.58 0.015 330);">بدون نام یا آواتار نویسنده — پاسخ API عمداً هویتِ نویسنده را ندارد؛ برچسبِ خنثیِ «کاربر BeauClick» جایگزینِ نام واقعی است، تاریخِ نسبی + خدمتِ رزروشده به‌جای هویت.</p>
+      </div>
+
+      <div>
+        <h3 style="margin: 0 0 10px; font-size: 16px; font-weight: 700;">نتایج جست‌وجو — نشان امتیاز روی کارت + فیلتر/مرتب‌سازی</h3>
+        <div style="display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start;">
+          <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 16px; width: 280px;">
+            <div style="font-size: 15px; font-weight: 700; margin-bottom: 6px;">آتلیه سارا محمدی</div>
+            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 8px;">
+              <span aria-hidden="true" style="font-size: 13px; color: oklch(0.62 0.13 75);">★★★★☆</span>
+              <span style="font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums;">۴٫۶</span>
+              <span style="font-size: 12px; color: oklch(0.58 0.015 330);">(۲۳)</span>
+            </div>
+            <div style="font-size: 13px; color: oklch(0.58 0.015 330);">میکاپ عروس · از ۱۲۰٬۰۰۰ تومان</div>
+          </div>
+          <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 16px; width: 280px;">
+            <div style="font-size: 15px; font-weight: 700; margin-bottom: 6px;">سالن بهار</div>
+            <div style="font-size: 13px; color: oklch(0.58 0.015 330); margin-bottom: 8px;">هنوز نظری ثبت نشده</div>
+            <div style="font-size: 13px; color: oklch(0.58 0.015 330);">رنگ مو · از ۹۰٬۰۰۰ تومان</div>
+          </div>
+          <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 10px; min-width: 220px;">
+            <div style="font-size: 13px; font-weight: 700;">فیلترهای جدید</div>
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: oklch(0.46 0.02 330);"><input type="checkbox" />حداقل ۴ ستاره</label>
+            <div style="font-size: 13px; color: oklch(0.46 0.02 330);">مرتب‌سازی: <strong>بیشترین امتیاز</strong></div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h3 style="margin: 0 0 10px; font-size: 16px; font-weight: 700;">رزروهای من — ثبت نظر روی نوبتِ تکمیل‌شده</h3>
+        <div style="display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start;">
+          <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 16px 18px; width: 300px;">
+            <div style="font-size: 14px; font-weight: 700; margin-bottom: 4px;">میکاپ عروس</div>
+            <div style="font-size: 13px; color: oklch(0.58 0.015 330); margin-bottom: 12px;">۱۲ مرداد ۱۴۰۴ · انجام‌شده</div>
+            <button type="button" style="font: inherit; min-height: 40px; padding: 0 16px; border: 1px solid oklch(0.42 0.13 340); border-radius: 9px; background: oklch(1 0 0); color: oklch(0.42 0.13 340); font-size: 14px; font-weight: 600; cursor: pointer; width: 100%;">ثبت نظر</button>
+          </div>
+          <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 16px 18px; width: 300px;">
+            <div style="font-size: 14px; font-weight: 700; margin-bottom: 4px;">شینیون</div>
+            <div style="font-size: 13px; color: oklch(0.58 0.015 330); margin-bottom: 12px;">۲۸ تیر ۱۴۰۴ · انجام‌شده</div>
+            <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: oklch(0.4 0.1 155);">✓ نظر ثبت شد</span>
+          </div>
+
+          <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; padding: 20px; width: 360px; display: flex; flex-direction: column; gap: 14px;">
+            <div style="font-size: 14px; font-weight: 700;">گفت‌وگوی ثبت نظر</div>
+            <div>
+              <div style="font-size: 13px; color: oklch(0.58 0.015 330); margin-bottom: 6px;">امتیاز (اجباری)</div>
+              <span aria-hidden="true" style="font-size: 22px; color: oklch(0.62 0.13 75); letter-spacing: 4px;">☆☆☆☆☆</span>
+            </div>
+            <textarea placeholder="متن نظر (اختیاری، حداکثر ۲۰۰۰ نویسه)" style="font: inherit; font-size: 14px; border: 1px solid oklch(0.9 0.008 60); border-radius: 9px; padding: 10px 12px; min-height: 70px; resize: vertical;"></textarea>
+            <button type="button" disabled style="font: inherit; min-height: 44px; border: none; border-radius: 9px; background: oklch(0.86 0.01 60); color: oklch(0.6 0.01 60); font-size: 14px; font-weight: 700; cursor: not-allowed;">ثبت (تا انتخاب ستاره غیرفعال)</button>
+            <div style="font-size: 12px; line-height: 1.8; color: oklch(0.58 0.015 330);">فقط ستاره بدون متن یک ثبتِ کامل و معتبر است — نباید ناقص جلوه کند. پس از ثبت غیرقابلِ ویرایش است.</div>
+            <div style="padding: 10px 12px; border-radius: 8px; background: oklch(0.97 0.03 25); color: oklch(0.5 0.16 25); font-size: 13px;">خطا (۴۰۹): «این نوبت قابل نظردهی نیست» — یک پیامِ واحد برای تکمیل‌نشده/متعلق به دیگری/ازپیش‌ثبت‌شده.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="max-width: 1280px; background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 20px 24px;">
+      <h3 style="margin: 0 0 10px; font-size: 16px; font-weight: 700; color: oklch(0.22 0.02 330);">پشتوانه داده</h3>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; font-size: 14px; color: oklch(0.46 0.02 330); line-height: 1.8;">
+        <div><strong style="color: oklch(0.4 0.1 155); font-weight: 700;">داده موجود:</strong> rating.average/count روی هر متخصص، GET /reviews صفحه‌بندی‌شده، پاسخ متخصص، ثبت نظر با محدودیت یک‌بار — همه IMPLEMENTABLE (فاز D).</div>
+        <div><strong style="color: oklch(0.46 0.09 75); font-weight: 700;">تصمیم طراحی:</strong> برچسبِ «کاربر BeauClick» به‌جای نام؛ افشای نام یا آواتار نویسنده PRODUCT DECISION REQUIRED + تغییرِ قرارداد بک‌اند، چون API فعلاً هیچ هویتی نمی‌دهد.</div>
+        <div><strong style="color: oklch(0.47 0.17 25); font-weight: 700;">ساخته نشد:</strong> هیستوگرام توزیع ستاره‌ها (فقط average/count موجود است)؛ صندوق پاسخ‌های بدون‌پاسخِ متخصص (مسیر جدا در فضای‌کار متخصص نیاز دارد).</div>
+      </div>
+    </div>
+  </section>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 1400, &quot;height&quot;: 900}}"></script>
+</body>
+</html>
