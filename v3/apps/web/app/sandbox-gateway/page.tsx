@@ -55,7 +55,19 @@ function SandboxGatewayContent() {
       // HTTP status meant a refused decision was followed by a confident
       // redirect to the "payment done" leg. Double-clicking a button was
       // enough to reach it.
-      const body = (await response.json().catch(() => null)) as { accepted?: boolean; reason?: string } | null;
+      // `decide` is an ordinary JSON route, so its answer arrives inside the
+      // standard `{ data, meta, error }` envelope -- the two callback routes
+      // beside it carry `@SkipResponseEnvelope()` precisely because they are
+      // redirects and this one is not. `R31-20`: this used to read
+      // `body.accepted` off the ENVELOPE, where it is always `undefined`, so
+      // the guard below fired on every response including a successful one.
+      // A customer who paid saw "این تراکنش پیش‌تر نهایی شده است" and was
+      // never returned to the callback, leaving the order pending forever --
+      // the same browser-only shape as R31-17, a different root cause.
+      const envelope = (await response.json().catch(() => null)) as {
+        data?: { accepted?: boolean; reason?: string } | null;
+      } | null;
+      const body = envelope?.data ?? null;
       if (!body?.accepted) {
         throw new Error(
           body?.reason === 'sandbox_gateway_disabled'
