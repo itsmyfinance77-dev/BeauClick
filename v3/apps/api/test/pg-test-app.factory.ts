@@ -14,7 +14,6 @@ import { OTP_DEBUG_OBSERVER, OtpDebugObserver, capabilitiesForRoles } from '@bea
 import { OutboxRelay } from '@beauclick/events';
 import { FINANCIAL_DATA_SOURCE } from '@beauclick/financial';
 
-import { AppModule } from '../src/app.module';
 
 export const TEST_JWT_SECRET = 'pg-test-secret-do-not-use-in-real-environments';
 
@@ -170,6 +169,42 @@ export async function createPgTestApp(envOverrides: Record<string, string> = {})
   process.env.DATABASE_URL = env.database;
   process.env.FINANCIAL_DATABASE_URL = env.financial;
 
+  /**
+   * `AppModule` is imported HERE, after the environment is set, and NOT at the
+   * top of this file.
+   *
+   * `ConfigModule.forRoot({ validate })` runs the moment `app.module.ts` is
+   * evaluated -- that is when the `@Module` decorator's `imports` array is
+   * constructed, not when `Test.createTestingModule` runs. `validate` receives
+   * a snapshot of `process.env` and its return value becomes the module's
+   * internal config, which `ConfigService.get()` reads in preference to
+   * `process.env`.
+   *
+   * With a static import that snapshot was taken at FILE LOAD, before this
+   * function had assigned anything -- so `envOverrides` silently affected only
+   * the values read straight from `process.env` (throttler options) and never
+   * the ones read through `ConfigService` (every OTP, booking, loyalty, and
+   * privacy policy number).
+   *
+   * That was invisible until a suite overrode a `ConfigService` value whose
+   * `apps/api/.env` entry differed from the code default: under bare `jest` the
+   * override appeared to work, because the snapshot fell through to the same
+   * default it was asking for, and under `nx run api:test:pg` -- which loads
+   * `apps/api/.env` into `process.env` first -- it did not. Same code, two
+   * results, which is precisely the failure mode the comment above about
+   * `process.env` was written to prevent in the first place.
+   *
+   * ONE CAVEAT, because it is not obvious: jest caches the module per test
+   * FILE, so the snapshot belongs to the FIRST `createPgTestApp` call in a
+   * file. A suite that boots a second app with different overrides gets the
+   * first app's `ConfigService` values. That is fine for the one suite doing it
+   * today (`throttling.pg-spec.ts` overrides only `THROTTLE_*`, which
+   * `throttlerOptionsFromEnv` reads straight from `process.env` at boot), and
+   * it is written down here so the next suite that needs two configurations
+   * splits into two files instead of debugging it.
+   */
+  const { AppModule } = await import('../src/app.module');
+
   // AppModule already registers the global filter, interceptor, and the
   // three guards. Re-registering them here (an earlier version did) silently
   // DOUBLE-WRAPPED every response envelope -- data.data.redirectUrl instead
@@ -294,6 +329,11 @@ export const RESETTABLE_TABLES = [
   'provider.review_eligibility',
   'media.abuse_reports',
   'media.objects',
+  // V3.1 Phase E. Payloads first: `export_payloads.request_id` is a real FK to
+  // `data_requests`, the only cross-table FK in the privacy schema.
+  'privacy.outbox_events',
+  'privacy.export_payloads',
+  'privacy.data_requests',
 ];
 
 /**

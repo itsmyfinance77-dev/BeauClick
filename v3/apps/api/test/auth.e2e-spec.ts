@@ -24,7 +24,17 @@ describe('Authentication flow (e2e)', () => {
   it('completes the full request-otp -> verify-otp -> refresh -> logout lifecycle', async () => {
     const requestRes = await request(app.getHttpServer()).post('/api/v1/auth/request-otp').send({ phone: PHONE, purpose: 'login' });
     expect(requestRes.status).toBe(200);
-    expect(requestRes.body.data).toEqual({ requested: true });
+    // `requested: true` is still the anti-enumeration invariant this line was
+    // written for -- identical for a phone with an account and one without.
+    // V3.1 Phase E adds `cooldownRemaining` and `expiresInSeconds` (QA-19),
+    // both policy constants that are likewise identical for every caller, so
+    // the invariant is unchanged and the assertion is widened rather than
+    // relaxed: the shape is still checked exactly.
+    expect(requestRes.body.data).toEqual({
+      requested: true,
+      cooldownRemaining: expect.any(Number),
+      expiresInSeconds: expect.any(Number),
+    });
     expect(requestRes.body.error).toBeNull();
 
     const code = otpObserver.lastCodeFor('+98' + PHONE.slice(1));
