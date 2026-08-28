@@ -116,9 +116,86 @@ export const ProfessionalMediaChanged = defineEvent({
   }),
 });
 
+/**
+ * V3.1 Phase D. `V3_DOMAIN_BOUNDARIES.md` §provider named this contract in
+ * Phase 0 and search, loyalty, and analytics have referenced it ever since as
+ * the thing that would eventually arrive. This is it.
+ *
+ * WHAT IS DELIBERATELY ABSENT: the review's TEXT. `comment` is free-text,
+ * customer-authored, PII-adjacent content, and `V3_DOMAIN_BOUNDARIES.md` §ai
+ * names "raw review text" on the excluded-by-construction list. An event
+ * payload is the widest distribution channel in this architecture -- it
+ * reaches every consumer, is persisted in an outbox, and is replayable -- so
+ * putting the prose in it would make that exclusion unenforceable downstream
+ * no matter how carefully each individual consumer behaved.
+ *
+ * The `rating` IS carried, because it is the signal: search cannot maintain
+ * `rating_sum` without the number, and re-reading it would mean search
+ * depending on provider.
+ */
+export const ReviewCreated = defineEvent({
+  name: 'ReviewCreated',
+  version: 1,
+  aggregateType: 'review',
+  producer: 'provider',
+  description: 'A customer reviewed a completed booking. Carries the rating; never the review text.',
+  idempotency:
+    'A UNIQUE index on `booking_id` means the review exists at most once, so this is emitted at most once per booking. Search additionally guards its counter with `signal_applications` keyed by the outbox row id, because a counter increment is not naturally idempotent.',
+  schema: z.object({
+    reviewId: uuid(),
+    bookingId: uuid(),
+    professionalId: uuid(),
+    customerId: uuid(),
+    rating: z.number().int().min(1).max(5),
+    createdAt: instant(),
+  }),
+});
+
+/**
+ * V3.1 Phase D, and a DELIBERATE ADDITION beyond the event the roadmap named.
+ *
+ * The roadmap lists only `ReviewCreated` for this phase. Shipping only that
+ * would leave moderation decorative for ranking: a review hidden for abuse
+ * would keep its rating in `search.ranking_signals` forever, because the
+ * counter was incremented by an event that already happened and nothing would
+ * undo it. A provider would then be ranked on reviews no longer visible to the
+ * customers deciding whether to book them.
+ *
+ * That is precisely the QA-18 bug class -- a signal whose writer does not
+ * match reality -- which this phase exists to close, so closing half of it
+ * would be worse than not noticing. The deviation is recorded in
+ * `V3.1_PHASE_D_IMPLEMENTATION.md` rather than made silently.
+ *
+ * Carries `rating` so the consumer can compensate by exactly the amount that
+ * was applied, and `fromStatus`/`toStatus` so a consumer that cares about only
+ * one direction can filter without keeping state. The moderator's free-text
+ * `reason` is NOT carried -- operator-authored prose, the same exclusion
+ * `BookingCancelled` already applies to its own reason.
+ */
+export const ReviewModerated = defineEvent({
+  name: 'ReviewModerated',
+  version: 1,
+  aggregateType: 'review',
+  producer: 'provider',
+  description: "A moderator decided a review's visibility. Reverses or restores its ranking contribution.",
+  idempotency:
+    'Compare-and-swap on the review row, so a transition happens once. Search guards the compensating counter with `signal_applications` under a signal name distinct from the creation one, so a redelivery of either cannot double-apply.',
+  schema: z.object({
+    reviewId: uuid(),
+    professionalId: uuid(),
+    rating: z.number().int().min(1).max(5),
+    fromStatus: z.string(),
+    toStatus: z.string(),
+    actorId: uuid(),
+    moderatedAt: instant(),
+  }),
+});
+
 export const PROVIDER_EVENTS = [
   ProfessionalUpdated,
   ProfessionalVerificationChanged,
   ServiceOfferingUpdated,
   ProfessionalMediaChanged,
+  ReviewCreated,
+  ReviewModerated,
 ];

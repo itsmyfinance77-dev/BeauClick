@@ -10,6 +10,7 @@ import { ListProvidersDto } from './dto/list-providers.dto';
 import { CreateServiceOfferingDto, UpdateServiceOfferingDto } from './dto/create-service-offering.dto';
 import { AddPortfolioItemDto, SetProfileImageDto } from './dto/portfolio.dto';
 import { PortfolioService } from './portfolio.service';
+import { ReviewService } from './review.service';
 import { Public } from '@beauclick/auth';
 import { ProfessionalEntity } from './entities/professional.entity';
 import type { MediaDescriptor } from '@beauclick/media';
@@ -25,7 +26,11 @@ import type { MediaDescriptor } from '@beauclick/media';
  * eventually forgets. An always-present shape with explicit nulls is an
  * additive change no existing client notices.
  */
-function toPublicShape(p: ProfessionalEntity, images: ProfileImages = EMPTY_IMAGES) {
+function toPublicShape(
+  p: ProfessionalEntity,
+  images: ProfileImages = EMPTY_IMAGES,
+  rating: RatingSummary = EMPTY_RATING,
+) {
   return {
     id: p.id,
     displayName: p.displayName,
@@ -34,9 +39,29 @@ function toPublicShape(p: ProfessionalEntity, images: ProfileImages = EMPTY_IMAG
     specialties: p.specialties?.map((s) => ({ id: s.id, name: s.name })) ?? [],
     verificationStatus: p.verificationStatus,
     images,
+    rating,
     createdAt: p.createdAt,
   };
 }
+
+/**
+ * The rating aggregate, always present, `{ average: null, count: 0 }` when
+ * nobody has reviewed yet.
+ *
+ * Lives on the professional rather than in the reviews listing's `meta` for
+ * two reasons: a profile header needs it without fetching a page of reviews,
+ * and `meta` in this codebase means pagination and nothing else. Same
+ * always-present-with-explicit-nulls treatment `images` got in Phase C, and
+ * for the same reason — a consumer that has to distinguish "this response
+ * predates ratings" from "this professional has none" writes the same `?? 0`
+ * at every call site until one of them forgets.
+ */
+interface RatingSummary {
+  average: number | null;
+  count: number;
+}
+
+const EMPTY_RATING: RatingSummary = { average: null, count: 0 };
 
 interface ProfileImages {
   avatar: MediaDescriptor | null;
@@ -97,13 +122,19 @@ export class MyProviderController {
   constructor(
     private readonly providers: ProviderService,
     private readonly portfolio: PortfolioService,
+    private readonly reviews: ReviewService,
   ) {}
 
   @Get('provider')
   async myProvider(@CurrentUser() user: AuthenticatedUser) {
     const professional = await this.providers.findByOwnerId(user.userId);
     if (!professional) return null;
-    return toPublicShape(professional, await this.portfolio.imagesFor(professional));
+    const ratings = await this.reviews.ratingSummaryFor([professional.id]);
+    return toPublicShape(
+      professional,
+      await this.portfolio.imagesFor(professional),
+      ratings.get(professional.id) ?? EMPTY_RATING,
+    );
   }
 }
 
@@ -114,17 +145,23 @@ export class ProviderController {
     private readonly providers: ProviderService,
     private readonly services: ServiceOfferingService,
     private readonly portfolio: PortfolioService,
+    private readonly reviews: ReviewService,
   ) {}
 
   @Public()
   @Get()
   async list(@Query() query: ListProvidersDto): Promise<PaginatedResult<ReturnType<typeof toPublicShape>[]>> {
     const { items, total } = await this.providers.list(query);
-    // One batched describe for the whole page rather than one per row: a
-    // 20-item listing must not become 20 sequential lookups.
-    const images = await this.portfolio.imagesForMany(items);
+    // One batched lookup each for the whole page rather than one per row: a
+    // 20-item listing must not become 40 sequential queries.
+    const [images, ratings] = await Promise.all([
+      this.portfolio.imagesForMany(items),
+      this.reviews.ratingSummaryFor(items.map((p) => p.id)),
+    ]);
     return {
-      value: items.map((p) => toPublicShape(p, images.get(p.id) ?? EMPTY_IMAGES)),
+      value: items.map((p) =>
+        toPublicShape(p, images.get(p.id) ?? EMPTY_IMAGES, ratings.get(p.id) ?? EMPTY_RATING),
+      ),
       meta: { pagination: { page: query.page, limit: query.limit, total } },
     };
   }
@@ -137,7 +174,11 @@ export class ProviderController {
     // "exists but isn't yours" elsewhere -- consistent NOT_FOUND_OR_NOT_YOURS
     // shape even on a route with no ownership check at all.
     if (!provider) throw new NotFoundOrNotYoursException();
-    return toPublicShape(provider, await this.portfolio.imagesFor(provider));
+    const [images, ratings] = await Promise.all([
+      this.portfolio.imagesFor(provider),
+      this.reviews.ratingSummaryFor([provider.id]),
+    ]);
+    return toPublicShape(provider, images, ratings.get(provider.id) ?? EMPTY_RATING);
   }
 
   @Post()
@@ -151,7 +192,8 @@ export class ProviderController {
   @Patch(':id')
   async update(@Param('id') id: string, @Body() dto: UpdateProfessionalDto, @CurrentUser() user: AuthenticatedUser) {
     const updated = await this.providers.update(id, user.userId, dto);
-    return toPublicShape(updated, await this.portfolio.imagesFor(updated));
+    const ratings = await this.reviews.ratingSummaryFor([updated.id]);
+    return toPublicShape(updated, await this.portfolio.imagesFor(updated), ratings.get(updated.id) ?? EMPTY_RATING);
   }
 
   @Public()

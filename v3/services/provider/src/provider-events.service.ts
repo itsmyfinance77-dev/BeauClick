@@ -6,6 +6,8 @@ import {
   EventContractRegistry,
   ProfessionalMediaChanged,
   ProfessionalUpdated,
+  ReviewCreated,
+  ReviewModerated,
   ProfessionalVerificationChanged,
   ServiceOfferingUpdated,
   emitContractEvent,
@@ -217,6 +219,65 @@ export class ProviderEventsService {
         portfolioCount: snapshot.portfolioCount,
         portfolioPreviewUrls: snapshot.portfolioPreviewUrls,
         changedAt: new Date().toISOString(),
+      },
+    });
+  }
+
+  /**
+   * Emits `ReviewCreated`.
+   *
+   * NO REVISION BUMP, unlike every other emitter in this file, and the
+   * asymmetry is deliberate. `revision` orders writes to the search DOCUMENT
+   * -- the profile, the catalogue, the imagery -- where the newest snapshot
+   * wins and older ones are discarded. A rating is not a snapshot; it is an
+   * increment to a counter, and counters are made safe by
+   * `search.signal_applications` keyed on the event id, which is a different
+   * mechanism for a different problem. Bumping the revision here would emit no
+   * document change and would only make the next real profile edit look older
+   * than it is.
+   */
+  async emitReviewCreated(
+    manager: EntityManager,
+    review: { id: string; bookingId: string; professionalId: string; customerId: string; rating: number },
+  ): Promise<void> {
+    await emitContractEvent(this.contracts, manager, ProviderOutboxEntity, ReviewCreated, {
+      aggregateId: review.id,
+      payload: {
+        reviewId: review.id,
+        bookingId: review.bookingId,
+        professionalId: review.professionalId,
+        customerId: review.customerId,
+        rating: review.rating,
+        // The review TEXT is deliberately absent. See the contract's docblock.
+        createdAt: new Date().toISOString(),
+      },
+    });
+  }
+
+  /** Emits `ReviewModerated`, so the ranking contribution follows the visibility decision. */
+  async emitReviewModerated(
+    manager: EntityManager,
+    input: {
+      reviewId: string;
+      professionalId: string;
+      rating: number;
+      fromStatus: string;
+      toStatus: string;
+      actorId: string;
+    },
+  ): Promise<void> {
+    await emitContractEvent(this.contracts, manager, ProviderOutboxEntity, ReviewModerated, {
+      aggregateId: input.reviewId,
+      payload: {
+        reviewId: input.reviewId,
+        professionalId: input.professionalId,
+        rating: input.rating,
+        fromStatus: input.fromStatus,
+        toStatus: input.toStatus,
+        actorId: input.actorId,
+        // The moderator's free-text reason is NOT carried -- operator-authored
+        // prose, the same exclusion BookingCancelled applies to its own.
+        moderatedAt: new Date().toISOString(),
       },
     });
   }

@@ -13,3 +13,6 @@ export * from './verification/verification.service';
 export * from './entities/portfolio-item.entity';
 export * from './entities/verification-evidence.entity';
 export * from './portfolio.service';
+export * from './entities/review.entity';
+export * from './entities/review-eligibility.entity';
+export * from './review.service';
