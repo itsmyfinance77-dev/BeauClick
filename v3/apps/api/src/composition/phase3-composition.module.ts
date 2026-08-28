@@ -24,6 +24,12 @@ import {
   ServiceOfferingSearchHandler,
 } from '../events/search-projection.handlers';
 import {
+  BookingCompletedEligibilityHandler,
+  ReviewCreatedLoyaltyHandler,
+  ReviewCreatedSearchHandler,
+  ReviewModeratedSearchHandler,
+} from '../events/review.handlers';
+import {
   BookingCompletedLoyaltyHandler,
   OrderPaidLoyaltyHandler,
   buildTimelineHandlers,
@@ -78,6 +84,11 @@ import { PHASE3_EVENT_HANDLERS, PHASE3_OUTBOX_SOURCES } from './phase3-tokens';
     ProfileViewSignalHandler,
     BookingCompletedLoyaltyHandler,
     OrderPaidLoyaltyHandler,
+    // V3.1 Phase D
+    BookingCompletedEligibilityHandler,
+    ReviewCreatedSearchHandler,
+    ReviewModeratedSearchHandler,
+    ReviewCreatedLoyaltyHandler,
 
     {
       provide: PHASE3_EVENT_HANDLERS,
@@ -85,6 +96,10 @@ import { PHASE3_EVENT_HANDLERS, PHASE3_OUTBOX_SOURCES } from './phase3-tokens';
         ProfessionalUpdatedSearchHandler,
         ProfessionalMediaSearchHandler,
         ServiceOfferingSearchHandler,
+        BookingCompletedEligibilityHandler,
+        ReviewCreatedSearchHandler,
+        ReviewModeratedSearchHandler,
+        ReviewCreatedLoyaltyHandler,
         ProfileViewSignalHandler,
         BookingCompletedLoyaltyHandler,
         OrderPaidLoyaltyHandler,
@@ -99,6 +114,10 @@ import { PHASE3_EVENT_HANDLERS, PHASE3_OUTBOX_SOURCES } from './phase3-tokens';
         professionalUpdated: ProfessionalUpdatedSearchHandler,
         professionalMedia: ProfessionalMediaSearchHandler,
         serviceUpdated: ServiceOfferingSearchHandler,
+        reviewEligibility: BookingCompletedEligibilityHandler,
+        reviewCreatedSearch: ReviewCreatedSearchHandler,
+        reviewModeratedSearch: ReviewModeratedSearchHandler,
+        reviewCreatedLoyalty: ReviewCreatedLoyaltyHandler,
         profileView: ProfileViewSignalHandler,
         bookingLoyalty: BookingCompletedLoyaltyHandler,
         orderLoyalty: OrderPaidLoyaltyHandler,
@@ -112,6 +131,10 @@ import { PHASE3_EVENT_HANDLERS, PHASE3_OUTBOX_SOURCES } from './phase3-tokens';
         professionalUpdated,
         professionalMedia,
         serviceUpdated,
+        reviewEligibility,
+        reviewCreatedSearch,
+        reviewModeratedSearch,
+        reviewCreatedLoyalty,
         profileView,
         bookingLoyalty,
         orderLoyalty,
