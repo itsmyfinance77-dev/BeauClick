@@ -1,0 +1,17 @@
+# Build context hygiene. Everything here is either regenerated inside the
+# image, irrelevant to it, or must never enter it.
+**/node_modules
+**/dist
+**/.next
+**/.nx
+**/coverage
+**/*.tsbuildinfo
+**/.media-store
+# Secrets. `.env` is gitignored, so it is not in the repository -- but it IS on
+# a developer's disk, and `docker build .` from there would copy it into a
+# layer. A secret baked into an image layer survives every later deletion.
+**/.env
+**/.env.*
+!**/.env.example
+**/backups
+**/*.dump

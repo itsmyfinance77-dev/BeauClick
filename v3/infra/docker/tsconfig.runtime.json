@@ -1,0 +1,101 @@
+{
+  "//": [
+    "Runtime module resolution for the compiled API (V3.1 Phase F).",
+    "",
+    "tsconfig.base.json maps @beauclick/* to each package SOURCE (src/index.ts).",
+    "That is right for tests and for api:dev, and unusable at runtime: Node",
+    "cannot execute TypeScript. This is the same table with every target",
+    "rewritten to its compiled output under dist/.",
+    "",
+    "baseUrl is ../.. and NOT \".\": tsconfig-paths resolves baseUrl relative to",
+    "THIS FILE, so \".\" would look for /app/infra/docker/dist/... , miss, and",
+    "fall through to node_modules -- where each workspace package main points",
+    "back at src/index.ts and the process dies on the first import.",
+    "",
+    "Generated from tsconfig.base.json. Regenerate it when a path mapping is",
+    "added; infra/docker/Dockerfile.api asserts the API can start with it."
+  ],
+  "compilerOptions": {
+    "baseUrl": "../..",
+    "paths": {
+      "@beauclick/auth": [
+        "dist/libs/auth/src/index.js"
+      ],
+      "@beauclick/ownership": [
+        "dist/libs/ownership/src/index.js"
+      ],
+      "@beauclick/audit": [
+        "dist/libs/audit/src/index.js"
+      ],
+      "@beauclick/observability": [
+        "dist/libs/observability/src/index.js"
+      ],
+      "@beauclick/http": [
+        "dist/libs/http/src/index.js"
+      ],
+      "@beauclick/testing": [
+        "dist/libs/testing/src/index.js"
+      ],
+      "@beauclick/persian-utils": [
+        "dist/packages/persian-utils/src/index.js"
+      ],
+      "@beauclick/money": [
+        "dist/libs/money/src/index.js"
+      ],
+      "@beauclick/media": [
+        "dist/libs/media/src/index.js"
+      ],
+      "@beauclick/subject-data": [
+        "dist/libs/subject-data/src/index.js"
+      ],
+      "@beauclick/events": [
+        "dist/libs/events/src/index.js"
+      ],
+      "@beauclick/event-contracts": [
+        "dist/libs/event-contracts/src/index.js"
+      ],
+      "@beauclick/identity": [
+        "dist/services/identity/src/index.js"
+      ],
+      "@beauclick/provider": [
+        "dist/services/provider/src/index.js"
+      ],
+      "@beauclick/booking": [
+        "dist/services/booking/src/index.js"
+      ],
+      "@beauclick/commerce": [
+        "dist/services/commerce/src/index.js"
+      ],
+      "@beauclick/payment": [
+        "dist/services/payment/src/index.js"
+      ],
+      "@beauclick/financial": [
+        "dist/services/financial/src/index.js"
+      ],
+      "@beauclick/search": [
+        "dist/services/search/src/index.js"
+      ],
+      "@beauclick/loyalty": [
+        "dist/services/loyalty/src/index.js"
+      ],
+      "@beauclick/journey": [
+        "dist/services/journey/src/index.js"
+      ],
+      "@beauclick/notification": [
+        "dist/services/notification/src/index.js"
+      ],
+      "@beauclick/analytics": [
+        "dist/services/analytics/src/index.js"
+      ],
+      "@beauclick/business": [
+        "dist/services/business/src/index.js"
+      ],
+      "@beauclick/waitlist": [
+        "dist/services/waitlist/src/index.js"
+      ],
+      "@beauclick/privacy": [
+        "dist/services/privacy/src/index.js"
+      ]
+    }
+  }
+}

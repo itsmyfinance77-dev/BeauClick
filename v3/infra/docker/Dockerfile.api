@@ -1,0 +1,144 @@
+# syntax=docker/dockerfile:1
+#
+# The API container image (`V3_INFRASTRUCTURE_PLAN.md` §2).
+#
+# ## What this is and is not
+#
+# It is a runnable image, built and started against a real PostgreSQL during
+# V3.1 Phase F. It is NOT a hosting decision: nothing here names a provider, a
+# region, an orchestrator, or a registry. A container image is the artifact
+# every candidate platform in `§3`'s launch topology consumes, so building one
+# commits to none of them -- which is exactly why it can be built before the
+# `HOSTING` decision exists.
+#
+# ## Why the runtime needs `tsconfig-paths`
+#
+# `tsc` emits `dist/apps/api/src/main.js` with the `@beauclick/*` imports
+# intact, because they are TypeScript path mappings and not real packages. At
+# runtime Node resolves those specifiers through `node_modules`, where each
+# workspace package's `main` points at its own `src/index.ts` -- TypeScript
+# source, which Node cannot execute.
+#
+# So the mapping has to exist at runtime too. `infra/docker/tsconfig.runtime.json`
+# is `tsconfig.base.json`'s `paths` with every target rewritten from
+# `libs/x/src/index.ts` to `dist/libs/x/src/index.js`, and
+# `-r tsconfig-paths/register` applies it. The same mechanism `api:dev` already
+# uses; the only difference is which files it points at.
+#
+# The alternative -- rewriting each workspace package's `main` to its dist
+# output -- would break every test and every dev run, which resolve from source
+# deliberately.
+#
+# ## Why the whole workspace is carried into the runner
+#
+# pnpm's node_modules is a tree of symlinks into `node_modules/.pnpm`, so the
+# runtime dependency graph is not relocatable file-by-file: copying
+# `apps/api/node_modules` alone yields dangling links. Pruning it properly is
+# an optimisation with a real correctness risk, and an image that is smaller
+# and does not start is worse than one that is larger and does. `--prod` has
+# already removed the development dependencies, which is where most of the
+# weight was.
+
+# ---------------------------------------------------------------------------
+# Build
+# ---------------------------------------------------------------------------
+FROM node:22-alpine AS build
+WORKDIR /app
+
+# Pinned to `packageManager` in package.json. A mismatched pnpm computes a
+# different overrides-hash and rejects a lockfile the same workspace installs
+# cleanly with elsewhere -- the exact failure Phase 4's CI hit.
+ENV PNPM_VERSION=11.22.0
+RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
+
+# Manifests first, so a source-only change reuses the install layer.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml nx.json tsconfig.base.json ./
+COPY apps/api/package.json apps/api/
+COPY apps/web/package.json apps/web/
+COPY libs libs
+COPY services services
+COPY packages packages
+
+# `--frozen-lockfile`, so a lockfile that disagrees with package.json fails the
+# BUILD rather than being silently resolved differently here than in CI.
+RUN pnpm install --frozen-lockfile
+
+COPY apps/api apps/api
+COPY database database
+COPY infra infra
+
+# Only the API's own project. `pnpm build` would also build apps/web, which
+# ships as its own image.
+RUN npx tsc -p apps/api/tsconfig.json
+
+# ---------------------------------------------------------------------------
+# Runtime
+# ---------------------------------------------------------------------------
+FROM node:22-alpine AS runtime
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV PORT=3000
+# Read by `tsconfig-paths/register`. Baked in so the image starts correctly
+# with no platform-specific environment beyond the secrets.
+ENV TS_NODE_PROJECT=/app/infra/docker/tsconfig.runtime.json
+
+RUN corepack enable && corepack prepare pnpm@11.22.0 --activate
+
+COPY --from=build /app /app
+
+# Development dependencies are removed AFTER the build, so the compiler and the
+# test tooling never reach the runtime image.
+#
+# `CI=true` is required, not cosmetic: pnpm refuses to purge an existing
+# modules directory without a TTY and aborts with
+# `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY`. The first version of this line
+# ended in `|| true`, which turned that abort into a successful build carrying
+# the entire development dependency tree -- the compiler, the test runner, and
+# every type package -- into the runtime image, silently.
+#
+# No `|| true`. A prune that fails must fail the build.
+RUN CI=true pnpm install --frozen-lockfile --prod --ignore-scripts
+
+# Mirror each package's module-resolution root into the compiled tree.
+#
+# `tsc` emits to `dist/` with `rootDir` pinned at the workspace root, so
+# `services/payment/src/x.ts` becomes `dist/services/payment/src/x.js`. Node
+# resolves a bare specifier by walking UP from the requiring file looking for
+# `node_modules` -- and from inside `dist/` the first one it finds is the
+# workspace ROOT's, which under pnpm's strict layout holds only the root
+# package's own dependencies. Not `reflect-metadata`, not `typeorm`, not
+# `uuidv7`: those belong to `apps/api`, `services/payment`, and the rest, and
+# live under each package's own directory.
+#
+# So each package's `node_modules` is symlinked to the matching position in
+# `dist/`, which makes resolution from the compiled tree identical to
+# resolution from the source tree. A single link to `apps/api/node_modules`
+# would NOT do: `services/payment` depends on `uuidv7` and `apps/api` does not,
+# so the payment module would fail to load in production and nowhere else.
+#
+# Symlinks rather than copies, so this adds no bytes and cannot drift.
+RUN set -eu;     for pkg in apps/api libs/* services/* packages/*; do       if [ -d "/app/$pkg/node_modules" ]; then         mkdir -p "/app/dist/$pkg";         ln -sfn "/app/$pkg/node_modules" "/app/dist/$pkg/node_modules";       fi;     done;     test -e /app/dist/apps/api/node_modules/reflect-metadata
+
+# Not root. A process that cannot write its own image cannot be made to
+# persist anything by an exploit that reaches the filesystem.
+USER node
+
+EXPOSE 3000
+
+# No HEALTHCHECK instruction, deliberately: `/api/health` is the liveness
+# probe and `/api/health/ready` the readiness one, and which of them an
+# orchestrator calls, how often, and what it does about a failure is that
+# orchestrator's decision. Baking one interval into the image would silently
+# override whatever the platform is configured with.
+
+# `tsconfig-paths` is addressed by its resolved path rather than by name.
+#
+# pnpm's node_modules is not flat: `tsconfig-paths` is a dependency of
+# `apps/api`, so it lives under `apps/api/node_modules` and NOT at the
+# workspace root -- and `node -r <name>` resolves from the working directory,
+# which has to be `/app` for the relative `dist/...` paths in the runtime
+# mapping to work. Naming it resolved satisfies both. The first version of this
+# line used the bare name and the container exited immediately with
+# `Cannot find module 'tsconfig-paths/register'`.
+CMD ["node", "-r", "/app/apps/api/node_modules/tsconfig-paths/register.js", "dist/apps/api/src/main.js"]

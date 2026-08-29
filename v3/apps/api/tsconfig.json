@@ -12,21 +12,25 @@
     "outDir": "../../dist",
     "rootDir": "../..",
     "module": "commonjs",
-    "baseUrl": "../..",
-    "paths": {
-      "@beauclick/http": ["libs/http/src/index.ts"],
-      "@beauclick/auth": ["libs/auth/src/index.ts"],
-      "@beauclick/ownership": ["libs/ownership/src/index.ts"],
-      "@beauclick/identity": ["services/identity/src/index.ts"],
-      "@beauclick/provider": ["services/provider/src/index.ts"],
-      "@beauclick/booking": ["services/booking/src/index.ts"],
-      "@beauclick/commerce": ["services/commerce/src/index.ts"],
-      "@beauclick/payment": ["services/payment/src/index.ts"],
-      "@beauclick/financial": ["services/financial/src/index.ts"],
-      "@beauclick/money": ["libs/money/src/index.ts"],
-      "@beauclick/events": ["libs/events/src/index.ts"],
-      "@beauclick/observability": ["libs/observability/src/index.ts"]
-    }
+    // `baseUrl` and `paths` are deliberately NOT redeclared here: they are
+    // inherited from tsconfig.base.json, and TypeScript resolves an inherited
+    // `baseUrl` relative to the file it came from, so the mapping stays
+    // correct.
+    //
+    // They WERE redeclared, as a SUBSET -- twelve of the twenty-six packages.
+    // Everything absent from that subset resolved through node_modules
+    // instead, to the workspace symlink pointing at each package's own
+    // `src/index.ts`. That works for `ts-node` and for the test runners, which
+    // is why it went unnoticed, and it silently breaks `tsc -p`: TypeScript
+    // does not EMIT files it reached through `node_modules`. So `dist/` was
+    // missing `libs/audit`, `libs/media`, `libs/subject-data`,
+    // `libs/event-contracts`, and `libs/testing` entirely -- a build that
+    // succeeded and produced output that cannot start.
+    //
+    // Invisible until V3.1 Phase F ran the compiled output in a container,
+    // where it died on `Cannot find module '/app/libs/audit/src/
+    // admin-audit-log'`. Inheriting removes the class of bug rather than
+    // lengthening the list.
   },
   "include": ["src/**/*.ts"]
 }

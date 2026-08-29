@@ -48,7 +48,8 @@
     "@beauclick/media": "workspace:*",
     "@beauclick/subject-data": "workspace:*",
     "@beauclick/privacy": "workspace:*",
-    "@beauclick/observability": "workspace:*"
+    "@beauclick/observability": "workspace:*",
+    "tsconfig-paths": "^4.2.0"
   },
   "devDependencies": {
     "@beauclick/testing": "workspace:*",
@@ -58,7 +59,6 @@
     "@types/supertest": "^6.0.2",
     "supertest": "^7.0.0",
     "ts-node": "^10.9.2",
-    "tsconfig-paths": "^4.2.0",
     "uuidv7": "^1.2.1"
   }
 }
