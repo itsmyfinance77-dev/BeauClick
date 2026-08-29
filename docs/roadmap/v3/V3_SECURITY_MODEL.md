@@ -73,6 +73,51 @@ The AI provider (LLM or rule-based fallback) then only ever sees this pre-curate
 
 **Same-tenant-only, adversarially verified**: see §4 — this is not optional for AI specifically, since AI is the domain most likely to be asked, directly, in natural language, to reveal another tenant's information ("what about my colleague's numbers?").
 
+### 5.1 As implemented — V3.2-A, and what ADR-030 adds
+
+**ADR-030 amends this section**, turning each rule above into a named threat with a named
+control and a named test. Read it alongside this; where they differ in detail, ADR-030 is the
+implemented one.
+
+The two-stage model is built as specified, with three things worth recording because they are
+stronger than what this section asked for:
+
+- **The curation stage cannot be widened by accident.** The context is not "a fixed, minimal,
+  pre-aggregated JSON blob" assembled by remembering what to leave out — it is a closed
+  TypeScript type with three keys, assembled field by field, whose key set is asserted against
+  a literal. The excluded material has no port that returns it and no field that could hold it.
+  A professional's public `bio` is excluded too, which this section did not require: a public
+  string authored by one party and fed into a prompt on behalf of another is an injection
+  surface with no compensating benefit.
+- **The injection blocklist is explicitly a mitigation, not the defence.** It runs before the
+  provider is invoked, as required, and it is checked by a spy that the provider was never
+  called. But ADR-030 T1 records what this section leaves implicit: a phrase list is defeated
+  by paraphrase, and that is what a phrase list is. The defence is that a successful injection
+  has nothing to reach. The list is Unicode-normalised (NFKC, zero-width stripped, Persian and
+  Arabic letter forms unified, digits folded), because a filter defeated by a ZWNJ is
+  decoration — and ZWNJ is how Persian half-spaces are written.
+- **Output-side validation is two steps, not one.** Validation proves SHAPE; verification
+  proves FACT. A UUID that parses and refers to a suspended professional passes the first and
+  fails the second, and only the second is what a customer acts on. Re-verification reads the
+  authoritative provider tables, **not** the search projection: the projection is eventually
+  consistent, so a professional suspended thirty seconds ago is still in the index, and
+  re-verifying there would confirm exactly the record the platform has just decided must not be
+  shown.
+
+**System-prompt-level constraints are not relied on at all in this phase**, because there is no
+real LLM to instruct. The only registered provider is deterministic and in-process. The
+forbidden actions this section enumerates are enforced structurally instead: the provider is
+handed no repository, no `EntityManager`, and no service, so there is no collaborator through
+which a mutation could be attempted, and the response schema is `strict()` so a provider
+returning an `actions` array is rejected outright rather than having the unknown key silently
+dropped.
+
+**Two controls this section does not mention, added by `V32-DEC-008` and `V32-DEC-009`:** a
+per-user daily cap enforced in PostgreSQL atomically with the message insert (not a
+read-then-write, and not the in-memory HTTP throttler, whose effective limit multiplies by
+instance count), and the complete absence of any privileged route that can read AI conversation
+content.
+
 ---
 
 ## 6. Provider-abstraction safety (Payment / AI / SMS)

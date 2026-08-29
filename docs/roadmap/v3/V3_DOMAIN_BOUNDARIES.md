@@ -115,13 +115,59 @@ No microservices beyond the two already decided in ADR-002 (financial, payment) 
 
 ## ai
 
-- **Responsibility**: customer discovery assistant, professional insights assistant — provider-abstracted, two-stage authorization/curation, output-validated.
-- **Own schema**: `ai` — `ai_conversations`/`_messages`, `ai_professional_conversations`/`_messages`, `ai_recommendation_events`. `GAP-12`'s one-thread-per-tenant constraint is explicitly revisited, not re-adopted, in schema design.
-- **Public API**: `GET/POST /v1/ai/messages`, `GET/POST /v1/ai/professional/messages`, `POST /v1/ai/recommendations/{id}/click`.
-- **Internal API**: none exposed — ai-service only ever *calls into* other modules' already-scoped summary methods (`provider.getProviderSummary`, `analytics.compute`, `financial.receivableNetForCurrentSession` for the professional-mode context, `journey`'s context seam below), never the reverse.
-- **Events produced**: `AIConversationCreated`/`AIMessageSent` v1.
-- **Events consumed**: none required for core function (context is assembled synchronously per-request).
-- **Data ownership rules**: never given direct database access to any other module — every fact it sees comes through an already-authorized, already-curated summary call. Free-text/PII-bearing fields (CRM notes, raw review text, Journey's `notes` field) are excluded from context by construction, not access-controlled within it.
+**Implemented in V3.2-A to the deterministic sandbox milestone.** ADR-029 decides the
+boundary and the provider port; ADR-030 amends `V3_SECURITY_MODEL.md` §5 into nine named
+threats with named controls. The entries below are updated from the Phase 0 blueprint to what
+was actually built; where the two differ, the difference is stated rather than quietly
+overwritten.
+
+- **Responsibility**: customer discovery assistant — provider-abstracted, context-curated,
+  output-validated, and re-verified against the authoritative catalogue.
+  **Professional mode is deferred** (`V32-DEC-001`, decided 2026-08-29): no
+  `bc_use_professional_ai` capability exists, and no professional conversation table was
+  created. When it is approved it gets its own table keyed on the party, not a `scope` column
+  on the customer table.
+- **Own schema**: `ai` — `conversations`, `messages`, `recommendations`, `assistant_consents`,
+  `usage_daily`, `outbox_events`. `GAP-12`'s one-thread-per-tenant constraint was revisited and
+  **not** re-adopted: `V32-DEC-002` chose bounded sessions, so there is no `UNIQUE(user_id)`,
+  and there are instead a `status`, a `last_activity_at`, a 24-hour inactivity horizon, a
+  20-conversation retained cap, and a 30-day retention sweep.
+  Ownership is enforced by composite foreign keys — `messages` and `recommendations` reference
+  `conversations(id, user_id)` — so a row whose owner disagrees with its parent's is
+  unwritable, not merely absent from today's queries.
+- **Public API**: `GET/POST /v1/me/ai/consent`, `POST/GET /v1/me/ai/conversations`,
+  `GET /v1/me/ai/conversations/{id}`, `POST /v1/me/ai/conversations/{id}/messages`,
+  `DELETE /v1/me/ai/conversations/{id}`, `POST /v1/me/ai/recommendations/{id}/click`.
+  Under `/v1/me/` rather than the blueprint's `/v1/ai/`, because every route is self-scoped and
+  the prefix says so. **No route accepts an owner, customer, party, or user id**, and there is
+  no professional route.
+- **Internal API**: none exposed. `ai` only ever calls into other modules' already-scoped
+  summary methods, through two typed ports bound in the composition root
+  (`AI_JOURNEY_CONTEXT` → `journey.inferAiDefaults`, `AI_PUBLIC_CATALOGUE` → the existing
+  search read model plus provider's own tables for re-verification). Never the reverse.
+- **Events produced**: `AIConversationStarted` v1 and `AIMessageExchanged` v1.
+  Renamed from the blueprint's `AIConversationCreated`/`AIMessageSent` — the second carries one
+  customer message AND its reply, so "sent" would have described half of it. Neither schema has
+  a field able to hold prose, asserted mechanically by walking the zod schema.
+- **Events consumed**: none. Context is assembled synchronously per request.
+- **Data ownership rules**: never given direct database access to any other module. Every fact
+  it sees comes through an already-authorized, already-curated summary call, and the
+  allow-listed set is fixed by `V32-DEC-005`: string-free Journey inference, public
+  professional summaries, public service summaries, approved public search summaries.
+  Journey `notes` and goal titles, review comments and professional replies, CRM notes,
+  internal chat, moderation reasons, verification evidence, direct identifiers, financial
+  figures, and tenant-private analytics are excluded **by construction** — no port returns
+  them and no type can hold them. A professional's public `bio` is excluded too, because a
+  public string authored by one party and fed into a prompt on behalf of another is an
+  injection surface with no compensating benefit.
+- **Operator access**: none to content (`V32-DEC-009`). There is no admin route, no
+  impersonation, and no moderation queue for AI conversations. Operators get counts, latency,
+  provider mode, refusal mix, and the re-verification drop rate.
+- **Provider**: one registry, one port, and exactly one registered provider — `deterministic`,
+  a local assistant that narrates the real catalogue, needs no credential, makes no network
+  call, and says in its own reply that it is not a language model. Readiness reports
+  `ai_provider: simulated`, and `productionVerified` stays false with no code path able to
+  change it.
 
 ## journey
 
