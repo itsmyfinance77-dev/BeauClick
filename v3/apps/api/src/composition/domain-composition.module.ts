@@ -16,6 +16,7 @@ import { MediaModule } from '@beauclick/media';
 import { PrivacyModule, PrivacyOutboxEntity } from '@beauclick/privacy';
 
 import { Phase3CompositionModule } from './phase3-composition.module';
+import { AiCompositionModule } from './ai-composition.module';
 import { PHASE3_EVENT_HANDLERS, PHASE3_OUTBOX_SOURCES } from './phase3-tokens';
 import { AI_OUTBOX_SOURCES } from './ai-tokens';
 
@@ -90,6 +91,12 @@ import {
     // Phase 3's domains and their handlers/outboxes, contributed under their
     // own tokens and merged into the single relay below.
     Phase3CompositionModule,
+    // V3.2-A, for the same reason and by the same mechanism: it contributes
+    // `AI_OUTBOX_SOURCES`, which the merged `OUTBOX_SOURCES` factory below
+    // injects. A token is resolved through the injector of the module that
+    // declares the CONSUMER, so being a sibling under `AppModule` is not
+    // enough -- the module providing it has to be imported here.
+    AiCompositionModule,
   ],
   controllers: [
     CheckoutController,
@@ -192,6 +199,7 @@ import {
     OutboxRelay,
     OutboxSweepScheduler,
     Phase3CompositionModule,
+    AiCompositionModule,
     FINANCIAL_OUTBOX_RELAY,
     PrivacyModule,
     // V3.1 Phase F. Re-exported so the root injector can resolve

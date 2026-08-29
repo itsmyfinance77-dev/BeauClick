@@ -37,7 +37,6 @@ import { AI_ENTITIES } from '@beauclick/ai';
 import { DomainCompositionModule } from './composition/domain-composition.module';
 import { PrivilegedCapabilityModule } from './composition/privileged-capability.module';
 import { PrivacyCompositionModule } from './composition/privacy-composition.module';
-import { AiCompositionModule } from './composition/ai-composition.module';
 
 import cookieParser from 'cookie-parser';
 import { CorrelationMiddleware } from './observability/correlation.middleware';
@@ -194,12 +193,14 @@ import { MetricsController } from './observability/metrics.controller';
     SubjectDataModule,
     IdentityModule,
     ProviderModule,
+    // V3.2-A's `AiCompositionModule` is reached THROUGH this one rather than
+    // listed here, exactly as `Phase3CompositionModule` is: it contributes an
+    // outbox source that `DomainCompositionModule`'s merged `OUTBOX_SOURCES`
+    // factory injects, and a token is resolved through the injector of the
+    // module declaring the consumer -- so being a sibling here would not have
+    // been enough. It still loads before `PrivacyCompositionModule` below, which
+    // is what the coverage assertion needs.
     DomainCompositionModule,
-    // V3.2-A. Imported after DomainCompositionModule (whose Phase 3 composition
-    // provides the journey, provider, and search modules its ports read
-    // through) and BEFORE PrivacyCompositionModule, so `AiSubjectDataContract`
-    // exists by the time the coverage assertion runs over the contract list.
-    AiCompositionModule,
     // V3.1 Phase E. Imported AFTER DomainCompositionModule so the boot-order
     // is the honest one: every domain module is instantiated before the
     // coverage assertion runs over the contracts they registered.

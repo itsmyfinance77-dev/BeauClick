@@ -209,17 +209,9 @@ export class AiController {
     };
     return {
       conversation: toSummary(result.conversation),
-      messages: toMessageViews(
-        [result.customerMessage, result.assistantMessage],
-        result.recommendations.map((recommendation, index) => ({
-          id: `${result.assistantMessage.id}:${index}`,
-          messageId: result.assistantMessage.id,
-          targetType: recommendation.targetType,
-          targetId: recommendation.targetId,
-          displayName: recommendation.displayName,
-          position: recommendation.position,
-        })),
-      ),
+      // The PERSISTED recommendation rows, carrying their real ids -- which is
+      // what `POST /recommendations/:id/click` is addressed with.
+      messages: toMessageViews([result.customerMessage, result.assistantMessage], result.recommendations),
       quota,
     };
   }

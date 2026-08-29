@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
@@ -47,6 +47,36 @@ import { AI_OUTBOX_SOURCES } from './ai-tokens';
  * registered provider is the deterministic one, and it is registered inside
  * `AiModule` because it needs nothing from any other domain.
  */
+/**
+ * The two port bindings, `@Global()`.
+ *
+ * ## Why global, and why this is a separate module from the composition below
+ *
+ * `AiModule` DECLARES `AI_JOURNEY_CONTEXT` and `AI_PUBLIC_CATALOGUE` and
+ * provides neither, so something else has to bind them. The obvious place is
+ * the composition module below -- and that does not work, for a reason worth
+ * writing down because this codebase has now hit it three times.
+ *
+ * Nest resolves a provider through the injector of the module that DECLARES the
+ * consumer, walking up through that module's own imports. `AiCompositionModule`
+ * imports `AiModule`; the arrow points the wrong way. A token provided there is
+ * invisible to `AiModule`'s services, and the symptom is a boot-time
+ * `Nest can't resolve dependencies of the AiContextAssembler` -- which is at
+ * least loud. `PrivacyCompositionModule` records the quieter version of the same
+ * mistake: an `@Optional()` injection that silently resolved to an empty array,
+ * producing an export document with zero sections and an erasure that erased
+ * nothing, both of which look like working code.
+ *
+ * So the bindings live in a `@Global()` module, exactly as `DomainPortsModule`
+ * does for booking, commerce, and financial, and for the same reason: these are
+ * infrastructure bindings a domain module needs and must not import a domain to
+ * obtain.
+ *
+ * A domain module still cannot reach a SERVICE it should not see. Only the two
+ * narrow, AI-declared tokens are exported -- not `SearchService`, not
+ * `JourneyContextProvider`, and not the repositories the adapters read.
+ */
+@Global()
 @Module({
   imports: [
     ConfigModule,
@@ -58,14 +88,26 @@ import { AI_OUTBOX_SOURCES } from './ai-tokens';
     JourneyModule,
     ProviderModule,
     SearchModule,
-    AiModule,
   ],
   providers: [
-    AiSweepScheduler,
     JourneyAiContextAdapter,
     PublicCatalogueAiAdapter,
     { provide: AI_JOURNEY_CONTEXT, useExisting: JourneyAiContextAdapter },
     { provide: AI_PUBLIC_CATALOGUE, useExisting: PublicCatalogueAiAdapter },
+  ],
+  exports: [AI_JOURNEY_CONTEXT, AI_PUBLIC_CATALOGUE],
+})
+export class AiPortsModule {}
+
+@Module({
+  imports: [
+    ConfigModule,
+    // FIRST, so the ports are bound before `AiModule` is instantiated.
+    AiPortsModule,
+    AiModule,
+  ],
+  providers: [
+    AiSweepScheduler,
     {
       provide: AI_OUTBOX_SOURCES,
       // One table, on the shared application DataSource, drained by the same
@@ -75,6 +117,6 @@ import { AI_OUTBOX_SOURCES } from './ai-tokens';
       useValue: [{ name: 'ai', entity: AiOutboxEntity }] satisfies OutboxSource[],
     },
   ],
-  exports: [AI_JOURNEY_CONTEXT, AI_PUBLIC_CATALOGUE, AI_OUTBOX_SOURCES, AiSweepScheduler, AiModule],
+  exports: [AI_OUTBOX_SOURCES, AiSweepScheduler, AiPortsModule, AiModule],
 })
 export class AiCompositionModule {}

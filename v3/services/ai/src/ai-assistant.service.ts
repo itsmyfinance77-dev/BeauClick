@@ -24,6 +24,7 @@ import {
   AiAssistantUnavailableException,
   AiConsentRequiredException,
   AiConversationClosedException,
+  AiConversationNotFoundException,
   AiMessageTooLongException,
   AiQuotaExhaustedException,
   AiUnsafeRequestException,
@@ -42,7 +43,7 @@ import {
   UNSAFE_REQUEST_MESSAGE,
   screenCustomerInput,
 } from './safety/ai-input-safety';
-import { AiOutputRejectedError, AiOutputVerifier, VerifiedRecommendation } from './safety/ai-output-verification';
+import { AiOutputRejectedError, AiOutputVerifier } from './safety/ai-output-verification';
 
 /**
  * The one path a customer message takes, and the order it takes it in.
@@ -166,7 +167,7 @@ export class AiAssistantService {
     conversation: AiConversationEntity;
     customerMessage: AiMessageEntity;
     assistantMessage: AiMessageEntity;
-    recommendations: VerifiedRecommendation[];
+    recommendations: AiRecommendationEntity[];
     providerState: AiProviderState;
     quotaRemaining: number;
     quotaResetsAt: Date;
@@ -198,6 +199,35 @@ export class AiAssistantService {
     const reserved = await this.dataSource.transaction(async (manager) => {
       const conversation = await this.conversations.requireOwned(manager, userId, conversationId);
       if (conversation.status !== 'active') throw new AiConversationClosedException();
+
+      /**
+       * Lock the conversation row for the rest of this transaction.
+       *
+       * Two things depend on it, and the first one is not obvious.
+       *
+       * `sequence` is `message_count + 1`, and `uq_ai_messages_sequence` makes
+       * two messages claiming the same position unwritable -- which is the
+       * correct constraint and exactly right. Without this lock, two concurrent
+       * sends in ONE conversation both read `message_count = N`, both compute
+       * `N + 1`, and the loser dies on a unique violation: a 500 where a queued
+       * 201 belonged. Found by the concurrency case below, which fires
+       * twenty-six simultaneous sends at one conversation.
+       *
+       * Locking here serialises them instead, so each waits, re-reads the
+       * committed count, and takes the next position. The quota was already
+       * correct without it -- the increment and the insert share this
+       * transaction, so a failed insert rolled the counter back too -- but
+       * "correct after an error the user sees" is not the same as correct.
+       *
+       * Scoped to one conversation, so it contends with nothing except that
+       * conversation's own concurrent sends.
+       */
+      const locked: Array<{ message_count: number }> = await manager.query(
+        `SELECT message_count FROM ai.conversations WHERE id = $1 AND user_id = $2 FOR UPDATE`,
+        [conversation.id, userId],
+      );
+      if (locked.length === 0) throw new AiConversationNotFoundException();
+      conversation.messageCount = Number(locked[0].message_count);
 
       const outcome = await this.quota.consume(manager, userId, provider.respondsExternally);
       if (!outcome.allowed) {
@@ -277,9 +307,36 @@ export class AiAssistantService {
     const latencyMs = Date.now() - startedAt;
 
     // ---- 9b: the reply, its recommendations, and the event.
+    const persisted: AiRecommendationEntity[] = [];
     const assistantMessage = await this.dataSource.transaction(async (manager) => {
+      persisted.length = 0;
       const now = this.clock.now();
-      const sequence = reserved.conversation.messageCount + 1;
+
+      /**
+       * The sequence is re-derived HERE, under the row lock, and not carried
+       * from the reserving transaction.
+       *
+       * That transaction committed before the provider was called -- deliberately,
+       * so a slow model does not pin a connection -- and the count it observed is
+       * stale the moment another of this customer's sends commits. Reusing it
+       * made every concurrent reply collide on `uq_ai_messages_sequence` and
+       * surface as a 500, with the quota already spent by the first transaction
+       * and no reply to show for it.
+       *
+       * Found by the concurrency case in `ai-assistant.pg-spec.ts`: twenty-six
+       * simultaneous sends produced one success and a pile of internal errors.
+       * The lock in the reserving transaction was necessary and not sufficient;
+       * a lock has to be held by the transaction that does the write.
+       */
+      const locked: Array<{ message_count: number }> = await manager.query(
+        `SELECT message_count FROM ai.conversations WHERE id = $1 AND user_id = $2 FOR UPDATE`,
+        [reserved.conversation.id, userId],
+      );
+      // The conversation was destroyed between the two transactions -- the
+      // customer deleted it while waiting. Their message went with it, and there
+      // is nothing to attach a reply to.
+      if (locked.length === 0) throw new AiConversationNotFoundException();
+      const sequence = Number(locked[0].message_count) + 1;
 
       const message = await manager.getRepository(AiMessageEntity).save(
         manager.getRepository(AiMessageEntity).create({
@@ -299,7 +356,8 @@ export class AiAssistantService {
       );
 
       for (const recommendation of verified.recommendations) {
-        await manager.getRepository(AiRecommendationEntity).save(
+        persisted.push(
+          await manager.getRepository(AiRecommendationEntity).save(
           manager.getRepository(AiRecommendationEntity).create({
             id: uuidv7(),
             messageId: message.id,
@@ -313,6 +371,7 @@ export class AiAssistantService {
             position: recommendation.position,
             clickedAt: null,
           }),
+          ),
         );
       }
 
@@ -321,6 +380,7 @@ export class AiAssistantService {
         [reserved.conversation.id, sequence, now],
       );
       reserved.conversation.messageCount = sequence;
+      reserved.conversation.lastActivityAt = now;
 
       await emitContractEvent(this.contracts, manager, AiOutboxEntity, AIMessageExchanged, {
         aggregateId: reserved.conversation.id,
@@ -358,7 +418,12 @@ export class AiAssistantService {
       conversation: reserved.conversation,
       customerMessage: reserved.customerMessage,
       assistantMessage,
-      recommendations: [...verified.recommendations],
+      // The PERSISTED rows, so their real ids reach the client and a click can
+      // be recorded against them. Returning the pre-insert `VerifiedRecommendation`
+      // values would leave the caller inventing ids, which is what the first
+      // version of this did -- and the click route then answered 400 for every
+      // one of them.
+      recommendations: persisted,
       providerState,
       quotaRemaining: reserved.outcome.remaining,
       quotaResetsAt: reserved.outcome.resetsAt,

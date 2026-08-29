@@ -76,6 +76,23 @@ export function canonicalizeForScreening(text: string): string {
 /**
  * Instruction-override attempts, in both languages the product is used in.
  *
+ * ## Every pattern below is written in the CANONICAL alphabet
+ *
+ * This is the rule most likely to be broken by the next person to add one, and
+ * it was broken during this file's own development: a pattern containing `آن`
+ * matched nothing, because `canonicalizeForScreening` folds `آ` to `ا` before
+ * matching, so the text being tested had already become `ان`. The pattern was
+ * correct Persian and entirely dead.
+ *
+ * So: no `آ`, `أ`, `إ` (write `ا`), no `ة`, `ۀ` (write `ه`), no `ي` (write `ی`),
+ * no `ك` (write `ک`), no Persian or Arabic-Indic digits (write ASCII), and
+ * nothing uppercase. `ai-input-safety.spec.ts` asserts this mechanically over
+ * both lists, so a non-canonical pattern fails the suite rather than silently
+ * never firing.
+ *
+ * Note also that JavaScript's `` is ASCII-based and does NOT recognise a
+ * boundary after a Persian letter -- `یک` never matches. Use `\s` or nothing.
+ *
  * Written as regular expressions with `\s*` between words rather than literal
  * strings, so `ignore    all   previous  instructions` and its zero-width-padded
  * cousin both match after canonicalisation.
@@ -85,7 +102,7 @@ export function canonicalizeForScreening(text: string): string {
  * customer may reasonably use the word — which is why the patterns are phrases
  * about instructions and roles rather than keywords.
  */
-const INJECTION_PATTERNS: readonly RegExp[] = [
+export const INJECTION_PATTERNS: readonly RegExp[] = [
   // ---- instruction override, English
   /ignore\s+(all\s+|any\s+|the\s+)?(previous|prior|above|earlier)\s+(instruction|prompt|rule|direction)/,
   /disregard\s+(all\s+|any\s+|the\s+)?(previous|prior|above|earlier)/,
@@ -99,9 +116,9 @@ const INJECTION_PATTERNS: readonly RegExp[] = [
 
   // ---- instruction override, Persian
   /دستور(ات|های)?\s*(قبلی|بالا|پیشین)\s*(را)?\s*(نادیده|فراموش|رها)/,
-  /(نادیده\s*بگیر|فراموش\s*کن)\s*(هر\s*)?(چه|آنچه)/,
+  /(نادیده\s*بگیر|فراموش\s*کن)\s*(هر\s*)?(چه|انچه)/,
   /(پرامپت|دستورالعمل)\s*(سیستم|سیستمی)/,
-  /(از\s*این\s*(به\s*بعد|پس)|از\s*حالا)\s*تو\s*(یک|یه)\b/,
+  /(از\s*این\s*(به\s*بعد|پس)|از\s*حالا)\s*تو\s*(یک|یه)\s/,
   /نقش\s*(مدیر|ادمین|سیستم|توسعه\s*دهنده)/,
   /حالت\s*(توسعه|دیباگ|ادمین|بدون\s*محدودیت)/,
 ];
@@ -119,18 +136,18 @@ const INJECTION_PATTERNS: readonly RegExp[] = [
  * own spending — must NOT match; the patterns are about ANOTHER party, so they
  * are anchored on possessives and third-party nouns rather than on the topic.
  */
-const PRIVATE_DATA_PATTERNS: readonly RegExp[] = [
+export const PRIVATE_DATA_PATTERNS: readonly RegExp[] = [
   // ---- English
   /(other|another|previous|last)\s+(user|customer|client|person)('s)?\s+(message|conversation|chat|data|info|detail|phone|number)/,
   /(phone|mobile|contact|email|address)\s+(number\s+)?(of|for)\s+(the\s+)?(professional|provider|doctor|salon|customer|user)/,
   /(how much|what)\s+(does|do|did)\s+.{0,40}\s+(earn|make|charge internally|get paid)/,
   /(revenue|earnings|income|settlement|payout|commission)\s+(of|for)\s+/,
-  /(show|list|give)\s+me\s+(all\s+)?(users|customers|phone numbers|emails|conversations)/,
+  /(show|list|give|dump)\s+(me\s+)?(all\s+|every\s+)?(users|customers|phone numbers|emails|conversations)/,
   /(verification|identity)\s+(document|evidence|card)/,
 
   // ---- Persian
-  /(شماره|تلفن|موبایل|ایمیل|آدرس)\s*(تماس\s*)?(ی|های)?\s*(آن|این|فلان)?\s*(متخصص|سالن|پزشک|کاربر|مشتری)/,
-  /(درآمد|فروش|تسویه|کمیسیون|سود)\s*(ی|های)?\s*(آن|این|فلان)?\s*(متخصص|سالن|پزشک|کسب\s*و\s*کار)/,
+  /(شماره|تلفن|موبایل|ایمیل|ادرس)\s*(تماس\s*)?(ی|های)?\s*(ان|این|فلان)?\s*(متخصص|سالن|پزشک|کاربر|مشتری)/,
+  /(درامد|فروش|تسویه|کمیسیون|سود)\s*(ی|های)?\s*(ان|این|فلان)?\s*(متخصص|سالن|پزشک|کسب\s*و\s*کار)/,
   /(پیام|گفتگو|مکالمه)\s*(های)?\s*(کاربر|مشتری)\s*(دیگر|قبلی|بعدی)/,
   /(لیست|فهرست)\s*(همه\s*)?(کاربران|مشتریان|شماره\s*ها|ایمیل\s*ها)/,
   /(مدارک|مستندات)\s*(احراز\s*هویت|هویتی)/,
