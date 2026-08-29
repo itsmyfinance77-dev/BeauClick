@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // No `rootDir`, for the reason `libs/audit` records: this library imports
+    // `@beauclick/events` by path mapping for the correlation id, and pinning
+    // rootDir to src/ makes tsc reject that cross-project import even though
+    // the mapping resolves it. `scope:shared` -> `scope:shared` is permitted
+    // and linted on every run, so the real boundary check is untouched.
+    "outDir": "../../dist/libs/observability"
+  },
+  "include": ["src/**/*.ts"]
+}

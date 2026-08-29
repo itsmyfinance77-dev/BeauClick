@@ -1,0 +1,338 @@
+name: V3 CD
+
+# The deployment pipeline `V3_INFRASTRUCTURE_PLAN.md` §6 specifies, built to
+# its shape and stopping exactly where the external decisions begin.
+#
+# ## What this is
+#
+# The six steps §6 lists, as real jobs with real dependencies between them:
+#
+#   1. lint + typecheck + test          -> reuses the CI workflow's own gates
+#   2. build the container image, tagged {app}:{gitSha}
+#   3. run migrations for the target's schemas, as a SEPARATE step that must
+#      succeed before the deploy
+#   4. verify the PostgreSQL role contract on the target
+#   5. deploy
+#   6. post-deploy health check, with rollback on failure
+#
+# ## What this is NOT, and must not be read as
+#
+# **It cannot deploy anything, because there is nowhere to deploy to.** The
+# hosting decision (`HOSTING`) is the standing Phase 0 exit blocker and is
+# unresolved. The `deploy` job below therefore FAILS, loudly, naming what is
+# missing -- it does not skip, and it does not pass.
+#
+# That is deliberate. A CD workflow that reports success without deploying is
+# the worst possible artifact: it produces a green check that somebody will
+# later cite as evidence that deployment works. Failing is honest, and the
+# failure message is the specification for whoever wires the target in.
+#
+# **`workflow_dispatch` only.** No push trigger, no schedule. A pipeline that
+# cannot deploy must not run on every commit and paint the history red, and a
+# pipeline that CAN deploy should not have been given a push trigger without a
+# deliberate decision about which branch and which environment.
+#
+# ## The registry
+#
+# GHCR, because it is the registry already attached to this repository and
+# needs no account, no credential, and no vendor selection -- `GITHUB_TOKEN`
+# authenticates it. That is a build-artifact destination, not a hosting or
+# region decision; every candidate platform in §3's launch topology pulls from
+# an OCI registry. Override `CONTAINER_REGISTRY` if the hosting decision brings
+# its own.
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment (must have its secrets configured).'
+        required: true
+        default: staging
+        type: choice
+        options: [staging, production]
+      image_tag:
+        description: 'Image tag to deploy. Blank builds from this ref. Set it to a previous SHA to ROLL BACK.'
+        required: false
+        type: string
+
+concurrency:
+  # One deployment per environment at a time, and NOT cancel-in-progress: a
+  # half-applied migration is worse than a queued deploy.
+  group: v3-cd-${{ inputs.environment }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: v3
+
+env:
+  NODE_VERSION: '22'
+  PNPM_VERSION: '11.22.0'
+  CONTAINER_REGISTRY: ${{ vars.CONTAINER_REGISTRY || 'ghcr.io' }}
+
+jobs:
+  # --------------------------------------------------------------------------
+  # 1. The same gates a pull request passes. Deliberately re-run rather than
+  #    trusted from an earlier run: the commit being deployed may not be the
+  #    commit that was reviewed.
+  # --------------------------------------------------------------------------
+  gates:
+    name: gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: v3/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm build
+
+  # --------------------------------------------------------------------------
+  # 2. The image. Immutably tagged by commit SHA, per §2.
+  # --------------------------------------------------------------------------
+  image:
+    name: build image
+    needs: gates
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      tag: ${{ steps.tag.outputs.value }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve the tag
+        id: tag
+        # A supplied tag is a ROLLBACK: an image that already exists is
+        # redeployed rather than rebuilt, because rebuilding it would produce a
+        # different image from the same source (a different base-image digest,
+        # a different transitive dependency) and would therefore not be the
+        # thing that was previously running.
+        run: echo "value=${{ inputs.image_tag || github.sha }}" >> "$GITHUB_OUTPUT"
+
+      - name: Skip the build when redeploying an existing tag
+        id: existing
+        if: inputs.image_tag != ''
+        run: echo "Redeploying ${{ steps.tag.outputs.value }} without rebuilding."
+
+      - uses: docker/setup-buildx-action@v3
+        if: inputs.image_tag == ''
+
+      - uses: docker/login-action@v3
+        if: inputs.image_tag == ''
+        with:
+          registry: ${{ env.CONTAINER_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        if: inputs.image_tag == ''
+        uses: docker/build-push-action@v6
+        with:
+          context: v3
+          file: v3/infra/docker/Dockerfile.api
+          push: true
+          # Immutable by SHA. No `latest`, deliberately: a moving tag makes
+          # "which build is running" unanswerable, and makes a rollback a
+          # question rather than a command.
+          tags: ${{ env.CONTAINER_REGISTRY }}/${{ github.repository }}/api:${{ steps.tag.outputs.value }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # --------------------------------------------------------------------------
+  # 3. Migrations, as their own step that must succeed before any deploy (§6).
+  # --------------------------------------------------------------------------
+  migrate:
+    name: migrate
+    needs: image
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: v3/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+
+      - name: Refuse to continue without a target
+        # Named first, and its own step, so the failure says WHICH secret is
+        # missing rather than surfacing as a connection error thirty seconds
+        # later.
+        run: |
+          missing=""
+          [ -z "${{ secrets.DEPLOY_DATABASE_URL }}" ] && missing="$missing DEPLOY_DATABASE_URL"
+          [ -z "${{ secrets.DEPLOY_MIGRATION_URL_FINANCIAL }}" ] && missing="$missing DEPLOY_MIGRATION_URL_FINANCIAL"
+          [ -z "${{ secrets.DEPLOY_MIGRATION_URL_ADMIN }}" ] && missing="$missing DEPLOY_MIGRATION_URL_ADMIN"
+          if [ -n "$missing" ]; then
+            echo "::error::No database target is configured for '${{ inputs.environment }}'. Missing:$missing"
+            echo "These are set once per environment, after the HOSTING decision. See docs/runbooks/DEPLOY.md."
+            exit 1
+          fi
+
+      - name: Migrate
+        run: pnpm migrate
+        env:
+          DATABASE_URL: ${{ secrets.DEPLOY_DATABASE_URL }}
+          MIGRATION_URL_FINANCIAL: ${{ secrets.DEPLOY_MIGRATION_URL_FINANCIAL }}
+          MIGRATION_URL_ADMIN: ${{ secrets.DEPLOY_MIGRATION_URL_ADMIN }}
+
+      - name: Verify migrations are idempotent
+        # Re-running must apply nothing. A migration that is not re-runnable
+        # cannot be safely retried after a partial deploy -- which is exactly
+        # the situation a retry happens in.
+        run: |
+          OUTPUT=$(pnpm migrate 2>&1)
+          echo "$OUTPUT"
+          echo "$OUTPUT" | grep -q "Applied: 0" || { echo "::error::Re-running migrations was not a no-op"; exit 1; }
+        env:
+          DATABASE_URL: ${{ secrets.DEPLOY_DATABASE_URL }}
+          MIGRATION_URL_FINANCIAL: ${{ secrets.DEPLOY_MIGRATION_URL_FINANCIAL }}
+          MIGRATION_URL_ADMIN: ${{ secrets.DEPLOY_MIGRATION_URL_ADMIN }}
+
+  # --------------------------------------------------------------------------
+  # 4. `HOSTING_GRANTS`, wired.
+  #
+  #    The ledger's append-only guarantee is a ROLE CONTRACT, and a managed
+  #    provider that does not grant what it needs breaks it silently -- every
+  #    row present, every query working, and `UPDATE ledger_entries` quietly
+  #    permitted. Checked on every deploy rather than once at setup, because a
+  #    provider can change a default, and a restore can reset an ACL.
+  # --------------------------------------------------------------------------
+  verify-roles:
+    name: verify the role contract
+    needs: migrate
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: v3/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - name: Verify
+        # Runs as the ordinary application role, so it works on a provider that
+        # never hands out a superuser.
+        run: pnpm verify:roles
+        env:
+          DATABASE_URL: ${{ secrets.DEPLOY_DATABASE_URL }}
+
+  # --------------------------------------------------------------------------
+  # 5. Deploy. This is where the pipeline stops.
+  # --------------------------------------------------------------------------
+  deploy:
+    name: deploy
+    needs: [image, verify-roles]
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy the image
+        env:
+          IMAGE: ${{ env.CONTAINER_REGISTRY }}/${{ github.repository }}/api:${{ needs.image.outputs.tag }}
+          DEPLOY_COMMAND: ${{ secrets.DEPLOY_COMMAND }}
+        run: |
+          if [ -z "$DEPLOY_COMMAND" ]; then
+            echo "::error::EXTERNAL ENABLEMENT REQUIRED — there is no deployment target."
+            cat <<'BLOCKED'
+
+          The image was built and the database target was migrated and verified.
+          There is nowhere to deploy it to.
+
+          BLOCKED BY: HOSTING — the hosting/region decision, the standing Phase 0
+          exit blocker (V3.1_PRODUCT_ROADMAP.md §12 decision #1). It is a
+          business and regulatory call about domestic versus international
+          hosting, coupled to payment-gateway callback reachability and AI
+          provider reachability. It is not an engineering decision and this
+          workflow will not make it.
+
+          TO ENABLE, once that decision exists:
+            1. Provision the platform and its managed PostgreSQL.
+            2. Apply database/scripts/financial-roles.sql and
+               admin-audit-roles.sql as a superuser, once.
+            3. Set the environment secrets named in docs/runbooks/DEPLOY.md.
+            4. Set DEPLOY_COMMAND to the platform's own rolling-deploy
+               invocation. It receives $IMAGE.
+
+          This job FAILS rather than skipping, deliberately. A CD run that
+          reports success without deploying produces a green check somebody
+          will later cite as evidence that deployment works.
+          BLOCKED
+            exit 1
+          fi
+
+          echo "Deploying $IMAGE"
+          eval "$DEPLOY_COMMAND"
+
+  # --------------------------------------------------------------------------
+  # 6. Post-deploy verification, with rollback on failure (§6).
+  # --------------------------------------------------------------------------
+  post-deploy:
+    name: post-deploy health check
+    needs: deploy
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Liveness and readiness
+        env:
+          BASE_URL: ${{ secrets.DEPLOY_PUBLIC_API_BASE_URL }}
+        run: |
+          if [ -z "$BASE_URL" ]; then
+            echo "::error::DEPLOY_PUBLIC_API_BASE_URL is not set; the deployment cannot be verified."
+            exit 1
+          fi
+
+          for i in $(seq 1 30); do
+            if curl -sf "$BASE_URL/health" > /tmp/health.json; then break; fi
+            sleep 5
+          done
+          cat /tmp/health.json
+          grep -q '"status":"ok"' /tmp/health.json || { echo "::error::Liveness check failed"; exit 1; }
+
+          curl -sf "$BASE_URL/health/ready" > /tmp/ready.json
+          cat /tmp/ready.json
+          grep -q '"status":"ready"' /tmp/ready.json || { echo "::error::Readiness check failed"; exit 1; }
+
+          # The deployment's own configuration verdict. `productionVerified` is
+          # NOT asserted here: it is false on every deployment until the
+          # External Enablement Gate is executed and its ledger edited by a
+          # person holding evidence, and asserting it would make this job
+          # unpassable for the wrong reason.
+          grep -q '"valid":true' /tmp/ready.json || {
+            echo "::error::The deployment reports an invalid production configuration. Read /health/ready on the host — the reasons are withheld from the public response by design."
+            exit 1
+          }
+
+      - name: Rollback instructions
+        if: failure()
+        # Deliberately NOT an automatic rollback. §6 asks for one, and it needs
+        # the platform's own rolling-deploy semantics to be safe -- an
+        # automatic redeploy of the previous image AFTER a forward migration
+        # has already applied can leave the old code running against a newer
+        # schema, which is a worse failure than the one being rolled back from.
+        # The runbook decides; this prints the command.
+        run: |
+          echo "::error::Post-deploy verification failed. Roll back by re-running this workflow"
+          echo "with image_tag set to the previously deployed SHA. See docs/runbooks/ROLLBACK.md"
+          echo "for the migration-compatibility question that has to be answered first."

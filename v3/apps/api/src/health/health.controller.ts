@@ -5,24 +5,26 @@ import { SkipThrottle } from '@nestjs/throttler';
 import { Public } from '@beauclick/auth';
 import { MediaService } from '@beauclick/media';
 
+import { ReadinessReport, ReadinessService } from './readiness.service';
+
 /**
  * Backend foundation requirement: a real health endpoint -- V2 had NONE
  * (OPS-03, confirmed gap). Checks the actual DB connection, not just "the
  * process is up" -- a real health check should reflect real dependency
  * health.
  *
- * **The ONLY route in V3 exempt from global rate limiting**, and the
+ * **The ONLY routes in V3 exempt from global rate limiting**, and the
  * exemption is deliberate rather than convenient: every orchestrator,
- * uptime monitor, and load-balancer health probe hits this endpoint on a
- * fixed short interval from a small number of source IPs, so throttling it
+ * uptime monitor, and load-balancer health probe hits these endpoints on a
+ * fixed short interval from a small number of source IPs, so throttling them
  * would eventually mark a HEALTHY service as unhealthy and take it out of
- * rotation -- a rate limit causing the outage it exists to prevent. It is
- * exempt because it is infrastructure-critical, NOT because it is
+ * rotation -- a rate limit causing the outage it exists to prevent. They are
+ * exempt because they are infrastructure-critical, NOT because they are
  * frequently called; no other route qualifies on that reasoning.
  *
- * Safe to exempt because it takes no input, mutates nothing, requires no
- * auth, and returns a fixed-shape status with no data of any kind -- there
- * is no amplification or enumeration to gain by flooding it.
+ * Safe to exempt because they take no input, mutate nothing, require no
+ * auth, and return fixed-shape status with no data of any kind -- there
+ * is no amplification or enumeration to gain by flooding them.
  *
  * Bare `@SkipThrottle()` is correct here ONLY because exactly one throttler
  * is registered, and it is named `default` -- the decorator's own default
@@ -32,6 +34,19 @@ import { MediaService } from '@beauclick/media';
  * them, leaving health probes throttled by the other four. See
  * `throttlerOptionsFromEnv`'s docblock for why one throttler is the only
  * correct shape.
+ *
+ * ## Two endpoints, two different questions (V3.1 Phase F)
+ *
+ * `GET /health` is LIVENESS: should this process be restarted? Fast, coarse,
+ * and unchanged in shape from Phase 1 -- an orchestrator already depends on
+ * it and a liveness probe is the wrong place to add fields.
+ *
+ * `GET /health/ready` is READINESS: should traffic be routed here, and -- the
+ * question this platform actually needed -- **is this deployment talking to
+ * real things or to stand-ins?** See `readiness.ts` for why "healthy" could
+ * never answer that: a deployment running the sandbox gateway, the in-memory
+ * search engine, the local disk driver, and the null SMS provider is
+ * perfectly healthy and is not a marketplace.
  */
 @SkipThrottle()
 @Controller('health')
@@ -39,6 +54,7 @@ export class HealthController {
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly media: MediaService,
+    private readonly readiness: ReadinessService,
   ) {}
 
   @Public()
@@ -74,5 +90,22 @@ export class HealthController {
       checks: { database },
       storage,
     };
+  }
+
+  /**
+   * Readiness, including the simulated-versus-real distinction and the
+   * external-verification ledger.
+   *
+   * `@Public()` for the same reason the liveness probe is: an orchestrator's
+   * readiness check carries no session, and requiring one would mean the
+   * probe could never succeed. Everything the report contains is therefore
+   * written on the assumption that anyone can read it -- enums, booleans, and
+   * gap ids, never a host, credential, or endpoint. `ReadinessService`'s
+   * docblock states that rule and the suite asserts it.
+   */
+  @Public()
+  @Get('ready')
+  async ready(): Promise<ReadinessReport> {
+    return this.readiness.report();
   }
 }

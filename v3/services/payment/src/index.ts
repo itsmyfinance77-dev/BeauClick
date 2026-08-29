@@ -5,6 +5,7 @@ export * from './entities/payment-attempt.entity';
 export * from './entities/refund.entity';
 export * from './entities/payment-outbox.entity';
 export * from './entities/sandbox-transaction.entity';
+export * from './payment-failure';
 export * from './providers/payment-provider.interface';
 export * from './providers/payment-provider.registry';
 export * from './providers/sandbox-payment.provider';

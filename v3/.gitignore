@@ -24,3 +24,11 @@ coverage/
 # the repository, not only on the machine that ran it.
 !database/migrations/**/*.sql
 !database/scripts/*.sql
+
+# Database dumps produced by `pnpm backup` (V3.1 Phase F). Real data, and the
+# manifest beside each one records its checksum and row counts -- neither
+# belongs in version control, and the repo root's `*.sql` rule does not cover
+# pg_dump's custom format.
+backups/
+*.dump
+*.dump.manifest.json

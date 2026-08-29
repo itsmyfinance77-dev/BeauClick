@@ -247,6 +247,36 @@ jobs:
           MIGRATION_URL_FINANCIAL: postgres://beauclick_financial_owner:ci_owner@localhost:5432/beauclick_v3_ci
           MIGRATION_URL_ADMIN: postgres://beauclick_admin_audit_owner:ci_audit_owner@localhost:5432/beauclick_v3_ci
 
+      # V3.1 Phase F. The SAME command an operator will point at the real
+      # production host the day one exists (`HOSTING_GRANTS`). Running it here
+      # does NOT close that gap -- CI's container is a container -- but it does
+      # mean the command is exercised on every build rather than being written
+      # once and first run, untested, against production.
+      - name: Verify the PostgreSQL role contract
+        run: pnpm verify:roles
+        env:
+          DATABASE_URL: postgres://beauclick_app:ci_app@localhost:5432/beauclick_v3_ci
+
+      # V3.1 Phase F. Dumps, restores into a DISPOSABLE database, compares row
+      # counts and the schema version, and re-runs the role contract against
+      # the restored database.
+      #
+      # That last check is the point. A restore that returns every row and
+      # drops the GRANTS produces a database where the financial writer can
+      # UPDATE ledger entries -- and every count matches, every query works,
+      # and every smoke test passes. The failure is invisible to anything that
+      # only counts rows.
+      #
+      # This is NOT the restore drill `V3_INFRASTRUCTURE_PLAN.md` §9 requires.
+      # That needs a real backup of production data on the real host, and it
+      # stays open pending the HOSTING decision. This proves the mechanism.
+      - name: Rehearse a backup restore (non-production)
+        run: pnpm restore:rehearse
+        env:
+          REHEARSAL_ADMIN_URL: postgres://postgres:postgres@localhost:5432/postgres
+          REHEARSAL_SOURCE_URL: postgres://postgres:postgres@localhost:5432/beauclick_v3_ci
+          REHEARSAL_APP_URL: postgres://beauclick_app:ci_app@localhost:5432/beauclick_v3_ci
+
       - name: Real-PostgreSQL and OpenSearch suite
         run: pnpm test:pg
         env:

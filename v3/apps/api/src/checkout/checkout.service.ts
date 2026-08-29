@@ -1,10 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 
 import { BookingService, CreateBookingInput } from '@beauclick/booking';
 import { OrderService, OrderWithDetail } from '@beauclick/commerce';
 import { PaymentService, VerificationOutcome } from '@beauclick/payment';
 import { OutboxRelay } from '@beauclick/events';
+import { METRICS, MetricsRegistry } from '@beauclick/observability';
 
 export interface CheckoutResult {
   bookingId: string;
@@ -66,6 +67,12 @@ export class CheckoutService {
     private readonly orders: OrderService,
     private readonly payments: PaymentService,
     private readonly relay: OutboxRelay,
+    /**
+     * `@Optional()` for the same reason the exception filter's reporter is:
+     * a composition that omits `ObservabilityModule` must still be able to
+     * take a payment. A metric is never worth failing a checkout for.
+     */
+    @Optional() private readonly metrics?: MetricsRegistry,
   ) {}
 
   /**
@@ -219,6 +226,25 @@ export class CheckoutService {
       });
       refundIssued = true;
     }
+
+    /**
+     * The one metric worth alerting on in this whole domain.
+     *
+     * `unresolved` means a payment whose result NOBODY knows -- the gateway
+     * was not reached, or did not answer definitively, and the platform
+     * deliberately wrote nothing. A handful of those is a bad network minute;
+     * a sustained rate is money moving with no record of it, and it is
+     * invisible in every other signal: the request returned 303, the customer
+     * got a page, no error was thrown, and no event was emitted. Counting it
+     * here is what makes it visible at all.
+     *
+     * Labelled by OUTCOME only. Never by order, customer, or provider
+     * reference -- see `MetricsRegistry` on why an unbounded label kills the
+     * monitoring system it feeds.
+     */
+    this.metrics?.increment(METRICS.paymentVerifications, {
+      outcome: duplicateChargeRefunded ? 'duplicate_refunded' : refundIssued ? 'refunded' : outcome.status,
+    });
 
     await this.drainQuietly();
     return { outcome, refundIssued, duplicateChargeRefunded };

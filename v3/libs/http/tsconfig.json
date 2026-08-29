@@ -1,8 +1,14 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "outDir": "../../dist/libs/http",
-    "rootDir": "src"
+    // No `rootDir`, for the reason `libs/audit` records: this library now
+    // imports two sibling shared libs by path mapping (`@beauclick/events` for
+    // the correlation id, `@beauclick/observability` for the error-reporter
+    // port), and pinning rootDir to src/ makes tsc reject those cross-project
+    // imports outright even though the mapping resolves them. Both are
+    // `scope:shared` -> `scope:shared`, which Nx's enforce-module-boundaries
+    // permits and lints on every run.
+    "outDir": "../../dist/libs/http"
   },
   "include": ["src/**/*.ts"]
 }

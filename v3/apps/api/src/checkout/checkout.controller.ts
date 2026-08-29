@@ -115,9 +115,36 @@ export class PaymentCallbackController {
     private readonly config: ConfigService,
   ) {}
 
-  private resultUrl(status: string, orderId: string): string {
+  /**
+   * The redirect contract (`QA-21`).
+   *
+   * Three parameters, and the third is the point of this change: `reason`
+   * carries WHY a payment did not succeed, drawn from the closed public
+   * vocabulary in `payment-failure.ts`. Before it, every non-success collapsed
+   * into `status=failed`, and a customer who simply pressed "cancel" at their
+   * bank was told their payment had been refused -- which sends them looking
+   * for a problem with their card that does not exist.
+   *
+   * What is deliberately NOT here:
+   *
+   *  - the gateway's own failure code. It is provider-shaped and unbounded,
+   *    and a redirect URL is browser history, a referrer header, and whatever
+   *    analytics the result page loads. `toPublicFailureReason` narrows it.
+   *  - any amount, reference, or settlement id. The result page RE-FETCHES the
+   *    order from an authenticated endpoint for every figure it shows, so a
+   *    customer editing this query string changes the sentence at the top and
+   *    nothing else. That property is load-bearing and predates this change;
+   *    adding `reason` must not and does not weaken it.
+   *
+   * `reason` is omitted entirely rather than sent empty when there is none --
+   * a successful payment has no failure reason, and `reason=` would invite a
+   * frontend to render one.
+   */
+  private resultUrl(status: string, orderId: string, reason: string | null): string {
     const base = this.config.get<string>('PUBLIC_WEB_BASE_URL') ?? 'http://localhost:3100';
-    return `${base}/checkout/result?status=${encodeURIComponent(status)}&orderId=${encodeURIComponent(orderId)}`;
+    const query = new URLSearchParams({ status, orderId });
+    if (reason) query.set('reason', reason);
+    return `${base}/checkout/result?${query.toString()}`;
   }
 
   /**
@@ -157,9 +184,17 @@ export class PaymentCallbackController {
         ? 'refunded'
         : result.outcome.status;
 
+    // The reason is attached only to the states where it MEANS something.
+    // A refunded or duplicate-refunded outcome succeeded at the gateway and
+    // was corrected afterwards; labelling either with a failure reason would
+    // describe the wrong event. `unresolved` keeps its reason, because
+    // "we could not reach your bank" and "your bank timed out" are the same
+    // sentence to a customer and the page must say it.
+    const reason = status === 'failed' || status === 'unresolved' ? result.outcome.failureReason : null;
+
     // 303 See Other: the browser must follow with GET even when the gateway
     // returned via POST, so a refresh of the result page cannot re-submit.
-    return { url: this.resultUrl(status, result.outcome.orderId), statusCode: 303 };
+    return { url: this.resultUrl(status, result.outcome.orderId, reason), statusCode: 303 };
   }
 
   /** Re-initiate payment for an order whose first attempt failed or was abandoned. */

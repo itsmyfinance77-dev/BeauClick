@@ -1,0 +1,80 @@
+# Local development services (`V3_INFRASTRUCTURE_PLAN.md` §2).
+#
+# The same components the real-PostgreSQL suite needs, stood up with one
+# command instead of five `docker run` lines from a memo. Carries forward V2's
+# own "run everything locally, no cloud dependency for dev" value with the
+# tooling V3 actually uses.
+#
+# **Not a deployment topology.** These are development containers with
+# development passwords, no persistence guarantees, and no resource limits.
+# The launch topology is a managed platform whose vendor is undecided
+# (`HOSTING`); nothing here is a statement about it.
+#
+#   docker compose -f infra/docker/docker-compose.yml up -d
+#
+# Then provision the roles once and migrate:
+#   psql "postgres://postgres:postgres@localhost:5433/beauclick_v3_dev" \
+#     -v owner_password=dev_owner -v writer_password=dev_writer \
+#     -v reader_password=dev_reader -v db_name=beauclick_v3_dev \
+#     -v app_role=beauclick_app -f database/scripts/financial-roles.sql
+#
+# See docs/runbooks/DEPLOY.md for the full sequence.
+
+name: beauclick-v3-dev
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: bc-v3-pg
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: beauclick_v3_dev
+    # 5433, not 5432: a developer running a system PostgreSQL should not have
+    # to stop it to work on this project, and a silent port collision looks
+    # like a migration that ran against the wrong database.
+    ports: ['5433:5432']
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  opensearch:
+    image: opensearchproject/opensearch:2.19.1
+    container_name: bc-v3-os
+    environment:
+      discovery.type: single-node
+      DISABLE_SECURITY_PLUGIN: 'true'
+      DISABLE_INSTALL_DEMO_CONFIG: 'true'
+      OPENSEARCH_JAVA_OPTS: '-Xms1g -Xmx1g'
+    ports: ['9200:9200']
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -sf http://localhost:9200 || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  # S3-compatible object storage. MinIO is the S3 API's reference
+  # implementation and is NOT the vendor this platform will deploy against --
+  # that is undecided and downstream of `HOSTING`. `GAP-C-01` records the
+  # distinction rather than letting a working local bucket imply it is closed.
+  objectstorage:
+    image: minio/minio:latest
+    container_name: bc-v3-minio
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: beauclick_test
+      MINIO_ROOT_PASSWORD: beauclick_test_secret
+    # 9100 externally, because 9000 collides with too many other things.
+    ports: ['9100:9000']
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -sf http://localhost:9000/minio/health/live || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  postgres-data:
