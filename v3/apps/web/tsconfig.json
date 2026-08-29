@@ -16,7 +16,8 @@
     "paths": {
       "@/*": ["./*"],
       "@beauclick/design-tokens": ["../../packages/design-tokens/src/index.ts"],
-      "@beauclick/persian-utils": ["../../packages/persian-utils/src/index.ts"]
+      "@beauclick/persian-utils": ["../../packages/persian-utils/src/index.ts"],
+      "@beauclick/payment-contract": ["../../packages/payment-contract/src/index.ts"]
     },
     "plugins": [{ "name": "next" }]
   },

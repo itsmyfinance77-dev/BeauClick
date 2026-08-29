@@ -13,5 +13,6 @@ module.exports = {
     '^@/(.*)$': '<rootDir>/$1',
     '^@beauclick/persian-utils$': '<rootDir>/../../packages/persian-utils/src/index.ts',
     '^@beauclick/design-tokens$': '<rootDir>/../../packages/design-tokens/src/index.ts',
+    '^@beauclick/payment-contract$': '<rootDir>/../../packages/payment-contract/src/index.ts',
   },
 };
