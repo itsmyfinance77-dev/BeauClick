@@ -242,6 +242,9 @@ importers:
       '@beauclick/design-tokens':
         specifier: workspace:*
         version: link:../../packages/design-tokens
+      '@beauclick/payment-contract':
+        specifier: workspace:*
+        version: link:../../packages/payment-contract
       '@beauclick/persian-utils':
         specifier: workspace:*
         version: link:../../packages/persian-utils
@@ -510,6 +513,8 @@ importers:
         version: 1.2.1
 
   packages/design-tokens: {}
+
+  packages/payment-contract: {}
 
   packages/persian-utils: {}
 
@@ -1006,6 +1011,9 @@ importers:
       '@beauclick/ownership':
         specifier: workspace:*
         version: link:../../libs/ownership
+      '@beauclick/payment-contract':
+        specifier: workspace:*
+        version: link:../../packages/payment-contract
       '@beauclick/subject-data':
         specifier: workspace:*
         version: link:../../libs/subject-data

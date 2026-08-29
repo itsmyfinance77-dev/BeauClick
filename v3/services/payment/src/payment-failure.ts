@@ -1,74 +1,47 @@
+import { PaymentFailureReason, isRetryableFailureReason } from '@beauclick/payment-contract';
+
 import { VerifyPaymentResult } from './providers/payment-provider.interface';
 
 /**
- * The PUBLIC failure vocabulary — the only payment failure information that
- * ever leaves the server (`QA-21`).
+ * The payment domain's half of the failure contract.
  *
- * Why a second vocabulary exists at all. `payment_attempts.failure_code` and
- * `payment_intents.failure_code` store whatever the ADAPTER reported, because
- * that is what a support engineer needs when a customer calls: a gateway's
- * own code is the only thing the gateway's own support desk will accept. But
- * that value is provider-shaped, unbounded, and — for a real Iranian gateway —
- * frequently a numeric code or a free-text sentence that may embed a
- * reference, a merchant identifier, or a bank message. Putting it in a
- * redirect URL would publish it to the customer's browser history, their
- * referrer headers, and any analytics script the result page ever loads.
+ * The VOCABULARY itself -- the eight public reasons, the six result statuses,
+ * and the rule for which reasons permit a retry -- now lives in
+ * `@beauclick/payment-contract`, a dependency-free package the Next.js bundle
+ * can import. This module keeps the half that needs the domain: the table that
+ * maps a PROVIDER's own code onto a public reason, and the shape an ambiguous
+ * verification takes.
+ *
+ * That split exists because the checkout result page has to render the same
+ * eight reasons and make the same retry decision, and the only alternatives
+ * were dragging `@nestjs/common` and TypeORM into a browser bundle, or keeping
+ * a second copy of the vocabulary in the page. The second copy is what the page
+ * had, and two policies that must agree while being maintained separately are
+ * one policy plus a bug waiting for a release.
+ *
+ * Re-exported below, so every existing `@beauclick/payment` import keeps
+ * working and there is still exactly one place a server-side caller looks.
+ *
+ * ## Why the two codes stay different things
+ *
+ * `payment_attempts.failure_code` and `payment_intents.failure_code` store
+ * whatever the ADAPTER reported, because that is what a support engineer needs
+ * when a customer calls: a gateway's own code is the only thing the gateway's
+ * own support desk will accept. But that value is provider-shaped, unbounded,
+ * and -- for a real Iranian gateway -- frequently a numeric code or a free-text
+ * sentence that may embed a reference, a merchant identifier, or a bank
+ * message. Putting it in a redirect URL would publish it to the customer's
+ * browser history, their referrer headers, and any analytics script the result
+ * page ever loads.
  *
  * So there are two codes and they are deliberately different things:
  *
- *  - the PROVIDER code — stored, internal, unbounded, never rendered;
- *  - the PUBLIC reason — this closed set, safe to publish, and the ONLY thing
+ *  - the PROVIDER code -- stored, internal, unbounded, never rendered;
+ *  - the PUBLIC reason -- the closed set, safe to publish, and the ONLY thing
  *    the redirect contract and the frontend ever see.
- *
- * The set is closed on purpose. An adapter cannot widen it by returning a new
- * string: `toPublicFailureReason` maps what it recognises and answers
- * `gateway_error` for everything else. A new gateway therefore cannot leak a
- * new code by accident, and adding a genuinely new user-visible distinction is
- * a deliberate edit here plus the Persian copy that goes with it — which is
- * the point, because each of these needs a DIFFERENT sentence to the customer.
- *
- * `QA-21`'s actual complaint: `cancelled_by_user` and `declined` were both
- * rendered as "پرداخت انجام نشد". One means the customer changed their mind
- * and should simply be offered the button again; the other means their bank
- * refused and they need to try a different card. Collapsing them makes the
- * page useless in exactly the moment a customer is deciding whether to give
- * up.
  */
-export const PAYMENT_FAILURE_REASONS = [
-  /** The customer chose to abandon the payment at the bank's own page. */
-  'cancelled_by_user',
-  /** The bank refused the transaction — insufficient funds, a blocked card, a wrong PIN. */
-  'declined',
-  /** The intent's payment window closed before the gateway confirmed anything. */
-  'expired',
-  /** The customer returned from the gateway without completing anything there. */
-  'not_completed',
-  /**
-   * The gateway does not recognise the transaction at all.
-   *
-   * Also what a FORGED callback produces, and the two are deliberately
-   * indistinguishable from outside: an attacker probing references must not be
-   * able to tell a real-but-unpaid one from an invented one.
-   */
-  'unknown_reference',
-  /**
-   * The gateway reported a success whose amount or currency disagreed with the
-   * order. A security event, not an ordinary decline — see
-   * `PaymentService.applyVerification`.
-   */
-  'amount_mismatch',
-  /**
-   * The gateway could not be reached, or answered in a way that did not
-   * establish an outcome. **Not a failure of the payment** — the money may
-   * have moved. Carried through so the customer is told the truth rather than
-   * "no money was taken", which is the one thing nobody can promise here.
-   */
-  'unresolved',
-  /** Anything else a gateway reported. The safe fallback, never a leak. */
-  'gateway_error',
-] as const;
 
-export type PaymentFailureReason = (typeof PAYMENT_FAILURE_REASONS)[number];
+export * from '@beauclick/payment-contract';
 
 /**
  * Provider and internal codes that map onto a public reason.
@@ -141,23 +114,20 @@ export function toPublicFailureReason(providerFailureCode: string | null | undef
   return REASON_ALIASES.get(normalized) ?? 'gateway_error';
 }
 
-/** Whether a string is one of the public reasons — for the frontend contract's own boundary checks. */
-export function isPaymentFailureReason(value: unknown): value is PaymentFailureReason {
-  return typeof value === 'string' && (PAYMENT_FAILURE_REASONS as readonly string[]).includes(value);
-}
-
 /**
- * Whether a customer can sensibly be offered "try again" for this reason.
+ * Whether the failure a PROVIDER reported permits a retry.
  *
- * Server-side rather than a frontend `switch`, because the answer is a
- * property of the payment domain: `amount_mismatch` is an open security
- * investigation and must NOT invite a retry, and `unresolved` must not either
- * — retrying a payment that may already have succeeded is how a customer gets
- * charged twice.
+ * The narrowing and the rule are two separate steps on purpose. This takes a
+ * raw, stored, provider-shaped code and answers the domain question, so a
+ * caller in the payment domain never has to remember to narrow first — which
+ * is exactly the mistake that would let an unrecognised gateway code fall
+ * through to a permissive default.
+ *
+ * The RULE itself lives in `@beauclick/payment-contract` and is shared with
+ * the browser. This is the domain-side adapter onto it.
  */
-export function isRetryableFailureReason(reason: PaymentFailureReason | null): boolean {
-  if (reason === null) return false;
-  return reason === 'cancelled_by_user' || reason === 'declined' || reason === 'not_completed' || reason === 'gateway_error';
+export function isRetryableProviderFailureCode(providerFailureCode: string | null | undefined): boolean {
+  return isRetryableFailureReason(toPublicFailureReason(providerFailureCode));
 }
 
 /**
