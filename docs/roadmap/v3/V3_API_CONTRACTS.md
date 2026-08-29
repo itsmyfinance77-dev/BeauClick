@@ -89,6 +89,21 @@ No dedicated V2 controller — search is served through `provider-service`'s `/m
 
 No real gateway routes exist in V2 to inventory (`GAP-06`) — the callback/webhook contract is genuinely new. The one shape to preserve: a payment-status webhook/callback endpoint must be idempotent per provider-supplied transaction reference, and must never trust a client-supplied "payment succeeded" claim without independent provider verification.
 
+**V3.1 Phase F — what has since been built** (full contract:
+`docs/roadmap/v3.1/V3.1_PHASE_F_IMPLEMENTATION.md` §§2.1, 2.2b–2.2d; architecture: `ADR-028`):
+
+| Route | Method | Auth | Contract |
+|---|---|---|---|
+| `/v1/payments/callback/:provider` | GET + POST | public | The gateway's return leg. Idempotent per `(provider_key, provider_reference)`; the callback parameters identify the transaction and never attest to it. Redirects 303 to `PUBLIC_WEB_BASE_URL/checkout/result?status&orderId[&reason]` |
+| `/v1/orders/:id/payment/retry` | POST | session + `OrderOwnerResolver` | **V3.1 Phase F.** Order-scoped, so no intent id is ever put in a URL. Empty body — the server reads nothing from the request but the order id. Returns `{ redirectUrl }` only; refuses 409 `PAYMENT_RETRY_NOT_AVAILABLE` with a `reason` from a closed set |
+
+Two rules the redirect contract carries and that must not be relaxed:
+
+1. **`status`, `orderId`, and `reason` are presentation inputs, not payment truth.** Every figure on the result page is re-fetched from `GET /v1/orders/:id` under a valid session; editing the query string changes a sentence and nothing else.
+2. **The gateway's own failure code is never published.** It is stored for support and narrowed to a closed eight-member public vocabulary (`@beauclick/payment-contract`) before it reaches a URL — a redirect URL is browser history, a referrer header, and whatever analytics the page loads.
+
+Retry eligibility is derived **server-side** from the stored failure code, the order's status, and whether a gateway attempt is still open; the client's `reason` is never consulted. An unresolved verification writes nothing, so the intent's stored failure code may still be a retryable one — which is why an open attempt refuses a retry independently of it.
+
 ## financial-service
 
 | V2 route | Method | Auth | Notes to preserve |

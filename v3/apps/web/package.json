@@ -12,7 +12,8 @@
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "@beauclick/design-tokens": "workspace:*",
-    "@beauclick/persian-utils": "workspace:*"
+    "@beauclick/persian-utils": "workspace:*",
+    "@beauclick/payment-contract": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "^18.3.11",

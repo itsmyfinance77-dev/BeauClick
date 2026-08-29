@@ -3,7 +3,12 @@ import { DataSource } from 'typeorm';
 
 import { BookingService, CreateBookingInput } from '@beauclick/booking';
 import { OrderService, OrderWithDetail } from '@beauclick/commerce';
-import { PaymentService, VerificationOutcome } from '@beauclick/payment';
+import {
+  PaymentIntentNotFoundException,
+  PaymentRetryNotAvailableException,
+  PaymentService,
+  VerificationOutcome,
+} from '@beauclick/payment';
 import { OutboxRelay } from '@beauclick/events';
 import { METRICS, MetricsRegistry } from '@beauclick/observability';
 
@@ -248,6 +253,116 @@ export class CheckoutService {
 
     await this.drainQuietly();
     return { outcome, refundIssued, duplicateChargeRefunded };
+  }
+
+  /**
+   * Send a customer back to the gateway for an order whose payment failed
+   * (V3.1 Phase F design, §2 of `16_CHECKOUT_RESULT.md`).
+   *
+   * ## Why this is order-scoped and not intent-scoped
+   *
+   * The result page holds an `orderId` and nothing else -- the redirect
+   * contract deliberately carries no `intentId`, and it should not start: an
+   * intent id in a URL is a payment-domain identifier in browser history, a
+   * referrer header, and every analytics script the page loads, for no benefit
+   * the customer's own order id does not already provide.
+   *
+   * So the command takes the order, and the SERVER resolves which intent that
+   * means. The `orderId` is untrusted input, and it does not need to be
+   * trusted: `OrderOwnerResolver` on the route resolves the owner from the
+   * order row and compares it to the session, returning the same
+   * `NOT_FOUND_OR_NOT_YOURS` whether the order does not exist or belongs to
+   * somebody else.
+   *
+   * ## What is checked, and why each one
+   *
+   * Every input to every decision below is read from the database. Nothing is
+   * taken from the request except the order id, whose only power is to select
+   * a row the caller has already been proven to own.
+   *
+   *  1. **The order still owes money.** `paid`, `refunded`,
+   *     `partially_refunded`, and `cancelled` are all refusals. Without this a
+   *     customer could be sent to a bank for an order that has already
+   *     settled.
+   *  2. **The intent belongs to the same customer.** Redundant with the route
+   *     guard by design: the guard resolves from `commerce.orders` and this
+   *     reads `payment.payment_intents`, so the two agree only if the data is
+   *     consistent, and a disagreement fails closed.
+   *  3. **The intent has not succeeded, been cancelled, or expired**, and its
+   *     window has not lapsed. `PaymentService.initiate` re-checks all of this
+   *     and would refuse anyway; checking here turns a generic
+   *     `NOT_PAYABLE` into a specific, closed-vocabulary refusal the page can
+   *     render.
+   *  4. **No gateway transaction is open.** This is the one that makes
+   *     `unresolved` genuinely unretryable, and it is worth stating plainly:
+   *     an `unknown` verification writes NOTHING -- the attempt stays
+   *     `initiated` and the intent stays `pending` -- so the intent's stored
+   *     failure code is still whatever the PREVIOUS attempt recorded. Deciding
+   *     on the failure code alone would therefore offer a retry on a payment
+   *     that may already have taken the customer's money. An open attempt is
+   *     the honest signal, and all three situations it covers (at the bank,
+   *     abandoned, unresolved) must be refused identically because from here
+   *     they are indistinguishable.
+   *  5. **The recorded failure is one a retry can fix.** Derived from
+   *     `intent.failureCode` through the closed public vocabulary. The
+   *     caller's `reason` query parameter is never read.
+   *
+   * ## Concurrency
+   *
+   * Deliberately no lock and no transaction around the checks. Two concurrent
+   * retries both pass, both call `initiate`, and `initiate`'s own invariants
+   * resolve it: it reuses a live attempt if one exists, and
+   * `uq_payment_attempts_live_per_intent` -- a partial unique index over
+   * attempts still `initiated` -- makes a second one impossible at the
+   * database level, so the loser catches the unique violation and returns the
+   * winner's redirect URL. Exactly one chargeable gateway transaction, and
+   * both callers get the same one.
+   *
+   * Adding a transaction here would not improve that and would make it worse:
+   * it would hold a connection across `provider.initiate`, an HTTP round trip
+   * to a bank, which is the thing `initiate` is carefully written not to do.
+   *
+   * ## What it returns
+   *
+   * The redirect URL and nothing else. No provider reference, no attempt id,
+   * no intent id, no stored failure code.
+   */
+  async retryPayment(input: {
+    orderId: string;
+    customerId: string;
+    callbackBaseUrl: string;
+  }): Promise<{ redirectUrl: string }> {
+    const order = await this.orders.findById(input.orderId);
+    // The route's ownership guard already answered both of these. Repeated
+    // because this method is the one that issues a payment, and a future
+    // caller that forgets the decorator must not become a hole.
+    if (!order || order.customerId !== input.customerId) throw new PaymentIntentNotFoundException();
+
+    if (order.status !== 'pending') throw new PaymentRetryNotAvailableException('order_not_payable');
+
+    const intent = await this.payments.findLatestIntentForOrder(input.orderId);
+    if (!intent) throw new PaymentRetryNotAvailableException('no_payment_started');
+    if (intent.customerId !== input.customerId) throw new PaymentIntentNotFoundException();
+
+    if (intent.status === 'succeeded') throw new PaymentRetryNotAvailableException('already_paid');
+    if (intent.status === 'expired' || intent.expiresAt.getTime() <= Date.now()) {
+      throw new PaymentRetryNotAvailableException('expired');
+    }
+    if (intent.status === 'cancelled') throw new PaymentRetryNotAvailableException('order_not_payable');
+
+    const open = await this.payments.findOpenAttemptForIntent(intent.id);
+    if (open) throw new PaymentRetryNotAvailableException('verification_pending');
+
+    if (!this.payments.isIntentRetryable(intent)) throw new PaymentRetryNotAvailableException('not_retryable');
+
+    const initiated = await this.payments.initiate(
+      intent.id,
+      input.callbackBaseUrl,
+      `تلاش دوباره برای پرداخت سفارش ${intent.orderId}`,
+    );
+
+    await this.drainQuietly();
+    return { redirectUrl: initiated.redirectUrl };
   }
 
   /**

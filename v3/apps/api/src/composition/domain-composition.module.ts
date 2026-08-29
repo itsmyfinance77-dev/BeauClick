@@ -21,6 +21,7 @@ import { PHASE3_EVENT_HANDLERS, PHASE3_OUTBOX_SOURCES } from './phase3-tokens';
 import { DomainPortsModule } from './domain-ports.module';
 import { CheckoutService } from '../checkout/checkout.service';
 import { CheckoutController, SandboxGatewayController, PaymentCallbackController } from '../checkout/checkout.controller';
+import { OrderPaymentController } from '../checkout/order-payment.controller';
 import { OutboxSweepScheduler } from '../events/outbox-sweep.scheduler';
 import {
   BookingCancelledRefundHandler,
@@ -89,7 +90,18 @@ import {
     // own tokens and merged into the single relay below.
     Phase3CompositionModule,
   ],
-  controllers: [CheckoutController, PaymentCallbackController, SandboxGatewayController, WaitlistAcceptanceController],
+  controllers: [
+    CheckoutController,
+    PaymentCallbackController,
+    SandboxGatewayController,
+    // V3.1 Phase F. `POST /v1/orders/:id/payment/retry` -- order-scoped, so
+    // the redirect contract never has to carry an intent id. Registered here
+    // rather than in commerce because deciding whether a retry is permitted
+    // needs both the order's status and the intent's stored failure code, and
+    // ADR-011 forbids either service importing the other.
+    OrderPaymentController,
+    WaitlistAcceptanceController,
+  ],
   providers: [
     CheckoutService,
     WaitlistAcceptanceService,

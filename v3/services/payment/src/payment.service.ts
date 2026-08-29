@@ -13,7 +13,13 @@ import { PaymentOutboxEntity } from './entities/payment-outbox.entity';
 import { RefundEntity, RefundKind, RefundStatus } from './entities/refund.entity';
 import { PaymentProviderRegistry } from './providers/payment-provider.registry';
 import { VerifyPaymentResult } from './providers/payment-provider.interface';
-import { PaymentFailureReason, toPublicFailureReason, unresolvedVerification } from './payment-failure';
+import {
+  PaymentFailureReason,
+  PaymentRetryRefusal,
+  isRetryableProviderFailureCode,
+  toPublicFailureReason,
+  unresolvedVerification,
+} from './payment-failure';
 
 export class PaymentIntentNotFoundException extends DomainException {
   constructor() {
@@ -30,6 +36,31 @@ export class PaymentIntentNotPayableException extends DomainException {
 export class PaymentAmountMismatchException extends DomainException {
   constructor() {
     super('PAYMENT_AMOUNT_MISMATCH', 'مبلغ پرداخت‌شده با مبلغ سفارش مطابقت ندارد.', HttpStatus.CONFLICT);
+  }
+}
+
+/**
+ * A retry was asked for and the payment domain refused it.
+ *
+ * A distinct exception from `PaymentIntentNotPayableException`, because the
+ * two answer different questions and are read by different callers.
+ * `NOT_PAYABLE` describes an intent; this describes an ORDER-scoped retry
+ * request, and its `reason` comes from `PAYMENT_RETRY_REFUSALS` -- a closed
+ * set, so no internal state name and no provider code can reach a browser
+ * through it.
+ *
+ * 409 rather than 403: the caller is authorised (ownership was already
+ * resolved) and the request is well formed. What is wrong is the state of the
+ * order.
+ */
+export class PaymentRetryNotAvailableException extends DomainException {
+  constructor(reason: PaymentRetryRefusal) {
+    super(
+      'PAYMENT_RETRY_NOT_AVAILABLE',
+      'امکان تلاش دوباره برای این پرداخت وجود ندارد.',
+      HttpStatus.CONFLICT,
+      { reason },
+    );
   }
 }
 
@@ -212,6 +243,60 @@ export class PaymentService {
 
   async findIntent(intentId: string): Promise<PaymentIntentEntity | null> {
     return this.intents.findOne({ where: { id: intentId } });
+  }
+
+  /**
+   * The most recent intent for an order, whatever state it is in.
+   *
+   * Distinct from `findLiveIntentForOrder`, and the difference is the whole
+   * reason this exists: `LIVE_INTENT_STATUSES` is `created | pending |
+   * succeeded`, so a FAILED intent -- which is precisely the one a retry is
+   * about -- is invisible to that lookup. It has to be, because "live" means
+   * "owns its order, no second intent may exist alongside it", and a failed
+   * intent releases that claim.
+   *
+   * Ordered by id descending. Ids are uuidv7, which is time-ordered, so this
+   * is "newest" without a second timestamp column and without depending on
+   * `created_at` resolution for two intents created in the same millisecond.
+   */
+  async findLatestIntentForOrder(orderId: string): Promise<PaymentIntentEntity | null> {
+    return this.intents.findOne({ where: { orderId }, order: { id: 'DESC' } });
+  }
+
+  /**
+   * The open gateway transaction on an intent, if there is one.
+   *
+   * `initiated` means a customer was sent to a bank and nothing has come back
+   * that resolved it. That covers three situations which are indistinguishable
+   * from here and must be treated identically: the customer is at the bank
+   * right now, the customer abandoned the page, and **a verification came back
+   * `unknown`** -- which writes nothing precisely so the attempt stays
+   * recoverable.
+   *
+   * A retry must refuse all three. See `CheckoutService.retryPayment`.
+   */
+  async findOpenAttemptForIntent(intentId: string): Promise<PaymentAttemptEntity | null> {
+    return this.attempts.findOne({
+      where: { paymentIntentId: intentId, status: 'initiated' },
+      order: { id: 'DESC' },
+    });
+  }
+
+  /**
+   * Whether the failure recorded ON THIS INTENT permits a retry.
+   *
+   * Reads `intent.failureCode` -- the provider's own stored code -- and
+   * narrows it through the same closed vocabulary the browser holds. **The
+   * caller's `reason` query parameter is never consulted**: a client that
+   * claims a failure was retryable is asking a question the server answers
+   * from its own record.
+   *
+   * A null failure code is NOT retryable. An intent that has never
+   * definitively failed is either untouched, in flight, or unresolved, and
+   * none of those is a state a retry may act on.
+   */
+  isIntentRetryable(intent: PaymentIntentEntity): boolean {
+    return isRetryableProviderFailureCode(intent.failureCode);
   }
 
   /**

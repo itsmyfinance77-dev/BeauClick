@@ -39,6 +39,9 @@
       "@beauclick/persian-utils": [
         "dist/packages/persian-utils/src/index.js"
       ],
+      "@beauclick/payment-contract": [
+        "dist/packages/payment-contract/src/index.js"
+      ],
       "@beauclick/money": [
         "dist/libs/money/src/index.js"
       ],

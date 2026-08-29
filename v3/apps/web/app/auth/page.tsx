@@ -1,10 +1,11 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { useEffect, useState, type FormEvent } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useState, type FormEvent } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { ApiRequestError } from '@/lib/api-client';
-import { Alert, Button, Card, Input } from '@/components/ui';
+import { Alert, Button, Card, Input, LoadingState } from '@/components/ui';
+import { safeReturnPath } from '@/lib/safe-return';
 import { toPersianDigits } from '@beauclick/persian-utils';
 
 type Step = 'phone' | 'code';
@@ -19,9 +20,26 @@ type Step = 'phone' | 'code';
  * never invents its own copy for a server-side failure, so anti-
  * enumeration guarantees can't be undermined by a chattier frontend.
  */
-export default function AuthPage() {
+function AuthContent() {
   const { requestOtp, verifyOtp, status } = useAuth();
   const router = useRouter();
+  const params = useSearchParams();
+
+  /**
+   * Where to go after signing in.
+   *
+   * Added so a customer sent here from a page that needs a session -- the
+   * checkout result's receipt, today -- comes BACK to it rather than being
+   * dropped on the dashboard with no explanation of why they were interrupted.
+   *
+   * `safeReturnPath` is doing real work, not defensive decoration: `?next=` on
+   * a login page is the most valuable place in a product to have an open
+   * redirect. `/auth?next=https://evil.example/login` is a phishing page a
+   * customer reaches THROUGH the real site, immediately after typing a real
+   * OTP. It returns null for anything that is not an absolute path on this
+   * origin, so the fallback below is the only other outcome.
+   */
+  const returnTo = safeReturnPath(params.get('next')) ?? '/dashboard';
 
   const [step, setStep] = useState<Step>('phone');
   const [phone, setPhone] = useState('');
@@ -30,8 +48,8 @@ export default function AuthPage() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (status === 'authenticated') router.replace('/dashboard');
-  }, [status, router]);
+    if (status === 'authenticated') router.replace(returnTo);
+  }, [status, router, returnTo]);
 
   async function handleRequestOtp(event: FormEvent) {
     event.preventDefault();
@@ -53,7 +71,7 @@ export default function AuthPage() {
     setBusy(true);
     try {
       await verifyOtp(phone, code);
-      router.replace('/dashboard');
+      router.replace(returnTo);
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : 'خطایی رخ داد.');
     } finally {
@@ -120,5 +138,18 @@ export default function AuthPage() {
         )}
       </Card>
     </div>
+  );
+}
+
+/**
+ * `useSearchParams` suspends during prerender in the app router, so the page
+ * component is a boundary around the content -- the same shape
+ * `/checkout/result` uses, and for the same reason.
+ */
+export default function AuthPage() {
+  return (
+    <Suspense fallback={<LoadingState />}>
+      <AuthContent />
+    </Suspense>
   );
 }

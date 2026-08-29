@@ -116,6 +116,31 @@ export const bookingApi = {
 
   cancelBooking: (api: ApiClient, bookingId: string, reason?: string) =>
     api.post<BookingSummary>(`/v1/bookings/${bookingId}/cancel`, { reason }),
+
+  /**
+   * Send the customer back to the gateway for an order whose payment failed
+   * (V3.1 Phase F).
+   *
+   * ORDER-scoped, with no intent id anywhere in the request. That is a
+   * deliberate property of the contract rather than a convenience: an intent
+   * id in a URL is a payment-domain identifier written into browser history,
+   * referrer headers, and every analytics script the result page loads, and it
+   * buys nothing the customer's own order id does not already provide. The
+   * server resolves which intent this means, from its own records.
+   *
+   * The body is empty on purpose. There is nothing the client could put in it
+   * that the server would read -- not the failure reason, not a retryable
+   * flag, not a customer id. Every one of those is derived server-side from
+   * the authenticated session and the stored payment record, so a client that
+   * lies is answering a question nobody asked it.
+   *
+   * Returns only `{ redirectUrl }`. Refuses with `PAYMENT_RETRY_NOT_AVAILABLE`
+   * and a `reason` from the closed `PAYMENT_RETRY_REFUSALS` set, or with
+   * `NOT_FOUND_OR_NOT_YOURS` for an order that is not the caller's -- which is
+   * the same answer an order that does not exist gets.
+   */
+  retryOrderPayment: (api: ApiClient, orderId: string) =>
+    api.post<{ redirectUrl: string }>(`/v1/orders/${orderId}/payment/retry`, {}),
 };
 
 /**

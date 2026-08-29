@@ -1,0 +1,11 @@
+{
+  "name": "payment-contract",
+  "sourceRoot": "packages/payment-contract/src",
+  "projectType": "library",
+  "tags": ["type:lib", "scope:shared"],
+  "targets": {
+    "typecheck": { "executor": "nx:run-commands", "options": { "command": "tsc -p packages/payment-contract/tsconfig.json --noEmit" } },
+    "test": { "executor": "nx:run-commands", "options": { "command": "jest --config packages/payment-contract/jest.config.js" } },
+    "lint": { "executor": "nx:run-commands", "options": { "command": "eslint packages/payment-contract/src --resolve-plugins-relative-to ." } }
+  }
+}

@@ -5,8 +5,19 @@ import { AuthProvider } from '@/lib/auth-context';
 import { tokenStorage } from '@/lib/token-storage';
 
 const replace = jest.fn();
+/**
+ * `useSearchParams` was added to this mock in V3.1 Phase F, when the auth page
+ * gained `?next=` support so a customer sent here from the checkout result
+ * comes BACK to it after signing in.
+ *
+ * Empty params, so every case below still asserts the DEFAULT destination —
+ * the `next` behaviour itself is covered by `safe-return.spec.ts` (the
+ * open-redirect boundary) and by the checkout result suite (the link it
+ * builds).
+ */
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ replace, push: jest.fn() }),
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 function mockFetchOnce(status: number, body: unknown) {
