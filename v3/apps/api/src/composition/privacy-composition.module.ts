@@ -19,6 +19,7 @@ import { BusinessModule, BusinessSubjectDataContract } from '@beauclick/business
 import { WaitlistModule, WaitlistSubjectDataContract } from '@beauclick/waitlist';
 import { SearchModule, SearchSubjectDataContract } from '@beauclick/search';
 import { ERASURE_RUNNER, PrivacyModule, PrivacyService, PrivacySubjectDataContract } from '@beauclick/privacy';
+import { AiModule, AiSubjectDataContract } from '@beauclick/ai';
 
 /**
  * Erasure's one out-of-transaction step.
@@ -84,7 +85,7 @@ export class PrivacyErasureCompleter {
  * skipped by an export. The list is the wiring; the catalogue check is the
  * proof.
  *
- * Sixteen contracts. `financial`'s reads on its own connection (ADR-017);
+ * Seventeen contracts. `financial`'s reads on its own connection (ADR-017);
  * `search`'s is a claim with no work, because provider's `ProfessionalUpdated`
  * event already removes the document. Both are explained in their own files.
  */
@@ -108,6 +109,12 @@ export class PrivacyErasureCompleter {
     WaitlistModule,
     SearchModule,
     PrivacyModule,
+    // V3.2-A. Imported for its contract only. `ai`'s six tables are claimed
+    // like every other module's, and the boot assertion is what turns "somebody
+    // remembered to register" into a startup failure -- an unclaimed `ai` table
+    // stops the application, which is the intended severity for a schema
+    // holding the most sensitive prose in the platform.
+    AiModule,
   ],
   providers: [
     PrivacyErasureCompleter,
@@ -140,6 +147,7 @@ export class PrivacyErasureCompleter {
         MediaSubjectDataContract,
         AuditSubjectDataContract,
         PrivacySubjectDataContract,
+        AiSubjectDataContract,
       ],
       useFactory: (...contracts: SubjectDataContract[]): SubjectDataContract[] => contracts,
     },

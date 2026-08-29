@@ -1,0 +1,11 @@
+{
+  "name": "ai-contract",
+  "sourceRoot": "packages/ai-contract/src",
+  "projectType": "library",
+  "tags": ["type:lib", "scope:shared"],
+  "targets": {
+    "typecheck": { "executor": "nx:run-commands", "options": { "command": "tsc -p packages/ai-contract/tsconfig.json --noEmit" } },
+    "test": { "executor": "nx:run-commands", "options": { "command": "jest --config packages/ai-contract/jest.config.js" } },
+    "lint": { "executor": "nx:run-commands", "options": { "command": "eslint packages/ai-contract/src --resolve-plugins-relative-to ." } }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "@beauclick/ai-contract",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The browser-safe half of the AI assistant contract: the provider-state vocabulary, the closed refusal vocabulary, the conversation/message/recommendation enums, and the size, quota, and retention limits. Zero dependencies, no framework, no TypeORM -- so the Next.js bundle and the NestJS server share ONE definition instead of two that drift.",
+  "main": "src/index.ts",
+  "types": "src/index.ts"
+}

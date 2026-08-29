@@ -49,6 +49,8 @@
     "@beauclick/subject-data": "workspace:*",
     "@beauclick/privacy": "workspace:*",
     "@beauclick/observability": "workspace:*",
+    "@beauclick/ai": "workspace:*",
+    "@beauclick/ai-contract": "workspace:*",
     "tsconfig-paths": "^4.2.0"
   },
   "devDependencies": {

@@ -36,7 +36,12 @@ export type ServiceName =
   | 'analytics'
   | 'business'
   | 'waitlist'
-  | 'privacy';
+  | 'privacy'
+  // V3.2-A. The AI assistant domain (ADR-029). Added to the CLOSED contract
+  // rather than left off it: an event whose producer is not in this union
+  // cannot be declared, which is what makes "exactly one service owns this
+  // fact" a compile-time property instead of a convention.
+  | 'ai';
 
 export interface EventContract<TSchema extends z.ZodType = z.ZodType> {
   /** Wire name, e.g. `BookingCompleted`. Unique per version. */

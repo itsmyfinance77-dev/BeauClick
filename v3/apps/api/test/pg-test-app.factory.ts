@@ -88,6 +88,25 @@ const HERMETIC_ENV: Record<string, string> = {
   // A background sweep firing mid-assertion is a flaky test, not coverage.
   DISABLE_BACKGROUND_SWEEPS: 'true',
   NODE_ENV: 'test',
+  /**
+   * V3.2-A. The AI policy numbers, pinned to the owner-decided values.
+   *
+   * Set explicitly rather than left to the code defaults for the reason the
+   * loyalty block below records: a case asserting that the twenty-first message
+   * is refused must be testing the QUOTA MECHANISM, not whatever
+   * `AI_DAILY_MESSAGE_QUOTA` happens to fall back to. A suite that needs a
+   * different boundary overrides it through `createPgTestApp`'s parameter,
+   * which is the documented seam.
+   *
+   * `AI_DEFAULT_PROVIDER` is deliberately UNSET: exactly one provider is
+   * registered, so the registry resolves it without guessing -- and leaving it
+   * unset is what exercises that path rather than the configured one.
+   */
+  AI_DAILY_MESSAGE_QUOTA: '20',
+  AI_MAX_RETAINED_CONVERSATIONS: '20',
+  AI_INACTIVITY_CLOSE_HOURS: '24',
+  AI_RETENTION_DAYS: '30',
+  AI_PROVIDER_TIMEOUT_MS: '5000',
   // Loyalty policy pinned so a case asserting a points total is testing the
   // ledger, not whatever GAP-10 default happens to be current.
   LOYALTY_POINTS_BOOKING_COMPLETED: '10',
@@ -257,6 +276,17 @@ export async function createPgTestApp(envOverrides: Record<string, string> = {})
  * schema really is.
  */
 export const RESETTABLE_TABLES = [
+  // V3.2-A. Children first by convention, though the composite FKs cascade:
+  // `ai.recommendations` and `ai.messages` both reference `ai.conversations`
+  // ON DELETE CASCADE, so naming them keeps the truncate explicit rather than
+  // relying on a cascade to do the right thing -- the same reasoning the
+  // `identity.user_roles` line below records.
+  'ai.outbox_events',
+  'ai.recommendations',
+  'ai.messages',
+  'ai.conversations',
+  'ai.assistant_consents',
+  'ai.usage_daily',
   // Phase 4 schemas first, for the same children-first reason Phase 3's
   // comment gives: waitlist entries reference booking/provider ids by
   // convention (no FK), and business staff rows reference identity/provider

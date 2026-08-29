@@ -6,6 +6,7 @@ import { DataSource } from 'typeorm';
 import { FINANCIAL_DATA_SOURCE } from '@beauclick/financial';
 import { MediaService } from '@beauclick/media';
 import { PaymentProviderRegistry, SANDBOX_PROVIDER_KEY } from '@beauclick/payment';
+import { AiProviderRegistry } from '@beauclick/ai';
 import { SEARCH_ENGINE, SearchEnginePort } from '@beauclick/search';
 import { SMS_PROVIDER, SmsProvider } from '@beauclick/notification';
 import { ERROR_REPORTER, ErrorReporterPort } from '@beauclick/observability';
@@ -88,6 +89,7 @@ export class ReadinessService {
     @Optional() private readonly payments?: PaymentProviderRegistry,
     @Optional() @Inject(SMS_PROVIDER) private readonly sms?: SmsProvider,
     @Optional() @Inject(ERROR_REPORTER) private readonly errorReporter?: ErrorReporterPort,
+    @Optional() private readonly aiProviders?: AiProviderRegistry,
   ) {}
 
   private get isProduction(): boolean {
@@ -104,6 +106,7 @@ export class ReadinessService {
       this.describeSms(),
       this.describeErrorReporting(),
       this.describeThrottleStore(),
+      this.describeAiProvider(),
     ]);
 
     const problems = productionConfigurationErrors(collectEnv(this.config));
@@ -192,6 +195,33 @@ export class ReadinessService {
     // is right for development and must never look like a working error
     // tracker -- the third time this codebase has needed that distinction.
     return this.describe('error_reporting', this.errorReporter.reportsExternally ? 'configured' : 'simulated');
+  }
+
+  /**
+   * The AI provider's honest state (ADR-029 §4).
+   *
+   * The registry answers, not this method, and it answers from the RESOLVED
+   * provider rather than from configuration -- so a deployment whose
+   * `AI_DEFAULT_PROVIDER` names an adapter nobody registered reports
+   * `not_configured` rather than `configured`, because nothing can answer.
+   *
+   * `simulated` is what a deployment running only the deterministic local
+   * assistant reports, and it is the same word the sandbox gateway, the null
+   * SMS provider, and the in-memory search engine already wear. It means a real,
+   * correct implementation that must never be mistaken for the external thing it
+   * stands in for -- and here that mistake is unusually easy to make, because a
+   * deterministic Persian paragraph and a frontier model's Persian paragraph
+   * look identical to everybody except the code that produced them.
+   *
+   * Not probed, and there is nothing to probe: the only registered provider is
+   * in-process. When a real one exists it will report `configured` rather than
+   * `reachable`, for the reason object storage and the payment gateway already
+   * do -- a public, unauthenticated, rate-limit-exempt endpoint must not open a
+   * paid API connection on every orchestrator poll.
+   */
+  private describeAiProvider(): DependencyReadiness {
+    if (!this.aiProviders) return this.describe('ai_provider', 'not_configured');
+    return this.describe('ai_provider', this.aiProviders.describeReadiness());
   }
 
   private describeThrottleStore(): DependencyReadiness {

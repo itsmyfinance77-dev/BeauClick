@@ -17,6 +17,7 @@ import { PrivacyModule, PrivacyOutboxEntity } from '@beauclick/privacy';
 
 import { Phase3CompositionModule } from './phase3-composition.module';
 import { PHASE3_EVENT_HANDLERS, PHASE3_OUTBOX_SOURCES } from './phase3-tokens';
+import { AI_OUTBOX_SOURCES } from './ai-tokens';
 
 import { DomainPortsModule } from './domain-ports.module';
 import { CheckoutService } from '../checkout/checkout.service';
@@ -119,8 +120,8 @@ import {
       // Phase 2's three tables plus Phase 3's five, merged here because the
       // relay takes ONE list. Order matters only for tidiness -- each source
       // is drained independently and every handler is idempotent.
-      inject: [PHASE3_OUTBOX_SOURCES],
-      useFactory: (phase3: OutboxSource[]): OutboxSource[] => [
+      inject: [PHASE3_OUTBOX_SOURCES, AI_OUTBOX_SOURCES],
+      useFactory: (phase3: OutboxSource[], ai: OutboxSource[]): OutboxSource[] => [
         { name: 'booking', entity: BookingOutboxEntity },
         { name: 'commerce', entity: CommerceOutboxEntity },
         { name: 'payment', entity: PaymentOutboxEntity },
@@ -131,6 +132,10 @@ import {
         // analytics through the one relay rather than a second mechanism.
         { name: 'privacy', entity: PrivacyOutboxEntity },
         ...phase3,
+        // V3.2-A. On the shared DataSource like every source here except
+        // financial's, so the two AI lifecycle events reach analytics through
+        // the one relay rather than a second mechanism.
+        ...ai,
       ],
     },
     {

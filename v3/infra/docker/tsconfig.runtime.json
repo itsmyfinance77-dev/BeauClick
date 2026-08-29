@@ -42,6 +42,9 @@
       "@beauclick/payment-contract": [
         "dist/packages/payment-contract/src/index.js"
       ],
+      "@beauclick/ai-contract": [
+        "dist/packages/ai-contract/src/index.js"
+      ],
       "@beauclick/money": [
         "dist/libs/money/src/index.js"
       ],
@@ -98,6 +101,9 @@
       ],
       "@beauclick/privacy": [
         "dist/services/privacy/src/index.js"
+      ],
+      "@beauclick/ai": [
+        "dist/services/ai/src/index.js"
       ]
     }
   }

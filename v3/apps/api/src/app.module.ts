@@ -33,9 +33,11 @@ import { MediaModule, MEDIA_ENTITIES } from '@beauclick/media';
 import { SubjectDataModule } from '@beauclick/subject-data';
 import { HttpMetricsMiddleware, ObservabilityModule } from '@beauclick/observability';
 import { PRIVACY_ENTITIES } from '@beauclick/privacy';
+import { AI_ENTITIES } from '@beauclick/ai';
 import { DomainCompositionModule } from './composition/domain-composition.module';
 import { PrivilegedCapabilityModule } from './composition/privileged-capability.module';
 import { PrivacyCompositionModule } from './composition/privacy-composition.module';
+import { AiCompositionModule } from './composition/ai-composition.module';
 
 import cookieParser from 'cookie-parser';
 import { CorrelationMiddleware } from './observability/correlation.middleware';
@@ -98,6 +100,13 @@ import { MetricsController } from './observability/metrics.controller';
           // orchestrates other modules' erasures inside ONE transaction on this
           // DataSource, which it could not do from an isolated connection.
           ...PRIVACY_ENTITIES,
+          // V3.2-A. Six ordinary application-role tables on the shared pool.
+          // The AI schema needs neither `financial`'s second DataSource nor
+          // `admin`'s owner-role isolation: the application both reads and
+          // writes every one of them, and the sensitivity of what they hold is
+          // answered by there being no route that reads another customer's row
+          // (`V32-DEC-009`) rather than by a connection-level grant.
+          ...AI_ENTITIES,
         ],
         // V3_DATABASE_BLUEPRINT.md §2 mandates lower_snake_case columns;
         // TypeORM's default naming strategy uses the JS property name
@@ -186,6 +195,11 @@ import { MetricsController } from './observability/metrics.controller';
     IdentityModule,
     ProviderModule,
     DomainCompositionModule,
+    // V3.2-A. Imported after DomainCompositionModule (whose Phase 3 composition
+    // provides the journey, provider, and search modules its ports read
+    // through) and BEFORE PrivacyCompositionModule, so `AiSubjectDataContract`
+    // exists by the time the coverage assertion runs over the contract list.
+    AiCompositionModule,
     // V3.1 Phase E. Imported AFTER DomainCompositionModule so the boot-order
     // is the honest one: every domain module is instantiated before the
     // coverage assertion runs over the contracts they registered.

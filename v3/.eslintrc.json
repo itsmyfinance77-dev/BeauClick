@@ -58,7 +58,8 @@
               "scope:analytics",
               "scope:business",
               "scope:waitlist",
-              "scope:privacy"
+              "scope:privacy",
+              "scope:ai"
             ]
           },
           {
@@ -79,7 +80,8 @@
               "scope:analytics",
               "scope:business",
               "scope:waitlist",
-              "scope:privacy"
+              "scope:privacy",
+              "scope:ai"
             ]
           },
           {
@@ -100,7 +102,8 @@
               "scope:analytics",
               "scope:business",
               "scope:waitlist",
-              "scope:privacy"
+              "scope:privacy",
+              "scope:ai"
             ]
           },
           {
@@ -121,7 +124,8 @@
               "scope:analytics",
               "scope:business",
               "scope:waitlist",
-              "scope:privacy"
+              "scope:privacy",
+              "scope:ai"
             ]
           },
           {
@@ -142,7 +146,8 @@
               "scope:analytics",
               "scope:business",
               "scope:waitlist",
-              "scope:privacy"
+              "scope:privacy",
+              "scope:ai"
             ]
           },
           {
@@ -163,7 +168,8 @@
               "scope:analytics",
               "scope:business",
               "scope:waitlist",
-              "scope:privacy"
+              "scope:privacy",
+              "scope:ai"
             ]
           },
           {
@@ -184,7 +190,8 @@
               "scope:analytics",
               "scope:business",
               "scope:waitlist",
-              "scope:privacy"
+              "scope:privacy",
+              "scope:ai"
             ]
           },
           {
@@ -205,7 +212,8 @@
               "scope:analytics",
               "scope:business",
               "scope:waitlist",
-              "scope:privacy"
+              "scope:privacy",
+              "scope:ai"
             ]
           },
           {
@@ -226,7 +234,8 @@
               "scope:analytics",
               "scope:business",
               "scope:waitlist",
-              "scope:privacy"
+              "scope:privacy",
+              "scope:ai"
             ]
           },
           {
@@ -247,7 +256,8 @@
               "scope:analytics",
               "scope:business",
               "scope:waitlist",
-              "scope:privacy"
+              "scope:privacy",
+              "scope:ai"
             ]
           },
           {
@@ -268,7 +278,8 @@
               "scope:notification",
               "scope:business",
               "scope:waitlist",
-              "scope:privacy"
+              "scope:privacy",
+              "scope:ai"
             ]
           },
           {
@@ -289,7 +300,8 @@
               "scope:notification",
               "scope:analytics",
               "scope:waitlist",
-              "scope:privacy"
+              "scope:privacy",
+              "scope:ai"
             ]
           },
           {
@@ -310,7 +322,8 @@
               "scope:notification",
               "scope:analytics",
               "scope:business",
-              "scope:privacy"
+              "scope:privacy",
+              "scope:ai"
             ]
           },
           {
@@ -331,7 +344,30 @@
               "scope:notification",
               "scope:analytics",
               "scope:business",
-              "scope:waitlist"
+              "scope:waitlist",
+              "scope:ai"
+            ]
+          },
+          {
+            "sourceTag": "scope:ai",
+            "onlyDependOnLibsWithTags": [
+              "scope:shared"
+            ],
+            "notDependOnLibsWithTags": [
+              "scope:identity",
+              "scope:provider",
+              "scope:booking",
+              "scope:commerce",
+              "scope:payment",
+              "scope:financial",
+              "scope:search",
+              "scope:loyalty",
+              "scope:journey",
+              "scope:notification",
+              "scope:analytics",
+              "scope:business",
+              "scope:waitlist",
+              "scope:privacy"
             ]
           },
           {
@@ -354,7 +390,8 @@
               "scope:business",
               "scope:waitlist",
               "scope:app",
-              "scope:privacy"
+              "scope:privacy",
+              "scope:ai"
             ]
           },
           {
@@ -374,7 +411,8 @@
               "scope:analytics",
               "scope:business",
               "scope:waitlist",
-              "scope:privacy"
+              "scope:privacy",
+              "scope:ai"
             ]
           }
         ]

@@ -36,6 +36,9 @@ module.exports = {
     '^@beauclick/audit$': '<rootDir>/../../libs/audit/src/index.ts',
     '^@beauclick/subject-data$': '<rootDir>/../../libs/subject-data/src/index.ts',
     '^@beauclick/privacy$': '<rootDir>/../../services/privacy/src/index.ts',
+    '^@beauclick/ai$': '<rootDir>/../../services/ai/src/index.ts',
+    '^@beauclick/ai-contract$': '<rootDir>/../../packages/ai-contract/src/index.ts',
+    '^@beauclick/persian-utils$': '<rootDir>/../../packages/persian-utils/src/index.ts',
   },
   testTimeout: 20000,
 };
