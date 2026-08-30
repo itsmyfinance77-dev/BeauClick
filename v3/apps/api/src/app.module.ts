@@ -34,6 +34,7 @@ import { SubjectDataModule } from '@beauclick/subject-data';
 import { HttpMetricsMiddleware, ObservabilityModule } from '@beauclick/observability';
 import { PRIVACY_ENTITIES } from '@beauclick/privacy';
 import { AI_ENTITIES } from '@beauclick/ai';
+import { CHAT_ENTITIES } from '@beauclick/chat';
 import { DomainCompositionModule } from './composition/domain-composition.module';
 import { PrivilegedCapabilityModule } from './composition/privileged-capability.module';
 import { PrivacyCompositionModule } from './composition/privacy-composition.module';
@@ -106,6 +107,12 @@ import { MetricsController } from './observability/metrics.controller';
           // answered by there being no route that reads another customer's row
           // (`V32-DEC-009`) rather than by a connection-level grant.
           ...AI_ENTITIES,
+          // V3.2-B. Seven ordinary application-role tables on the shared pool.
+          // Chat holds the platform's second store of private subject-authored
+          // prose, and like `ai`'s the sensitivity is answered by there being no
+          // route that reads another party's rows -- not by a connection-level
+          // grant.
+          ...CHAT_ENTITIES,
         ],
         // V3_DATABASE_BLUEPRINT.md §2 mandates lower_snake_case columns;
         // TypeORM's default naming strategy uses the JS property name

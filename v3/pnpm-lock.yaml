@@ -103,6 +103,12 @@ importers:
       '@beauclick/business':
         specifier: workspace:*
         version: link:../../services/business
+      '@beauclick/chat':
+        specifier: workspace:*
+        version: link:../../services/chat
+      '@beauclick/chat-contract':
+        specifier: workspace:*
+        version: link:../../packages/chat-contract
       '@beauclick/commerce':
         specifier: workspace:*
         version: link:../../services/commerce
@@ -520,6 +526,8 @@ importers:
 
   packages/ai-contract: {}
 
+  packages/chat-contract: {}
+
   packages/design-tokens: {}
 
   packages/payment-contract: {}
@@ -735,6 +743,61 @@ importers:
       uuidv7:
         specifier: ^1.0.2
         version: 1.2.1
+
+  services/chat:
+    dependencies:
+      '@beauclick/audit':
+        specifier: workspace:*
+        version: link:../../libs/audit
+      '@beauclick/auth':
+        specifier: workspace:*
+        version: link:../../libs/auth
+      '@beauclick/chat-contract':
+        specifier: workspace:*
+        version: link:../../packages/chat-contract
+      '@beauclick/event-contracts':
+        specifier: workspace:*
+        version: link:../../libs/event-contracts
+      '@beauclick/events':
+        specifier: workspace:*
+        version: link:../../libs/events
+      '@beauclick/http':
+        specifier: workspace:*
+        version: link:../../libs/http
+      '@beauclick/ownership':
+        specifier: workspace:*
+        version: link:../../libs/ownership
+      '@beauclick/subject-data':
+        specifier: workspace:*
+        version: link:../../libs/subject-data
+      '@nestjs/common':
+        specifier: 10.4.22
+        version: 10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1)
+      '@nestjs/config':
+        specifier: 3.3.0
+        version: 3.3.0(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(rxjs@7.8.2)
+      '@nestjs/core':
+        specifier: 10.4.22
+        version: 10.4.22(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/platform-express@10.4.22)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/typeorm':
+        specifier: 10.0.2
+        version: 10.0.2(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@10.4.22)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@0.3.31(babel-plugin-macros@3.1.0)(pg@8.23.0)(supports-color@8.1.1)(ts-node@10.9.2(@types/node@22.20.1)(typescript@5.9.3)))
+      class-transformer:
+        specifier: 0.5.1
+        version: 0.5.1
+      class-validator:
+        specifier: 0.14.4
+        version: 0.14.4
+      typeorm:
+        specifier: 0.3.31
+        version: 0.3.31(babel-plugin-macros@3.1.0)(pg@8.23.0)(supports-color@8.1.1)(ts-node@10.9.2(@types/node@22.20.1)(typescript@5.9.3))
+      uuidv7:
+        specifier: ^1.0.2
+        version: 1.2.1
+    devDependencies:
+      '@beauclick/testing':
+        specifier: workspace:*
+        version: link:../../libs/testing
 
   services/commerce:
     dependencies:

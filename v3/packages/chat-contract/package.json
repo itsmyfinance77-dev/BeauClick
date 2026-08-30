@@ -1,0 +1,8 @@
+{
+  "name": "@beauclick/chat-contract",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The browser-safe half of the internal-chat contract: the counterparty vocabulary, the closed refusal vocabulary, report reasons and lifecycle, moderation actions, and the size, poll, throttle, window and retention limits. Zero dependencies, no framework, no TypeORM -- so the Next.js bundle and the NestJS server share ONE definition instead of two that drift. Deliberately carries NO attachment type or field.",
+  "main": "src/index.ts",
+  "types": "src/index.ts"
+}

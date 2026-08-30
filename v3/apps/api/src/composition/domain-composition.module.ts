@@ -17,6 +17,8 @@ import { PrivacyModule, PrivacyOutboxEntity } from '@beauclick/privacy';
 
 import { Phase3CompositionModule } from './phase3-composition.module';
 import { AiCompositionModule } from './ai-composition.module';
+import { ChatCompositionModule } from './chat-composition.module';
+import { CHAT_OUTBOX_SOURCES } from './chat-tokens';
 import { PHASE3_EVENT_HANDLERS, PHASE3_OUTBOX_SOURCES } from './phase3-tokens';
 import { AI_OUTBOX_SOURCES } from './ai-tokens';
 
@@ -97,6 +99,8 @@ import {
     // declares the CONSUMER, so being a sibling under `AppModule` is not
     // enough -- the module providing it has to be imported here.
     AiCompositionModule,
+    // V3.2-B, for the same reason and by the same mechanism.
+    ChatCompositionModule,
   ],
   controllers: [
     CheckoutController,
@@ -127,8 +131,8 @@ import {
       // Phase 2's three tables plus Phase 3's five, merged here because the
       // relay takes ONE list. Order matters only for tidiness -- each source
       // is drained independently and every handler is idempotent.
-      inject: [PHASE3_OUTBOX_SOURCES, AI_OUTBOX_SOURCES],
-      useFactory: (phase3: OutboxSource[], ai: OutboxSource[]): OutboxSource[] => [
+      inject: [PHASE3_OUTBOX_SOURCES, AI_OUTBOX_SOURCES, CHAT_OUTBOX_SOURCES],
+      useFactory: (phase3: OutboxSource[], ai: OutboxSource[], chat: OutboxSource[]): OutboxSource[] => [
         { name: 'booking', entity: BookingOutboxEntity },
         { name: 'commerce', entity: CommerceOutboxEntity },
         { name: 'payment', entity: PaymentOutboxEntity },
@@ -143,6 +147,9 @@ import {
         // financial's, so the two AI lifecycle events reach analytics through
         // the one relay rather than a second mechanism.
         ...ai,
+        // V3.2-B. Same, and additionally the path by which `MessageSent` reaches
+        // the notification module.
+        ...chat,
       ],
     },
     {
@@ -200,6 +207,7 @@ import {
     OutboxSweepScheduler,
     Phase3CompositionModule,
     AiCompositionModule,
+    ChatCompositionModule,
     FINANCIAL_OUTBOX_RELAY,
     PrivacyModule,
     // V3.1 Phase F. Re-exported so the root injector can resolve

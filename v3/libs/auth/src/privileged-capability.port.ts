@@ -48,4 +48,10 @@ export const PRIVILEGED_CAPABILITIES: readonly string[] = [
   // the live revocation re-check, and `libs/audit`'s refusal to boot when a
   // mutation gated on it declares no audit record.
   'bc_moderate_media',
+  // V3.2-B. Authority to read a private conversation between two other people,
+  // so it carries both properties this list confers: the live revocation
+  // re-check, and `libs/audit`'s refusal to boot when a mutation gated on it
+  // declares no audit record. Reading -- not only deciding -- is the privilege
+  // that matters here, and the moderation controller audits both.
+  'bc_moderate_chat',
 ];

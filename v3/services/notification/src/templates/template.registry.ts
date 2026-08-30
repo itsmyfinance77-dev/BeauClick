@@ -33,6 +33,27 @@ export interface TemplateDefinition {
  */
 const TEMPLATES: TemplateDefinition[] = [
   {
+    /**
+     * V3.2-B. A new chat message.
+     *
+     * **Carries no message body and no sender name**, and `requiredVars` is
+     * empty so there is nothing a caller could pass one through. ADR-032 §1
+     * keeps prose out of notification payloads, and a preview would put the
+     * message into a channel the retention and erasure rules do not cover.
+     *
+     * The deep link is the inbox rather than the thread: a notification that
+     * named the conversation in its URL would leak which conversation it was
+     * about into browser history and any referrer.
+     */
+    key: 'chat_message_received',
+    category: 'chat',
+    requiredVars: [],
+    subject: 'پیام جدید',
+    body: 'پیام جدیدی دریافت کرده‌اید.',
+    short: 'پیام جدیدی دریافت کرده‌اید.',
+    deepLink: '/chat',
+  },
+  {
     key: 'booking_confirmed',
     category: 'booking',
     requiredVars: ['professionalName', 'date', 'time'],

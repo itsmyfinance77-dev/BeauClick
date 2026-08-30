@@ -41,7 +41,12 @@ export type ServiceName =
   // rather than left off it: an event whose producer is not in this union
   // cannot be declared, which is what makes "exactly one service owns this
   // fact" a compile-time property instead of a convention.
-  | 'ai';
+  | 'ai'
+  // V3.2-B. Human messaging (ADR-031). A separate domain from `ai` and
+  // deliberately adjacent to it in this list: the two are the platform's only
+  // stores of private subject-authored prose, and the rule that neither may
+  // read the other is easier to remember when they are read together.
+  | 'chat';
 
 export interface EventContract<TSchema extends z.ZodType = z.ZodType> {
   /** Wire name, e.g. `BookingCompleted`. Unique per version. */

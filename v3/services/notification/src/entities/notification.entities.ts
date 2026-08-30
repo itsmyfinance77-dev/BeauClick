@@ -14,6 +14,11 @@ export const NOTIFICATION_CATEGORIES = [
   // loses a value it understood. See privacy.events.ts for why these messages
   // exist and 20260828300002 for why the category is mandatory.
   'privacy',
+  // V3.2-B. Deliberately NOT added to `MANDATORY_CATEGORIES` below: a chat
+  // message is not operationally required the way a booking confirmation or a
+  // payment receipt is, so a customer may switch it off. `V32-DEC-014`'s
+  // milestone boundary requires the category to be opt-outable.
+  'chat',
 ] as const;
 export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
 

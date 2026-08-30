@@ -10,6 +10,7 @@ import { BUSINESS_EVENTS } from './business.events';
 import { WAITLIST_EVENTS } from './waitlist.events';
 import { PRIVACY_EVENTS } from './privacy.events';
 import { AI_EVENTS } from './ai.events';
+import { CHAT_EVENTS } from './chat.events';
 
 export * from './common';
 export * from './booking.events';
@@ -23,6 +24,7 @@ export * from './business.events';
 export * from './waitlist.events';
 export * from './privacy.events';
 export * from './ai.events';
+export * from './chat.events';
 
 /**
  * Every contract V3 has published, in one list.
@@ -47,4 +49,5 @@ export const ALL_EVENT_CONTRACTS: EventContract[] = [
   ...WAITLIST_EVENTS,
   ...PRIVACY_EVENTS,
   ...AI_EVENTS,
+  ...CHAT_EVENTS,
 ];
