@@ -35,6 +35,7 @@ import { HttpMetricsMiddleware, ObservabilityModule } from '@beauclick/observabi
 import { PRIVACY_ENTITIES } from '@beauclick/privacy';
 import { AI_ENTITIES } from '@beauclick/ai';
 import { CHAT_ENTITIES } from '@beauclick/chat';
+import { WISHLIST_ENTITIES } from '@beauclick/wishlist';
 import { DomainCompositionModule } from './composition/domain-composition.module';
 import { PrivilegedCapabilityModule } from './composition/privileged-capability.module';
 import { PrivacyCompositionModule } from './composition/privacy-composition.module';
@@ -113,6 +114,14 @@ import { MetricsController } from './observability/metrics.controller';
           // route that reads another party's rows -- not by a connection-level
           // grant.
           ...CHAT_ENTITIES,
+          // V3.2-C Story #8. One ordinary application-role table on the shared
+          // pool. Registering it HERE and not only through
+          // `TypeOrmModule.forFeature` is what makes it exist at all:
+          // `forFeature` registers a repository PROVIDER, and a repository for
+          // an entity the DataSource has no metadata for fails at request time
+          // with `No metadata for "WishlistSavedItemEntity" was found` -- a 500
+          // that looks like a query bug rather than like a missing registration.
+          ...WISHLIST_ENTITIES,
         ],
         // V3_DATABASE_BLUEPRINT.md §2 mandates lower_snake_case columns;
         // TypeORM's default naming strategy uses the JS property name
