@@ -1,3 +1,7 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+import * as contract from './wishlist-contract';
 import {
   WISHLIST_DEFAULT_PAGE_SIZE,
   WISHLIST_MAX_CURSOR_LENGTH,
@@ -76,10 +80,8 @@ describe('wishlist contract vocabularies', () => {
 
 describe('what the contract deliberately does not expose', () => {
   it('has no target-state vocabulary — that is Story #9', () => {
-    // Imported dynamically so this asserts the MODULE's exports rather than
-    // whatever this file happened to import at the top.
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const contract = require('./wishlist-contract') as Record<string, unknown>;
+    // Namespace import, so this asserts the MODULE's whole export surface
+    // rather than whatever names this file happened to destructure.
     const exported = Object.keys(contract);
 
     for (const forbidden of [
@@ -93,8 +95,6 @@ describe('what the contract deliberately does not expose', () => {
   });
 
   it('has no count, popularity, or display export of any kind', () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const contract = require('./wishlist-contract') as Record<string, unknown>;
     const exported = Object.keys(contract);
 
     // A popularity count is refused outright by `V32-DEC-021`, and a display
@@ -105,12 +105,16 @@ describe('what the contract deliberately does not expose', () => {
     }
   });
 
-  it('is importable with no runtime dependency', () => {
-    // The whole reason this package exists. `package.json` declares no
-    // dependencies; if somebody adds one, this file still imports cleanly but
-    // the browser bundle grows silently -- so the assertion is on the manifest.
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const manifest = require('../package.json') as { dependencies?: Record<string, string> };
+  it('declares no runtime dependency', () => {
+    // The whole reason this package exists. If somebody adds a dependency, every
+    // test above still passes and the browser bundle grows silently -- so the
+    // assertion is on the manifest, read from disk rather than imported, so it
+    // sees what pnpm and the bundler see.
+    const manifest = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8')) as {
+      dependencies?: Record<string, string>;
+      peerDependencies?: Record<string, string>;
+    };
     expect(manifest.dependencies).toBeUndefined();
+    expect(manifest.peerDependencies).toBeUndefined();
   });
 });
