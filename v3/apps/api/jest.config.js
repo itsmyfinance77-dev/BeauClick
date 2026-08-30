@@ -37,6 +37,8 @@ module.exports = {
     '^@beauclick/subject-data$': '<rootDir>/../../libs/subject-data/src/index.ts',
     '^@beauclick/privacy$': '<rootDir>/../../services/privacy/src/index.ts',
     '^@beauclick/ai$': '<rootDir>/../../services/ai/src/index.ts',
+    '^@beauclick/chat$': '<rootDir>/../../services/chat/src/index.ts',
+    '^@beauclick/chat-contract$': '<rootDir>/../../packages/chat-contract/src/index.ts',
     '^@beauclick/ai-contract$': '<rootDir>/../../packages/ai-contract/src/index.ts',
     '^@beauclick/persian-utils$': '<rootDir>/../../packages/persian-utils/src/index.ts',
   },

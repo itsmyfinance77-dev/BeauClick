@@ -11,6 +11,7 @@ import { uuidv7 } from 'uuidv7';
 import { ValidationException } from '@beauclick/http';
 import { assertPrivilegedMutationsAreAudited } from '@beauclick/audit';
 import { OTP_DEBUG_OBSERVER, OtpDebugObserver, capabilitiesForRoles } from '@beauclick/identity';
+import { CHAT_CLOCK, ChatClock } from '@beauclick/chat';
 import { OutboxRelay } from '@beauclick/events';
 import { FINANCIAL_DATA_SOURCE } from '@beauclick/financial';
 
@@ -47,6 +48,38 @@ export interface PgTestApp {
    * `otp_generated` hook existed for exactly this reason and for no other.
    */
   otpObserver: CapturingOtpObserver;
+  /**
+   * The chat module's clock, frozen on demand.
+   *
+   * `chat.send_counters` buckets by wall-clock UTC minute, so a burst that
+   * straddles :59 -> :00 is charged to two buckets and the cap appears not to
+   * hold. That is correct production behaviour and a flaky test: the twenty-first
+   * send is refused 55 seconds out of 60. Freezing removes the coin flip without
+   * changing what is being proved -- the limit still has to be enforced by the
+   * conditional write, not by the test.
+   *
+   * Left running by default, so a spec that does not care sees real time.
+   */
+  chatClock: FreezableChatClock;
+}
+
+/** Real time until a test says otherwise. */
+export class FreezableChatClock implements ChatClock {
+  private fixed: Date | null = null;
+
+  now(): Date {
+    return this.fixed ? new Date(this.fixed.getTime()) : new Date();
+  }
+
+  /** Pins the clock. With no argument, pins it to now. */
+  freeze(at: Date = new Date()): Date {
+    this.fixed = new Date(at.getTime());
+    return this.now();
+  }
+
+  release(): void {
+    this.fixed = null;
+  }
 }
 
 export class CapturingOtpObserver implements OtpDebugObserver {
@@ -107,6 +140,19 @@ const HERMETIC_ENV: Record<string, string> = {
   AI_INACTIVITY_CLOSE_HOURS: '24',
   AI_RETENTION_DAYS: '30',
   AI_PROVIDER_TIMEOUT_MS: '5000',
+  /**
+   * V3.2-B. The chat policy numbers, pinned to the owner-decided values.
+   *
+   * Set explicitly rather than left to the code defaults for the reason the
+   * loyalty and AI blocks record: a case asserting that the 21st message in a
+   * minute is refused must be testing the THROTTLE MECHANISM, not whatever
+   * default happens to be current.
+   */
+  CHAT_MAX_MESSAGES_PER_MINUTE: '20',
+  CHAT_MAX_MESSAGES_PER_DAY: '300',
+  CHAT_MAX_REPORTS_PER_DAY: '5',
+  CHAT_RETENTION_MONTHS: '24',
+  CHAT_RETENTION_BATCH_SIZE: '500',
   // Loyalty policy pinned so a case asserting a points total is testing the
   // ledger, not whatever GAP-10 default happens to be current.
   LOYALTY_POINTS_BOOKING_COMPLETED: '10',
@@ -230,13 +276,18 @@ export async function createPgTestApp(envOverrides: Record<string, string> = {})
   // of data.redirectUrl -- and ran each guard twice. The harness must boot
   // the application, not rebuild half of it.
   const otpObserver = new CapturingOtpObserver();
+  const chatClock = new FreezableChatClock();
   const moduleRef = await Test.createTestingModule({
     imports: [AppModule],
   })
-    // The one substitution this harness makes, and it replaces a NO-OP with a
-    // recorder -- no production behaviour is bypassed.
+    // The first substitution replaces a NO-OP with a recorder, and the second
+    // hands a test the ability to stop time -- which the chat clock exists for.
+    // Neither bypasses production behaviour: the clock runs at real time unless a
+    // test freezes it, and every rule still reads it through the same port.
     .overrideProvider(OTP_DEBUG_OBSERVER)
     .useValue(otpObserver)
+    .overrideProvider(CHAT_CLOCK)
+    .useValue(chatClock)
     .compile();
 
   const app = moduleRef.createNestApplication();
@@ -263,6 +314,7 @@ export async function createPgTestApp(envOverrides: Record<string, string> = {})
     financialDataSource: app.get<DataSource>(FINANCIAL_DATA_SOURCE),
     relay: app.get(OutboxRelay),
     otpObserver,
+    chatClock,
   };
 }
 
@@ -276,6 +328,14 @@ export async function createPgTestApp(envOverrides: Record<string, string> = {})
  * schema really is.
  */
 export const RESETTABLE_TABLES = [
+  // V3.2-B. Children first by convention, though the composite FKs cascade.
+  'chat.outbox_events',
+  'chat.reports',
+  'chat.messages',
+  'chat.conversation_participants',
+  'chat.conversations',
+  'chat.blocks',
+  'chat.send_counters',
   // V3.2-A. Children first by convention, though the composite FKs cascade:
   // `ai.recommendations` and `ai.messages` both reference `ai.conversations`
   // ON DELETE CASCADE, so naming them keeps the truncate explicit rather than
