@@ -161,11 +161,10 @@ export class ChatSubjectDataContract implements SubjectDataContract {
     const erasedMessages = await manager.query(
       `UPDATE chat.messages
           SET body = NULL, sender_user_id = NULL, erased_at = $2
-        WHERE sender_user_id = $1
-      RETURNING id`,
+        WHERE sender_user_id = $1`,
       [userId, tombstone.erasedAt],
     );
-    anonymized += Array.isArray(erasedMessages) ? erasedMessages.length : 0;
+    anonymized += rowCount(erasedMessages);
 
     // Participant rows: the read watermark of somebody who no longer exists.
     const participants = await manager.query(
@@ -187,10 +186,10 @@ export class ChatSubjectDataContract implements SubjectDataContract {
 
     // Reports: tombstone the reporter, destroy the note.
     const reports = await manager.query(
-      `UPDATE chat.reports SET reported_by = NULL, note = NULL WHERE reported_by = $1 RETURNING id`,
+      `UPDATE chat.reports SET reported_by = NULL, note = NULL WHERE reported_by = $1`,
       [userId],
     );
-    anonymized += Array.isArray(reports) ? reports.length : 0;
+    anonymized += rowCount(reports);
 
     return {
       moduleKey: this.moduleKey,
@@ -207,7 +206,15 @@ export class ChatSubjectDataContract implements SubjectDataContract {
   }
 }
 
-/** `DELETE` through `manager.query` returns `[rows, count]` on the pg driver. */
+/**
+ * How many rows a write actually touched.
+ *
+ * TypeORM's postgres driver returns `[rows, rowCount]` for `UPDATE` and
+ * `DELETE`, including when the statement carries `RETURNING`. Counting
+ * `result.length` therefore reports 2 for every such statement, which is why the
+ * `RETURNING` clauses above were removed rather than counted -- an erasure report
+ * that always says "2 rows anonymized" is worse than one that says nothing.
+ */
 function rowCount(result: unknown): number {
   return Array.isArray(result) && typeof result[1] === 'number' ? result[1] : 0;
 }

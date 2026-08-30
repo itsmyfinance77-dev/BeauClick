@@ -228,7 +228,7 @@ export class ChatController {
       dto.body,
       dto.idempotencyKey ?? null,
     );
-    const side = await this.access.sideOf(user.userId, conversation);
+    const side = await this.access.sideOf(this.access.manager, user.userId, conversation);
     return {
       message: toMessageView(message, user.userId, side ?? 'customer'),
       conversation: await this.summarise(user.userId, conversation, message.sequence),

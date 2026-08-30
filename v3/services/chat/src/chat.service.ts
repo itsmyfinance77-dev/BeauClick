@@ -117,15 +117,16 @@ export class ChatService {
     counterpartyType: ChatCounterpartyType,
     counterpartyId: string,
   ): Promise<{ conversation: ChatConversationEntity; created: boolean }> {
-    const relationship = await this.access.eligibleCounterparties(customerUserId).then((all) =>
-      all.find((r) => r.counterpartyType === counterpartyType && r.counterpartyId === counterpartyId),
-    );
-    // No qualifying booking, a counterparty that does not exist, a booking that
-    // only ever went pending -> cancelled, and a booking with no seller snapshot
-    // are ALL this refusal. A caller enumerating ids learns nothing.
-    if (!relationship) throw new ChatNotEligibleException();
-
     return this.dataSource.transaction(async (manager) => {
+      const eligible = await this.access.eligibleCounterparties(manager, customerUserId);
+      const relationship = eligible.find(
+        (r) => r.counterpartyType === counterpartyType && r.counterpartyId === counterpartyId,
+      );
+      // No qualifying booking, a counterparty that does not exist, a booking that
+      // only ever went pending -> cancelled, and a booking with no seller snapshot
+      // are ALL this refusal. A caller enumerating ids learns nothing.
+      if (!relationship) throw new ChatNotEligibleException();
+
       const now = this.clock.now();
       const id = uuidv7();
 
@@ -377,7 +378,7 @@ export class ChatService {
   ): Promise<{ items: ChatConversationEntity[]; nextCursor: string | null }> {
     const pageSize = Math.min(Math.max(1, limit), CHAT_MAX_PAGE_SIZE);
     const decoded = cursor ? decodeConversationCursor(cursor) : null;
-    const sellerParties = await this.access.sellerCounterparties(callerUserId);
+    const sellerParties = await this.access.sellerCounterparties(this.access.manager, callerUserId);
 
     const query = this.dataSource
       .getRepository(ChatConversationEntity)
@@ -489,7 +490,7 @@ export class ChatService {
    * is why a seller who has never opened a thread sees its messages as unread.
    */
   async unreadCount(callerUserId: string): Promise<{ total: number; conversations: number }> {
-    const sellerParties = await this.access.sellerCounterparties(callerUserId);
+    const sellerParties = await this.access.sellerCounterparties(this.access.manager, callerUserId);
     const pairs = sellerParties.map((p) => `${p.counterpartyType}:${p.counterpartyId}`);
 
     const rows: Array<{ total: string; conversations: string }> = await this.dataSource.query(

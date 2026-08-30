@@ -38,6 +38,16 @@ export const CAPABILITIES_BY_ROLE: Record<Role, string[]> = {
     'bc_manage_business_staff',
     'bc_manage_own_availability',
     'bc_view_own_finance',
+    // V3.2-B. The capability gates the ACTION -- "may this account use chat at
+    // all" -- and says nothing about WHICH conversations. Which ones is decided
+    // per request by the seller-access port: the business owner and active
+    // managers, and nobody else (`V32-DEC-010`).
+    //
+    // An earlier draft withheld this, reasoning that business access is
+    // membership rather than a role. That conflated two different questions and
+    // was simply wrong: the capability guard runs first, so a business owner was
+    // refused at the door and their membership was never consulted.
+    'bc_use_chat',
   ],
   // `bc_moderate_media` (V3.1 Phase C) sits with the other content-moderation
   // capabilities and deliberately NOT with platform_operator's -- the roles

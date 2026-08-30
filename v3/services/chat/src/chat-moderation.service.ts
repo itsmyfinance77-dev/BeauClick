@@ -306,7 +306,19 @@ export class ChatModerationService {
   ): Promise<ChatReportEntity | null> {
     return this.dataSource.transaction(async (manager) => {
       const now = this.clock.now();
-      const updated: Array<{ id: string }> = await manager.query(
+      /**
+       * `status = 'open'` in the WHERE is what makes this a compare-and-swap:
+       * two moderators deciding simultaneously produce one decision, and the
+       * loser is told the report is gone rather than overwriting a colleague's
+       * verdict.
+       *
+       * `returnedRowCount` rather than `result.length`, and that distinction is
+       * load-bearing. TypeORM's postgres driver returns `[rows, rowCount]` for an
+       * UPDATE -- even one with `RETURNING` -- so `result.length` is ALWAYS 2 and
+       * the guard never fires. The first version of this read `updated.length`
+       * and cheerfully let the second moderator overwrite the first.
+       */
+      const updated = await manager.query(
         `UPDATE chat.reports
             SET status = $2, decided_by = $3, decided_at = $4,
                 decision_reason = $5, decision_action = $6
@@ -314,7 +326,7 @@ export class ChatModerationService {
         RETURNING id`,
         [reportId, outcome, moderatorUserId, now, reason, outcome === 'upheld' ? action : null],
       );
-      if (updated.length === 0) return null;
+      if (returnedRowCount(updated) === 0) return null;
 
       const report = await manager.getRepository(ChatReportEntity).findOne({ where: { id: reportId } });
       if (!report) return null;
@@ -363,4 +375,22 @@ export class ChatModerationService {
   async blocksAuthoredBy(manager: EntityManager, userId: string): Promise<ChatBlockEntity[]> {
     return manager.getRepository(ChatBlockEntity).find({ where: { blockerUserId: userId } });
   }
+}
+
+/**
+ * How many rows a write actually touched.
+ *
+ * TypeORM's postgres driver returns `[rows, rowCount]` for `UPDATE` and
+ * `DELETE` -- including when the statement carries `RETURNING` -- but plain
+ * `rows` for `INSERT`. Reading `.length` off the result therefore means
+ * "2" for every update that ever ran, which reads as success and is not.
+ *
+ * `INSERT ... ON CONFLICT DO UPDATE` counts as an INSERT and returns rows, which
+ * is why `reserveSendSlot` and the AI quota can test `rows.length` directly.
+ */
+function returnedRowCount(result: unknown): number {
+  if (!Array.isArray(result)) return 0;
+  // [rows, rowCount] -- the UPDATE/DELETE shape.
+  if (result.length === 2 && Array.isArray(result[0]) && typeof result[1] === 'number') return result[1];
+  return result.length;
 }

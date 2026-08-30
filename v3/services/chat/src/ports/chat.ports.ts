@@ -1,3 +1,5 @@
+import type { EntityManager } from 'typeorm';
+
 import type { ChatCounterpartyType } from '@beauclick/chat-contract';
 
 /**
@@ -12,6 +14,22 @@ import type { ChatCounterpartyType } from '@beauclick/chat-contract';
  * Read this file as the enforcement of `V32-DEC-010` and `V32-DEC-011`. Every
  * fact chat uses to decide who may talk to whom arrives through one of the two
  * interfaces below, and each returns a closed, structured value.
+ *
+ * ## Every method takes the caller's `EntityManager`, and that is not decoration
+ *
+ * The same shape `SubjectDataContract.exportSubjectData(manager, userId)` uses,
+ * and for a sharper reason here. These reads run INSIDE the send transaction --
+ * `V32-DEC-011` requires eligibility re-evaluated there. An implementation using
+ * its own `DataSource` would take a SECOND pool connection while the transaction
+ * already holds one, so N concurrent sends need 2N connections against a pool of
+ * ten: past five simultaneous senders the pool is exhausted, and every remaining
+ * request waits forever on a connection held by a transaction that is itself
+ * waiting for a connection.
+ *
+ * Not hypothetical. It is what the twenty-way concurrency case in
+ * `chat-privacy-moderation.pg-spec.ts` did on its first run: no error, no
+ * timeout, just a suite that never finished. Threading the manager makes the
+ * nested read part of the same transaction on the same connection.
  */
 
 /**
@@ -65,7 +83,10 @@ export interface ChatEligibilityPort {
    * Returns an empty array rather than throwing when there are none — "you have
    * no qualifying relationships" is an ordinary answer, not an error.
    */
-  eligibleCounterpartiesFor(customerUserId: string): Promise<readonly ChatEligibleRelationship[]>;
+  eligibleCounterpartiesFor(
+    manager: EntityManager,
+    customerUserId: string,
+  ): Promise<readonly ChatEligibleRelationship[]>;
 
   /**
    * The relationship with one specific counterparty, or null.
@@ -76,6 +97,7 @@ export interface ChatEligibilityPort {
    * send is the moment the window stops meaning anything.
    */
   findRelationship(
+    manager: EntityManager,
     customerUserId: string,
     counterpartyType: ChatCounterpartyType,
     counterpartyId: string,
@@ -107,6 +129,7 @@ export interface ChatSellerAccessPort {
    * loses the inbox on their next request, not at token expiry.
    */
   canAccessCounterparty(
+    manager: EntityManager,
     userId: string,
     counterpartyType: ChatCounterpartyType,
     counterpartyId: string,
@@ -118,7 +141,10 @@ export interface ChatSellerAccessPort {
    * Drives the seller-side inbox. An empty array is the normal answer for a
    * customer with no professional or business role.
    */
-  counterpartiesFor(userId: string): Promise<readonly { counterpartyType: ChatCounterpartyType; counterpartyId: string }[]>;
+  counterpartiesFor(
+    manager: EntityManager,
+    userId: string,
+  ): Promise<readonly { counterpartyType: ChatCounterpartyType; counterpartyId: string }[]>;
 
   /**
    * Who to notify on the seller side when a customer sends a message.
@@ -129,6 +155,7 @@ export interface ChatSellerAccessPort {
    * salon notifies each of them once.
    */
   recipientsFor(
+    manager: EntityManager,
     counterpartyType: ChatCounterpartyType,
     counterpartyId: string,
   ): Promise<readonly string[]>;

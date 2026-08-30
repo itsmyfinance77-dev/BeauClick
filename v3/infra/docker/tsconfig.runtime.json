@@ -45,6 +45,9 @@
       "@beauclick/ai-contract": [
         "dist/packages/ai-contract/src/index.js"
       ],
+      "@beauclick/chat-contract": [
+        "dist/packages/chat-contract/src/index.js"
+      ],
       "@beauclick/money": [
         "dist/libs/money/src/index.js"
       ],
@@ -104,6 +107,9 @@
       ],
       "@beauclick/ai": [
         "dist/services/ai/src/index.js"
+      ],
+      "@beauclick/chat": [
+        "dist/services/chat/src/index.js"
       ]
     }
   }

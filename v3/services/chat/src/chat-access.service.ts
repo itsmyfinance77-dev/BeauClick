@@ -82,7 +82,7 @@ export class ChatAccessService {
     callerUserId: string,
     conversation: ChatConversationEntity,
   ): Promise<ChatAccessVerdict> {
-    const side = await this.sideOf(callerUserId, conversation);
+    const side = await this.sideOf(manager, callerUserId, conversation);
     if (side === null) {
       return { canRead: false, canSend: false, reason: null, side: null, relationship: null };
     }
@@ -103,6 +103,7 @@ export class ChatAccessService {
     }
 
     const relationship = await this.eligibility.findRelationship(
+      manager,
       conversation.customerUserId,
       conversation.counterpartyType,
       conversation.counterpartyId,
@@ -130,9 +131,14 @@ export class ChatAccessService {
    * deactivated this morning loses the inbox on their next request, not at token
    * expiry, because nothing about their access is stored here.
    */
-  async sideOf(callerUserId: string, conversation: ChatConversationEntity): Promise<ChatSide | null> {
+  async sideOf(
+    manager: EntityManager,
+    callerUserId: string,
+    conversation: ChatConversationEntity,
+  ): Promise<ChatSide | null> {
     if (conversation.customerUserId === callerUserId) return 'customer';
     const allowed = await this.sellerAccess.canAccessCounterparty(
+      manager,
       callerUserId,
       conversation.counterpartyType,
       conversation.counterpartyId,
@@ -158,7 +164,7 @@ export class ChatAccessService {
       .findOne({ where: { id: conversationId } });
     if (!conversation) throw new NotFoundOrNotYoursException();
 
-    const side = await this.sideOf(callerUserId, conversation);
+    const side = await this.sideOf(manager, callerUserId, conversation);
     if (side === null) throw new NotFoundOrNotYoursException();
 
     return { conversation, side };
@@ -199,6 +205,7 @@ export class ChatAccessService {
   ): Promise<string[]> {
     if (conversation.customerUserId === callerUserId) {
       const recipients = await this.sellerAccess.recipientsFor(
+        manager,
         conversation.counterpartyType,
         conversation.counterpartyId,
       );
@@ -242,14 +249,18 @@ export class ChatAccessService {
 
   /** Every counterparty the caller may act for on the seller side. */
   async sellerCounterparties(
+    manager: EntityManager,
     userId: string,
   ): Promise<readonly { counterpartyType: ChatCounterpartyType; counterpartyId: string }[]> {
-    return this.sellerAccess.counterpartiesFor(userId);
+    return this.sellerAccess.counterpartiesFor(manager, userId);
   }
 
   /** Every counterparty the caller may START a conversation with. */
-  async eligibleCounterparties(customerUserId: string): Promise<readonly ChatEligibleRelationship[]> {
-    return this.eligibility.eligibleCounterpartiesFor(customerUserId);
+  async eligibleCounterparties(
+    manager: EntityManager,
+    customerUserId: string,
+  ): Promise<readonly ChatEligibleRelationship[]> {
+    return this.eligibility.eligibleCounterpartiesFor(manager, customerUserId);
   }
 
   /** The block check, exposed for the block-creation path's own validation. */

@@ -11,12 +11,15 @@
 -- it: `V32-DEC-011` lets either legitimate participant initiate, and a
 -- professional replying to their own customer is the ordinary case.
 --
--- It is NOT granted to `business`. Business-side access is not a role question
--- at all -- it is membership, evaluated per request against
--- `business.business_staff` (owner or an ACTIVE manager). A role grant would be
--- the wrong shape: it would say "anyone holding the business role may use chat"
--- where the rule is "the owner and active managers of THIS business may read
--- THIS conversation". `ChatSellerAccessPort` answers that; a capability cannot.
+-- Granted to `business` as well, and the reasoning is worth stating because an
+-- earlier draft got it wrong. The capability gates the ACTION -- "may this
+-- account use chat at all" -- and says nothing about WHICH conversations. Which
+-- ones is a membership question, answered per request by `ChatSellerAccessPort`:
+-- the business owner and ACTIVE managers, and nobody else (`V32-DEC-010`).
+--
+-- Withholding the capability did not narrow access; it made business chat
+-- unreachable, because the capability guard runs before any membership check and
+-- refused a business owner at the door.
 --
 -- Holding the capability is necessary and never sufficient. Eligibility
 -- (`V32-DEC-011`) and the send window (`V32-DEC-012`) are re-evaluated inside the
@@ -47,6 +50,7 @@ ON CONFLICT (slug) DO NOTHING;
 INSERT INTO identity.role_capabilities (role_slug, capability_slug) VALUES
     ('customer',      'bc_use_chat'),
     ('professional',  'bc_use_chat'),
+    ('business',      'bc_use_chat'),
     ('moderator',     'bc_moderate_chat'),
     ('administrator', 'bc_moderate_chat')
 ON CONFLICT DO NOTHING;

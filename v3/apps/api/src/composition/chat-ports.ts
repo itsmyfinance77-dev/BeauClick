@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, IsNull, Repository } from 'typeorm';
+import { EntityManager, IsNull } from 'typeorm';
 
 import { ChatEligibilityPort, ChatEligibleRelationship, ChatSellerAccessPort } from '@beauclick/chat';
 import type { ChatCounterpartyType } from '@beauclick/chat-contract';
@@ -59,7 +58,6 @@ import { ProfessionalEntity } from '@beauclick/provider';
  */
 @Injectable()
 export class BookingBackedChatEligibility implements ChatEligibilityPort {
-  constructor(private readonly dataSource: DataSource) {}
 
   /**
    * The one query, shared by both methods.
@@ -93,9 +91,12 @@ export class BookingBackedChatEligibility implements ChatEligibilityPort {
            )
   `;
 
-  async eligibleCounterpartiesFor(customerUserId: string): Promise<readonly ChatEligibleRelationship[]> {
+  async eligibleCounterpartiesFor(
+    manager: EntityManager,
+    customerUserId: string,
+  ): Promise<readonly ChatEligibleRelationship[]> {
     const rows: Array<{ counterparty_type: ChatCounterpartyType; counterparty_id: string; last_slot_end: Date }> =
-      await this.dataSource.query(
+      await manager.query(
         `${this.sql} GROUP BY o.seller_party_type, o.seller_party_id`,
         [customerUserId],
       );
@@ -108,12 +109,13 @@ export class BookingBackedChatEligibility implements ChatEligibilityPort {
   }
 
   async findRelationship(
+    manager: EntityManager,
     customerUserId: string,
     counterpartyType: ChatCounterpartyType,
     counterpartyId: string,
   ): Promise<ChatEligibleRelationship | null> {
     const rows: Array<{ counterparty_type: ChatCounterpartyType; counterparty_id: string; last_slot_end: Date }> =
-      await this.dataSource.query(
+      await manager.query(
         `${this.sql}
            AND o.seller_party_type = $2 AND o.seller_party_id = $3
          GROUP BY o.seller_party_type, o.seller_party_id`,
@@ -157,33 +159,28 @@ export class BookingBackedChatEligibility implements ChatEligibilityPort {
  */
 @Injectable()
 export class BusinessBackedChatSellerAccess implements ChatSellerAccessPort {
-  constructor(
-    @InjectRepository(ProfessionalEntity) private readonly professionals: Repository<ProfessionalEntity>,
-    @InjectRepository(BusinessEntity) private readonly businesses: Repository<BusinessEntity>,
-    @InjectRepository(BusinessStaffEntity) private readonly staff: Repository<BusinessStaffEntity>,
-  ) {}
-
   async canAccessCounterparty(
+    manager: EntityManager,
     userId: string,
     counterpartyType: ChatCounterpartyType,
     counterpartyId: string,
   ): Promise<boolean> {
     if (counterpartyType === 'professional') {
-      const professional = await this.professionals.findOne({
+      const professional = await manager.getRepository(ProfessionalEntity).findOne({
         where: { id: counterpartyId, ownerId: userId, deletedAt: IsNull() },
         select: { id: true },
       });
       return professional !== null;
     }
 
-    const business = await this.businesses.findOne({
+    const business = await manager.getRepository(BusinessEntity).findOne({
       where: { id: counterpartyId, ownerId: userId, deletedAt: IsNull() },
       select: { id: true },
     });
     if (business) return true;
 
     // Active MANAGERS only. `role: 'staff'` is deliberately absent.
-    const membership = await this.staff.findOne({
+    const membership = await manager.getRepository(BusinessStaffEntity).findOne({
       where: { businessId: counterpartyId, userId, status: 'active', role: 'manager' },
       select: { id: true },
     });
@@ -191,13 +188,21 @@ export class BusinessBackedChatSellerAccess implements ChatSellerAccessPort {
   }
 
   async counterpartiesFor(
+    manager: EntityManager,
     userId: string,
   ): Promise<readonly { counterpartyType: ChatCounterpartyType; counterpartyId: string }[]> {
-    const [professionals, ownedBusinesses, managed] = await Promise.all([
-      this.professionals.find({ where: { ownerId: userId, deletedAt: IsNull() }, select: { id: true } }),
-      this.businesses.find({ where: { ownerId: userId, deletedAt: IsNull() }, select: { id: true } }),
-      this.staff.find({ where: { userId, status: 'active', role: 'manager' }, select: { businessId: true } }),
-    ]);
+    // Sequential rather than `Promise.all`. Three reads on ONE transaction's
+    // manager share one connection and serialise anyway, and issuing them
+    // together only risks a driver-level protocol error for no gain.
+    const professionals = await manager
+      .getRepository(ProfessionalEntity)
+      .find({ where: { ownerId: userId, deletedAt: IsNull() }, select: { id: true } });
+    const ownedBusinesses = await manager
+      .getRepository(BusinessEntity)
+      .find({ where: { ownerId: userId, deletedAt: IsNull() }, select: { id: true } });
+    const managed = await manager
+      .getRepository(BusinessStaffEntity)
+      .find({ where: { userId, status: 'active', role: 'manager' }, select: { businessId: true } });
 
     const businessIds = new Set<string>([
       ...ownedBusinesses.map((b) => b.id),
@@ -223,29 +228,30 @@ export class BusinessBackedChatSellerAccess implements ChatSellerAccessPort {
    * honest behaviour: an inbox shared by four people is four people's inbox.
    */
   async recipientsFor(
+    manager: EntityManager,
     counterpartyType: ChatCounterpartyType,
     counterpartyId: string,
   ): Promise<readonly string[]> {
     if (counterpartyType === 'professional') {
-      const professional = await this.professionals.findOne({
+      const professional = await manager.getRepository(ProfessionalEntity).findOne({
         where: { id: counterpartyId, deletedAt: IsNull() },
         select: { ownerId: true },
       });
       return professional ? [professional.ownerId] : [];
     }
 
-    const business = await this.businesses.findOne({
+    const business = await manager.getRepository(BusinessEntity).findOne({
       where: { id: counterpartyId, deletedAt: IsNull() },
       select: { ownerId: true },
     });
-    const managers = await this.staff.find({
+    const managers = await manager.getRepository(BusinessStaffEntity).find({
       where: { businessId: counterpartyId, status: 'active', role: 'manager' },
       select: { userId: true },
     });
 
     const recipients = new Set<string>();
     if (business) recipients.add(business.ownerId);
-    for (const manager of managers) recipients.add(manager.userId);
+    for (const membership of managers) recipients.add(membership.userId);
     return [...recipients];
   }
 }
