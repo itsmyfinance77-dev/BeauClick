@@ -53,6 +53,31 @@ This was verified true, not merely designed-to-be-true, in every domain checked:
 2. **Default owner-only visibility, no implicit staff fallback**, for the most sensitive data (financial, AI) — V2 made this an explicit, deliberate deviation from its own more permissive default (which does allow a staff-role fallback for CRM/analytics). V3 should preserve this two-tier default: broad operational data (CRM, own-analytics) may have a staff-access fallback; money and AI-conversation content should not, unless a specific product decision widens it.
 3. **An adversarial test that actually forges the cross-tenant parameter**, not just a happy-path ownership test. V2's financial and AI tests do this correctly (seed party B with a distinguishable real value, ask as party A, assert the value never appears anywhere in A's response) — this exact test shape should be a required part of every V3 endpoint that touches tenant-scoped data, not an occasional nice-to-have.
 
+### 4.1 Chat, as implemented — V3.2-B
+
+Chat is the platform's second store of private subject-authored prose, and the first with **two**
+people in it. ADR-031 and ADR-032 carry the full model; three properties belong in this section
+because they are the isolation ones.
+
+**Eligibility is proven, not asserted, and is re-proven inside the send transaction.** V2 shipped
+chat with no eligibility rule at all — `start_or_get` rejected only self-conversation, so any
+holder of `bc_send_message` could open a thread against any user id. V3 requires a booking
+relationship, and specifically requires it to be provable: a `cancelled` booking qualifies only
+when the append-only `booking.booking_history` shows it previously reached `confirmed`, because
+`pending` is the one status a stranger can create unilaterally and a `pending`→`cancelled` hold
+would otherwise be an eligibility grant anybody could mint.
+
+**The counterparty is immutable.** It is read once from the historical seller-party snapshot on
+the booking's order and written onto the conversation. There is no recomputation and no fallback
+to current affiliation, so a professional changing salon cannot move an existing customer
+conversation to a business that customer never dealt with. A missing snapshot fails closed.
+
+**The adversarial test shape §4 requires is applied here in four forms**, not one: a forged
+counterparty has zero effect; a `pending`→`cancelled` booking grants nothing; a fabricated or
+missing order triggers no fallback; and changing a professional's affiliation after the fact
+moves no conversation. Missing, foreign, and ineligible targets return the one shared
+`NotFoundOrNotYoursException`, byte-identically.
+
 **Known, accepted gap to close, not repeat (`GAP-05`)**: V2's isolation for financial data is enforced only at the REST-controller boundary — `LedgerService` itself has no row-level access control independent of which caller reaches it. V3's data-access layer should not rely solely on "only gated controllers ever call this" as its security boundary; enforce isolation as close to the data as the stack reasonably allows (e.g., row-level security at the database, or a mandatory tenant-scoping parameter the query layer refuses to omit).
 
 ---

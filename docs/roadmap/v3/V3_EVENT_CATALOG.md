@@ -232,6 +232,35 @@ half of it; `Exchanged` describes the fact the event actually records.
   click is recorded on the recommendation row itself, and emitting an event nothing reads would
   be publishing because a table changed.
 
+### `ConversationStarted` v1 and `MessageSent` v1 — IMPLEMENTED (V3.2-B)
+
+Human chat. Both carry ids, enums, counts, and instants, and **neither has a field able to hold a
+message body** — asserted mechanically by walking the zod schema, the same check the AI contracts
+carry.
+
+- **Producer**: `chat` (added to the closed `ServiceName` contract in V3.2-B).
+- **`ConversationStarted` payload**: `{ conversationId, customerUserId, counterpartyType,
+  counterpartyId, startedAt }`.
+- **`MessageSent` payload**: `{ conversationId, messageId, senderUserId, recipientUserId,
+  sequence, bodyLength, occurredAt }`.
+- **Consumers**: `notification` (an in-app message notification under the new opt-outable `chat`
+  category) and `analytics`, through the existing generic ingestion handler.
+- **Idempotency**: `messageId` is the natural key; `UNIQUE (conversation_id, sequence)` makes a
+  redelivered exchange unwritable, the notification module's own idempotency key covers the
+  notification side, and the analytics fact table dedupes on the source event id.
+- **`bodyLength`, never the body.** A count of Unicode code points. The prose lives in
+  `chat.messages` and nowhere else — not in an event, a notification payload, an analytics
+  dimension, a metric label, or a log line.
+- **`recipientUserId` is carried** so the notification consumer needs no cross-domain join at
+  dispatch time. On a business-side conversation it is the specific recipient the notification is
+  for, resolved from the business-inbox membership at emit time.
+- **`counterpartyType` is `professional | business`**, reusing `commerce.orders`' existing party
+  vocabulary rather than inventing a second one.
+- **No report or moderation event exists.** No consumer justifies one, and a moderation event
+  would carry the reporter's free-text note — which ADR-032 keeps out of every channel.
+- **No attachment field**, in either event. Adding attachments later is a `MessageSent` v2, not an
+  edit.
+
 ---
 
 ## Framework/lifecycle (not domain events — noted for completeness)

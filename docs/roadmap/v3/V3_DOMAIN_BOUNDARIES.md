@@ -169,6 +169,45 @@ overwritten.
   `ai_provider: simulated`, and `productionVerified` stays false with no code path able to
   change it.
 
+## chat
+
+**New in V3.2-B.** Human messaging between a customer and the seller party they actually
+transacted with. ADR-031 decides who may talk and for how long; ADR-032 decides privacy, abuse,
+and moderation. Decisions `V32-DEC-010` … `V32-DEC-015`, closed 2026-08-30.
+
+- **Responsibility**: two-party conversations gated on a proven booking relationship, with
+  blocking, reporting, and a moderation queue. Polling transport, in-app notification only.
+- **Own schema**: `chat` — `conversations`, `conversation_participants`, `messages`, `blocks`,
+  `reports`, `send_counters`, `outbox_events`. **No `message_attachments`**: attachments are out
+  of the milestone entirely, not stubbed.
+- **Public API**: `GET/POST /v1/chat/conversations`, `GET /v1/chat/conversations/{id}`,
+  `GET/POST /v1/chat/conversations/{id}/messages`, `POST /v1/chat/conversations/{id}/read`,
+  `GET /v1/chat/unread-count`, `POST/DELETE /v1/chat/blocks`, `POST /v1/chat/reports`, and three
+  `bc_moderate_chat` routes under `/v1/admin/chat/reports`.
+- **Internal API**: none exposed. `chat` calls out through typed ports bound in the composition
+  root — booking eligibility, the historical seller snapshot, and business-inbox membership — and
+  nothing calls into it.
+- **Events produced**: `ConversationStarted` v1 and `MessageSent` v1. Ids, enums, counts, and
+  instants only; **no field can hold a message body**.
+- **Events consumed**: none.
+- **Data ownership rules**: the counterparty is the **immutable historical seller-party snapshot**
+  from `commerce.orders` (`source_type='booking'`), recorded at creation and never recomputed —
+  **no fallback** to current `business_staff` affiliation, and a missing snapshot fails closed.
+  A business conversation belongs to the business; inbox access is the **owner and active
+  managers only**, with practitioner-specific access deferred to the V3.3-C role matrix. Read
+  state is a monotonic watermark on the participant row, never a per-message flag.
+- **Erasure**: ADR-027-consistent and taking **no exception** to it. The erased subject's prose is
+  destroyed, leaving a neutral structural placeholder with no excerpt or reconstructable content;
+  the counterparty's own messages survive; the identity is tombstoned. 24-month retention swept by
+  hard delete and cascade.
+- **Moderation**: entry is a report id and nothing else — no conversation browsing, no user or
+  message search, no arbitrary conversation-id access. A moderator may not send, impersonate,
+  edit, or delete. Reading a reported window is itself audited.
+- **The AI boundary**: **no chat context port exists and none may be added.** Human chat is not AI
+  context, `V3.2_PRODUCT_ROADMAP.md` §4 states it as a non-goal, and the capability catalog lists
+  automatic use of it as `RETIRED`. Enforced structurally, not by policy: `ai`'s context type is a
+  closed three-key interface whose key set is asserted against a literal.
+
 ## journey
 
 - **Responsibility**: customer beauty profile (preferred specialty/city/budget), goals, timeline — an independent bounded module per this task's explicit domain list (see status note above).
