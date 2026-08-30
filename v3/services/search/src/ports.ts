@@ -1,3 +1,5 @@
+import type { WishlistTargetRef } from '@beauclick/wishlist-contract';
+
 /**
  * The search engine port.
  *
@@ -172,3 +174,54 @@ export interface ProviderReindexSourcePort {
 }
 
 export const PROVIDER_REINDEX_SOURCE = Symbol('BEAUCLICK_PROVIDER_REINDEX_SOURCE');
+
+/**
+ * The caller's own saved state, for the results this module just returned
+ * (V3.2-C Story #9, ADR-034).
+ *
+ * ## Why a port, and why the state is not indexed
+ *
+ * The obvious implementation is a field on the search document, and it is wrong
+ * for a reason worth writing down: a saved item belongs to ONE customer, and the
+ * index holds ONE document per professional shared by every customer who
+ * searches. Storing it there would mean either a document per (professional,
+ * customer) pair, or a per-customer filter on a shared document — the first is
+ * unbounded, the second is a privacy hazard one query-builder mistake away from
+ * showing one customer another's list.
+ *
+ * So the saved state is **hydrated after the search**, from the authoritative
+ * table, for the caller alone. That also makes it strictly consistent while the
+ * results around it stay eventually consistent, which is the correct way round:
+ * a customer who just tapped save must see it reflected on the next page load
+ * even though the index has not moved.
+ *
+ * `search` may not import `wishlist` (ADR-011), so it declares this and the
+ * composition root binds it — the same shape `PROVIDER_REINDEX_SOURCE` above
+ * already has. `@beauclick/wishlist-contract` IS importable: `scope:shared`,
+ * zero dependencies, and it exists so the two sides share a vocabulary without
+ * sharing a module.
+ *
+ * ## What it must never become
+ *
+ * There is no method here that returns a count, a total, or anything about a
+ * customer other than the one named in the call — and therefore no way for a
+ * save to become a ranking input. `V32-DEC-021` refuses a popularity signal
+ * outright, and the refusal is structural rather than a filter somebody has to
+ * remember: this port cannot express one, and `ranking.ts` is not touched by
+ * this story.
+ */
+export interface WishlistSavedTargetsPort {
+  /**
+   * Which of `targets` the customer `userId` has saved, as a set of
+   * `"{targetType}:{targetId}"` keys.
+   *
+   * `userId` is always the session-resolved caller. Search is a `@Public()`
+   * surface, so there may be no caller at all — in which case this port is not
+   * called and the saved state is reported as `null` rather than `false`.
+   *
+   * Batched: one call for the whole page, never one per result.
+   */
+  savedTargets(userId: string, targets: readonly WishlistTargetRef[]): Promise<ReadonlySet<string>>;
+}
+
+export const WISHLIST_SAVED_TARGETS = Symbol('BEAUCLICK_SEARCH_WISHLIST_SAVED_TARGETS');

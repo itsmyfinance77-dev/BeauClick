@@ -11,10 +11,15 @@ import { JwtAuthGuard, CapabilityGuard } from '@beauclick/auth';
 import { OwnershipGuard } from '@beauclick/ownership';
 import { IdentityModule, IDENTITY_ENTITIES, OTP_DEBUG_OBSERVER, OtpDebugObserver } from '@beauclick/identity';
 import { ProviderModule, PROVIDER_ENTITIES } from '@beauclick/provider';
+import { WISHLIST_ENTITIES } from '@beauclick/wishlist';
 import { EventContractsModule } from '@beauclick/event-contracts';
 import { AuditModule, AUDIT_ENTITIES } from '@beauclick/audit';
 import { createInMemoryDataSource } from '@beauclick/testing';
 import { TypeOrmTestingModule } from './typeorm-testing.module';
+import {
+  WishlistPortsModule,
+  WishlistSavedStateModule,
+} from '../src/composition/wishlist-composition.module';
 
 const TEST_JWT_SECRET = 'test-secret-do-not-use-in-real-environments';
 
@@ -88,7 +93,17 @@ export async function createTestApp(): Promise<TestApp> {
   // AUDIT_ENTITIES joins the list because Phase A made an audit record part of
   // a privileged mutation's own transaction -- identity and provider now depend
   // on AdminAuditService, so a module graph without it cannot resolve them.
-  const entities = [...IDENTITY_ENTITIES, ...PROVIDER_ENTITIES, ...AUDIT_ENTITIES];
+  // WISHLIST_ENTITIES joins the list for the reason AUDIT_ENTITIES did before
+  // it: V3.2-C Story #9 made the caller's saved state part of the public
+  // professional shape, so `ProviderController` now depends on a port bound by
+  // the REAL composition modules below, and those need the table to exist.
+  //
+  // The real bindings are imported rather than stubbed deliberately. A stub
+  // returning "nothing is saved" would make this layer agree with itself and
+  // prove nothing about the wiring — which is precisely the failure Story #8
+  // shipped (the entity was missing from the DataSource list, every POST
+  // returned 500 at request time, and the app booted cleanly).
+  const entities = [...IDENTITY_ENTITIES, ...PROVIDER_ENTITIES, ...AUDIT_ENTITIES, ...WISHLIST_ENTITIES];
   // Built and initialized BEFORE the testing module is compiled -- see
   // TypeOrmTestingModule's docblock for why this must be synchronous, not
   // an async dynamic module.
@@ -116,6 +131,13 @@ export async function createTestApp(): Promise<TestApp> {
       AuditModule,
       IdentityModule,
       ProviderModule,
+      // V3.2-C Story #9. Both are @Global, and both still have to be imported
+      // ONCE somewhere in the graph to be registered -- this is that once for
+      // the pg-mem layer. `WishlistPortsModule` binds the wishlist's read into
+      // the catalogue; `WishlistSavedStateModule` binds the catalogue's read
+      // into the wishlist, which is the one `ProviderController` needs.
+      WishlistPortsModule,
+      WishlistSavedStateModule,
     ],
     providers: [
       { provide: APP_FILTER, useClass: BeauClickExceptionFilter },

@@ -13,12 +13,10 @@
  *
  * ## What is deliberately NOT here
  *
- * **No target state, and no `available` / `unavailable` vocabulary.** Story #8
- * builds persistence and the contract; the target-state projection is Story #9
- * (`V32-DEC-021`, ADR-033 §4). Declaring the vocabulary now would be a promise a
- * client codes against before anything can produce it, and an always-`available`
- * field would be worse than an absent one — it would be wrong rather than
- * missing.
+ * **No reason, cause, or discriminator on `unavailable`.** Story #9 adds the
+ * target-state vocabulary below, and it has exactly two members. Deleted,
+ * suspended, and revoked collapse into one value, and the collapse is a security
+ * property rather than a presentation preference — see `WISHLIST_TARGET_STATES`.
  *
  * **No display fields.** No `displayName`, price, image, city, or rating.
  * `provider` and `search` stay authoritative for public target data (ADR-033
@@ -63,6 +61,90 @@ export type WishlistTargetType = (typeof WISHLIST_TARGET_TYPES)[number];
 export function isWishlistTargetType(value: unknown): value is WishlistTargetType {
   return typeof value === 'string' && (WISHLIST_TARGET_TYPES as readonly string[]).includes(value);
 }
+
+/** A saveable catalogue entity, addressed the way every side of this contract addresses one. */
+export interface WishlistTargetRef {
+  readonly targetType: WishlistTargetType;
+  readonly targetId: string;
+}
+
+/**
+ * The identity of a target across the two id spaces, as one string.
+ *
+ * A professional id and a service id are both UUIDs from the same generator, so
+ * a bare id is ambiguous between the two tables. Every set and map that carries
+ * saved state or target state is keyed by this function.
+ *
+ * It lives HERE, in the zero-dependency contract, because four modules now build
+ * this key — `wishlist` when it answers, `search` and `provider` when they read
+ * the answer, and the page when it looks a result up. Two independent key
+ * formats that must agree is the kind of duplication that silently stops
+ * agreeing, and the failure would be a heart that renders unfilled on a target
+ * the customer saved.
+ */
+export function wishlistTargetKey(target: WishlistTargetRef): string {
+  return `${target.targetType}:${target.targetId}`;
+}
+
+// ---------------------------------------------------------------------------
+// Target state (V3.2-C Story #9)
+// ---------------------------------------------------------------------------
+
+/**
+ * What a saved target currently is, as far as a customer may be told.
+ *
+ * **Two members, and there will never be a third.** `V32-DEC-021` makes a target
+ * unavailable when it is soft-deleted, **or** its owning professional is
+ * soft-deleted, **or** that professional's `verification_status` is `suspended`
+ * or `revoked`. Four distinguishable internal situations, one value.
+ *
+ * The collapse is the whole point and it is a security property, not a
+ * presentation preference. A saved list that said *why* a target went away would
+ * be a live feed of moderation and verification decisions about named third
+ * parties — one the customer never asked for and the professional never
+ * consented to. `WISHLIST_REFUSAL_REASONS` below collapses the same four
+ * situations for the same reason, so the two halves of this contract cannot
+ * disagree.
+ *
+ * There is deliberately **no** `reason`, `cause`, `since`, `unavailableAt`, or
+ * `deletedAt` anywhere near this type. A timestamp would date the platform's
+ * decision; a cause would name it. The absence is structural: there is no field
+ * here that could carry one.
+ *
+ * A professional who is merely `unverified`, `pending`, or `rejected` is
+ * **`available`**, because `SearchService.searchProviders` filters only
+ * `is_deleted` and ordinary discovery still returns them. A stricter rule here
+ * would make the saved list contradict the page the customer saved it from.
+ */
+export const WISHLIST_TARGET_STATES = ['available', 'unavailable'] as const;
+export type WishlistTargetState = (typeof WISHLIST_TARGET_STATES)[number];
+
+export function isWishlistTargetState(value: unknown): value is WishlistTargetState {
+  return typeof value === 'string' && (WISHLIST_TARGET_STATES as readonly string[]).includes(value);
+}
+
+/**
+ * The caller's own saved state, as a discovery surface reports it.
+ *
+ * Three values, not two, and the third is load-bearing:
+ *
+ * - `true` / `false` — the **authenticated** caller has, or has not, saved this
+ *   target.
+ * - `null` — **no saved state applies to this response.** An anonymous visitor
+ *   browsing search results, or a response that is not a discovery read at all.
+ *
+ * `null` rather than `false` for the anonymous case, because `false` is a claim
+ * ("you have not saved this") made about somebody the server cannot identify.
+ * The same always-present-with-explicit-nulls treatment `images` and `rating`
+ * already get on the public professional shape, and for the reason that shape
+ * records: a consumer forced to distinguish "this field is missing" from "this
+ * field is false" writes the same `?? null` at every call site until one of them
+ * forgets.
+ *
+ * This is **never** an aggregate. There is no count of how many customers saved
+ * a target anywhere in this contract, and `V32-DEC-021` refuses one outright.
+ */
+export type WishlistSavedState = boolean | null;
 
 // ---------------------------------------------------------------------------
 // Limits
@@ -134,8 +216,9 @@ export type WishlistRefusalReason = (typeof WISHLIST_REFUSAL_REASONS)[number];
 /**
  * One saved item, as the API returns it.
  *
- * Three fields, and that is the whole shape. Two of them are values the caller
- * supplied themselves; the third is when the server recorded it.
+ * Four fields, and that is the whole shape. Two of them are values the caller
+ * supplied themselves; the third is when the server recorded it; the fourth is
+ * computed on every read and stored nowhere.
  *
  * There is no `id`. The saved row's primary key is an internal identifier the
  * caller never needs: every operation addresses an item by
@@ -149,6 +232,18 @@ export interface WishlistItemView {
   readonly targetId: string;
   /** ISO-8601 instant. */
   readonly savedAt: string;
+  /**
+   * Whether the target is still showable, computed on **this** read.
+   *
+   * Never cached, never persisted, and never carried on the saved row (ADR-033
+   * §6). That is what lets a lifted suspension restore the item with no write of
+   * any kind — there is nothing to repair, because there was never anything
+   * stored to go stale.
+   *
+   * Added in V3.2-C Story #9. Additive: a client written against Story #8's
+   * three-field shape keeps working and simply ignores the key.
+   */
+  readonly state: WishlistTargetState;
 }
 
 /**

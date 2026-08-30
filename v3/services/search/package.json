@@ -22,7 +22,8 @@
     "typeorm": "^0.3.20",
     "uuidv7": "^1.0.2",
     "@beauclick/audit": "workspace:*",
-    "@beauclick/subject-data": "workspace:*"
+    "@beauclick/subject-data": "workspace:*",
+    "@beauclick/wishlist-contract": "workspace:*"
   },
   "devDependencies": {
     "@beauclick/testing": "workspace:*"

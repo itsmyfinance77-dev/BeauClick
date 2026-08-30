@@ -21,6 +21,7 @@
     "@beauclick/audit": "workspace:*",
     "@beauclick/media": "workspace:*",
     "@nestjs/config": "^3.2.3",
-    "@beauclick/subject-data": "workspace:*"
+    "@beauclick/subject-data": "workspace:*",
+    "@beauclick/wishlist-contract": "workspace:*"
   }
 }

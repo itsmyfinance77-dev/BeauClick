@@ -8,8 +8,11 @@ import {
   WISHLIST_MAX_PAGE_SIZE,
   WISHLIST_MAX_SAVED_ITEMS,
   WISHLIST_REFUSAL_REASONS,
+  WISHLIST_TARGET_STATES,
   WISHLIST_TARGET_TYPES,
+  isWishlistTargetState,
   isWishlistTargetType,
+  wishlistTargetKey,
 } from './wishlist-contract';
 
 /**
@@ -78,19 +81,99 @@ describe('wishlist contract vocabularies', () => {
   });
 });
 
+/**
+ * The target-state vocabulary Story #8 refused to declare and Story #9 owns.
+ *
+ * Story #8's spec asserted these names were ABSENT, so adding them required
+ * editing that assertion — which is the reviewable act it existed to force. The
+ * assertions below are its replacement, and they are the stricter half: the
+ * vocabulary now exists, so what matters is that it stays two-valued.
+ */
+describe('target state (V3.2-C Story #9)', () => {
+  it('offers exactly two states, and neither carries a cause', () => {
+    // Against a LITERAL, independently written. A third member — `deleted`,
+    // `suspended`, `revoked`, or anything else naming WHY — would turn every
+    // customer's saved list into a live feed of moderation and verification
+    // decisions about named third parties.
+    expect([...WISHLIST_TARGET_STATES]).toEqual(['available', 'unavailable']);
+    expect(WISHLIST_TARGET_STATES).toHaveLength(2);
+  });
+
+  it('recognises the two states and rejects every cause-bearing value', () => {
+    expect(isWishlistTargetState('available')).toBe(true);
+    expect(isWishlistTargetState('unavailable')).toBe(true);
+
+    for (const forbidden of [
+      'deleted',
+      'suspended',
+      'revoked',
+      'not_found',
+      'unverified',
+      'pending',
+      'rejected',
+      'unavailable_deleted',
+      'AVAILABLE',
+      '',
+    ]) {
+      expect(isWishlistTargetState(forbidden)).toBe(false);
+    }
+    expect(isWishlistTargetState(null)).toBe(false);
+    expect(isWishlistTargetState(undefined)).toBe(false);
+    expect(isWishlistTargetState(true)).toBe(false);
+    // `Object.prototype` members must not pass a membership check written with
+    // `includes` on an array.
+    expect(isWishlistTargetState('toString')).toBe(false);
+  });
+
+  it('has exactly one unavailable state for every unavailable cause', () => {
+    // The property stated as the test the implementation must satisfy: however
+    // many internal situations mean "gone", the contract can express one.
+    const causes = ['soft-deleted', 'owner soft-deleted', 'owner suspended', 'owner revoked', 'never existed'];
+    const renderable = new Set(causes.map(() => 'unavailable' as const));
+    expect(renderable.size).toBe(1);
+    expect(WISHLIST_TARGET_STATES.filter((s) => s !== 'available')).toEqual(['unavailable']);
+  });
+
+  it('keys a target by type AND id, so the two id spaces cannot collide', () => {
+    // A professional id and a service id are both UUIDv7 from the same
+    // generator. Keyed by id alone, a service saved by one customer would mark a
+    // professional as saved for them the moment the two ids matched.
+    const id = '01931a2b-3c4d-7e8f-9012-3456789abcde';
+    expect(wishlistTargetKey({ targetType: 'professional', targetId: id })).toBe(`professional:${id}`);
+    expect(wishlistTargetKey({ targetType: 'service', targetId: id })).toBe(`service:${id}`);
+    expect(wishlistTargetKey({ targetType: 'professional', targetId: id })).not.toBe(
+      wishlistTargetKey({ targetType: 'service', targetId: id }),
+    );
+  });
+});
+
 describe('what the contract deliberately does not expose', () => {
-  it('has no target-state vocabulary — that is Story #9', () => {
+  it('exposes no cause, reason, or timestamp beside the target state', () => {
     // Namespace import, so this asserts the MODULE's whole export surface
     // rather than whatever names this file happened to destructure.
     const exported = Object.keys(contract);
 
     for (const forbidden of [
-      'WISHLIST_TARGET_STATES',
-      'WishlistTargetState',
-      'WISHLIST_AVAILABILITY',
-      'isWishlistTargetState',
+      'WISHLIST_UNAVAILABLE_REASONS',
+      'WishlistUnavailableReason',
+      'WISHLIST_TARGET_STATE_CAUSES',
+      'WishlistTargetStateDetail',
+      'WISHLIST_VERIFICATION_STATUSES',
     ]) {
       expect(exported).not.toContain(forbidden);
+    }
+
+    // Nothing exported may name an internal provider state or a moment the
+    // platform acted, in any casing.
+    //
+    // `reason` is NOT in this pattern, and the exception is deliberate rather
+    // than an oversight: `WISHLIST_REFUSAL_REASONS` legitimately carries the
+    // word, and its own test above proves it collapses every unavailable cause
+    // into `target_unavailable`. A pattern that forbade the word outright would
+    // have to be weakened the moment somebody read it, which is worse than one
+    // that forbids exactly the things that must not exist.
+    for (const name of exported) {
+      expect(name).not.toMatch(/suspend|revok|verification|deletedat|unavailableat/i);
     }
   });
 
