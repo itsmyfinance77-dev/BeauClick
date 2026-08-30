@@ -218,6 +218,34 @@ describePg('wishlist discovery integration and target-state projection (real Pos
       expect(offerings[0].saved).toBe(true);
     });
 
+    it('marks EVERY saved target in a large mixed batch, losing none', async () => {
+      // The de-duplication trap: `getMany` hydrates entities and dedupes them by
+      // primary key, so a partial select that omitted `id` could collapse
+      // distinct rows into one and silently report saved targets as unsaved.
+      // Twenty-five in one page is enough for that to show.
+      const user = await customer();
+      const targets: SeededProfessional[] = [];
+      for (let i = 0; i < 25; i += 1) {
+        const target = await seedTarget();
+        await save(user, 'professional', target.id).expect(200);
+        await save(user, 'service', target.serviceId).expect(200);
+        targets.push(target);
+      }
+
+      const items = (await providerList(user, '?limit=50').expect(200)).body.data as Array<{
+        id: string;
+        saved: boolean | null;
+      }>;
+      const marked = items.filter((i) => i.saved === true).map((i) => i.id);
+      expect(new Set(marked)).toEqual(new Set(targets.map((t) => t.id)));
+
+      // And the same for services, through the other consumer.
+      for (const target of targets.slice(0, 3)) {
+        const offerings = (await servicesOf(target.id, user).expect(200)).body.data as Array<{ saved: boolean }>;
+        expect(offerings.every((o) => o.saved === true)).toBe(true);
+      }
+    });
+
     it('reports null, not false, for a caller the server cannot identify', async () => {
       // `false` would be a claim about somebody who has not identified themselves.
       // The distinction is the whole reason `saved` is `boolean | null`.

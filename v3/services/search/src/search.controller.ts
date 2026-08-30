@@ -59,7 +59,6 @@ interface PublicProviderResult {
 
 function toPublic(doc: ProviderSearchDocument, saved: WishlistSavedState): PublicProviderResult {
   return {
-    saved,
     id: doc.professionalId,
     displayName: doc.displayName,
     bio: doc.bio,
@@ -75,6 +74,8 @@ function toPublic(doc: ProviderSearchDocument, saved: WishlistSavedState): Publi
     priceFromToman: doc.minPriceToman,
     rating: { average: doc.ratingAvg, count: doc.reviewCount },
     badges: doc.rankingSignalKeys,
+    // Last, so the additive field is additive in the serialised order too.
+    saved,
   };
 }
 

@@ -333,7 +333,12 @@ export class WishlistService {
 
     const query = this.items
       .createQueryBuilder('w')
-      .select(['w.targetType', 'w.targetId'])
+      // `w.id` is selected even though the answer never carries it: `getMany`
+      // hydrates entities and DE-DUPLICATES them by primary key, so a partial
+      // select that omits the key can collapse distinct rows into one. The id
+      // reaches this method and stops here — it is not in the returned set and
+      // the contract has no field that could hold it.
+      .select(['w.id', 'w.targetType', 'w.targetId'])
       // The ownership predicate is in the WHERE clause and not checked
       // afterwards, for the reason `remove` records: another customer's saved
       // item is not found for the same reason a nonexistent one is not found.
