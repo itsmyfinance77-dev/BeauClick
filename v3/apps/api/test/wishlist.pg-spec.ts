@@ -410,11 +410,17 @@ describePg('wishlist — persistence, ownership, cap, tombstones, privacy (real 
       // The key set, asserted against a literal. A new key fails this test until
       // somebody edits it, which is the reviewable act the assertion exists to
       // force -- the same discipline `ai-context.spec.ts` applies to its context.
-      expect(Object.keys(item).sort()).toEqual(['savedAt', 'targetId', 'targetType']);
-      // Story #9 adds the `available | unavailable` projection. Story #8 must
-      // not ship a half-built version of it.
-      expect(item).not.toHaveProperty('state');
+      //
+      // `state` was added by V3.2-C Story #9 and editing this line is exactly the
+      // review the assertion is for. Story #8's version listed three keys and
+      // additionally asserted `state` was ABSENT, because declaring a
+      // vocabulary nothing could produce would have been a promise a client
+      // codes against before anything can keep it.
+      expect(Object.keys(item).sort()).toEqual(['savedAt', 'state', 'targetId', 'targetType']);
+      // The state is a bare value from the closed vocabulary and nothing more.
+      expect(item.state).toBe('unavailable');
       expect(item).not.toHaveProperty('available');
+      expect(item).not.toHaveProperty('unavailableReason');
       expect(item).not.toHaveProperty('displayName');
       expect(JSON.stringify(item)).not.toMatch(/revoked|suspended|deleted|verification/i);
     });
