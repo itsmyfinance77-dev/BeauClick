@@ -21,6 +21,7 @@ import { SearchModule, SearchSubjectDataContract } from '@beauclick/search';
 import { ERASURE_RUNNER, PrivacyModule, PrivacyService, PrivacySubjectDataContract } from '@beauclick/privacy';
 import { AiModule, AiSubjectDataContract } from '@beauclick/ai';
 import { ChatModule, ChatSubjectDataContract } from '@beauclick/chat';
+import { WishlistModule, WishlistSubjectDataContract } from '@beauclick/wishlist';
 
 /**
  * Erasure's one out-of-transaction step.
@@ -120,6 +121,15 @@ export class PrivacyErasureCompleter {
     // like every other module's, and the boot assertion is what turns "somebody
     // remembered to register" into a startup failure.
     ChatModule,
+    // V3.2-C Story #8. Imported for its contract only. One table, claimed like
+    // every other schema is -- and the boot assertion is what turns "somebody
+    // remembered to register" into a startup failure.
+    //
+    // Worth the extra line here: a wishlist row is DELETED on erasure rather
+    // than anonymized, which is the opposite of the platform default. That is a
+    // claim somebody had to make deliberately, and the coverage check is what
+    // made them make it.
+    WishlistModule,
   ],
   providers: [
     PrivacyErasureCompleter,
@@ -154,6 +164,7 @@ export class PrivacyErasureCompleter {
         PrivacySubjectDataContract,
         AiSubjectDataContract,
         ChatSubjectDataContract,
+        WishlistSubjectDataContract,
       ],
       useFactory: (...contracts: SubjectDataContract[]): SubjectDataContract[] => contracts,
     },

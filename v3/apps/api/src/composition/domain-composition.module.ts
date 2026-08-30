@@ -18,6 +18,7 @@ import { PrivacyModule, PrivacyOutboxEntity } from '@beauclick/privacy';
 import { Phase3CompositionModule } from './phase3-composition.module';
 import { AiCompositionModule } from './ai-composition.module';
 import { ChatCompositionModule } from './chat-composition.module';
+import { WishlistCompositionModule } from './wishlist-composition.module';
 import { CHAT_OUTBOX_SOURCES } from './chat-tokens';
 import { PHASE3_EVENT_HANDLERS, PHASE3_OUTBOX_SOURCES } from './phase3-tokens';
 import { AI_OUTBOX_SOURCES } from './ai-tokens';
@@ -101,6 +102,12 @@ import {
     AiCompositionModule,
     // V3.2-B, for the same reason and by the same mechanism.
     ChatCompositionModule,
+    // V3.2-C Story #8. Imported here for a DIFFERENT reason from the two above:
+    // `wishlist` contributes no outbox source, because it emits no events and
+    // has no outbox table at all (`V32-DEC-021`). It is listed here so it is
+    // instantiated before `PrivacyCompositionModule` runs the subject-data
+    // coverage assertion, which is the only ordering it actually needs.
+    WishlistCompositionModule,
   ],
   controllers: [
     CheckoutController,
@@ -208,6 +215,7 @@ import {
     Phase3CompositionModule,
     AiCompositionModule,
     ChatCompositionModule,
+    WishlistCompositionModule,
     FINANCIAL_OUTBOX_RELAY,
     PrivacyModule,
     // V3.1 Phase F. Re-exported so the root injector can resolve
