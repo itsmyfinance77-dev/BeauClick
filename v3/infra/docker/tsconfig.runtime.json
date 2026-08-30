@@ -48,6 +48,9 @@
       "@beauclick/chat-contract": [
         "dist/packages/chat-contract/src/index.js"
       ],
+      "@beauclick/wishlist-contract": [
+        "dist/packages/wishlist-contract/src/index.js"
+      ],
       "@beauclick/money": [
         "dist/libs/money/src/index.js"
       ],
@@ -110,6 +113,9 @@
       ],
       "@beauclick/chat": [
         "dist/services/chat/src/index.js"
+      ],
+      "@beauclick/wishlist": [
+        "dist/services/wishlist/src/index.js"
       ]
     }
   }

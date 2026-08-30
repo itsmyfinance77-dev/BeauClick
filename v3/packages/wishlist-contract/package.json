@@ -1,0 +1,8 @@
+{
+  "name": "@beauclick/wishlist-contract",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The browser-safe half of the wishlist contract: the closed target-type vocabulary, the closed refusal vocabulary, and the cap, page-size and cursor limits. Zero dependencies, no framework, no TypeORM -- so the Next.js bundle and the NestJS server share ONE definition instead of two that drift. Deliberately carries NO target-state vocabulary (Story #9), no display field, and no count of any kind.",
+  "main": "src/index.ts",
+  "types": "src/index.ts"
+}

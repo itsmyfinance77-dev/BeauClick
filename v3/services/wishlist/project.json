@@ -1,0 +1,11 @@
+{
+  "name": "wishlist",
+  "sourceRoot": "services/wishlist/src",
+  "projectType": "library",
+  "tags": ["type:service", "scope:wishlist"],
+  "targets": {
+    "typecheck": { "executor": "nx:run-commands", "options": { "command": "tsc -p services/wishlist/tsconfig.json --noEmit" } },
+    "test": { "executor": "nx:run-commands", "options": { "command": "jest --config services/wishlist/jest.config.js" } },
+    "lint": { "executor": "nx:run-commands", "options": { "command": "eslint services/wishlist/src --resolve-plugins-relative-to ." } }
+  }
+}

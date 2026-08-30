@@ -328,6 +328,10 @@ export async function createPgTestApp(envOverrides: Record<string, string> = {})
  * schema really is.
  */
 export const RESETTABLE_TABLES = [
+  // V3.2-C Story #8. One table, no children, no outbox -- `wishlist` emits no
+  // events and has no outbox table at all. Listed first only to keep the
+  // newest-schema-first convention this list has followed since Phase 4.
+  'wishlist.saved_items',
   // V3.2-B. Children first by convention, though the composite FKs cascade.
   'chat.outbox_events',
   'chat.reports',

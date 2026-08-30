@@ -53,6 +53,8 @@
     "@beauclick/ai-contract": "workspace:*",
     "@beauclick/chat": "workspace:*",
     "@beauclick/chat-contract": "workspace:*",
+    "@beauclick/wishlist": "workspace:*",
+    "@beauclick/wishlist-contract": "workspace:*",
     "tsconfig-paths": "^4.2.0"
   },
   "devDependencies": {
