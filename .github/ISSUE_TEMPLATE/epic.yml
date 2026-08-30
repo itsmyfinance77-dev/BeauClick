@@ -1,0 +1,33 @@
+name: Epic
+description: A phase-level outcome grouping accepted stories and decisions
+title: "[Epic] "
+labels: ["type:epic", "status:proposed"]
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Outcome and value
+    validations:
+      required: true
+  - type: textarea
+    id: children
+    attributes:
+      label: Child backlog items
+      description: Link decisions, stories, bugs, design syncs, and external blockers. Epics do not carry Story Points.
+      placeholder: |
+        - [ ] #123
+    validations:
+      required: true
+  - type: textarea
+    id: gates
+    attributes:
+      label: Gates and non-goals
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Epic completion rule
+      description: State which child outcomes and evidence must be Done before this epic closes.
+    validations:
+      required: true

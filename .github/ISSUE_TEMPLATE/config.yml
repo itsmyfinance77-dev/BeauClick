@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Backlog operating model
+    url: https://github.com/marabi766/BeauClick/blob/master/docs/product/BACKLOG_OPERATING_MODEL.md
+    about: Read the classification, Story Point, Ready, and Done rules before opening work.

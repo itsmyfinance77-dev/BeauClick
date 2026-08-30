@@ -3,6 +3,11 @@
 BeauClick uses a pull-request-first workflow. `master` represents the latest
 reviewed, integration-tested state; it is not a working branch.
 
+Product work is also backlog-first. Every implementation pull request must
+reference an accepted GitHub issue carrying the appropriate type, milestone,
+priority, status, and story-point labels. The operating model is documented in
+[`docs/product/BACKLOG_OPERATING_MODEL.md`](docs/product/BACKLOG_OPERATING_MODEL.md).
+
 ## Required workflow
 
 1. Fetch `origin` and verify the intended baseline before changing files.
@@ -12,13 +17,16 @@ reviewed, integration-tested state; it is not a working branch.
 4. Commit in reviewable stages when a change spans decisions, schema, code,
    tests, and documentation.
 5. Push the branch and open a pull request against `master`.
-6. Run the checks appropriate to the change. Any code, schema, build, workflow,
+6. Link the accepted backlog item in the pull request. A PR must not silently
+   widen the story's acceptance criteria or close an unresolved product decision.
+7. Run the checks appropriate to the change. Any code, schema, build, workflow,
    or dependency change must pass the complete V3 CI pipeline.
-7. A failed, cancelled, pending, or skipped required check is not approval to
+8. A failed, cancelled, pending, or skipped required check is not approval to
    merge. Repair the same branch and let CI run again.
-8. Review the final diff and confirm that the PR contains no credentials,
+9. Review the final diff and confirm that the PR contains no credentials,
    generated secrets, unrelated files, or accidental external integrations.
-9. Squash-merge only after the required checks are green. Delete the short-lived
+10. Squash-merge only after the required checks are green. Close the linked issue
+   only when its Definition of Done is satisfied, then delete the short-lived
    branch after merge.
 
 Direct pushes to `master` are prohibited by project policy. GitHub branch

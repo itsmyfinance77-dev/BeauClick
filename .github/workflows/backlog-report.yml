@@ -1,0 +1,46 @@
+name: Backlog Report
+
+on:
+  issues:
+    types: [opened, closed, reopened, labeled, unlabeled, milestoned, demilestoned]
+  workflow_dispatch:
+  schedule:
+    - cron: '17 3 * * 1'
+  pull_request:
+    paths:
+      - 'scripts/backlog-report.mjs'
+      - 'scripts/backlog-report.test.mjs'
+      - 'docs/product/**'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/workflows/backlog-report.yml'
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  validate:
+    name: validate backlog metrics
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test the report calculations
+        run: node --test scripts/backlog-report.test.mjs
+
+  publish:
+    name: publish backlog dashboard
+    needs: validate
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Update the dashboard issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/backlog-report.mjs --update-dashboard

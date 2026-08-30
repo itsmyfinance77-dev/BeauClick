@@ -2,9 +2,15 @@
 
 Describe the user-visible or engineering result. Lead with what changed and why.
 
+Backlog item: Closes #____
+
+- Milestone:
+- Story points:
+
 ## Scope
 
 - [ ] The PR has one coherent purpose.
+- [ ] The linked backlog item was accepted and its acceptance criteria are unchanged or explicitly revised.
 - [ ] Unrelated local or user-owned changes are excluded.
 - [ ] No credential, secret, production configuration, or unapproved external integration is included.
 
@@ -18,6 +24,7 @@ List the commands, test counts, migration results, screenshots, or contract evid
 - [ ] Database migrations were tested from clean and already-applied states, when applicable.
 - [ ] Privacy/ownership/authorization boundaries were rechecked, when applicable.
 - [ ] Documentation and design status match the implemented contract.
+- [ ] The linked issue's Definition of Done is satisfied before it is closed.
 
 ## Review boundaries
 
