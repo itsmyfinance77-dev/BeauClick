@@ -326,8 +326,14 @@ export class WishlistService {
     const idsByType = new Map<WishlistTargetType, string[]>();
     for (const type of WISHLIST_TARGET_TYPES) idsByType.set(type, []);
     for (const target of targets) {
-      // De-duplicated implicitly by the database; not worth a Set here, because
-      // the page sizes upstream are bounded at fifty.
+      // Not de-duplicated here, and it does not need to be: a repeated id in an
+      // `IN` list costs nothing, and the answer is a Set either way.
+      //
+      // The list lengths are bounded by the callers, all but one by an explicit
+      // page limit — 50 for the saved list and for search, 100 for the provider
+      // listing. The exception is one professional's service catalogue, which is
+      // as long as their catalogue; that route already returns every one of
+      // those rows, so this adds no bound the response did not already have.
       idsByType.get(target.targetType)?.push(target.targetId);
     }
 
