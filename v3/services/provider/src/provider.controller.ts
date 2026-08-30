@@ -1,6 +1,9 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Patch, Post, Query } from '@nestjs/common';
 import { CurrentUser, AuthenticatedUser, PaginatedResult } from '@beauclick/http';
 import { ResolveOwner, NotFoundOrNotYoursException } from '@beauclick/ownership';
+import { wishlistTargetKey } from '@beauclick/wishlist-contract';
+import type { WishlistSavedState } from '@beauclick/wishlist-contract';
+import { WISHLIST_SAVED_TARGETS, WishlistSavedTargetsPort } from './ports';
 import { ProviderService } from './provider.service';
 import { ServiceOfferingService } from './service-offering.service';
 import { ProviderOwnerResolver } from './provider-owner.resolver';
@@ -30,6 +33,7 @@ function toPublicShape(
   p: ProfessionalEntity,
   images: ProfileImages = EMPTY_IMAGES,
   rating: RatingSummary = EMPTY_RATING,
+  saved: WishlistSavedState = null,
 ) {
   return {
     id: p.id,
@@ -40,6 +44,28 @@ function toPublicShape(
     verificationStatus: p.verificationStatus,
     images,
     rating,
+    /**
+     * Whether the AUTHENTICATED caller has saved this professional (V3.2-C
+     * Story #9), `null` when there is no caller or the response is not a
+     * discovery read.
+     *
+     * Defaulted to `null` and always present, the same treatment `images` and
+     * `rating` above already get and for the reason those record: a consumer
+     * forced to distinguish "this response predates saved state" from "not
+     * saved" writes the same `?? null` at every call site until one of them
+     * forgets. `null` rather than `false` for an anonymous visitor, because
+     * `false` is a claim about somebody the server cannot identify.
+     *
+     * The discovery reads (`GET /v1/providers`, `GET /v1/providers/:id`) pass a
+     * real value. The professional's own-profile read and every mutation
+     * response leave the default: those are the provider's management surface,
+     * not a page anybody discovers from, and computing a customer's saved state
+     * there would be a query bought for a control that is not on the page.
+     *
+     * **Never an aggregate.** There is no save count on this shape, and
+     * `V32-DEC-021` refuses one outright.
+     */
+    saved,
     createdAt: p.createdAt,
   };
 }
@@ -146,21 +172,64 @@ export class ProviderController {
     private readonly services: ServiceOfferingService,
     private readonly portfolio: PortfolioService,
     private readonly reviews: ReviewService,
+    /**
+     * Bound by the composition root and by nothing else. `ProviderModule`
+     * provides no default, so a composition that forgets it fails to boot rather
+     * than quietly reporting `saved: null` for every signed-in customer forever.
+     */
+    @Inject(WISHLIST_SAVED_TARGETS) private readonly wishlist: WishlistSavedTargetsPort,
   ) {}
 
+  /**
+   * The caller's own saved state for a page of professionals, or `null` for
+   * every one of them when there is no caller.
+   *
+   * One call for the page, never one per row — the same rule the two batched
+   * lookups beside it already follow, and the N+1 pattern issue #9 forbids by
+   * name. Returns a lookup rather than a set so each call site reads the same
+   * way whether or not there was a caller.
+   */
+  private async savedLookup(
+    userId: string | null,
+    refs: ReadonlyArray<{ targetType: 'professional' | 'service'; targetId: string }>,
+  ): Promise<(ref: { targetType: 'professional' | 'service'; targetId: string }) => WishlistSavedState> {
+    // No subject, no query. Asking "which of these has nobody saved" would
+    // require inventing a caller.
+    if (!userId || refs.length === 0) return () => (userId ? false : null);
+    const saved = await this.wishlist.savedTargets(userId, refs);
+    return (ref) => saved.has(wishlistTargetKey(ref));
+  }
+
+  /**
+   * `@Public()`, so `@CurrentUser()` may be absent — and its absence is never an
+   * error, exactly as on `GET /v1/search/providers`.
+   */
   @Public()
   @Get()
-  async list(@Query() query: ListProvidersDto): Promise<PaginatedResult<ReturnType<typeof toPublicShape>[]>> {
+  async list(
+    @Query() query: ListProvidersDto,
+    @CurrentUser() user?: AuthenticatedUser,
+  ): Promise<PaginatedResult<ReturnType<typeof toPublicShape>[]>> {
     const { items, total } = await this.providers.list(query);
     // One batched lookup each for the whole page rather than one per row: a
     // 20-item listing must not become 40 sequential queries.
-    const [images, ratings] = await Promise.all([
+    const [images, ratings, saved] = await Promise.all([
       this.portfolio.imagesForMany(items),
       this.reviews.ratingSummaryFor(items.map((p) => p.id)),
+      // From the verified JWT, never from the query string.
+      this.savedLookup(
+        user?.userId ?? null,
+        items.map((p) => ({ targetType: 'professional' as const, targetId: p.id })),
+      ),
     ]);
     return {
       value: items.map((p) =>
-        toPublicShape(p, images.get(p.id) ?? EMPTY_IMAGES, ratings.get(p.id) ?? EMPTY_RATING),
+        toPublicShape(
+          p,
+          images.get(p.id) ?? EMPTY_IMAGES,
+          ratings.get(p.id) ?? EMPTY_RATING,
+          saved({ targetType: 'professional', targetId: p.id }),
+        ),
       ),
       meta: { pagination: { page: query.page, limit: query.limit, total } },
     };
@@ -168,17 +237,27 @@ export class ProviderController {
 
   @Public()
   @Get(':id')
-  async getOne(@Param('id') id: string) {
+  async getOne(@Param('id') id: string, @CurrentUser() user?: AuthenticatedUser) {
     const provider = await this.providers.findById(id);
     // Identical response for "doesn't exist" as OwnershipGuard gives for
     // "exists but isn't yours" elsewhere -- consistent NOT_FOUND_OR_NOT_YOURS
     // shape even on a route with no ownership check at all.
+    //
+    // The saved-state lookup runs only AFTER this refusal, so a caller cannot
+    // learn anything about a professional who does not resolve: the wishlist is
+    // never consulted for an id that got a 404.
     if (!provider) throw new NotFoundOrNotYoursException();
-    const [images, ratings] = await Promise.all([
+    const [images, ratings, saved] = await Promise.all([
       this.portfolio.imagesFor(provider),
       this.reviews.ratingSummaryFor([provider.id]),
+      this.savedLookup(user?.userId ?? null, [{ targetType: 'professional', targetId: provider.id }]),
     ]);
-    return toPublicShape(provider, images, ratings.get(provider.id) ?? EMPTY_RATING);
+    return toPublicShape(
+      provider,
+      images,
+      ratings.get(provider.id) ?? EMPTY_RATING,
+      saved({ targetType: 'professional', targetId: provider.id }),
+    );
   }
 
   @Post()
@@ -196,12 +275,29 @@ export class ProviderController {
     return toPublicShape(updated, await this.portfolio.imagesFor(updated), ratings.get(updated.id) ?? EMPTY_RATING);
   }
 
+  /**
+   * The service consumer's saved state (V3.2-C Story #9).
+   *
+   * The existing key set is preserved exactly and `saved` is added beside it —
+   * additive, so no client that reads a price or a duration is affected. The
+   * batch is bounded by one professional's catalogue, which is why the service
+   * control lives here rather than on every nested service of every search
+   * result.
+   */
   @Public()
   @Get(':id/services')
-  async listServices(@Param('id') id: string) {
+  async listServices(@Param('id') id: string, @CurrentUser() user?: AuthenticatedUser) {
     const provider = await this.providers.findById(id);
     if (!provider) throw new NotFoundOrNotYoursException();
-    return this.services.listForProfessional(id);
+    const offerings = await this.services.listForProfessional(id);
+    const saved = await this.savedLookup(
+      user?.userId ?? null,
+      offerings.map((s) => ({ targetType: 'service' as const, targetId: s.id })),
+    );
+    return offerings.map((offering) => ({
+      ...offering,
+      saved: saved({ targetType: 'service', targetId: offering.id }),
+    }));
   }
 
   @ResolveOwner(ProviderOwnerResolver)

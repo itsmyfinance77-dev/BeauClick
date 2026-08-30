@@ -1,13 +1,15 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Inject, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { Public, policy } from '@beauclick/auth';
 import { AuthenticatedUser, CurrentUser } from '@beauclick/http';
 import { RequireCapability } from '@beauclick/auth';
 import { AdminAuditService, AuditAction } from '@beauclick/audit';
+import { wishlistTargetKey } from '@beauclick/wishlist-contract';
+import type { WishlistSavedState } from '@beauclick/wishlist-contract';
 import { AutocompleteDto, RecordProfileViewDto, SearchProvidersDto } from './dto/search.dto';
 import { SearchIndexerService } from './indexing/search-indexer.service';
 import { SearchService } from './search.service';
-import { ProviderSearchDocument } from './ports';
+import { ProviderSearchDocument, WISHLIST_SAVED_TARGETS, WishlistSavedTargetsPort } from './ports';
 
 /**
  * The public search API.
@@ -30,9 +32,32 @@ interface PublicProviderResult {
   priceFromToman: number | null;
   rating: { average: number; count: number };
   badges: string[];
+  /**
+   * Whether the AUTHENTICATED caller has saved this professional (V3.2-C Story
+   * #9), or `null` when there is no caller.
+   *
+   * `null` rather than `false` for an anonymous visitor, because `false` is a
+   * claim about somebody the server cannot identify. `WishlistSavedState`
+   * documents the tri-state; the same always-present-with-explicit-nulls
+   * treatment the public professional shape already gives `images` and `rating`.
+   *
+   * **This is never an aggregate.** There is no count of how many customers
+   * saved this professional anywhere in this response, and no such field exists
+   * to be added by accident — `V32-DEC-021` refuses a public popularity signal
+   * outright, and `badges` continues to carry `rankingSignalKeys` and nothing
+   * else.
+   *
+   * The nested `services` deliberately do NOT carry this field. A service's own
+   * saved state is served by `GET /v1/providers/:id/services`, where the batch is
+   * bounded by one professional's catalogue; hydrating every service of every
+   * result here would make the batch grow with a product nobody controls, and a
+   * capped batch would report saved services as unsaved — a wrong answer where
+   * an absent field is an honest one.
+   */
+  saved: WishlistSavedState;
 }
 
-function toPublic(doc: ProviderSearchDocument): PublicProviderResult {
+function toPublic(doc: ProviderSearchDocument, saved: WishlistSavedState): PublicProviderResult {
   return {
     id: doc.professionalId,
     displayName: doc.displayName,
@@ -49,6 +74,8 @@ function toPublic(doc: ProviderSearchDocument): PublicProviderResult {
     priceFromToman: doc.minPriceToman,
     rating: { average: doc.ratingAvg, count: doc.reviewCount },
     badges: doc.rankingSignalKeys,
+    // Last, so the additive field is additive in the serialised order too.
+    saved,
   };
 }
 
@@ -64,6 +91,12 @@ export class SearchController {
   constructor(
     private readonly search: SearchService,
     private readonly indexer: SearchIndexerService,
+    /**
+     * Bound by the composition root and by nothing else. `SearchModule` provides
+     * no default, so a composition that forgets it fails to boot rather than
+     * quietly reporting `saved: null` for every signed-in customer forever.
+     */
+    @Inject(WISHLIST_SAVED_TARGETS) private readonly wishlist: WishlistSavedTargetsPort,
   ) {}
 
   /**
@@ -94,8 +127,38 @@ export class SearchController {
       user?.userId ?? null,
     );
 
+    /**
+     * ONE call for the page, after the search, for the caller alone.
+     *
+     * Skipped entirely for an anonymous visitor — there is no subject to ask
+     * about, so there is no query and every result reports `null`. That is not
+     * an optimisation: issuing a saved-state query for a caller the server
+     * cannot identify would require inventing a subject.
+     *
+     * Ordering matters. The saved state is read AFTER the engine has chosen and
+     * ranked the results, so it cannot influence which results appear or where —
+     * the search is identical for a signed-in and a signed-out caller, and a
+     * save can never become a ranking signal (`V32-DEC-021`).
+     */
+    const saved = user
+      ? await this.wishlist.savedTargets(
+          // From the verified JWT. `searchProviders` is `@Public()`, so this is
+          // the only identity in play and it is never read from the query string.
+          user.userId,
+          result.items.map((doc) => ({ targetType: 'professional' as const, targetId: doc.professionalId })),
+        )
+      : null;
+
     return {
-      items: result.items.map(toPublic),
+      items: result.items.map((doc) =>
+        toPublic(
+          doc,
+          // The key is built by the contract's own function, not by a template
+          // literal here — this side and the wishlist side must agree, and a
+          // second format is how they would stop.
+          saved ? saved.has(wishlistTargetKey({ targetType: 'professional', targetId: doc.professionalId })) : null,
+        ),
+      ),
       pagination: {
         page,
         pageSize,

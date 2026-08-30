@@ -1,6 +1,6 @@
 # ADR-033: The Wishlist Domain — Ownership, Saveable Targets, and Neutral Tombstones
 
-**Status:** Accepted — implemented in V3.2-C Story #8 (contract, persistence, API, privacy lifecycle).
+**Status:** Accepted — implemented in V3.2-C Story #8 (contract, persistence, API, privacy lifecycle). **The two halves this ADR deferred to Story #9 — the rendered target state (§6, §140) and saved-state hydration (§4) — landed on 2026-08-31 as [ADR-034](./ADR-034-wishlist-saved-state-hydration-and-target-state-projection.md).** ADR-034 revisits nothing here: ownership, the target set, the tombstone rule, the cap, and the erasure model are unchanged. It does absorb `WishlistSaveableTargetPort` into a broader batch port, which is exactly what §4 said should happen.
 **Date:** 2026-08-30.
 **Relates to:** ADR-011 (repository architecture and module boundaries), ADR-027 (subject-data contract, boot-time coverage), ADR-021 (search read model — one ranking implementation), ADR-029/ADR-030 (the AI catalogue port whose re-verification discipline this ADR copies), `V3_SECURITY_MODEL.md` §3 (indistinguishable refusals, no caller-supplied identity), `V3_DOMAIN_BOUNDARIES.md` (whose `provider.wishlist_items` proposal this ADR overrules on the merits).
 **Binding on:** `V32-DEC-020` and `V32-DEC-021`, closed by the product owner on 2026-08-30.

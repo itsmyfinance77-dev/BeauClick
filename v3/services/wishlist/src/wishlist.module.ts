@@ -12,17 +12,18 @@ import { WishlistSubjectDataContract } from './wishlist-subject-data.contract';
  *
  * ## What it does NOT provide, and why that is the boundary
  *
- * `WISHLIST_SAVEABLE_TARGET` is declared in `ports/wishlist.ports.ts` and bound
+ * `WISHLIST_TARGET_PORT` is declared in `ports/wishlist.ports.ts` and bound
  * by the composition root. **It is not provided here.** A module that cannot
  * boot without its port bound is a module whose boundary is real: there is no
  * default implementation to fall back on, and no way to ship a stub by accident.
  *
  * That matters here for a specific reason. The port carries `V32-DEC-021`'s
- * saveable predicate, which reads `provider.professionals.verification_status`
+ * availability predicate, which reads `provider.professionals.verification_status`
  * and two `deleted_at` columns — data `wishlist` may not import (ADR-011,
  * enforced by lint). Providing a permissive stub would put a product decision
  * inside a module that cannot see the data it is about, and the stub would pass
- * every test written against this module alone.
+ * every test written against this module alone — while reporting every saved
+ * item `available`, including the ones the platform has decided not to show.
  *
  * ## What it exports, and what it withholds
  *

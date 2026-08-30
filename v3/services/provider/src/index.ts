@@ -17,3 +17,4 @@ export * from './entities/review.entity';
 export * from './entities/review-eligibility.entity';
 export * from './review.service';
 export * from './provider-subject-data.contract';
+export * from './ports';

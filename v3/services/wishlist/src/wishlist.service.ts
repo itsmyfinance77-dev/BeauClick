@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, Repository } from 'typeorm';
+import { Brackets, DataSource, EntityManager, Repository } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
 
 import { AuditLogger, insertOnce } from '@beauclick/events';
@@ -9,12 +9,23 @@ import {
   WISHLIST_MAX_CURSOR_LENGTH,
   WISHLIST_MAX_PAGE_SIZE,
   WISHLIST_MAX_SAVED_ITEMS,
+  WISHLIST_TARGET_TYPES,
 } from '@beauclick/wishlist-contract';
-import type { WishlistItemView, WishlistPageView, WishlistTargetType } from '@beauclick/wishlist-contract';
+import type {
+  WishlistItemView,
+  WishlistPageView,
+  WishlistTargetState,
+  WishlistTargetType,
+} from '@beauclick/wishlist-contract';
 
 import { WishlistSavedItemEntity } from './entities/wishlist.entities';
 import { WishlistLimitReachedException } from './wishlist.exceptions';
-import { WISHLIST_SAVEABLE_TARGET, WishlistSaveableTargetPort, WishlistTargetRef } from './ports/wishlist.ports';
+import {
+  WISHLIST_TARGET_PORT,
+  WishlistTargetPort,
+  WishlistTargetRef,
+  wishlistTargetKey,
+} from './ports/wishlist.ports';
 
 /**
  * A namespace for this module's advisory locks.
@@ -77,7 +88,7 @@ export class WishlistService {
     private readonly dataSource: DataSource,
     @InjectRepository(WishlistSavedItemEntity)
     private readonly items: Repository<WishlistSavedItemEntity>,
-    @Inject(WISHLIST_SAVEABLE_TARGET) private readonly targets: WishlistSaveableTargetPort,
+    @Inject(WISHLIST_TARGET_PORT) private readonly targets: WishlistTargetPort,
   ) {}
 
   /**
@@ -111,7 +122,18 @@ export class WishlistService {
       const existing = await manager.getRepository(WishlistSavedItemEntity).findOne({
         where: { userId, targetType: target.targetType, targetId: target.targetId },
       });
-      if (existing) return toView(existing);
+      if (existing) {
+        // The state is COMPUTED here rather than assumed `available`, and the
+        // difference matters: this branch is reached for a target that may have
+        // been suspended since it was saved, which is exactly the case the early
+        // return exists to let succeed. Answering `available` would be a lie the
+        // very next `GET /items` contradicts.
+        //
+        // It discloses nothing new. The caller already holds this row, and their
+        // own list reports the same value for it on every read.
+        const available = await this.targets.availableTargets(manager, [target]);
+        return toView(existing, stateOf(available, target));
+      }
 
       await this.lockSubject(manager, userId);
 
@@ -120,10 +142,16 @@ export class WishlistService {
         .count({ where: { userId } });
       if (held >= WISHLIST_MAX_SAVED_ITEMS) throw new WishlistLimitReachedException();
 
-      // Missing, soft-deleted, suspended, and revoked all arrive here as
-      // `false`, and all leave as the platform's single refusal.
-      const saveable = await this.targets.isSaveable(manager, target);
-      if (!saveable) throw new NotFoundOrNotYoursException();
+      // Missing, soft-deleted, suspended, and revoked all arrive here as an
+      // ABSENCE from the returned set, and all leave as the platform's single
+      // refusal. The port cannot tell this branch which of the four it was, and
+      // that is the design rather than a limitation.
+      //
+      // A single-element batch, deliberately: the same port and therefore the
+      // same predicate `list` reads through (ADR-033 §4). A second single-target
+      // method would be a second implementation of `V32-DEC-021`.
+      const available = await this.targets.availableTargets(manager, [target]);
+      if (!available.has(wishlistTargetKey(target))) throw new NotFoundOrNotYoursException();
 
       const id = uuidv7();
       // `insertOnce` rather than reading `identifiers`: TypeORM echoes back a
@@ -148,7 +176,9 @@ export class WishlistService {
         const raced = await manager.getRepository(WishlistSavedItemEntity).findOneOrFail({
           where: { userId, targetType: target.targetType, targetId: target.targetId },
         });
-        return toView(raced);
+        // `available` without a second port call: this transaction proved it
+        // moments ago and has not committed since.
+        return toView(raced, 'available');
       }
 
       // Ids and an enum. No target detail, because this module holds none.
@@ -157,7 +187,7 @@ export class WishlistService {
       const saved = await manager
         .getRepository(WishlistSavedItemEntity)
         .findOneOrFail({ where: { id } });
-      return toView(saved);
+      return toView(saved, 'available');
     });
   }
 
@@ -195,11 +225,26 @@ export class WishlistService {
    * a cursor, which is an answer it can act on; a 400 is a dead end for a caller
    * whose only mistake was optimism.
    *
-   * **No target state is returned and none is computed.** This method reads one
-   * table and joins nothing. A saved row whose target has been deleted or
-   * suspended appears here unchanged — that is the tombstone (`V32-DEC-021`), and
-   * at this layer it is a property of what this query does NOT do. The
-   * `available | unavailable` projection is Story #9.
+   * ## The target-state projection (Story #9)
+   *
+   * **The query above is unchanged, and that is the point.** It still reads one
+   * table, joins nothing, filters on nothing but `user_id` and the cursor, and
+   * orders by the index. A saved row whose target has been deleted or suspended
+   * is selected, positioned, and paged exactly as any other — that is the
+   * tombstone (`V32-DEC-021`), and it remains a property of what this query does
+   * NOT do.
+   *
+   * The state is then computed for the page in ONE port call, AFTER the rows are
+   * chosen. That ordering is what keeps pagination stable while targets change
+   * underneath a paging client: because nothing about target state can affect
+   * which rows are selected or how they are ordered, a professional suspended
+   * between page 1 and page 2 cannot make a row skip, repeat, or move. A
+   * projection that filtered instead of annotating would have exactly that bug.
+   *
+   * **The state is never written anywhere.** It is not cached on the row, not
+   * memoised across requests, and not stored in the schema — there is no column
+   * that could hold it (ADR-033 §6). A lifted suspension therefore restores the
+   * item on the next read with no wishlist write of any kind.
    */
   async list(userId: string, limit: number | undefined, cursor: string | null): Promise<WishlistPageView> {
     const pageSize = clampPageSize(limit);
@@ -230,7 +275,104 @@ export class WishlistService {
     const last = items[items.length - 1];
     const nextCursor = rows.length > pageSize && last ? encodeWishlistCursor(last.createdAt, last.id) : null;
 
-    return { items: items.map(toView), nextCursor };
+    // ONE call for the whole page, not one per row. The port's contract is a
+    // batch for exactly this reason: fifty saved items resolved individually is
+    // the N+1 pattern issue #9 forbids by name.
+    //
+    // `this.dataSource.manager` rather than a transaction: this is a read, and
+    // wrapping it would buy a snapshot nothing needs. The rows are already
+    // fixed by the time the port runs, so a target changing state mid-request
+    // can only change the annotation on a row that is already in the page —
+    // never which rows are in it.
+    const available = await this.targets.availableTargets(this.dataSource.manager, items.map(refOf));
+
+    return {
+      items: items.map((row) => toView(row, stateOf(available, refOf(row)))),
+      nextCursor,
+    };
+  }
+
+  /**
+   * Which of `targets` **this** customer has saved.
+   *
+   * The read behind every saved-state marker on a search result, a professional
+   * profile, and a service listing (issue #9). Three properties, and each is
+   * load-bearing:
+   *
+   * **`userId` is the FIRST parameter and is always the session-resolved
+   * caller.** Every consumer reaches this through a port bound in the
+   * composition root, and every one of those passes `@CurrentUser().userId`.
+   * No route anywhere accepts a customer, owner, or user id from a request.
+   *
+   * **One query, whatever the page size.** The `WHERE` is
+   * `user_id = $1 AND ((target_type = 'professional' AND target_id IN (…)) OR
+   * (target_type = 'service' AND target_id IN (…)))`, which is two range scans
+   * on `uq_wishlist_saved_items_user_target (user_id, target_type, target_id)`
+   * inside a single statement. Written type-scoped rather than as a bare
+   * `target_id IN (…)` deliberately: without `target_type` the index cannot be
+   * seeked past its first column, and the query degrades to a scan of the
+   * customer's rows.
+   *
+   * **It returns membership, never a count.** There is no aggregate here, no
+   * "how many customers saved this", and no shape that could carry one —
+   * `V32-DEC-021` refuses a popularity signal outright, and the refusal is
+   * structural rather than a filter somebody has to remember to apply. The
+   * answer is a subset of what the caller asked about, restricted to the
+   * caller's own rows, and nothing else exists to leak.
+   */
+  async savedTargets(userId: string, targets: readonly WishlistTargetRef[]): Promise<ReadonlySet<string>> {
+    if (targets.length === 0) return EMPTY_KEYS;
+
+    const idsByType = new Map<WishlistTargetType, string[]>();
+    for (const type of WISHLIST_TARGET_TYPES) idsByType.set(type, []);
+    for (const target of targets) {
+      // Not de-duplicated here, and it does not need to be: a repeated id in an
+      // `IN` list costs nothing, and the answer is a Set either way.
+      //
+      // The list lengths are bounded by the callers, all but one by an explicit
+      // page limit — 50 for the saved list and for search, 100 for the provider
+      // listing. The exception is one professional's service catalogue, which is
+      // as long as their catalogue; that route already returns every one of
+      // those rows, so this adds no bound the response did not already have.
+      idsByType.get(target.targetType)?.push(target.targetId);
+    }
+
+    const query = this.items
+      .createQueryBuilder('w')
+      // `w.id` is selected even though the answer never carries it: `getMany`
+      // hydrates entities and DE-DUPLICATES them by primary key, so a partial
+      // select that omits the key can collapse distinct rows into one. The id
+      // reaches this method and stops here — it is not in the returned set and
+      // the contract has no field that could hold it.
+      .select(['w.id', 'w.targetType', 'w.targetId'])
+      // The ownership predicate is in the WHERE clause and not checked
+      // afterwards, for the reason `remove` records: another customer's saved
+      // item is not found for the same reason a nonexistent one is not found.
+      .where('w.user_id = :userId', { userId });
+
+    query.andWhere(
+      new Brackets((qb) => {
+        let any = false;
+        for (const [type, ids] of idsByType) {
+          if (ids.length === 0) continue;
+          // Distinct parameter names per branch: TypeORM's parameter map is
+          // flat, so reusing `ids` would silently overwrite the first branch.
+          qb.orWhere(`(w.target_type = :type_${type} AND w.target_id IN (:...ids_${type}))`, {
+            [`type_${type}`]: type,
+            [`ids_${type}`]: ids,
+          });
+          any = true;
+        }
+        // Unreachable while the vocabulary is closed and non-empty, and present
+        // so that a future third target type nobody wired here cannot turn this
+        // into `WHERE user_id = $1` — which would report every saved item as a
+        // match for a page it has nothing to do with.
+        if (!any) qb.where('1 = 0');
+      }),
+    );
+
+    const rows = await query.getMany();
+    return new Set(rows.map((row) => wishlistTargetKey({ targetType: row.targetType, targetId: row.targetId })));
   }
 
   /**
@@ -269,7 +411,27 @@ export class WishlistService {
   }
 }
 
-function toView(row: WishlistSavedItemEntity): WishlistItemView {
+/** The empty answer, allocated once. */
+const EMPTY_KEYS: ReadonlySet<string> = new Set<string>();
+
+/** The saved row, as the port and the contract both address a target. */
+function refOf(row: WishlistSavedItemEntity): WishlistTargetRef {
+  return { targetType: row.targetType as WishlistTargetType, targetId: row.targetId };
+}
+
+/**
+ * Set membership, rendered as the contract's two-valued state.
+ *
+ * The ONE place the mapping happens, so `available` cannot mean one thing in
+ * `save` and another in `list`. Note what it cannot express: there is no third
+ * branch and no argument that could carry a reason, so a cause has nowhere to
+ * enter even by accident.
+ */
+function stateOf(available: ReadonlySet<string>, target: WishlistTargetRef): WishlistTargetState {
+  return available.has(wishlistTargetKey(target)) ? 'available' : 'unavailable';
+}
+
+function toView(row: WishlistSavedItemEntity, state: WishlistTargetState): WishlistItemView {
   // Constructed field by field rather than spread. A spread would carry `id` —
   // an internal identifier the contract deliberately does not expose — and would
   // silently carry any column a later migration adds.
@@ -277,6 +439,9 @@ function toView(row: WishlistSavedItemEntity): WishlistItemView {
     targetType: row.targetType as WishlistTargetType,
     targetId: row.targetId,
     savedAt: row.createdAt.toISOString(),
+    // A literal from the closed vocabulary, computed on this read and stored
+    // nowhere. Every unavailable cause arrives here as the same string.
+    state,
   };
 }
 
