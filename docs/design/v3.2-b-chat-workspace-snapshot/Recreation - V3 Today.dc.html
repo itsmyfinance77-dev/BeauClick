@@ -1,0 +1,1514 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas" />
+<style>
+  @font-face { font-family: 'Vazirmatn'; src: url('fonts/Vazir-Light.ttf') format('truetype'); font-weight: 300; font-display: swap; }
+  @font-face { font-family: 'Vazirmatn'; src: url('fonts/Vazir-Regular.ttf') format('truetype'); font-weight: 400; font-display: swap; }
+  @font-face { font-family: 'Vazirmatn'; src: url('fonts/Vazir-Medium.ttf') format('truetype'); font-weight: 500; font-display: swap; }
+  @font-face { font-family: 'Vazirmatn'; src: url('fonts/Vazir-Bold.ttf') format('truetype'); font-weight: 600 700; font-display: swap; }
+  @font-face { font-family: 'Vazirmatn'; src: url('fonts/Vazir-Black.ttf') format('truetype'); font-weight: 800 900; font-display: swap; }
+  body { margin: 0; background: oklch(0.94 0.005 280); font-family: 'Vazirmatn', system-ui, sans-serif; }
+  a { color: oklch(0.4 0.16 290); }
+  a:hover { color: oklch(0.34 0.16 290); }
+  code { font-family: ui-monospace, Menlo, monospace; font-size: 0.85em; direction: ltr; unicode-bidi: isolate; }
+</style>
+</helmet>
+
+<div dir="rtl" style="padding: 40px; display: flex; flex-direction: column; gap: 56px;">
+
+  <div style="max-width: 900px; display: flex; flex-direction: column; gap: 10px;">
+    <div style="font-size: 13px; font-weight: 700; letter-spacing: 0.04em; color: oklch(0.45 0.02 290);">BEAUCLICK V3.1 — مبنای مقایسه</div>
+    <h1 style="margin: 0; font-size: 40px; font-weight: 900; line-height: 1.2; color: oklch(0.2 0.02 290);">بازسازی صفحه‌های امروزِ V3</h1>
+    <p style="margin: 0; font-size: 16px; line-height: 1.85; color: oklch(0.42 0.02 290);">هر نما زیر، بازسازیِ دقیقِ همان صفحه در <code>v3/apps/web</code> با توکن‌های فعلی <code>tokens.css</code> است — همان رنگ، همان اندازه، همان فاصله، همان چیدمان و همان متن فارسی. داده‌ها نمونه‌اند اما شکل و شمار فیلدها از خودِ کد آمده. این نماها برای مقایسه‌اند، نه پیشنهاد. عرض هر نما ۱۲۸۰ پیکسل است — همان <code>--bc-spacing-content-max-width</code>.</p>
+  </div>
+
+  <section style="display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.2 0.02 290); color: #fff;">۰۱</span>
+      <h2 style="margin: 0; font-size: 22px; font-weight: 800; color: oklch(0.2 0.02 290);">صفحه اصلی</h2>
+      <code style="color: oklch(0.45 0.02 290);">app/page.tsx</code>
+      <span style="font-size: 13px; color: oklch(0.45 0.02 290);">سرور-رندر، نمای خارج‌شده از حساب</span>
+    </div>
+
+    <div style="width: 1280px; background: oklch(0.985 0.006 280); border: 1px solid oklch(0.82 0.01 290); border-radius: 6px; overflow: hidden; color: oklch(0.2 0.02 290); line-height: 1.8; font-variant-numeric: tabular-nums;">
+      <header style="border-bottom: 1px solid oklch(0.9 0.012 290); background: #fff;">
+        <div style="max-width: 1280px; margin: 0 auto; padding: 16px 40px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+          <a href="#" style="font-weight: 800; font-size: 20px; text-decoration: none; color: oklch(0.2 0.02 290); display: inline-flex; align-items: center; gap: 8px; min-height: 44px;"><img src="uploads/mark-mono.svg" alt="" width="20" height="20" style="display: block; flex-shrink: 0;" />BeauClick</a>
+          <nav aria-label="ناوبری اصلی" style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px; row-gap: 4px; justify-content: flex-end;">
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">جست‌وجو</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">متخصص‌ها</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">ورود</a>
+          </nav>
+        </div>
+      </header>
+      <main style="padding: 40px; max-width: 1280px; margin: 0 auto;">
+        <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+          <h1 style="margin: 0 0 12px; font-size: 32px; font-weight: 700; line-height: 1.25;">BeauClick</h1>
+          <p style="color: oklch(0.48 0.02 290); margin: 0 0 12px;">مارکت‌پلیس هوشمند زیبایی — رزرو آنلاین خدمات زیبایی از متخصص‌های تأییدشده.</p>
+          <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-block-start: 8px;">
+            <a href="#" style="display: inline-flex; align-items: center; justify-content: center; font-weight: 600; min-height: 44px; padding: 12px 20px;">جست‌وجوی متخصص</a>
+            <a href="#" style="display: inline-flex; align-items: center; justify-content: center; font-weight: 600; min-height: 44px; padding: 12px 20px;">مشاهده متخصص‌ها</a>
+            <a href="#" style="display: inline-flex; align-items: center; justify-content: center; font-weight: 600; min-height: 44px; padding: 12px 20px;">ورود با شماره موبایل</a>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <p style="margin: 0; max-width: 1280px; font-size: 14px; line-height: 1.85; color: oklch(0.42 0.02 290);">کل صفحه اصلیِ محصول یک کارت است: یک تیتر، یک جمله توضیح و سه پیوندِ متنی. بدون جست‌وجو، بدون دسته‌بندی، بدون متخصص، بدون تصویر، بدون پاصفحه. سه پیوند هم دکمه نیستند — <code>ENTRY_LINK_STYLE</code> فقط <code>padding</code> و <code>minHeight</code> دارد، پس در ۱۲۸۰ پیکسل عرض، کارت زیر سربرگ تقریباً خالی می‌ماند.</p>
+  </section>
+
+  <section style="display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.2 0.02 290); color: #fff;">۰۲</span>
+      <h2 style="margin: 0; font-size: 22px; font-weight: 800; color: oklch(0.2 0.02 290);">جست‌وجو</h2>
+      <code style="color: oklch(0.45 0.02 290);">app/search/page.tsx</code>
+    </div>
+
+    <div style="width: 1280px; background: oklch(0.985 0.006 280); border: 1px solid oklch(0.82 0.01 290); border-radius: 6px; overflow: hidden; color: oklch(0.2 0.02 290); line-height: 1.8; font-variant-numeric: tabular-nums;">
+      <header style="border-bottom: 1px solid oklch(0.9 0.012 290); background: #fff;">
+        <div style="max-width: 1280px; margin: 0 auto; padding: 16px 40px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+          <a href="#" style="font-weight: 800; font-size: 20px; text-decoration: none; color: oklch(0.2 0.02 290); display: inline-flex; align-items: center; gap: 8px; min-height: 44px;"><img src="uploads/mark-mono.svg" alt="" width="20" height="20" style="display: block; flex-shrink: 0;" />BeauClick</a>
+          <nav aria-label="ناوبری اصلی" style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px; row-gap: 4px; justify-content: flex-end;">
+            <a href="#" aria-current="page" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 800; color: oklch(0.4 0.16 290); text-decoration: none;">جست‌وجو</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">متخصص‌ها</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">رزروهای من</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">مسیر من</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">باشگاه</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">لیست انتظار</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">کسب‌وکار</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">حالت متخصص</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">اعلان‌ها<span aria-hidden="true" style="margin-inline-start: 4px; font-size: 12px; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: oklch(0.4 0.16 290); color: #fff;">۳</span></a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">داشبورد</a>
+            <span style="font-size: 13px; color: oklch(0.535 0.02 290);">مینا رضایی</span>
+            <button type="button" style="font: inherit; font-size: 14px; padding: 8px 14px; border-radius: 12px; border: 1px solid oklch(0.9 0.012 290); background: transparent; color: oklch(0.2 0.02 290); cursor: pointer; min-height: 44px;">خروج</button>
+          </nav>
+        </div>
+      </header>
+      <main style="padding: 40px; max-width: 1280px; margin: 0 auto;">
+        <section>
+          <h1 style="font-size: 24px; margin: 0 0 4px; font-weight: 700; line-height: 1.25;">جست‌وجوی متخصص</h1>
+          <p style="color: oklch(0.535 0.02 290); margin: 0 0 20px; font-size: 14px;">نام متخصص، خدمت یا شهر را بنویسید.</p>
+
+          <form role="search" style="margin-block-end: 20px;">
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <div style="flex: 1 1 240px; min-width: 0; position: relative;">
+                <label style="display: block; font-weight: 600; font-size: 14px; margin-block-end: 6px;">جست‌وجو</label>
+                <input type="search" value="میکاپ" placeholder="مثلاً میکاپ عروس" style="width: 100%; font: inherit; padding: 12px 14px; min-height: 44px; border-radius: 0; border: 1px solid oklch(0.9 0.012 290); background: #fff; color: oklch(0.2 0.02 290);" />
+              </div>
+              <div style="align-self: flex-end; min-width: 120px;">
+                <button type="submit" style="font: inherit; font-weight: 600; padding: 12px 20px; border-radius: 12px; border: none; background: oklch(0.4 0.16 290); color: #fff; cursor: pointer; width: 100%; min-height: 44px;">جست‌وجو</button>
+              </div>
+            </div>
+          </form>
+
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-block-end: 16px;">
+            <button type="button" style="font: inherit; font-size: 14px; padding: 10px 16px; min-height: 44px; border-radius: 999px; border: 1px solid oklch(0.9 0.012 290); background: transparent; color: oklch(0.2 0.02 290); cursor: pointer;">فقط تأییدشده</button>
+            <button type="button" style="font: inherit; font-size: 14px; padding: 10px 16px; min-height: 44px; border-radius: 999px; border: 1px solid oklch(0.4 0.16 290); background: oklch(0.4 0.16 290); color: #fff; cursor: pointer;">مرتبط‌ترین</button>
+            <button type="button" style="font: inherit; font-size: 14px; padding: 10px 16px; min-height: 44px; border-radius: 999px; border: 1px solid oklch(0.9 0.012 290); background: transparent; color: oklch(0.2 0.02 290); cursor: pointer;">برترین‌ها</button>
+            <button type="button" style="font: inherit; font-size: 14px; padding: 10px 16px; min-height: 44px; border-radius: 999px; border: 1px solid oklch(0.9 0.012 290); background: transparent; color: oklch(0.2 0.02 290); cursor: pointer;">ارزان‌ترین</button>
+            <button type="button" style="font: inherit; font-size: 14px; padding: 10px 16px; min-height: 44px; border-radius: 999px; border: 1px solid oklch(0.9 0.012 290); background: transparent; color: oklch(0.2 0.02 290); cursor: pointer;">گران‌ترین</button>
+          </div>
+
+          <p style="font-size: 14px; color: oklch(0.535 0.02 290); margin: 0 0 12px;">۳ نتیجه یافت شد</p>
+
+          <ul style="list-style: none; padding: 0; margin: 0; display: grid; gap: 16px;">
+            <li>
+              <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+                <div style="display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+                  <div style="min-width: 0;">
+                    <h2 style="font-size: 18px; margin: 0; font-weight: 700; line-height: 1.25;"><a href="#" style="color: oklch(0.2 0.02 290); text-decoration: none; display: inline-flex; align-items: center; min-height: 44px;">آتلیه سارا محمدی</a></h2>
+                    <p style="margin: 4px 0 0; font-size: 13px; color: oklch(0.535 0.02 290);">یزد</p>
+                    <p style="margin: 6px 0 0; font-size: 13px;">میکاپ عروس، شینیون، اصلاح ابرو</p>
+                  </div>
+                  <p style="margin: 0; font-weight: 700; white-space: nowrap;">از ۸۵۰٬۰۰۰ تومان</p>
+                </div>
+                <ul style="list-style: none; display: flex; gap: 6px; flex-wrap: wrap; padding: 0; margin: 10px 0 0;">
+                  <li style="font-size: 12px; padding: 4px 10px; border-radius: 999px; background: oklch(0.965 0.014 290); color: oklch(0.535 0.02 290);">تأییدشده</li>
+                  <li style="font-size: 12px; padding: 4px 10px; border-radius: 999px; background: oklch(0.965 0.014 290); color: oklch(0.535 0.02 290);">امتیاز بالا</li>
+                  <li style="font-size: 12px; padding: 4px 10px; border-radius: 999px; background: oklch(0.965 0.014 290); color: oklch(0.535 0.02 290);">پروفایل کامل</li>
+                </ul>
+              </div>
+            </li>
+            <li>
+              <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+                <div style="display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+                  <div style="min-width: 0;">
+                    <h2 style="font-size: 18px; margin: 0; font-weight: 700; line-height: 1.25;"><a href="#" style="color: oklch(0.2 0.02 290); text-decoration: none; display: inline-flex; align-items: center; min-height: 44px;">سالن زیبایی نگین</a></h2>
+                    <p style="margin: 4px 0 0; font-size: 13px; color: oklch(0.535 0.02 290);">یزد</p>
+                    <p style="margin: 6px 0 0; font-size: 13px;">رنگ و لایت، کراتین</p>
+                  </div>
+                  <p style="margin: 0; font-weight: 700; white-space: nowrap;">از ۱٬۲۰۰٬۰۰۰ تومان</p>
+                </div>
+                <ul style="list-style: none; display: flex; gap: 6px; flex-wrap: wrap; padding: 0; margin: 10px 0 0;">
+                  <li style="font-size: 12px; padding: 4px 10px; border-radius: 999px; background: oklch(0.965 0.014 290); color: oklch(0.535 0.02 290);">تأییدشده</li>
+                  <li style="font-size: 12px; padding: 4px 10px; border-radius: 999px; background: oklch(0.965 0.014 290); color: oklch(0.535 0.02 290);">فعال</li>
+                </ul>
+              </div>
+            </li>
+            <li>
+              <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+                <div style="display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+                  <div style="min-width: 0;">
+                    <h2 style="font-size: 18px; margin: 0; font-weight: 700; line-height: 1.25;"><a href="#" style="color: oklch(0.2 0.02 290); text-decoration: none; display: inline-flex; align-items: center; min-height: 44px;">استودیو مهسا</a></h2>
+                    <p style="margin: 4px 0 0; font-size: 13px; color: oklch(0.535 0.02 290);">یزد</p>
+                    <p style="margin: 6px 0 0; font-size: 13px;">میکاپ مجلسی</p>
+                  </div>
+                </div>
+                <ul style="list-style: none; display: flex; gap: 6px; flex-wrap: wrap; padding: 0; margin: 10px 0 0;">
+                  <li style="font-size: 12px; padding: 4px 10px; border-radius: 999px; background: oklch(0.965 0.014 290); color: oklch(0.535 0.02 290);">پروفایل کامل</li>
+                </ul>
+              </div>
+            </li>
+          </ul>
+
+          <section style="margin-block-start: 24px;">
+            <h2 style="font-size: 16px; margin: 0 0 12px; font-weight: 700; line-height: 1.25;">محدوده قیمت</h2>
+            <ul style="list-style: none; padding: 0; margin: 0; display: flex; gap: 8px; flex-wrap: wrap;">
+              <li style="font-size: 13px; color: oklch(0.535 0.02 290);">تا ۵۰۰ هزار تومان: ۰</li>
+              <li style="font-size: 13px; color: oklch(0.535 0.02 290);">۵۰۰ هزار تا ۱ میلیون: ۱</li>
+              <li style="font-size: 13px; color: oklch(0.535 0.02 290);">۱ تا ۲ میلیون: ۲</li>
+            </ul>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <p style="margin: 0; max-width: 1280px; font-size: 14px; line-height: 1.85; color: oklch(0.42 0.02 290);">فیلترها و مرتب‌سازی در یک ردیفِ همسان‌اند: «فقط تأییدشده» که یک وضعیت است و چهار گزینه ترتیب که یک انتخاب‌اند، از هم قابل تشخیص نیستند. نتیجه‌ها فهرست کارت‌های تمام‌عرض‌اند با نامی که هم‌وزن قیمت است و بدون هیچ کنشی به مرحله بعد. سطلِ قیمت — که در یک مارکت‌پلیس فیلترِ اصلی است — به‌صورت متنِ خواندنی در پایین صفحه آمده و قابل کلیک نیست. ورودیِ جست‌وجو <code>--bc-radius-input</code> را صدا می‌زند که در <code>tokens.css</code> وجود ندارد، پس گردیِ آن در مرورگر صفر می‌شود.</p>
+  </section>
+
+  <section style="display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.2 0.02 290); color: #fff;">۰۳</span>
+      <h2 style="margin: 0; font-size: 22px; font-weight: 800; color: oklch(0.2 0.02 290);">پروفایل متخصص و رزرو</h2>
+      <code style="color: oklch(0.45 0.02 290);">app/providers/[id]/page.tsx</code>
+      <span style="font-size: 13px; color: oklch(0.45 0.02 290);">پروفایل و رزرو یک صفحه‌اند</span>
+    </div>
+
+    <div style="width: 1280px; background: oklch(0.985 0.006 280); border: 1px solid oklch(0.82 0.01 290); border-radius: 6px; overflow: hidden; color: oklch(0.2 0.02 290); line-height: 1.8; font-variant-numeric: tabular-nums;">
+      <header style="border-bottom: 1px solid oklch(0.9 0.012 290); background: #fff;">
+        <div style="max-width: 1280px; margin: 0 auto; padding: 16px 40px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+          <a href="#" style="font-weight: 800; font-size: 20px; text-decoration: none; color: oklch(0.2 0.02 290); display: inline-flex; align-items: center; gap: 8px; min-height: 44px;"><img src="uploads/mark-mono.svg" alt="" width="20" height="20" style="display: block; flex-shrink: 0;" />BeauClick</a>
+          <nav aria-label="ناوبری اصلی" style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px; row-gap: 4px; justify-content: flex-end;">
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">جست‌وجو</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">متخصص‌ها</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">رزروهای من</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">مسیر من</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">باشگاه</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">لیست انتظار</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">کسب‌وکار</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">حالت متخصص</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">اعلان‌ها</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">داشبورد</a>
+            <span style="font-size: 13px; color: oklch(0.535 0.02 290);">مینا رضایی</span>
+            <button type="button" style="font: inherit; font-size: 14px; padding: 8px 14px; border-radius: 12px; border: 1px solid oklch(0.9 0.012 290); background: transparent; color: oklch(0.2 0.02 290); cursor: pointer; min-height: 44px;">خروج</button>
+          </nav>
+        </div>
+      </header>
+      <main style="padding: 40px; max-width: 1280px; margin: 0 auto;">
+        <section style="display: grid; gap: 16px;">
+          <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+            <h1 style="font-size: 24px; margin: 0 0 4px; font-weight: 700; line-height: 1.25;">آتلیه سارا محمدی</h1>
+            <p style="color: oklch(0.48 0.02 290); margin: 0;">میکاپ عروس و مجلسی، با ده سال سابقه در یزد.</p>
+          </div>
+
+          <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+            <h2 style="font-size: 18px; margin: 0 0 12px; font-weight: 700; line-height: 1.25;">انتخاب خدمت</h2>
+            <ul style="list-style: none; padding: 0; margin: 0; display: grid; gap: 8px;">
+              <li>
+                <button type="button" aria-pressed="true" style="font: inherit; width: 100%; min-height: 44px; text-align: start; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; border: 1px solid oklch(0.4 0.16 290); background: oklch(0.94 0.03 290); color: oklch(0.2 0.02 290); cursor: pointer;">
+                  <span>میکاپ عروس<span style="display: block; font-size: 12px; color: oklch(0.535 0.02 290);">۱۸۰ دقیقه</span></span>
+                  <strong style="white-space: nowrap;">۸۵۰٬۰۰۰ تومان</strong>
+                </button>
+              </li>
+              <li>
+                <button type="button" style="font: inherit; width: 100%; min-height: 44px; text-align: start; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; border: 1px solid oklch(0.9 0.012 290); background: transparent; color: oklch(0.2 0.02 290); cursor: pointer;">
+                  <span>شینیون<span style="display: block; font-size: 12px; color: oklch(0.535 0.02 290);">۹۰ دقیقه</span></span>
+                  <strong style="white-space: nowrap;">۴۲۰٬۰۰۰ تومان</strong>
+                </button>
+              </li>
+              <li>
+                <button type="button" style="font: inherit; width: 100%; min-height: 44px; text-align: start; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; border: 1px solid oklch(0.9 0.012 290); background: transparent; color: oklch(0.2 0.02 290); cursor: pointer;">
+                  <span>اصلاح ابرو<span style="display: block; font-size: 12px; color: oklch(0.535 0.02 290);">۳۰ دقیقه</span></span>
+                  <strong style="white-space: nowrap;">۱۲۰٬۰۰۰ تومان</strong>
+                </button>
+              </li>
+            </ul>
+          </div>
+
+          <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+            <h2 style="font-size: 18px; margin: 0 0 12px; font-weight: 700; line-height: 1.25;">انتخاب زمان</h2>
+            <div style="display: grid; gap: 20px;">
+              <div>
+                <h3 style="font-size: 14px; font-weight: 700; margin: 0 0 8px; color: oklch(0.48 0.02 290); line-height: 1.25;">چهارشنبه ۶ شهریور ۱۴۰۴</h3>
+                <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 8px;">
+                  <li><button type="button" style="font: inherit; min-height: 44px; min-width: 76px; padding: 10px 14px; border-radius: 999px; border: 1px solid oklch(0.9 0.012 290); background: transparent; color: oklch(0.2 0.02 290); cursor: pointer; direction: ltr;">۰۹:۳۰</button></li>
+                  <li><button type="button" aria-pressed="true" style="font: inherit; min-height: 44px; min-width: 76px; padding: 10px 14px; border-radius: 999px; border: 1px solid oklch(0.4 0.16 290); background: oklch(0.4 0.16 290); color: #fff; cursor: pointer; direction: ltr;">۱۲:۰۰</button></li>
+                  <li><button type="button" style="font: inherit; min-height: 44px; min-width: 76px; padding: 10px 14px; border-radius: 999px; border: 1px solid oklch(0.9 0.012 290); background: transparent; color: oklch(0.2 0.02 290); cursor: pointer; direction: ltr;">۱۶:۳۰</button></li>
+                </ul>
+              </div>
+              <div>
+                <h3 style="font-size: 14px; font-weight: 700; margin: 0 0 8px; color: oklch(0.48 0.02 290); line-height: 1.25;">پنجشنبه ۷ شهریور ۱۴۰۴</h3>
+                <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 8px;">
+                  <li><button type="button" style="font: inherit; min-height: 44px; min-width: 76px; padding: 10px 14px; border-radius: 999px; border: 1px solid oklch(0.9 0.012 290); background: transparent; color: oklch(0.2 0.02 290); cursor: pointer; direction: ltr;">۱۰:۰۰</button></li>
+                  <li><button type="button" style="font: inherit; min-height: 44px; min-width: 76px; padding: 10px 14px; border-radius: 999px; border: 1px solid oklch(0.9 0.012 290); background: transparent; color: oklch(0.2 0.02 290); cursor: pointer; direction: ltr;">۱۴:۰۰</button></li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+            <h2 style="font-size: 18px; margin: 0 0 12px; font-weight: 700; line-height: 1.25;">تأیید و پرداخت</h2>
+            <dl style="display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; font-size: 14px; margin: 0;">
+              <dt style="color: oklch(0.535 0.02 290);">خدمت</dt>
+              <dd style="margin: 0;">میکاپ عروس</dd>
+              <dt style="color: oklch(0.535 0.02 290);">مبلغ</dt>
+              <dd style="margin: 0;">۸۵۰٬۰۰۰ تومان</dd>
+            </dl>
+            <p style="font-size: 12px; color: oklch(0.535 0.02 290); margin: 12px 0 0;">مبلغ نهایی توسط سرور محاسبه می‌شود و در صفحه‌ی رسید نمایش داده خواهد شد.</p>
+            <div style="margin-block-start: 16px;">
+              <button type="button" style="font: inherit; font-weight: 600; padding: 12px 20px; border-radius: 12px; border: none; background: oklch(0.4 0.16 290); color: #fff; cursor: pointer; width: 100%; min-height: 44px;">رزرو و پرداخت</button>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <p style="margin: 0; max-width: 1280px; font-size: 14px; line-height: 1.85; color: oklch(0.42 0.02 290);">این صفحه هم پروفایل است هم جریان رزرو، در چهار کارتِ پشت‌سرهم و تمام‌عرض. از سرفصل‌های یک پروفایل مارکت‌پلیس فقط دو فیلد وجود دارد: <code>displayName</code> و <code>bio</code> — بدون شهر، بدون تخصص، بدون وضعیت تأیید، بدون تصویر. در ۱۲۸۰ پیکسل، خلاصه سفارش تا انتهای صفحه پایین می‌رود و هنگام انتخاب زمان دیده نمی‌شود؛ دکمه «رزرو و پرداخت» هم تمام‌عرضِ ۱۲۰۰ پیکسل است.</p>
+  </section>
+
+  <section style="display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.2 0.02 290); color: #fff;">۰۴</span>
+      <h2 style="margin: 0; font-size: 22px; font-weight: 800; color: oklch(0.2 0.02 290);">رزروهای من</h2>
+      <code style="color: oklch(0.45 0.02 290);">app/bookings/page.tsx</code>
+    </div>
+
+    <div style="width: 1280px; background: oklch(0.985 0.006 280); border: 1px solid oklch(0.82 0.01 290); border-radius: 6px; overflow: hidden; color: oklch(0.2 0.02 290); line-height: 1.8; font-variant-numeric: tabular-nums;">
+      <header style="border-bottom: 1px solid oklch(0.9 0.012 290); background: #fff;">
+        <div style="max-width: 1280px; margin: 0 auto; padding: 16px 40px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+          <a href="#" style="font-weight: 800; font-size: 20px; text-decoration: none; color: oklch(0.2 0.02 290); display: inline-flex; align-items: center; gap: 8px; min-height: 44px;"><img src="uploads/mark-mono.svg" alt="" width="20" height="20" style="display: block; flex-shrink: 0;" />BeauClick</a>
+          <nav aria-label="ناوبری اصلی" style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px; row-gap: 4px; justify-content: flex-end;">
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">جست‌وجو</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">متخصص‌ها</a>
+            <a href="#" aria-current="page" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 800; color: oklch(0.4 0.16 290); text-decoration: none;">رزروهای من</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">مسیر من</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">باشگاه</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">لیست انتظار</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">کسب‌وکار</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">حالت متخصص</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">اعلان‌ها</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">داشبورد</a>
+            <span style="font-size: 13px; color: oklch(0.535 0.02 290);">مینا رضایی</span>
+            <button type="button" style="font: inherit; font-size: 14px; padding: 8px 14px; border-radius: 12px; border: 1px solid oklch(0.9 0.012 290); background: transparent; color: oklch(0.2 0.02 290); cursor: pointer; min-height: 44px;">خروج</button>
+          </nav>
+        </div>
+      </header>
+      <main style="padding: 40px; max-width: 1280px; margin: 0 auto;">
+        <section>
+          <div style="display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 8px; margin-block-end: 20px;">
+            <div style="min-width: 0;"><h1 style="font-size: 24px; font-weight: 800; margin: 0;">رزروهای من</h1></div>
+          </div>
+          <ul style="list-style: none; padding: 0; margin: 0; display: grid; gap: 16px;">
+            <li>
+              <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+                <div style="display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+                  <div>
+                    <p style="margin: 0; font-weight: 700;">چهارشنبه ۶ شهریور ۱۴۰۴</p>
+                    <p style="margin: 4px 0 0; color: oklch(0.48 0.02 290); font-size: 14px;">ساعت <span style="direction: ltr; display: inline-block;">۱۲:۰۰</span></p>
+                  </div>
+                  <span style="color: oklch(0.5 0.13 150); font-weight: 700; font-size: 14px;">تأیید شده</span>
+                </div>
+                <div style="margin-block-start: 16px;">
+                  <button type="button" style="font: inherit; font-weight: 600; padding: 10px 16px; border-radius: 12px; border: 1px solid oklch(0.535 0.19 25); background: transparent; color: oklch(0.535 0.19 25); cursor: pointer; width: auto; min-height: 44px;">لغو رزرو</button>
+                </div>
+              </div>
+            </li>
+            <li>
+              <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+                <div style="display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+                  <div>
+                    <p style="margin: 0; font-weight: 700;">شنبه ۲ شهریور ۱۴۰۴</p>
+                    <p style="margin: 4px 0 0; color: oklch(0.48 0.02 290); font-size: 14px;">ساعت <span style="direction: ltr; display: inline-block;">۱۰:۰۰</span></p>
+                  </div>
+                  <span style="color: oklch(0.48 0.02 290); font-weight: 700; font-size: 14px;">انجام شده</span>
+                </div>
+              </div>
+            </li>
+            <li>
+              <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+                <div style="display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+                  <div>
+                    <p style="margin: 0; font-weight: 700;">یکشنبه ۲۷ مرداد ۱۴۰۴</p>
+                    <p style="margin: 4px 0 0; color: oklch(0.48 0.02 290); font-size: 14px;">ساعت <span style="direction: ltr; display: inline-block;">۱۸:۳۰</span></p>
+                  </div>
+                  <span style="color: oklch(0.535 0.02 290); font-weight: 700; font-size: 14px;">منقضی شده</span>
+                </div>
+              </div>
+            </li>
+          </ul>
+        </section>
+      </main>
+    </div>
+
+    <p style="margin: 0; max-width: 1280px; font-size: 14px; line-height: 1.85; color: oklch(0.42 0.02 290);">کارتِ رزرو فقط تاریخ، ساعت و وضعیت را دارد. نامِ متخصص، نامِ خدمت، مبلغ و نشانی در آن نیست — یعنی مشتری از فهرست رزروهایش نمی‌فهمد کدام رزرو مربوط به کیست. وضعیت هم به‌جای نشان، متنِ رنگی است (<code>STATUS_FA</code> یک <code>tone</code> رنگی می‌دهد که مستقیم روی <code>color</code> می‌نشیند)، پس «تأیید شده» و «منقضی شده» فقط با رنگ از هم جدا می‌شوند.</p>
+  </section>
+
+  <section style="display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.2 0.02 290); color: #fff;">۰۵</span>
+      <h2 style="margin: 0; font-size: 22px; font-weight: 800; color: oklch(0.2 0.02 290);">داشبورد مشتری</h2>
+      <code style="color: oklch(0.45 0.02 290);">app/dashboard/page.tsx</code>
+    </div>
+
+    <div style="width: 1280px; background: oklch(0.985 0.006 280); border: 1px solid oklch(0.82 0.01 290); border-radius: 6px; overflow: hidden; color: oklch(0.2 0.02 290); line-height: 1.8; font-variant-numeric: tabular-nums;">
+      <header style="border-bottom: 1px solid oklch(0.9 0.012 290); background: #fff;">
+        <div style="max-width: 1280px; margin: 0 auto; padding: 16px 40px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+          <a href="#" style="font-weight: 800; font-size: 20px; text-decoration: none; color: oklch(0.2 0.02 290); display: inline-flex; align-items: center; gap: 8px; min-height: 44px;"><img src="uploads/mark-mono.svg" alt="" width="20" height="20" style="display: block; flex-shrink: 0;" />BeauClick</a>
+          <nav aria-label="ناوبری اصلی" style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px; row-gap: 4px; justify-content: flex-end;">
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">جست‌وجو</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">متخصص‌ها</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">رزروهای من</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">مسیر من</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">باشگاه</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">لیست انتظار</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">کسب‌وکار</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">حالت متخصص</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">اعلان‌ها</a>
+            <a href="#" aria-current="page" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 800; color: oklch(0.4 0.16 290); text-decoration: none;">داشبورد</a>
+            <span style="font-size: 13px; color: oklch(0.535 0.02 290);">مینا رضایی</span>
+            <button type="button" style="font: inherit; font-size: 14px; padding: 8px 14px; border-radius: 12px; border: 1px solid oklch(0.9 0.012 290); background: transparent; color: oklch(0.2 0.02 290); cursor: pointer; min-height: 44px;">خروج</button>
+          </nav>
+        </div>
+      </header>
+      <main style="padding: 40px; max-width: 1280px; margin: 0 auto;">
+        <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+          <h1 style="font-size: 24px; margin: 0 0 12px; font-weight: 700; line-height: 1.25;">داشبورد</h1>
+          <dl style="display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; font-size: 14px; margin: 0;">
+            <dt style="color: oklch(0.535 0.02 290);">شماره موبایل</dt>
+            <dd style="margin: 0;">09131234567</dd>
+            <dt style="color: oklch(0.535 0.02 290);">نقش‌ها</dt>
+            <dd style="margin: 0;">bc_customer</dd>
+            <dt style="color: oklch(0.535 0.02 290);">امروز</dt>
+            <dd style="margin: 0;">چهارشنبه ۶ شهریور ۱۴۰۴</dd>
+          </dl>
+        </div>
+      </main>
+    </div>
+
+    <p style="margin: 0; max-width: 1280px; font-size: 14px; line-height: 1.85; color: oklch(0.42 0.02 290);">داشبورد مشتری هنوز همان چیزی است که کدش می‌گوید: یک فراخوانِ <code>GET /v1/me</code> برای اثباتِ زنجیره احراز هویت. سه فیلد، یکی از آن‌ها نقشِ خامِ <code>bc_customer</code> به انگلیسی، شماره موبایل با ارقام لاتین، و هیچ ارجاعی به رزرو، مسیر یا باشگاه.</p>
+  </section>
+
+  <section style="display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.2 0.02 290); color: #fff;">۰۶</span>
+      <h2 style="margin: 0; font-size: 22px; font-weight: 800; color: oklch(0.2 0.02 290);">نمای کلی متخصص</h2>
+      <code style="color: oklch(0.45 0.02 290);">app/pro/page.tsx + components/pro-shell.tsx</code>
+    </div>
+
+    <div style="width: 1280px; background: oklch(0.985 0.006 280); border: 1px solid oklch(0.82 0.01 290); border-radius: 6px; overflow: hidden; color: oklch(0.2 0.02 290); line-height: 1.8; font-variant-numeric: tabular-nums;">
+      <header style="border-bottom: 1px solid oklch(0.9 0.012 290); background: #fff;">
+        <div style="max-width: 1280px; margin: 0 auto; padding: 16px 40px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+          <a href="#" style="font-weight: 800; font-size: 20px; text-decoration: none; color: oklch(0.2 0.02 290); display: inline-flex; align-items: center; gap: 8px; min-height: 44px;"><img src="uploads/mark-mono.svg" alt="" width="20" height="20" style="display: block; flex-shrink: 0;" />BeauClick</a>
+          <nav aria-label="ناوبری اصلی" style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px; row-gap: 4px; justify-content: flex-end;">
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">جست‌وجو</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">متخصص‌ها</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">رزروهای من</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">مسیر من</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">باشگاه</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">لیست انتظار</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">کسب‌وکار</a>
+            <a href="#" aria-current="page" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 800; color: oklch(0.4 0.16 290); text-decoration: none;">حالت متخصص</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">اعلان‌ها</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">داشبورد</a>
+            <span style="font-size: 13px; color: oklch(0.535 0.02 290);">سارا محمدی</span>
+            <button type="button" style="font: inherit; font-size: 14px; padding: 8px 14px; border-radius: 12px; border: 1px solid oklch(0.9 0.012 290); background: transparent; color: oklch(0.2 0.02 290); cursor: pointer; min-height: 44px;">خروج</button>
+          </nav>
+        </div>
+      </header>
+      <main style="padding: 40px; max-width: 1280px; margin: 0 auto;">
+        <div>
+          <div style="background: oklch(0.94 0.03 290); border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 16px; margin-block-end: 20px;">
+            <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-block-end: 8px;">
+              <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0;">
+                <span style="display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.94 0.03 290); color: oklch(0.4 0.16 290);">حالت متخصص</span>
+                <span style="font-size: 14px; font-weight: 700;">سارا محمدی</span>
+                <span style="display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.94 0.04 150); color: oklch(0.5 0.13 150);">تأیید شده</span>
+              </div>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; font-size: 13px; font-weight: 600; color: oklch(0.48 0.02 290); text-decoration: none;">بازگشت به نمای مشتری</a>
+            </div>
+            <nav aria-label="ناوبری متخصص" style="display: flex; flex-wrap: wrap; gap: 8px; row-gap: 0; min-width: 0;">
+              <a href="#" aria-current="page" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 800; color: oklch(0.4 0.16 290); border-bottom: 2px solid oklch(0.4 0.16 290); text-decoration: none;">نمای کلی</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); border-bottom: 2px solid transparent; text-decoration: none;">رزروها</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); border-bottom: 2px solid transparent; text-decoration: none;">زمان‌های آزاد</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); border-bottom: 2px solid transparent; text-decoration: none;">خدمات</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); border-bottom: 2px solid transparent; text-decoration: none;">مالی</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); border-bottom: 2px solid transparent; text-decoration: none;">آمار</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); border-bottom: 2px solid transparent; text-decoration: none;">پروفایل</a>
+            </nav>
+          </div>
+
+          <div style="display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 8px; margin-block-end: 20px;">
+            <div style="min-width: 0;">
+              <h1 style="font-size: 24px; font-weight: 800; margin: 0;">سلام، سارا محمدی</h1>
+              <p style="font-size: 14px; color: oklch(0.48 0.02 290); margin: 6px 0 0;">نمای کلی کسب‌وکار شما.</p>
+            </div>
+          </div>
+
+          <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+            <h2 style="font-size: 16px; font-weight: 700; margin: 0 0 4px;">تکمیل راه‌اندازی</h2>
+            <p style="font-size: 13px; color: oklch(0.48 0.02 290); margin: 0 0 12px;">تا این موارد کامل نشود، مشتری‌ها نمی‌توانند شما را پیدا کنند یا رزرو کنند.</p>
+            <ul style="list-style: none; margin: 0; padding: 0; display: grid; gap: 8px;">
+              <li style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <span style="display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.94 0.04 150); color: oklch(0.5 0.13 150);">انجام شد</span>
+                <span style="font-size: 14px;">ثبت حداقل یک خدمت</span>
+              </li>
+              <li style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <span style="display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.95 0.045 80); color: oklch(0.53 0.115 70);">باقی مانده</span>
+                <span style="font-size: 14px;">ثبت زمان‌های آزاد</span>
+                <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; font-weight: 600; font-size: 14px; color: oklch(0.4 0.16 290); text-decoration: none;">انجام بده</a>
+              </li>
+              <li style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <span style="display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.94 0.04 150); color: oklch(0.5 0.13 150);">انجام شد</span>
+                <span style="font-size: 14px;">انتخاب تخصص‌ها</span>
+              </li>
+              <li style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <span style="display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.94 0.04 150); color: oklch(0.5 0.13 150);">انجام شد</span>
+                <span style="font-size: 14px;">انتخاب شهر</span>
+              </li>
+            </ul>
+          </div>
+
+          <div style="margin-block-start: 20px;">
+            <div style="display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+              <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+                <p style="margin: 0; font-size: 13px; color: oklch(0.48 0.02 290);">نوبت‌های ۲۴ ساعت آینده</p>
+                <p style="margin: 6px 0 0; font-size: 22px; font-weight: 800; overflow-wrap: anywhere;">۲</p>
+              </div>
+              <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+                <p style="margin: 0; font-size: 13px; color: oklch(0.48 0.02 290);">زمان‌های آزاد</p>
+                <p style="margin: 6px 0 0; font-size: 22px; font-weight: 800; overflow-wrap: anywhere;">۰</p>
+              </div>
+              <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+                <p style="margin: 0; font-size: 13px; color: oklch(0.48 0.02 290);">خدمات</p>
+                <p style="margin: 6px 0 0; font-size: 22px; font-weight: 800; overflow-wrap: anywhere;">۳</p>
+              </div>
+              <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+                <p style="margin: 0; font-size: 13px; color: oklch(0.48 0.02 290);">خالص قابل دریافت</p>
+                <p style="margin: 6px 0 0; font-size: 22px; font-weight: 800; overflow-wrap: anywhere;">۱۲٬۴۸۰٬۰۰۰</p>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-block-start: 20px;">
+            <h2 style="font-size: 16px; font-weight: 700; margin: 0 0 4px;">در انتظار ثبت وضعیت</h2>
+            <p style="font-size: 13px; color: oklch(0.48 0.02 290); margin: 0 0 12px;">زمان این نوبت‌ها گذشته است. تا وضعیت آن‌ها را ثبت نکنید، امتیاز باشگاه مشتری و آمار شما به‌روز نمی‌شود.</p>
+            <div style="display: grid; gap: 16px;">
+              <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+                <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;">
+                  <div style="min-width: 0;">
+                    <p style="margin: 0; font-size: 14px; font-weight: 700;">سه‌شنبه ۵ شهریور ۱۴۰۴</p>
+                    <p style="margin: 4px 0 0; font-size: 13px; color: oklch(0.48 0.02 290);">ساعت ۱۶:۰۰</p>
+                  </div>
+                  <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; font-weight: 600; font-size: 14px; color: oklch(0.4 0.16 290); text-decoration: none;">ثبت وضعیت</a>
+                </div>
+              </div>
+              <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+                <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;">
+                  <div style="min-width: 0;">
+                    <p style="margin: 0; font-size: 14px; font-weight: 700;">دوشنبه ۴ شهریور ۱۴۰۴</p>
+                    <p style="margin: 4px 0 0; font-size: 13px; color: oklch(0.48 0.02 290);">ساعت ۱۱:۳۰</p>
+                  </div>
+                  <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; font-weight: 600; font-size: 14px; color: oklch(0.4 0.16 290); text-decoration: none;">ثبت وضعیت</a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-block-start: 20px;">
+            <h2 style="font-size: 16px; font-weight: 700; margin: 0 0 12px;">نوبت‌های پیش‌رو</h2>
+            <div style="display: grid; gap: 16px;">
+              <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+                <p style="margin: 0; font-size: 14px; font-weight: 700;">چهارشنبه ۶ شهریور ۱۴۰۴ — ساعت ۱۲:۰۰</p>
+                <p style="margin: 4px 0 0; font-size: 13px; color: oklch(0.48 0.02 290);">میکاپ عروس</p>
+              </div>
+              <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+                <p style="margin: 0; font-size: 14px; font-weight: 700;">چهارشنبه ۶ شهریور ۱۴۰۴ — ساعت ۱۷:۰۰</p>
+                <p style="margin: 4px 0 0; font-size: 13px; color: oklch(0.48 0.02 290);">شینیون</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <p style="margin: 0; max-width: 1280px; font-size: 14px; line-height: 1.85; color: oklch(0.42 0.02 290);">نوارِ حالت درست کار می‌کند و بهترین بخشِ چرومِ فعلی است. اما زیرِ آن، سه بخشِ متوالی با تیترهای هم‌وزنِ ۱۶ پیکسلی و کارت‌های یک‌شکل آمده‌اند؛ «در انتظار ثبت وضعیت» که فوری‌ترین کارِ روز است، از «نوبت‌های پیش‌رو» قابل تشخیص نیست. کارت‌های شمارنده در ستون ۱۶۰ پیکسلی با <code>padding: 24</code> نشسته‌اند، پس رقمِ ۱۲٬۴۸۰٬۰۰۰ روی مرزِ شکستن است — همان دلیلی که <code>overflowWrap: anywhere</code> را به <code>StatCard</code> آورد. هیچ نمایشِ زمانی یا تقویمی هم وجود ندارد؛ روزِ کاری یک متخصص فهرستِ کارت است.</p>
+  </section>
+
+  <section style="display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.2 0.02 290); color: #fff;">۰۷</span>
+      <h2 style="margin: 0; font-size: 22px; font-weight: 800; color: oklch(0.2 0.02 290);">رزروهای متخصص</h2>
+      <code style="color: oklch(0.45 0.02 290);">app/pro/bookings/page.tsx</code>
+      <span style="font-size: 13px; color: oklch(0.45 0.02 290);">پرکارترین صفحه محصول — ۲۵ کیلوبایت کد</span>
+    </div>
+
+    <div style="width: 1280px; background: oklch(0.985 0.006 280); border: 1px solid oklch(0.82 0.01 290); border-radius: 6px; overflow: hidden; color: oklch(0.2 0.02 290); line-height: 1.8; font-variant-numeric: tabular-nums;">
+      <header style="border-bottom: 1px solid oklch(0.9 0.012 290); background: #fff;">
+        <div style="max-width: 1280px; margin: 0 auto; padding: 16px 40px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+          <a href="#" style="font-weight: 800; font-size: 20px; text-decoration: none; color: oklch(0.2 0.02 290); display: inline-flex; align-items: center; gap: 8px; min-height: 44px;"><img src="uploads/mark-mono.svg" alt="" width="20" height="20" style="display: block; flex-shrink: 0;" />BeauClick</a>
+          <nav aria-label="ناوبری اصلی" style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px; row-gap: 4px; justify-content: flex-end;">
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">جست‌وجو</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">متخصص‌ها</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">رزروهای من</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">مسیر من</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">باشگاه</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">لیست انتظار</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">کسب‌وکار</a>
+            <a href="#" aria-current="page" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 800; color: oklch(0.4 0.16 290); text-decoration: none;">حالت متخصص</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">اعلان‌ها</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">داشبورد</a>
+            <span style="font-size: 13px; color: oklch(0.535 0.02 290);">سارا محمدی</span>
+            <button type="button" style="font: inherit; font-size: 14px; padding: 8px 14px; border-radius: 12px; border: 1px solid oklch(0.9 0.012 290); background: transparent; color: oklch(0.2 0.02 290); cursor: pointer; min-height: 44px;">خروج</button>
+          </nav>
+        </div>
+      </header>
+      <main style="padding: 40px; max-width: 1280px; margin: 0 auto;">
+        <div>
+          <div style="background: oklch(0.94 0.03 290); border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 16px; margin-block-end: 20px;">
+            <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-block-end: 8px;">
+              <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0;">
+                <span style="display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.94 0.03 290); color: oklch(0.4 0.16 290);">حالت متخصص</span>
+                <span style="font-size: 14px; font-weight: 700;">سارا محمدی</span>
+                <span style="display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.94 0.04 150); color: oklch(0.5 0.13 150);">تأیید شده</span>
+              </div>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; font-size: 13px; font-weight: 600; color: oklch(0.48 0.02 290); text-decoration: none;">بازگشت به نمای مشتری</a>
+            </div>
+            <nav aria-label="ناوبری متخصص" style="display: flex; flex-wrap: wrap; gap: 8px; row-gap: 0; min-width: 0;">
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); border-bottom: 2px solid transparent; text-decoration: none;">نمای کلی</a>
+              <a href="#" aria-current="page" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 800; color: oklch(0.4 0.16 290); border-bottom: 2px solid oklch(0.4 0.16 290); text-decoration: none;">رزروها</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); border-bottom: 2px solid transparent; text-decoration: none;">زمان‌های آزاد</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); border-bottom: 2px solid transparent; text-decoration: none;">خدمات</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); border-bottom: 2px solid transparent; text-decoration: none;">مالی</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); border-bottom: 2px solid transparent; text-decoration: none;">آمار</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); border-bottom: 2px solid transparent; text-decoration: none;">پروفایل</a>
+            </nav>
+          </div>
+
+          <div style="display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 8px; margin-block-end: 20px;">
+            <div style="min-width: 0;">
+              <h1 style="font-size: 24px; font-weight: 800; margin: 0;">رزروها</h1>
+              <p style="font-size: 14px; color: oklch(0.48 0.02 290); margin: 6px 0 0;">رزروهای مشتریان شما. پس از پایان نوبت، وضعیت آن را ثبت کنید.</p>
+            </div>
+          </div>
+
+          <div role="tablist" aria-label="فیلتر رزروها" style="display: flex; gap: 8px; margin-block-end: 16px; flex-wrap: wrap;">
+            <button type="button" role="tab" aria-selected="true" style="font: inherit; font-size: 14px; font-weight: 800; min-height: 44px; padding: 0 16px; border-radius: 999px; cursor: pointer; border: 1px solid oklch(0.4 0.16 290); background: oklch(0.94 0.03 290); color: oklch(0.4 0.16 290);">پیش‌رو (۴)</button>
+            <button type="button" role="tab" aria-selected="false" style="font: inherit; font-size: 14px; font-weight: 600; min-height: 44px; padding: 0 16px; border-radius: 999px; cursor: pointer; border: 1px solid oklch(0.9 0.012 290); background: transparent; color: oklch(0.2 0.02 290);">گذشته (۱۲)</button>
+          </div>
+
+          <div style="display: grid; gap: 16px;">
+            <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+              <div style="display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 8px;">
+                <div style="min-width: 0;">
+                  <p style="margin: 0; font-weight: 700; font-size: 14px;">چهارشنبه ۶ شهریور ۱۴۰۴</p>
+                  <p style="margin: 4px 0 0; font-size: 14px;">ساعت ۱۲:۰۰ تا ۱۵:۰۰</p>
+                  <p style="margin: 6px 0 0; font-size: 13px; color: oklch(0.48 0.02 290);">میکاپ عروس — ۸۵۰٬۰۰۰</p>
+                  <p style="margin: 4px 0 0; font-size: 12px; color: oklch(0.535 0.02 290);">مشتری: <span style="direction: ltr; display: inline-block; font-family: monospace;">a3f91c47</span></p>
+                </div>
+                <span style="display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.94 0.03 290); color: oklch(0.4 0.16 290);">تأیید شده</span>
+              </div>
+              <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-block-start: 16px;">
+                <button type="button" style="font: inherit; font-weight: 600; padding: 10px 16px; border-radius: 12px; border: none; background: oklch(0.4 0.16 290); color: #fff; cursor: pointer; min-height: 44px;">ثبت انجام نوبت</button>
+                <button type="button" style="font: inherit; font-weight: 600; padding: 10px 16px; border-radius: 12px; border: 1px solid oklch(0.9 0.012 290); background: transparent; color: oklch(0.2 0.02 290); cursor: pointer; min-height: 44px;">تغییر زمان</button>
+                <button type="button" style="font: inherit; font-weight: 600; padding: 10px 16px; border-radius: 12px; border: 1px solid oklch(0.9 0.012 290); background: transparent; color: oklch(0.2 0.02 290); cursor: pointer; min-height: 44px;">تاریخچه</button>
+              </div>
+              <p style="margin: 10px 0 0; font-size: 12px; color: oklch(0.535 0.02 290);">ثبت عدم حضور تنها پس از پایان زمان نوبت ممکن است.</p>
+            </div>
+
+            <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+              <div style="display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 8px;">
+                <div style="min-width: 0;">
+                  <p style="margin: 0; font-weight: 700; font-size: 14px;">چهارشنبه ۶ شهریور ۱۴۰۴</p>
+                  <p style="margin: 4px 0 0; font-size: 14px;">ساعت ۱۷:۰۰ تا ۱۸:۳۰</p>
+                  <p style="margin: 6px 0 0; font-size: 13px; color: oklch(0.48 0.02 290);">شینیون — ۴۲۰٬۰۰۰</p>
+                  <p style="margin: 4px 0 0; font-size: 12px; color: oklch(0.535 0.02 290);">مشتری: <span style="direction: ltr; display: inline-block; font-family: monospace;">7be20d18</span></p>
+                  <p style="margin: 4px 0 0; font-size: 12px; color: oklch(0.535 0.02 290);">۱ بار جابه‌جا شده</p>
+                </div>
+                <span style="display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.95 0.045 80); color: oklch(0.53 0.115 70);">در انتظار پرداخت</span>
+              </div>
+              <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-block-start: 16px;">
+                <button type="button" style="font: inherit; font-weight: 600; padding: 10px 16px; border-radius: 12px; border: 1px solid oklch(0.9 0.012 290); background: transparent; color: oklch(0.2 0.02 290); cursor: pointer; min-height: 44px;">تغییر زمان</button>
+                <button type="button" style="font: inherit; font-weight: 600; padding: 10px 16px; border-radius: 12px; border: 1px solid oklch(0.9 0.012 290); background: transparent; color: oklch(0.2 0.02 290); cursor: pointer; min-height: 44px;">تاریخچه</button>
+              </div>
+            </div>
+
+            <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+              <div style="display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 8px;">
+                <div style="min-width: 0;">
+                  <p style="margin: 0; font-weight: 700; font-size: 14px;">سه‌شنبه ۵ شهریور ۱۴۰۴</p>
+                  <p style="margin: 4px 0 0; font-size: 14px;">ساعت ۱۶:۰۰ تا ۱۶:۳۰</p>
+                  <p style="margin: 6px 0 0; font-size: 13px; color: oklch(0.48 0.02 290);">اصلاح ابرو — ۱۲۰٬۰۰۰</p>
+                  <p style="margin: 4px 0 0; font-size: 12px; color: oklch(0.535 0.02 290);">مشتری: <span style="direction: ltr; display: inline-block; font-family: monospace;">c1904e6b</span></p>
+                </div>
+                <span style="display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.94 0.03 290); color: oklch(0.4 0.16 290);">تأیید شده</span>
+              </div>
+              <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-block-start: 16px;">
+                <button type="button" style="font: inherit; font-weight: 600; padding: 10px 16px; border-radius: 12px; border: none; background: oklch(0.4 0.16 290); color: #fff; cursor: pointer; min-height: 44px;">ثبت انجام نوبت</button>
+                <button type="button" style="font: inherit; font-weight: 600; padding: 10px 16px; border-radius: 12px; border: 1px solid oklch(0.535 0.19 25); background: transparent; color: oklch(0.535 0.19 25); cursor: pointer; min-height: 44px;">عدم حضور مشتری</button>
+                <button type="button" style="font: inherit; font-weight: 600; padding: 10px 16px; border-radius: 12px; border: 1px solid oklch(0.9 0.012 290); background: transparent; color: oklch(0.2 0.02 290); cursor: pointer; min-height: 44px;">بستن تاریخچه</button>
+              </div>
+              <p style="margin: 6px 0 0; font-size: 12px; color: oklch(0.535 0.02 290);">تغییر زمان تا ۶ ساعت پیش از نوبت ممکن است.</p>
+              <div style="margin-block-start: 16px; padding-block-start: 16px; border-block-start: 1px solid oklch(0.9 0.012 290);">
+                <ul style="list-style: none; margin: 0; padding: 0; display: grid; gap: 8px;">
+                  <li style="font-size: 13px;"><span style="font-weight: 600;">ایجاد رزرو</span><span style="color: oklch(0.535 0.02 290);"> — یکشنبه ۳ شهریور ۱۴۰۴ ساعت ۱۱:۲۰</span></li>
+                  <li style="font-size: 13px;"><span style="font-weight: 600;">تأیید رزرو</span><span style="color: oklch(0.535 0.02 290);"> — یکشنبه ۳ شهریور ۱۴۰۴ ساعت ۱۱:۲۲</span></li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-block-start: 16px; display: grid; gap: 8px; justify-items: center;">
+            <button type="button" style="font: inherit; font-weight: 600; padding: 10px 16px; border-radius: 12px; border: 1px solid oklch(0.9 0.012 290); background: transparent; color: oklch(0.2 0.02 290); cursor: pointer; min-height: 44px;">بارگذاری رزروهای بیشتر</button>
+            <p style="margin: 0; font-size: 12px; color: oklch(0.535 0.02 290);">۵۰ از ۶۳ رزرو بارگذاری شده است.</p>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <p style="margin: 0; max-width: 1280px; font-size: 14px; line-height: 1.85; color: oklch(0.42 0.02 290);">این صفحه منطقاً دقیق‌ترین بخش محصول است — تأیید برای هر کنش مخرب، دلیلِ نبودنِ هر دکمه، حالتِ سرور به‌جای به‌روزرسانیِ خوش‌بینانه — و بصری‌ترین ضعف را دارد. هر رزرو کارتی است با پنج سطرِ متنیِ هم‌وزن، تا سه دکمه کنارِ هم و تا دو خطِ توضیحِ ۱۲ پیکسلی، و همه‌ی رزروها یک‌شکل‌اند: «تأیید شده» با «در انتظار پرداخت» فقط رنگِ نشان تفاوت دارد. مشتری هم فقط یک هشت‌رقمیِ هگز است — چیزی که API واقعاً می‌دهد، اما در نمایی که متخصص روزی ده بار می‌بیند، غیرقابل استفاده.</p>
+  </section>
+
+  <section style="display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.2 0.02 290); color: #fff;">۰۸</span>
+      <h2 style="margin: 0; font-size: 22px; font-weight: 800; color: oklch(0.2 0.02 290);">زمان‌های آزاد</h2>
+      <code style="color: oklch(0.45 0.02 290);">app/pro/availability/page.tsx</code>
+    </div>
+
+    <div style="width: 1280px; background: oklch(0.985 0.006 280); border: 1px solid oklch(0.82 0.01 290); border-radius: 6px; overflow: hidden; color: oklch(0.2 0.02 290); line-height: 1.8; font-variant-numeric: tabular-nums;">
+      <header style="border-bottom: 1px solid oklch(0.9 0.012 290); background: #fff;">
+        <div style="max-width: 1280px; margin: 0 auto; padding: 16px 40px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+          <a href="#" style="font-weight: 800; font-size: 20px; text-decoration: none; color: oklch(0.2 0.02 290); display: inline-flex; align-items: center; gap: 8px; min-height: 44px;"><img src="uploads/mark-mono.svg" alt="" width="20" height="20" style="display: block; flex-shrink: 0;" />BeauClick</a>
+          <nav aria-label="ناوبری اصلی" style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px; row-gap: 4px; justify-content: flex-end;">
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">جست‌وجو</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">متخصص‌ها</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">رزروهای من</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">مسیر من</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">باشگاه</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">لیست انتظار</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">کسب‌وکار</a>
+            <a href="#" aria-current="page" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 800; color: oklch(0.4 0.16 290); text-decoration: none;">حالت متخصص</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">اعلان‌ها</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">داشبورد</a>
+            <span style="font-size: 13px; color: oklch(0.535 0.02 290);">سارا محمدی</span>
+            <button type="button" style="font: inherit; font-size: 14px; padding: 8px 14px; border-radius: 12px; border: 1px solid oklch(0.9 0.012 290); background: transparent; color: oklch(0.2 0.02 290); cursor: pointer; min-height: 44px;">خروج</button>
+          </nav>
+        </div>
+      </header>
+      <main style="padding: 40px; max-width: 1280px; margin: 0 auto;">
+        <div>
+          <div style="background: oklch(0.94 0.03 290); border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 16px; margin-block-end: 20px;">
+            <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-block-end: 8px;">
+              <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0;">
+                <span style="display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.94 0.03 290); color: oklch(0.4 0.16 290);">حالت متخصص</span>
+                <span style="font-size: 14px; font-weight: 700;">سارا محمدی</span>
+                <span style="display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.94 0.04 150); color: oklch(0.5 0.13 150);">تأیید شده</span>
+              </div>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; font-size: 13px; font-weight: 600; color: oklch(0.48 0.02 290); text-decoration: none;">بازگشت به نمای مشتری</a>
+            </div>
+            <nav aria-label="ناوبری متخصص" style="display: flex; flex-wrap: wrap; gap: 8px; row-gap: 0; min-width: 0;">
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); border-bottom: 2px solid transparent; text-decoration: none;">نمای کلی</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); border-bottom: 2px solid transparent; text-decoration: none;">رزروها</a>
+              <a href="#" aria-current="page" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 800; color: oklch(0.4 0.16 290); border-bottom: 2px solid oklch(0.4 0.16 290); text-decoration: none;">زمان‌های آزاد</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); border-bottom: 2px solid transparent; text-decoration: none;">خدمات</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); border-bottom: 2px solid transparent; text-decoration: none;">مالی</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); border-bottom: 2px solid transparent; text-decoration: none;">آمار</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); border-bottom: 2px solid transparent; text-decoration: none;">پروفایل</a>
+            </nav>
+          </div>
+
+          <div style="display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 8px; margin-block-end: 20px;">
+            <div style="min-width: 0;">
+              <h1 style="font-size: 24px; font-weight: 800; margin: 0;">زمان‌های آزاد</h1>
+              <p style="font-size: 14px; color: oklch(0.48 0.02 290); margin: 6px 0 0;">ساعت‌هایی که مشتری می‌تواند رزرو کند. همه ساعت‌ها به وقت ایران است.</p>
+            </div>
+          </div>
+
+          <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+            <h2 style="font-size: 16px; font-weight: 700; margin: 0 0 4px;">ساخت گروهی</h2>
+            <p style="font-size: 13px; color: oklch(0.48 0.02 290); margin: 0 0 16px;">یک الگوی هفتگی را روی یک بازه تاریخی اعمال می‌کند. اجرای دوباره همان الگو، زمان‌های تکراری نمی‌سازد.</p>
+            <fieldset style="border: 0; padding: 0; margin: 0 0 16px;">
+              <legend style="font-weight: 600; font-size: 14px; padding: 0; margin-block-end: 8px;">روزهای هفته</legend>
+              <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                <label style="display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; border-radius: 999px; border: 1px solid oklch(0.4 0.16 290); font-size: 14px; cursor: pointer;"><input type="checkbox" checked="checked" />شنبه</label>
+                <label style="display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; border-radius: 999px; border: 1px solid oklch(0.9 0.012 290); font-size: 14px; cursor: pointer;"><input type="checkbox" />یکشنبه</label>
+                <label style="display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; border-radius: 999px; border: 1px solid oklch(0.4 0.16 290); font-size: 14px; cursor: pointer;"><input type="checkbox" checked="checked" />دوشنبه</label>
+                <label style="display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; border-radius: 999px; border: 1px solid oklch(0.9 0.012 290); font-size: 14px; cursor: pointer;"><input type="checkbox" />سه‌شنبه</label>
+                <label style="display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; border-radius: 999px; border: 1px solid oklch(0.4 0.16 290); font-size: 14px; cursor: pointer;"><input type="checkbox" checked="checked" />چهارشنبه</label>
+                <label style="display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; border-radius: 999px; border: 1px solid oklch(0.9 0.012 290); font-size: 14px; cursor: pointer;"><input type="checkbox" />پنجشنبه</label>
+                <label style="display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; border-radius: 999px; border: 1px solid oklch(0.9 0.012 290); font-size: 14px; cursor: pointer;"><input type="checkbox" />جمعه</label>
+              </div>
+            </fieldset>
+
+            <div style="display: flex; flex-direction: column; gap: 6px; margin-block-end: 16px;">
+              <label style="font-weight: 600; font-size: 14px;">از تاریخ</label>
+              <input type="date" value="2026-08-28" style="font: inherit; padding: 12px 14px; border-radius: 12px; border: 1px solid oklch(0.9 0.012 290); background: #fff; color: oklch(0.2 0.02 290); min-height: 44px;" />
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px; margin-block-end: 16px;">
+              <label style="font-weight: 600; font-size: 14px;">تا تاریخ</label>
+              <input type="date" value="2026-09-27" style="font: inherit; padding: 12px 14px; border-radius: 12px; border: 1px solid oklch(0.9 0.012 290); background: #fff; color: oklch(0.2 0.02 290); min-height: 44px;" />
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px; margin-block-end: 16px;">
+              <label style="font-weight: 600; font-size: 14px;">از ساعت</label>
+              <input type="time" value="09:00" style="font: inherit; padding: 12px 14px; border-radius: 12px; border: 1px solid oklch(0.9 0.012 290); background: #fff; color: oklch(0.2 0.02 290); min-height: 44px;" />
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px; margin-block-end: 16px;">
+              <label style="font-weight: 600; font-size: 14px;">تا ساعت</label>
+              <input type="time" value="17:00" style="font: inherit; padding: 12px 14px; border-radius: 12px; border: 1px solid oklch(0.9 0.012 290); background: #fff; color: oklch(0.2 0.02 290); min-height: 44px;" />
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px; margin-block-end: 16px;">
+              <label style="font-weight: 600; font-size: 14px;">مدت هر نوبت (دقیقه)</label>
+              <input value="60" style="font: inherit; padding: 12px 14px; border-radius: 12px; border: 1px solid oklch(0.9 0.012 290); background: #fff; color: oklch(0.2 0.02 290); min-height: 44px; direction: ltr; text-align: center;" />
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px; margin-block-end: 16px;">
+              <label style="font-weight: 600; font-size: 14px;">خدمت</label>
+              <select style="font: inherit; padding: 12px 14px; border-radius: 12px; border: 1px solid oklch(0.9 0.012 290); background: #fff; color: oklch(0.2 0.02 290); min-height: 44px;"><option>همه خدمات</option></select>
+              <span style="font-size: 12px; color: oklch(0.535 0.02 290);">اختیاری. اگر خالی بماند، برای همه خدمات قابل رزرو است.</span>
+            </div>
+            <button type="submit" style="font: inherit; font-weight: 600; padding: 12px 20px; border-radius: 12px; border: none; background: oklch(0.4 0.16 290); color: #fff; cursor: pointer; width: 100%; min-height: 44px;">ساخت زمان‌های آزاد</button>
+          </div>
+
+          <div style="margin-block-start: 20px;">
+            <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+              <h2 style="font-size: 16px; font-weight: 700; margin: 0 0 16px;">افزودن یک زمان</h2>
+              <div style="display: flex; flex-direction: column; gap: 6px; margin-block-end: 16px;">
+                <label style="font-weight: 600; font-size: 14px;">تاریخ</label>
+                <input type="date" value="2026-08-28" style="font: inherit; padding: 12px 14px; border-radius: 12px; border: 1px solid oklch(0.9 0.012 290); background: #fff; color: oklch(0.2 0.02 290); min-height: 44px;" />
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 6px; margin-block-end: 16px;">
+                <label style="font-weight: 600; font-size: 14px;">از ساعت</label>
+                <input type="time" value="09:00" style="font: inherit; padding: 12px 14px; border-radius: 12px; border: 1px solid oklch(0.9 0.012 290); background: #fff; color: oklch(0.2 0.02 290); min-height: 44px;" />
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 6px; margin-block-end: 16px;">
+                <label style="font-weight: 600; font-size: 14px;">تا ساعت</label>
+                <input type="time" value="10:00" style="font: inherit; padding: 12px 14px; border-radius: 12px; border: 1px solid oklch(0.9 0.012 290); background: #fff; color: oklch(0.2 0.02 290); min-height: 44px;" />
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 6px; margin-block-end: 16px;">
+                <label style="font-weight: 600; font-size: 14px;">خدمت</label>
+                <select style="font: inherit; padding: 12px 14px; border-radius: 12px; border: 1px solid oklch(0.9 0.012 290); background: #fff; color: oklch(0.2 0.02 290); min-height: 44px;"><option>همه خدمات</option></select>
+              </div>
+              <button type="submit" style="font: inherit; font-weight: 600; padding: 12px 20px; border-radius: 12px; border: none; background: oklch(0.4 0.16 290); color: #fff; cursor: pointer; width: 100%; min-height: 44px;">افزودن</button>
+            </div>
+          </div>
+
+          <div style="margin-block-start: 20px;">
+            <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-block-end: 12px;">
+              <h2 style="font-size: 16px; font-weight: 700; margin: 0;">زمان‌های ثبت‌شده</h2>
+              <div role="group" aria-label="بازه نمایش" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <button type="button" style="font: inherit; font-size: 13px; font-weight: 600; min-height: 44px; padding: 0 14px; border-radius: 999px; cursor: pointer; border: 1px solid oklch(0.9 0.012 290); background: transparent; color: oklch(0.2 0.02 290);">۳۰ روز</button>
+                <button type="button" aria-pressed="true" style="font: inherit; font-size: 13px; font-weight: 800; min-height: 44px; padding: 0 14px; border-radius: 999px; cursor: pointer; border: 1px solid oklch(0.4 0.16 290); background: oklch(0.94 0.03 290); color: oklch(0.4 0.16 290);">۶۰ روز</button>
+                <button type="button" style="font: inherit; font-size: 13px; font-weight: 600; min-height: 44px; padding: 0 14px; border-radius: 999px; cursor: pointer; border: 1px solid oklch(0.9 0.012 290); background: transparent; color: oklch(0.2 0.02 290);">۱۲۰ روز</button>
+              </div>
+            </div>
+            <div style="display: grid; gap: 16px;">
+              <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+                <p style="margin: 0 0 12px; font-weight: 700; font-size: 14px;">چهارشنبه ۶ شهریور ۱۴۰۴</p>
+                <ul style="list-style: none; margin: 0; padding: 0; display: grid; gap: 8px;">
+                  <li style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; border-block-end: 1px solid oklch(0.9 0.012 290); padding-block-end: 8px;">
+                    <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0;">
+                      <span style="font-size: 14px; font-weight: 600;">۰۹:۰۰ تا ۱۰:۰۰</span>
+                      <span style="display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.94 0.04 150); color: oklch(0.5 0.13 150);">آزاد</span>
+                    </div>
+                    <button type="button" style="font: inherit; font-weight: 600; padding: 10px 16px; border-radius: 12px; border: 1px solid oklch(0.535 0.19 25); background: transparent; color: oklch(0.535 0.19 25); cursor: pointer; min-height: 44px;">حذف</button>
+                  </li>
+                  <li style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; border-block-end: 1px solid oklch(0.9 0.012 290); padding-block-end: 8px;">
+                    <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0;">
+                      <span style="font-size: 14px; font-weight: 600;">۱۲:۰۰ تا ۱۵:۰۰</span>
+                      <span style="display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.94 0.03 290); color: oklch(0.4 0.16 290);">رزرو شده</span>
+                      <span style="font-size: 13px; color: oklch(0.48 0.02 290);">میکاپ عروس</span>
+                    </div>
+                    <span style="font-size: 12px; color: oklch(0.535 0.02 290);">برای آزاد کردن، رزرو را لغو کنید</span>
+                  </li>
+                  <li style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; border-block-end: 1px solid oklch(0.9 0.012 290); padding-block-end: 8px;">
+                    <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0;">
+                      <span style="font-size: 14px; font-weight: 600;">۱۷:۰۰ تا ۱۸:۳۰</span>
+                      <span style="display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.95 0.045 80); color: oklch(0.53 0.115 70);">در حال رزرو</span>
+                    </div>
+                    <span style="font-size: 12px; color: oklch(0.535 0.02 290);">مشتری در حال تکمیل رزرو است</span>
+                  </li>
+                </ul>
+              </div>
+              <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+                <p style="margin: 0 0 12px; font-weight: 700; font-size: 14px;">پنجشنبه ۷ شهریور ۱۴۰۴</p>
+                <ul style="list-style: none; margin: 0; padding: 0; display: grid; gap: 8px;">
+                  <li style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; border-block-end: 1px solid oklch(0.9 0.012 290); padding-block-end: 8px;">
+                    <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0;">
+                      <span style="font-size: 14px; font-weight: 600;">۱۰:۰۰ تا ۱۱:۰۰</span>
+                      <span style="display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.94 0.04 150); color: oklch(0.5 0.13 150);">آزاد</span>
+                    </div>
+                    <button type="button" style="font: inherit; font-weight: 600; padding: 10px 16px; border-radius: 12px; border: 1px solid oklch(0.535 0.19 25); background: transparent; color: oklch(0.535 0.19 25); cursor: pointer; min-height: 44px;">حذف</button>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <p style="margin: 0; max-width: 1280px; font-size: 14px; line-height: 1.85; color: oklch(0.42 0.02 290);">مهم‌ترین ابزارِ عرضه در محصول، دو فرمِ تک‌ستونیِ پشت‌سرهم است: ساخت گروهی با هفت فیلدِ عمودی و دکمه تمام‌عرض، بعد «افزودن یک زمان» با چهار فیلد دیگر. هیچ تقویم و هیچ نمای هفتگی وجود ندارد — متخصص الگوی هفتگی‌اش را می‌سازد بدون آن‌که ببیند نتیجه‌اش روی هفته چه شکلی است. زمان‌های ثبت‌شده هم فهرستی از کارت‌های روزانه‌اند که در ۱۲۸۰ پیکسل، هر کارت یک سطرِ ۱٬۲۰۰ پیکسلی برای یک بازه یک‌ساعته می‌گیرد.</p>
+  </section>
+
+  <section style="display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.2 0.02 290); color: #fff;">۰۹</span>
+      <h2 style="margin: 0; font-size: 22px; font-weight: 800; color: oklch(0.2 0.02 290);">مالی متخصص</h2>
+      <code style="color: oklch(0.45 0.02 290);">app/pro/finance/page.tsx</code>
+    </div>
+
+    <div style="width: 1280px; background: oklch(0.985 0.006 280); border: 1px solid oklch(0.82 0.01 290); border-radius: 6px; overflow: hidden; color: oklch(0.2 0.02 290); line-height: 1.8; font-variant-numeric: tabular-nums;">
+      <header style="border-bottom: 1px solid oklch(0.9 0.012 290); background: #fff;">
+        <div style="max-width: 1280px; margin: 0 auto; padding: 16px 40px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+          <a href="#" style="font-weight: 800; font-size: 20px; text-decoration: none; color: oklch(0.2 0.02 290); display: inline-flex; align-items: center; gap: 8px; min-height: 44px;"><img src="uploads/mark-mono.svg" alt="" width="20" height="20" style="display: block; flex-shrink: 0;" />BeauClick</a>
+          <nav aria-label="ناوبری اصلی" style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px; row-gap: 4px; justify-content: flex-end;">
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">جست‌وجو</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">متخصص‌ها</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">رزروهای من</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">مسیر من</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">باشگاه</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">لیست انتظار</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">کسب‌وکار</a>
+            <a href="#" aria-current="page" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 800; color: oklch(0.4 0.16 290); text-decoration: none;">حالت متخصص</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">اعلان‌ها</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">داشبورد</a>
+            <span style="font-size: 13px; color: oklch(0.535 0.02 290);">سارا محمدی</span>
+            <button type="button" style="font: inherit; font-size: 14px; padding: 8px 14px; border-radius: 12px; border: 1px solid oklch(0.9 0.012 290); background: transparent; color: oklch(0.2 0.02 290); cursor: pointer; min-height: 44px;">خروج</button>
+          </nav>
+        </div>
+      </header>
+      <main style="padding: 40px; max-width: 1280px; margin: 0 auto;">
+        <div>
+          <div style="background: oklch(0.94 0.03 290); border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 16px; margin-block-end: 20px;">
+            <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-block-end: 8px;">
+              <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0;">
+                <span style="display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.94 0.03 290); color: oklch(0.4 0.16 290);">حالت متخصص</span>
+                <span style="font-size: 14px; font-weight: 700;">سارا محمدی</span>
+                <span style="display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.94 0.04 150); color: oklch(0.5 0.13 150);">تأیید شده</span>
+              </div>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; font-size: 13px; font-weight: 600; color: oklch(0.48 0.02 290); text-decoration: none;">بازگشت به نمای مشتری</a>
+            </div>
+            <nav aria-label="ناوبری متخصص" style="display: flex; flex-wrap: wrap; gap: 8px; row-gap: 0; min-width: 0;">
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); border-bottom: 2px solid transparent; text-decoration: none;">نمای کلی</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); border-bottom: 2px solid transparent; text-decoration: none;">رزروها</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); border-bottom: 2px solid transparent; text-decoration: none;">زمان‌های آزاد</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); border-bottom: 2px solid transparent; text-decoration: none;">خدمات</a>
+              <a href="#" aria-current="page" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 800; color: oklch(0.4 0.16 290); border-bottom: 2px solid oklch(0.4 0.16 290); text-decoration: none;">مالی</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); border-bottom: 2px solid transparent; text-decoration: none;">آمار</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); border-bottom: 2px solid transparent; text-decoration: none;">پروفایل</a>
+            </nav>
+          </div>
+
+          <div style="display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 8px; margin-block-end: 20px;">
+            <div style="min-width: 0;">
+              <h1 style="font-size: 24px; font-weight: 800; margin: 0;">مالی</h1>
+              <p style="font-size: 14px; color: oklch(0.48 0.02 290); margin: 6px 0 0;">درآمد شما از رزروهای پرداخت‌شده، پس از کسر کارمزد پلتفرم.</p>
+            </div>
+            <div style="flex-shrink: 0;"><span style="display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.965 0.014 290); color: oklch(0.48 0.02 290);">درآمد شخصی</span></div>
+          </div>
+
+          <div style="margin-block-end: 20px;">
+            <div style="display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
+              <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+                <p style="margin: 0; font-size: 13px; color: oklch(0.48 0.02 290);">خالص قابل دریافت</p>
+                <p style="margin: 6px 0 0; font-size: 22px; font-weight: 800; overflow-wrap: anywhere;">۱۲٬۴۸۰٬۰۰۰</p>
+              </div>
+              <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+                <p style="margin: 0; font-size: 13px; color: oklch(0.48 0.02 290);">تسویه‌شده</p>
+                <p style="margin: 6px 0 0; font-size: 22px; font-weight: 800; overflow-wrap: anywhere;">۸٬۱۰۰٬۰۰۰</p>
+              </div>
+              <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+                <p style="margin: 0; font-size: 13px; color: oklch(0.48 0.02 290);">در انتظار تسویه</p>
+                <p style="margin: 6px 0 0; font-size: 22px; font-weight: 800; overflow-wrap: anywhere;">۴٬۳۸۰٬۰۰۰</p>
+              </div>
+            </div>
+          </div>
+
+          <h2 style="font-size: 16px; font-weight: 700; margin: 0 0 12px;">سفارش‌های در انتظار تسویه</h2>
+          <div style="display: grid; gap: 16px;">
+            <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+              <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;">
+                <div style="min-width: 0;">
+                  <p style="margin: 0; font-weight: 700;">۷۶۵٬۰۰۰</p>
+                  <p style="margin: 4px 0 0; font-size: 12px; color: oklch(0.535 0.02 290);">سفارش <span style="direction: ltr; display: inline-block; font-family: monospace;">4c8e1baf</span></p>
+                </div>
+                <button type="button" style="font: inherit; font-weight: 600; padding: 10px 16px; border-radius: 12px; border: 1px solid oklch(0.9 0.012 290); background: transparent; color: oklch(0.2 0.02 290); cursor: pointer; min-height: 44px;">بستن ریز تراکنش</button>
+              </div>
+              <div style="margin-block-start: 16px; padding-block-start: 16px; border-block-start: 1px solid oklch(0.9 0.012 290);">
+                <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                  <caption style="text-align: start; font-weight: 700; margin-block-end: 8px;">ریز تراکنش سفارش</caption>
+                  <tbody>
+                    <tr>
+                      <th scope="row" style="text-align: start; font-weight: 600; padding: 4px 0;">سهم شما</th>
+                      <td style="text-align: end; padding: 4px 0;">۷۶۵٬۰۰۰</td>
+                      <td style="text-align: end; padding: 4px 0; color: oklch(0.535 0.02 290);">۱۰٫۰٪</td>
+                    </tr>
+                    <tr>
+                      <th scope="row" style="text-align: start; font-weight: 600; padding: 4px 0;">کارمزد پلتفرم</th>
+                      <td style="text-align: end; padding: 4px 0;">۸۵٬۰۰۰</td>
+                      <td style="text-align: end; padding: 4px 0; color: oklch(0.535 0.02 290);">۱۰٫۰٪</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+              <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;">
+                <div style="min-width: 0;">
+                  <p style="margin: 0; font-weight: 700;">۳۷۸٬۰۰۰</p>
+                  <p style="margin: 4px 0 0; font-size: 12px; color: oklch(0.535 0.02 290);">سفارش <span style="direction: ltr; display: inline-block; font-family: monospace;">9a0f37d2</span></p>
+                </div>
+                <button type="button" style="font: inherit; font-weight: 600; padding: 10px 16px; border-radius: 12px; border: 1px solid oklch(0.9 0.012 290); background: transparent; color: oklch(0.2 0.02 290); cursor: pointer; min-height: 44px;">ریز تراکنش</button>
+              </div>
+            </div>
+          </div>
+
+          <h2 style="font-size: 16px; font-weight: 700; margin: 24px 0 12px;">تاریخچه تسویه</h2>
+          <div style="display: grid; gap: 16px;">
+            <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+              <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;">
+                <div style="min-width: 0;">
+                  <p style="margin: 0; font-weight: 700;">۵٬۲۰۰٬۰۰۰</p>
+                  <p style="margin: 4px 0 0; font-size: 13px; color: oklch(0.48 0.02 290);">شنبه ۲ شهریور ۱۴۰۴ — bank_transfer</p>
+                </div>
+                <span style="display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.94 0.04 150); color: oklch(0.5 0.13 150);">تسویه</span>
+              </div>
+            </div>
+            <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+              <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;">
+                <div style="min-width: 0;">
+                  <p style="margin: 0; font-weight: 700;">۲٬۹۰۰٬۰۰۰</p>
+                  <p style="margin: 4px 0 0; font-size: 13px; color: oklch(0.48 0.02 290);">شنبه ۲۶ مرداد ۱۴۰۴ — bank_transfer</p>
+                </div>
+                <span style="display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.94 0.04 150); color: oklch(0.5 0.13 150);">تسویه</span>
+              </div>
+            </div>
+          </div>
+
+          <p style="font-size: 12px; color: oklch(0.535 0.02 290); margin-block-start: 20px;">تسویه توسط تیم مالی پلتفرم انجام می‌شود. پرداخت خودکار هنوز فعال نیست.</p>
+        </div>
+      </main>
+    </div>
+
+    <p style="margin: 0; max-width: 1280px; font-size: 14px; line-height: 1.85; color: oklch(0.42 0.02 290);">سه شمارنده بی‌واحد در بالای صفحه: «۱۲٬۴۸۰٬۰۰۰» بدون کلمه تومان، بدون بازه زمانی و بدون هیچ نشانه‌ای از روند. مبلغ‌ها در کارت‌ها هم همین‌طور — «۷۶۵٬۰۰۰» تنها، در وزن ۷۰۰ و اندازه ۱۶ پیکسل، هم‌وزنِ هر متن دیگری در صفحه. جدولِ ریز تراکنش تنها جدولِ واقعیِ پنل متخصص است و ستون درصد در آن برای هر دو سطر یک مقدار نشان می‌دهد، چون <code>commissionRateBp</code> روی هر دو رکورد یکی است. مالی‌ترین صفحه محصول هیچ نمودار، هیچ مقایسه و هیچ برچسبِ واحد ندارد.</p>
+  </section>
+
+  <section style="display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.2 0.02 290); color: #fff;">۱۰</span>
+      <h2 style="margin: 0; font-size: 22px; font-weight: 800; color: oklch(0.2 0.02 290);">نمای کلی مدیریت</h2>
+      <code style="color: oklch(0.45 0.02 290);">app/admin/page.tsx + components/admin-shell.tsx</code>
+    </div>
+
+    <div style="width: 1280px; background: oklch(0.985 0.006 280); border: 1px solid oklch(0.82 0.01 290); border-radius: 6px; overflow: hidden; color: oklch(0.2 0.02 290); line-height: 1.8; font-variant-numeric: tabular-nums;">
+      <header style="border-bottom: 1px solid oklch(0.9 0.012 290); background: #fff;">
+        <div style="max-width: 1280px; margin: 0 auto; padding: 16px 40px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+          <a href="#" style="font-weight: 800; font-size: 20px; text-decoration: none; color: oklch(0.2 0.02 290); display: inline-flex; align-items: center; gap: 8px; min-height: 44px;"><img src="uploads/mark-mono.svg" alt="" width="20" height="20" style="display: block; flex-shrink: 0;" />BeauClick</a>
+          <nav aria-label="ناوبری اصلی" style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px; row-gap: 4px; justify-content: flex-end;">
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">جست‌وجو</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">متخصص‌ها</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">رزروهای من</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">مسیر من</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">باشگاه</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">لیست انتظار</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">کسب‌وکار</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">حالت متخصص</a>
+            <a href="#" aria-current="page" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 800; color: oklch(0.4 0.16 290); text-decoration: none;">مدیریت</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">اعلان‌ها</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">داشبورد</a>
+            <span style="font-size: 13px; color: oklch(0.535 0.02 290);">رضا کاظمی</span>
+            <button type="button" style="font: inherit; font-size: 14px; padding: 8px 14px; border-radius: 12px; border: 1px solid oklch(0.9 0.012 290); background: transparent; color: oklch(0.2 0.02 290); cursor: pointer; min-height: 44px;">خروج</button>
+          </nav>
+        </div>
+      </header>
+      <main style="padding: 40px; max-width: 1280px; margin: 0 auto;">
+        <div>
+          <div style="background: oklch(0.95 0.045 80); border: 1px solid oklch(0.53 0.115 70); border-radius: 18px; padding: 16px; margin-block-end: 20px;">
+            <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-block-end: 8px;">
+              <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0;">
+                <span style="display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.95 0.045 80); color: oklch(0.53 0.115 70);">پنل مدیریت</span>
+                <span style="font-size: 14px; font-weight: 700;">رضا کاظمی</span>
+                <span style="display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.965 0.014 290); color: oklch(0.48 0.02 290);">مدیریت پلتفرم</span>
+                <span style="display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.965 0.014 290); color: oklch(0.48 0.02 290);">بررسی احراز هویت</span>
+              </div>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; font-size: 13px; font-weight: 600; color: oklch(0.48 0.02 290); text-decoration: none;">خروج از پنل مدیریت</a>
+            </div>
+            <nav aria-label="ناوبری مدیریت" style="display: flex; flex-wrap: wrap; gap: 8px; row-gap: 0; min-width: 0;">
+              <a href="#" aria-current="page" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 800; color: oklch(0.53 0.115 70); border-bottom: 2px solid oklch(0.53 0.115 70); text-decoration: none;">نمای کلی</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); border-bottom: 2px solid transparent; text-decoration: none;">احراز هویت</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); border-bottom: 2px solid transparent; text-decoration: none;">کاربران و نقش‌ها</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); border-bottom: 2px solid transparent; text-decoration: none;">گزارش عملیات</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); border-bottom: 2px solid transparent; text-decoration: none;">تسویه‌ها</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); border-bottom: 2px solid transparent; text-decoration: none;">جست‌وجو</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); border-bottom: 2px solid transparent; text-decoration: none;">اعلان‌ها</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); border-bottom: 2px solid transparent; text-decoration: none;">تعارض شماره</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); border-bottom: 2px solid transparent; text-decoration: none;">باشگاه</a>
+            </nav>
+          </div>
+
+          <div style="display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 8px; margin-block-end: 20px;">
+            <div style="min-width: 0;">
+              <h1 style="font-size: 24px; font-weight: 800; margin: 0;">نمای کلی</h1>
+              <p style="font-size: 14px; color: oklch(0.48 0.02 290); margin: 6px 0 0;">کارهایی که در انتظار بررسی شماست.</p>
+            </div>
+          </div>
+
+          <div style="display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));">
+            <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+              <p style="margin: 0; font-size: 13px; color: oklch(0.48 0.02 290);">درخواست احراز هویت</p>
+              <p style="margin: 6px 0 0; font-size: 22px; font-weight: 800; overflow-wrap: anywhere;">۷</p>
+              <div style="margin-block-start: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <span style="display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.95 0.045 80); color: oklch(0.53 0.115 70);">نیازمند بررسی</span>
+                <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; font-weight: 600; font-size: 14px; color: oklch(0.4 0.16 290); text-decoration: none;">مشاهده</a>
+              </div>
+            </div>
+            <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+              <p style="margin: 0; font-size: 13px; color: oklch(0.48 0.02 290);">تعارض شماره بررسی‌نشده</p>
+              <p style="margin: 6px 0 0; font-size: 22px; font-weight: 800; overflow-wrap: anywhere;">۰</p>
+              <div style="margin-block-start: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <span style="display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.94 0.04 150); color: oklch(0.5 0.13 150);">بدون مورد</span>
+                <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; font-weight: 600; font-size: 14px; color: oklch(0.4 0.16 290); text-decoration: none;">مشاهده</a>
+              </div>
+            </div>
+            <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+              <p style="margin: 0; font-size: 13px; color: oklch(0.48 0.02 290);">اعلان ناموفق نهایی</p>
+              <p style="margin: 6px 0 0; font-size: 22px; font-weight: 800; overflow-wrap: anywhere;">۳</p>
+              <div style="margin-block-start: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <span style="display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.95 0.045 80); color: oklch(0.53 0.115 70);">نیازمند بررسی</span>
+                <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; font-weight: 600; font-size: 14px; color: oklch(0.4 0.16 290); text-decoration: none;">مشاهده</a>
+              </div>
+            </div>
+            <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+              <p style="margin: 0; font-size: 13px; color: oklch(0.48 0.02 290);">سند معطل در نمایه</p>
+              <p style="margin: 6px 0 0; font-size: 22px; font-weight: 800; overflow-wrap: anywhere;">—</p>
+              <div style="margin-block-start: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <span style="display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.965 0.014 290); color: oklch(0.48 0.02 290);">خوانده نشد</span>
+                <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; font-weight: 600; font-size: 14px; color: oklch(0.4 0.16 290); text-decoration: none;">مشاهده</a>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-block-start: 24px;">
+            <h2 style="font-size: 16px; font-weight: 700; margin: 0 0 12px;">پلتفرم در ۳۰ روز گذشته</h2>
+            <div style="display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));">
+              <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+                <p style="margin: 0; font-size: 13px; color: oklch(0.48 0.02 290);">رزروهای ثبت‌شده</p>
+                <p style="margin: 6px 0 0; font-size: 22px; font-weight: 800; overflow-wrap: anywhere;">۲۱۴</p>
+              </div>
+              <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+                <p style="margin: 0; font-size: 13px; color: oklch(0.48 0.02 290);">نوبت‌های انجام‌شده</p>
+                <p style="margin: 6px 0 0; font-size: 22px; font-weight: 800; overflow-wrap: anywhere;">۱۸۷</p>
+              </div>
+              <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+                <p style="margin: 0; font-size: 13px; color: oklch(0.48 0.02 290);">فروش ناخالص</p>
+                <p style="margin: 6px 0 0; font-size: 22px; font-weight: 800; overflow-wrap: anywhere;">۱۴۲٬۶۵۰٬۰۰۰</p>
+              </div>
+              <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+                <p style="margin: 0; font-size: 13px; color: oklch(0.48 0.02 290);">جست‌وجوی بدون نتیجه</p>
+                <p style="margin: 6px 0 0; font-size: 22px; font-weight: 800; overflow-wrap: anywhere;">۱۸٪</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <p style="margin: 0; max-width: 1280px; font-size: 14px; line-height: 1.85; color: oklch(0.42 0.02 290);">تصمیمِ درستِ این صفحه — صف‌ها اول، آمار بعد — در چیدمان دیده نمی‌شود: هشت کارتِ کاملاً یک‌شکل در دو ردیف، با یک تیترِ ۱۶ پیکسلی بینشان. «۷ درخواست احراز هویت» که کارِ واقعیِ اپراتور است، از «۱۴۲٬۶۵۰٬۰۰۰ فروش ناخالص» که فقط اطلاع است، تفکیک بصری ندارد. تفکیکِ «—» برای خطا از «۰» برای نبودِ مورد هم درست پیاده شده اما هر دو در یک اندازه و یک وزن نشسته‌اند. کارت‌ها با <code>padding: 24</code> در ستون ۱۹۰ پیکسلی، تراکمِ یک مرکز کنترل را ندارند.</p>
+  </section>
+
+  <section style="display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.2 0.02 290); color: #fff;">۱۱</span>
+      <h2 style="margin: 0; font-size: 22px; font-weight: 800; color: oklch(0.2 0.02 290);">صف احراز هویت</h2>
+      <code style="color: oklch(0.45 0.02 290);">app/admin/verification/page.tsx</code>
+    </div>
+
+    <div style="width: 1280px; background: oklch(0.985 0.006 280); border: 1px solid oklch(0.82 0.01 290); border-radius: 6px; overflow: hidden; color: oklch(0.2 0.02 290); line-height: 1.8; font-variant-numeric: tabular-nums;">
+      <header style="border-bottom: 1px solid oklch(0.9 0.012 290); background: #fff;">
+        <div style="max-width: 1280px; margin: 0 auto; padding: 16px 40px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+          <a href="#" style="font-weight: 800; font-size: 20px; text-decoration: none; color: oklch(0.2 0.02 290); display: inline-flex; align-items: center; gap: 8px; min-height: 44px;"><img src="uploads/mark-mono.svg" alt="" width="20" height="20" style="display: block; flex-shrink: 0;" />BeauClick</a>
+          <nav aria-label="ناوبری اصلی" style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px; row-gap: 4px; justify-content: flex-end;">
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">جست‌وجو</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">متخصص‌ها</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">رزروهای من</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">مسیر من</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">باشگاه</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">لیست انتظار</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">کسب‌وکار</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">حالت متخصص</a>
+            <a href="#" aria-current="page" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 800; color: oklch(0.4 0.16 290); text-decoration: none;">مدیریت</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">اعلان‌ها</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">داشبورد</a>
+            <span style="font-size: 13px; color: oklch(0.535 0.02 290);">رضا کاظمی</span>
+            <button type="button" style="font: inherit; font-size: 14px; padding: 8px 14px; border-radius: 12px; border: 1px solid oklch(0.9 0.012 290); background: transparent; color: oklch(0.2 0.02 290); cursor: pointer; min-height: 44px;">خروج</button>
+          </nav>
+        </div>
+      </header>
+      <main style="padding: 40px; max-width: 1280px; margin: 0 auto;">
+        <div>
+          <div style="background: oklch(0.95 0.045 80); border: 1px solid oklch(0.53 0.115 70); border-radius: 18px; padding: 16px; margin-block-end: 20px;">
+            <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-block-end: 8px;">
+              <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0;">
+                <span style="display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.95 0.045 80); color: oklch(0.53 0.115 70);">پنل مدیریت</span>
+                <span style="font-size: 14px; font-weight: 700;">رضا کاظمی</span>
+                <span style="display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.965 0.014 290); color: oklch(0.48 0.02 290);">مدیریت پلتفرم</span>
+                <span style="display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.965 0.014 290); color: oklch(0.48 0.02 290);">بررسی احراز هویت</span>
+              </div>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; font-size: 13px; font-weight: 600; color: oklch(0.48 0.02 290); text-decoration: none;">خروج از پنل مدیریت</a>
+            </div>
+            <nav aria-label="ناوبری مدیریت" style="display: flex; flex-wrap: wrap; gap: 8px; row-gap: 0; min-width: 0;">
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); border-bottom: 2px solid transparent; text-decoration: none;">نمای کلی</a>
+              <a href="#" aria-current="page" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 800; color: oklch(0.53 0.115 70); border-bottom: 2px solid oklch(0.53 0.115 70); text-decoration: none;">احراز هویت</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); border-bottom: 2px solid transparent; text-decoration: none;">کاربران و نقش‌ها</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); border-bottom: 2px solid transparent; text-decoration: none;">گزارش عملیات</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); border-bottom: 2px solid transparent; text-decoration: none;">تسویه‌ها</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); border-bottom: 2px solid transparent; text-decoration: none;">جست‌وجو</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); border-bottom: 2px solid transparent; text-decoration: none;">اعلان‌ها</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); border-bottom: 2px solid transparent; text-decoration: none;">تعارض شماره</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); border-bottom: 2px solid transparent; text-decoration: none;">باشگاه</a>
+            </nav>
+          </div>
+
+          <div style="display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 8px; margin-block-end: 20px;">
+            <div style="min-width: 0;">
+              <h1 style="font-size: 24px; font-weight: 800; margin: 0;">صف احراز هویت</h1>
+              <p style="font-size: 14px; color: oklch(0.48 0.02 290); margin: 6px 0 0;">درخواست‌های در انتظار بررسی. هر تصمیم با نام شما و دلیل آن ثبت می‌شود و قابل حذف نیست.</p>
+            </div>
+          </div>
+
+          <div style="padding: 12px 14px; border-radius: 14px; margin-block-end: 16px; font-size: 14px; background: oklch(0.94 0.04 150); color: oklch(0.5 0.13 150);">در این نسخه، درخواست‌ها بدون بارگذاری مدرک ارسال می‌شوند. امکان پیوست مدارک در فاز بعدی اضافه خواهد شد.</div>
+
+          <div style="display: grid; gap: 16px;">
+            <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+              <div style="display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 8px;">
+                <div style="min-width: 0;">
+                  <p style="margin: 0; font-weight: 700;">آتلیه سارا محمدی</p>
+                  <p style="margin: 4px 0 0; font-size: 13px; color: oklch(0.48 0.02 290);">ارسال: ۵ شهریور ۱۴۰۴، ۱۴:۲۰</p>
+                  <p style="margin: 4px 0 0; font-size: 12px; color: oklch(0.535 0.02 290);">متخصص: <span style="direction: ltr; display: inline-block; font-family: monospace;">e71a9302</span></p>
+                  <p style="margin: 8px 0 0; font-size: 14px;">«ده سال سابقه، دارای مجوز صنفی از اتحادیه آرایشگران یزد.»</p>
+                </div>
+                <span style="display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.95 0.045 80); color: oklch(0.53 0.115 70);">در انتظار بررسی</span>
+              </div>
+              <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-block-start: 16px;">
+                <button type="button" style="font: inherit; font-weight: 600; padding: 10px 16px; border-radius: 12px; border: none; background: oklch(0.4 0.16 290); color: #fff; cursor: pointer; min-height: 44px;">تأیید</button>
+                <button type="button" style="font: inherit; font-weight: 600; padding: 10px 16px; border-radius: 12px; border: 1px solid oklch(0.535 0.19 25); background: transparent; color: oklch(0.535 0.19 25); cursor: pointer; min-height: 44px;">رد</button>
+              </div>
+            </div>
+            <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+              <div style="display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 8px;">
+                <div style="min-width: 0;">
+                  <p style="margin: 0; font-weight: 700;">سالن زیبایی نگین</p>
+                  <p style="margin: 4px 0 0; font-size: 13px; color: oklch(0.48 0.02 290);">ارسال: ۴ شهریور ۱۴۰۴، ۰۹:۰۵</p>
+                  <p style="margin: 4px 0 0; font-size: 12px; color: oklch(0.535 0.02 290);">متخصص: <span style="direction: ltr; display: inline-block; font-family: monospace;">2b48c7f1</span></p>
+                  <p style="margin: 8px 0 0; font-size: 13px; color: oklch(0.535 0.02 290);">توضیحی ثبت نشده است.</p>
+                </div>
+                <span style="display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.95 0.045 80); color: oklch(0.53 0.115 70);">در انتظار بررسی</span>
+              </div>
+              <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-block-start: 16px;">
+                <button type="button" style="font: inherit; font-weight: 600; padding: 10px 16px; border-radius: 12px; border: none; background: oklch(0.4 0.16 290); color: #fff; cursor: pointer; min-height: 44px;">تأیید</button>
+                <button type="button" style="font: inherit; font-weight: 600; padding: 10px 16px; border-radius: 12px; border: 1px solid oklch(0.535 0.19 25); background: transparent; color: oklch(0.535 0.19 25); cursor: pointer; min-height: 44px;">رد</button>
+              </div>
+            </div>
+            <p style="font-size: 12px; color: oklch(0.535 0.02 290); margin: 0;">۷ درخواست در صف.</p>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <p style="margin: 0; max-width: 1280px; font-size: 14px; line-height: 1.85; color: oklch(0.42 0.02 290);">اپراتور باید درباره هویتِ یک کسب‌وکار تصمیم بگیرد و آنچه می‌بیند یک نامِ نمایشی، یک تاریخ، هشت رقم هگز و یک جمله خودگفته است. این محدودیتِ واقعی محصول است — هیچ بارگذاری مدرکی وجود ندارد و صفحه صادقانه همین را می‌گوید — اما نمای فعلی حتی همان اطلاعِ موجود را هم سازمان نمی‌دهد: شهر، تخصص، تعداد خدمات و سابقه رزروِ متخصص در API هست و در این صف نیست. پیامِ سبزِ بالای صفحه هم یک اطلاع است که با توکنِ «موفق» نمایش داده می‌شود، چون توکنِ <code>info</code> وجود ندارد.</p>
+  </section>
+
+  <section style="display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.2 0.02 290); color: #fff;">۱۲</span>
+      <h2 style="margin: 0; font-size: 22px; font-weight: 800; color: oklch(0.2 0.02 290);">مسیر زیبایی و باشگاه مشتریان</h2>
+      <code style="color: oklch(0.45 0.02 290);">app/journey/page.tsx · app/loyalty/page.tsx</code>
+    </div>
+
+    <div style="display: flex; gap: 28px; flex-wrap: wrap;">
+
+      <div style="width: 1280px; background: oklch(0.985 0.006 280); border: 1px solid oklch(0.82 0.01 290); border-radius: 6px; overflow: hidden; color: oklch(0.2 0.02 290); line-height: 1.8; font-variant-numeric: tabular-nums;">
+        <header style="border-bottom: 1px solid oklch(0.9 0.012 290); background: #fff;">
+          <div style="max-width: 1280px; margin: 0 auto; padding: 16px 40px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+            <a href="#" style="font-weight: 800; font-size: 20px; text-decoration: none; color: oklch(0.2 0.02 290); display: inline-flex; align-items: center; gap: 8px; min-height: 44px;"><img src="uploads/mark-mono.svg" alt="" width="20" height="20" style="display: block; flex-shrink: 0;" />BeauClick</a>
+            <nav aria-label="ناوبری اصلی" style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px; row-gap: 4px; justify-content: flex-end;">
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">جست‌وجو</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">متخصص‌ها</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">رزروهای من</a>
+              <a href="#" aria-current="page" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 800; color: oklch(0.4 0.16 290); text-decoration: none;">مسیر من</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">باشگاه</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">لیست انتظار</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">کسب‌وکار</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">حالت متخصص</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">اعلان‌ها</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">داشبورد</a>
+              <span style="font-size: 13px; color: oklch(0.535 0.02 290);">مینا رضایی</span>
+              <button type="button" style="font: inherit; font-size: 14px; padding: 8px 14px; border-radius: 12px; border: 1px solid oklch(0.9 0.012 290); background: transparent; color: oklch(0.2 0.02 290); cursor: pointer; min-height: 44px;">خروج</button>
+            </nav>
+          </div>
+        </header>
+        <main style="padding: 40px; max-width: 1280px; margin: 0 auto;">
+          <section>
+            <h1 style="font-size: 24px; margin: 0 0 4px; font-weight: 700; line-height: 1.25;">مسیر زیبایی من</h1>
+            <p style="color: oklch(0.535 0.02 290); font-size: 14px; margin: 0 0 20px;">ترجیح‌ها و اهداف شما، فقط برای خودتان.</p>
+
+            <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+              <h2 style="font-size: 18px; margin: 0 0 12px; font-weight: 700; line-height: 1.25;">ترجیح‌های من</h2>
+              <div style="display: flex; flex-direction: column; gap: 6px; margin-block-end: 16px;">
+                <label style="font-weight: 600; font-size: 14px;">حداکثر بودجه (تومان)</label>
+                <input value="۲٬۰۰۰٬۰۰۰" style="font: inherit; padding: 12px 14px; border-radius: 12px; border: 1px solid oklch(0.9 0.012 290); background: #fff; color: oklch(0.2 0.02 290); min-height: 44px; direction: ltr; text-align: center;" />
+                <span style="font-size: 12px; color: oklch(0.535 0.02 290);">می‌توانید عدد را با ارقام فارسی هم بنویسید.</span>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 6px; margin-block-end: 16px;">
+                <label style="font-weight: 600; font-size: 14px;">یادداشت‌های شخصی</label>
+                <textarea rows="4" style="font: inherit; padding: 12px 14px; border-radius: 0; border: 1px solid oklch(0.9 0.012 290); background: #fff; color: oklch(0.2 0.02 290); resize: vertical;">پوست حساس. رنگ مو روشن‌تر از قبل نباشد.</textarea>
+                <p style="margin: 0; font-size: 12px; color: oklch(0.535 0.02 290);">این یادداشت‌ها خصوصی است و هرگز به دستیار هوشمند ارسال نمی‌شود. ۴۳ از ۵۰۰</p>
+              </div>
+              <button type="submit" style="font: inherit; font-weight: 600; padding: 12px 20px; border-radius: 12px; border: none; background: oklch(0.4 0.16 290); color: #fff; cursor: pointer; width: 100%; min-height: 44px;">ذخیره</button>
+            </div>
+
+            <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+              <h2 style="font-size: 18px; margin: 0 0 12px; font-weight: 700; line-height: 1.25;">اهداف من</h2>
+              <form style="display: flex; gap: 8px; flex-wrap: wrap; margin-block-end: 16px;">
+                <div style="flex: 1 1 220px; min-width: 0;">
+                  <label style="display: block; font-weight: 600; font-size: 14px; margin-block-end: 6px;">هدف تازه</label>
+                  <input placeholder="مثلاً آماده شدن برای عروسی" style="width: 100%; font: inherit; padding: 12px 14px; min-height: 44px; border-radius: 0; border: 1px solid oklch(0.9 0.012 290); background: #fff; color: oklch(0.2 0.02 290);" />
+                </div>
+                <div style="align-self: flex-end; min-width: 120px;">
+                  <button type="submit" style="font: inherit; font-weight: 600; padding: 12px 20px; border-radius: 12px; border: none; background: oklch(0.4 0.16 290); color: #fff; cursor: pointer; width: 100%; min-height: 44px;">افزودن</button>
+                </div>
+              </form>
+              <ul style="list-style: none; padding: 0; margin: 0; display: grid; gap: 8px;">
+                <li style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 0; border-block-end: 1px solid oklch(0.9 0.012 290);">
+                  <span style="font-size: 15px;">آماده شدن برای عروسی خواهرم</span>
+                  <button type="button" style="font: inherit; font-size: 14px; padding: 10px 14px; min-height: 44px; border-radius: 12px; border: 1px solid oklch(0.9 0.012 290); background: transparent; color: oklch(0.2 0.02 290); cursor: pointer;">محقق شد</button>
+                </li>
+                <li style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 0; border-block-end: 1px solid oklch(0.9 0.012 290);">
+                  <span style="font-size: 15px; text-decoration: line-through;">مراقبت ماهانه پوست</span>
+                  <span style="font-size: 13px; color: oklch(0.535 0.02 290);">محقق شد</span>
+                </li>
+              </ul>
+            </div>
+
+            <h2 style="font-size: 18px; margin: 24px 0 12px; font-weight: 700; line-height: 1.25;">تاریخچه</h2>
+            <ol style="list-style: none; padding: 0; margin: 0; display: grid; gap: 8px;">
+              <li>
+                <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+                  <div style="display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+                    <span style="font-size: 15px;">ثبت هدف تازه</span>
+                    <span style="font-size: 12px; color: oklch(0.535 0.02 290);">دوشنبه ۴ شهریور ۱۴۰۴</span>
+                  </div>
+                </div>
+              </li>
+              <li>
+                <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+                  <div style="display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+                    <span style="font-size: 15px;">انجام خدمت میکاپ عروس</span>
+                    <span style="font-size: 12px; color: oklch(0.535 0.02 290);">شنبه ۲ شهریور ۱۴۰۴</span>
+                  </div>
+                </div>
+              </li>
+            </ol>
+          </section>
+        </main>
+      </div>
+
+      <div style="width: 1280px; background: oklch(0.985 0.006 280); border: 1px solid oklch(0.82 0.01 290); border-radius: 6px; overflow: hidden; color: oklch(0.2 0.02 290); line-height: 1.8; font-variant-numeric: tabular-nums;">
+        <header style="border-bottom: 1px solid oklch(0.9 0.012 290); background: #fff;">
+          <div style="max-width: 1280px; margin: 0 auto; padding: 16px 40px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+            <a href="#" style="font-weight: 800; font-size: 20px; text-decoration: none; color: oklch(0.2 0.02 290); display: inline-flex; align-items: center; gap: 8px; min-height: 44px;"><img src="uploads/mark-mono.svg" alt="" width="20" height="20" style="display: block; flex-shrink: 0;" />BeauClick</a>
+            <nav aria-label="ناوبری اصلی" style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px; row-gap: 4px; justify-content: flex-end;">
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">جست‌وجو</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">متخصص‌ها</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">رزروهای من</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">مسیر من</a>
+              <a href="#" aria-current="page" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 800; color: oklch(0.4 0.16 290); text-decoration: none;">باشگاه</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">لیست انتظار</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">کسب‌وکار</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">حالت متخصص</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">اعلان‌ها</a>
+              <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">داشبورد</a>
+              <span style="font-size: 13px; color: oklch(0.535 0.02 290);">مینا رضایی</span>
+              <button type="button" style="font: inherit; font-size: 14px; padding: 8px 14px; border-radius: 12px; border: 1px solid oklch(0.9 0.012 290); background: transparent; color: oklch(0.2 0.02 290); cursor: pointer; min-height: 44px;">خروج</button>
+            </nav>
+          </div>
+        </header>
+        <main style="padding: 40px; max-width: 1280px; margin: 0 auto;">
+          <section>
+            <h1 style="font-size: 24px; margin: 0 0 16px; font-weight: 700; line-height: 1.25;">باشگاه مشتریان</h1>
+
+            <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+              <div style="display: flex; gap: 24px; flex-wrap: wrap;">
+                <div>
+                  <p style="margin: 0; font-size: 13px; color: oklch(0.535 0.02 290);">امتیاز قابل استفاده</p>
+                  <p style="margin: 4px 0 0; font-size: 28px; font-weight: 800;">۴۲۰</p>
+                </div>
+                <div>
+                  <p style="margin: 0; font-size: 13px; color: oklch(0.535 0.02 290);">مجموع امتیاز کسب‌شده</p>
+                  <p style="margin: 4px 0 0; font-size: 28px; font-weight: 800;">۱٬۱۵۰</p>
+                </div>
+              </div>
+              <p style="margin: 16px 0 0; font-size: 15px;">سطح فعلی شما: <strong>نقره‌ای</strong></p>
+              <div style="margin-block-start: 12px;">
+                <p style="margin: 0 0 6px; font-size: 14px;">۳۵۰ امتیاز تا سطح طلایی</p>
+                <div role="progressbar" style="height: 8px; border-radius: 999px; background: transparent; overflow: hidden;">
+                  <div style="width: 68%; height: 100%; background: oklch(0.4 0.16 290);"></div>
+                </div>
+              </div>
+            </div>
+
+            <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+              <h2 style="font-size: 16px; margin: 0 0 12px; font-weight: 700; line-height: 1.25;">مزایای شما</h2>
+              <ul style="margin: 0; padding-inline-start: 20px;">
+                <li style="font-size: 14px; margin-block-end: 4px;">۵٪ تخفیف روی همه خدمات</li>
+                <li style="font-size: 14px; margin-block-end: 4px;">ضریب ۱٫۲ برابری امتیاز</li>
+              </ul>
+            </div>
+
+            <h2 style="font-size: 18px; margin: 24px 0 12px; font-weight: 700; line-height: 1.25;">تاریخچه امتیاز</h2>
+            <ul style="list-style: none; padding: 0; margin: 0; display: grid; gap: 8px;">
+              <li>
+                <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+                  <div style="display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+                    <div>
+                      <p style="margin: 0; font-size: 15px;">انجام خدمت</p>
+                      <p style="margin: 4px 0 0; font-size: 12px; color: oklch(0.535 0.02 290);">شنبه ۲ شهریور ۱۴۰۴</p>
+                    </div>
+                    <p style="margin: 0; font-weight: 700; color: oklch(0.2 0.02 290);">+۱۰۲</p>
+                  </div>
+                  <p style="margin: 6px 0 0; font-size: 12px; color: oklch(0.535 0.02 290);">شامل ضریب مزایا (پایه: ۸۵)</p>
+                </div>
+              </li>
+              <li>
+                <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+                  <div style="display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+                    <div>
+                      <p style="margin: 0; font-size: 15px;">تعدیل دستی</p>
+                      <p style="margin: 4px 0 0; font-size: 12px; color: oklch(0.535 0.02 290);">پنجشنبه ۳۱ مرداد ۱۴۰۴</p>
+                    </div>
+                    <p style="margin: 0; font-weight: 700; color: oklch(0.535 0.02 290);">−۵۰</p>
+                  </div>
+                </div>
+              </li>
+            </ul>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <p style="margin: 0; max-width: 1280px; font-size: 14px; line-height: 1.85; color: oklch(0.42 0.02 290);">دو صفحه که برای مشتری یک چیزند — «تاریخ من با این محصول» — در دو مقصدِ جدا در ناوبری نشسته‌اند، هر یک با تاریخچه خودش. کارت‌ها در هر دو صفحه بدون فاصله عمودی پشت‌سرهم می‌آیند، چون <code>Card</code> حاشیه بیرونی ندارد و این صفحه‌ها آن را در یک شبکه با <code>gap</code> نگذاشته‌اند. نوارِ پیشرفتِ سطح باشگاه پس‌زمینه‌اش را از <code>--bc-color-surface-muted</code> می‌گیرد که در <code>tokens.css</code> تعریف نشده، پس شیارِ نوار در مرورگر بی‌رنگ است و فقط بخشِ پرشده دیده می‌شود؛ همان اتفاق برای <code>--bc-radius-input</code> در هر سه ورودیِ این صفحه‌ها می‌افتد و گردی‌شان صفر می‌شود.</p>
+  </section>
+
+  <section style="display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.2 0.02 290); color: #fff;">۱۳</span>
+      <h2 style="margin: 0; font-size: 22px; font-weight: 800; color: oklch(0.2 0.02 290);">کسب‌وکار</h2>
+      <code style="color: oklch(0.45 0.02 290);">app/business/page.tsx</code>
+      <span style="font-size: 13px; color: oklch(0.45 0.02 290);">حالتِ مالک، با دعوت در انتظار</span>
+    </div>
+
+    <div style="width: 1280px; background: oklch(0.985 0.006 280); border: 1px solid oklch(0.82 0.01 290); border-radius: 6px; overflow: hidden; color: oklch(0.2 0.02 290); line-height: 1.8; font-variant-numeric: tabular-nums;">
+      <header style="border-bottom: 1px solid oklch(0.9 0.012 290); background: #fff;">
+        <div style="max-width: 1280px; margin: 0 auto; padding: 16px 40px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+          <a href="#" style="font-weight: 800; font-size: 20px; text-decoration: none; color: oklch(0.2 0.02 290); display: inline-flex; align-items: center; gap: 8px; min-height: 44px;"><img src="uploads/mark-mono.svg" alt="" width="20" height="20" style="display: block; flex-shrink: 0;" />BeauClick</a>
+          <nav aria-label="ناوبری اصلی" style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px; row-gap: 4px; justify-content: flex-end;">
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">جست‌وجو</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">متخصص‌ها</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">رزروهای من</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">مسیر من</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">باشگاه</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">لیست انتظار</a>
+            <a href="#" aria-current="page" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 800; color: oklch(0.4 0.16 290); text-decoration: none;">کسب‌وکار</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">حالت متخصص</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">اعلان‌ها</a>
+            <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font-size: 14px; font-weight: 600; color: oklch(0.2 0.02 290); text-decoration: none;">داشبورد</a>
+            <span style="font-size: 13px; color: oklch(0.535 0.02 290);">سارا محمدی</span>
+            <button type="button" style="font: inherit; font-size: 14px; padding: 8px 14px; border-radius: 12px; border: 1px solid oklch(0.9 0.012 290); background: transparent; color: oklch(0.2 0.02 290); cursor: pointer; min-height: 44px;">خروج</button>
+          </nav>
+        </div>
+      </header>
+      <main style="padding: 40px; max-width: 1280px; margin: 0 auto;">
+        <section style="display: grid; gap: 16px;">
+          <div style="display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 8px; margin-block-end: 20px;">
+            <div style="min-width: 0;">
+              <h1 style="font-size: 24px; font-weight: 800; margin: 0;">کسب‌وکار</h1>
+              <p style="font-size: 14px; color: oklch(0.48 0.02 290); margin: 6px 0 0;">دعوت‌ها، کسب‌وکار شما و اعضای آن.</p>
+            </div>
+          </div>
+
+          <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+            <h2 style="font-size: 16px; margin: 0 0 12px; font-weight: 700; line-height: 1.25;">دعوت‌های شما</h2>
+            <ul style="list-style: none; padding: 0; margin: 0; display: grid; gap: 8px;">
+              <li style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                <span style="font-size: 14px;">دعوت به عنوان کارمند</span>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                  <button type="button" style="font: inherit; font-weight: 600; padding: 10px 16px; border-radius: 12px; border: none; background: oklch(0.4 0.16 290); color: #fff; cursor: pointer; min-height: 44px;">پذیرفتن</button>
+                  <button type="button" style="font: inherit; font-weight: 600; padding: 10px 16px; border-radius: 12px; border: 1px solid oklch(0.535 0.19 25); background: transparent; color: oklch(0.535 0.19 25); cursor: pointer; min-height: 44px;">رد کردن</button>
+                </div>
+              </li>
+            </ul>
+          </div>
+
+          <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+            <h2 style="font-size: 18px; margin: 0 0 12px; font-weight: 700; line-height: 1.25;">آتلیه سارا محمدی</h2>
+            <p style="color: oklch(0.48 0.02 290); margin: 0 0 12px;">میکاپ عروس و مجلسی، با ده سال سابقه در یزد.</p>
+            <p style="font-size: 13px; color: oklch(0.535 0.02 290); margin: 0;">ثبت‌شده در یکشنبه ۱۹ مرداد ۱۴۰۴</p>
+          </div>
+
+          <div style="background: #fff; border: 1px solid oklch(0.9 0.012 290); border-radius: 18px; padding: 24px;">
+            <h2 style="font-size: 16px; margin: 0 0 12px; font-weight: 700; line-height: 1.25;">اعضای کسب‌وکار</h2>
+            <ul style="list-style: none; padding: 0; margin: 0 0 16px; display: grid; gap: 8px;">
+              <li style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                <span style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 14px;">مدیر<span style="display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.94 0.04 150); color: oklch(0.5 0.13 150);">فعال</span></span>
+                <button type="button" style="font: inherit; font-weight: 600; padding: 10px 16px; border-radius: 12px; border: 1px solid oklch(0.535 0.19 25); background: transparent; color: oklch(0.535 0.19 25); cursor: pointer; min-height: 44px;">حذف</button>
+              </li>
+              <li style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                <span style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 14px;">کارمند<span style="display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.95 0.045 80); color: oklch(0.53 0.115 70);">دعوت‌شده</span></span>
+                <button type="button" style="font: inherit; font-weight: 600; padding: 10px 16px; border-radius: 12px; border: 1px solid oklch(0.535 0.19 25); background: transparent; color: oklch(0.535 0.19 25); cursor: pointer; min-height: 44px;">حذف</button>
+              </li>
+              <li style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                <span style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 14px;">کارمند<span style="display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: oklch(0.965 0.014 290); color: oklch(0.48 0.02 290);">غیرفعال</span></span>
+                <button type="button" style="font: inherit; font-weight: 600; padding: 10px 16px; border-radius: 12px; border: 1px solid oklch(0.535 0.19 25); background: transparent; color: oklch(0.535 0.19 25); cursor: pointer; min-height: 44px;">حذف</button>
+              </li>
+            </ul>
+            <div style="display: flex; flex-direction: column; gap: 6px; margin-block-end: 16px;">
+              <label style="font-weight: 600; font-size: 14px;">شناسه کاربری فرد مورد نظر</label>
+              <input style="font: inherit; padding: 12px 14px; border-radius: 12px; border: 1px solid oklch(0.9 0.012 290); background: #fff; color: oklch(0.2 0.02 290); min-height: 44px;" />
+              <span style="font-size: 12px; color: oklch(0.535 0.02 290);">شناسه کاربری (شناسه حساب کاربری) فردی که می‌خواهید دعوت کنید.</span>
+            </div>
+            <div style="margin-block-end: 16px;">
+              <div role="group" aria-label="نقش" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <button type="button" aria-pressed="true" style="font: inherit; font-size: 13px; font-weight: 800; min-height: 44px; padding: 0 14px; border-radius: 999px; cursor: pointer; border: 1px solid oklch(0.4 0.16 290); background: oklch(0.94 0.03 290); color: oklch(0.4 0.16 290);">کارمند</button>
+                <button type="button" style="font: inherit; font-size: 13px; font-weight: 600; min-height: 44px; padding: 0 14px; border-radius: 999px; cursor: pointer; border: 1px solid oklch(0.9 0.012 290); background: transparent; color: oklch(0.2 0.02 290);">مدیر</button>
+              </div>
+            </div>
+            <button type="submit" style="font: inherit; font-weight: 600; padding: 12px 20px; border-radius: 12px; border: none; background: oklch(0.4 0.16 290); color: #fff; cursor: pointer; width: 100%; min-height: 44px;">ارسال دعوت</button>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <p style="margin: 0; max-width: 1280px; font-size: 14px; line-height: 1.85; color: oklch(0.42 0.02 290);">بستر کسب‌وکار امروز هیچ نوارِ حالتی ندارد — با آن‌که سه بستر دیگر دارند — و در ناوبری اصلی به‌عنوان یک پیوندِ ساده در کنار «باشگاه» و «لیست انتظار» نشسته است. اعضا نام ندارند: API فقط نقش و شناسه می‌دهد، پس فهرست اعضا سه سطرِ «مدیر / کارمند / کارمند» است که از هم قابل تشخیص نیستند و هر سه یک دکمه «حذف» قرمز دارند. دعوت هم با شناسه کاربریِ خام انجام می‌شود — کاری که در عمل هیچ صاحب سالنی نمی‌تواند انجام دهد. این محدودیتِ داده است، نه طراحی؛ اما نمای فعلی آن را پنهان هم نمی‌کند.</p>
+  </section>
+
+</div>
+</x-dc>
+</body>
+</html>
