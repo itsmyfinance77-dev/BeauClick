@@ -1,0 +1,30 @@
+name: Pull Request Policy
+
+on:
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  branch-policy:
+    name: branch and merge policy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require a scoped working branch
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          case "$HEAD_REF" in
+            feature/*|fix/*|docs/*|chore/*|design/*|codex/*) ;;
+            *)
+              echo "Branch '$HEAD_REF' must use feature/, fix/, docs/, chore/, design/, or codex/."
+              exit 1
+              ;;
+          esac
+
+      - name: Explain the merge gate
+        run: |
+          echo "This check validates PR metadata only."
+          echo "Code, schema, workflow, build, or dependency changes also require the complete V3 CI pipeline."
