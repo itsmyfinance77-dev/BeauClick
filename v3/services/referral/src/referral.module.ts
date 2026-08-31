@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { REFERRAL_ENTITIES } from './entities/referral.entities';
+import { REFERRAL_CLOCK, systemReferralClock } from './referral-clock';
 import { REFERRAL_CODE_GENERATOR, defaultReferralCodeGenerator } from './referral-code.generator';
 import { ReferralController } from './referral.controller';
 import { ReferralService } from './referral.service';
@@ -11,19 +12,30 @@ import { ReferralSubjectDataContract } from './referral-subject-data.contract';
 /**
  * The referral module (ADR-035).
  *
- * ## It has no ports, and that is the measure of the boundary
+ * ## Its two ports, and what they measure about the boundary
  *
- * `WishlistModule` declares a port because it must read `provider` to decide
- * whether a target is showable. This module declares **none**: a referral code
- * is generated from a CSPRNG and stored against the session's own user id, and
- * neither step needs a fact from any other domain. It depends on nothing at
- * runtime except its own schema, `ConfigModule` for the public origin, and the
- * shared libraries.
+ * Story #11 declared **none**, and ADR-035 recorded why: a referral code is
+ * generated from a CSPRNG and stored against the session's own user id, and
+ * neither step needs a fact from any other domain. It also recorded what would
+ * change it — *Story #27 has to ask `identity` how old an account is, and
+ * `V32-DEC-019` binds the answer to an indistinguishable refusal.*
  *
- * That will change when attribution lands — Story #27 has to ask `identity` how
- * old an account is, and `V32-DEC-019` binds the answer to an indistinguishable
- * refusal. It is not needed here, and a port declared ahead of its consumer is a
- * seam nothing tests.
+ * That is now the case, and it needs `booking` too. `REFERRAL_IDENTITY_PORT` and
+ * `REFERRAL_BOOKING_PORT` are declared by this module and bound in
+ * `apps/api/src/composition` (ADR-011, ADR-036 §4), exactly as
+ * `WISHLIST_TARGET_PORT` is.
+ *
+ * **Neither has a default implementation here, and that is the whole point of
+ * declaring them rather than importing.** A module that cannot boot without its
+ * ports bound is a module whose boundary is real: there is nothing to fall back
+ * on, and no way to ship a stub by accident. It matters more than usual here,
+ * because a permissive stub — "everybody is new", "nobody has booked" — would
+ * pass every test written against this module alone while disabling two of the
+ * six eligibility rules in production.
+ *
+ * The clock below is the opposite case and is bound here: like the generator, it
+ * is a **seam** rather than a port, and a composition that says nothing about it
+ * still gets correct behaviour.
  *
  * ## What it exports, and what it withholds
  *
@@ -60,6 +72,13 @@ import { ReferralSubjectDataContract } from './referral-subject-data.contract';
     // still gets correct behaviour, which is the opposite of how
     // `WISHLIST_TARGET_PORT` is treated.
     { provide: REFERRAL_CODE_GENERATOR, useValue: defaultReferralCodeGenerator },
+    // The wall clock, likewise a seam and not a port. The suite overrides it to
+    // freeze time, because the 30-day claim window and the 90-day pending
+    // expiry are BOUNDARIES, and a boundary tested by waiting is a boundary
+    // nobody has tested (ADR-036 §5).
+    { provide: REFERRAL_CLOCK, useValue: systemReferralClock },
+    // `REFERRAL_IDENTITY_PORT` and `REFERRAL_BOOKING_PORT` are deliberately
+    // ABSENT. See the docblock: no default is the mechanism.
   ],
   exports: [ReferralService, ReferralSubjectDataContract, TypeOrmModule],
 })

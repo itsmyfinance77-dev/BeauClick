@@ -13,23 +13,30 @@
  *
  * ## What is deliberately NOT here
  *
- * **No reward value, point total, or cap.** `V32-DEC-016` sets both referral
- * reward values to **0** and `V32-DEC-019` caps a referrer at 10 qualified
- * referrals per Tehran calendar month — and none of that is implemented by this
- * story. A number here that nothing enforces would be a promise a client renders
- * before anything can keep it.
+ * **No reward value, point total, cap, or qualification vocabulary.** No
+ * `qualified`, `capped`, `reversed`, `reward`, or `points` constant or state.
+ * `V32-DEC-016` sets both referral reward values to **0** and `V32-DEC-019`
+ * caps a referrer at 10 qualified referrals per Tehran calendar month — and
+ * none of it is implemented by Stories #11 or #27. A number here that nothing
+ * enforces would be a promise a client renders before anything can keep it, and
+ * declaring the states would be designing Stories #12 and #28 from here.
  *
- * **No attribution vocabulary.** No `claimed`, `attributed`, `qualified`,
- * `capped`, or `reversed` state. Attribution is Story #27 and it is a separate
- * story because the platform has no signup event and no `isNewUser` signal.
- * Declaring the states now would be designing that story from here.
- *
- * **No referee, referrer, or counterparty shape.** This story knows about
- * exactly one person: the caller, and their own code.
+ * **No referrer, referee, or counterparty identity shape.** Story #27 adds the
+ * claim, and a successful claim returns the caller's **own** attribution facts
+ * and nothing about the other party — no user id, no phone, no display name,
+ * and above all not the referrer's code, which `V32-DEC-019` forbids from a
+ * referee's export in terms. There is no field here that could carry one.
  *
  * **No count of any kind.** Not how many people used a code, not how many
  * invites were sent, not how many times the code was shared. There is no field
  * here that could carry one, and `V32-DEC-033` forbids share-tracking outright.
+ *
+ * **No refusal vocabulary for the claim route.** Unlike `ChatRefusalReason`,
+ * and the difference is the whole security property rather than an omission:
+ * `V32-DEC-019` collapses every claim refusal into **one** answer, so a
+ * vocabulary here would be a set of names for distinctions the server is
+ * forbidden to make — and exporting one would invite a client to switch on a
+ * value it can never receive (ADR-036 §8).
  */
 
 // ---------------------------------------------------------------------------
@@ -54,11 +61,12 @@
  *  * `1` is **kept**: with both `I` and `L` absent there is nothing left for it
  *    to be confused with.
  *
- * **Not owner-ratified.** ADR-035 §3 records this, the length below, and the
- * resulting entropy as an engineering realisation of `V32-DEC-033`'s closed
- * properties — the owner closed the invite-link format and the share channel,
- * and never specified the code's own shape. Changing it is this constant, a
- * `VARCHAR` width in one migration, and regenerating existing codes.
+ * **Owner-ratified.** `V32-DEC-034`, closed on 2026-08-31, ratifies this
+ * constant and the length below at exactly the values already implemented, so
+ * ratification changed no constant, no migration, and no already-issued code
+ * (ADR-035 §3). Changing either is now a **new owner decision** — a register
+ * entry, this constant, a `VARCHAR` width in one migration, and regenerating
+ * every code already issued — rather than an implementation choice.
  */
 export const REFERRAL_CODE_ALPHABET = '123456789ABCDEFGHJKMNPQRSTVWXYZ';
 
@@ -67,12 +75,18 @@ export const REFERRAL_CODE_ALPHABET = '123456789ABCDEFGHJKMNPQRSTVWXYZ';
  *
  * 31^10 is about 8.19e14, or **~49.5 bits** of entropy.
  *
- * Ten rather than six or eight, and the reason is a dependency rather than a
- * taste: `V32-DEC-019` throttles the claim route at 10 attempts per caller per
- * hour, which would make eight characters comfortable — but that throttle
- * belongs to the reward story and does not exist yet. Ten is the first length at
- * which the code is safe against an **unthrottled** attacker, so this foundation
- * does not depend on a control a later story owns.
+ * Ten rather than six or eight, and the reason is a boundary rather than a
+ * taste. `V32-DEC-019` throttles the claim route at 10 attempts per caller per
+ * hour — `REFERRAL_CLAIM_ATTEMPTS_PER_HOUR` below — which would make eight
+ * characters comfortable. Story #11 generated codes **before that control
+ * existed**, so the format had to stand on its own, and ten is the first length
+ * at which the code is safe against a **wholly unthrottled** attacker: ≈ 2,598
+ * years at 10,000 guesses a second, against ≈ 9.35 billion years at the
+ * throttled rate (`V32-DEC-034`).
+ *
+ * Story #27 has since built that throttle, so the margin is now real rather
+ * than hypothetical — but the length is justified without it, which is the
+ * property that mattered and the reason eight was refused.
  */
 export const REFERRAL_CODE_LENGTH = 10;
 
@@ -265,4 +279,149 @@ export interface ReferralCodeView {
    * is not a claim that it will work.
    */
   readonly shareChannels: readonly ReferralShareChannel[];
+}
+
+// ---------------------------------------------------------------------------
+// The attribution claim (V3.2-C Story #27, ADR-036)
+// ---------------------------------------------------------------------------
+
+/**
+ * How old an account may be and still claim an invitation, in days.
+ *
+ * `V32-DEC-019`'s claim window, and Issue #27's acceptance criterion states it
+ * as **≤ 30 days** — so the boundary is **inclusive**: an account created
+ * exactly 30 days ago to the millisecond may still claim.
+ *
+ * Exported so a page can explain the window without hardcoding it, and so the
+ * server and the page cannot disagree about what "too old" means. It is
+ * measured as an **absolute UTC duration** from `identity.users.created_at`,
+ * never as a calendar boundary — see `REFERRAL_PENDING_ATTRIBUTION_EXPIRY_DAYS`
+ * for why that distinction is load-bearing in this domain.
+ *
+ * A client must not treat this as an authorisation check. It is the server's
+ * rule, restated here for display; the server reads the authoritative account
+ * age through a narrow port inside the claim's own transaction, and a caller
+ * cannot supply it (ADR-036 §4).
+ */
+export const REFERRAL_CLAIM_MAX_ACCOUNT_AGE_DAYS = 30;
+
+/**
+ * How long a pending attribution stands before it lapses, in days.
+ *
+ * `V32-DEC-017`, and it is an **absolute UTC duration** from the attribution
+ * instant — deliberately not a Tehran calendar boundary.
+ *
+ * The distinction is not pedantry, and this package is exactly where it gets
+ * confused: `V32-DEC-019`'s **referrer cap** IS per Tehran calendar month, and
+ * it lives one story away (#12). Mixing them would make "90 days" mean
+ * something subtly different for a claim recorded at 23:00 than for one at
+ * 01:00. Durations between two instants get arithmetic; promises about a
+ * person's calendar get a calendar.
+ *
+ * **This is not the invite link's expiry, and the link still has none.**
+ * `V32-DEC-033` gives the link no independent expiry and makes its validity
+ * follow the code and the referral lifecycle. What expires here is a *pending
+ * attribution* — a relationship that was formed and never qualified — which is
+ * a different object from the code that formed it.
+ */
+export const REFERRAL_PENDING_ATTRIBUTION_EXPIRY_DAYS = 90;
+
+/**
+ * How many claim attempts one authenticated caller may make per hour.
+ *
+ * `V32-DEC-019`. Enforced **in PostgreSQL**, transactionally, not by the
+ * in-memory HTTP throttler — whose effective limit multiplies by instance count
+ * while `THROTTLE-STORE` is unresolved (ADR-036 §6).
+ *
+ * **Every attempt counts, including one that is refused.** This number is a
+ * **guess rate**, not a comfort setting: `V32-DEC-034` prices the code's length
+ * against exactly this figure — 10 per hour against 31^10 is an exhaustive
+ * search of ≈ 9.35 billion years — and makes it the stated reason the code is
+ * ten characters rather than eight. A limit that counted only successful claims
+ * would bound nothing.
+ *
+ * Exported so a page can pace its own retries rather than discovering the limit
+ * by hitting it.
+ */
+export const REFERRAL_CLAIM_ATTEMPTS_PER_HOUR = 10;
+
+/**
+ * The error `code` on **every** refused claim, and there is exactly one.
+ *
+ * `V32-DEC-019` collapses all six refusal cases — unknown code, revoked code,
+ * the caller's own code, already attributed, account too old, already booked —
+ * into **one indistinguishable response**, so the route is neither a code
+ * oracle nor an account oracle.
+ *
+ * This is a single constant rather than a vocabulary, and that is the point.
+ * A `ReferralClaimRefusalReason` union would be a set of names for distinctions
+ * the server is forbidden to make; a client that switched on one would be
+ * writing branches that can never be reached, and somebody would eventually
+ * "fix" that by making the server send them.
+ *
+ * The response carries no `details`, no reason, and no discriminator. A client
+ * that needs to say something to a customer says the one thing that is true:
+ * this code cannot be claimed by this account.
+ *
+ * A spent throttle (`429`) and a malformed request (`400`) are **not** claim
+ * refusals and do not carry this code — neither is an answer about eligibility,
+ * and neither reveals anything about another party (ADR-036 §6c, §8).
+ */
+export const REFERRAL_CLAIM_REFUSED_CODE = 'REFERRAL_CLAIM_REFUSED';
+
+/**
+ * What a claim request contains: **the code, and nothing else.**
+ *
+ * One field, and the closedness is the security property rather than
+ * minimalism. The referee is resolved from the authenticated session and is
+ * never an input; the referrer is read from the claimed code's row. So the code
+ * is the **only client-controlled claim credential in the story**.
+ *
+ * The server binds this shape to a DTO validated with `whitelist` and
+ * `forbidNonWhitelisted`, so any other property — `refereeUserId`,
+ * `referrerUserId`, `ownerUserId`, `userId`, `phone`, `createdAt`,
+ * `hasCompletedBooking`, `rewardAmount`, `expiresAt`, `status` — is **refused
+ * with a 400**, not ignored.
+ *
+ * Refused rather than ignored, and the difference is real: a silently-dropped
+ * `refereeUserId` is a field somebody later wires up by accident, and until
+ * they do it trains callers to believe the server read it. A 400 says the field
+ * does not exist, which is true. Story #11's empty query DTO makes the same
+ * choice for the same reason.
+ */
+export interface ReferralClaimRequest {
+  /** Ten characters from `REFERRAL_CODE_ALPHABET`. `isReferralCodeShape` tests the shape. */
+  readonly code: string;
+}
+
+/**
+ * What a **successful** claim returns: the caller's own two facts.
+ *
+ * **No referrer identity of any kind** — no user id, no phone, no display name,
+ * and above all not the referrer's code. `V32-DEC-019` binds the referee's
+ * export to *their own referral fact and never the referrer's bearer code*, and
+ * a response is a weaker place to leak one than an export only in that fewer
+ * people read it. No closed decision requires the referrer to be named here, so
+ * they are not.
+ *
+ * **No reward, no points, no qualification state, and no status.**
+ * `V32-DEC-016` sets both reward values to 0 and qualification is Story #12; a
+ * field here would be a promise a client renders before anything can keep it.
+ *
+ * Both fields are ISO-8601 UTC instants — strings rather than `Date`, because
+ * this package crosses a JSON boundary and a `Date` here would be a lie about
+ * what arrives.
+ */
+export interface ReferralClaimResult {
+  /** When the attribution was recorded. Immutable thereafter (ADR-036 §3). */
+  readonly attributedAt: string;
+  /**
+   * When this pending attribution lapses — `attributedAt` plus
+   * `REFERRAL_PENDING_ATTRIBUTION_EXPIRY_DAYS`, as an absolute UTC duration.
+   *
+   * The caller's own fact about their own attribution, which is why it is
+   * returned at all. What happens when it passes is Story #12's to decide;
+   * nothing in this milestone reads it.
+   */
+  readonly expiresAt: string;
 }

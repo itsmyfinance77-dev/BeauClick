@@ -8,6 +8,7 @@ import {
   SubjectDataContract,
   SubjectDataCoverageService,
   evaluateCoverage,
+  tombstoneFor,
 } from '@beauclick/subject-data';
 import { ALL_EVENT_CONTRACTS } from '@beauclick/event-contracts';
 import {
@@ -23,6 +24,25 @@ import {
 } from '@beauclick/referral';
 
 import { PgTestApp, SeededUser, createPgTestApp, requiredPgEnv, resetDatabase, seedUser } from './pg-test-app.factory';
+
+/**
+ * The instant every erasure in this file is stamped with.
+ *
+ * `SubjectDataContract.eraseSubjectData` has always taken a `SubjectTombstone`
+ * third argument — `PrivacyService` has always passed one — and this module
+ * simply had no use for it while `referral_codes` was the only table it owned,
+ * so the implementation omitted the parameter and these calls omitted the
+ * argument.
+ *
+ * V3.2-C Story #27 gave the module a **retained** table whose erased side must
+ * be tombstoned (`V32-DEC-019`), so the parameter is now declared and used, and
+ * these call sites pass what the real caller passes: the platform's shared
+ * `tombstoneFor`, not a local placeholder.
+ *
+ * A fixed instant rather than `new Date()`, so an assertion about *when* a
+ * subject was erased can never depend on how long the test took.
+ */
+const ERASED_AT = new Date('2026-07-01T00:00:00.000Z');
 
 const pgConfigured = requiredPgEnv() !== null;
 const describePg = pgConfigured ? describe : describe.skip;
@@ -572,13 +592,28 @@ describePg('referral — code identity, generation, privacy, and the share bound
 
     it('has no outbox table in the referral schema at all', async () => {
       // The structural half of the previous case. `V32-DEC-033` approves
-      // ReferralQualified and ReferralReversed for the REWARD path; this story
-      // produces neither, so a table nothing writes would still need a
-      // subject-data claim nobody could verify.
+      // ReferralQualified and ReferralReversed for the REWARD path; neither
+      // Story #11 nor Story #27 produces either, so a table nothing writes would
+      // still need a subject-data claim nobody could verify.
+      //
+      // This pinned the schema at exactly `['referral_codes']` until V3.2-C
+      // Story #27 added `referrals` and `claim_attempts`. Widening the list
+      // would keep the case passing while it silently stopped checking anything
+      // -- the next table added would just be appended again.
+      //
+      // So the assertion now says what it always meant: NO OUTBOX, and nothing
+      // from the reward path. A new table is allowed; an outbox table, a
+      // reward_grants, or a referrer_counters is not, and each would fail here
+      // before its migration was reviewed.
       const rows = await dataSource.query(
         `SELECT tablename FROM pg_tables WHERE schemaname = 'referral' ORDER BY tablename`,
       );
-      expect(rows.map((r: { tablename: string }) => r.tablename)).toEqual(['referral_codes']);
+      const tables = rows.map((r: { tablename: string }) => r.tablename);
+
+      expect(tables).toEqual(['claim_attempts', 'referral_codes', 'referrals']);
+      for (const forbidden of ['outbox_events', 'reward_grants', 'referrer_counters']) {
+        expect(tables).not.toContain(forbidden);
+      }
     });
 
     it('emits no event contract naming referral', async () => {
@@ -615,13 +650,29 @@ describePg('referral — code identity, generation, privacy, and the share bound
   // -------------------------------------------------------------------------
 
   describe('subject data', () => {
-    it('claims exactly one table, as subject_data', () => {
+    it('claims the code table as subject_data, and claims no table that does not exist', () => {
       const contract = app.get(ReferralSubjectDataContract);
       expect(contract.moduleKey).toBe('referral');
-      // Exactly one. `referral.referrals`, `reward_grants`, and
-      // `referrer_counters` are named in V32-DEC-019 and belong to Stories #27,
-      // #12 and #28 -- claiming one early is `claimed_but_absent` and fails boot.
-      expect(contract.tables).toEqual([{ table: 'referral.referral_codes', disposition: 'subject_data' }]);
+
+      // This pinned the whole list at one entry until V3.2-C Story #27 added
+      // `referral.referrals` (retained) and `referral.claim_attempts`
+      // (subject_data). The count was never the guarantee -- these two were:
+      //
+      //   the CODE table's disposition, which `V32-DEC-019` ratifies as
+      //   subject_data because an ownerless code must not remain claimable; and
+      //
+      //   that nothing from the reward path is claimed early, because
+      //   `claimed_but_absent` fails the boot and a stale claim reads as
+      //   coverage while covering nothing.
+      expect(contract.tables).toContainEqual({
+        table: 'referral.referral_codes',
+        disposition: 'subject_data',
+      });
+
+      const claimed = contract.tables.map((claim) => claim.table);
+      for (const notYetBuilt of ['referral.reward_grants', 'referral.referrer_counters']) {
+        expect(claimed).not.toContain(notYetBuilt);
+      }
     });
 
     it('exports the subject\'s own code, and only the code and an instant', async () => {
@@ -633,13 +684,22 @@ describePg('referral — code identity, generation, privacy, and the share bound
       const contract = app.get(ReferralSubjectDataContract);
       const sections = await contract.exportSubjectData(dataSource.manager, user.id);
 
-      expect(sections).toHaveLength(1);
-      expect(sections[0].key).toBe('referral_codes');
-      expect(sections[0].rows).toHaveLength(1);
-      expect(Object.keys(sections[0].rows[0]).sort()).toEqual(['code', 'createdAt']);
-      expect(sections[0].rows[0].code).toBe(code);
+      // The CODE section, addressed by key rather than by index. It was
+      // `sections[0]` and asserted `sections` had length one, until V3.2-C
+      // Story #27 added the two attribution sections. Addressing by key is what
+      // this should always have done: a positional assertion breaks when a
+      // section is added ahead of it, which says nothing about whether the
+      // guarantee still holds.
+      const codes = sections.find((section) => section.key === 'referral_codes');
+      expect(codes).toBeDefined();
+      expect(codes!.rows).toHaveLength(1);
+      expect(Object.keys(codes!.rows[0]).sort()).toEqual(['code', 'createdAt']);
+      expect(codes!.rows[0].code).toBe(code);
+
       // `V32-DEC-019` binds the shape: a referrer's export carries their OWN
-      // code and no other party's anything.
+      // code and no other party's anything. Asserted over the WHOLE document,
+      // so a section added by a later story is covered by it too -- which is
+      // exactly what happened, and this is the half that had to keep working.
       expect(JSON.stringify(sections)).not.toContain(otherCode);
       expect(JSON.stringify(sections)).not.toContain(other.id);
     });
@@ -660,7 +720,7 @@ describePg('referral — code identity, generation, privacy, and the share bound
       await readCode(survivor).expect(200);
 
       const contract = app.get(ReferralSubjectDataContract);
-      const outcome = await contract.eraseSubjectData(dataSource.manager, user.id);
+      const outcome = await contract.eraseSubjectData(dataSource.manager, user.id, tombstoneFor(user.id, ERASED_AT));
 
       // Deleted, not anonymised. `V32-DEC-019`: an ownerless code must not
       // remain claimable, and an anonymised row IS an ownerless code.
@@ -683,7 +743,7 @@ describePg('referral — code identity, generation, privacy, and the share bound
       const code = (await readCode(user).expect(200)).body.data.code as string;
 
       const contract = app.get(ReferralSubjectDataContract);
-      await contract.eraseSubjectData(dataSource.manager, user.id);
+      await contract.eraseSubjectData(dataSource.manager, user.id, tombstoneFor(user.id, ERASED_AT));
 
       // The unique index no longer holds it, which is the observable form of
       // "hard delete rather than revoke": a soft-revoked row would still occupy
@@ -701,7 +761,7 @@ describePg('referral — code identity, generation, privacy, and the share bound
       const user = await customer();
       const before = (await readCode(user).expect(200)).body.data.code as string;
 
-      await app.get(ReferralSubjectDataContract).eraseSubjectData(dataSource.manager, user.id);
+      await app.get(ReferralSubjectDataContract).eraseSubjectData(dataSource.manager, user.id, tombstoneFor(user.id, ERASED_AT));
 
       const after = (await readCode(user).expect(200)).body.data.code as string;
       expect(after).not.toBe(before);
@@ -712,7 +772,7 @@ describePg('referral — code identity, generation, privacy, and the share bound
       // DELETE, so `result.length` is 2 for every statement -- an erasure that
       // always claims two rows.
       const empty = await customer();
-      const outcome = await app.get(ReferralSubjectDataContract).eraseSubjectData(dataSource.manager, empty.id);
+      const outcome = await app.get(ReferralSubjectDataContract).eraseSubjectData(dataSource.manager, empty.id, tombstoneFor(empty.id, ERASED_AT));
       expect(outcome.deleted).toBe(0);
     });
 

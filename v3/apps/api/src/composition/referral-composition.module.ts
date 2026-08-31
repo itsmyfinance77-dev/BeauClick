@@ -1,29 +1,91 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
 
-import { ReferralModule } from '@beauclick/referral';
+import { BookingEntity } from '@beauclick/booking';
+import { UserEntity } from '@beauclick/identity';
+import { REFERRAL_BOOKING_PORT, REFERRAL_IDENTITY_PORT, ReferralModule } from '@beauclick/referral';
+
+import { ReferralBookingAdapter, ReferralIdentityAdapter } from './referral-ports';
 
 /**
- * The V3.2-C Story #11 composition root.
+ * The referral domain's reads into `identity` and `booking`, `@Global()`.
  *
- * **The smallest composition module in the repository, and the smallness is the
- * point.** It binds no port, merges no outbox source, registers no event
- * handler, and provides no adapter — it exists so `ReferralModule` is
- * instantiated in the application graph, and so the reason it needs nothing else
- * is written down somewhere a reader will look.
+ * ## Why global, and why this is a separate module from the composition below
  *
- * ## Why there is no port to bind
+ * `ReferralModule` DECLARES both tokens and provides neither, so something else
+ * has to bind them. The obvious place is `ReferralCompositionModule` below —
+ * **and that does not work**, for the reason `WishlistPortsModule` and
+ * `AiPortsModule` both record at length, and which this story hit as a boot
+ * failure before reading their docblocks:
  *
- * `WishlistCompositionModule` exists because `wishlist` must read `provider` to
- * decide whether a saved target is showable, and ADR-011 forbids the import. A
- * referral code is drawn from a CSPRNG and stored against the session's own user
- * id: **no fact from any other domain participates**, so there is no cross-domain
- * read to write down and no token to bind.
+ * Nest resolves a provider through the injector of the module that DECLARES the
+ * consumer, walking up through *that* module's own imports.
+ * `ReferralCompositionModule` imports `ReferralModule`, so the arrow points the
+ * wrong way: a token provided in the composition module is invisible to
+ * `ReferralService`, and the symptom is exactly `Nest can't resolve
+ * dependencies of the ReferralService (…, ?, …)`.
  *
- * Story #27 changes this. Attribution has to ask `identity` how old an account
- * is, and `V32-DEC-019` binds that answer into one indistinguishable refusal —
- * so a port will be declared by `referral` and bound here, exactly as the
- * wishlist's is. Declaring it now would be a seam nothing crosses.
+ * So the binding lives in a `@Global()` module, as `DomainPortsModule`,
+ * `AiPortsModule`, and `WishlistPortsModule` all do, and for the same reason:
+ * this is an infrastructure binding a domain module needs and must not import a
+ * domain to obtain.
+ *
+ * A domain module still cannot reach a service it should not see. Only the two
+ * narrow, referral-declared tokens are exported — not `IdentityService`, not
+ * `BookingService`, and not the repositories the adapters read. `referral` can
+ * ask how old an account is and whether a booking was completed, and can ask
+ * nothing else.
+ *
+ * ## `TypeOrmModule.forFeature` is repeated here on purpose
+ *
+ * `forFeature` is scoped to the module that registers it, so the entities being
+ * available in the (`@Global`) `DomainPortsModule` does not make them resolvable
+ * here — the same note `AiPortsModule` and `Phase3CompositionModule` both
+ * record. The adapters run every query on the CALLER's `EntityManager`; this
+ * registration exists so `manager.getRepository(...)` can resolve their
+ * metadata.
+ */
+@Global()
+@Module({
+  imports: [TypeOrmModule.forFeature([UserEntity, BookingEntity])],
+  providers: [
+    ReferralIdentityAdapter,
+    ReferralBookingAdapter,
+    { provide: REFERRAL_IDENTITY_PORT, useExisting: ReferralIdentityAdapter },
+    { provide: REFERRAL_BOOKING_PORT, useExisting: ReferralBookingAdapter },
+  ],
+  exports: [REFERRAL_IDENTITY_PORT, REFERRAL_BOOKING_PORT],
+})
+export class ReferralPortsModule {}
+
+/**
+ * The V3.2-C referral composition root (Stories #11 and #27).
+ *
+ * ## It binds two ports now, and Story #11's docblock predicted exactly this
+ *
+ * This was *"the smallest composition module in the repository"* and bound
+ * nothing, because a referral code is drawn from a CSPRNG and stored against the
+ * session's own user id — no fact from any other domain participated. That
+ * docblock also recorded what would change it: *Story #27 changes this.
+ * Attribution has to ask `identity` how old an account is, and `V32-DEC-019`
+ * binds that answer into one indistinguishable refusal — so a port will be
+ * declared by `referral` and bound here, exactly as the wishlist's is.*
+ *
+ * This is that story, and it needs `booking` as well: eligibility is *account
+ * age ≤ 30 days* **and** *no completed booking* (Issue #27, ADR-036 §4).
+ *
+ * `ReferralModule` declares both tokens and provides **neither**, so a
+ * composition that failed to bind one is a boot failure rather than a permissive
+ * fallback — see `referral-ports.ts` for why that asymmetry is load-bearing here
+ * specifically.
+ *
+ * The binding itself lives in `ReferralPortsModule` above rather than in this
+ * module, and its docblock records why that is a requirement rather than a
+ * preference: a provider declared here is invisible to `ReferralService`,
+ * because Nest resolves through the injector of the module that declares the
+ * consumer. This module imports it FIRST, so both ports exist before
+ * `ReferralModule` is instantiated.
  *
  * ## What is deliberately not composed here
  *
@@ -34,24 +96,36 @@ import { ReferralModule } from '@beauclick/referral';
  * story produces no event, has no `referral.outbox_events` table, and therefore
  * contributes nothing for the relay to drain.
  *
- * **No event handler.** The module consumes nothing. A referral code is not a
- * reaction to any domain fact — it is created by its owner reading it.
+ * **No event handler, and `ReferralAttributed` is still not defined.** The
+ * module consumes nothing and now emits nothing either, which is the same
+ * answer for a different reason than Story #11 had: attribution IS a lifecycle
+ * moment, and it still has **no consumer**. Story #12 qualifies on
+ * `BookingCompleted` (`V32-DEC-018`), not on an attribution event
+ * (`V32-DEC-033`, ADR-036 §10).
  *
  * **No notification category and no notification.** `V32-DEC-033` restricts
  * referral notifications to the **qualified** and **reversed** moments, and
- * neither exists in this story. Getting a code is not a lifecycle moment; it is
- * the absence of one.
+ * neither exists yet. Claiming an invitation is not one of them.
  *
- * **No sweep scheduler.** There is no retention horizon: a code is destroyed by
- * its owner's erasure and by nothing else (`V32-DEC-019`). A scheduler that swept
- * expired codes would implement an expiry `V32-DEC-033` explicitly refuses.
+ * **No sweep scheduler**, and Story #27 does not add one although it adds two
+ * things that age. `referral.referrals.expires_at` is a *pending* expiry that
+ * Story #12 will read — nothing sweeps it, because expiry is a state the reward
+ * path evaluates rather than a row to delete. `referral.claim_attempts` rows go
+ * stale hourly and are left: `chat.send_counters` is swept by
+ * `ChatRetentionService`, and the referral equivalent belongs with the retention
+ * horizon Story #12 or a later operational story owns, not bolted on here.
  *
- * **Nothing from Stories #12, #13, #14, #27, or #28.** No attribution, no claim
- * route, no qualification, no reward grant, no cap counter, no abuse suite, and
- * no frontend.
+ * **Nothing from Stories #12, #13, #14, or #28.** No qualification, no reward
+ * grant, no `reward_grants` or `referrer_counters` table, no monthly cap, no
+ * reversal, no abuse suite, and no frontend.
  */
 @Module({
-  imports: [ConfigModule, ReferralModule],
-  exports: [ReferralModule],
+  imports: [
+    ConfigModule,
+    // FIRST, so both ports are bound before `ReferralModule` is instantiated.
+    ReferralPortsModule,
+    ReferralModule,
+  ],
+  exports: [ReferralPortsModule, ReferralModule],
 })
 export class ReferralCompositionModule {}
