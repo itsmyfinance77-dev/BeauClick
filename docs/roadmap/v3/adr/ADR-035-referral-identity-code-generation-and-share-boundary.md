@@ -3,7 +3,7 @@
 **Status:** Accepted — implemented in V3.2-C Story #11 (module, schema, code generation, share contract).
 **Date:** 2026-08-31.
 **Relates to:** ADR-011 (repository architecture and module boundaries), ADR-027 (subject-data contract and boot-time coverage), ADR-033/ADR-034 (the wishlist domain, whose one-table/one-module shape and no-event boundary this ADR follows closely), ADR-024 (waitlist concurrency — the same conditional-write discipline), `V3_SECURITY_MODEL.md` §3 (indistinguishable refusals, no caller-supplied identity), `V3_DATABASE_BLUEPRINT.md` §§1–4.
-**Binding on:** `V32-DEC-019` and `V32-DEC-033`, closed by the product owner on 2026-08-30.
+**Binding on:** `V32-DEC-019` and `V32-DEC-033`, closed by the product owner on 2026-08-30; and `V32-DEC-034`, which **ratifies the code format** and was closed by the product owner on **2026-08-31**.
 **Does not decide:** attribution, the claim route, qualification, reward values, reversal, or the abuse suite. Those are Stories #27, #12, #28, and #13, and §9 states the boundary precisely so this ADR is not read as having settled them.
 
 ## Context
@@ -12,7 +12,9 @@ A referral code is the smallest object in the V3.2-C programme and the one with 
 
 Four facts about the repository and the closed decisions shaped this ADR.
 
-**The owner closed the share channel and the link, but not the code's own shape.** `V32-DEC-033` fixes the invite link at `{origin}/invite/{code}`, fixes copy-code and copy-link as unconditional fallbacks, and approves native share as contract and design only. It says nothing about the alphabet or the length of `{code}`. Issue #11 requires only "a CSPRNG over an unambiguous alphabet". §3 records the parameters chosen and flags them for ratification rather than presenting them as already decided.
+**The owner closed the share channel and the link, but not the code's own shape.** `V32-DEC-033` fixes the invite link at `{origin}/invite/{code}`, fixes copy-code and copy-link as unconditional fallbacks, and approves native share as contract and design only. It says nothing about the alphabet or the length of `{code}`, and Issue #11 requires only "a CSPRNG over an unambiguous alphabet".
+
+**That gap is now closed.** When this ADR was first written, the alphabet and length were the one parameter no closed decision covered, so §3 recorded them plainly and flagged them for ratification rather than presenting them as settled. The product owner **ratified the format on 2026-08-31** as `V32-DEC-034`, at exactly the values already implemented. §3 now records a closed owner decision; the pre-ratification state is described above so the sequence stays legible rather than rewritten.
 
 **The owner already ratified this table's privacy disposition.** `V32-DEC-019` carries a dispositions table, and `referral.referral_codes` is `subject_data`, **deleted/revoked on the owner's erasure**, with the stated reason: *an ownerless code must not remain claimable*. That is a closed decision, not an engineering choice, and §6 implements it literally.
 
@@ -51,9 +53,20 @@ referral.referral_codes
 
 **No display, share, or usage columns.** No `share_count`, no `last_shared_at`, no `claimed_count`. Each would be an analytics fact this story is forbidden to collect, and the absence is structural: there is no column that could hold one.
 
-### 3. The code: CSPRNG over an unambiguous alphabet — parameters recorded, and flagged
+### 3. The code: CSPRNG over the owner-ratified alphabet
 
-**This is the one place this ADR chooses a parameter the owner has not ratified.** It is recorded here plainly rather than buried in an implementation.
+**These are closed owner decisions, ratified 2026-08-31 as `V32-DEC-034`.** They are recorded here as well as in the register because an implementation reader should not have to leave the ADR to learn whether a parameter is settled.
+
+| Parameter | Ratified value |
+|---|---|
+| `REFERRAL_CODE_ALPHABET` | `123456789ABCDEFGHJKMNPQRSTVWXYZ` |
+| `REFERRAL_CODE_LENGTH` | `10` |
+| Alphabet size | 31 characters, **uppercase only**, excluding `0`, `I`, `L`, `O`, `U` |
+| Ratification date | **2026-08-31** |
+| Approver | **Product owner** |
+| Status | **CLOSED / RATIFIED** |
+
+The values below were implemented before ratification and were **not changed by it** — the owner ratified the format as built, so no constant, migration, or already-issued code required regeneration.
 
 **Alphabet — 31 characters.** Crockford Base32 (which already excludes `I`, `L`, `O`, and `U`) with `0` additionally removed:
 
@@ -64,9 +77,18 @@ minus "0":          123456789ABCDEFGHJKMNPQRSTVWXYZ   (31)
 
 The exclusions are the point. `I`/`l`, `O`/`0`, and `U` — which Crockford drops to avoid accidental obscenity — are precisely the characters that make a code misread when it is spoken aloud, written on paper, or typed from a screenshot, which is exactly how a referral code travels. `0` goes too, because with `O` already absent it is the remaining glyph a reader most often supplies from memory. `1` is **kept**: with both `I` and `L` gone there is nothing left for it to be confused with. Uppercase only, so a code read aloud has one spelling.
 
-**Length — 10 characters.** 31^10 ≈ 8.19 × 10^14, or about **49.5 bits** of entropy.
+**Length — 10 characters.** 31^10 = **819,628,286,980,801** distinct codes, or about **49.5 bits** of entropy (10 × log₂ 31 = 49.54).
 
-**Why 10 and not 6 or 8.** The code is a bearer credential and the claim route will be an authenticated but broadly reachable surface. `V32-DEC-019` throttles claims at 10 attempts per caller per hour, which bounds online guessing hard — but the throttle is a control the reward story owns, and this story must not depend on a control that does not exist yet. At 49.5 bits, an attacker making 10 guesses an hour needs on the order of 10^13 years, and even an unthrottled attacker at 10,000 guesses a second needs millennia. Six characters (≈29.7 bits) would be inside the reach of an unthrottled attacker; eight (≈39.6 bits) is defensible but leaves no margin for a future decision to relax the throttle. Ten is the first length where the code is safe **without** relying on a rate limit another story owns.
+**Why 10 and not 6 or 8.** The code is a bearer credential and the claim route will be an authenticated but broadly reachable surface. `V32-DEC-019` throttles claims at **10 attempts per authenticated caller per hour** — but that throttle belongs to **Story #27 — Referral attribution claim lifecycle**, which owns `POST /api/v1/me/referral/claim` and enforces the limit **in PostgreSQL**, never the in-memory HTTP throttler whose effective limit multiplies by instance count while `THROTTLE-STORE` is unresolved. Story #11 builds none of that, so the code must be safe **without** it.
+
+At 49.5 bits it is, and the arithmetic is worth stating exactly rather than gesturing at:
+
+| Guess rate | Exhaustive search | Expected success (midpoint) |
+|---|---|---|
+| **10 per hour** — the Story #27 throttle | ≈ **9.35 billion years** | ≈ **4.68 billion years** |
+| **10,000 per second** — wholly unthrottled | ≈ **2,598 years** | ≈ **1,299 years** |
+
+Six characters (≈29.7 bits) would be inside the reach of an unthrottled attacker; eight (≈39.6 bits) is defensible but leaves no margin for a future decision to relax the throttle. Ten is the first length where the code is safe **without** relying on a rate limit another story owns.
 
 **Why not a UUID.** A referral code is read aloud and typed by hand. A 36-character UUID is unusable for that, and shortening one reintroduces exactly this decision with worse entropy per character.
 
@@ -74,7 +96,7 @@ The exclusions are the point. `I`/`l`, `O`/`0`, and `U` — which Crockford drop
 
 **No user-derived material of any kind.** Not the phone, the user id, a timestamp, a sequence, a hash of any of them, or a checksum over them. The generator's only input is the CSPRNG; **it does not receive the owner's id at all**, which makes "the code reveals nothing about its owner" a property of the function signature rather than of its body.
 
-**Flagged for ratification.** The alphabet, the length, and therefore the entropy are engineering realisations of `V32-DEC-033`'s closed properties rather than owner decisions. If the owner wants a different length or alphabet, the change is a constant in `@beauclick/referral-contract`, a `VARCHAR` width in one migration, and a regenerated set of codes — cheap now, and progressively less so once attribution exists.
+**Ratified, not assumed.** The alphabet and the length were engineering realisations of `V32-DEC-033`'s closed properties when this ADR was first committed, and were flagged as such. The product owner **closed them as `V32-DEC-034` on 2026-08-31**, at the values above. They are no longer an engineering default and may not be revised by an implementation decision: a different length or alphabet is now a **new owner decision**, plus a constant in `@beauclick/referral-contract`, a `VARCHAR` width in one migration, and a regenerated set of codes — mechanically cheap only while attribution does not exist.
 
 ### 4. Generate-and-retry on the unique constraint, never read-then-write
 
@@ -158,15 +180,14 @@ It carries the code alphabet and length, the invite path segment, the share payl
 ## Consequences
 
 - A customer has a stable referral identity from their first read of one route, and it never changes.
-- The code is safe against online guessing without depending on the claim throttle, which does not exist yet.
+- The code is safe against online guessing **without** depending on the claim throttle, which belongs to **Story #27** and does not exist yet. At the Story #27 rate of 10 attempts per caller per hour, exhausting the space takes ≈ 9.35 billion years; even wholly unthrottled at 10,000 guesses a second it takes ≈ 2,598 years.
 - Erasure destroys the code, so an ownerless code cannot be claimed once attribution lands.
 - The reward stories inherit a `ServiceName` member, one table, and one contract package. They add attribution, qualification, and rewards; they do not revisit code identity.
-- A different alphabet or length remains cheap to change until attribution exists, and progressively less so afterwards. §3 flags it.
+- The alphabet and length are **owner-ratified** (`V32-DEC-034`, 2026-08-31) at the values already implemented. Changing either is now a new owner decision rather than an engineering one, and remains mechanically cheap only until attribution exists.
 - Because the route creates on read, a client that has never called it has no code — there is no backfill, and none is needed.
 
 ## What is deliberately not decided here
 
-- **The exact alphabet and length as an owner-ratified parameter** — chosen and justified in §3, flagged for ratification.
 - **Approved share, legal, and disclosure copy** — a public-release gate, not a backend gate.
 - **Attribution, qualification, rewards, reversal, and the abuse suite** — Stories #27, #12, #28, #13.
 - **Any revocation state that is not erasure** — a migration and a decision if it is ever wanted.
