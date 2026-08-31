@@ -16,7 +16,11 @@ import {
   REFERRAL_CLAIM_REFUSED_CODE,
   REFERRAL_PENDING_ATTRIBUTION_EXPIRY_DAYS,
 } from '@beauclick/referral-contract';
-import { ReferralClaimRefusedException, ReferralService } from '@beauclick/referral';
+import {
+  ReferralClaimRefusedException,
+  ReferralClaimThrottledException,
+  ReferralService,
+} from '@beauclick/referral';
 
 import {
   PgTestApp,
@@ -790,24 +794,47 @@ describePg('referral attribution — claim lifecycle, concurrency, privacy (real
 
     it('CONCURRENT attempts cannot exceed the limit', async () => {
       // The case the in-memory throttler cannot pass and a read-then-write
-      // counter cannot pass. Twenty simultaneous requests, one caller: exactly
+      // counter cannot pass. Twenty simultaneous claims, one caller: exactly
       // ten must be charged and the counter must land on exactly ten.
+      //
+      // Fired at the SERVICE rather than over HTTP, and that is a fix rather
+      // than a shortcut. The first version used twenty concurrent supertest
+      // requests and failed in CI with `read ECONNRESET` -- twenty simultaneous
+      // sockets against the in-process server on a smaller runner, which is a
+      // property of the harness and not of the throttle. It passed locally
+      // every time, which is exactly the kind of flake that gets retried into
+      // the tree.
+      //
+      // Nothing is lost by dropping the HTTP layer: the guarantee under test is
+      // that ONE conditional statement cannot be raced, which is a database
+      // property. `booking-concurrency.pg-spec` fires at the service for the
+      // same reason. The HTTP mapping of the two outcomes is covered separately
+      // by the 10-then-429 case above.
       const referee = await customer();
       ctx.referralClock.freeze(new Date('2026-06-15T10:30:00.000Z'));
 
       const attempts = 20;
-      const responses = await Promise.all(
-        Array.from({ length: attempts }, () => claim(referee, 'ZZZZZZZZZZ')),
+      const results = await Promise.allSettled(
+        Array.from({ length: attempts }, () => referral.claim(referee.id, 'ZZZZZZZZZZ')),
       );
 
-      const charged = responses.filter((response) => response.status === 409).length;
-      const throttled = responses.filter((response) => response.status === 429).length;
+      // Every one of the twenty is refused -- the code does not exist -- so the
+      // question is only WHICH refusal each got. Exactly ten must have been
+      // charged an attempt and reached the eligibility check; the other ten
+      // must have been turned away by the throttle.
+      const charged = results.filter(
+        (result) => result.status === 'rejected' && result.reason instanceof ReferralClaimRefusedException,
+      ).length;
+      const throttled = results.filter(
+        (result) => result.status === 'rejected' && result.reason instanceof ReferralClaimThrottledException,
+      ).length;
 
       expect(charged).toBe(REFERRAL_CLAIM_ATTEMPTS_PER_HOUR);
       expect(throttled).toBe(attempts - REFERRAL_CLAIM_ATTEMPTS_PER_HOUR);
+      expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(0);
 
       // The counter itself never exceeded the limit -- the conditional write is
-      // what guarantees this, not the response tally.
+      // what guarantees this, not the tally above.
       const [row] = await dataSource.query(
         'SELECT attempt_count FROM referral.claim_attempts WHERE claimant_user_id = $1',
         [referee.id],
