@@ -1,0 +1,11 @@
+{
+  "name": "referral",
+  "sourceRoot": "services/referral/src",
+  "projectType": "library",
+  "tags": ["type:lib", "scope:referral"],
+  "targets": {
+    "typecheck": { "executor": "nx:run-commands", "options": { "command": "tsc -p services/referral/tsconfig.json --noEmit" } },
+    "test": { "executor": "nx:run-commands", "options": { "command": "jest --config services/referral/jest.config.js" } },
+    "lint": { "executor": "nx:run-commands", "options": { "command": "eslint services/referral/src --resolve-plugins-relative-to ." } }
+  }
+}

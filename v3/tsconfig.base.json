@@ -31,6 +31,7 @@
       "@beauclick/ai-contract": ["packages/ai-contract/src/index.ts"],
       "@beauclick/chat-contract": ["packages/chat-contract/src/index.ts"],
       "@beauclick/wishlist-contract": ["packages/wishlist-contract/src/index.ts"],
+      "@beauclick/referral-contract": ["packages/referral-contract/src/index.ts"],
       "@beauclick/money": ["libs/money/src/index.ts"],
       "@beauclick/media": ["libs/media/src/index.ts"],
       "@beauclick/subject-data": ["libs/subject-data/src/index.ts"],
@@ -52,7 +53,8 @@
       "@beauclick/privacy": ["services/privacy/src/index.ts"],
       "@beauclick/ai": ["services/ai/src/index.ts"],
       "@beauclick/chat": ["services/chat/src/index.ts"],
-      "@beauclick/wishlist": ["services/wishlist/src/index.ts"]
+      "@beauclick/wishlist": ["services/wishlist/src/index.ts"],
+      "@beauclick/referral": ["services/referral/src/index.ts"]
     }
   }
 }
