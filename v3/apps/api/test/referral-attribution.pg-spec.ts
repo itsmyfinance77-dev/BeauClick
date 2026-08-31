@@ -16,7 +16,7 @@ import {
   REFERRAL_CLAIM_REFUSED_CODE,
   REFERRAL_PENDING_ATTRIBUTION_EXPIRY_DAYS,
 } from '@beauclick/referral-contract';
-import { ReferralService } from '@beauclick/referral';
+import { ReferralClaimRefusedException, ReferralService } from '@beauclick/referral';
 
 import {
   PgTestApp,
@@ -821,18 +821,117 @@ describePg('referral attribution — claim lifecycle, concurrency, privacy (real
   // ==========================================================================
 
   describe('concurrency and immutability', () => {
-    it('two simultaneous claims for one referee create EXACTLY ONE row', async () => {
+    /**
+     * ## What the mutation proof discovered about this group, stated up front
+     *
+     * The first version of the concurrency case fired two, then ten, claims at
+     * the service and asserted one row. Dropping `uq_referrals_referee`
+     * entirely did **not** make it fail — so it was proving nothing about the
+     * constraint.
+     *
+     * The reason is a property of this design that is worth knowing rather than
+     * a flaw: `chargeClaimAttempt` runs **first**, and it is a conditional
+     * `INSERT … ON CONFLICT DO UPDATE` on the row `(claimant_user_id,
+     * window_start)`. For one caller that is the **same row every time**, so
+     * PostgreSQL's row lock **serialises that caller's concurrent claims**
+     * before any of them reaches an eligibility read. The service's own
+     * prior-attribution `findOne` then catches every straggler, and the unique
+     * index never fires.
+     *
+     * That is good behaviour — a single caller cannot stampede the claim path —
+     * but it means the service is the wrong instrument for proving the
+     * constraint. So the group below proves it two ways that do not depend on
+     * the throttle at all: two genuinely overlapping transactions racing the
+     * `INSERT`, and a raw duplicate. Both fail when the constraint is dropped;
+     * the service-level cases below them prove the end-to-end outcome.
+     */
+    it('two OVERLAPPING transactions inserting one referee: exactly one commits', async () => {
+      // The constraint proved directly, with the throttle out of the way.
+      //
+      // Both transactions BEGIN, both INSERT the same `referee_user_id`, and
+      // NEITHER commits until both have tried -- so the second is genuinely
+      // inside the first's uncommitted window, which is precisely the state
+      // `READ COMMITTED` makes invisible to an application check.
+      const referrer = await customer();
+      const other = await customer();
+      const referee = await customer();
+
+      const first = dataSource.createQueryRunner();
+      const second = dataSource.createQueryRunner();
+      await first.connect();
+      await second.connect();
+
+      const insert = (runner: typeof first, referrerId: string) =>
+        runner.query(
+          `INSERT INTO referral.referrals
+             (id, referrer_user_id, referee_user_id, referral_code_id, attributed_at, expires_at)
+           VALUES ($1, $2, $3, $4, now(), now() + interval '90 days')`,
+          [uuidv7(), referrerId, referee.id, uuidv7()],
+        );
+
+      try {
+        await first.startTransaction();
+        await second.startTransaction();
+
+        await insert(first, referrer.id);
+
+        // The second INSERT BLOCKS on the unique index until the first
+        // transaction resolves -- it cannot see the uncommitted row, and it
+        // cannot proceed past it either. That block is the guarantee.
+        const blocked = insert(second, other.id);
+
+        await first.commitTransaction();
+
+        // Now it unblocks, and fails.
+        await expect(blocked).rejects.toThrow(/uq_referrals_referee/);
+        await second.rollbackTransaction();
+      } finally {
+        await first.release();
+        await second.release();
+      }
+
+      const rows = await storedAttributions();
+      expect(rows).toHaveLength(1);
+      expect(rows[0].referrer_user_id).toBe(referrer.id);
+    });
+
+    it('TEN concurrent service claims for one referee create EXACTLY ONE row', async () => {
+      // The end-to-end outcome. This does NOT prove the constraint -- see the
+      // group note above -- and it is kept because what it does prove is
+      // separately worth holding: ten simultaneous claims produce one row, one
+      // success, and nine refusals that are all the SAME refusal.
+      //
+      // Ten is exactly `REFERRAL_CLAIM_ATTEMPTS_PER_HOUR`, so every one is
+      // charged and none is refused by the throttle instead.
+      const referrer = await customer();
+      const referee = await customer();
+      const code = await codeOf(referrer);
+
+      const results = await Promise.allSettled(
+        Array.from({ length: REFERRAL_CLAIM_ATTEMPTS_PER_HOUR }, () => referral.claim(referee.id, code)),
+      );
+
+      expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+      expect(await storedAttributions()).toHaveLength(1);
+
+      for (const result of results) {
+        if (result.status === 'rejected') {
+          expect(result.reason).toBeInstanceOf(ReferralClaimRefusedException);
+        }
+      }
+    });
+
+    it('two simultaneous HTTP claims for one referee also yield exactly one row', async () => {
+      // The whole stack, guards and pipes included.
       const referrer = await customer();
       const referee = await customer();
       const code = await codeOf(referrer);
 
       const [a, b] = await Promise.all([claim(referee, code), claim(referee, code)]);
 
-      const statuses = [a.status, b.status].sort();
-      expect(statuses).toEqual([200, 409]);
+      expect([a.status, b.status].sort()).toEqual([200, 409]);
       expect(await storedAttributions()).toHaveLength(1);
-      // The loser's refusal is the SAME body as every other refusal -- a
-      // concurrency loss must not be distinguishable either.
+
       const loser = a.status === 409 ? a : b;
       const unrelated = await claim(await customer(), 'ZZZZZZZZZZ').expect(409);
       expect(loser.body).toEqual(unrelated.body);
