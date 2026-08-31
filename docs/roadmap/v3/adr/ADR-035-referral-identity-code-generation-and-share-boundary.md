@@ -180,7 +180,7 @@ It carries the code alphabet and length, the invite path segment, the share payl
 ## Consequences
 
 - A customer has a stable referral identity from their first read of one route, and it never changes.
-- The code is safe against online guessing **without** depending on the claim throttle, which belongs to **Story #27** and does not exist yet. At the Story #27 rate of 10 attempts per caller per hour, exhausting the space takes ≈ 9.35 billion years; even wholly unthrottled at 10,000 guesses a second it takes ≈ 2,598 years.
+- The code is safe against online guessing **without** depending on the claim throttle, which belongs to **Story #27** and did not exist when this story shipped. At the Story #27 rate of 10 attempts per caller per hour, exhausting the space takes ≈ 9.35 billion years; even wholly unthrottled at 10,000 guesses a second it takes ≈ 2,598 years. Story #27 has since built that throttle (**ADR-036** §6), so the margin is now real rather than hypothetical — but the length is justified without it, which is the property that mattered and the reason eight was refused.
 - Erasure destroys the code, so an ownerless code cannot be claimed once attribution lands.
 - The reward stories inherit a `ServiceName` member, one table, and one contract package. They add attribution, qualification, and rewards; they do not revisit code identity.
 - The alphabet and length are **owner-ratified** (`V32-DEC-034`, 2026-08-31) at the values already implemented. Changing either is now a new owner decision rather than an engineering one, and remains mechanically cheap only until attribution exists.
@@ -189,6 +189,6 @@ It carries the code alphabet and length, the invite path segment, the share payl
 ## What is deliberately not decided here
 
 - **Approved share, legal, and disclosure copy** — a public-release gate, not a backend gate.
-- **Attribution, qualification, rewards, reversal, and the abuse suite** — Stories #27, #12, #28, #13.
+- **Attribution** — Story #27, now decided in **ADR-036**, which continues this ADR and revisits none of it. **Qualification, rewards, reversal, and the abuse suite** remain undecided here — Stories #12, #28, #13.
 - **Any revocation state that is not erasure** — a migration and a decision if it is ever wanted.
 - **Platform-sent SMS, email, push, and every social-network share API** — externally gated by dependency-ledger rows 6 and 7, and not claimed as delivered.
