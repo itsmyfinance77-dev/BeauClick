@@ -1,8 +1,7 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query } from '@nestjs/common';
-import { IsString, Matches } from 'class-validator';
+import { IsString } from 'class-validator';
 
 import { AuthenticatedUser, CurrentUser } from '@beauclick/http';
-import { REFERRAL_CODE_ALPHABET, REFERRAL_CODE_LENGTH } from '@beauclick/referral-contract';
 import type { ReferralClaimResult, ReferralCodeView } from '@beauclick/referral-contract';
 
 import { ReferralService } from './referral.service';
@@ -46,33 +45,48 @@ export class ReferralCodeQueryDto {}
  * docblock records that the route's behaviour was the weaker one until the
  * real-PostgreSQL suite asserted otherwise and failed.
  *
- * ## Why the shape is validated here as well as by the domain
+ * ## Why the code's SHAPE is deliberately NOT validated here
  *
- * `@Matches` against the ratified alphabet is not a duplicate of
- * `isReferralCodeShape` — it is the same rule at the edge, where a malformed
- * string is cheaper to refuse. It also keeps a garbage value out of the
- * throttle: without it, ten requests of `"' OR 1=1"` would each consume an
- * attempt and reach a database lookup.
+ * `@IsString()` and nothing more. The obvious version of this class carried
+ * `@Matches(/^[ALPHABET]{10}$/)` so a malformed code was refused at the edge,
+ * and it had to be removed — the adversarial suite caught it leaking a bearer
+ * credential.
  *
- * **A malformed code is a 400 and a well-formed unknown code is the collapsed
- * 409, and that is not an oracle.** The distinction is decidable by the client
- * without asking — `isReferralCodeShape` is exported from the contract precisely
- * so a page can make it locally — so the response reveals nothing the caller
- * could not compute. What it must never do is distinguish among *well-formed*
- * codes, and it does not.
+ * The platform's `ValidationException` serialises class-validator's
+ * `ValidationError`, and that object carries `target` and `value` — **the
+ * submitted payload**. So a failed `@Matches` returned
+ * `{"target":{"code":"…"},"value":"…"}`, putting whatever the caller typed into
+ * a response body and from there into whatever logs client errors. A custom
+ * `message` does not help: the echo is the pipe's, not the constraint's.
  *
- * The pattern is built from the contract's own constants rather than written
- * out, so a future owner decision that changes the alphabet or the length
- * changes this rule too instead of leaving a second copy behind.
+ * For most routes that is harmless, because the caller is being shown their own
+ * input. Here the input is a **bearer credential**, and `V32-DEC-033` keeps a
+ * referral code out of exception messages specifically. The realistic trigger is
+ * not an attacker: it is a customer typing their inviter's real code in
+ * lowercase — malformed, because `isReferralCodeShape` is deliberately
+ * case-sensitive, and one `toUpperCase()` away from the live credential.
+ *
+ * So the shape check moved into the service, where a malformed code becomes the
+ * ordinary collapsed refusal with no `details` at all. Three consequences, all
+ * of them improvements:
+ *
+ *  * **Nothing is echoed.** The refusal carries no payload to echo into.
+ *  * **Indistinguishability gets stronger, not weaker.** A malformed code and an
+ *    unknown code now return the identical 409 — one fewer distinction the route
+ *    can make.
+ *  * **A malformed probe consumes a throttle attempt**, as it should: it was an
+ *    attempt. The edge check would have let an attacker probe for free.
+ *
+ * The cost is that a genuinely mistyped code costs the customer one of their ten
+ * hourly attempts. That is the correct trade against leaking the credential, and
+ * a page can still refuse obvious garbage locally without a request —
+ * `isReferralCodeShape` is exported from the contract precisely so it can.
+ *
+ * `@IsString()` stays, because a non-string is not a code and cannot leak one;
+ * the body-size limit bounds the rest.
  */
 export class ReferralClaimDto {
   @IsString()
-  @Matches(new RegExp(`^[${REFERRAL_CODE_ALPHABET}]{${REFERRAL_CODE_LENGTH}}$`), {
-    // The message names no code and quotes nothing back. An error that echoed
-    // the submitted value would put a bearer credential in a response body and,
-    // from there, into whatever logs the client's errors (`V32-DEC-033`).
-    message: 'کد دعوت نامعتبر است.',
-  })
   code!: string;
 }
 

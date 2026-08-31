@@ -12,6 +12,7 @@ import { ValidationException } from '@beauclick/http';
 import { assertPrivilegedMutationsAreAudited } from '@beauclick/audit';
 import { OTP_DEBUG_OBSERVER, OtpDebugObserver, capabilitiesForRoles } from '@beauclick/identity';
 import { CHAT_CLOCK, ChatClock } from '@beauclick/chat';
+import { REFERRAL_CLOCK, ReferralClock } from '@beauclick/referral';
 import { OutboxRelay } from '@beauclick/events';
 import { FINANCIAL_DATA_SOURCE } from '@beauclick/financial';
 
@@ -60,11 +61,29 @@ export interface PgTestApp {
    *
    * Left running by default, so a spec that does not care sees real time.
    */
-  chatClock: FreezableChatClock;
+  chatClock: FreezableClock;
+  /**
+   * The referral module's clock, frozen on demand.
+   *
+   * A SEPARATE instance from `chatClock` rather than one shared clock, because
+   * the two modules are independent and a spec freezing one must not silently
+   * stop the other -- which would make an unrelated suite's failure look like a
+   * product bug.
+   *
+   * Story #27 needs it for three boundaries that cannot be proved otherwise
+   * (ADR-036 §5): the claim window is **inclusive at exactly 30 days**, the
+   * pending expiry is **exactly 90 days** from the attribution instant, and the
+   * throttle counts per UTC hour -- so a burst straddling :59 -> :00 is charged
+   * to two buckets and the limit appears not to hold. Each is a boundary, and a
+   * boundary tested against the wall clock is a boundary nobody has tested.
+   *
+   * Left running by default.
+   */
+  referralClock: FreezableClock;
 }
 
 /** Real time until a test says otherwise. */
-export class FreezableChatClock implements ChatClock {
+export class FreezableClock implements ChatClock, ReferralClock {
   private fixed: Date | null = null;
 
   now(): Date {
@@ -276,18 +295,26 @@ export async function createPgTestApp(envOverrides: Record<string, string> = {})
   // of data.redirectUrl -- and ran each guard twice. The harness must boot
   // the application, not rebuild half of it.
   const otpObserver = new CapturingOtpObserver();
-  const chatClock = new FreezableChatClock();
+  const chatClock = new FreezableClock();
+  const referralClock = new FreezableClock();
   const moduleRef = await Test.createTestingModule({
     imports: [AppModule],
   })
-    // The first substitution replaces a NO-OP with a recorder, and the second
-    // hands a test the ability to stop time -- which the chat clock exists for.
-    // Neither bypasses production behaviour: the clock runs at real time unless a
-    // test freezes it, and every rule still reads it through the same port.
+    // The first substitution replaces a NO-OP with a recorder, and the other two
+    // hand a test the ability to stop time -- which both clocks exist for.
+    // Neither bypasses production behaviour: each clock runs at real time unless
+    // a test freezes it, and every rule still reads it through the same port.
+    //
+    // The two clocks are SEPARATE instances on purpose. A single shared clock
+    // would mean a referral spec freezing time also stopped chat's send-window
+    // and retention rules, so an unrelated suite's failure would look like a
+    // product bug rather than like the harness.
     .overrideProvider(OTP_DEBUG_OBSERVER)
     .useValue(otpObserver)
     .overrideProvider(CHAT_CLOCK)
     .useValue(chatClock)
+    .overrideProvider(REFERRAL_CLOCK)
+    .useValue(referralClock)
     .compile();
 
   const app = moduleRef.createNestApplication();
@@ -315,6 +342,7 @@ export async function createPgTestApp(envOverrides: Record<string, string> = {})
     relay: app.get(OutboxRelay),
     otpObserver,
     chatClock,
+    referralClock,
   };
 }
 
@@ -328,9 +356,19 @@ export async function createPgTestApp(envOverrides: Record<string, string> = {})
  * schema really is.
  */
 export const RESETTABLE_TABLES = [
-  // V3.2-C Story #11. One table, no children, no outbox -- `referral` emits no
-  // event in this story and has no outbox table. Listed first to keep the
-  // newest-schema-first convention this list has followed since Phase 4.
+  // V3.2-C Story #27. Attribution and its claim throttle. Still no outbox --
+  // `ReferralAttributed` is deliberately not defined because it has no consumer
+  // (ADR-036 §10).
+  //
+  // `referral.referrals` is listed FIRST although it has no foreign key to the
+  // codes table, and the absence of that FK is itself deliberate (ADR-036 §2):
+  // the two rows have different erasure lifecycles, so no referential action
+  // expresses their relationship and a CASCADE could not be relied on here even
+  // if the order were wrong.
+  'referral.referrals',
+  'referral.claim_attempts',
+  // V3.2-C Story #11. Listed after the tables that reference it by id, keeping
+  // the newest-schema-first convention this list has followed since Phase 4.
   'referral.referral_codes',
   // V3.2-C Story #8. One table, no children, no outbox -- `wishlist` emits no
   // events and has no outbox table at all. Listed first only to keep the

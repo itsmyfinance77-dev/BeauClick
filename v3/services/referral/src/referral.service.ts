@@ -12,6 +12,7 @@ import {
   REFERRAL_SHARE_TITLE,
   buildReferralInviteUrl,
   buildReferralShareText,
+  isReferralCodeShape,
 } from '@beauclick/referral-contract';
 import type { ReferralClaimResult, ReferralCodeView, ReferralSharePayload } from '@beauclick/referral-contract';
 
@@ -278,7 +279,21 @@ export class ReferralService {
     await this.chargeClaimAttempt(refereeUserId);
 
     return this.codes.manager.transaction(async (manager) => {
-      // (2) The lookup by value. A miss and a hit that is then refused are
+      // (2a) The SHAPE, checked here rather than by a DTO constraint.
+      //
+      // Deliberate, and the controller's `ReferralClaimDto` docblock records
+      // why at length: the platform's `ValidationException` serialises
+      // class-validator's `ValidationError`, which carries the submitted
+      // `value` -- so an `@Matches` failure echoed a bearer credential into a
+      // response body. The realistic trigger is a customer typing their
+      // inviter's real code in lowercase.
+      //
+      // Refusing here folds a malformed code into the ONE collapsed refusal, so
+      // the route makes one fewer distinction than it did, and a malformed
+      // probe correctly consumes a throttle attempt rather than being free.
+      if (!isReferralCodeShape(code)) throw new ReferralClaimRefusedException();
+
+      // (2b) The lookup by value. A miss and a hit that is then refused are
       // indistinguishable to the caller by construction: both paths throw the
       // SAME no-argument exception.
       //

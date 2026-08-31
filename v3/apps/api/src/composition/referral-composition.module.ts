@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
@@ -7,6 +7,57 @@ import { UserEntity } from '@beauclick/identity';
 import { REFERRAL_BOOKING_PORT, REFERRAL_IDENTITY_PORT, ReferralModule } from '@beauclick/referral';
 
 import { ReferralBookingAdapter, ReferralIdentityAdapter } from './referral-ports';
+
+/**
+ * The referral domain's reads into `identity` and `booking`, `@Global()`.
+ *
+ * ## Why global, and why this is a separate module from the composition below
+ *
+ * `ReferralModule` DECLARES both tokens and provides neither, so something else
+ * has to bind them. The obvious place is `ReferralCompositionModule` below —
+ * **and that does not work**, for the reason `WishlistPortsModule` and
+ * `AiPortsModule` both record at length, and which this story hit as a boot
+ * failure before reading their docblocks:
+ *
+ * Nest resolves a provider through the injector of the module that DECLARES the
+ * consumer, walking up through *that* module's own imports.
+ * `ReferralCompositionModule` imports `ReferralModule`, so the arrow points the
+ * wrong way: a token provided in the composition module is invisible to
+ * `ReferralService`, and the symptom is exactly `Nest can't resolve
+ * dependencies of the ReferralService (…, ?, …)`.
+ *
+ * So the binding lives in a `@Global()` module, as `DomainPortsModule`,
+ * `AiPortsModule`, and `WishlistPortsModule` all do, and for the same reason:
+ * this is an infrastructure binding a domain module needs and must not import a
+ * domain to obtain.
+ *
+ * A domain module still cannot reach a service it should not see. Only the two
+ * narrow, referral-declared tokens are exported — not `IdentityService`, not
+ * `BookingService`, and not the repositories the adapters read. `referral` can
+ * ask how old an account is and whether a booking was completed, and can ask
+ * nothing else.
+ *
+ * ## `TypeOrmModule.forFeature` is repeated here on purpose
+ *
+ * `forFeature` is scoped to the module that registers it, so the entities being
+ * available in the (`@Global`) `DomainPortsModule` does not make them resolvable
+ * here — the same note `AiPortsModule` and `Phase3CompositionModule` both
+ * record. The adapters run every query on the CALLER's `EntityManager`; this
+ * registration exists so `manager.getRepository(...)` can resolve their
+ * metadata.
+ */
+@Global()
+@Module({
+  imports: [TypeOrmModule.forFeature([UserEntity, BookingEntity])],
+  providers: [
+    ReferralIdentityAdapter,
+    ReferralBookingAdapter,
+    { provide: REFERRAL_IDENTITY_PORT, useExisting: ReferralIdentityAdapter },
+    { provide: REFERRAL_BOOKING_PORT, useExisting: ReferralBookingAdapter },
+  ],
+  exports: [REFERRAL_IDENTITY_PORT, REFERRAL_BOOKING_PORT],
+})
+export class ReferralPortsModule {}
 
 /**
  * The V3.2-C referral composition root (Stories #11 and #27).
@@ -24,22 +75,17 @@ import { ReferralBookingAdapter, ReferralIdentityAdapter } from './referral-port
  * This is that story, and it needs `booking` as well: eligibility is *account
  * age ≤ 30 days* **and** *no completed booking* (Issue #27, ADR-036 §4).
  *
- * `ReferralModule` declares both tokens and provides **neither**, so this module
- * failing to bind one is a boot failure rather than a permissive fallback — see
- * `referral-ports.ts` for why that asymmetry is load-bearing here specifically.
+ * `ReferralModule` declares both tokens and provides **neither**, so a
+ * composition that failed to bind one is a boot failure rather than a permissive
+ * fallback — see `referral-ports.ts` for why that asymmetry is load-bearing here
+ * specifically.
  *
- * ## Why `TypeOrmModule.forFeature` appears here
- *
- * The two adapters read `identity.users` and `booking.bookings`. They run every
- * query on the caller's `EntityManager` rather than on an injected repository
- * (bug #2 — a port that opens its own connection inside a caller's transaction
- * exhausts the pool under exactly the concurrency this route must survive), but
- * the entities must still be registered with the DataSource for
- * `manager.getRepository(...)` to resolve their metadata.
- *
- * Registering them HERE rather than widening `ReferralModule`'s own
- * `forFeature` is the boundary: `referral` never sees either entity, and the app
- * layer — which is permitted to know about all three domains — supplies them.
+ * The binding itself lives in `ReferralPortsModule` above rather than in this
+ * module, and its docblock records why that is a requirement rather than a
+ * preference: a provider declared here is invisible to `ReferralService`,
+ * because Nest resolves through the injector of the module that declares the
+ * consumer. This module imports it FIRST, so both ports exist before
+ * `ReferralModule` is instantiated.
  *
  * ## What is deliberately not composed here
  *
@@ -76,16 +122,10 @@ import { ReferralBookingAdapter, ReferralIdentityAdapter } from './referral-port
 @Module({
   imports: [
     ConfigModule,
+    // FIRST, so both ports are bound before `ReferralModule` is instantiated.
+    ReferralPortsModule,
     ReferralModule,
-    // Metadata only -- every query runs on the caller's EntityManager. See the
-    // docblock, and `referral-ports.ts` for why that is required rather than
-    // stylistic.
-    TypeOrmModule.forFeature([UserEntity, BookingEntity]),
   ],
-  providers: [
-    { provide: REFERRAL_IDENTITY_PORT, useClass: ReferralIdentityAdapter },
-    { provide: REFERRAL_BOOKING_PORT, useClass: ReferralBookingAdapter },
-  ],
-  exports: [ReferralModule],
+  exports: [ReferralPortsModule, ReferralModule],
 })
 export class ReferralCompositionModule {}
