@@ -61,7 +61,8 @@
               "scope:privacy",
               "scope:ai",
               "scope:chat",
-              "scope:wishlist"
+              "scope:wishlist",
+              "scope:referral"
             ]
           },
           {
@@ -85,7 +86,8 @@
               "scope:privacy",
               "scope:ai",
               "scope:chat",
-              "scope:wishlist"
+              "scope:wishlist",
+              "scope:referral"
             ]
           },
           {
@@ -109,7 +111,8 @@
               "scope:privacy",
               "scope:ai",
               "scope:chat",
-              "scope:wishlist"
+              "scope:wishlist",
+              "scope:referral"
             ]
           },
           {
@@ -133,7 +136,8 @@
               "scope:privacy",
               "scope:ai",
               "scope:chat",
-              "scope:wishlist"
+              "scope:wishlist",
+              "scope:referral"
             ]
           },
           {
@@ -157,7 +161,8 @@
               "scope:privacy",
               "scope:ai",
               "scope:chat",
-              "scope:wishlist"
+              "scope:wishlist",
+              "scope:referral"
             ]
           },
           {
@@ -181,7 +186,8 @@
               "scope:privacy",
               "scope:ai",
               "scope:chat",
-              "scope:wishlist"
+              "scope:wishlist",
+              "scope:referral"
             ]
           },
           {
@@ -205,7 +211,8 @@
               "scope:privacy",
               "scope:ai",
               "scope:chat",
-              "scope:wishlist"
+              "scope:wishlist",
+              "scope:referral"
             ]
           },
           {
@@ -229,7 +236,8 @@
               "scope:privacy",
               "scope:ai",
               "scope:chat",
-              "scope:wishlist"
+              "scope:wishlist",
+              "scope:referral"
             ]
           },
           {
@@ -253,7 +261,8 @@
               "scope:privacy",
               "scope:ai",
               "scope:chat",
-              "scope:wishlist"
+              "scope:wishlist",
+              "scope:referral"
             ]
           },
           {
@@ -277,7 +286,8 @@
               "scope:privacy",
               "scope:ai",
               "scope:chat",
-              "scope:wishlist"
+              "scope:wishlist",
+              "scope:referral"
             ]
           },
           {
@@ -301,7 +311,8 @@
               "scope:privacy",
               "scope:ai",
               "scope:chat",
-              "scope:wishlist"
+              "scope:wishlist",
+              "scope:referral"
             ]
           },
           {
@@ -325,7 +336,8 @@
               "scope:privacy",
               "scope:ai",
               "scope:chat",
-              "scope:wishlist"
+              "scope:wishlist",
+              "scope:referral"
             ]
           },
           {
@@ -349,7 +361,8 @@
               "scope:privacy",
               "scope:ai",
               "scope:chat",
-              "scope:wishlist"
+              "scope:wishlist",
+              "scope:referral"
             ]
           },
           {
@@ -373,7 +386,8 @@
               "scope:waitlist",
               "scope:ai",
               "scope:chat",
-              "scope:wishlist"
+              "scope:wishlist",
+              "scope:referral"
             ]
           },
           {
@@ -397,7 +411,8 @@
               "scope:waitlist",
               "scope:privacy",
               "scope:chat",
-              "scope:wishlist"
+              "scope:wishlist",
+              "scope:referral"
             ]
           },
           {
@@ -421,7 +436,8 @@
               "scope:waitlist",
               "scope:privacy",
               "scope:ai",
-              "scope:wishlist"
+              "scope:wishlist",
+              "scope:referral"
             ]
           },
           {
@@ -445,7 +461,33 @@
               "scope:waitlist",
               "scope:privacy",
               "scope:ai",
-              "scope:chat"
+              "scope:chat",
+              "scope:referral"
+            ]
+          },
+          {
+            "sourceTag": "scope:referral",
+            "onlyDependOnLibsWithTags": [
+              "scope:shared"
+            ],
+            "notDependOnLibsWithTags": [
+              "scope:identity",
+              "scope:provider",
+              "scope:booking",
+              "scope:commerce",
+              "scope:payment",
+              "scope:financial",
+              "scope:search",
+              "scope:loyalty",
+              "scope:journey",
+              "scope:notification",
+              "scope:analytics",
+              "scope:business",
+              "scope:waitlist",
+              "scope:privacy",
+              "scope:ai",
+              "scope:chat",
+              "scope:wishlist"
             ]
           },
           {
@@ -471,7 +513,8 @@
               "scope:privacy",
               "scope:ai",
               "scope:chat",
-              "scope:wishlist"
+              "scope:wishlist",
+              "scope:referral"
             ]
           },
           {
@@ -494,7 +537,8 @@
               "scope:privacy",
               "scope:ai",
               "scope:chat",
-              "scope:wishlist"
+              "scope:wishlist",
+              "scope:referral"
             ]
           }
         ]

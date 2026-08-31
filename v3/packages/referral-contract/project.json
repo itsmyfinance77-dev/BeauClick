@@ -1,0 +1,11 @@
+{
+  "name": "referral-contract",
+  "sourceRoot": "packages/referral-contract/src",
+  "projectType": "library",
+  "tags": ["type:lib", "scope:shared"],
+  "targets": {
+    "typecheck": { "executor": "nx:run-commands", "options": { "command": "tsc -p packages/referral-contract/tsconfig.json --noEmit" } },
+    "test": { "executor": "nx:run-commands", "options": { "command": "jest --config packages/referral-contract/jest.config.js" } },
+    "lint": { "executor": "nx:run-commands", "options": { "command": "eslint packages/referral-contract/src --resolve-plugins-relative-to ." } }
+  }
+}

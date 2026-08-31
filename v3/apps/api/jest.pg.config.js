@@ -33,6 +33,8 @@ module.exports = {
     '^@beauclick/chat-contract$': '<rootDir>/../../packages/chat-contract/src/index.ts',
     '^@beauclick/wishlist$': '<rootDir>/../../services/wishlist/src/index.ts',
     '^@beauclick/wishlist-contract$': '<rootDir>/../../packages/wishlist-contract/src/index.ts',
+    '^@beauclick/referral$': '<rootDir>/../../services/referral/src/index.ts',
+    '^@beauclick/referral-contract$': '<rootDir>/../../packages/referral-contract/src/index.ts',
     '^@beauclick/ai-contract$': '<rootDir>/../../packages/ai-contract/src/index.ts',
     '^@beauclick/persian-utils$': '<rootDir>/../../packages/persian-utils/src/index.ts',
     '^@beauclick/search$': '<rootDir>/../../services/search/src/index.ts',

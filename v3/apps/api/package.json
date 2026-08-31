@@ -55,7 +55,9 @@
     "@beauclick/chat-contract": "workspace:*",
     "@beauclick/wishlist": "workspace:*",
     "@beauclick/wishlist-contract": "workspace:*",
-    "tsconfig-paths": "^4.2.0"
+    "tsconfig-paths": "^4.2.0",
+    "@beauclick/referral": "workspace:*",
+    "@beauclick/referral-contract": "workspace:*"
   },
   "devDependencies": {
     "@beauclick/testing": "workspace:*",

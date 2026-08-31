@@ -22,6 +22,7 @@ import { ERASURE_RUNNER, PrivacyModule, PrivacyService, PrivacySubjectDataContra
 import { AiModule, AiSubjectDataContract } from '@beauclick/ai';
 import { ChatModule, ChatSubjectDataContract } from '@beauclick/chat';
 import { WishlistModule, WishlistSubjectDataContract } from '@beauclick/wishlist';
+import { ReferralModule, ReferralSubjectDataContract } from '@beauclick/referral';
 
 /**
  * Erasure's one out-of-transaction step.
@@ -130,6 +131,7 @@ export class PrivacyErasureCompleter {
     // claim somebody had to make deliberately, and the coverage check is what
     // made them make it.
     WishlistModule,
+    ReferralModule,
   ],
   providers: [
     PrivacyErasureCompleter,
@@ -165,6 +167,7 @@ export class PrivacyErasureCompleter {
         AiSubjectDataContract,
         ChatSubjectDataContract,
         WishlistSubjectDataContract,
+        ReferralSubjectDataContract,
       ],
       useFactory: (...contracts: SubjectDataContract[]): SubjectDataContract[] => contracts,
     },

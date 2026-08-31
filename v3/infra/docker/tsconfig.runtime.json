@@ -51,6 +51,9 @@
       "@beauclick/wishlist-contract": [
         "dist/packages/wishlist-contract/src/index.js"
       ],
+      "@beauclick/referral-contract": [
+        "dist/packages/referral-contract/src/index.js"
+      ],
       "@beauclick/money": [
         "dist/libs/money/src/index.js"
       ],
@@ -116,6 +119,9 @@
       ],
       "@beauclick/wishlist": [
         "dist/services/wishlist/src/index.js"
+      ],
+      "@beauclick/referral": [
+        "dist/services/referral/src/index.js"
       ]
     }
   }

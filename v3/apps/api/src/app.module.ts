@@ -36,6 +36,7 @@ import { PRIVACY_ENTITIES } from '@beauclick/privacy';
 import { AI_ENTITIES } from '@beauclick/ai';
 import { CHAT_ENTITIES } from '@beauclick/chat';
 import { WISHLIST_ENTITIES } from '@beauclick/wishlist';
+import { REFERRAL_ENTITIES } from '@beauclick/referral';
 import { DomainCompositionModule } from './composition/domain-composition.module';
 import { PrivilegedCapabilityModule } from './composition/privileged-capability.module';
 import { PrivacyCompositionModule } from './composition/privacy-composition.module';
@@ -122,6 +123,14 @@ import { MetricsController } from './observability/metrics.controller';
           // with `No metadata for "WishlistSavedItemEntity" was found` -- a 500
           // that looks like a query bug rather than like a missing registration.
           ...WISHLIST_ENTITIES,
+          // V3.2-C Story #11. One ordinary application-role table on the shared
+          // pool. Registered HERE and not only through
+          // `TypeOrmModule.forFeature` for the reason the wishlist line above
+          // records: `forFeature` registers a repository PROVIDER, and a
+          // repository for an entity the DataSource has no metadata for fails at
+          // REQUEST time with `No metadata for "ReferralCodeEntity" was found` --
+          // a 500 that looks like a query bug while the app boots cleanly.
+          ...REFERRAL_ENTITIES,
         ],
         // V3_DATABASE_BLUEPRINT.md §2 mandates lower_snake_case columns;
         // TypeORM's default naming strategy uses the JS property name
