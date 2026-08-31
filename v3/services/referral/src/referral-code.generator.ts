@@ -100,3 +100,44 @@ export function generateReferralCode(): string {
 
   return code;
 }
+
+/**
+ * The generator, as something the module can inject and a test can substitute.
+ *
+ * ## Why a token exists for a pure function
+ *
+ * `generateReferralCode` above is pure and needs no injection to work. What
+ * needs the seam is the **collision-retry path**: at ~49.5 bits a natural
+ * collision will never be observed, so the only way to prove the retry works is
+ * to force one — and forcing one means making the next draw return a value the
+ * test chose.
+ *
+ * A test could instead reach into this module's compiled exports and patch the
+ * binding, and an earlier version of the suite did exactly that. It required a
+ * relative cross-project import, which `@nx/enforce-module-boundaries` refuses
+ * for a good reason: a test that reaches around the package boundary is a test
+ * that breaks when the package is restructured, and it is not how any other
+ * consumer reaches this code.
+ *
+ * So the seam is explicit and follows the two the repository already has:
+ * `CHAT_CLOCK`, so a test can freeze time without the rule reading a different
+ * clock, and `OTP_DEBUG_OBSERVER`, which exists solely so a test can learn a
+ * generated code. Same shape, same reason.
+ *
+ * **It is not a port.** Nothing outside this module implements it, the
+ * composition root does not bind it, and `ReferralModule` provides the real
+ * implementation by default — so a composition that ignores it entirely gets
+ * correct behaviour, which is the opposite of the fail-closed treatment a
+ * genuine cross-domain port gets.
+ */
+export interface ReferralCodeGenerator {
+  /** One fresh code. Takes nothing, for the reason `generateReferralCode` records. */
+  next(): string;
+}
+
+export const REFERRAL_CODE_GENERATOR = Symbol('BEAUCLICK_REFERRAL_CODE_GENERATOR');
+
+/** The real generator, and the module's default binding. */
+export const defaultReferralCodeGenerator: ReferralCodeGenerator = {
+  next: generateReferralCode,
+};

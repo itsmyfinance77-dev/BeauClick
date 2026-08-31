@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { REFERRAL_ENTITIES } from './entities/referral.entities';
+import { REFERRAL_CODE_GENERATOR, defaultReferralCodeGenerator } from './referral-code.generator';
 import { ReferralController } from './referral.controller';
 import { ReferralService } from './referral.service';
 import { ReferralSubjectDataContract } from './referral-subject-data.contract';
@@ -51,7 +52,15 @@ import { ReferralSubjectDataContract } from './referral-subject-data.contract';
 @Module({
   imports: [ConfigModule, TypeOrmModule.forFeature(REFERRAL_ENTITIES)],
   controllers: [ReferralController],
-  providers: [ReferralService, ReferralSubjectDataContract],
+  providers: [
+    ReferralService,
+    ReferralSubjectDataContract,
+    // The real CSPRNG generator, bound HERE rather than left to the composition
+    // root. It is a seam, not a port: a composition that says nothing about it
+    // still gets correct behaviour, which is the opposite of how
+    // `WISHLIST_TARGET_PORT` is treated.
+    { provide: REFERRAL_CODE_GENERATOR, useValue: defaultReferralCodeGenerator },
+  ],
   exports: [ReferralService, ReferralSubjectDataContract, TypeOrmModule],
 })
 export class ReferralModule {}

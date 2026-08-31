@@ -1,9 +1,29 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 
 import { AuthenticatedUser, CurrentUser } from '@beauclick/http';
 import type { ReferralCodeView } from '@beauclick/referral-contract';
 
 import { ReferralService } from './referral.service';
+
+/**
+ * The query string this route accepts: **nothing**.
+ *
+ * An empty class, and the emptiness is the mechanism rather than a placeholder.
+ * The global `ValidationPipe` runs with `whitelist` and `forbidNonWhitelisted`,
+ * and those only apply to a parameter that is actually bound to a DTO — a
+ * handler with no `@Query()` at all is never validated, so an unexpected
+ * parameter is silently **ignored**.
+ *
+ * Ignored is not good enough here. Issue #11 requires a forged owner identity to
+ * be *rejected*, and the difference is real: a silently-ignored `?ownerId=` is a
+ * field somebody later wires up by accident, and until they do it trains callers
+ * to believe the server read it. With this DTO bound, every query parameter is
+ * non-whitelisted and the request is refused with a 400.
+ *
+ * The cost is that a legitimate future parameter has to be added here
+ * deliberately, which is the point.
+ */
+export class ReferralCodeQueryDto {}
 
 /**
  * The caller's own referral identity.
@@ -16,10 +36,12 @@ import { ReferralService } from './referral.service';
  * is `v1/me/referral` rather than `v1/referral/:userId` so there is no segment
  * that could ever be mistaken for one.
  *
- * A forged `?ownerId=` is still **refused with a 400** rather than ignored,
- * because the global `ValidationPipe` runs with `forbidNonWhitelisted` and this
- * handler declares no query DTO to whitelist it into. That is the stronger
- * outcome: a silently-ignored field is one somebody later wires up by accident.
+ * A forged `?ownerId=` is **refused with a 400** rather than ignored, and that
+ * takes a deliberate act: `ReferralCodeQueryDto` below is an empty class bound
+ * to `@Query()` purely so the global `ValidationPipe` runs at all. Without it
+ * the pipe never sees the query string and an unexpected parameter is silently
+ * dropped — which was this route's behaviour until the real-PostgreSQL suite
+ * asserted otherwise and failed.
  *
  * ## No capability, and that is a decision
  *
@@ -57,7 +79,12 @@ export class ReferralController {
    * depend on history rather than on facts.
    */
   @Get('code')
-  async code(@CurrentUser() user: AuthenticatedUser): Promise<ReferralCodeView> {
+  async code(
+    // Bound solely so the ValidationPipe runs and refuses any query parameter.
+    // The value is never read -- there is nothing in it to read.
+    @Query() _query: ReferralCodeQueryDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<ReferralCodeView> {
     return this.referral.codeFor(user.userId);
   }
 }

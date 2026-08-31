@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, QueryFailedError, Repository } from 'typeorm';
@@ -13,7 +13,7 @@ import {
 import type { ReferralCodeView, ReferralSharePayload } from '@beauclick/referral-contract';
 
 import { ReferralCodeEntity } from './entities/referral.entities';
-import { generateReferralCode } from './referral-code.generator';
+import { REFERRAL_CODE_GENERATOR, ReferralCodeGenerator } from './referral-code.generator';
 
 /**
  * How many times to redraw a code after a global-uniqueness collision.
@@ -69,6 +69,13 @@ export class ReferralService {
     @InjectRepository(ReferralCodeEntity)
     private readonly codes: Repository<ReferralCodeEntity>,
     private readonly config: ConfigService,
+    /**
+     * The code source. `ReferralModule` binds the real CSPRNG generator, so this
+     * is not a port and no composition has to supply it -- it is the seam that
+     * lets the suite force a collision and prove the retry below actually works
+     * (see `ReferralCodeGenerator`).
+     */
+    @Inject(REFERRAL_CODE_GENERATOR) private readonly generator: ReferralCodeGenerator,
   ) {}
 
   /**
@@ -131,7 +138,7 @@ export class ReferralService {
         ownerUserId,
         // Takes no arguments, so it cannot be handed the owner id even by
         // accident (ADR-035 §3).
-        code: generateReferralCode(),
+        code: this.generator.next(),
       });
 
       try {
