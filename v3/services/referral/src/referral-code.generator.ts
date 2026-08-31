@@ -40,9 +40,10 @@ import { REFERRAL_CODE_ALPHABET, REFERRAL_CODE_LENGTH } from '@beauclick/referra
  *
  * `256 - (256 % 31)` = `256 - 8` = **248**. Bytes 248..255 would map onto only
  * the first eight characters of the alphabet, so they are thrown away rather
- * than folded in. Computed rather than written as `248` so that ratifying a
- * different alphabet length (ADR-035 §3 flags the parameter) cannot leave a
- * stale constant behind that reintroduces the bias silently.
+ * than folded in. Computed rather than written as `248` so that a later owner
+ * decision changing the alphabet — the current one is ratified by `V32-DEC-034`
+ * (ADR-035 §3) — cannot leave a stale constant behind that reintroduces the bias
+ * silently.
  */
 const REJECT_AT = 256 - (256 % REFERRAL_CODE_ALPHABET.length);
 

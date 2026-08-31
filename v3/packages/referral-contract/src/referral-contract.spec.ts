@@ -18,10 +18,12 @@ import {
  * These assertions look trivial and are not.
  *
  * Each pins a value that a later edit could change without anything else
- * failing. Some are owner decisions (`V32-DEC-033`'s invite format and share
- * channels); the alphabet and length are the parameters ADR-035 §3 chose and
- * flagged for ratification, which makes pinning them here more important rather
- * than less — an unratified constant that drifts silently is the worst of both.
+ * failing. All of them are owner decisions: `V32-DEC-033` fixes the invite
+ * format and the share channels, and `V32-DEC-034` ratified the alphabet and
+ * the length on 2026-08-31 (ADR-035 §3). They are binding contract values, which
+ * makes pinning them here more important rather than less — a ratified constant
+ * that drifted silently would put this package in contradiction with a closed
+ * decision, and nothing else would notice.
  */
 describe('the referral code alphabet and length', () => {
   it('is Crockford Base32 minus the ambiguous glyphs, as a literal', () => {

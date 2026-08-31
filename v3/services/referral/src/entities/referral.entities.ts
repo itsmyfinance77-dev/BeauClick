@@ -42,10 +42,11 @@ export class ReferralCodeEntity {
    * The code. Ten characters from the contract's 31-character alphabet.
    *
    * The column is `varchar(16)` while the code is 10 characters, deliberately:
-   * ADR-035 §3 flags the length as an unratified parameter, and the surplus
-   * width means ratifying a longer code is a constant change rather than a
-   * column rewrite on a table attribution rows will by then reference. The exact
-   * length is enforced by `ck_referral_codes_shape` and by the contract.
+   * the length is ratified at 10 by `V32-DEC-034` (ADR-035 §3), and the surplus
+   * width means that a LATER owner decision to lengthen the code stays a constant
+   * change rather than a column rewrite on a table attribution rows will by then
+   * reference. The exact length is enforced by `ck_referral_codes_shape` and by
+   * the contract.
    */
   @Column({ type: 'varchar', length: 16 })
   code!: string;
