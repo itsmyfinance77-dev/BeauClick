@@ -71,6 +71,13 @@ The full service price, the amount collectible by BeauClick and the venue balanc
 are different facts. A client must never infer one from another. Deposit is an
 allocation of the price, not a discount or fee.
 
+Percentage deposits use integer basis points. The v1 calculation rounds down to
+the nearest toman, then applies the snapshotted minimum and maximum and finally
+caps collection at the full service price. This is a safety invariant rather
+than a configurable business preference: BeauClick must never collect more than
+the disclosed service total, and the platform-collected amount plus the venue
+balance must equal that total exactly.
+
 ### 4. Policies are immutable versions; bookings receive snapshots
 
 A policy definition is immutable once a booking references it. A booking-facing
