@@ -1,0 +1,11 @@
+{
+  "name": "commercial-policy",
+  "sourceRoot": "services/commercial-policy/src",
+  "projectType": "library",
+  "tags": ["type:service", "scope:commercial-policy"],
+  "targets": {
+    "typecheck": { "executor": "nx:run-commands", "options": { "command": "tsc -p services/commercial-policy/tsconfig.json --noEmit" } },
+    "test": { "executor": "nx:run-commands", "options": { "command": "jest --config services/commercial-policy/jest.config.js" } },
+    "lint": { "executor": "nx:run-commands", "options": { "command": "eslint services/commercial-policy/src --resolve-plugins-relative-to ." } }
+  }
+}

@@ -491,6 +491,32 @@
             ]
           },
           {
+            "sourceTag": "scope:commercial-policy",
+            "onlyDependOnLibsWithTags": [
+              "scope:shared"
+            ],
+            "notDependOnLibsWithTags": [
+              "scope:identity",
+              "scope:provider",
+              "scope:booking",
+              "scope:commerce",
+              "scope:payment",
+              "scope:financial",
+              "scope:search",
+              "scope:loyalty",
+              "scope:journey",
+              "scope:notification",
+              "scope:analytics",
+              "scope:business",
+              "scope:waitlist",
+              "scope:privacy",
+              "scope:ai",
+              "scope:chat",
+              "scope:wishlist",
+              "scope:referral"
+            ]
+          },
+          {
             "sourceTag": "scope:shared",
             "onlyDependOnLibsWithTags": [
               "scope:shared"
@@ -514,7 +540,8 @@
               "scope:ai",
               "scope:chat",
               "scope:wishlist",
-              "scope:referral"
+              "scope:referral",
+              "scope:commercial-policy"
             ]
           },
           {
@@ -538,7 +565,8 @@
               "scope:ai",
               "scope:chat",
               "scope:wishlist",
-              "scope:referral"
+              "scope:referral",
+              "scope:commercial-policy"
             ]
           }
         ]
