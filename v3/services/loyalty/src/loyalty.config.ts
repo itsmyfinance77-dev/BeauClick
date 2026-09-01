@@ -102,10 +102,48 @@ export const LOYALTY_REASONS = {
    */
   referralReferrerReward: 'referral_referrer_reward',
   referralRefereeReward: 'referral_referee_reward',
+  /**
+   * The two referral REVERSAL reasons — V3.2-C Story #28 (`V32-DEC-017`,
+   * ADR-038 §5).
+   *
+   * ## Distinct reasons are the mechanism, not a labelling convenience
+   *
+   * `V32-DEC-017` binds a reversal to *"a new negative row under a distinct
+   * reason, never a mutation"*, and the ledger's idempotency is
+   * `UNIQUE(reference_type, reference_id, reason)`. So the distinct reason is
+   * exactly what gives the clawback **its own idempotency slot** against the
+   * same `('referral', <referral id>)` reference: a redelivered `OrderRefunded`
+   * finds the slot taken and writes nothing, while the original award's slot
+   * stays occupied by the row it always was.
+   *
+   * Reusing the reward reason with a negative value would have been the
+   * alternative, and it fails on the same index: the second insert would
+   * collide with the award and be deduplicated away, so **no clawback would
+   * ever be written**. The bug would surface as "we refunded the order and the
+   * points are still there".
+   *
+   * Four reasons rather than two, for the same reason there are two rather than
+   * one: one reason cannot idempotently address two people, and a reward and
+   * its reversal cannot share a slot.
+   *
+   * `pointsFor()` returns 0 for both, deliberately. **A reversal amount is
+   * never configured** — it comes from the persisted original ledger row
+   * (ADR-038 §5), because reward configuration may change between the award and
+   * the refund, and a customer must not have more clawed back than they were
+   * ever given.
+   */
+  referralReferrerReversal: 'referral_referrer_reversal',
+  referralRefereeReversal: 'referral_referee_reversal',
   manualAdjustment: 'manual_adjustment',
 } as const;
 
-/** The reference type both referral reasons use. The id is the REFERRAL id. */
+/**
+ * The reference type all four referral reasons use. The id is the REFERRAL id.
+ *
+ * The reversal shares the reference with the award it reverses, which is what
+ * makes the two rows findable as one story: `('referral', <id>)` with four
+ * possible reasons is a complete account of what a referral did to a balance.
+ */
 export const LOYALTY_REFERRAL_REFERENCE_TYPE = 'referral';
 
 export type LoyaltyReason = (typeof LOYALTY_REASONS)[keyof typeof LOYALTY_REASONS];

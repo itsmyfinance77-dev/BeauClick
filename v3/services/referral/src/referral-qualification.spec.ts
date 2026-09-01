@@ -106,13 +106,17 @@ describe('the reward vocabularies', () => {
     }
   });
 
-  it('has exactly two referral statuses, and neither is expired or reversed', () => {
-    expect([...REFERRAL_STATUSES]).toEqual(['pending', 'qualified']);
-    // `expired` is a PREDICATE (`expires_at <= now()`), not a state -- storing
-    // it would need a sweeper and make expiry depend on whether a job ran.
-    // `reversed` is Story #28's vocabulary.
+  it('has exactly three referral statuses, in lifecycle order, and none is `expired`', () => {
+    // V3.2-C Story #28 added `reversed`, which Story #12 deliberately withheld
+    // until its behaviour existed. The order is the lifecycle: the database
+    // trigger permits `pending -> qualified -> reversed` and nothing else.
+    expect([...REFERRAL_STATUSES]).toEqual(['pending', 'qualified', 'reversed']);
+
+    // `expired` is still absent, and still for the original reason: it is a
+    // PREDICATE (`expires_at <= now()`), not a state -- storing it would need a
+    // sweeper and make expiry depend on whether a job had run.
     for (const status of REFERRAL_STATUSES) {
-      expect(status).not.toMatch(/expir|revers|clawback|refund/i);
+      expect(status).not.toMatch(/expir/i);
     }
   });
 });
@@ -375,15 +379,17 @@ describe('the ReferralQualified v1 contract', () => {
     expect(registered!.aggregateType).toBe('referral');
   });
 
-  it('is the ONLY referral event in the catalogue', () => {
+  it('is one of exactly the TWO referral events V32-DEC-033 approves', () => {
     // `V32-DEC-033` approves `ReferralQualified` v1 and `ReferralReversed` v1
-    // and nothing else; the second is Story #28's. `ReferralAttributed` is
-    // refused outright -- no consumer.
+    // and nothing else. Story #12 declared the first; Story #28 gave the second
+    // a publisher, and the vocabulary is now CLOSED at two.
     const referralEvents = ALL_EVENT_CONTRACTS.filter((c) => c.producer === 'referral').map((c) => c.name);
-    expect(referralEvents).toEqual(['ReferralQualified']);
+    expect(referralEvents.sort()).toEqual(['ReferralQualified', 'ReferralReversed']);
 
+    // The four refused by name stay refused. `ReferralAttributed` is refused
+    // outright -- no consumer; the other three are states rather than events.
     for (const name of ALL_EVENT_CONTRACTS.map((c) => c.name)) {
-      expect(name).not.toMatch(/ReferralAttributed|ReferralReversed|ReferralRewarded|ReferralCapped|ReferralExpired/);
+      expect(name).not.toMatch(/ReferralAttributed|ReferralRewarded|ReferralCapped|ReferralExpired/);
     }
   });
 
@@ -522,8 +528,20 @@ describe('the ReferralQualified v1 contract', () => {
   });
 });
 
-describe('the Story #28 boundary', () => {
-  it('declares no reversal reason, event, or method anywhere in the module', () => {
+describe('the separation between the reward path and the clawback', () => {
+  /**
+   * V3.2-C Story #28 exists now, so this group no longer asserts that reversal
+   * is ABSENT from the module — `entities/referral.entities.ts` legitimately
+   * carries `reversed` and `ReferralRewardReversalEntity`, and the file list
+   * below dropped it for that reason.
+   *
+   * What it still asserts, and what was always the point worth keeping: the
+   * REWARD path contains no clawback machinery. `V32-DEC-017` makes a reversal
+   * a new negative row under a distinct reason, written by its own service
+   * through its own port, and the reward path stays structurally incapable of
+   * subtracting a point.
+   */
+  it('declares no reversal reason, event, or method on the REWARD path', () => {
     const stripComments = (source: string) =>
       source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
@@ -531,7 +549,6 @@ describe('the Story #28 boundary', () => {
       'referral-qualification.service.ts',
       'referral-reward.config.ts',
       'ports/referral-loyalty.port.ts',
-      'entities/referral.entities.ts',
     ]) {
       const code = stripComments(sourceOf(...file.split('/')));
       expect(code).not.toMatch(/referral_reversal|referral_clawback|ReferralReversed|OrderRefunded/);

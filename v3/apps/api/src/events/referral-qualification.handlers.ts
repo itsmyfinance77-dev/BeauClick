@@ -9,7 +9,7 @@ import {
   ReferralQualified,
   parseEnvelope,
 } from '@beauclick/event-contracts';
-import { ReferralQualificationService } from '@beauclick/referral';
+import { ReferralQualificationService, ReferralReversalService } from '@beauclick/referral';
 import { NotificationService } from '@beauclick/notification';
 
 /**
@@ -67,6 +67,8 @@ export class BookingCompletedReferralHandler implements DomainEventHandler {
   constructor(
     private readonly dataSource: DataSource,
     private readonly qualification: ReferralQualificationService,
+    // V3.2-C Story #28. The convergence half of ADR-038 §8 -- see `handle`.
+    private readonly reversal: ReferralReversalService,
     @Inject(EVENT_CONTRACT_REGISTRY) private readonly contracts: EventContractRegistry,
   ) {}
 
@@ -76,15 +78,60 @@ export class BookingCompletedReferralHandler implements DomainEventHandler {
     // naming the field rather than an `undefined` flowing into a column.
     const payload = parseEnvelope(this.contracts, BookingCompleted, envelope);
 
-    const result = await this.dataSource.transaction(async (manager) =>
-      this.qualification.qualify(manager, {
+    const result = await this.dataSource.transaction(async (manager) => {
+      const qualified = await this.qualification.qualify(manager, {
         // `customerId` IS the referee. `BookingCompleted` v1 already carries
         // both identifiers this story needs, which is why no lookup port over
         // `booking` was declared (ADR-037 §4).
         refereeUserId: payload.customerId,
         bookingId: payload.bookingId,
-      }),
-    );
+      });
+
+      /**
+       * V3.2-C Story #28 — the convergence check (ADR-038 §8).
+       *
+       * ## Why a qualification handler reverses anything at all
+       *
+       * `OrderRefunded` and `BookingCompleted` come from **different outbox
+       * tables**. The relay drains sources in registration order with no
+       * cross-source ordering, and a handler that throws leaves its row for an
+       * arbitrarily later sweep — so a refund being consumed *before* the
+       * booking completion that qualifies its referral is an ordinary
+       * occurrence rather than a pathology.
+       *
+       * The reversal handler loses that case on its own: it finds a `pending`
+       * referral, affects zero rows, and the qualification that follows leaves
+       * an active reward standing on a fully refunded order. That is
+       * `V32-DEC-017`'s free-points loop, reintroduced by delivery order alone.
+       *
+       * ## Neither authority moves
+       *
+       * `V32-DEC-018` is untouched: **booking** still qualified this referral,
+       * and **payment** is still what reverses it. This is the same
+       * authoritative order read the reversal handler performs, taken at the
+       * other end of the ordering — not a new trigger, not a poll, and not a
+       * reconciliation job.
+       *
+       * ## Composed here rather than inside the qualification service
+       *
+       * The handler already owns the transaction (ADR-037 §5), so both effects
+       * are in it either way. Putting the call here keeps the two services
+       * independent — qualification knows nothing about refunds — and keeps the
+       * whole `BookingCompleted` reaction visible in one place.
+       *
+       * ## Guarded on `qualified`, and the guard is not an optimisation
+       *
+       * Every completed booking on the platform reaches this handler and almost
+       * none qualifies anything. Without the guard, each one would take a
+       * `FOR SHARE` lock on its order for the life of this transaction, to
+       * answer a question about a referral that does not exist.
+       */
+      if (qualified.qualified) {
+        await this.reversal.reverseAlreadyRefundedBooking(manager, payload.bookingId);
+      }
+
+      return qualified;
+    });
 
     // `debug`, not `log`: the overwhelming majority of completed bookings
     // belong to customers who were never referred, and an info line for each

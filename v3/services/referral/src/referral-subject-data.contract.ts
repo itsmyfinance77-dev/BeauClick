@@ -34,14 +34,19 @@ import { ReferralService, rowCount } from './referral.service';
  * a two-party fact; a referral code is single-party and, in this story,
  * referenced by nothing.
  *
- * ## SIX tables are claimed, with THREE different dispositions
+ * ## SEVEN tables are claimed, with THREE different dispositions
  *
  * `V32-DEC-019`'s dispositions table names four `referral` tables and all four
- * now exist: Story #27 added `referrals` and `claim_attempts`, and Story #12
- * added `reward_grants` and `referrer_counters`. The sixth,
- * `referral.outbox_events`, is Story #12's and is not in the owner's table
- * because it holds no subject data to have a disposition about — which is
- * itself a claim that has to be made and justified.
+ * exist: Story #27 added `referrals` and `claim_attempts`, and Story #12 added
+ * `reward_grants` and `referrer_counters`.
+ *
+ * Two are not in the owner's table because they did not exist when it was
+ * written, and each needs its own justification rather than inheriting one.
+ * `referral.outbox_events` is Story #12's and holds no subject data to have a
+ * disposition about. `referral.reward_reversals` is Story #28's and is
+ * `retained` for a reason the decisions do supply — `V32-DEC-017` allows a
+ * clawback to leave a balance below zero, so the record explaining it has to
+ * survive.
  *
  * The dispositions are not uniform, and the split is the same one throughout:
  * **what the row is FOR decides what happens to it.** A bearer credential and
@@ -125,6 +130,28 @@ export class ReferralSubjectDataContract implements SubjectDataContract {
       reason:
         'V32-DEC-019: the grant is the audit explanation for a retained loyalty ledger entry. Retaining the points row while destroying the grant that explains it would leave a balance nobody could justify to the person holding it.',
     },
+    /**
+     * V3.2-C Story #28. `retained`, for the same reason as the grant above and
+     * with a sharper consequence.
+     *
+     * `V32-DEC-019` retains `reward_grants` because it explains a retained
+     * loyalty ledger entry. This table explains a retained **negative** one —
+     * and a negative balance with no explanation is worse than an unexplained
+     * positive one, because it is a debt the person holding it cannot account
+     * for. `V32-DEC-017` accepts that a clawback may drive a balance below zero
+     * and never clamps it, so the explanation has to survive.
+     *
+     * Nothing on the row identifies anybody once the recipient id points at a
+     * user who no longer exists: ids, a closed enum, an integer, an instant. So
+     * unlike `referrals` there is no tombstone to write — the platform's stated
+     * treatment for id-only rows.
+     */
+    {
+      table: 'referral.reward_reversals',
+      disposition: 'retained',
+      reason:
+        'V32-DEC-017 and V32-DEC-019: the reversal is the audit explanation for a retained NEGATIVE loyalty ledger entry, and a clawback may drive a balance below zero. Destroying it would leave a debt nobody could justify to the person holding it.',
+    },
     // A cap counter about a person who no longer exists. `V32-DEC-019` names
     // this table explicitly and gives it the same treatment as
     // `chat.send_counters`: deleted, because a rate limit on somebody who
@@ -177,6 +204,7 @@ export class ReferralSubjectDataContract implements SubjectDataContract {
     const codes = await this.referral.allForSubject(manager, userId);
     const { asReferrer, asReferee } = await this.referral.attributionsForSubject(manager, userId);
     const grants = await this.referral.rewardGrantsForSubject(manager, userId);
+    const reversals = await this.referral.rewardReversalsForSubject(manager, userId);
 
     return [
       {
@@ -274,6 +302,54 @@ export class ReferralSubjectDataContract implements SubjectDataContract {
           grantedAt: row.grantedAt,
         })),
       },
+      {
+        key: 'referral_reward_reversals',
+        description: 'پاداش‌های دعوت که به دلیل بازگشت وجه لغو شده است',
+        /**
+         * V3.2-C Story #28. The subject's OWN reversals, both sides.
+         *
+         * ## Its own section, and the grant section is deliberately not merged
+         *
+         * A reversal is a second, later fact about the same reward, and the two
+         * could plausibly be one row saying "awarded 50, reversed 50". They are
+         * kept apart for the same reason the ledger keeps them apart: a
+         * combined row would be a *derived* statement, and deriving it means
+         * this export inventing a summary that the underlying tables do not
+         * hold. Two sections say exactly what the platform recorded, in the
+         * order it recorded it.
+         *
+         * ## The disclosure a negative balance requires
+         *
+         * `V32-DEC-017` allows a clawback to drive a balance below zero and
+         * **never clamps it**. A person whose points went down is entitled to
+         * see the record that explains it — `nothing_to_reverse, 0` included,
+         * which tells them the platform considered their side and took nothing.
+         * That is the same honest-zero disclosure `V32-DEC-016` requires on the
+         * way in.
+         *
+         * ## What is absent, and why each one
+         *
+         * Addressed by `recipient_user_id`, so this section never loads a row
+         * that names the counterparty — the export cannot leak an identity it
+         * does not read.
+         *
+         * **No `referralId`**, for the reason the grant section records: an
+         * internal identifier the subject cannot use, which would let two
+         * exports be correlated by a value neither person chose.
+         *
+         * **No order id, and no refund detail.** The order belongs to the
+         * commerce export, which is where a person's own orders and refunds are
+         * disclosed. Repeating it here would put money detail into a referral
+         * record — and for a *referrer*, the order is somebody else's entirely,
+         * so it is not their data to receive at all.
+         */
+        rows: reversals.map((row) => ({
+          side: row.side,
+          outcome: row.outcome,
+          points: row.points,
+          reversedAt: row.reversedAt,
+        })),
+      },
     ];
   }
 
@@ -350,6 +426,19 @@ export class ReferralSubjectDataContract implements SubjectDataContract {
      */
     const grantsRetained = await this.referral.countRewardGrants(manager, userId);
 
+    /**
+     * V3.2-C Story #28. The reward reversals are RETAINED, likewise untouched.
+     *
+     * The same argument as the grants, with a sharper edge: the entry this row
+     * explains is a **negative** one, and `V32-DEC-017` allows a clawback to
+     * drive a balance below zero and never clamps it. Destroying the
+     * explanation would leave a debt nobody could account for.
+     *
+     * Nothing here to tombstone either — a recipient id, a side, a closed enum,
+     * an integer and an instant.
+     */
+    const reversalsRetained = await this.referral.countRewardReversals(manager, userId);
+
     const retained: Array<{ table: string; reason: string }> = [];
     if (tombstoned > 0) {
       retained.push({
@@ -363,6 +452,13 @@ export class ReferralSubjectDataContract implements SubjectDataContract {
         table: 'referral.reward_grants',
         reason:
           'V32-DEC-019: the grant is the audit explanation for a loyalty ledger entry that is itself retained. It holds only ids, an outcome and a number — no name, phone, code or prose — so it no longer describes a person once the identity it references is gone.',
+      });
+    }
+    if (reversalsRetained > 0) {
+      retained.push({
+        table: 'referral.reward_reversals',
+        reason:
+          'V32-DEC-017: the reversal is the audit explanation for a NEGATIVE loyalty ledger entry that is itself retained, and a clawback may leave a balance below zero. It holds only ids, an outcome and a number — no name, phone, code or prose — so it no longer describes a person once the identity it references is gone.',
       });
     }
 

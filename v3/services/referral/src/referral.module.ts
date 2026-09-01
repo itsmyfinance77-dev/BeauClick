@@ -6,6 +6,7 @@ import { REFERRAL_ENTITIES } from './entities/referral.entities';
 import { REFERRAL_CLOCK, systemReferralClock } from './referral-clock';
 import { REFERRAL_REWARD_CONFIG, REFERRAL_REWARD_DEFAULTS } from './referral-reward.config';
 import { ReferralQualificationService } from './referral-qualification.service';
+import { ReferralReversalService } from './referral-reversal.service';
 import { REFERRAL_CODE_GENERATOR, defaultReferralCodeGenerator } from './referral-code.generator';
 import { ReferralController } from './referral.controller';
 import { ReferralService } from './referral.service';
@@ -69,6 +70,11 @@ import { ReferralSubjectDataContract } from './referral-subject-data.contract';
   providers: [
     ReferralService,
     ReferralQualificationService,
+    // V3.2-C Story #28. Declares REFERRAL_ORDER_LOOKUP_PORT and
+    // REFERRAL_LOYALTY_REVERSAL_PORT and provides NEITHER, for the reason the
+    // docblock gives: a composition that forgets one fails to boot rather than
+    // falling back to something permissive.
+    ReferralReversalService,
     ReferralSubjectDataContract,
     // The real CSPRNG generator, bound HERE rather than left to the composition
     // root. It is a seam, not a port: a composition that says nothing about it
@@ -88,6 +94,12 @@ import { ReferralSubjectDataContract } from './referral-subject-data.contract';
     // `REFERRAL_IDENTITY_PORT` and `REFERRAL_BOOKING_PORT` are deliberately
     // ABSENT. See the docblock: no default is the mechanism.
   ],
-  exports: [ReferralService, ReferralQualificationService, ReferralSubjectDataContract, TypeOrmModule],
+  exports: [
+    ReferralService,
+    ReferralQualificationService,
+    ReferralReversalService,
+    ReferralSubjectDataContract,
+    TypeOrmModule,
+  ],
 })
 export class ReferralModule {}
