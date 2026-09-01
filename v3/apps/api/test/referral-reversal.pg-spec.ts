@@ -26,8 +26,11 @@ import {
   PgTestApp,
   SeededUser,
   createPgTestApp,
+  futureSlotTime,
   requiredPgEnv,
   resetDatabase,
+  seedProfessional,
+  seedSlot,
   seedUser,
 } from './pg-test-app.factory';
 
@@ -36,6 +39,12 @@ const describePg = pgConfigured ? describe : describe.skip;
 
 const DAY_MS = 86_400_000;
 const ORDER_TOTAL = 100_000;
+
+/**
+ * A fixed id for the seeded bronze tier, so the benefit rows that hang off it
+ * can be written in the same statement block without a round trip.
+ */
+const BRONZE_TIER_ID = '00000000-0000-4000-8000-0000000b0117';
 
 /**
  * Referral reversal and the loyalty clawback, against real PostgreSQL —
@@ -408,31 +417,82 @@ describePg('referral reversal — full refund, clawback, convergence (real Postg
     });
 
     it('reverses what was CREDITED, not the base, when a tier multiplier applied', async () => {
-      // The finding that reshaped ADR-038 §5. `award()` credits
-      // `round(base * multiplierBp / 10000)`, so the grant's `points` is the
-      // BASE and the ledger's is what the customer actually received. A
-      // clawback reading the grant would under-reverse by the whole bonus and
-      // nothing would ever report the residue.
+      /**
+       * The finding that reshaped ADR-038 §5, and the case that makes it
+       * demonstrable rather than merely argued.
+       *
+       * `award()` credits `round(base * multiplierBp / 10000)` using the
+       * recipient's membership benefits at award time — so `reward_grants.points`
+       * is the **base** and the ledger row is what the customer actually
+       * received. With no benefit seeded the two are equal, and a clawback that
+       * reversed the grant's figure would look perfectly correct: the residue
+       * only appears for customers whose tier earned them a bonus, which is
+       * exactly why nothing would ever report it.
+       *
+       * So a real 1.2x benefit is seeded. Base 50 credits 60; the reversal must
+       * be −60. An implementation reading the grant writes −50 and leaves 10
+       * points behind, permanently.
+       */
+      await dataSource.query(
+        `INSERT INTO loyalty.tiers (id, slug, name, threshold_points, sort_order, is_active)
+         VALUES ($1, 'bronze', 'bronze', 0, 0, true)`,
+        [BRONZE_TIER_ID],
+      );
+      await dataSource.query(
+        `INSERT INTO loyalty.benefits (id, source_type, source_id, benefit_type, label, config, is_active)
+         VALUES ($1, 'tier', $2, 'bonus_points_multiplier', 'x1.2', '{"multiplierBp": 12000}'::jsonb, true)`,
+        [uuidv7(), BRONZE_TIER_ID],
+      );
+
       const { referralId, orderId, referrer } = await awardedReferral({ referrerPoints: 50, refereePoints: 0 });
 
       const positive = (await ledgerRows(referralId)).find(
         (r) => r.reason === LOYALTY_REASONS.referralReferrerReward,
       );
-      expect(positive).toBeDefined();
+      // The multiplier genuinely applied -- without this the whole case is
+      // vacuous, and it silently was until a mutation probe said so.
+      expect(positive?.multiplier_bp).toBe(12000);
+      expect(positive?.base_points).toBe(50);
+      expect(positive?.points).toBe(60);
 
       await refundAndReverse(orderId, ORDER_TOTAL);
 
       const negative = (await ledgerRows(referralId)).find(
         (r) => r.reason === LOYALTY_REASONS.referralReferrerReversal,
       );
-      // The exact negation of the credited row, including its multiplier --
-      // which the reversal copies rather than recomputing, so a later benefit
-      // change cannot make a past reversal look wrong.
-      expect(negative?.points).toBe(-(positive as { points: number }).points);
-      expect(negative?.base_points).toBe(-(positive as { base_points: number }).base_points);
-      expect(negative?.multiplier_bp).toBe((positive as { multiplier_bp: number }).multiplier_bp);
-      // And the net effect on the person is exactly zero.
+      // The credited amount, not the base. This is the assertion the whole
+      // grant-decides-whether / ledger-decides-how-much split exists for.
+      expect(negative?.points).toBe(-60);
+      expect(negative?.base_points).toBe(-50);
+      // The ORIGINAL multiplier, copied rather than recomputed, so a later
+      // benefit change cannot make a past reversal look wrong.
+      expect(negative?.multiplier_bp).toBe(12000);
+
+      // And the net effect on the person is exactly zero -- which reversing the
+      // base would have missed by the whole bonus.
       expect(await ledger.balance(referrer.id)).toBe(0);
+    });
+
+    it('still cross-checks the grant against the ledger when a multiplier applied', async () => {
+      // The cross-check compares the grant's points against the ledger row's
+      // BASE points, not its credited points -- so a multiplier must not make
+      // it fire. If it did, every referral belonging to a benefited customer
+      // would fail to reverse at all.
+      await dataSource.query(
+        `INSERT INTO loyalty.tiers (id, slug, name, threshold_points, sort_order, is_active)
+         VALUES ($1, 'bronze', 'bronze', 0, 0, true)`,
+        [BRONZE_TIER_ID],
+      );
+      await dataSource.query(
+        `INSERT INTO loyalty.benefits (id, source_type, source_id, benefit_type, label, config, is_active)
+         VALUES ($1, 'tier', $2, 'bonus_points_multiplier', 'x1.2', '{"multiplierBp": 12000}'::jsonb, true)`,
+        [uuidv7(), BRONZE_TIER_ID],
+      );
+
+      const { orderId, referralId } = await awardedReferral({ referrerPoints: 50, refereePoints: 30 });
+
+      await expect(refundAndReverse(orderId, ORDER_TOTAL)).resolves.toMatchObject({ reversed: true });
+      expect((await ledgerRows(referralId)).filter((r) => r.points < 0)).toHaveLength(2);
     });
   });
 
@@ -1239,6 +1299,136 @@ describePg('referral reversal — full refund, clawback, convergence (real Postg
       });
 
       expect((await referralRow(referralId)).status).toBe('qualified');
+    });
+
+    it('CONVERGES through the REAL handler chain, driven by the relay', async () => {
+      /**
+       * The cases above call the two services the way the handler does. This
+       * one drives nothing directly: both events go into their real outbox
+       * tables and `relay.drain()` dispatches them, so the composition root's
+       * wiring, the handler's own `qualified` guard, and the ordering are all
+       * under test rather than reproduced.
+       *
+       * It matters because a mutation probe found the gap: removing the
+       * convergence call from the HANDLER left every convergence test green,
+       * since they each called the service themselves. A test that reproduces
+       * the code it is testing proves the reproduction.
+       *
+       * `OrderRefunded` is inserted FIRST and `commerce` drains before
+       * `booking`, so the refund is genuinely consumed before the booking
+       * completion that qualifies the referral.
+       */
+      const referrer = await customer();
+      const referee = await customer();
+      const referralId = await pendingReferral(referrer, referee);
+
+      // A REAL professional, service and completed booking, not fabricated ids.
+      // `BookingCompleted` has other consumers -- `review_eligibility` among
+      // them -- and they hold foreign keys into `provider`. A fixture that
+      // satisfies only the referral handler is a fixture that never reaches it.
+      const proOwner = await customer();
+      const professional = await seedProfessional(dataSource, proOwner.id, 'متخصص');
+      const slotId = await seedSlot(dataSource, professional.id, professional.serviceId, futureSlotTime(-24));
+      const bookingId = uuidv7();
+      await dataSource.query(
+        `INSERT INTO booking.bookings
+           (id, customer_id, professional_id, service_id, slot_id, slot_start, slot_end, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'completed')`,
+        [
+          bookingId,
+          referee.id,
+          professional.id,
+          professional.serviceId,
+          slotId,
+          futureSlotTime(-24),
+          futureSlotTime(-23),
+        ],
+      );
+      const orderId = await paidOrder(bookingId, referee.id);
+
+      withRewards(50, 30);
+
+      // A real refund, through commerce, which writes the real OrderRefunded.
+      await orders.recordRefund(orderId, ORDER_TOTAL, uuidv7());
+
+      await dataSource.query(
+        `INSERT INTO booking.outbox_events
+           (id, aggregate_type, aggregate_id, event_type, event_version, payload)
+         VALUES ($1, 'booking', $2, 'BookingCompleted', 1, $3::jsonb)`,
+        [
+          uuidv7(),
+          bookingId,
+          JSON.stringify({
+            bookingId,
+            professionalId: professional.id,
+            customerId: referee.id,
+            serviceId: professional.serviceId,
+            completedAt: new Date().toISOString(),
+          }),
+        ],
+      );
+
+      // Twice: the second drain dispatches the ReferralQualified and
+      // ReferralReversed rows the first one produced, so the notifications land
+      // too and redelivery is exercised on the way.
+      await relay.drain();
+      await relay.drain();
+
+      // Every `BookingCompleted` handler must have succeeded, not just the
+      // referral one. The relay aborts an envelope's handler loop on the first
+      // throw and leaves the row unpublished, so a partially-dispatched event
+      // would make everything below a test of the wrong thing -- which is
+      // exactly what happened on the first run of this case, where a
+      // `review_eligibility` foreign key rejected a fabricated professional id
+      // and the referral handler was never reached.
+      const bookingOutbox = await dataSource.query(
+        'SELECT published_at, attempts, last_error FROM booking.outbox_events',
+      );
+      expect(bookingOutbox).toEqual([
+        expect.objectContaining({ attempts: 0, last_error: null }),
+      ]);
+      expect(bookingOutbox[0].published_at).not.toBeNull();
+
+      const row = await referralRow(referralId);
+      expect(row.status).toBe('reversed');
+      expect(row.reversal_order_id).toBe(orderId);
+
+      expect((await outboxEvents()).map((e) => e.event_type)).toEqual([
+        'ReferralQualified',
+        'ReferralReversed',
+      ]);
+
+      // The REFERRAL's own four rows net to zero -- the qualification really
+      // happened and was really reversed, rather than never happening.
+      const referralLedger = await ledgerRows(referralId);
+      expect(referralLedger).toHaveLength(4);
+      expect(referralLedger.reduce((sum, r) => sum + r.points, 0)).toBe(0);
+
+      // The referrer has nothing else, so their balance is exactly zero.
+      expect(await ledger.balance(referrer.id)).toBe(0);
+
+      // The referee keeps their OWN booking-completion points, which
+      // `BookingCompletedLoyaltyHandler` awarded in the same drain and which
+      // this story must not touch: it is a separate fact with a separate
+      // idempotency key, and a clawback that reached it would be taking back a
+      // reward the customer genuinely earned by turning up.
+      const bookingPoints = (await dataSource.query(
+        `SELECT COALESCE(SUM(points), 0)::int AS total FROM loyalty.points_entries
+          WHERE user_id = $1 AND reason = $2`,
+        [referee.id, LOYALTY_REASONS.bookingCompleted],
+      )) as Array<{ total: number }>;
+      expect(bookingPoints[0].total).toBeGreaterThan(0);
+      expect(await ledger.balance(referee.id)).toBe(bookingPoints[0].total);
+
+      // And both parties were told, about their own side only.
+      expect((await notificationsFor(referrer.id)).map((n) => n.template_key).sort()).toEqual([
+        'referral_qualified_referrer',
+        'referral_reversed_referrer',
+      ]);
+      expect((await notificationsFor(referee.id)).map((n) => n.template_key).sort()).toEqual([
+        'referral_qualified_referee',
+        'referral_reversed_referee',
+      ]);
     });
 
     it('reverses exactly ONCE when both paths race', async () => {
