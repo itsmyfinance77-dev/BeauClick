@@ -444,6 +444,71 @@ function checkCookiePolicy(config: Env, errors: string[]): void {
   }
 }
 
+/**
+ * The two referral reward values — V3.2-C Story #12 (`V32-DEC-016`, ADR-037 §3).
+ *
+ * ## Why these refuse to boot while every other loyalty number falls back
+ *
+ * `LoyaltyConfig.int()` silently returns the default for a malformed value,
+ * which is the right behaviour for the three `GAP-10` provisional awards: they
+ * are placeholders, an operator overriding one is tuning, and a typo costing a
+ * fallback is recoverable and visible.
+ *
+ * These two are different in kind, and the failure mode runs in **both**
+ * directions:
+ *
+ *  * `LOYALTY_POINTS_REFERRAL_REFERRER=-5` or `=1.5` or `=abc` would silently
+ *    become **0** — and 0 is a *meaningful, decided value* here
+ *    (`V32-DEC-016`: honestly disabled). So the deployment would look exactly
+ *    like a correct one that had deliberately disabled rewards, and nothing
+ *    anywhere would say otherwise.
+ *  * The operator who set it believes they have **enabled** a reward. Every
+ *    qualification then records `disabled_zero`, writes no ledger row, and
+ *    consumes no slot — correctly, per the configuration the server actually
+ *    read. The discrepancy would surface as "we turned referral rewards on and
+ *    nobody ever got anything", weeks later, with the ledger correctly empty.
+ *
+ * Refusing to start converts a silent economic misconfiguration into a loud
+ * one, at the only moment it is cheap.
+ *
+ * ## Checked in EVERY environment, not only production
+ *
+ * The same reasoning as `checkCookiePolicy` above: a developer who types
+ * `=-5` should learn immediately rather than ship a `.env` that behaves one way
+ * locally and refuses in staging.
+ *
+ * Absent is always fine — that is the decided default of 0, and requiring the
+ * variable would force every deployment to restate an owner decision.
+ */
+function checkReferralRewardValues(config: Env, errors: string[]): void {
+  for (const key of ['LOYALTY_POINTS_REFERRAL_REFERRER', 'LOYALTY_POINTS_REFERRAL_REFEREE']) {
+    const raw = read(config, key);
+    if (raw === null) continue;
+
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed < 0) {
+      errors.push(
+        `${key} must be a non-negative integer number of loyalty points (received "${raw}"). ` +
+          'It is left unset for the decided default of 0; a malformed value would silently become 0, ' +
+          'which is indistinguishable from deliberately disabling the reward (V32-DEC-016).',
+      );
+      continue;
+    }
+
+    // An upper bound, because the failure this catches is a units mistake
+    // rather than a hostile one: points are a whole-number currency and a
+    // pasted Toman price or a stray trailing zero would quietly authorise an
+    // award orders of magnitude larger than any plausible referral reward.
+    // `Number.MAX_SAFE_INTEGER` is not a bound anybody meant to opt into.
+    if (parsed > 1_000_000) {
+      errors.push(
+        `${key} is ${raw}, which is implausibly large for a loyalty-point reward. ` +
+          'If a figure above 1,000,000 is genuinely intended, that is an owner decision to record rather than an environment variable to widen.',
+      );
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 
 /**
@@ -486,6 +551,10 @@ export function validateEnv(config: Record<string, unknown>): Record<string, unk
   }
 
   checkCookiePolicy(config, errors);
+  // Every environment, not only production. See the function's docblock: a
+  // malformed reward value silently becomes 0, and 0 is a DECIDED value here,
+  // so the misconfiguration is invisible in the running system.
+  checkReferralRewardValues(config, errors);
 
   if (nodeEnv === 'production') errors.push(...productionConfigurationErrors(config));
 

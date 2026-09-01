@@ -5,6 +5,8 @@
   "main": "src/index.ts",
   "types": "src/index.ts",
   "dependencies": {
+    "@beauclick/event-contracts": "workspace:*",
+    "@beauclick/events": "workspace:*",
     "@beauclick/http": "workspace:*",
     "@beauclick/referral-contract": "workspace:*",
     "@beauclick/subject-data": "workspace:*",

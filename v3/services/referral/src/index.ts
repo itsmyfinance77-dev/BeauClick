@@ -7,3 +7,6 @@ export * from './referral-code.generator';
 export * from './referral-subject-data.contract';
 export * from './entities/referral.entities';
 export * from './ports/referral.ports';
+export * from './referral-qualification.service';
+export * from './referral-reward.config';
+export * from './ports/referral-loyalty.port';

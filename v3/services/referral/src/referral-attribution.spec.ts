@@ -183,6 +183,27 @@ describe('the claim refusals', () => {
 describe('the module boundary', () => {
   const sourceOf = (...segments: string[]) => readFileSync(join(__dirname, ...segments), 'utf8');
 
+  /**
+   * The source with block and line comments removed.
+   *
+   * Several assertions here forbid an identifier from appearing in a file, and
+   * a raw source match cannot tell a **reference** from an **explanation of why
+   * there is no reference**. This codebase's docblocks explain absences at
+   * length — deliberately — so as the prose grew, the blunt match started
+   * failing on the very comments that document the guarantee.
+   *
+   * Stripping comments keeps the rule aimed at code, which is what it always
+   * meant. It is a crude tokenizer rather than a parser: it does not understand
+   * a `//` inside a string literal, which is acceptable because every use below
+   * searches for a PascalCase identifier that no string in these files
+   * contains. The three assertions in the case below prove the stripper works
+   * in both directions rather than trusting it.
+   */
+  const stripComments = (source: string): string =>
+    source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+
+  const codeOf = (...segments: string[]) => stripComments(sourceOf(...segments));
+
   it('declares both ports as symbols with no default implementation', () => {
     expect(typeof REFERRAL_IDENTITY_PORT).toBe('symbol');
     expect(typeof REFERRAL_BOOKING_PORT).toBe('symbol');
@@ -229,37 +250,98 @@ describe('the module boundary', () => {
     expect(sourceOf('ports', 'referral.ports.ts')).not.toMatch(/@beauclick\/(identity|booking)/);
   });
 
-  it('registers all three entities, and no speculative fourth', () => {
+  it('registers every entity the module owns, and nothing speculative', () => {
+    // This pinned exactly three entities until V3.2-C Story #12 added the
+    // grant, the counter and the outbox. The COUNT was never the guarantee --
+    // widening the array each story would keep the case green while it stopped
+    // checking anything.
+    //
+    // What it always meant, and now says: every table the module owns is
+    // registered (so subject-data coverage and the test harness's reset can
+    // both see it), and NOTHING from Story #28 is registered ahead of its
+    // behaviour.
     const names = REFERRAL_ENTITIES.map((entity) => entity.name).sort();
-    expect(names).toEqual(['ReferralAttributionEntity', 'ReferralClaimAttemptEntity', 'ReferralCodeEntity']);
-  });
 
-  it('defines and emits NO attribution event, and has no outbox', () => {
-    // `V32-DEC-033`, ADR-036 §10: `ReferralAttributed` has no consumer. Story
-    // #12 qualifies on `BookingCompleted`, not on an attribution event.
-    for (const file of ['referral.service.ts', 'referral.module.ts', 'entities/referral.entities.ts']) {
-      const source = sourceOf(...file.split('/'));
-      expect(source).not.toMatch(/ReferralAttributed|ReferralClaimed/);
-      expect(source).not.toMatch(/emitContractEvent|OutboxEntity|outbox_events/);
+    expect(names).toEqual([
+      'ReferralAttributionEntity',
+      'ReferralClaimAttemptEntity',
+      'ReferralCodeEntity',
+      'ReferralOutboxEntity',
+      'ReferralReferrerCounterEntity',
+      'ReferralRewardGrantEntity',
+    ]);
+
+    for (const name of names) {
+      expect(name).not.toMatch(/revers|clawback|refund|appeal|review|override/i);
     }
   });
 
-  it('exposes no reward, qualification, reversal, or manual-review API', () => {
-    // Stories #12 and #28, and `V32-DEC-019` refuses review and appeals
-    // outright. Checked against the SERVICE source rather than the prototype so
-    // a private method is caught too.
-    const service = sourceOf('referral.service.ts');
-    // Method declarations only -- the prose necessarily discusses these words
-    // when explaining what the story does not build.
-    const declarations = [...service.matchAll(/^\s{2}(?:private\s+|async\s+|private\s+async\s+)?(\w+)\s*\(/gm)].map(
-      (match) => match[1],
-    );
-
-    for (const name of declarations) {
-      expect(name).not.toMatch(/reward|qualif|revers|clawback|grant|points|appeal|review|override/i);
+  it('still defines and emits NO ReferralAttributed, even now that an outbox exists', () => {
+    // `V32-DEC-033`, ADR-036 §10, ADR-037 §10: `ReferralAttributed` has no
+    // consumer, and Story #12 USED UP the last plausible argument for defining
+    // it -- qualification consumes `BookingCompleted`, not an attribution
+    // event.
+    //
+    // The second half of this case used to assert the module had no outbox at
+    // all. Story #12 gives it one, WITH its first producer, exactly as ADR-035
+    // §7 and ADR-036 §10 said would be the condition for creating it. So the
+    // assertion narrows to what it always meant: whatever this module emits, it
+    // is not an attribution event.
+    // Matched against CODE, not prose.
+    //
+    // A raw source match used to be enough and stopped being so in this story:
+    // the entities file now explains at length WHY `ReferralAttributed` is not
+    // defined, and a rule that forbade naming it would forbid the explanation
+    // rather than the leak. Same failure class as the `count`/`ACCOUNT` false
+    // positive the contract spec records.
+    for (const file of [
+      'referral.service.ts',
+      'referral.module.ts',
+      'entities/referral.entities.ts',
+      'referral-qualification.service.ts',
+    ]) {
+      expect(codeOf(...file.split('/'))).not.toMatch(/ReferralAttributed|ReferralClaimed/);
     }
-    // Non-vacuity: the extractor must actually find the methods it is filtering.
-    expect(declarations).toEqual(expect.arrayContaining(['claim', 'codeFor', 'chargeClaimAttempt']));
+
+    // Non-vacuity: the comment stripper must actually remove comments, or every
+    // assertion above passes by finding an empty string.
+    expect(codeOf('referral-qualification.service.ts')).toMatch(/emitContractEvent/);
+    expect(stripComments('/* ReferralAttributed */ const a = 1;')).not.toMatch(/ReferralAttributed/);
+    expect(stripComments('// ReferralAttributed\nconst a = 1;')).not.toMatch(/ReferralAttributed/);
+    expect(stripComments('const ReferralAttributed = 1;')).toMatch(/ReferralAttributed/);
+
+    // And the one event that IS emitted is the only one approved for this
+    // story. `ReferralReversed` is approved by `V32-DEC-033` too -- but for
+    // Story #28, so emitting it here would be starting that story.
+    const qualification = codeOf('referral-qualification.service.ts');
+    expect(qualification).toMatch(/ReferralQualified/);
+    expect(qualification).not.toMatch(/ReferralReversed|ReferralRewarded|ReferralCapped|ReferralExpired/);
+  });
+
+  it('exposes no reversal, clawback, or manual-review API', () => {
+    // This refused `qualif`, `reward`, `grant` and `points` as well, until
+    // V3.2-C Story #12 legitimately built all four. Narrowed to Story #28's
+    // vocabulary and to the three surfaces `V32-DEC-019` refuses outright --
+    // manual review, appeals, and administrator overrides.
+    //
+    // Checked against the SOURCE rather than the prototype so a private method
+    // is caught too.
+    const declarationsIn = (file: string) =>
+      [...sourceOf(file).matchAll(/^\s{2}(?:private\s+|async\s+|private\s+async\s+)?(\w+)\s*\(/gm)].map(
+        (match) => match[1],
+      );
+
+    const service = declarationsIn('referral.service.ts');
+    const qualification = declarationsIn('referral-qualification.service.ts');
+
+    for (const name of [...service, ...qualification]) {
+      expect(name).not.toMatch(/revers|clawback|refund|appeal|review|override|negative|deduct/i);
+    }
+
+    // Non-vacuity for BOTH extractions: a regex that found nothing would pass
+    // the loop above no matter what either file contained.
+    expect(service).toEqual(expect.arrayContaining(['claim', 'codeFor', 'chargeClaimAttempt']));
+    expect(qualification).toEqual(expect.arrayContaining(['qualify', 'chargeReferrerCap', 'recordGrant']));
   });
 
   it('never reads the wall clock outside the injected one', () => {

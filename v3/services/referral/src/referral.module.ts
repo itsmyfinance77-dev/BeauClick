@@ -4,6 +4,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { REFERRAL_ENTITIES } from './entities/referral.entities';
 import { REFERRAL_CLOCK, systemReferralClock } from './referral-clock';
+import { REFERRAL_REWARD_CONFIG, REFERRAL_REWARD_DEFAULTS } from './referral-reward.config';
+import { ReferralQualificationService } from './referral-qualification.service';
 import { REFERRAL_CODE_GENERATOR, defaultReferralCodeGenerator } from './referral-code.generator';
 import { ReferralController } from './referral.controller';
 import { ReferralService } from './referral.service';
@@ -66,6 +68,7 @@ import { ReferralSubjectDataContract } from './referral-subject-data.contract';
   controllers: [ReferralController],
   providers: [
     ReferralService,
+    ReferralQualificationService,
     ReferralSubjectDataContract,
     // The real CSPRNG generator, bound HERE rather than left to the composition
     // root. It is a seam, not a port: a composition that says nothing about it
@@ -77,9 +80,14 @@ import { ReferralSubjectDataContract } from './referral-subject-data.contract';
     // expiry are BOUNDARIES, and a boundary tested by waiting is a boundary
     // nobody has tested (ADR-036 §5).
     { provide: REFERRAL_CLOCK, useValue: systemReferralClock },
+    // The two reward values, defaulting to the DECIDED zero (V32-DEC-016).
+    // A seam, not a port: an unconfigured deployment awards nothing, which is
+    // the safe failure for an economics setting. The composition root
+    // overrides it with the real LoyaltyConfig figures.
+    { provide: REFERRAL_REWARD_CONFIG, useValue: REFERRAL_REWARD_DEFAULTS },
     // `REFERRAL_IDENTITY_PORT` and `REFERRAL_BOOKING_PORT` are deliberately
     // ABSENT. See the docblock: no default is the mechanism.
   ],
-  exports: [ReferralService, ReferralSubjectDataContract, TypeOrmModule],
+  exports: [ReferralService, ReferralQualificationService, ReferralSubjectDataContract, TypeOrmModule],
 })
 export class ReferralModule {}

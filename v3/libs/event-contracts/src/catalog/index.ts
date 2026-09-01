@@ -11,6 +11,7 @@ import { WAITLIST_EVENTS } from './waitlist.events';
 import { PRIVACY_EVENTS } from './privacy.events';
 import { AI_EVENTS } from './ai.events';
 import { CHAT_EVENTS } from './chat.events';
+import { REFERRAL_EVENTS } from './referral.events';
 
 export * from './common';
 export * from './booking.events';
@@ -25,6 +26,7 @@ export * from './waitlist.events';
 export * from './privacy.events';
 export * from './ai.events';
 export * from './chat.events';
+export * from './referral.events';
 
 /**
  * Every contract V3 has published, in one list.
@@ -50,4 +52,9 @@ export const ALL_EVENT_CONTRACTS: EventContract[] = [
   ...PRIVACY_EVENTS,
   ...AI_EVENTS,
   ...CHAT_EVENTS,
+  // V3.2-C Story #12. `ReferralQualified` v1 only — `V32-DEC-033` approves it
+  // and `ReferralReversed` v1 and nothing else, and the second belongs to
+  // Story #28. `referral` has been in `ServiceName` since Story #11 precisely
+  // so this line could be added without first editing a closed vocabulary.
+  ...REFERRAL_EVENTS,
 ];

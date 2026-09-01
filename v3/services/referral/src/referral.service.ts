@@ -16,7 +16,11 @@ import {
 } from '@beauclick/referral-contract';
 import type { ReferralClaimResult, ReferralCodeView, ReferralSharePayload } from '@beauclick/referral-contract';
 
-import { ReferralAttributionEntity, ReferralCodeEntity } from './entities/referral.entities';
+import {
+  ReferralAttributionEntity,
+  ReferralCodeEntity,
+  ReferralRewardGrantEntity,
+} from './entities/referral.entities';
 import {
   REFERRAL_CLOCK,
   ReferralClock,
@@ -506,6 +510,55 @@ export class ReferralService {
   async eraseClaimAttempts(manager: EntityManager, userId: string): Promise<number> {
     const result = await manager.query('DELETE FROM referral.claim_attempts WHERE claimant_user_id = $1', [userId]);
     return rowCount(result);
+  }
+
+  /**
+   * Deletes the subject's monthly cap counters — V3.2-C Story #12.
+   *
+   * `subject_data`, deleted on erasure (`V32-DEC-019`), for the same reason
+   * `claim_attempts` is: a rate limit about a person who can no longer act is
+   * not data about anybody.
+   *
+   * Returns the driver's real row count, not the number of rows it hoped to
+   * touch — the erasure report is only honest if every number in it came from
+   * the database (V3.2-B bug #3).
+   */
+  async eraseReferrerCounters(manager: EntityManager, userId: string): Promise<number> {
+    const result = await manager.query('DELETE FROM referral.referrer_counters WHERE referrer_user_id = $1', [userId]);
+    return rowCount(result);
+  }
+
+  /**
+   * Every reward grant this subject is the recipient of — V3.2-C Story #12.
+   *
+   * Addressed by `recipient_user_id` rather than joined through `referrals`,
+   * which is why that column exists: the export can show somebody their own
+   * outcome without ever loading the row that names the counterparty. An export
+   * cannot leak an identity it never reads.
+   *
+   * Ordered deterministically so two exports of unchanged data are identical
+   * documents — the same reason `allForSubject` orders by `(createdAt, id)`.
+   */
+  async rewardGrantsForSubject(
+    manager: EntityManager,
+    userId: string,
+  ): Promise<ReferralRewardGrantEntity[]> {
+    return manager.getRepository(ReferralRewardGrantEntity).find({
+      where: { recipientUserId: userId },
+      order: { grantedAt: 'ASC', id: 'ASC' },
+    });
+  }
+
+  /**
+   * How many grants survive this subject's erasure.
+   *
+   * Counted rather than assumed, so the erasure report names
+   * `referral.reward_grants` as retained only when something is actually
+   * retained. A report that listed a table holding nothing would be as
+   * misleading as one that omitted a table holding something.
+   */
+  async countRewardGrants(manager: EntityManager, userId: string): Promise<number> {
+    return manager.getRepository(ReferralRewardGrantEntity).count({ where: { recipientUserId: userId } });
   }
 
   /**

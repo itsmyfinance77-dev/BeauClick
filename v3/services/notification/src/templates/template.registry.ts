@@ -54,6 +54,59 @@ const TEMPLATES: TemplateDefinition[] = [
     deepLink: '/chat',
   },
   {
+    /**
+     * V3.2-C Story #12. Somebody the customer invited completed their first
+     * booking (`V32-DEC-033`, ADR-037 §11).
+     *
+     * **`requiredVars` is empty, and that is the mechanism rather than a
+     * coincidence.** `V32-DEC-033` keeps referral codes, phone numbers, display
+     * names, and free prose out of every notification payload — and a referral
+     * code is a bearer credential that never leaves the authenticated read
+     * route. With no declared variable there is nothing a caller could pass one
+     * through, exactly as `chat_message_received` above.
+     *
+     * **It names no points figure**, and that is correctness rather than
+     * restraint: `V32-DEC-016` sets both reward values to **0**, so a message
+     * claiming anything was earned would be false. It states the lifecycle
+     * fact, which is true whatever the configured economics are — and stays
+     * true on the day the business sets a real number, so this copy does not
+     * become a lie in either direction.
+     *
+     * **It does not name the person who was invited.** A referrer's export may
+     * not reveal referee identity (`V32-DEC-019`), and a notification is a
+     * weaker container than an export, not a stronger one.
+     *
+     * The deep link is the customer's own referral page rather than anything
+     * naming the referral, for the reason the chat template records: an id in a
+     * URL leaks into browser history and any referrer header.
+     */
+    key: 'referral_qualified_referrer',
+    category: 'referral',
+    requiredVars: [],
+    subject: 'دعوت شما به نتیجه رسید',
+    body: 'یکی از دعوت‌های شما تکمیل شد.',
+    short: 'یکی از دعوت‌های شما تکمیل شد.',
+    deepLink: '/referral',
+  },
+  {
+    /**
+     * V3.2-C Story #12. The invited customer's own referral qualified.
+     *
+     * The mirror of the template above and subject to the same rules: no
+     * variables, no points figure, and **no reference to the inviter**. A
+     * referee's export may never carry the referrer's bearer code, phone, or
+     * display name (`V32-DEC-019`); the same boundary applies here, and it is
+     * kept by the template having no slot for any of them.
+     */
+    key: 'referral_qualified_referee',
+    category: 'referral',
+    requiredVars: [],
+    subject: 'دعوت شما ثبت شد',
+    body: 'دعوتی که با آن ثبت‌نام کردید تکمیل شد.',
+    short: 'دعوتی که با آن ثبت‌نام کردید تکمیل شد.',
+    deepLink: '/referral',
+  },
+  {
     key: 'booking_confirmed',
     category: 'booking',
     requiredVars: ['professionalName', 'date', 'time'],
