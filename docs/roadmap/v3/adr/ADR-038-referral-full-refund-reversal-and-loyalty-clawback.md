@@ -4,7 +4,8 @@
 **Date:** 2026-09-01.
 **Relates to:** ADR-037 (the qualification this reverses, and whose §13 reserved every decision below), ADR-036 (the attribution claim lifecycle), ADR-035 (referral code identity and the share boundary), ADR-011 (composition-root boundary), ADR-022 (event contracts and the transactional outbox), ADR-027 (subject-data contract and boot-time coverage), ADR-023 (the seller-of-record split the order carries), ADR-017 (why a guarantee that matters is enforced by the database), `V3_DATABASE_BLUEPRINT.md` §§1–4.
 **Binding on:** `V32-DEC-017` (full refund only; partial never; `duplicate_charge` never; no time limit; append-only negative row under a distinct reason; balance may go negative and is never clamped; lifetime earned unreduced and no tier demotion), `V32-DEC-018` (**booking is the qualification authority, payment is the reversal authority** — this ADR is the second half of that sentence), `V32-DEC-016` (two sides, two reasons, two values, both **0**, and zero means honestly disabled), `V32-DEC-032` (the same ledger semantics, decided once for both this and the review clawback), `V32-DEC-033` (`ReferralReversed` v1 as an approved event, the payload prohibitions, and the in-app opt-outable notification boundary), `V32-DEC-019` (the per-referrer cap this ADR deliberately does not adjust — see §12).
-**Does not decide:** the review-reward clawback (`V32-DEC-032` settles its *semantics* and schedules nothing), refund policy itself (Phase F blocker 15 decides *when* a refund is granted), any manual or administrative reversal surface, and **whether a reversal returns the referrer's monthly cap slot** — §12 states why that is left open rather than settled here.
+**Does not decide:** the review-reward clawback (`V32-DEC-032` settles its *semantics* and schedules nothing), refund policy itself (Phase F blocker 15 decides *when* a refund is granted), and any manual or administrative reversal surface.
+**Amended 2026-09-01:** §12 opened as *"what this ADR deliberately does not settle"* — whether a reversal returns the referrer's monthly cap slot. The owner ratified it the same day as **`V32-DEC-036`: the slot stays spent**, matching the null action this story had already shipped. §12 now records the decision and its proof.
 
 ## Context
 
@@ -208,11 +209,17 @@ It joins the subject's **export** as part of the existing `referral_rewards` sec
 
 **No personal prose is written anywhere** — not on the reversal row, not on the outbox row, not in an exception message. The trigger raises by naming a column set, never a value.
 
-### 12. What this ADR deliberately does not settle
+### 12. The monthly cap slot is NOT returned — `V32-DEC-036`
 
-**Whether a reversal returns the referrer's monthly cap slot.** ADR-037 left it open in as many words — *"a counter it must decrement or not — a decision that ADR deliberately leaves open"* — and none of `V32-DEC-016`, `-017`, `-018`, `-019`, `-032` or `-035` answers it. Both readings are defensible: returning the slot treats the cap as *"ten rewards that stuck"*, keeping it treats the cap as *"ten qualifications processed"*, and the second bounds payouts more tightly.
+**A reversal leaves `referral.referrer_counters` completely alone.** No decrement, no deletion, no recomputation, and no cross-period adjustment — in the same Jalali month or a later one.
 
-This story therefore **does not touch `referral.referrer_counters`**, and that is the null action rather than a quiet choice of the second reading. Deciding it would be inventing a policy under cover of implementing one — the same failure `V32-DEC-035` was created to correct, where an unratified reading of "Tehran calendar month" shipped as though it had been chosen. The question is recorded here so it is asked rather than discovered, and a decision either way is a one-statement change to a path that is already transactional.
+**This section shipped as an open question and was closed the same day.** ADR-037 left it open in as many words — *"a counter it must decrement or not — a decision that ADR deliberately leaves open"* — and no closed decision answered it, so this story took the **null action** and recorded the question rather than settling it under cover of implementing it. The owner ratified **(a)** on **2026-09-01** as `V32-DEC-036`, and the null action turned out to be the ratified behaviour. **No production line changed when the decision landed**, which is the outcome the flag-rather-than-assume discipline is for.
+
+**The reason is the abuse boundary.** The cap counts **qualifications the platform successfully processed**, not rewards that survived a refund. Returning the slot would make qualification/refund **cycling** possible — a referrer colluding with invitees who book and refund could reuse one slot indefinitely — and `V32-DEC-019` calls the monthly cap the *bounded-exposure control* for an erase-and-re-register gap it accepts knowingly. A cap that a refund can refund would bound nothing. The cost is accepted knowingly in the other direction too: a referrer whose invitee is refunded through no fault of their own loses a slot they earned nothing from.
+
+**The rule does not vary by period**, and that clause is load-bearing rather than decorative. A refund landing in a later Jalali month must not reach back and decrement the earlier period's counter, and must not create or adjust a row in the current one. The alternative — returning the slot only within the same period — was refused for making a referrer's remaining allowance depend on *when the refund happened* rather than on what they did.
+
+**Proved, not merely arranged.** `referral-reversal.spec.ts` asserts structurally that the reversal service never names the table, which proves the code does not mention it and cannot prove a row survived. The real-PostgreSQL suite therefore asserts the counter row is **byte-identical after the reversal** — period, count and `updated_at` — in both the same and a later Jalali month, and that no row appears in the later period. `updated_at` is in the assertion deliberately: it is an `@UpdateDateColumn`, so any write at all moves it, and a same-value `UPDATE` that a count comparison would miss is caught.
 
 ### 13. What this story is NOT
 
@@ -237,4 +244,4 @@ This story therefore **does not touch `referral.referrer_counters`**, and that i
 - A spendable balance may go negative and is never clamped, closing the "book, get referred, spend, refund" loop.
 - Lifetime earned, tier, and membership are untouched — by the shape of the query rather than by a guard, and asserted anyway.
 - Refund-before-qualification converges, without a new retry or reconciliation mechanism, and without moving either authority.
-- The referrer's monthly cap slot stays spent, and §12 records that this is an open question rather than a decision.
+- The referrer's monthly cap slot stays spent — ratified as `V32-DEC-036`, so the cap counts qualifications processed rather than rewards that survived a refund, and a refund can never refund a slot.
