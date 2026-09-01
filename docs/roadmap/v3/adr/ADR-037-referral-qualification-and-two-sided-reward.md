@@ -1,9 +1,9 @@
 # ADR-037: Referral Qualification — The Compare-and-Swap, Two Independent Reward Sides, and the Honest Zero
 
 **Status:** Accepted — implemented in V3.2-C Story #12 (qualification and independent two-sided loyalty reward).
-**Date:** 2026-09-01.
+**Date:** 2026-09-01. §7's calendar was amended the same day, when the owner ratified the Solar Hijri month as `V32-DEC-035`.
 **Relates to:** ADR-036 (the attribution claim lifecycle this continues and revisits none of), ADR-035 (referral code identity and the share boundary), ADR-011 (composition-root boundary), ADR-022 (event contracts and the transactional outbox), ADR-027 (subject-data contract and boot-time coverage), ADR-024 (waitlist concurrency — the conditional-write discipline this reuses a third time), ADR-017 (why a guarantee that matters is enforced by the database), `V3_SECURITY_MODEL.md` §3, `V3_DATABASE_BLUEPRINT.md` §§1–4.
-**Binding on:** `V32-DEC-016` (two sides, two ledger reasons, two independent values, both **0**, and zero means honestly disabled), `V32-DEC-018` (the qualifying event and the three explicit non-triggers), `V32-DEC-019` (the per-referrer monthly cap, the independence of the two sides at the cap, and compare-and-swap replay safety), `V32-DEC-017` (the 90-day pending expiry this story consumes but does not re-decide), `V32-DEC-033` (the approved event vocabulary, the payload prohibitions, and the in-app opt-outable notification boundary).
+**Binding on:** `V32-DEC-016` (two sides, two ledger reasons, two independent values, both **0**, and zero means honestly disabled), `V32-DEC-018` (the qualifying event and the three explicit non-triggers), `V32-DEC-019` (the per-referrer monthly cap, the independence of the two sides at the cap, and compare-and-swap replay safety), `V32-DEC-035` (the cap's calendar: the **Solar Hijri** month beginning at 00:00 `Asia/Tehran` — ratified 2026-09-01, correcting the Gregorian reading §7 originally flagged), `V32-DEC-017` (the 90-day pending expiry this story consumes but does not re-decide), `V32-DEC-033` (the approved event vocabulary, the payload prohibitions, and the in-app opt-outable notification boundary).
 **Does not decide:** reversal, clawback, negative ledger rows, the refund consumer, or any order-lookup port. Those are Story #28, and §13 states the boundary precisely so this ADR is not read as having settled them.
 
 ## Context
@@ -22,7 +22,7 @@ Six facts about the repository and the closed decisions shaped this ADR.
 
 **The `referral` notification category already exists and is already absent from `MANDATORY_CATEGORIES`.** `V32-DEC-033` requires it to be opt-outable; it already is. §11 adds templates and nothing else.
 
-**The cap's calendar is the one parameter no closed decision pins precisely**, and §7 says so at length rather than choosing quietly.
+**The cap's calendar was the one parameter no closed decision pinned precisely**, and §7 said so at length rather than choosing quietly. The owner closed it on **2026-09-01** as `V32-DEC-035` — the **Solar Hijri** month — so §7 now records a ratified parameter and the implementation follows it. The pre-ratification state is described there rather than rewritten, because the sequence is the point: the ADR flagged a question it could not answer, and the flag is what produced the answer.
 
 ## Decision
 
@@ -159,22 +159,69 @@ Zero rows returned means the cap is spent, and the referrer side is marked `capp
 
 **The boundary, stated so it is testable:** qualifications 1–10 in a period are within the cap; the 11th is `capped` for the referrer while the referee is still paid; the next period starts a fresh counter row; and there is no lifetime cap, so period *n+1* is unaffected by how many periods came before.
 
-#### The calendar, flagged rather than assumed
+#### The calendar: Solar Hijri, ratified as `V32-DEC-035`
 
-**`period` is the Gregorian year-month evaluated in `Asia/Tehran`** — `YYYY-MM`, from the runtime's IANA database, never the server's local zone.
+**`period` is the SOLAR HIJRI (Jalali) year-month of the instant, read in `Asia/Tehran`** — an
+ASCII `YYYY-MM` key such as `1405-06`, with a zero-padded month.
 
-This ADR records that as an **engineering interpretation of an owner phrase, not a ratified parameter**, because the phrase admits two readings and they are materially different:
+This section previously recorded the Gregorian-in-Tehran reading as an **engineering
+interpretation of an owner phrase, not a ratified parameter**, and flagged it for ratification
+rather than presenting it as settled. **The owner ratified the Solar Hijri month on 2026-09-01 as
+`V32-DEC-035`**, so the flagged interpretation was wrong and is corrected here and in code. The
+pre-ratification state is described above so the sequence stays legible rather than rewritten.
 
-- **Gregorian month in Tehran** — what `ai`'s `tehranCalendarDay` does for its per-day quota, and what this implements.
-- **Jalali (Solar Hijri) month** — Iran's official calendar, which this repository fully supports (`toJalali`, `PLATFORM_TIMEZONE`), and whose months begin around the 21st of a Gregorian one. `packages/persian-utils/src/format.ts` states that the platform "uses the Jalali (Solar Hijri) calendar, **never Gregorian**" for user-facing dates.
+**Why the question existed at all.** `V32-DEC-019` says *"Tehran calendar month"*. That phrase
+admits two readings whose windows differ by roughly **three weeks**, because a Jalali month begins
+around the 21st of a Gregorian one — so "when does my allowance reset" has two materially
+different answers, every month, forever.
 
-The two windows differ by roughly three weeks, so a capped referrer's allowance resets on a materially different date under each.
+**Why the `ai` precedent did not settle it, which is the part worth keeping.** `tehranCalendarDay`
+buckets the AI quota by Gregorian day in Tehran and reads like a precedent. It is not one: for a
+**day**, Gregorian-in-Tehran and Jalali-in-Tehran are the **same window** and only the label
+differs. The question a **month** asks had therefore never been exercised anywhere in this
+codebase, and the implementation inherited an interpretation nobody had chosen.
 
-**Why the `ai` precedent does not actually settle it:** for a *day*, Gregorian-in-Tehran and Jalali-in-Tehran are the **same window** — only the label differs. The precedent has therefore never been exercised on the question a *month* asks.
+**Three separable concerns, and conflating any two is how this goes wrong:**
 
-**Why this ADR chooses rather than blocks.** Both configured values are **0**, so the cap has **no financial effect whatsoever today**: a capped referrer is paid nothing, and an uncapped one is paid nothing. The choice becomes material only when a non-zero reward is enabled, which is itself a separate owner decision that this story does not make. Choosing now, documenting the alternative, and flagging it is the same course `ADR-035` §3 took with the code format — which the owner subsequently ratified as `V32-DEC-034`.
+| Concern | Mechanism | What it must NOT do |
+|---|---|---|
+| **Instants** | `TIMESTAMPTZ`, compared in UTC | acquire a calendar |
+| **Timezone** | `wallClockIn(instant, 'Asia/Tehran')` — IANA, via `formatToParts` | hardcode +03:30 |
+| **Calendar** | `toJalali(gy, gm, gd)` — pure arithmetic | know anything about zones |
 
-**It is cheap to change now and expensive later**, and the reason is worth stating precisely: the period is a plain `VARCHAR` bucket key with no rows that have ever gated a payment, so switching calendars today is one function and a backfill of nothing. Once a non-zero reward has been paid under one calendar, changing it re-cuts a window people were paid against. **If the owner intends Jalali months, that is a new decision-register entry, not a refactor.**
+The period key is the calendar applied to the timezone applied to the instant. An implementation
+that skipped the timezone would bucket by UTC and push every late-evening Tehran qualification into
+the wrong month; one that skipped the calendar is the Gregorian behaviour this entry replaces.
+
+**Each period begins at 00:00 `Asia/Tehran`, never 00:00 UTC.** Tehran is UTC+03:30 and Iran
+abolished DST in 2022, so a boundary currently falls at **20:30 UTC on the preceding day**. That
+offset is **derived from the IANA database at the instant in question** rather than hardcoded —
+`wallClockIn` does this already — because a future reinstatement of DST would move it by an hour,
+and a hardcoded offset would be correct today and silently wrong for the affected days.
+
+**No new dependency, and the audit is the reason.** The conversion uses this repository's own
+`@beauclick/persian-utils`: `toJalali` is a ported, public-domain 2820-year-cycle algorithm routed
+through Julian Day Numbers, already the single Jalali implementation the whole platform uses and
+already verified in `jalali.spec.ts` against the 1979-02-11 ↔ 1357-11-22 reference point. It is
+**pure arithmetic**, so it does not depend on the container's ICU build for calendar correctness —
+which an `Intl` `ca-persian` formatter would have. A `scope:shared` package that four services
+already depend on is not a new supply-chain surface.
+
+**No data migration is required, and that is evidence rather than convenience.**
+`referral.referrer_counters.period` is `VARCHAR(7)` under
+`^[0-9]{4}-(0[1-9]|1[0-2])$`, which `1405-06` satisfies unchanged — the column was calendar-
+agnostic by accident and is calendar-agnostic on purpose now. And no row can exist under the old
+reading: the table arrived in the migration merged as `597c88d` on 2026-09-01, **no release tag
+contains it**, the CD pipeline has never run (its own header records that it "cannot deploy
+anything, because there is nowhere to deploy to" while `HOSTING` is unresolved), and the only
+database that has ever held it is a development scratch database, verified empty. There is no
+cutover, no mixed-calendar period, and no user data to rewrite.
+
+**Nothing else about the cap changes.** The limit of 10, the per-referrer scope, the absence of a
+lifetime cap, the single conditional statement, the independence of the two reward sides at the
+cap, and the refusal of device/IP/fingerprint signals are all `V32-DEC-019` and are untouched. Both
+reward values remain **0**, and the correction landed **before** either became non-zero — the only
+moment at which a payout window can be re-cut for free.
 
 ### 8. Zero is honestly disabled, and that is load-bearing
 
@@ -271,7 +318,7 @@ The one thing this story does for Story #28 is **persist `qualifying_booking_id`
 ## What is deliberately not decided here
 
 - **The reward figures.** Both are 0 and changing either is an owner decision, not a configuration convenience.
-- **Whether "Tehran calendar month" means Gregorian-in-Tehran or Jalali** (§7). Implemented as the former, flagged for ratification, and materially inert while both values are 0.
+- ~~**Whether "Tehran calendar month" means Gregorian-in-Tehran or Jalali**~~ — **no longer open.** Flagged by §7 rather than assumed, and **ratified by the owner on 2026-09-01 as `V32-DEC-035`: the Solar Hijri (Jalali) month**, beginning at 00:00 `Asia/Tehran`. §7 now records the ratified parameter and the implementation follows it. Left listed rather than deleted, so a reader who remembers this ADR flagging the question can see how it was answered.
 - **Whether a reversal decrements the monthly counter.** Story #28's question, and a real one: a reversed referral that keeps its counter slot bounds payouts more tightly than one that returns it. Not prejudged here.
 - **Widening qualification to a paid non-booking order** — `V32-DEC-018` keeps option (b) out while `commerce.orders.source_type` admits only `booking` and `direct`, because the branch would be unreachable and untestable.
 - **Any notification beyond the qualified moment**, and any channel beyond in-app — externally gated.
