@@ -1,3 +1,5 @@
+import { toJalali, wallClockIn } from '@beauclick/persian-utils';
+
 /**
  * The injected clock (ADR-036 §5).
  *
@@ -28,8 +30,8 @@
  *
  * The distinction is not pedantry in this domain, because the referral domain
  * contains **both kinds** and they are one story apart. `V32-DEC-019`'s
- * referrer cap is *10 qualified referrals per **Tehran calendar month***, and it
- * belongs to Story #12. `V32-DEC-017`'s 90-day pending expiry is a duration, and
+ * referrer cap is *10 qualified referrals per **Solar Hijri calendar month***
+ * (`V32-DEC-035`), and it belongs to Story #12. `V32-DEC-017`'s 90-day pending expiry is a duration, and
  * it belongs here. Implementing the second with a calendar would make "90 days"
  * mean something subtly different for a claim recorded at 23:00 than for one at
  * 01:00, and would introduce a month-length discontinuity nobody benefits from.
@@ -118,57 +120,117 @@ export function hourBucket(instant: Date): Date {
 }
 
 /**
- * The Tehran calendar month an instant falls in, as `YYYY-MM`.
+ * The SOLAR HIJRI (Jalali) calendar month an instant falls in, read in
+ * `Asia/Tehran`, as an ASCII `YYYY-MM` key such as `1405-06`.
  *
  * The bucket key for `referral.referrer_counters` — `V32-DEC-019`'s **10
- * qualified referrals per referrer per Tehran calendar month**.
+ * qualified referrals per referrer per **Solar Hijri calendar month**, ratified
+ * as `V32-DEC-035`.
  *
- * ## This is the one parameter no closed decision pins precisely
+ * ## The calendar is Jalali, and this was decided rather than inherited
  *
- * `V32-DEC-019` says "Tehran calendar month". That phrase admits two readings
- * and they are **materially different**:
+ * `V32-DEC-019` said "Tehran calendar month" without naming a calendar.
+ * `ADR-037` §7 flagged the ambiguity instead of presenting its Gregorian
+ * reading as settled, and the owner **ratified the Solar Hijri (Jalali) month
+ * on 2026-09-01** — so this returns a **Jalali** year and month, and a
+ * Gregorian month evaluated in Tehran is explicitly *not* the policy.
  *
- *  * the **Gregorian** month evaluated in `Asia/Tehran` — what this returns; or
- *  * the **Jalali** (Solar Hijri) month, Iran's official calendar, which this
- *    repository fully supports (`toJalali` in `@beauclick/persian-utils`) and
- *    which `persian-utils`' own `format.ts` says the platform uses "never
- *    Gregorian" for user-facing dates.
+ * The two readings are not a rounding difference. A Jalali month begins around
+ * the 21st of a Gregorian one, so "when does my allowance reset" had two
+ * answers roughly **three weeks apart, every month, forever**.
  *
- * Jalali months begin around the 21st of a Gregorian one, so the two windows
- * differ by roughly three weeks and a capped referrer's allowance would reset
- * on a materially different date under each.
+ * **`ai`'s `tehranCalendarDay` is not a precedent for the other reading**,
+ * which is the trap this correction came out of: for a **day**, Gregorian and
+ * Jalali are the *same window* and only the label differs. The question a
+ * **month** asks had never been exercised anywhere in this codebase.
  *
- * **`ai`'s precedent does not settle it.** `tehranCalendarDay` is
- * Gregorian-in-Tehran, but for a **day** the two calendars are the *same
- * window* — only the label differs. The question a **month** asks has therefore
- * never been exercised anywhere in this codebase.
+ * ## Three separable concerns, and conflating any two is how this goes wrong
  *
- * **Why this chooses rather than blocks** (ADR-037 §7): both configured reward
- * values are **0**, so the cap has no financial effect at all today — a capped
- * referrer is paid nothing and an uncapped one is paid nothing. It is also
- * cheap to change now and expensive later: this is a bucket key that has never
- * gated a payment. **If the owner intends Jalali months, that is a new
- * decision-register entry rather than a refactor.**
+ * | Concern | Mechanism | Must not |
+ * |---|---|---|
+ * | the **instant** | a `Date`, UTC | acquire a calendar |
+ * | the **timezone** | `wallClockIn(instant, 'Asia/Tehran')` | hardcode +03:30 |
+ * | the **calendar** | `toJalali(gy, gm, gd)` | know about zones |
  *
- * ## Mechanics
+ * Read strictly in that order. An implementation that skipped the timezone
+ * would bucket by UTC and push every late-evening Tehran qualification into the
+ * wrong month; one that skipped the calendar is the Gregorian behaviour this
+ * replaces.
  *
- * `en-CA` for the same reason `tehranCalendarDay` uses it: its short date
- * format is ISO-ordered, so slicing the first seven characters yields `YYYY-MM`
- * without a manual part-reassembly step and the off-by-one padding bugs that
- * come with one.
+ * **The period begins at 00:00 `Asia/Tehran`**, which is currently 20:30 UTC on
+ * the preceding day. That offset is **read from the IANA database at the
+ * instant in question** — `wallClockIn` uses `formatToParts` under the hood —
+ * rather than hardcoded, because Iran abolished DST in 2022 and could resume
+ * it, and a fixed offset would be right today and silently an hour wrong for
+ * the affected days.
  *
- * The offset comes from the runtime's IANA database rather than a hardcoded
- * +03:30. Iran abolished DST in 2022 and could resume it; a fixed offset is
- * correct today and silently wrong for the affected days if that ever changes —
- * which would move a referrer's month boundary by an hour, in exactly the hour
- * a burst of qualifications is least likely to be noticed.
+ * ## Why this adds no dependency
+ *
+ * `@beauclick/persian-utils` is already the platform's single Jalali
+ * implementation and is `scope:shared` with four services already depending on
+ * it. `toJalali` is **pure arithmetic** — the public-domain 2820-year-cycle
+ * algorithm routed through Julian Day Numbers, verified in `jalali.spec.ts`
+ * against the 1979-02-11 ↔ 1357-11-22 reference point — so calendar
+ * correctness does **not** depend on the container's ICU build.
+ *
+ * An `Intl.DateTimeFormat` with `calendar: 'persian'` would have been the
+ * obvious alternative and was rejected for exactly that reason: it makes a
+ * payout window depend on which ICU data the production image happens to ship,
+ * and a small-ICU build would silently fall back to a Gregorian answer that
+ * looks perfectly well-formed.
+ *
+ * ## Fail closed
+ *
+ * The result is validated against the same shape the database enforces
+ * (`ck_referrer_counters_period_format`). A malformed or non-ASCII value throws
+ * rather than being written: a period key is the bucket a payout limit is
+ * counted in, and a silently wrong one would create a parallel window nothing
+ * ever caps.
  */
 export function tehranCalendarMonth(instant: Date): string {
-  return monthFormatter.format(instant);
+  // 1. The instant, read as a wall clock in Tehran. IANA offset, via
+  //    `formatToParts` with an `en-US` locale -- so the parts are ASCII digits
+  //    rather than a locale's own numbering system.
+  const wall = wallClockIn(instant, REFERRAL_CAP_TIME_ZONE);
+
+  // 2. That Gregorian wall-clock DATE, converted to Jalali. Pure arithmetic;
+  //    no zone, no locale, no ICU.
+  const { jy, jm } = toJalali(wall.year, wall.month, wall.day);
+
+  const period = `${jy}-${String(jm).padStart(2, '0')}`;
+
+  // 3. Fail closed. Not defensive decoration: `jy` outside four digits or `jm`
+  //    outside 1..12 would violate the database CHECK and be rejected at INSERT
+  //    time -- during a qualification, in production, on the first day of a
+  //    month. Throwing here fails the same transaction one statement earlier
+  //    with a message that says which value was wrong.
+  if (!REFERRAL_PERIOD_KEY_PATTERN.test(period)) {
+    throw new Error(
+      `Referral cap period key is malformed: expected a Jalali YYYY-MM with ASCII digits, computed "${period}" ` +
+        `from Tehran wall clock ${wall.year}-${wall.month}-${wall.day}.`,
+    );
+  }
+
+  return period;
 }
 
-const monthFormatter = new Intl.DateTimeFormat('en-CA', {
-  timeZone: 'Asia/Tehran',
-  year: 'numeric',
-  month: '2-digit',
-});
+/**
+ * The platform timezone the cap is evaluated in — `V32-DEC-035`.
+ *
+ * Named here rather than inlined because it is a **ratified parameter**, and a
+ * reader looking for it should find a constant rather than a string literal
+ * inside a function call.
+ */
+export const REFERRAL_CAP_TIME_ZONE = 'Asia/Tehran';
+
+/**
+ * The shape a period key must have, identical to
+ * `ck_referrer_counters_period_format` in the migration.
+ *
+ * Duplicated deliberately rather than derived: the database constraint is the
+ * real guarantee, and this one exists so a malformed key fails in the
+ * application with a diagnosable message instead of as a constraint violation
+ * mid-transaction. Two copies of a regex that must agree is a real cost, and
+ * the suite asserts they do.
+ */
+export const REFERRAL_PERIOD_KEY_PATTERN = /^[0-9]{4}-(0[1-9]|1[0-2])$/;

@@ -398,10 +398,29 @@ describePg('professional operating surface (real PostgreSQL)', () => {
   // -------------------------------------------------------------------
 
   describe('booking actions', () => {
+    /**
+     * A monotonic suffix, replacing `Math.floor(Math.random() * 90) + 10`.
+     *
+     * The random form drew from a pool of **90** values per prefix, and every
+     * case below seeds at least two professionals and two customers — so two
+     * draws from one pool collided on `uq_users_phone` about **1 run in 45**.
+     * It failed a required CI check exactly that way on 2026-09-01, in a run
+     * whose changes were confined to the referral calendar and could not have
+     * touched this file.
+     *
+     * Fixed rather than re-run, because re-running is how a flake gets retried
+     * into the tree; and made deterministic rather than merely wider, because a
+     * bigger random pool lowers the odds without removing them. Every other
+     * fixture in this file already uses a fixed unique phone — this one was the
+     * outlier.
+     */
+    let phoneSeq = 0;
+    const nextPhone = (prefix: string) => `${prefix}${String((phoneSeq += 1)).padStart(2, '0')}`;
+
     async function seedConfirmedBooking(opts: { hoursFromNow: number }) {
-      const proUser = await seedUser(app, dataSource, `+9891200001${Math.floor(Math.random() * 90) + 10}`);
+      const proUser = await seedUser(app, dataSource, nextPhone('+9891200001'));
       const professional = await seedProfessional(dataSource, proUser.id, 'متخصص');
-      const customer = await seedUser(app, dataSource, `+9891200002${Math.floor(Math.random() * 90) + 10}`);
+      const customer = await seedUser(app, dataSource, nextPhone('+9891200002'));
       const slotId = await seedSlot(
         dataSource,
         professional.id,
