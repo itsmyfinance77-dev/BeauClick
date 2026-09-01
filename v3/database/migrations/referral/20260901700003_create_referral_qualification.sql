@@ -427,25 +427,42 @@ CREATE TABLE referral.referrer_counters (
 -- existing opt-outable `referral` category (`V32-DEC-033`) -- so the table
 -- arrives with its first real producer rather than ahead of one.
 --
--- The shape is the platform's standard outbox, identical to `chat`, `ai`,
--- `journey` and the rest, because the relay reads them all through one
--- `OutboxSource` abstraction and a bespoke shape here would be a second thing
--- to keep in step.
+-- The shape is the platform's standard outbox, column for column identical to
+-- `chat.outbox_events`, because every subclass of `OutboxEventEntityBase`
+-- shares one column definition and the relay reads them all through one
+-- `OutboxSource` abstraction.
+--
+-- Column-for-column matters more than it sounds. The first version of this
+-- table invented `dispatched_at` where the base declares `published_at`, and
+-- omitted `attempts` and `last_error` entirely. It applied cleanly, the
+-- entity compiled, and every test that qualified a referral failed at runtime
+-- with `column ReferralOutboxEntity.published_at does not exist` -- because
+-- TypeORM builds its SELECT from the ENTITY, and the entity inherits columns
+-- this table did not have. There is no schema-versus-entity check that would
+-- have caught it earlier; the real-PostgreSQL suite is the check.
+--
+-- `published_at` is null until the relay has dispatched the row to every
+-- registered handler, and the relay's claim query filters on exactly that --
+-- which is what makes redelivery-after-crash automatic and is why the outbox
+-- is at-least-once by design.
 CREATE TABLE referral.outbox_events (
     id UUID PRIMARY KEY,
-    aggregate_type VARCHAR(64) NOT NULL,
+    aggregate_type VARCHAR(60) NOT NULL,
     aggregate_id UUID NOT NULL,
     event_type VARCHAR(80) NOT NULL,
     event_version INTEGER NOT NULL DEFAULT 1,
     payload JSONB NOT NULL,
     correlation_id UUID,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    dispatched_at TIMESTAMPTZ
+    published_at TIMESTAMPTZ,
+    -- Incremented on each failed dispatch, so a poison message is visible
+    -- rather than silently retried forever.
+    attempts INTEGER NOT NULL DEFAULT 0,
+    last_error TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX ix_referral_outbox_undispatched
-    ON referral.outbox_events (created_at)
-    WHERE dispatched_at IS NULL;
+CREATE INDEX ix_referral_outbox_unpublished ON referral.outbox_events (id) WHERE published_at IS NULL;
+CREATE INDEX ix_referral_outbox_correlation ON referral.outbox_events (correlation_id);
 
 -- --------------------------------------------------------------------------
 -- What is NOT created, stated so a later reader does not assume an omission
