@@ -313,12 +313,12 @@ The one thing this story does for Story #28 is **persist `qualifying_booking_id`
 - Zero is disabled honestly: recorded, explained, and reversible, with the ledger slot left free for a figure the business has not yet chosen.
 - The cap is bounded transactionally across every API instance, by the same conditional-write shape the platform now uses in three places.
 - The financial role boundary is untouched, because the points ledger is a different object from the money ledger and neither schema needed a migration.
-- Story #28 inherits a qualified referral that names its qualifying booking, two grant rows that explain what was and was not paid, and a counter it must decrement or not — a decision that ADR deliberately leaves open.
+- Story #28 inherits a qualified referral that names its qualifying booking, two grant rows that explain what was and was not paid, and a counter it must decrement or not — a decision this ADR deliberately left open, and which the owner closed on 2026-09-01 as `V32-DEC-036`: **it decrements nothing.**
 
 ## What is deliberately not decided here
 
 - **The reward figures.** Both are 0 and changing either is an owner decision, not a configuration convenience.
 - ~~**Whether "Tehran calendar month" means Gregorian-in-Tehran or Jalali**~~ — **no longer open.** Flagged by §7 rather than assumed, and **ratified by the owner on 2026-09-01 as `V32-DEC-035`: the Solar Hijri (Jalali) month**, beginning at 00:00 `Asia/Tehran`. §7 now records the ratified parameter and the implementation follows it. Left listed rather than deleted, so a reader who remembers this ADR flagging the question can see how it was answered.
-- **Whether a reversal decrements the monthly counter.** Story #28's question, and a real one: a reversed referral that keeps its counter slot bounds payouts more tightly than one that returns it. Not prejudged here.
+- ~~**Whether a reversal decrements the monthly counter.**~~ — **no longer open.** Flagged here rather than prejudged, and **ratified by the owner on 2026-09-01 as `V32-DEC-036`: the slot STAYS SPENT.** The cap counts qualifications the platform successfully processed, not rewards that survived a refund — because returning the slot makes qualification/refund cycling possible and would leave the monthly cap bounding nothing. `referral.referrer_counters` is unchanged by a reversal, in the same Jalali month or a later one. Left listed rather than deleted, so a reader who remembers this ADR flagging the question can see how it was answered — the same treatment §7's calendar question got.
 - **Widening qualification to a paid non-booking order** — `V32-DEC-018` keeps option (b) out while `commerce.orders.source_type` admits only `booking` and `direct`, because the branch would be unreachable and untestable.
 - **Any notification beyond the qualified moment**, and any channel beyond in-app — externally gated.
