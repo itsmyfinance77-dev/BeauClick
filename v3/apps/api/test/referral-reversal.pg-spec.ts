@@ -886,6 +886,182 @@ describePg('referral reversal — full refund, clawback, convergence (real Postg
   }
 
   // ==========================================================================
+  // 6b. The monthly cap slot stays spent — `V32-DEC-036`
+  // ==========================================================================
+
+  describe('the referrer monthly cap counter', () => {
+    /**
+     * Every row of the counter, verbatim — including PostgreSQL's own `xmin`.
+     *
+     * ## Why `xmin` and not `updated_at`
+     *
+     * `updated_at` was the obvious choice and is the WRONG one, which a
+     * mutation probe established rather than review: it is a TypeORM
+     * `@UpdateDateColumn`, set by **application code**, and the column's
+     * `DEFAULT now()` fires only on INSERT. A raw-SQL `UPDATE` — which is
+     * exactly how this counter is written, because the cap has to be one
+     * conditional statement — leaves it completely untouched. An assertion on
+     * `updated_at` would therefore have passed while the row underneath it was
+     * being rewritten.
+     *
+     * `xmin` is the system column holding the id of the transaction that
+     * produced the current row version. **Any** write produces a new version
+     * and a new `xmin`: a decrement, a recomputation that happens to land on
+     * the same number, a decrement-then-restore, and a bare
+     * `SET qualified_count = qualified_count` are all caught, and a count
+     * comparison alone catches none of them.
+     */
+    async function counterRows(referrerUserId: string) {
+      return dataSource.query(
+        `SELECT period, qualified_count, xmin::text AS row_version
+           FROM referral.referrer_counters
+          WHERE referrer_user_id = $1 ORDER BY period`,
+        [referrerUserId],
+      ) as Promise<Array<{ period: string; qualified_count: number; row_version: string }>>;
+    }
+
+    /**
+     * `V32-DEC-036`: **the slot stays spent.** The cap counts *qualifications
+     * the platform successfully processed*, not *rewards that survived a
+     * refund*.
+     *
+     * ## Why this needs a database test at all
+     *
+     * `referral-reversal.spec.ts` already asserts that the reversal service's
+     * source does not contain the string `referrer_counters`. That proves the
+     * code does not **mention** the table; it cannot prove a **row survived**,
+     * and it would pass unchanged if a reversal wrote the counter through the
+     * entity, through a repository, or from a handler two files away. The
+     * guarantee is about a row, so it is asserted about a row.
+     *
+     * ## Why the abuse boundary depends on it
+     *
+     * Returning the slot would make qualification/refund **cycling** possible:
+     * a referrer colluding with invitees who book and refund could reuse one
+     * slot indefinitely, and `V32-DEC-019` calls the monthly cap the
+     * *bounded-exposure control* for an erase-and-re-register gap it accepts
+     * knowingly. A cap that a refund can refund is not a cap.
+     */
+    it('is UNCHANGED by a reversal in the SAME Jalali month', async () => {
+      // Frozen inside Shahrivar 1405, so the qualification and the refund are
+      // unambiguously in one cap period.
+      ctx.referralClock.freeze(new Date('2026-09-15T10:00:00.000Z'));
+
+      const { referrer, orderId } = await awardedReferral();
+
+      const before = await counterRows(referrer.id);
+      expect(before).toHaveLength(1);
+      expect(before[0].qualified_count).toBe(1);
+
+      await refundAndReverse(orderId, ORDER_TOTAL);
+
+      // Byte-identical, row version included. Not "still 1" -- untouched.
+      expect(await counterRows(referrer.id)).toEqual(before);
+    });
+
+    it('is UNCHANGED by a reversal in a LATER Jalali month, in BOTH periods', async () => {
+      /**
+       * The clause the owner made explicit, and the one a plausible
+       * implementation gets wrong in two different directions at once: reaching
+       * BACK to decrement the period the qualification was charged to, or
+       * reaching FORWARD to credit the period the refund landed in.
+       *
+       * Shahrivar 1405 ends at 2026-09-22T20:30Z, so these two instants are in
+       * different Jalali months while being only weeks apart — and the second
+       * is still Gregorian 2026-10, which a Gregorian implementation would also
+       * have separated. The assertion below on the period KEY is what
+       * distinguishes them: `1405-06`, never `2026-09`.
+       */
+      ctx.referralClock.freeze(new Date('2026-09-15T10:00:00.000Z'));
+      const { referrer, orderId } = await awardedReferral();
+
+      const before = await counterRows(referrer.id);
+      expect(before).toHaveLength(1);
+      // The Solar Hijri key `V32-DEC-035` ratified, asserted here so this test
+      // fails loudly if the cap calendar is ever changed underneath it.
+      expect(before[0].period).toBe('1405-06');
+
+      // A month later, in Mehr 1405.
+      ctx.referralClock.freeze(new Date('2026-10-10T10:00:00.000Z'));
+      const result = await refundAndReverse(orderId, ORDER_TOTAL);
+      expect(result.reversed).toBe(true);
+
+      const after = await counterRows(referrer.id);
+      // The ORIGINAL period is untouched...
+      expect(after).toEqual(before);
+      // ...and no row was created in the period the refund landed in. A
+      // cross-period adjustment would show up as a second row here, which a
+      // single-row equality check alone would not have caught.
+      expect(after.map((row) => row.period)).toEqual(['1405-06']);
+    });
+
+    it('does not free the slot for a NEW qualification — the cycling case', async () => {
+      /**
+       * The property the decision actually buys, stated as behaviour rather
+       * than as a row comparison: after a reversal, the referrer's next
+       * qualification consumes the NEXT slot, not the one that was returned.
+       *
+       * This is the assertion an abuser would have to defeat. The two above
+       * prove the row did not move; this proves that the row not moving means
+       * what the decision says it means.
+       */
+      ctx.referralClock.freeze(new Date('2026-09-15T10:00:00.000Z'));
+
+      const { referrer, orderId } = await awardedReferral();
+      await refundAndReverse(orderId, ORDER_TOTAL);
+
+      // The same referrer invites somebody else and it qualifies.
+      const secondReferee = await customer();
+      await pendingReferral(referrer, secondReferee);
+      const secondBooking = uuidv7();
+      await paidOrder(secondBooking, secondReferee.id);
+      expect((await qualifyFor(secondReferee, secondBooking)).qualified).toBe(true);
+
+      // TWO, not one: the reversed referral's slot was never given back.
+      const rows = await counterRows(referrer.id);
+      expect(rows).toHaveLength(1);
+      expect(rows[0].qualified_count).toBe(2);
+    });
+
+    it('does not free a slot for a referrer who is already CAPPED', async () => {
+      /**
+       * The sharpest form of the same property, and the one with money behind
+       * it. A referrer at the cap gets `capped` rather than a reward; if a
+       * reversal returned a slot, their very next qualification would become
+       * payable again — which is the cycling loop, reachable in two events.
+       */
+      ctx.referralClock.freeze(new Date('2026-09-15T10:00:00.000Z'));
+
+      const referrer = await customer();
+      withRewards(50, 30);
+      await dataSource.query(
+        `INSERT INTO referral.referrer_counters (referrer_user_id, period, qualified_count)
+         VALUES ($1, '1405-06', $2)`,
+        [referrer.id, REFERRAL_MONTHLY_CAP],
+      );
+
+      // One capped qualification, then its order is fully refunded.
+      const referee = await customer();
+      await pendingReferral(referrer, referee);
+      const bookingId = uuidv7();
+      const orderId = await paidOrder(bookingId, referee.id);
+      expect((await qualifyFor(referee, bookingId)).referrerOutcome).toBe('capped');
+
+      const before = await counterRows(referrer.id);
+      await refundAndReverse(orderId, ORDER_TOTAL);
+      expect(await counterRows(referrer.id)).toEqual(before);
+
+      // The next qualification is STILL capped -- the refund bought the
+      // referrer nothing.
+      const third = await customer();
+      await pendingReferral(referrer, third);
+      const thirdBooking = uuidv7();
+      await paidOrder(thirdBooking, third.id);
+      expect((await qualifyFor(third, thirdBooking)).referrerOutcome).toBe('capped');
+    });
+  });
+
+  // ==========================================================================
   // 7. Balance, lifetime earned, tier and membership
   // ==========================================================================
 
