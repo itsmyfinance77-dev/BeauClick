@@ -905,12 +905,21 @@ describePg('referral attribution — claim lifecycle, concurrency, privacy (real
         // The second INSERT BLOCKS on the unique index until the first
         // transaction resolves -- it cannot see the uncommitted row, and it
         // cannot proceed past it either. That block is the guarantee.
-        const blocked = insert(second, other.id);
+        // Attach both handlers BEFORE releasing the unique-index lock. If the
+        // rejection handler is attached only after commit, Jest can observe an
+        // unhandled-rejection window under parallel load even though the error
+        // is the exact constraint refusal this test expects.
+        const blocked = insert(second, other.id).then(
+          () => ({ accepted: true as const, error: null }),
+          (error: unknown) => ({ accepted: false as const, error }),
+        );
 
         await first.commitTransaction();
 
         // Now it unblocks, and fails.
-        await expect(blocked).rejects.toThrow(/uq_referrals_referee/);
+        const outcome = await blocked;
+        expect(outcome.accepted).toBe(false);
+        expect(String(outcome.error)).toMatch(/uq_referrals_referee/);
         await second.rollbackTransaction();
       } finally {
         await first.release();

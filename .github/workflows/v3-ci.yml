@@ -277,8 +277,17 @@ jobs:
           REHEARSAL_SOURCE_URL: postgres://postgres:postgres@localhost:5432/beauclick_v3_ci
           REHEARSAL_APP_URL: postgres://beauclick_app:ci_app@localhost:5432/beauclick_v3_ci
 
-      - name: Real-PostgreSQL and OpenSearch suite
-        run: pnpm test:pg
+      - name: Real-PostgreSQL and OpenSearch suite (zero skipped)
+        # Run the expensive suite exactly once. `tee` preserves the complete
+        # evidence while `pipefail` preserves pnpm/Jest's real exit code. The
+        # parser then proves the summary exists and both suites and tests are
+        # fully executed; it does not treat missing/unparseable output as green.
+        run: |
+          set -euo pipefail
+          pnpm test:pg 2>&1 | tee "$RUNNER_TEMP/v3-pg-test-output.log"
+          pnpm ts-node --project database/scripts/tsconfig.json \
+            database/scripts/assert-jest-zero-skipped.ts \
+            "$RUNNER_TEMP/v3-pg-test-output.log"
         env:
           TEST_DATABASE_URL: postgres://beauclick_app:ci_app@localhost:5432/beauclick_v3_ci
           TEST_FINANCIAL_WRITER_URL: postgres://beauclick_financial_writer:ci_writer@localhost:5432/beauclick_v3_ci
@@ -292,33 +301,6 @@ jobs:
           # the role itself has always been provisioned with this exact
           # password by the step above. Wiring it activates real coverage that
           # was written in Phase 2 and has never once actually executed.
-          TEST_FINANCIAL_READER_URL: postgres://beauclick_financial_reader:ci_reader@localhost:5432/beauclick_v3_ci
-          TEST_OPENSEARCH_URL: http://localhost:9200
-          # Present, so `media-s3.pg-spec.ts` RUNS rather than skipping -- the
-          # same reasoning the financial reader URL above carries. The suite
-          # creates its own bucket using this codebase's own signer, so there
-          # is no provisioning step to drift: a wrong signature fails in the
-          # suite rather than being mistaken for a setup problem.
-          TEST_S3_ENDPOINT: http://localhost:9000
-          TEST_S3_ACCESS_KEY_ID: beauclick_test
-          TEST_S3_SECRET_ACCESS_KEY: beauclick_test_secret
-          TEST_S3_BUCKET: beauclick-media-ci
-
-      - name: Assert no suite was silently skipped
-        # A `describe.skip` triggered by a missing environment variable looks
-        # identical to a passing run in the summary line. This makes that
-        # difference fatal.
-        run: |
-          OUTPUT=$(pnpm test:pg 2>&1 | tail -20)
-          echo "$OUTPUT"
-          if echo "$OUTPUT" | grep -qE "[0-9]+ skipped, [0-9]+ of [0-9]+ total"; then
-            echo "A test suite was skipped -- a required service or credential is missing."
-            exit 1
-          fi
-        env:
-          TEST_DATABASE_URL: postgres://beauclick_app:ci_app@localhost:5432/beauclick_v3_ci
-          TEST_FINANCIAL_WRITER_URL: postgres://beauclick_financial_writer:ci_writer@localhost:5432/beauclick_v3_ci
-          TEST_FINANCIAL_OWNER_URL: postgres://beauclick_financial_owner:ci_owner@localhost:5432/beauclick_v3_ci
           TEST_FINANCIAL_READER_URL: postgres://beauclick_financial_reader:ci_reader@localhost:5432/beauclick_v3_ci
           TEST_OPENSEARCH_URL: http://localhost:9200
           # Present, so `media-s3.pg-spec.ts` RUNS rather than skipping -- the
