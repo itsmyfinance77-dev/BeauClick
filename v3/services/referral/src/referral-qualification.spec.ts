@@ -10,7 +10,9 @@ import {
   ReferralQualified,
 } from '@beauclick/event-contracts';
 
-import { tehranCalendarMonth } from './referral-clock';
+import { isJalaliLeapYear, jalaliMonthLength } from '@beauclick/persian-utils';
+
+import { REFERRAL_PERIOD_KEY_PATTERN, tehranCalendarMonth } from './referral-clock';
 import { REFERRAL_REWARD_DEFAULTS } from './referral-reward.config';
 import { REFERRAL_LEDGER_REFERENCE_TYPE, REFERRAL_MONTHLY_CAP } from './referral-qualification.service';
 import { REFERRAL_STATUSES } from './entities/referral.entities';
@@ -178,45 +180,187 @@ describe('the monthly cap', () => {
   });
 });
 
-describe('the Tehran calendar month', () => {
-  // Tehran is UTC+3:30 (Iran abolished DST in 2022), so a calendar month rolls
-  // at 20:30 UTC on the last day. These are ACTUAL INSTANTS rather than
-  // formatted labels, which is the only way a boundary test means anything.
-  it('rolls at 20:30 UTC on the last day of the month', () => {
-    expect(tehranCalendarMonth(new Date('2026-09-30T20:29:59.999Z'))).toBe('2026-09');
-    expect(tehranCalendarMonth(new Date('2026-09-30T20:30:00.000Z'))).toBe('2026-10');
+describe('the Solar Hijri (Jalali) cap period — V32-DEC-035', () => {
+  /**
+   * Every instant below is an ACTUAL UTC INSTANT, not a formatted label.
+   *
+   * Tehran is UTC+03:30 and Iran abolished DST in 2022, so 00:00 Tehran is
+   * **20:30 UTC on the preceding day**. That is where every boundary in this
+   * group sits, and asserting it in UTC is the only way to prove the boundary
+   * is the Tehran one rather than the machine's.
+   *
+   * Nothing here reads the current date, the host timezone, or the host locale:
+   * `tehranCalendarMonth` takes the instant as an argument, and the expected
+   * values are literals.
+   */
+
+  it('uses the JALALI year and month, not the Gregorian ones', () => {
+    // The headline. 2026-09-15 in Tehran is Shahrivar 1405 -- so a Gregorian
+    // implementation returns `2026-09` and this must not.
+    const instant = new Date('2026-09-15T12:00:00.000Z');
+
+    expect(tehranCalendarMonth(instant)).toBe('1405-06');
+    expect(tehranCalendarMonth(instant)).not.toBe('2026-09');
+    // And the Jalali year is nowhere near the Gregorian one, which is the
+    // cheapest possible check that a calendar conversion happened at all.
+    expect(tehranCalendarMonth(instant).slice(0, 4)).toBe('1405');
   });
 
-  it('puts a late-evening Tehran instant in the month the customer sees', () => {
-    // 23:59 Tehran on 30 September is still September to the person, even
-    // though it is already 20:29 UTC. Bucketing in UTC would move a referrer's
-    // last-night-of-the-month qualification into the next month's allowance.
-    expect(tehranCalendarMonth(new Date('2026-09-30T20:29:00.000Z'))).toBe('2026-09');
-    // And 00:01 Tehran on 1 October is October.
-    expect(tehranCalendarMonth(new Date('2026-09-30T20:31:00.000Z'))).toBe('2026-10');
+  it('maps Nowruz correctly on both sides of the boundary', () => {
+    // 1 Farvardin 1405 = 2026-03-21 Tehran, so the year rolls at
+    // 2026-03-20T20:30:00Z. Esfand 1404 -> Farvardin 1405.
+    expect(tehranCalendarMonth(new Date('2026-03-20T20:29:59.999Z'))).toBe('1404-12');
+    expect(tehranCalendarMonth(new Date('2026-03-20T20:30:00.000Z'))).toBe('1405-01');
   });
 
-  it('differs from the UTC month in the 3.5-hour window where they disagree', () => {
-    // The non-vacuity of the whole helper: if it were secretly UTC-based, every
-    // assertion above would still pass except this one.
-    const instant = new Date('2026-09-30T21:00:00.000Z');
-    expect(instant.toISOString().slice(0, 7)).toBe('2026-09');
-    expect(tehranCalendarMonth(instant)).toBe('2026-10');
+  it('rolls at 00:00 Asia/Tehran, NOT 00:00 UTC', () => {
+    // The instant a UTC-based implementation would treat as the boundary is
+    // three and a half hours LATE -- by 00:00 UTC on 2026-03-21 the new Jalali
+    // month has already been running since 20:30Z the previous day.
+    expect(tehranCalendarMonth(new Date('2026-03-20T21:00:00.000Z'))).toBe('1405-01');
+    expect(tehranCalendarMonth(new Date('2026-03-21T00:00:00.000Z'))).toBe('1405-01');
+    // ...and the instant just before the TEHRAN boundary is still the old
+    // month, even though it is the same UTC day as instants that are not.
+    expect(tehranCalendarMonth(new Date('2026-03-20T20:29:00.000Z'))).toBe('1404-12');
   });
 
-  it('handles a year boundary', () => {
-    expect(tehranCalendarMonth(new Date('2026-12-31T20:29:00.000Z'))).toBe('2026-12');
-    expect(tehranCalendarMonth(new Date('2026-12-31T20:31:00.000Z'))).toBe('2027-01');
+  it('keeps the last instant of a Jalali month in the previous bucket', () => {
+    // 31-day month: Shahrivar 1405 ends 2026-09-22 Tehran; 1 Mehr is 09-23.
+    expect(tehranCalendarMonth(new Date('2026-09-22T20:29:59.999Z'))).toBe('1405-06');
   });
 
-  it('always produces the shape the CHECK constraint accepts', () => {
+  it('puts the first instant of a Jalali month in the new bucket', () => {
+    expect(tehranCalendarMonth(new Date('2026-09-22T20:30:00.000Z'))).toBe('1405-07');
+  });
+
+  it('rolls a 31-day month correctly (months 1-6)', () => {
+    // Farvardin 1405 has 31 days: 1405-01-01 = 2026-03-21, so 1405-02-01 is
+    // 2026-04-21 and the boundary is 2026-04-20T20:30Z.
+    expect(tehranCalendarMonth(new Date('2026-04-20T20:29:59.999Z'))).toBe('1405-01');
+    expect(tehranCalendarMonth(new Date('2026-04-20T20:30:00.000Z'))).toBe('1405-02');
+  });
+
+  it('rolls a 30-day month correctly (months 7-11)', () => {
+    // Aban 1405 has 30 days: 1405-09-01 (Azar) = 2026-11-22, boundary
+    // 2026-11-21T20:30Z.
+    expect(tehranCalendarMonth(new Date('2026-11-21T20:29:59.999Z'))).toBe('1405-08');
+    expect(tehranCalendarMonth(new Date('2026-11-21T20:30:00.000Z'))).toBe('1405-09');
+  });
+
+  it('rolls Esfand correctly in a NON-LEAP Persian year (29 days)', () => {
+    // 1404 is not a leap year, so Esfand 1404 has 29 days and ends
+    // 2026-03-20 Tehran.
+    expect(isJalaliLeapYear(1404)).toBe(false);
+    expect(jalaliMonthLength(1404, 12)).toBe(29);
+    expect(tehranCalendarMonth(new Date('2026-03-20T20:29:59.999Z'))).toBe('1404-12');
+    expect(tehranCalendarMonth(new Date('2026-03-20T20:30:00.000Z'))).toBe('1405-01');
+  });
+
+  it('rolls Esfand correctly in a LEAP Persian year (30 days)', () => {
+    // 1403 IS a leap year, so Esfand 1403 has 30 days and 1 Farvardin 1404
+    // falls on 2025-03-21 -- boundary 2025-03-20T20:30Z. A leap-year bug would
+    // move this by exactly one day.
+    expect(isJalaliLeapYear(1403)).toBe(true);
+    expect(jalaliMonthLength(1403, 12)).toBe(30);
+    expect(tehranCalendarMonth(new Date('2025-03-20T20:29:59.999Z'))).toBe('1403-12');
+    expect(tehranCalendarMonth(new Date('2025-03-20T20:30:00.000Z'))).toBe('1404-01');
+  });
+
+  it('does NOT reset when the GREGORIAN month changes inside one Jalali month', () => {
+    // Mehr 1405 runs 2026-09-23 .. 2026-10-22 Tehran, so it spans the
+    // Gregorian September -> October boundary. A Gregorian implementation
+    // resets here; the ratified one must not.
+    expect(tehranCalendarMonth(new Date('2026-09-30T20:29:00.000Z'))).toBe('1405-07');
+    expect(tehranCalendarMonth(new Date('2026-09-30T20:31:00.000Z'))).toBe('1405-07');
+  });
+
+  it('DOES reset when the JALALI month changes inside one Gregorian month', () => {
+    // The mirror image, and together with the case above it is the pair that
+    // proves the semantics actually changed. Both instants are Gregorian
+    // 2026-09; only the Jalali month differs.
+    expect(tehranCalendarMonth(new Date('2026-09-22T20:29:00.000Z'))).toBe('1405-06');
+    expect(tehranCalendarMonth(new Date('2026-09-22T20:31:00.000Z'))).toBe('1405-07');
+  });
+
+  it('produces ASCII digits matching the database CHECK, across a whole Jalali year', () => {
     // `ck_referrer_counters_period_format` is `^[0-9]{4}-(0[1-9]|1[0-2])$`. A
-    // helper that produced anything else would fail at INSERT time, in
-    // production, on the first qualification of a month.
+    // key with Persian digits (`۱۴۰۵-۰۶`) would look right in a log and be
+    // rejected at INSERT time, in production, on the first qualification of a
+    // month -- so the shape is asserted, and so is the absence of non-ASCII.
     for (let month = 0; month < 12; month += 1) {
-      const value = tehranCalendarMonth(new Date(Date.UTC(2026, month, 15)));
-      expect(value).toMatch(/^[0-9]{4}-(0[1-9]|1[0-2])$/);
+      // The 10th of each Gregorian month at noon Tehran, which walks the whole
+      // Jalali year without landing on a boundary.
+      const value = tehranCalendarMonth(new Date(Date.UTC(2026, month, 10, 8, 30)));
+
+      expect(value).toMatch(REFERRAL_PERIOD_KEY_PATTERN);
+      expect(value).toMatch(/^[\x20-\x7E]+$/);
+      expect(value).not.toMatch(/[۰-۹٠-٩]/);
     }
+  });
+
+  it('pins the application pattern to the database CHECK', () => {
+    // The two are deliberately duplicated -- the database constraint is the
+    // real guarantee and the application one exists to fail diagnosably a
+    // statement earlier. Duplication is only safe if something asserts they
+    // agree, and the migration is read from disk rather than transcribed.
+    const migration = readFileSync(
+      join(
+        __dirname,
+        '..', '..', '..',
+        'database', 'migrations', 'referral',
+        '20260901700003_create_referral_qualification.sql',
+      ),
+      'utf8',
+    );
+
+    expect(migration).toContain("period ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'");
+    expect(REFERRAL_PERIOD_KEY_PATTERN.source).toBe('^[0-9]{4}-(0[1-9]|1[0-2])$');
+  });
+
+  it('fails CLOSED on a malformed conversion rather than writing a bad key', () => {
+    // A period key is the bucket a payout limit is counted in. A silently wrong
+    // one creates a parallel window nothing ever caps, so the helper throws
+    // rather than returning something that merely looks plausible.
+    //
+    // Driven by making the CALENDAR return an impossible month, which is the
+    // only realistic failure mode: `wallClockIn` cannot produce a non-numeric
+    // year, but a future calendar-library swap could return `jm = 13`.
+    //
+    // `jest.doMock` inside `isolateModules` rather than `spyOn`, because an ES
+    // module's exports are non-configurable and `spyOn` throws
+    // "Cannot redefine property". Isolating the registry also keeps the fake
+    // calendar from leaking into any other case in this file.
+    jest.isolateModules(() => {
+      jest.doMock('@beauclick/persian-utils', () => ({
+        ...jest.requireActual('@beauclick/persian-utils'),
+        toJalali: () => ({ jy: 1405, jm: 13, jd: 1 }),
+      }));
+
+      // `require` rather than `import`, because `jest.isolateModules` needs a
+      // SYNCHRONOUS load to pick up the mocked registry -- a static import is
+      // hoisted above `doMock` and would get the real module. The rule is
+      // suppressed by name for this one line rather than the file.
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const withBrokenCalendar = require('./referral-clock') as typeof import('./referral-clock');
+
+      expect(() => withBrokenCalendar.tehranCalendarMonth(new Date('2026-09-15T12:00:00.000Z'))).toThrow(
+        /malformed/i,
+      );
+    });
+
+    jest.dontMock('@beauclick/persian-utils');
+
+    // Non-vacuity: the real implementation still works, so the case above
+    // proved the guard rather than proving the mock broke the module.
+    expect(tehranCalendarMonth(new Date('2026-09-15T12:00:00.000Z'))).toBe('1405-06');
+  });
+
+  it('is deterministic — the same instant always yields the same key', () => {
+    // No hidden dependence on the current date, the host timezone, or a
+    // formatter cache warming up.
+    const instant = new Date('2026-09-15T12:00:00.000Z');
+    const keys = new Set(Array.from({ length: 50 }, () => tehranCalendarMonth(instant)));
+    expect([...keys]).toEqual(['1405-06']);
   });
 });
 

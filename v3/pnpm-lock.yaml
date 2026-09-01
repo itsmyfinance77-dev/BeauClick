@@ -1310,6 +1310,9 @@ importers:
       '@beauclick/http':
         specifier: workspace:*
         version: link:../../libs/http
+      '@beauclick/persian-utils':
+        specifier: workspace:*
+        version: link:../../packages/persian-utils
       '@beauclick/referral-contract':
         specifier: workspace:*
         version: link:../../packages/referral-contract

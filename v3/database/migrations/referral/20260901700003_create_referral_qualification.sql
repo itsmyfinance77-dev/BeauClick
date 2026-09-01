@@ -352,36 +352,46 @@ CREATE TABLE referral.referrer_counters (
     referrer_user_id UUID NOT NULL,
 
     /*
-     * The Tehran calendar month, as `YYYY-MM`.
+     * The SOLAR HIJRI (Jalali) calendar month, as `YYYY-MM` -- `V32-DEC-035`.
      *
-     * ## The one parameter no closed decision pins precisely (ADR-037 §7)
+     * A JALALI year and month, so `1405-06` and never `2026-09`. Each period
+     * begins at 00:00 `Asia/Tehran` on the first day of the Jalali month, and a
+     * Gregorian month evaluated in Tehran is explicitly NOT the policy.
      *
-     * `V32-DEC-019` says "Tehran calendar month". That phrase admits two
-     * readings and they are materially different:
+     * ## The comment this replaces, and why it is corrected in place
      *
-     *   * the GREGORIAN month evaluated in `Asia/Tehran` -- what this column
-     *     stores, and what `ai`'s `tehranCalendarDay` does for its per-day
-     *     quota; or
-     *   * the JALALI (Solar Hijri) month, Iran's official calendar, which this
-     *     repository fully supports (`toJalali`) and which `persian-utils`
-     *     says the platform uses "never Gregorian" for user-facing dates.
+     * `V32-DEC-019` said "Tehran calendar month" without naming a calendar, and
+     * this column originally documented the GREGORIAN reading while flagging it
+     * for ratification (`ADR-037` §7) rather than presenting it as settled. The
+     * owner ratified the SOLAR HIJRI month on 2026-09-01, so the flagged
+     * reading was wrong.
      *
-     * Jalali months begin around the 21st of a Gregorian one, so the two
-     * windows differ by roughly three weeks.
+     * This file is edited rather than corrected by a follow-up migration
+     * because the comment describes a POLICY rather than a schema, and because
+     * the schema itself needs no change at all (below). The usual objection --
+     * do not rewrite an applied migration -- does not apply: no release tag
+     * contains this file, the CD pipeline has never run, and the only database
+     * that has ever held the table is a development scratch database. Nothing
+     * that outlives a test run has applied it.
      *
-     * **The `ai` precedent does not settle it**: for a DAY the two calendars
-     * are the same window and only the label differs, so the question a MONTH
-     * asks has never been exercised.
+     * ## Why the ambiguity was real, kept because it is the trap
      *
-     * Implemented as Gregorian-in-Tehran and FLAGGED FOR RATIFICATION rather
-     * than presented as settled -- the course `ADR-035` §3 took with the code
-     * format, which the owner later ratified as `V32-DEC-034`.
+     * `ai`'s `tehranCalendarDay` looks like a precedent for the Gregorian
+     * reading and is NOT one: for a DAY the two calendars are the same window
+     * and only the label differs. The question a MONTH asks had never been
+     * exercised anywhere in this codebase, so the implementation inherited an
+     * interpretation nobody had chosen. Jalali months begin around the 21st of
+     * a Gregorian one, so the two windows differ by roughly three weeks.
      *
-     * It is materially inert today: BOTH configured reward values are **0**, so
-     * a capped referrer is paid nothing and an uncapped one is paid nothing.
-     * It is also cheap to change now and expensive later -- this is a bucket
-     * key that has never gated a payment. If the owner intends Jalali months,
-     * that is a new decision-register entry, not a refactor.
+     * ## No schema change was needed, and that is why
+     *
+     * `VARCHAR(7)` and `ck_referrer_counters_period_format`
+     * (`^[0-9]{4}-(0[1-9]|1[0-2])$`) accept a Jalali key unchanged -- a Jalali
+     * year is four digits and its months are 1..12 like any other. The column
+     * was calendar-agnostic by accident and is calendar-agnostic on purpose
+     * now. Ratifying the calendar therefore required no migration and no
+     * backfill, which is only true because it happened before any reward value
+     * became non-zero.
      *
      * A VARCHAR bucket rather than a date range, for the contention reason the
      * other two counters record: bucketing means concurrent referrers in

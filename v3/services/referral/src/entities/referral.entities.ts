@@ -371,11 +371,20 @@ export class ReferralReferrerCounterEntity {
   referrerUserId!: string;
 
   /**
-   * The Tehran calendar month, `YYYY-MM`, from `tehranCalendarMonth`.
+   * The **Solar Hijri (Jalali)** calendar month, `YYYY-MM`, from
+   * `tehranCalendarMonth` — `V32-DEC-035`.
    *
-   * See that function's docblock for the Gregorian-versus-Jalali question this
-   * repository has not had to answer before, why it is answered as Gregorian
-   * here, and why it is materially inert while both reward values are 0.
+   * A Jalali year and month, so `1405-06`, not `2026-09`. The period begins at
+   * 00:00 `Asia/Tehran` on the first day of the Jalali month.
+   *
+   * `VARCHAR(7)` and the `^[0-9]{4}-(0[1-9]|1[0-2])$` CHECK are unchanged from
+   * the original migration and needed no alteration: a Jalali key satisfies
+   * both. The column was calendar-agnostic by accident and is calendar-agnostic
+   * on purpose now — which is why ratifying the calendar required no data
+   * migration.
+   *
+   * See `tehranCalendarMonth` for why the Gregorian reading was flagged rather
+   * than assumed, and why `ai`'s per-DAY Tehran precedent did not settle it.
    */
   @PrimaryColumn({ type: 'varchar', length: 7 })
   period!: string;

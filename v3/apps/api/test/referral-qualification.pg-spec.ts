@@ -248,7 +248,7 @@ describePg('referral qualification — CAS, two sides, cap, ledger (real Postgre
       ]);
     });
 
-    it('increments the referrer cap counter in the Tehran month', async () => {
+    it('increments the referrer cap counter in the JALALI month', async () => {
       const referrer = await customer();
       const referee = await customer();
       await pendingReferral(referrer, referee);
@@ -256,7 +256,7 @@ describePg('referral qualification — CAS, two sides, cap, ledger (real Postgre
       ctx.referralClock.freeze(new Date('2026-09-15T10:00:00.000Z'));
       await qualifyFor(referee);
 
-      expect(await counters(referrer.id)).toEqual([{ period: '2026-09', qualified_count: 1 }]);
+      expect(await counters(referrer.id)).toEqual([{ period: '1405-06', qualified_count: 1 }]);
     });
 
     it('emits exactly one ReferralQualified v1, with a truthful payload', async () => {
@@ -683,7 +683,7 @@ describePg('referral qualification — CAS, two sides, cap, ledger (real Postgre
       expect(outcomes[REFERRAL_MONTHLY_CAP]).toBe('capped');
 
       expect(await counters(referrer.id)).toEqual([
-        { period: '2026-09', qualified_count: REFERRAL_MONTHLY_CAP },
+        { period: '1405-06', qualified_count: REFERRAL_MONTHLY_CAP },
       ]);
     });
 
@@ -722,22 +722,49 @@ describePg('referral qualification — CAS, two sides, cap, ledger (real Postgre
       expect(last).toMatchObject({ referrerOutcome: 'capped', refereeOutcome: 'awarded' });
     });
 
-    it('the NEXT Tehran month starts a fresh window — no lifetime cap', async () => {
+    it('the NEXT JALALI month starts a fresh window — no lifetime cap', async () => {
+      // `V32-DEC-035`: the period is the SOLAR HIJRI month, so the reset
+      // instant is 1 Mehr 1405 -- 00:00 Tehran on 2026-09-23, which is
+      // 2026-09-22T20:30Z -- and NOT 1 October.
+      //
+      // This is also the decisive case: both instants below are Gregorian
+      // 2026-09, so a Gregorian implementation would keep one bucket and
+      // refuse the eleventh qualification. The cap resetting here is only
+      // correct under the ratified calendar.
       const referrer = await customer();
       ctx.referralClock.freeze(new Date('2026-09-15T10:00:00.000Z'));
       withRewards(30, 15);
 
       await qualifyMany(referrer, REFERRAL_MONTHLY_CAP);
 
-      // 00:01 Tehran on 1 October.
-      ctx.referralClock.freeze(new Date('2026-09-30T20:31:00.000Z'));
+      // 00:01 Tehran on 1 Mehr 1405 -- still Gregorian September.
+      ctx.referralClock.freeze(new Date('2026-09-22T20:31:00.000Z'));
       const outcomes = await qualifyMany(referrer, 1);
 
       expect(outcomes).toEqual(['awarded']);
       expect(await counters(referrer.id)).toEqual([
-        { period: '2026-09', qualified_count: REFERRAL_MONTHLY_CAP },
-        { period: '2026-10', qualified_count: 1 },
+        { period: '1405-06', qualified_count: REFERRAL_MONTHLY_CAP },
+        { period: '1405-07', qualified_count: 1 },
       ]);
+    });
+
+    it('does NOT reset when only the GREGORIAN month changes', async () => {
+      // The mirror image, and the half a Gregorian implementation passes
+      // while getting the case above wrong. Mehr 1405 spans the Gregorian
+      // September -> October boundary, so crossing it must change nothing.
+      const referrer = await customer();
+      withRewards(30, 15);
+
+      // Inside Mehr 1405, before the Gregorian month end.
+      ctx.referralClock.freeze(new Date('2026-09-30T20:29:00.000Z'));
+      await qualifyMany(referrer, 1);
+
+      // Two minutes later: Gregorian October, still Mehr 1405.
+      ctx.referralClock.freeze(new Date('2026-09-30T20:31:00.000Z'));
+      await qualifyMany(referrer, 1);
+
+      // ONE bucket, not two -- the allowance did not reset.
+      expect(await counters(referrer.id)).toEqual([{ period: '1405-07', qualified_count: 2 }]);
     });
 
     it('the cap is per referrer — one at the cap does not affect another', async () => {
@@ -776,7 +803,7 @@ describePg('referral qualification — CAS, two sides, cap, ledger (real Postgre
 
       // The counter landed on exactly the cap, never above.
       expect(await counters(referrer.id)).toEqual([
-        { period: '2026-09', qualified_count: REFERRAL_MONTHLY_CAP },
+        { period: '1405-06', qualified_count: REFERRAL_MONTHLY_CAP },
       ]);
     });
 
@@ -790,7 +817,7 @@ describePg('referral qualification — CAS, two sides, cap, ledger (real Postgre
       await qualifyFor(referee);
       await qualifyFor(referee);
 
-      expect(await counters(referrer.id)).toEqual([{ period: '2026-09', qualified_count: 1 }]);
+      expect(await counters(referrer.id)).toEqual([{ period: '1405-06', qualified_count: 1 }]);
     });
   });
 
