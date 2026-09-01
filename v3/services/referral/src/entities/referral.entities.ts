@@ -1,4 +1,18 @@
-import { Check, Column, CreateDateColumn, Entity, Index, PrimaryColumn, Unique } from 'typeorm';
+import {
+  Check,
+  Column,
+  CreateDateColumn,
+  Entity,
+  Index,
+  PrimaryColumn,
+  Unique,
+  UpdateDateColumn,
+} from 'typeorm';
+import { OutboxEventEntityBase } from '@beauclick/events';
+import type {
+  ReferralRewardOutcome,
+  ReferralRewardSide,
+} from '@beauclick/event-contracts';
 
 /**
  * The referral code. One table, and the domain is complete for Story #11.
@@ -162,6 +176,43 @@ export class ReferralAttributionEntity {
 
   @Column({ type: 'timestamptz', nullable: true })
   refereeErasedAt!: Date | null;
+
+  /**
+   * The lifecycle state — V3.2-C Story #12 (ADR-037 §2).
+   *
+   * Story #27 shipped without this column and ADR-036 §12 recorded why: the
+   * pending state was the existence of the row plus `expires_at`, and a column
+   * whose only value was `'pending'` would have been speculative. It is the
+   * left-hand side of the qualification compare-and-swap now.
+   *
+   * See `REFERRAL_STATUSES` for why there is no `expired` and no `reversed`.
+   */
+  @Column({ type: 'varchar', length: 16, default: 'pending' })
+  status!: ReferralStatus;
+
+  /**
+   * When qualification happened, and WHICH booking caused it.
+   *
+   * Both NULL until qualification, both non-NULL after, and
+   * `ck_referrals_qualification_complete` makes any other combination
+   * unwritable — so a qualified referral without its qualifying booking is
+   * unrepresentable rather than merely unlikely.
+   *
+   * `qualifyingBookingId` is the ONE thing this story builds for Story #28
+   * (ADR-037 §13): `V32-DEC-017` makes a full refund of the qualifying
+   * booking's order the reversal trigger, and without this column that story
+   * would have to identify the order by guessing. **Nothing in this story reads
+   * it.**
+   *
+   * Both are frozen once set by `tg_referrals_immutable`, with a different rule
+   * from the four attribution columns: those are frozen always, these are
+   * frozen once non-NULL, because NULL -> value is the qualification itself.
+   */
+  @Column({ type: 'timestamptz', nullable: true })
+  qualifiedAt!: Date | null;
+
+  @Column({ type: 'uuid', nullable: true })
+  qualifyingBookingId!: string | null;
 }
 
 /**
@@ -199,4 +250,166 @@ export class ReferralClaimAttemptEntity {
   updatedAt!: Date;
 }
 
-export const REFERRAL_ENTITIES = [ReferralCodeEntity, ReferralAttributionEntity, ReferralClaimAttemptEntity];
+/**
+ * The referral lifecycle status — V3.2-C Story #12 (ADR-037 §2).
+ *
+ * Exactly two values, and the two that are absent are absent on purpose:
+ *
+ *  * **no `expired`** — expiry is a PREDICATE (`expires_at <= now()`), not a
+ *    state. Storing it would need a sweeper to maintain, which would make a
+ *    referral's expiry depend on whether a background job had run rather than
+ *    on the clock. The compare-and-swap reads the predicate directly.
+ *  * **no `reversed`** — Story #28's vocabulary. Adding it now would put that
+ *    story's data model on the table before its behaviour exists.
+ */
+export const REFERRAL_STATUSES = ['pending', 'qualified'] as const;
+export type ReferralStatus = (typeof REFERRAL_STATUSES)[number];
+
+/**
+ * A reward grant — one per referral per side, always both — V3.2-C Story #12.
+ *
+ * ## Why two rows exist even when neither pays anything
+ *
+ * `V32-DEC-019`'s owner correction is explicit: *both grants must not be
+ * skipped merely because the inviter reached their cap*, and *an invited
+ * customer must never lose their own approved reward because of somebody
+ * else's activity*. The two sides are independent facts, so they are two rows.
+ *
+ * With both configured values at 0 today, both rows will read
+ * `disabled_zero, points 0` — and that is the point rather than a degenerate
+ * case. `V32-DEC-016` requires zero to be **honestly disabled**: the platform
+ * recording that it decided, on that date, to award zero is a materially
+ * different claim from the platform recording nothing at all.
+ *
+ * ## The disposition is `retained`, and this row is the reason
+ *
+ * `V32-DEC-019` retains this table because it **explains a retained loyalty
+ * ledger entry**. A points row with no grant accounting for it would be a
+ * balance nobody could justify to the person holding it.
+ */
+@Entity({ name: 'reward_grants', schema: 'referral' })
+@Unique('uq_reward_grants_referral_side', ['referralId', 'side'])
+@Index('ix_reward_grants_recipient', ['recipientUserId'])
+export class ReferralRewardGrantEntity {
+  @PrimaryColumn('uuid')
+  id!: string;
+
+  /**
+   * The referral this grant explains.
+   *
+   * No relation and no foreign key, for the erasure-lifecycle reason ADR-036 §2
+   * records: both rows are retained, and a referential action would tie their
+   * fates together in a way no disposition asked for.
+   */
+  @Column({ type: 'uuid' })
+  referralId!: string;
+
+  /**
+   * Whose grant this is.
+   *
+   * Named with the `_user_id` suffix so ADR-027's coverage heuristic recognises
+   * it, and present at all so a subject's own grants are addressable **without
+   * joining back to `referrals`** — which is what lets the privacy export show
+   * a person their own outcome without ever loading the row that names the
+   * counterparty.
+   */
+  @Column({ type: 'uuid' })
+  recipientUserId!: string;
+
+  @Column({ type: 'varchar', length: 16 })
+  side!: ReferralRewardSide;
+
+  @Column({ type: 'varchar', length: 24 })
+  outcome!: ReferralRewardOutcome;
+
+  /**
+   * The CONFIGURED value at qualification time.
+   *
+   * Captured per row rather than derived on read, for the same reason
+   * `loyalty.points_entries` captures `multiplier_bp`: a later change to the
+   * configured figure must never retroactively alter what a past qualification
+   * was worth. It is also what makes `disabled_zero, points 0` an explanation
+   * instead of a restatement.
+   */
+  @Column({ type: 'int' })
+  points!: number;
+
+  /**
+   * The ledger reason this side uses.
+   *
+   * Stored rather than derived from `side`, because this row's job is to
+   * explain a retained ledger entry: if the side-to-reason mapping ever
+   * changed, deriving it would silently rewrite the history of every past
+   * grant.
+   */
+  @Column({ type: 'varchar', length: 64 })
+  ledgerReason!: string;
+
+  @Column({ type: 'timestamptz' })
+  grantedAt!: Date;
+}
+
+/**
+ * The per-referrer monthly cap counter — `V32-DEC-019`, ADR-037 §7.
+ *
+ * **Nothing reads this entity through the repository API**, and that is
+ * deliberate rather than an oversight — the same note
+ * `ReferralClaimAttemptEntity` carries. The counter is charged by one
+ * conditional `INSERT … ON CONFLICT DO UPDATE … WHERE qualified_count < $3
+ * RETURNING`, written as raw SQL on the caller's `EntityManager`, because the
+ * whole guarantee is that the read and the write are **one statement**. A
+ * repository `findOne` followed by a `save` is `GAP-04`, which `V32-DEC-019`
+ * names and forbids in those words.
+ *
+ * The entity exists so the table is registered with TypeORM — which the
+ * subject-data coverage check and the test harness's reset both rely on — and
+ * so the column names have one definition.
+ */
+@Entity({ name: 'referrer_counters', schema: 'referral' })
+export class ReferralReferrerCounterEntity {
+  @PrimaryColumn('uuid')
+  referrerUserId!: string;
+
+  /**
+   * The Tehran calendar month, `YYYY-MM`, from `tehranCalendarMonth`.
+   *
+   * See that function's docblock for the Gregorian-versus-Jalali question this
+   * repository has not had to answer before, why it is answered as Gregorian
+   * here, and why it is materially inert while both reward values are 0.
+   */
+  @PrimaryColumn({ type: 'varchar', length: 7 })
+  period!: string;
+
+  @Column({ type: 'int' })
+  qualifiedCount!: number;
+
+  @UpdateDateColumn({ type: 'timestamptz' })
+  updatedAt!: Date;
+}
+
+/**
+ * The referral outbox — the module's first, arriving with its first producer.
+ *
+ * ADR-035 §7 and ADR-036 §10 both declined to create this, and both were right
+ * at the time: `ReferralAttributed` is deliberately not defined because it has
+ * no consumer, and an outbox table nothing writes would still need a
+ * subject-data claim nobody could verify.
+ *
+ * `ReferralQualified` v1 has a consumer (`V32-DEC-033`: the in-app,
+ * opt-outable `referral` notification), so the table arrives now.
+ *
+ * Extends the shared base so the relay reads it through the same `OutboxSource`
+ * abstraction as every other domain; a bespoke shape here would be a second
+ * thing to keep in step for no benefit.
+ */
+@Entity({ name: 'outbox_events', schema: 'referral' })
+export class ReferralOutboxEntity extends OutboxEventEntityBase {}
+
+export const REFERRAL_ENTITIES = [
+  ReferralCodeEntity,
+  ReferralAttributionEntity,
+  ReferralClaimAttemptEntity,
+  ReferralRewardGrantEntity,
+  ReferralReferrerCounterEntity,
+  ReferralOutboxEntity,
+];

@@ -293,7 +293,7 @@ Anything a future decision wants to change in this list is a decision-register e
 
 ## What is deliberately not decided here
 
-- **Qualification, reward values, reversal, clawback, and the referrer's monthly cap** — Stories #12 and #28, under `V32-DEC-016`, `V32-DEC-017`, `V32-DEC-018`, and `V32-DEC-019`.
-- **What reads `expires_at`.** This story computes and stores it correctly; the story that acts on an expired pending attribution is #12.
+- **Qualification, reward values, and the referrer's monthly cap** — Story #12, now decided in **ADR-037**, which continues this ADR and revisits none of it. **Reversal and clawback** remain undecided here — Story #28, under `V32-DEC-017`.
+- **What reads `expires_at`.** This story computes and stores it correctly; the story that acts on an expired pending attribution is #12, which has since done so — its compare-and-swap reads `expires_at > now` with a **strict** comparison (ADR-037 §2), so a pending attribution lapses at the instant it lapses.
 - **Any revocation state that is not erasure** — unchanged from ADR-035: a migration and a decision if it is ever wanted, not a nullable column added on the chance somebody does.
 - **The erase-then-re-register gap.** `V32-DEC-019` records it knowingly: erasure rewrites `users.phone` to a tombstone alias, so the number becomes registrable again after the 7-day grace window, producing a genuinely new `user_id` with a genuinely new `created_at` that nothing detects. The monthly referrer cap is the bounded-exposure control. This story does not close it and does not claim to.

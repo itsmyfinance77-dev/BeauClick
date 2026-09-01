@@ -6,7 +6,18 @@ import { BookingEntity } from '@beauclick/booking';
 import { UserEntity } from '@beauclick/identity';
 import { REFERRAL_BOOKING_PORT, REFERRAL_IDENTITY_PORT, ReferralModule } from '@beauclick/referral';
 
+import { OutboxSource } from '@beauclick/events';
+import { LoyaltyConfig, LoyaltyModule } from '@beauclick/loyalty';
+import { NotificationModule } from '@beauclick/notification';
+import { REFERRAL_LOYALTY_PORT, REFERRAL_REWARD_CONFIG, ReferralOutboxEntity } from '@beauclick/referral';
+
 import { ReferralBookingAdapter, ReferralIdentityAdapter } from './referral-ports';
+import { ReferralLoyaltyAdapter, referralRewardConfigFrom } from './referral-loyalty.adapter';
+import { REFERRAL_EVENT_HANDLERS, REFERRAL_OUTBOX_SOURCES } from './referral-tokens';
+import {
+  BookingCompletedReferralHandler,
+  ReferralQualifiedNotificationHandler,
+} from '../events/referral-qualification.handlers';
 
 /**
  * The referral domain's reads into `identity` and `booking`, `@Global()`.
@@ -48,14 +59,32 @@ import { ReferralBookingAdapter, ReferralIdentityAdapter } from './referral-port
  */
 @Global()
 @Module({
-  imports: [TypeOrmModule.forFeature([UserEntity, BookingEntity])],
+  imports: [
+    TypeOrmModule.forFeature([UserEntity, BookingEntity]),
+    // V3.2-C Story #12. For LoyaltyLedgerService and LoyaltyConfig, which the
+    // loyalty adapter and the reward-config factory need. `referral` still
+    // never sees either -- only apps/api does, which is the boundary.
+    LoyaltyModule,
+  ],
   providers: [
     ReferralIdentityAdapter,
     ReferralBookingAdapter,
+    ReferralLoyaltyAdapter,
     { provide: REFERRAL_IDENTITY_PORT, useExisting: ReferralIdentityAdapter },
     { provide: REFERRAL_BOOKING_PORT, useExisting: ReferralBookingAdapter },
+    // V3.2-C Story #12. The one reach into the loyalty ledger (ADR-037 §4).
+    { provide: REFERRAL_LOYALTY_PORT, useExisting: ReferralLoyaltyAdapter },
+    // The two configured reward values, read from the authoritative
+    // LoyaltyConfig. ReferralModule binds a default of { 0, 0 }, so this
+    // changes nothing on a default deployment -- it exists so that SETTING
+    // the variables actually reaches the domain.
+    {
+      provide: REFERRAL_REWARD_CONFIG,
+      inject: [LoyaltyConfig],
+      useFactory: referralRewardConfigFrom,
+    },
   ],
-  exports: [REFERRAL_IDENTITY_PORT, REFERRAL_BOOKING_PORT],
+  exports: [REFERRAL_IDENTITY_PORT, REFERRAL_BOOKING_PORT, REFERRAL_LOYALTY_PORT, REFERRAL_REWARD_CONFIG],
 })
 export class ReferralPortsModule {}
 
@@ -122,10 +151,39 @@ export class ReferralPortsModule {}
 @Module({
   imports: [
     ConfigModule,
-    // FIRST, so both ports are bound before `ReferralModule` is instantiated.
+    // FIRST, so every port is bound before `ReferralModule` is instantiated.
     ReferralPortsModule,
     ReferralModule,
+    // For the ReferralQualified consumer. The notification module is the
+    // ONLY delivery mechanism referral touches: in-app, under the existing
+    // opt-outable `referral` category (V32-DEC-033). No SMS, email, push, or
+    // external provider -- every one of those is externally gated.
+    NotificationModule,
   ],
-  exports: [ReferralPortsModule, ReferralModule],
+  providers: [
+    // The two event handlers, provided here and surfaced under one token.
+    // `BookingCompleted` -> qualify (V32-DEC-018); `ReferralQualified` ->
+    // notify both parties (V32-DEC-033).
+    BookingCompletedReferralHandler,
+    ReferralQualifiedNotificationHandler,
+    {
+      provide: REFERRAL_EVENT_HANDLERS,
+      inject: [BookingCompletedReferralHandler, ReferralQualifiedNotificationHandler],
+      useFactory: (
+        qualify: BookingCompletedReferralHandler,
+        notify: ReferralQualifiedNotificationHandler,
+      ) => [qualify, notify],
+    },
+    // V3.2-C Story #12. The module`s first outbox source, merged by
+    // DomainCompositionModule into the single OUTBOX_SOURCES the relay drains.
+    // Its own token rather than OUTBOX_SOURCES directly, for the reason
+    // ai-tokens.ts records: two modules both providing OUTBOX_SOURCES would
+    // not merge -- the second would silently replace the first.
+    {
+      provide: REFERRAL_OUTBOX_SOURCES,
+      useValue: [{ name: 'referral', entity: ReferralOutboxEntity }] satisfies OutboxSource[],
+    },
+  ],
+  exports: [ReferralPortsModule, ReferralModule, REFERRAL_OUTBOX_SOURCES, REFERRAL_EVENT_HANDLERS],
 })
 export class ReferralCompositionModule {}

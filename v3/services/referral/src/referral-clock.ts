@@ -116,3 +116,59 @@ export function hourBucket(instant: Date): Date {
   bucket.setUTCMinutes(0, 0, 0);
   return bucket;
 }
+
+/**
+ * The Tehran calendar month an instant falls in, as `YYYY-MM`.
+ *
+ * The bucket key for `referral.referrer_counters` — `V32-DEC-019`'s **10
+ * qualified referrals per referrer per Tehran calendar month**.
+ *
+ * ## This is the one parameter no closed decision pins precisely
+ *
+ * `V32-DEC-019` says "Tehran calendar month". That phrase admits two readings
+ * and they are **materially different**:
+ *
+ *  * the **Gregorian** month evaluated in `Asia/Tehran` — what this returns; or
+ *  * the **Jalali** (Solar Hijri) month, Iran's official calendar, which this
+ *    repository fully supports (`toJalali` in `@beauclick/persian-utils`) and
+ *    which `persian-utils`' own `format.ts` says the platform uses "never
+ *    Gregorian" for user-facing dates.
+ *
+ * Jalali months begin around the 21st of a Gregorian one, so the two windows
+ * differ by roughly three weeks and a capped referrer's allowance would reset
+ * on a materially different date under each.
+ *
+ * **`ai`'s precedent does not settle it.** `tehranCalendarDay` is
+ * Gregorian-in-Tehran, but for a **day** the two calendars are the *same
+ * window* — only the label differs. The question a **month** asks has therefore
+ * never been exercised anywhere in this codebase.
+ *
+ * **Why this chooses rather than blocks** (ADR-037 §7): both configured reward
+ * values are **0**, so the cap has no financial effect at all today — a capped
+ * referrer is paid nothing and an uncapped one is paid nothing. It is also
+ * cheap to change now and expensive later: this is a bucket key that has never
+ * gated a payment. **If the owner intends Jalali months, that is a new
+ * decision-register entry rather than a refactor.**
+ *
+ * ## Mechanics
+ *
+ * `en-CA` for the same reason `tehranCalendarDay` uses it: its short date
+ * format is ISO-ordered, so slicing the first seven characters yields `YYYY-MM`
+ * without a manual part-reassembly step and the off-by-one padding bugs that
+ * come with one.
+ *
+ * The offset comes from the runtime's IANA database rather than a hardcoded
+ * +03:30. Iran abolished DST in 2022 and could resume it; a fixed offset is
+ * correct today and silently wrong for the affected days if that ever changes —
+ * which would move a referrer's month boundary by an hour, in exactly the hour
+ * a burst of qualifications is least likely to be noticed.
+ */
+export function tehranCalendarMonth(instant: Date): string {
+  return monthFormatter.format(instant);
+}
+
+const monthFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Tehran',
+  year: 'numeric',
+  month: '2-digit',
+});

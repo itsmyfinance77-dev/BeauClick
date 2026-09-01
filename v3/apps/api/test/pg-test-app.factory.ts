@@ -365,6 +365,13 @@ export const RESETTABLE_TABLES = [
   // the two rows have different erasure lifecycles, so no referential action
   // expresses their relationship and a CASCADE could not be relied on here even
   // if the order were wrong.
+  // V3.2-C Story #12. Qualification, the two-sided grants, the monthly cap
+  // counter, and the module's first outbox. Children first: a grant references
+  // a referral by id (no FK, for the erasure-lifecycle reason ADR-036 §2
+  // records), so ordering is a convention here rather than a cascade.
+  'referral.outbox_events',
+  'referral.reward_grants',
+  'referral.referrer_counters',
   'referral.referrals',
   'referral.claim_attempts',
   // V3.2-C Story #11. Listed after the tables that reference it by id, keeping

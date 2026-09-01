@@ -27,27 +27,86 @@ export interface LoyaltyPolicy {
   pointsBookingCompleted: number;
   pointsReviewSubmitted: number;
   pointsOrderCompleted: number;
-  pointsReferralQualified: number;
+  /**
+   * The referrer's and the referee's rewards for a qualified referral, as TWO
+   * independent values (V3.2-C Story #12, `V32-DEC-016`, ADR-037 §3).
+   *
+   * Two rather than one, and the reason is mechanical rather than stylistic.
+   * The ledger's idempotency is
+   * `UNIQUE (reference_type, reference_id, reason)`, so one shared reason
+   * would make the two people's rewards for ONE referral id collide in the
+   * same slot — the second would silently never happen. Two values without two
+   * reasons would be the same bug with extra configuration.
+   */
+  pointsReferralReferrer: number;
+  pointsReferralReferee: number;
 }
 
 export const LOYALTY_POLICY_DEFAULTS: LoyaltyPolicy = {
   pointsBookingCompleted: 10,
   pointsReviewSubmitted: 5,
   pointsOrderCompleted: 10,
-  // No V2 precedent -- referral rewards existed but split a configured pool
-  // rather than awarding flat points. Zero, so referral qualification awards
-  // nothing until the business sets a real figure, rather than inventing one.
-  pointsReferralQualified: 0,
+  /**
+   * **Both zero, and zero is HONESTLY DISABLED rather than a placeholder.**
+   *
+   * `V32-DEC-016` decided both values and set both to 0: qualification is
+   * still recorded, the reward grant is still recorded, and **no ledger row is
+   * written and no idempotency slot is consumed** — so a later approved figure
+   * can still be awarded against the same referral id. `award()` below the
+   * fold implements exactly that, and Story #12 proves it structurally against
+   * the real table rather than trusting this comment.
+   *
+   * **These are not placeholders awaiting a number, unlike the three above.**
+   * The three flat awards are `GAP-10` provisional V2 values that
+   * `unresolvedPolicies()` reports as unresolved. These two are a **closed
+   * owner decision** whose current answer happens to be zero, which is why
+   * they are deliberately absent from that report: telling an operator the
+   * referral values are "unresolved" would be false.
+   *
+   * A non-zero figure is a NEW owner decision. Not a roadmap example, not a
+   * legacy V2 number, not a test fixture, and specifically not V2's 50.
+   */
+  pointsReferralReferrer: 0,
+  pointsReferralReferee: 0,
 };
 
-/** Reasons a ledger row can carry. The reason is part of the idempotency key, so this set is a contract. */
+/**
+ * Reasons a ledger row can carry. The reason is part of the idempotency key, so
+ * this set is a contract.
+ *
+ * ## `referral_qualified` was removed by V3.2-C Story #12, deliberately
+ *
+ * A single `referral_qualified` reason lived here from Phase 2 and is exactly
+ * the shape `V32-DEC-016` forbids: one reason cannot idempotently pay two
+ * people against one referral id.
+ *
+ * It was removed rather than left beside the pair below, and removing it
+ * destroyed nothing — it was **structurally unwritable**. Its configured value
+ * was 0, and `award()` returns before the `INSERT` at zero, so no row could
+ * ever have carried it; zero rows was verified against the real table before
+ * the change. Leaving an unused single-sided reason in a set this codebase
+ * calls a contract would have put the one shape the decision forbids within
+ * easy reach of the next author.
+ */
 export const LOYALTY_REASONS = {
   bookingCompleted: 'booking_completed',
   reviewSubmitted: 'review_submitted',
   orderCompleted: 'order_completed',
-  referralQualified: 'referral_qualified',
+  /**
+   * The two referral reasons (`V32-DEC-016`).
+   *
+   * Both are referenced as `('referral', <referral id>)` — never the booking
+   * id. The guarantee being bought is *one reward per referral per side*, and
+   * the booking id would express *one reward per booking per side*, which is a
+   * different and weaker statement the moment a referee books twice.
+   */
+  referralReferrerReward: 'referral_referrer_reward',
+  referralRefereeReward: 'referral_referee_reward',
   manualAdjustment: 'manual_adjustment',
 } as const;
+
+/** The reference type both referral reasons use. The id is the REFERRAL id. */
+export const LOYALTY_REFERRAL_REFERENCE_TYPE = 'referral';
 
 export type LoyaltyReason = (typeof LOYALTY_REASONS)[keyof typeof LOYALTY_REASONS];
 
@@ -76,7 +135,8 @@ export class LoyaltyConfig {
       pointsBookingCompleted: this.int('LOYALTY_POINTS_BOOKING_COMPLETED', LOYALTY_POLICY_DEFAULTS.pointsBookingCompleted),
       pointsReviewSubmitted: this.int('LOYALTY_POINTS_REVIEW_SUBMITTED', LOYALTY_POLICY_DEFAULTS.pointsReviewSubmitted),
       pointsOrderCompleted: this.int('LOYALTY_POINTS_ORDER_COMPLETED', LOYALTY_POLICY_DEFAULTS.pointsOrderCompleted),
-      pointsReferralQualified: this.int('LOYALTY_POINTS_REFERRAL_QUALIFIED', LOYALTY_POLICY_DEFAULTS.pointsReferralQualified),
+      pointsReferralReferrer: this.int('LOYALTY_POINTS_REFERRAL_REFERRER', LOYALTY_POLICY_DEFAULTS.pointsReferralReferrer),
+      pointsReferralReferee: this.int('LOYALTY_POINTS_REFERRAL_REFEREE', LOYALTY_POLICY_DEFAULTS.pointsReferralReferee),
     };
   }
 
@@ -94,8 +154,10 @@ export class LoyaltyConfig {
         return p.pointsReviewSubmitted;
       case LOYALTY_REASONS.orderCompleted:
         return p.pointsOrderCompleted;
-      case LOYALTY_REASONS.referralQualified:
-        return p.pointsReferralQualified;
+      case LOYALTY_REASONS.referralReferrerReward:
+        return p.pointsReferralReferrer;
+      case LOYALTY_REASONS.referralRefereeReward:
+        return p.pointsReferralReferee;
       default:
         return 0;
     }

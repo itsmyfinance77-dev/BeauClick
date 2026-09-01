@@ -610,9 +610,25 @@ describePg('referral — code identity, generation, privacy, and the share bound
       );
       const tables = rows.map((r: { tablename: string }) => r.tablename);
 
-      expect(tables).toEqual(['claim_attempts', 'referral_codes', 'referrals']);
-      for (const forbidden of ['outbox_events', 'reward_grants', 'referrer_counters']) {
-        expect(tables).not.toContain(forbidden);
+      // Widened once by Story #27 and again by Story #12, which is the pattern
+      // that shows the LIST was never the guarantee -- appending to it each
+      // story keeps the case green while it checks less and less.
+      //
+      // What it protects is stated directly now: nothing from Story #28. The
+      // three tables it used to forbid all exist legitimately, each having
+      // arrived WITH the behaviour that fills it -- which is precisely the
+      // condition ADR-035 §7 set for creating an outbox at all.
+      expect(tables).toEqual([
+        'claim_attempts',
+        'outbox_events',
+        'referral_codes',
+        'referrals',
+        'referrer_counters',
+        'reward_grants',
+      ]);
+
+      for (const notYetBuilt of ['reversals', 'clawbacks', 'refund_events', 'reward_reversals']) {
+        expect(tables).not.toContain(notYetBuilt);
       }
     });
 
@@ -620,14 +636,28 @@ describePg('referral — code identity, generation, privacy, and the share bound
       // `referral` IS in `ServiceName` (ADR-035 §1) so Story #12 can declare its
       // approved events without editing a closed vocabulary. This story declares
       // none, and that distinction is what this asserts.
+      // This asserted NO contract named or produced by `referral`, which was
+      // right while Story #11 declared none. V3.2-C Story #12 declares exactly
+      // one, so the assertion becomes the sharper statement: the referral
+      // domain produces `ReferralQualified` and NOTHING else.
+      //
+      // `V32-DEC-033` approves `ReferralQualified` v1 and `ReferralReversed` v1
+      // and nothing else; the second is Story #28's, and `ReferralAttributed`
+      // is refused outright because it has no consumer.
+      const produced = (ALL_EVENT_CONTRACTS as Array<{ name: string; producer: string }>)
+        .filter((contract) => contract.producer === 'referral')
+        .map((contract) => contract.name);
+      expect(produced).toEqual(['ReferralQualified']);
+
       for (const contract of ALL_EVENT_CONTRACTS as Array<{ name: string; producer: string }>) {
-        expect(contract.producer).not.toBe('referral');
-        // `referral` only. NOT `/invite/` -- `StaffInvited` is a pre-existing
-        // business-domain event about inviting somebody to a BUSINESS, and it
-        // has nothing to do with referral invites. A regex broad enough to catch
-        // it is a regex that will be loosened by the next person who trips over
-        // it, which is worse than one that says what it means.
-        expect(contract.name.toLowerCase()).not.toContain('referral');
+        // NOT `/invite/` -- `StaffInvited` is a pre-existing business-domain
+        // event about inviting somebody to a BUSINESS, and it has nothing to do
+        // with referral invites. A regex broad enough to catch it is a regex
+        // that will be loosened by the next person who trips over it, which is
+        // worse than one that says what it means.
+        expect(contract.name).not.toMatch(
+          /ReferralAttributed|ReferralReversed|ReferralRewarded|ReferralCapped|ReferralExpired/,
+        );
       }
     });
 
@@ -650,7 +680,7 @@ describePg('referral — code identity, generation, privacy, and the share bound
   // -------------------------------------------------------------------------
 
   describe('subject data', () => {
-    it('claims the code table as subject_data, and claims no table that does not exist', () => {
+    it('claims the code table as subject_data, and claims no table that does not exist', async () => {
       const contract = app.get(ReferralSubjectDataContract);
       expect(contract.moduleKey).toBe('referral');
 
@@ -669,9 +699,24 @@ describePg('referral — code identity, generation, privacy, and the share bound
         disposition: 'subject_data',
       });
 
+      // `reward_grants` and `referrer_counters` were listed here as not-yet-
+      // built until V3.2-C Story #12 built and claimed both. The guarantee
+      // survives with a different list: nothing may be claimed ahead of the
+      // behaviour that fills it, because `claimed_but_absent` fails the boot
+      // and a stale claim reads as coverage while covering nothing.
       const claimed = contract.tables.map((claim) => claim.table);
-      for (const notYetBuilt of ['referral.reward_grants', 'referral.referrer_counters']) {
+      for (const notYetBuilt of ['referral.reversals', 'referral.clawbacks', 'referral.refund_events']) {
         expect(claimed).not.toContain(notYetBuilt);
+      }
+
+      // And every claim names a table that actually exists -- the same rule,
+      // checked against reality rather than against a hand-written list.
+      const real: Array<{ tablename: string }> = await dataSource.query(
+        `SELECT tablename FROM pg_tables WHERE schemaname = 'referral'`,
+      );
+      const realNames = real.map((row) => `referral.${row.tablename}`);
+      for (const claim of claimed) {
+        expect(realNames).toContain(claim);
       }
     });
 

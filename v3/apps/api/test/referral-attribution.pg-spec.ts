@@ -1101,16 +1101,27 @@ describePg('referral attribution — claim lifecycle, concurrency, privacy (real
       return dataSource.transaction((manager) => referralContract().exportSubjectData(manager, userId));
     }
 
-    it('claims all three tables at boot, against the REAL catalogue', async () => {
+    it('claims EVERY referral table at boot, against the REAL catalogue', async () => {
+      // This pinned exactly the three tables Story #27 owned. V3.2-C Story #12
+      // added three more, and widening the literal each story would keep the
+      // case green while it stopped checking anything.
+      //
+      // The guarantee was never the count -- it is that the CLAIM LIST and the
+      // REAL CATALOGUE agree, in both directions. That is stated directly now,
+      // so a table added without a claim (or a claim left behind after a table
+      // is dropped) fails here whatever the number happens to be.
       const catalogue: Array<{ table_schema: string; table_name: string }> = await dataSource.query(
         `SELECT table_schema, table_name FROM information_schema.tables
           WHERE table_schema = 'referral' AND table_type = 'BASE TABLE'`,
       );
       const real = catalogue.map((row) => `${row.table_schema}.${row.table_name}`).sort();
-      expect(real).toEqual(['referral.claim_attempts', 'referral.referral_codes', 'referral.referrals']);
 
       const claims = referralContract().tables.map((claim) => claim.table).sort();
       expect(claims).toEqual(real);
+
+      // Non-vacuity: two empty lists would also be equal.
+      expect(real.length).toBeGreaterThanOrEqual(3);
+      expect(real).toContain('referral.referrals');
 
       // And the dispositions are the ones `V32-DEC-019` ratified.
       const byTable = new Map(referralContract().tables.map((claim) => [claim.table, claim]));
@@ -1403,12 +1414,24 @@ describePg('referral attribution — claim lifecycle, concurrency, privacy (real
       }
     });
 
-    it('has no referral outbox table at all', async () => {
-      expect(
-        await dataSource.query(
-          `SELECT 1 FROM information_schema.tables WHERE table_schema = 'referral' AND table_name = 'outbox_events'`,
-        ),
-      ).toHaveLength(0);
+    it('writes NO event to the outbox Story #12 later added', async () => {
+      // This asserted the referral schema had no outbox table AT ALL, which was
+      // right while no referral event had a consumer: ADR-035 §7 and ADR-036
+      // §10 both declined to create one for exactly that reason.
+      //
+      // V3.2-C Story #12 created it WITH its first producer, which is the
+      // condition those ADRs set for creating it. So the assertion narrows to
+      // what it always protected: whatever reaches that outbox, ATTRIBUTION
+      // does not put it there. `ReferralAttributed` is still not defined and
+      // still has no consumer (`V32-DEC-033`).
+      const referrer = await customer();
+      const referee = await customer();
+      const code = await codeOf(referrer);
+
+      await claim(referee, code).expect(200);
+
+      const rows = await dataSource.query('SELECT event_type FROM referral.outbox_events');
+      expect(rows).toEqual([]);
     });
 
     it('writes the code into NO outbox, notification, analytics table, or log', async () => {
@@ -1479,11 +1502,24 @@ describePg('referral attribution — claim lifecycle, concurrency, privacy (real
       expect(scanned.join('')).toContain(planted);
     });
 
-    it('exposes no reward, qualification, or reversal API', async () => {
+    it('exposes no reversal or clawback API on the ATTRIBUTION service', async () => {
+      // This refused `reward`, `qualif`, `grant` and `points` too, until V3.2-C
+      // Story #12 legitimately built all four -- in a SEPARATE service
+      // (`ReferralQualificationService`), which is why this case still means
+      // something: the attribution service did not grow them.
+      //
+      // Narrowed to Story #28's vocabulary, which no service may carry yet.
       const methods = Object.getOwnPropertyNames(Object.getPrototypeOf(referral));
       for (const method of methods) {
-        expect(method).not.toMatch(/reward|qualif|revers|clawback|grant|points|cap(?!tured)/i);
+        expect(method).not.toMatch(/revers|clawback|refund|appeal|override/i);
       }
+
+      // And the attribution service still does not qualify anything. Two
+      // implementations of one decision is how two implementations start
+      // disagreeing.
+      expect(methods).not.toContain('qualify');
+      // Non-vacuity: the reflection must actually be finding methods.
+      expect(methods).toEqual(expect.arrayContaining(['claim', 'codeFor']));
     });
   });
 });

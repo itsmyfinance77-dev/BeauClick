@@ -1301,6 +1301,12 @@ importers:
 
   services/referral:
     dependencies:
+      '@beauclick/event-contracts':
+        specifier: workspace:*
+        version: link:../../libs/event-contracts
+      '@beauclick/events':
+        specifier: workspace:*
+        version: link:../../libs/events
       '@beauclick/http':
         specifier: workspace:*
         version: link:../../libs/http

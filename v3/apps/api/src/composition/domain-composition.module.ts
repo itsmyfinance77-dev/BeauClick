@@ -23,6 +23,7 @@ import { ReferralCompositionModule } from './referral-composition.module';
 import { CHAT_OUTBOX_SOURCES } from './chat-tokens';
 import { PHASE3_EVENT_HANDLERS, PHASE3_OUTBOX_SOURCES } from './phase3-tokens';
 import { AI_OUTBOX_SOURCES } from './ai-tokens';
+import { REFERRAL_EVENT_HANDLERS, REFERRAL_OUTBOX_SOURCES } from './referral-tokens';
 
 import { DomainPortsModule } from './domain-ports.module';
 import { CheckoutService } from '../checkout/checkout.service';
@@ -146,8 +147,13 @@ import {
       // Phase 2's three tables plus Phase 3's five, merged here because the
       // relay takes ONE list. Order matters only for tidiness -- each source
       // is drained independently and every handler is idempotent.
-      inject: [PHASE3_OUTBOX_SOURCES, AI_OUTBOX_SOURCES, CHAT_OUTBOX_SOURCES],
-      useFactory: (phase3: OutboxSource[], ai: OutboxSource[], chat: OutboxSource[]): OutboxSource[] => [
+      inject: [PHASE3_OUTBOX_SOURCES, AI_OUTBOX_SOURCES, CHAT_OUTBOX_SOURCES, REFERRAL_OUTBOX_SOURCES],
+      useFactory: (
+        phase3: OutboxSource[],
+        ai: OutboxSource[],
+        chat: OutboxSource[],
+        referral: OutboxSource[],
+      ): OutboxSource[] => [
         { name: 'booking', entity: BookingOutboxEntity },
         { name: 'commerce', entity: CommerceOutboxEntity },
         { name: 'payment', entity: PaymentOutboxEntity },
@@ -165,6 +171,11 @@ import {
         // V3.2-B. Same, and additionally the path by which `MessageSent` reaches
         // the notification module.
         ...chat,
+        // V3.2-C Story #12. The referral module`s first outbox source. Its only
+        // event is `ReferralQualified`, whose consumer is the in-app
+        // notification -- so this is the path by which a qualified referral
+        // reaches the person it belongs to.
+        ...referral,
       ],
     },
     {
@@ -184,6 +195,7 @@ import {
         waitlistSvc: WaitlistService,
         slots: Repository<AvailabilitySlotEntity>,
         phase3: DomainEventHandler[],
+        referral: DomainEventHandler[],
       ) => [
         orderPaid,
         orderRefunded,
@@ -199,6 +211,11 @@ import {
         new WaitlistMatcherHandler('WaitlistDeclined', waitlistSvc, slots),
         new WaitlistMatcherHandler('WaitlistExpired', waitlistSvc, slots),
         ...phase3,
+        // V3.2-C Story #12. Two handlers: BookingCompleted -> qualify, and
+        // ReferralQualified -> notify both parties. `BookingCompleted` now has
+        // THREE handlers (loyalty, review eligibility, referral), which is the
+        // fan-out this list is built for -- each is independently idempotent.
+        ...referral,
       ],
       inject: [
         OrderPaidLedgerHandler,
@@ -210,6 +227,7 @@ import {
         WaitlistService,
         getRepositoryToken(AvailabilitySlotEntity),
         PHASE3_EVENT_HANDLERS,
+        REFERRAL_EVENT_HANDLERS,
       ],
     },
     OutboxRelay,
