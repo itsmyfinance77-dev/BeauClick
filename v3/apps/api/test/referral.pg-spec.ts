@@ -610,14 +610,16 @@ describePg('referral — code identity, generation, privacy, and the share bound
       );
       const tables = rows.map((r: { tablename: string }) => r.tablename);
 
-      // Widened once by Story #27 and again by Story #12, which is the pattern
-      // that shows the LIST was never the guarantee -- appending to it each
-      // story keeps the case green while it checks less and less.
+      // Widened by Story #27, again by Story #12, and again by Story #28 --
+      // which is the pattern that shows the LIST was never the guarantee:
+      // appending to it each story keeps the case green while it checks less
+      // and less.
       //
-      // What it protects is stated directly now: nothing from Story #28. The
-      // three tables it used to forbid all exist legitimately, each having
-      // arrived WITH the behaviour that fills it -- which is precisely the
-      // condition ADR-035 §7 set for creating an outbox at all.
+      // What it protects is stated directly. Every table here arrived WITH the
+      // behaviour that fills it, which is precisely the condition ADR-035 §7
+      // set for creating an outbox at all; the ones forbidden below are the
+      // surfaces `V32-DEC-019` refuses OUTRIGHT and that no owner decision has
+      // since approved.
       expect(tables).toEqual([
         'claim_attempts',
         'outbox_events',
@@ -625,38 +627,45 @@ describePg('referral — code identity, generation, privacy, and the share bound
         'referrals',
         'referrer_counters',
         'reward_grants',
+        'reward_reversals',
       ]);
 
-      for (const notYetBuilt of ['reversals', 'clawbacks', 'refund_events', 'reward_reversals']) {
-        expect(tables).not.toContain(notYetBuilt);
+      // `reward_reversals` was on this list until V3.2-C Story #28 built it
+      // from `V32-DEC-017`. These four have no decision behind them: a
+      // fingerprint or device signal (`V32-DEC-019` refuses it and says the
+      // durable material does not exist anyway), an appeal queue, a
+      // manual-review queue, and an administrator override log.
+      for (const refusedOutright of ['device_signals', 'appeals', 'review_queue', 'overrides']) {
+        expect(tables).not.toContain(refusedOutright);
       }
     });
 
-    it('emits no event contract naming referral', async () => {
-      // `referral` IS in `ServiceName` (ADR-035 §1) so Story #12 can declare its
-      // approved events without editing a closed vocabulary. This story declares
-      // none, and that distinction is what this asserts.
-      // This asserted NO contract named or produced by `referral`, which was
-      // right while Story #11 declared none. V3.2-C Story #12 declares exactly
-      // one, so the assertion becomes the sharper statement: the referral
-      // domain produces `ReferralQualified` and NOTHING else.
+    it('emits exactly the two event contracts V32-DEC-033 approves', async () => {
+      // `referral` IS in `ServiceName` (ADR-035 §1) so its approved events could
+      // be declared without editing a closed vocabulary.
       //
-      // `V32-DEC-033` approves `ReferralQualified` v1 and `ReferralReversed` v1
-      // and nothing else; the second is Story #28's, and `ReferralAttributed`
-      // is refused outright because it has no consumer.
+      // This asserted NO contract produced by `referral` while Story #11
+      // declared none, then exactly one after Story #12. Story #28 gives
+      // `ReferralReversed` a publisher -- *a contract nothing publishes is a
+      // promise to a consumer that does not exist* -- so the vocabulary is now
+      // CLOSED AT TWO, which is the whole of what `V32-DEC-033` approves.
       const produced = (ALL_EVENT_CONTRACTS as Array<{ name: string; producer: string }>)
         .filter((contract) => contract.producer === 'referral')
-        .map((contract) => contract.name);
-      expect(produced).toEqual(['ReferralQualified']);
+        .map((contract) => contract.name)
+        .sort();
+      expect(produced).toEqual(['ReferralQualified', 'ReferralReversed']);
 
       for (const contract of ALL_EVENT_CONTRACTS as Array<{ name: string; producer: string }>) {
+        // The four refused BY NAME stay refused: `ReferralAttributed` has no
+        // consumer, and the other three are states rather than events.
+        //
         // NOT `/invite/` -- `StaffInvited` is a pre-existing business-domain
         // event about inviting somebody to a BUSINESS, and it has nothing to do
         // with referral invites. A regex broad enough to catch it is a regex
         // that will be loosened by the next person who trips over it, which is
         // worse than one that says what it means.
         expect(contract.name).not.toMatch(
-          /ReferralAttributed|ReferralReversed|ReferralRewarded|ReferralCapped|ReferralExpired/,
+          /ReferralAttributed|ReferralRewarded|ReferralCapped|ReferralExpired/,
         );
       }
     });

@@ -909,9 +909,13 @@ describePg('referral qualification — CAS, two sides, cap, ledger (real Postgre
     const referralContract = () => contractsOf().find((c) => c.moduleKey === 'referral')!;
     const coverage = () => app.get(SubjectDataCoverageService);
 
-    it('claims all six referral tables, with the ratified dispositions', async () => {
+    it('claims every referral table, with the ratified dispositions', async () => {
       const byTable = new Map(referralContract().tables.map((claim) => [claim.table, claim]));
 
+      // V3.2-C Story #28 added `reward_reversals`, so the list is seven. The
+      // exhaustive assertion is kept exhaustive rather than relaxed: its whole
+      // value is that a new table forces a decision here, which is exactly what
+      // it just did.
       expect([...byTable.keys()].sort()).toEqual([
         'referral.claim_attempts',
         'referral.outbox_events',
@@ -919,6 +923,7 @@ describePg('referral qualification — CAS, two sides, cap, ledger (real Postgre
         'referral.referrals',
         'referral.referrer_counters',
         'referral.reward_grants',
+        'referral.reward_reversals',
       ]);
 
       // `V32-DEC-019` ratifies these two directly.

@@ -3,14 +3,17 @@ import { defineEvent } from '../event-contract';
 import { instant, uuid } from './common';
 
 /**
- * The referral domain's events — V3.2-C Story #12 (ADR-037 §10).
+ * The referral domain's events — V3.2-C Stories #12 (ADR-037 §10) and #28
+ * (ADR-038 §9).
  *
- * ## Exactly one event, and the other three are refused by name
+ * ## Exactly two events, and the other three are refused by name
  *
  * `V32-DEC-033` approves **`ReferralQualified` v1 and `ReferralReversed` v1 and
- * nothing else**. This file declares the first; the second belongs to Story #28
- * and is deliberately absent, because a contract nothing publishes is a promise
- * to a consumer that does not exist.
+ * nothing else**. Story #12 declared the first and left the second out, because
+ * *a contract nothing publishes is a promise to a consumer that does not
+ * exist*. Story #28 gives it a publisher, so it is declared below and the
+ * vocabulary is now **closed at two**. Nothing else may be added without an
+ * owner decision.
  *
  * Also absent, each for its own reason:
  *
@@ -134,4 +137,97 @@ export const ReferralQualified = defineEvent({
   }),
 });
 
-export const REFERRAL_EVENTS = [ReferralQualified];
+/**
+ * What happened to one side's reward when the referral was reversed —
+ * V3.2-C Story #28 (ADR-038 §5).
+ *
+ * A **closed** set of two, and the second is not a failure:
+ *
+ *  * **`reversed`** — a negative ledger row was written for exactly the points
+ *    the original award credited.
+ *  * **`nothing_to_reverse`** — the original grant was `disabled_zero` or
+ *    `capped`, so no ledger row ever existed to reverse. `V32-DEC-016`'s honest
+ *    zero applies in this direction too: **no zero-value negative row is
+ *    written and no idempotency slot is consumed**, so a figure the business
+ *    later approves can still be awarded — and still reversed — against the
+ *    same referral id.
+ *
+ * The distinction matters to a consumer for the same reason `capped` and
+ * `disabled_zero` do on the way in: *"we took back 50 points"* and *"there was
+ * nothing to take back"* are materially different statements, and collapsing
+ * them would make any future consumer unable to tell a clawback from a no-op.
+ *
+ * There is deliberately no `partial` and no `failed`. A reversal takes back the
+ * whole award or does not happen: the transaction commits every effect or none
+ * of them (ADR-038 §7).
+ */
+export const REFERRAL_REVERSAL_OUTCOMES = ['reversed', 'nothing_to_reverse'] as const;
+export type ReferralReversalOutcome = (typeof REFERRAL_REVERSAL_OUTCOMES)[number];
+
+/**
+ * A qualified referral was reversed — the qualifying booking's commerce order
+ * was **fully** refunded.
+ *
+ * ## The second of the two events `V32-DEC-033` approves, and the last
+ *
+ * `ReferralQualified` above declared the first, and this file recorded that the
+ * second *"belongs to Story #28 and is deliberately absent, because a contract
+ * nothing publishes is a promise to a consumer that does not exist."* It has a
+ * publisher now. The vocabulary is closed at two, and the four events refused
+ * by name above stay refused.
+ *
+ * ## Why the point values are non-negative MAGNITUDES
+ *
+ * The mirror image of the bound on `ReferralQualified`, and load-bearing in the
+ * same way. There, `nonnegative()` stops a clawback being smuggled through a
+ * reward event; here it stops a **reward** being smuggled through a reversal
+ * one. The direction is carried by the event's name and by the reason on the
+ * ledger row — which is where direction belongs, and is the only place a
+ * consumer should have to look for it.
+ *
+ * ## Why the order id is carried and the refund id is not
+ *
+ * The order is the **authoritative cause**: it is what the platform re-read to
+ * decide the refund was full (ADR-038 §2), it names no person, and a consumer
+ * that cannot see why a reversal happened is one that has to ask.
+ *
+ * The refund id is absent for the reason the column is (ADR-038 §4): the
+ * convergence path reverses a referral whose order was already fully refunded
+ * before qualification was consumed, and holds no refund event. A field that is
+ * only sometimes present is one no consumer can rely on.
+ *
+ * ## What no payload here may ever carry
+ *
+ * `V32-DEC-033`, unchanged and restated because this is a second publisher:
+ * *no referral code, phone, display name, or free prose in any event payload,
+ * notification payload, analytics dimension, metric label, or log line.* Every
+ * field below is a uuid, an instant, a bounded integer, or a member of a closed
+ * enum, so there is **no field a string could travel through** — and no order
+ * metadata beyond the id itself: no amount, no currency, no seller, no
+ * customer.
+ */
+export const ReferralReversed = defineEvent({
+  name: 'ReferralReversed',
+  version: 1,
+  aggregateType: 'referral',
+  producer: 'referral',
+  description:
+    "A full refund of the qualifying booking's order reversed a qualified referral. Carries both sides' reversal outcomes and the causing order id; carries no code, phone, name, prose, or money detail.",
+  idempotency:
+    'Emitted inside the reversal transaction, guarded by the CAS on status=qualified. A redelivered OrderRefunded affects zero rows and emits nothing, so exactly one event exists per referral. The two ledger reversal reasons are a second, independent slot.',
+  schema: z.object({
+    referralId: uuid(),
+    referrerUserId: uuid(),
+    refereeUserId: uuid(),
+    /** The order whose FULL refund caused this. The authoritative cause, and an id only. */
+    reversalOrderId: uuid(),
+    reversedAt: instant(),
+
+    referrerOutcome: z.enum(REFERRAL_REVERSAL_OUTCOMES),
+    referrerPointsReversed: z.number().int().nonnegative(),
+    refereeOutcome: z.enum(REFERRAL_REVERSAL_OUTCOMES),
+    refereePointsReversed: z.number().int().nonnegative(),
+  }),
+});
+
+export const REFERRAL_EVENTS = [ReferralQualified, ReferralReversed];

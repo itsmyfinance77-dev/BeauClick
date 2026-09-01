@@ -9,6 +9,9 @@ import {
 } from '@beauclick/loyalty';
 import type {
   ReferralLedgerReason,
+  ReferralLoyaltyReversal,
+  ReferralLoyaltyReversalPort,
+  ReferralReversalLedgerReason,
   ReferralLoyaltyAward,
   ReferralLoyaltyPort,
   ReferralRewardConfig,
@@ -107,6 +110,100 @@ export class ReferralLoyaltyAdapter implements ReferralLoyaltyPort {
 }
 
 /**
+ * The two reversal reasons, asserted equal across the boundary — V3.2-C Story
+ * #28 (ADR-038 §6).
+ *
+ * The mirror of `REASON_AGREEMENT` above, and it exists for a sharper reason
+ * than the reward pair does. If a reversal reason drifted from loyalty's
+ * constant, the negative row would be written under a string the ledger's
+ * vocabulary does not contain — so it would still deduplicate correctly
+ * against itself, still sum into the balance, and still be invisible to every
+ * query that filters by reason. The clawback would work and be unauditable.
+ * This line makes that a build failure.
+ */
+const REVERSAL_REASON_AGREEMENT: Record<ReferralReversalLedgerReason, ReferralReversalLedgerReason> = {
+  [LOYALTY_REASONS.referralReferrerReversal]: LOYALTY_REASONS.referralReferrerReversal,
+  [LOYALTY_REASONS.referralRefereeReversal]: LOYALTY_REASONS.referralRefereeReversal,
+};
+
+/**
+ * The referral domain's clawback into the loyalty ledger — V3.2-C Story #28
+ * (ADR-011, ADR-038 §§5–6).
+ *
+ * A **second** adapter behind a **second** token rather than a method on
+ * `ReferralLoyaltyAdapter`, because the reward port's own docblock reserved it
+ * that way: *"It also cannot write a negative row … that belongs to Story #28
+ * with its own trigger and its own port."* Keeping them apart keeps the reward
+ * path's guarantee structural — nothing it can do subtracts points — instead of
+ * turning it into a convention.
+ *
+ * ## No amount crosses this boundary, and that is the whole design
+ *
+ * `ReferralLoyaltyReversal` has no `points` field. The domain names **which
+ * award** to reverse; `LoyaltyLedgerService.reverse` reads what that award
+ * actually credited and negates it.
+ *
+ * `V32-DEC-017` requires the clawback to be exactly what was given, and reward
+ * configuration may legitimately change between the award and the refund — the
+ * business could raise the referrer reward from 0 to 50 in the months between a
+ * booking and its refund. A port that accepted an amount would let a caller
+ * compute one from *current* configuration, which is the single most likely way
+ * this goes wrong. With no parameter, an over-claw has nowhere to enter.
+ *
+ * `expectedBasePoints` is the one figure that does cross and it is a
+ * **cross-check, not a source**: the grant row's persisted base is compared
+ * against the original entry's, and the ledger raises on disagreement. The
+ * grant exists to explain that ledger row, so the two silently diverging is
+ * itself the bug.
+ *
+ * ## Why the grant cannot supply the amount
+ *
+ * `reward_grants.points` is the configured **base**; `award()` credits
+ * `Math.round(base * multiplierBp / 10000)` using the recipient's membership
+ * benefit at award time. Reversing the grant's figure would under-claw exactly
+ * those customers whose tier earned them a bonus, by an amount that grows with
+ * the benefit and that nothing anywhere would report. So the grant decides
+ * *whether*, and the ledger decides *how much* (ADR-038 §5).
+ */
+@Injectable()
+export class ReferralLoyaltyReversalAdapter implements ReferralLoyaltyReversalPort {
+  constructor(private readonly ledger: LoyaltyLedgerService) {}
+
+  /**
+   * Writes one negative loyalty row inside the caller's transaction.
+   *
+   * The manager is passed through and never omitted. `reverse(input, manager)`
+   * opens its own transaction when it is absent, which would commit a clawback
+   * the reversal transaction could no longer roll back — leaving a customer
+   * with points taken from a referral the platform still shows as qualified —
+   * and would open a second pool connection inside a transaction, which is
+   * V3.2-B's bug #2.
+   */
+  async reverse(
+    manager: EntityManager,
+    input: ReferralLoyaltyReversal,
+  ): Promise<{ reversed: boolean; points: number }> {
+    const result = await this.ledger.reverse(
+      {
+        referenceType: input.referenceType,
+        referenceId: input.referenceId,
+        originalReason: input.originalReason,
+        reversalReason: input.reversalReason,
+        expectedBasePoints: input.expectedBasePoints,
+      },
+      manager,
+    );
+
+    // `reversed` and the magnitude, and nothing else. The magnitude is a fact
+    // about THIS referral's own reward -- the domain needs it for the event and
+    // the audit row -- while a balance or a lifetime total would be a fact about
+    // the person's whole loyalty history, which is what the reward adapter
+    // above refuses to return for the same reason.
+    return { reversed: result.reversed, points: result.points };
+  }
+}
+
+/**
  * The two configured reward values, read from the authoritative `LoyaltyConfig`.
  *
  * A factory rather than a constant, because `LoyaltyConfig.policy` reads
@@ -134,4 +231,5 @@ export function referralRewardConfigFrom(config: LoyaltyConfig): ReferralRewardC
 // or a linter could drop. They exist to fail the BUILD, which requires them to
 // be part of it.
 void REASON_AGREEMENT;
+void REVERSAL_REASON_AGREEMENT;
 void REFERENCE_TYPE_AGREEMENT;

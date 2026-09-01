@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { OutboxEventEntityBase } from '@beauclick/events';
 import type {
+  ReferralReversalOutcome,
   ReferralRewardOutcome,
   ReferralRewardSide,
 } from '@beauclick/event-contracts';
@@ -198,21 +199,61 @@ export class ReferralAttributionEntity {
    * unwritable — so a qualified referral without its qualifying booking is
    * unrepresentable rather than merely unlikely.
    *
-   * `qualifyingBookingId` is the ONE thing this story builds for Story #28
-   * (ADR-037 §13): `V32-DEC-017` makes a full refund of the qualifying
-   * booking's order the reversal trigger, and without this column that story
-   * would have to identify the order by guessing. **Nothing in this story reads
-   * it.**
+   * `qualifyingBookingId` was the ONE thing Story #12 built ahead for Story #28
+   * (ADR-037 §13) — *"a column, not a behaviour"*. Story #28 reads it: it is
+   * the only handle the reversal path has, because `OrderRefunded` carries no
+   * customer and no source, and the order lookup resolves it through
+   * `commerce.orders.source_id`.
    *
    * Both are frozen once set by `tg_referrals_immutable`, with a different rule
    * from the four attribution columns: those are frozen always, these are
    * frozen once non-NULL, because NULL -> value is the qualification itself.
+   *
+   * **Both survive the reversal**, and `ck_referrals_qualification_complete`
+   * requires it. `V32-DEC-017` reverses the *reward*, never the record that it
+   * was earned — and losing the booking id on reversal would destroy the link
+   * back to the order that caused it, on the very row whose job is now to
+   * explain that order.
    */
   @Column({ type: 'timestamptz', nullable: true })
   qualifiedAt!: Date | null;
 
   @Column({ type: 'uuid', nullable: true })
   qualifyingBookingId!: string | null;
+
+  /**
+   * The reversal facts — V3.2-C Story #28 (`V32-DEC-017`, ADR-038 §4).
+   *
+   * Both NULL until a full refund reverses the referral, both non-NULL after,
+   * and `ck_referrals_reversal_complete` makes any other combination
+   * unwritable. That constraint is what makes **torn reversal facts**
+   * unrepresentable: a row marked reversed without the order that reversed it
+   * would be a negative loyalty balance nobody could explain, and it is exactly
+   * the state a crash between two statements would otherwise leave behind.
+   *
+   * `reversalOrderId` is the **authoritative cause** — the commerce order whose
+   * status the platform re-read and found fully refunded. Persisted so an
+   * operator can trace a clawback to the money that moved without replaying
+   * events: it reaches `commerce.orders` directly and `payment.refunds` through
+   * that table's own `order_id` index.
+   *
+   * There is deliberately **no `reversalRefundId`**, although `OrderRefunded`
+   * carries one. The convergence path (ADR-038 §8) reverses a referral whose
+   * order was already fully refunded before the qualification event was
+   * consumed, and holds no refund event — so the column would be present on
+   * some reversed rows and absent on others, which is a fact no audit can rely
+   * on and every reader must first learn the exception to.
+   *
+   * Frozen once set by the same trigger, under the same rule as the
+   * qualification facts. The trigger additionally refuses `reversed ->
+   * qualified`: that transition satisfies every CHECK on this table and would
+   * silently resurrect a reward the platform has taken back.
+   */
+  @Column({ type: 'timestamptz', nullable: true })
+  reversedAt!: Date | null;
+
+  @Column({ type: 'uuid', nullable: true })
+  reversalOrderId!: string | null;
 }
 
 /**
@@ -251,18 +292,24 @@ export class ReferralClaimAttemptEntity {
 }
 
 /**
- * The referral lifecycle status — V3.2-C Story #12 (ADR-037 §2).
+ * The referral lifecycle status — V3.2-C Stories #12 (ADR-037 §2) and #28
+ * (ADR-038 §4).
  *
- * Exactly two values, and the two that are absent are absent on purpose:
+ * `pending -> qualified -> reversed`, **one way**, and the trigger enforces the
+ * direction rather than the CHECK constraints: `reversed -> qualified` with the
+ * reversal columns cleared satisfies every CHECK on the table and would
+ * silently resurrect a reward the platform has taken back.
  *
- *  * **no `expired`** — expiry is a PREDICATE (`expires_at <= now()`), not a
- *    state. Storing it would need a sweeper to maintain, which would make a
- *    referral's expiry depend on whether a background job had run rather than
- *    on the clock. The compare-and-swap reads the predicate directly.
- *  * **no `reversed`** — Story #28's vocabulary. Adding it now would put that
- *    story's data model on the table before its behaviour exists.
+ * `reversed` is Story #28's, and Story #12 deliberately left it out — *"adding
+ * it now would put that story's data model on the table before its behaviour
+ * exists"*. The behaviour exists.
+ *
+ * There is still **no `expired`**: expiry is a PREDICATE (`expires_at <=
+ * now()`), not a state. Storing it would need a sweeper to maintain, which
+ * would make a referral's expiry depend on whether a background job had run
+ * rather than on the clock. The compare-and-swap reads the predicate directly.
  */
-export const REFERRAL_STATUSES = ['pending', 'qualified'] as const;
+export const REFERRAL_STATUSES = ['pending', 'qualified', 'reversed'] as const;
 export type ReferralStatus = (typeof REFERRAL_STATUSES)[number];
 
 /**
@@ -350,6 +397,107 @@ export class ReferralRewardGrantEntity {
 }
 
 /**
+ * A reward reversal — one per reversed referral per side, always both —
+ * V3.2-C Story #28 (`V32-DEC-017`, ADR-038 §5).
+ *
+ * ## Why this is a separate table and not columns on `ReferralRewardGrantEntity`
+ *
+ * `reward_grants` records what the platform decided **at qualification**.
+ * Bolting reversal columns onto that row would mean UPDATEing a historical
+ * record to say what happened to it later — so the row would stop being a
+ * statement about a moment, and a reader could no longer tell from the row
+ * alone whether they were looking at the original decision or a rewritten one.
+ *
+ * The ledger this table explains works exactly the other way: a reversal there
+ * is a **new row, never a mutation** (`V32-DEC-017`). This table matches it,
+ * and the match is the argument.
+ *
+ * ## Why two rows exist even when one of them took nothing back
+ *
+ * The same reason `reward_grants` writes two when neither pays. The sides are
+ * independent facts (`V32-DEC-019`'s owner correction), and with both
+ * configured values at 0 today **both** rows will read
+ * `nothing_to_reverse, points 0` — which is the point rather than a degenerate
+ * case. A row saying the platform considered this side and found nothing to
+ * take back is a materially different claim from no row at all, and it is what
+ * makes *"reverse both sides"* impossible to read as *"write two zero-point
+ * ledger rows"*.
+ *
+ * ## The disposition is `retained`, and this row is the reason
+ *
+ * `V32-DEC-019` retains `reward_grants` because it **explains a retained
+ * loyalty ledger entry**. This row explains a retained *negative* one — and a
+ * negative balance with no explanation is worse than an unexplained positive
+ * one, because it is a debt the person holding it cannot account for.
+ */
+@Entity({ name: 'reward_reversals', schema: 'referral' })
+@Unique('uq_reward_reversals_referral_side', ['referralId', 'side'])
+@Index('ix_reward_reversals_recipient', ['recipientUserId'])
+export class ReferralRewardReversalEntity {
+  @PrimaryColumn('uuid')
+  id!: string;
+
+  /**
+   * The referral whose reward was reversed.
+   *
+   * No relation and no foreign key, for the erasure-lifecycle reason ADR-036 §2
+   * records: both rows are retained, and a referential action would tie their
+   * fates together in a way no disposition asked for.
+   */
+  @Column({ type: 'uuid' })
+  referralId!: string;
+
+  /**
+   * Whose reward this reversal concerns.
+   *
+   * Named with the `_user_id` suffix so ADR-027's coverage heuristic recognises
+   * it, and present at all so a subject's own reversals are addressable
+   * **without joining back to `referrals`** — which is what lets the privacy
+   * export show a person their own clawback without ever loading the row that
+   * names the counterparty.
+   */
+  @Column({ type: 'uuid' })
+  recipientUserId!: string;
+
+  @Column({ type: 'varchar', length: 16 })
+  side!: ReferralRewardSide;
+
+  @Column({ type: 'varchar', length: 24 })
+  outcome!: ReferralReversalOutcome;
+
+  /**
+   * The MAGNITUDE clawed back, non-negative.
+   *
+   * Non-negative because the direction is carried by this table's name and by
+   * the ledger row's reason, which is where direction belongs; a signed column
+   * here would let a reversal row assert a reward.
+   *
+   * The value is what the **ledger row** actually carried, not the base figure
+   * `ReferralRewardGrantEntity.points` recorded (ADR-038 §5). `award()` applies
+   * the recipient's membership multiplier on top of the base, so reversing the
+   * grant's figure would under-claw exactly those customers whose tier earned
+   * them a bonus — by an amount that grows with the benefit and that nothing
+   * would ever report.
+   */
+  @Column({ type: 'int' })
+  points!: number;
+
+  /**
+   * The reversal reason this side used.
+   *
+   * Stored rather than derived from `side`, for the reason
+   * `ReferralRewardGrantEntity.ledgerReason` records: this row's job is to
+   * explain a retained ledger entry, and deriving the mapping would silently
+   * rewrite the history of every past reversal if the mapping ever changed.
+   */
+  @Column({ type: 'varchar', length: 64 })
+  ledgerReason!: string;
+
+  @Column({ type: 'timestamptz' })
+  reversedAt!: Date;
+}
+
+/**
  * The per-referrer monthly cap counter — `V32-DEC-019`, ADR-037 §7.
  *
  * **Nothing reads this entity through the repository API**, and that is
@@ -419,6 +567,7 @@ export const REFERRAL_ENTITIES = [
   ReferralAttributionEntity,
   ReferralClaimAttemptEntity,
   ReferralRewardGrantEntity,
+  ReferralRewardReversalEntity,
   ReferralReferrerCounterEntity,
   ReferralOutboxEntity,
 ];

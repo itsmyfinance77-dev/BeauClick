@@ -252,14 +252,15 @@ describe('the module boundary', () => {
 
   it('registers every entity the module owns, and nothing speculative', () => {
     // This pinned exactly three entities until V3.2-C Story #12 added the
-    // grant, the counter and the outbox. The COUNT was never the guarantee --
-    // widening the array each story would keep the case green while it stopped
-    // checking anything.
+    // grant, the counter and the outbox, and seven since Story #28 added the
+    // reversal. The COUNT was never the guarantee -- widening the array each
+    // story would keep the case green while it stopped checking anything.
     //
-    // What it always meant, and now says: every table the module owns is
-    // registered (so subject-data coverage and the test harness's reset can
-    // both see it), and NOTHING from Story #28 is registered ahead of its
-    // behaviour.
+    // What it always meant, and still says: every table the module owns is
+    // registered, so subject-data coverage and the test harness's reset can
+    // both see it. A table registered nowhere is an ADR-027 `no_claim`
+    // violation waiting for the next boot, and a table the harness cannot
+    // TRUNCATE leaks rows between tests.
     const names = REFERRAL_ENTITIES.map((entity) => entity.name).sort();
 
     expect(names).toEqual([
@@ -269,10 +270,15 @@ describe('the module boundary', () => {
       'ReferralOutboxEntity',
       'ReferralReferrerCounterEntity',
       'ReferralRewardGrantEntity',
+      'ReferralRewardReversalEntity',
     ]);
 
+    // The three surfaces `V32-DEC-019` refuses OUTRIGHT, and which no story has
+    // approved. `revers` and `refund` were on this list until Story #28 built
+    // the first of them from a ratified owner decision; these three have no
+    // such decision behind them and are refused permanently.
     for (const name of names) {
-      expect(name).not.toMatch(/revers|clawback|refund|appeal|review|override/i);
+      expect(name).not.toMatch(/appeal|review|override/i);
     }
   });
 
@@ -318,11 +324,16 @@ describe('the module boundary', () => {
     expect(qualification).not.toMatch(/ReferralReversed|ReferralRewarded|ReferralCapped|ReferralExpired/);
   });
 
-  it('exposes no reversal, clawback, or manual-review API', () => {
+  it('exposes no manual-review, appeal or override API, and no clawback on the reward path', () => {
     // This refused `qualif`, `reward`, `grant` and `points` as well, until
-    // V3.2-C Story #12 legitimately built all four. Narrowed to Story #28's
-    // vocabulary and to the three surfaces `V32-DEC-019` refuses outright --
-    // manual review, appeals, and administrator overrides.
+    // V3.2-C Story #12 legitimately built all four -- and refused `revers` and
+    // `refund` until Story #28 built those from `V32-DEC-017`. Each narrowing
+    // followed a ratified owner decision, which is the only thing that should
+    // ever narrow it.
+    //
+    // What is refused PERMANENTLY is the set `V32-DEC-019` rules out outright
+    // and no decision has since approved: a manual-review queue, an appeal
+    // workflow, and an administrator override.
     //
     // Checked against the SOURCE rather than the prototype so a private method
     // is caught too.
@@ -333,15 +344,33 @@ describe('the module boundary', () => {
 
     const service = declarationsIn('referral.service.ts');
     const qualification = declarationsIn('referral-qualification.service.ts');
+    const reversal = declarationsIn('referral-reversal.service.ts');
 
-    for (const name of [...service, ...qualification]) {
-      expect(name).not.toMatch(/revers|clawback|refund|appeal|review|override|negative|deduct/i);
+    for (const name of [...service, ...qualification, ...reversal]) {
+      expect(name).not.toMatch(/appeal|review|override|manual|compensat/i);
     }
 
-    // Non-vacuity for BOTH extractions: a regex that found nothing would pass
-    // the loop above no matter what either file contained.
+    // The REWARD path stays structurally incapable of subtracting a point:
+    // `V32-DEC-017` puts the clawback in its own service behind its own port,
+    // and nothing on the qualification path may reach it.
+    for (const name of qualification) {
+      expect(name).not.toMatch(/revers|clawback|refund|negative|deduct/i);
+    }
+
+    // `referral.service.ts` names reversal only in the two READ helpers the
+    // privacy export needs. A writer here would be a second way to claw back,
+    // outside the transaction that owns the reversal.
+    for (const name of service.filter((n) => /revers/i.test(n))) {
+      expect(name).toMatch(/^(rewardReversalsForSubject|countRewardReversals)$/);
+    }
+
+    // Non-vacuity for ALL THREE extractions: a regex that found nothing would
+    // pass every loop above no matter what the files contained.
     expect(service).toEqual(expect.arrayContaining(['claim', 'codeFor', 'chargeClaimAttempt']));
     expect(qualification).toEqual(expect.arrayContaining(['qualify', 'chargeReferrerCap', 'recordGrant']));
+    expect(reversal).toEqual(
+      expect.arrayContaining(['reverseForRefundedOrder', 'reverseAlreadyRefundedBooking', 'reverseSide']),
+    );
   });
 
   it('never reads the wall clock outside the injected one', () => {

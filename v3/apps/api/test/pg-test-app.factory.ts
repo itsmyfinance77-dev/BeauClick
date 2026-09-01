@@ -370,6 +370,9 @@ export const RESETTABLE_TABLES = [
   // a referral by id (no FK, for the erasure-lifecycle reason ADR-036 §2
   // records), so ordering is a convention here rather than a cascade.
   'referral.outbox_events',
+  // V3.2-C Story #28, before `reward_grants` for the same by-convention reason:
+  // a reversal references the referral and the grant it reverses by id only.
+  'referral.reward_reversals',
   'referral.reward_grants',
   'referral.referrer_counters',
   'referral.referrals',

@@ -1502,22 +1502,41 @@ describePg('referral attribution — claim lifecycle, concurrency, privacy (real
       expect(scanned.join('')).toContain(planted);
     });
 
-    it('exposes no reversal or clawback API on the ATTRIBUTION service', async () => {
+    it('does not grow a qualification or clawback API on the ATTRIBUTION service', async () => {
       // This refused `reward`, `qualif`, `grant` and `points` too, until V3.2-C
-      // Story #12 legitimately built all four -- in a SEPARATE service
-      // (`ReferralQualificationService`), which is why this case still means
-      // something: the attribution service did not grow them.
+      // Story #12 legitimately built all four -- and refused `revers` and
+      // `refund` until Story #28 built those. Every narrowing followed a
+      // ratified owner decision, which is the only thing that should narrow it.
       //
-      // Narrowed to Story #28's vocabulary, which no service may carry yet.
+      // The case still means something because each of those stories built its
+      // vocabulary in a SEPARATE service: the attribution service grew none of
+      // them, and that is what is asserted here.
       const methods = Object.getOwnPropertyNames(Object.getPrototypeOf(referral));
+
+      // Refused PERMANENTLY: the surfaces `V32-DEC-019` rules out outright and
+      // no decision has since approved.
       for (const method of methods) {
-        expect(method).not.toMatch(/revers|clawback|refund|appeal|override/i);
+        expect(method).not.toMatch(/appeal|override|manual|compensat/i);
       }
 
-      // And the attribution service still does not qualify anything. Two
+      // The attribution service neither qualifies nor reverses. Two
       // implementations of one decision is how two implementations start
-      // disagreeing.
+      // disagreeing -- and a second way to write a negative ledger row would be
+      // a second way to get the amount wrong.
       expect(methods).not.toContain('qualify');
+      for (const method of methods) {
+        expect(method).not.toMatch(/^reverse/i);
+      }
+
+      // Story #28 added exactly two reversal-named methods here, and both are
+      // READ-ONLY helpers the privacy export needs -- a subject's own clawbacks
+      // have to be exportable, and reading them through `referrals` would load
+      // the row that names the counterparty. Pinned by name so a WRITER cannot
+      // arrive under cover of the same word.
+      for (const method of methods.filter((name) => /revers/i.test(name))) {
+        expect(method).toMatch(/^(rewardReversalsForSubject|countRewardReversals)$/);
+      }
+
       // Non-vacuity: the reflection must actually be finding methods.
       expect(methods).toEqual(expect.arrayContaining(['claim', 'codeFor']));
     });

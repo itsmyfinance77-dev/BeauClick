@@ -9,15 +9,31 @@ import { REFERRAL_BOOKING_PORT, REFERRAL_IDENTITY_PORT, ReferralModule } from '@
 import { OutboxSource } from '@beauclick/events';
 import { LoyaltyConfig, LoyaltyModule } from '@beauclick/loyalty';
 import { NotificationModule } from '@beauclick/notification';
-import { REFERRAL_LOYALTY_PORT, REFERRAL_REWARD_CONFIG, ReferralOutboxEntity } from '@beauclick/referral';
+import { OrderEntity } from '@beauclick/commerce';
+import {
+  REFERRAL_LOYALTY_PORT,
+  REFERRAL_LOYALTY_REVERSAL_PORT,
+  REFERRAL_ORDER_LOOKUP_PORT,
+  REFERRAL_REWARD_CONFIG,
+  ReferralOutboxEntity,
+} from '@beauclick/referral';
 
 import { ReferralBookingAdapter, ReferralIdentityAdapter } from './referral-ports';
-import { ReferralLoyaltyAdapter, referralRewardConfigFrom } from './referral-loyalty.adapter';
+import {
+  ReferralLoyaltyAdapter,
+  ReferralLoyaltyReversalAdapter,
+  referralRewardConfigFrom,
+} from './referral-loyalty.adapter';
+import { ReferralOrderAdapter } from './referral-order.adapter';
 import { REFERRAL_EVENT_HANDLERS, REFERRAL_OUTBOX_SOURCES } from './referral-tokens';
 import {
   BookingCompletedReferralHandler,
   ReferralQualifiedNotificationHandler,
 } from '../events/referral-qualification.handlers';
+import {
+  OrderRefundedReferralHandler,
+  ReferralReversedNotificationHandler,
+} from '../events/referral-reversal.handlers';
 
 /**
  * The referral domain's reads into `identity` and `booking`, `@Global()`.
@@ -60,7 +76,10 @@ import {
 @Global()
 @Module({
   imports: [
-    TypeOrmModule.forFeature([UserEntity, BookingEntity]),
+    // V3.2-C Story #28 adds `OrderEntity`, for the order-lookup adapter's
+    // metadata. `forFeature` is scoped to the module that registers it, which
+    // is why this list is repeated here rather than inherited.
+    TypeOrmModule.forFeature([UserEntity, BookingEntity, OrderEntity]),
     // V3.2-C Story #12. For LoyaltyLedgerService and LoyaltyConfig, which the
     // loyalty adapter and the reward-config factory need. `referral` still
     // never sees either -- only apps/api does, which is the boundary.
@@ -70,10 +89,34 @@ import {
     ReferralIdentityAdapter,
     ReferralBookingAdapter,
     ReferralLoyaltyAdapter,
+    // V3.2-C Story #28.
+    ReferralLoyaltyReversalAdapter,
+    ReferralOrderAdapter,
     { provide: REFERRAL_IDENTITY_PORT, useExisting: ReferralIdentityAdapter },
     { provide: REFERRAL_BOOKING_PORT, useExisting: ReferralBookingAdapter },
     // V3.2-C Story #12. The one reach into the loyalty ledger (ADR-037 §4).
     { provide: REFERRAL_LOYALTY_PORT, useExisting: ReferralLoyaltyAdapter },
+    /**
+     * V3.2-C Story #28. The clawback, behind a SECOND token (ADR-038 §§5-6).
+     *
+     * Separate from `REFERRAL_LOYALTY_PORT` rather than a method on it,
+     * because the reward port reserved it that way in terms: *"it also cannot
+     * write a negative row … that belongs to Story #28 with its own trigger
+     * and its own port."* Keeping the two apart keeps the reward path's
+     * guarantee -- that nothing it can do subtracts points -- a shape rather
+     * than a convention, and makes the two directions separately auditable.
+     */
+    { provide: REFERRAL_LOYALTY_REVERSAL_PORT, useExisting: ReferralLoyaltyReversalAdapter },
+    /**
+     * V3.2-C Story #28. The one read into commerce (ADR-038 §3).
+     *
+     * `OrderRefunded` v1 carries no customer and no source, so a reversal
+     * cannot tell which referral a refund concerns without re-reading the
+     * order -- and re-reading is required anyway, because full-versus-partial
+     * is the ORDER's authoritative status and not something the event can
+     * express.
+     */
+    { provide: REFERRAL_ORDER_LOOKUP_PORT, useExisting: ReferralOrderAdapter },
     // The two configured reward values, read from the authoritative
     // LoyaltyConfig. ReferralModule binds a default of { 0, 0 }, so this
     // changes nothing on a default deployment -- it exists so that SETTING
@@ -84,7 +127,14 @@ import {
       useFactory: referralRewardConfigFrom,
     },
   ],
-  exports: [REFERRAL_IDENTITY_PORT, REFERRAL_BOOKING_PORT, REFERRAL_LOYALTY_PORT, REFERRAL_REWARD_CONFIG],
+  exports: [
+    REFERRAL_IDENTITY_PORT,
+    REFERRAL_BOOKING_PORT,
+    REFERRAL_LOYALTY_PORT,
+    REFERRAL_LOYALTY_REVERSAL_PORT,
+    REFERRAL_ORDER_LOOKUP_PORT,
+    REFERRAL_REWARD_CONFIG,
+  ],
 })
 export class ReferralPortsModule {}
 
@@ -147,6 +197,24 @@ export class ReferralPortsModule {}
  * **Nothing from Stories #12, #13, #14, or #28.** No qualification, no reward
  * grant, no `reward_grants` or `referrer_counters` table, no monthly cap, no
  * reversal, no abuse suite, and no frontend.
+ *
+ * ## V3.2-C Story #28 makes all four of those paragraphs historical
+ *
+ * They are left standing rather than rewritten, because they were accurate when
+ * written and the sequence is worth reading: the module acquired an outbox when
+ * it acquired a producer, and a second consumer when a second owner decision
+ * had a trigger. What is true now:
+ *
+ *  * the outbox source exists (Story #12) and carries **two** event types;
+ *  * there are **four** handlers under one token — qualify, notify-qualified,
+ *    reverse, notify-reversed;
+ *  * `V32-DEC-033`'s two notification moments both exist, and the vocabulary is
+ *    closed at those two;
+ *  * there is still **no sweep scheduler**, and Story #28 adds none: a reversed
+ *    referral is terminal and permanent, exactly as a qualified one is.
+ *
+ * **Nothing from Stories #13, #14 or #15.** No abuse suite, no design artifact,
+ * and no frontend.
  */
 @Module({
   imports: [
@@ -161,18 +229,39 @@ export class ReferralPortsModule {}
     NotificationModule,
   ],
   providers: [
-    // The two event handlers, provided here and surfaced under one token.
-    // `BookingCompleted` -> qualify (V32-DEC-018); `ReferralQualified` ->
-    // notify both parties (V32-DEC-033).
+    /**
+     * The four event handlers, provided here and surfaced under one token.
+     *
+     *   `BookingCompleted`  -> qualify, and converge if the order is already
+     *                          fully refunded (V32-DEC-018, ADR-038 §8)
+     *   `ReferralQualified` -> notify both parties (V32-DEC-033)
+     *   `OrderRefunded`     -> reverse on a FULL refund (V32-DEC-017)
+     *   `ReferralReversed`  -> notify both parties (V32-DEC-033)
+     *
+     * All four under one token because they are one domain's event surface, and
+     * splitting them would suggest they could be composed independently — which
+     * they cannot. A deployment that qualified without reversing would be a
+     * platform with `V32-DEC-017`'s free-points loop open; one that reversed
+     * without notifying would take points back silently.
+     */
     BookingCompletedReferralHandler,
     ReferralQualifiedNotificationHandler,
+    OrderRefundedReferralHandler,
+    ReferralReversedNotificationHandler,
     {
       provide: REFERRAL_EVENT_HANDLERS,
-      inject: [BookingCompletedReferralHandler, ReferralQualifiedNotificationHandler],
+      inject: [
+        BookingCompletedReferralHandler,
+        ReferralQualifiedNotificationHandler,
+        OrderRefundedReferralHandler,
+        ReferralReversedNotificationHandler,
+      ],
       useFactory: (
         qualify: BookingCompletedReferralHandler,
-        notify: ReferralQualifiedNotificationHandler,
-      ) => [qualify, notify],
+        notifyQualified: ReferralQualifiedNotificationHandler,
+        reverse: OrderRefundedReferralHandler,
+        notifyReversed: ReferralReversedNotificationHandler,
+      ) => [qualify, notifyQualified, reverse, notifyReversed],
     },
     // V3.2-C Story #12. The module`s first outbox source, merged by
     // DomainCompositionModule into the single OUTBOX_SOURCES the relay drains.

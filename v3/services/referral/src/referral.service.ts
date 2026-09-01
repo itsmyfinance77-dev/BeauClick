@@ -20,6 +20,7 @@ import {
   ReferralAttributionEntity,
   ReferralCodeEntity,
   ReferralRewardGrantEntity,
+  ReferralRewardReversalEntity,
 } from './entities/referral.entities';
 import {
   REFERRAL_CLOCK,
@@ -559,6 +560,37 @@ export class ReferralService {
    */
   async countRewardGrants(manager: EntityManager, userId: string): Promise<number> {
     return manager.getRepository(ReferralRewardGrantEntity).count({ where: { recipientUserId: userId } });
+  }
+
+  /**
+   * Every reward reversal this subject is the recipient of — V3.2-C Story #28.
+   *
+   * The exact mirror of `rewardGrantsForSubject`, addressed by
+   * `recipient_user_id` for the same reason and ordered deterministically for
+   * the same one: an export cannot leak an identity it never reads, and two
+   * exports of unchanged data should be identical documents.
+   */
+  async rewardReversalsForSubject(
+    manager: EntityManager,
+    userId: string,
+  ): Promise<ReferralRewardReversalEntity[]> {
+    return manager.getRepository(ReferralRewardReversalEntity).find({
+      where: { recipientUserId: userId },
+      order: { reversedAt: 'ASC', id: 'ASC' },
+    });
+  }
+
+  /**
+   * How many reversals survive this subject's erasure — V3.2-C Story #28.
+   *
+   * Counted rather than assumed, exactly as the grants are, so the erasure
+   * report names `referral.reward_reversals` as retained only when something is
+   * actually retained.
+   */
+  async countRewardReversals(manager: EntityManager, userId: string): Promise<number> {
+    return manager.getRepository(ReferralRewardReversalEntity).count({
+      where: { recipientUserId: userId },
+    });
   }
 
   /**

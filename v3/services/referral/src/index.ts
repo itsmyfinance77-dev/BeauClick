@@ -10,3 +10,6 @@ export * from './ports/referral.ports';
 export * from './referral-qualification.service';
 export * from './referral-reward.config';
 export * from './ports/referral-loyalty.port';
+export * from './referral-reversal.service';
+export * from './ports/referral-loyalty-reversal.port';
+export * from './ports/referral-order-lookup.port';
