@@ -495,6 +495,52 @@ describePg('referral qualification — CAS, two sides, cap, ledger (real Postgre
       expect(rows[0].base_points).toBe(25);
     });
 
+    it('does not even CALL the ledger for a zero side', async () => {
+      // The DOMAIN's own guard, tested separately from the ledger's.
+      //
+      // The mutation pass found this gap: weakening
+      // `awardIfPayable`'s early return did NOT fail the two cases above,
+      // because `LoyaltyLedgerService.award` ALSO returns early at zero points.
+      // Both tests were therefore proving the LEDGER's guard while appearing to
+      // prove the domain's.
+      //
+      // ADR-037 §8 claims TWO independent reasons the idempotency slot stays
+      // free -- the domain does not call, and the ledger would refuse anyway --
+      // and a claim of independence is only worth making if each half is
+      // observed on its own. This is the first half; the ledger's is already
+      // covered by its own suite.
+      const referrer = await customer();
+      const referee = await customer();
+      await pendingReferral(referrer, referee);
+
+      const port = app.get<{ award: (...args: unknown[]) => unknown }>(
+        (await import('@beauclick/referral')).REFERRAL_LOYALTY_PORT,
+      );
+      const spy = jest.spyOn(port, 'award');
+
+      await qualifyFor(referee);
+
+      expect(spy).not.toHaveBeenCalled();
+    });
+
+    it('is NON-VACUOUS: the ledger IS called when a side is positive', async () => {
+      // Without this, the case above would pass against a port that was never
+      // wired up at all.
+      const referrer = await customer();
+      const referee = await customer();
+      await pendingReferral(referrer, referee);
+
+      const port = app.get<{ award: (...args: unknown[]) => unknown }>(
+        (await import('@beauclick/referral')).REFERRAL_LOYALTY_PORT,
+      );
+      const spy = jest.spyOn(port, 'award');
+
+      withRewards(30, 15);
+      await qualifyFor(referee);
+
+      expect(spy).toHaveBeenCalledTimes(2);
+    });
+
     it('pays correctly when a positive referrer value is configured', async () => {
       const referrer = await customer();
       const referee = await customer();
