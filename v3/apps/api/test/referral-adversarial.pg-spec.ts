@@ -117,6 +117,35 @@ describePg('referral — abuse, security and concurrency adversarial suite (real
     ctx = await createPgTestApp();
     app = ctx.app;
     dataSource = ctx.dataSource;
+
+    // -----------------------------------------------------------------------
+    // Bind the HTTP server ONCE, before any request is made.
+    //
+    // This is not a tidiness preference; without it §A5 is FLAKY, and it failed
+    // in CI exactly once before this line existed.
+    //
+    // `createPgTestApp` calls `app.init()`, which wires Nest but does NOT
+    // listen. supertest therefore binds lazily: the first `request(server)`
+    // whose target has no address calls `server.listen(0)` and, because it
+    // OWNS that listener, closes it again when its own assertion ends. Measured
+    // with a probe rather than assumed -- `listening` reads `false` before a
+    // request AND `false` again after one completes.
+    //
+    // With one request in flight that is invisible. With eight fired together,
+    // the owner closes the listener while the other seven still hold sockets on
+    // it, and they die with `read ECONNRESET` -- an error with nothing to do
+    // with referrals, on a machine slow enough for all eight to truly overlap.
+    //
+    // Pre-binding removes the ownership entirely: every request finds an
+    // address, none creates a listener, and none closes one. `app.close()` in
+    // `afterAll` shuts it down.
+    await new Promise<void>((resolve, reject) => {
+      const server = app.getHttpServer();
+      if (server.listening) return resolve();
+      server.once('error', reject);
+      server.listen(0, () => resolve());
+    });
+
     referral = app.get(ReferralService);
     qualification = app.get(ReferralQualificationService);
     reversal = app.get(ReferralReversalService);
@@ -778,9 +807,30 @@ describePg('referral — abuse, security and concurrency adversarial suite (real
   });
 
   describe('A5 — simultaneous claims cannot create two attributions', () => {
+    it('PRECONDITION: the HTTP server is pre-bound, so no request owns the listener', () => {
+      // Guards the `beforeAll` above, and it is worth a named case rather than a
+      // comment because removing that binding does not break this suite -- it
+      // makes it FLAKY, which is worse and much harder to attribute.
+      //
+      // Proved non-vacuous: deleting the pre-bind fails exactly this case.
+      const server = app.getHttpServer();
+      expect(server.listening).toBe(true);
+      expect(server.address()).not.toBeNull();
+    });
+
     it('NEGATIVE: eight concurrent HTTP claims by one referee create exactly one row', async () => {
-      const referrers = await Promise.all(Array.from({ length: 8 }, () => customer()));
-      const codes = await Promise.all(referrers.map(codeOf));
+      // Fixture setup is deliberately SEQUENTIAL. Eight concurrent mutating
+      // `GET /code` calls would spend the connection pool on the part of this
+      // case that is not under test, and the pool is what the eight concurrent
+      // CLAIMS below need -- the `2N connections against a pool of 10` shape
+      // V3.2-B recorded as bug #2.
+      const referrers: SeededUser[] = [];
+      const codes: string[] = [];
+      for (let i = 0; i < 8; i += 1) {
+        const referrer = await customer();
+        referrers.push(referrer);
+        codes.push(await codeOf(referrer));
+      }
       const referee = await customer();
 
       const responses = await Promise.all(codes.map((code) => claim(referee, code)));
