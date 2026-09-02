@@ -28,6 +28,43 @@ export interface AwardInput {
   overridePoints?: number;
 }
 
+/**
+ * Which award to reverse — V3.2-C Story #28 (ADR-038 §6).
+ *
+ * Note what is **absent**: there is no amount. The caller names the award and
+ * the ledger reads what it credited, so an over-claw has no parameter to arrive
+ * through (`V32-DEC-017`).
+ */
+export interface ReverseInput {
+  /** The reference the original award carried. The reversal shares it. */
+  referenceType: string;
+  referenceId: string;
+  /** The reason the original award was written under. */
+  originalReason: LoyaltyReason;
+  /**
+   * The reason the negative row is written under. **Must differ** from
+   * `originalReason`: the distinct reason is what gives the reversal its own
+   * slot under `UNIQUE(reference_type, reference_id, reason)`, and reusing the
+   * award's reason would deduplicate the clawback away entirely.
+   */
+  reversalReason: LoyaltyReason;
+  /**
+   * The base points the CALLER has persisted for this award, if it has any.
+   *
+   * A cross-check and never a source (see `reverse`). Referral passes its grant
+   * row's figure so the two persisted records are asserted to agree rather than
+   * assumed to.
+   */
+  expectedBasePoints?: number;
+}
+
+export interface ReverseResult {
+  /** Whether a negative row was written. `false` is a normal outcome. */
+  reversed: boolean;
+  /** The MAGNITUDE clawed back — what the original credited. `0` when nothing was. */
+  points: number;
+}
+
 export interface AwardResult {
   awarded: boolean;
   entryId: string | null;
@@ -150,6 +187,143 @@ export class LoyaltyLedgerService {
 
       this.auditLog.log({ action: 'loyalty.awarded', userId: input.userId, points, reason: input.reason });
       return { awarded: true, entryId, points, lifetimeEarned, tierChanged };
+    };
+
+    return manager ? run(manager) : this.dataSource.transaction(run);
+  }
+
+  /**
+   * Reverses a previous award: one new NEGATIVE row, never a mutation.
+   *
+   * V3.2-C Story #28 (`V32-DEC-017`, `V32-DEC-032`, ADR-038 §6). Both decisions
+   * bind the same semantics, deliberately, so that one ledger does not acquire
+   * two different answers to "an award survived the thing that earned it being
+   * undone".
+   *
+   * ## Why this is a method here and not a caller writing a negative award
+   *
+   * `award()` cannot serve this and could not be made to, for three independent
+   * reasons -- any one of which would be a defect:
+   *
+   *  * it **returns early at zero** and re-derives the figure from
+   *    `pointsFor(reason)` or an override, so the amount would come from
+   *    configuration that may have changed since the award;
+   *  * it **re-applies the multiplier**, so a caller passing the original
+   *    credited points would have the recipient's benefit applied a second
+   *    time;
+   *  * it **emits `LoyaltyPointsEarned`**, which `analytics` sums into
+   *    `loyalty_points_earned`. A negative one would quietly turn a
+   *    gross-earnings metric into a net one, and nothing would report it.
+   *
+   * ## The amount is READ, never passed in
+   *
+   * The caller says *which award* to reverse, never *by how much*. That is the
+   * point: `V32-DEC-017` requires the clawback to be exactly what was credited,
+   * and reward configuration may legitimately change between the award and the
+   * refund. Reading the original row makes an over-claw unrepresentable rather
+   * than merely unlikely -- there is no parameter through which a wrong figure
+   * could arrive.
+   *
+   * `expectedBasePoints` is a **cross-check, not a source**. Referral passes
+   * the figure its own grant row recorded so the two persisted records are
+   * asserted to agree; a mismatch means the grant no longer explains the ledger
+   * entry it exists to explain, and that is a bug worth a loud failure rather
+   * than a quietly-preferred value.
+   *
+   * ## What it deliberately does not do
+   *
+   * **No tier recomputation and no event.** `lifetimeEarned()` sums positive
+   * rows only, so a negative row cannot move a tier -- the guarantee
+   * `V32-DEC-017` needs is a property of the query rather than a branch here,
+   * and adding a recomputation would be adding a way for it to stop being true.
+   * `V32-DEC-033` approves `ReferralReversed` for the referral case and no
+   * loyalty-side reversal event exists or is approved.
+   *
+   * **No clamp.** The balance may go negative, and `V32-DEC-017` says why in
+   * terms: clamping converts "book, get referred, spend the points, refund"
+   * into a working exploit.
+   *
+   * Returns `reversed: false` when there is nothing to reverse -- either the
+   * original award never wrote a row (a `disabled_zero` or `capped` referral
+   * side) or this reversal has already been recorded. Both are **normal** return
+   * values, not errors: the outbox is at-least-once and redelivery is the steady
+   * state.
+   */
+  async reverse(input: ReverseInput, manager?: EntityManager): Promise<ReverseResult> {
+    const run = async (m: EntityManager): Promise<ReverseResult> => {
+      const original = await m.getRepository(PointsEntryEntity).findOne({
+        where: {
+          referenceType: input.referenceType,
+          referenceId: input.referenceId,
+          reason: input.originalReason,
+        },
+      });
+
+      // Nothing was ever credited under that reason. The referral case is a
+      // side whose grant was `disabled_zero` or `capped`, which wrote no row
+      // and consumed no slot precisely so a later approved figure could still
+      // be awarded -- so finding nothing here is the designed outcome, not a
+      // missing record.
+      if (!original) return { reversed: false, points: 0 };
+
+      if (input.expectedBasePoints !== undefined && input.expectedBasePoints !== original.basePoints) {
+        // Neither figure and neither party is named: the message says which
+        // record disagrees, not what it says. An amount in an exception is an
+        // amount in a log line.
+        throw new Error(
+          `Loyalty reversal refused: the caller's persisted base points disagree with the original ` +
+            `${input.originalReason} entry for reference ${input.referenceType}. The grant no longer ` +
+            `explains the ledger row it exists to explain.`,
+        );
+      }
+
+      const entryId = uuidv7();
+      // `insertOnce` rather than reading `identifiers`, for the reason
+      // insert-once.ts records: TypeORM echoes back a caller-supplied id
+      // whether or not the row was inserted, so the obvious check reports
+      // every duplicate as a fresh write. The unique index on
+      // (reference_type, reference_id, reason) is the ONLY duplicate guard
+      // here -- there is no read-then-write to accidentally rely on.
+      const won = await insertOnce(
+        m
+          .createQueryBuilder()
+          .insert()
+          .into(PointsEntryEntity)
+          .values({
+            id: entryId,
+            userId: original.userId,
+            // The negatives of what was actually credited. Not the configured
+            // value, and not the base -- ADR-038 §5.
+            points: -original.points,
+            basePoints: -original.basePoints,
+            // The ORIGINAL multiplier, copied rather than recomputed. Required
+            // by `ck_points_entries_multiplier` (>= 10000), and correct on its
+            // own terms: the row states the multiplier it is undoing, so a
+            // later benefit change cannot make a past reversal look wrong.
+            multiplierBp: original.multiplierBp,
+            reason: input.reversalReason,
+            referenceType: input.referenceType,
+            referenceId: input.referenceId,
+          }),
+      );
+
+      if (!won) {
+        this.auditLog.log({
+          action: 'loyalty.reversal_deduplicated',
+          userId: original.userId,
+          reason: input.reversalReason,
+          referenceId: input.referenceId,
+        });
+        return { reversed: false, points: 0 };
+      }
+
+      this.auditLog.log({
+        action: 'loyalty.reversed',
+        userId: original.userId,
+        points: -original.points,
+        reason: input.reversalReason,
+      });
+      return { reversed: true, points: original.points };
     };
 
     return manager ? run(manager) : this.dataSource.transaction(run);

@@ -243,6 +243,44 @@ export const NOTIFICATION_RULES: NotificationRule[] = [
     entityType: 'data_request',
     build: async (p) => ({ userId: str(p.subjectUserId), entityId: str(p.requestId), vars: {} }),
   },
+  {
+    /**
+     * V3.2-B. A new chat message.
+     *
+     * The only rule in this list that needs NO enricher, and that is by design:
+     * `MessageSent` carries `recipientUserId` precisely so the notification side
+     * needs no cross-domain join at dispatch time. On a business-side
+     * conversation the send path emits one event per authorized recipient, so a
+     * message to a salon produces one notification for the owner and one for
+     * each active manager.
+     *
+     * `vars` is EMPTY and the template requires none. There is no variable
+     * through which a message body or a sender name could reach a notification
+     * -- ADR-032 §1 keeps prose out of notification payloads, and a preview would
+     * put the message into a channel the retention and erasure rules do not
+     * cover.
+     *
+     * `entityType: 'chat_message'` rather than `chat_conversation`, and this is
+     * the load-bearing line. The idempotency key is
+     * `{templateKey}:{entityType}:{entityId}:{userId}:{channel}`, so keying on
+     * the conversation would give each recipient exactly ONE chat notification
+     * per conversation for its whole life, with every later message silently
+     * swallowed as a duplicate. That is not hypothetical -- it is the tier-change
+     * bug recorded on `dedupeBy` above, where keying on the customer meant every
+     * customer received one tier notification ever.
+     */
+    eventType: 'MessageSent',
+    templateKey: 'chat_message_received',
+    // in_app only. Email and SMS have no verified provider (GAP-11), and push is
+    // out of the V3.2-B milestone entirely (`CHAT-PUSH`).
+    channels: ['in_app'],
+    entityType: 'chat_message',
+    build: async (p) => ({
+      userId: str(p.recipientUserId),
+      entityId: str(p.messageId),
+      vars: {},
+    }),
+  },
 ];
 
 /**

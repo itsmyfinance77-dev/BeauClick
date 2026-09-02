@@ -115,13 +115,98 @@ No microservices beyond the two already decided in ADR-002 (financial, payment) 
 
 ## ai
 
-- **Responsibility**: customer discovery assistant, professional insights assistant — provider-abstracted, two-stage authorization/curation, output-validated.
-- **Own schema**: `ai` — `ai_conversations`/`_messages`, `ai_professional_conversations`/`_messages`, `ai_recommendation_events`. `GAP-12`'s one-thread-per-tenant constraint is explicitly revisited, not re-adopted, in schema design.
-- **Public API**: `GET/POST /v1/ai/messages`, `GET/POST /v1/ai/professional/messages`, `POST /v1/ai/recommendations/{id}/click`.
-- **Internal API**: none exposed — ai-service only ever *calls into* other modules' already-scoped summary methods (`provider.getProviderSummary`, `analytics.compute`, `financial.receivableNetForCurrentSession` for the professional-mode context, `journey`'s context seam below), never the reverse.
-- **Events produced**: `AIConversationCreated`/`AIMessageSent` v1.
-- **Events consumed**: none required for core function (context is assembled synchronously per-request).
-- **Data ownership rules**: never given direct database access to any other module — every fact it sees comes through an already-authorized, already-curated summary call. Free-text/PII-bearing fields (CRM notes, raw review text, Journey's `notes` field) are excluded from context by construction, not access-controlled within it.
+**Implemented in V3.2-A to the deterministic sandbox milestone.** ADR-029 decides the
+boundary and the provider port; ADR-030 amends `V3_SECURITY_MODEL.md` §5 into nine named
+threats with named controls. The entries below are updated from the Phase 0 blueprint to what
+was actually built; where the two differ, the difference is stated rather than quietly
+overwritten.
+
+- **Responsibility**: customer discovery assistant — provider-abstracted, context-curated,
+  output-validated, and re-verified against the authoritative catalogue.
+  **Professional mode is deferred** (`V32-DEC-001`, decided 2026-08-29): no
+  `bc_use_professional_ai` capability exists, and no professional conversation table was
+  created. When it is approved it gets its own table keyed on the party, not a `scope` column
+  on the customer table.
+- **Own schema**: `ai` — `conversations`, `messages`, `recommendations`, `assistant_consents`,
+  `usage_daily`, `outbox_events`. `GAP-12`'s one-thread-per-tenant constraint was revisited and
+  **not** re-adopted: `V32-DEC-002` chose bounded sessions, so there is no `UNIQUE(user_id)`,
+  and there are instead a `status`, a `last_activity_at`, a 24-hour inactivity horizon, a
+  20-conversation retained cap, and a 30-day retention sweep.
+  Ownership is enforced by composite foreign keys — `messages` and `recommendations` reference
+  `conversations(id, user_id)` — so a row whose owner disagrees with its parent's is
+  unwritable, not merely absent from today's queries.
+- **Public API**: `GET/POST /v1/me/ai/consent`, `POST/GET /v1/me/ai/conversations`,
+  `GET /v1/me/ai/conversations/{id}`, `POST /v1/me/ai/conversations/{id}/messages`,
+  `DELETE /v1/me/ai/conversations/{id}`, `POST /v1/me/ai/recommendations/{id}/click`.
+  Under `/v1/me/` rather than the blueprint's `/v1/ai/`, because every route is self-scoped and
+  the prefix says so. **No route accepts an owner, customer, party, or user id**, and there is
+  no professional route.
+- **Internal API**: none exposed. `ai` only ever calls into other modules' already-scoped
+  summary methods, through two typed ports bound in the composition root
+  (`AI_JOURNEY_CONTEXT` → `journey.inferAiDefaults`, `AI_PUBLIC_CATALOGUE` → the existing
+  search read model plus provider's own tables for re-verification). Never the reverse.
+- **Events produced**: `AIConversationStarted` v1 and `AIMessageExchanged` v1.
+  Renamed from the blueprint's `AIConversationCreated`/`AIMessageSent` — the second carries one
+  customer message AND its reply, so "sent" would have described half of it. Neither schema has
+  a field able to hold prose, asserted mechanically by walking the zod schema.
+- **Events consumed**: none. Context is assembled synchronously per request.
+- **Data ownership rules**: never given direct database access to any other module. Every fact
+  it sees comes through an already-authorized, already-curated summary call, and the
+  allow-listed set is fixed by `V32-DEC-005`: string-free Journey inference, public
+  professional summaries, public service summaries, approved public search summaries.
+  Journey `notes` and goal titles, review comments and professional replies, CRM notes,
+  internal chat, moderation reasons, verification evidence, direct identifiers, financial
+  figures, and tenant-private analytics are excluded **by construction** — no port returns
+  them and no type can hold them. A professional's public `bio` is excluded too, because a
+  public string authored by one party and fed into a prompt on behalf of another is an
+  injection surface with no compensating benefit.
+- **Operator access**: none to content (`V32-DEC-009`). There is no admin route, no
+  impersonation, and no moderation queue for AI conversations. Operators get counts, latency,
+  provider mode, refusal mix, and the re-verification drop rate.
+- **Provider**: one registry, one port, and exactly one registered provider — `deterministic`,
+  a local assistant that narrates the real catalogue, needs no credential, makes no network
+  call, and says in its own reply that it is not a language model. Readiness reports
+  `ai_provider: simulated`, and `productionVerified` stays false with no code path able to
+  change it.
+
+## chat
+
+**New in V3.2-B.** Human messaging between a customer and the seller party they actually
+transacted with. ADR-031 decides who may talk and for how long; ADR-032 decides privacy, abuse,
+and moderation. Decisions `V32-DEC-010` … `V32-DEC-015`, closed 2026-08-30.
+
+- **Responsibility**: two-party conversations gated on a proven booking relationship, with
+  blocking, reporting, and a moderation queue. Polling transport, in-app notification only.
+- **Own schema**: `chat` — `conversations`, `conversation_participants`, `messages`, `blocks`,
+  `reports`, `send_counters`, `outbox_events`. **No `message_attachments`**: attachments are out
+  of the milestone entirely, not stubbed.
+- **Public API**: `GET/POST /v1/chat/conversations`, `GET /v1/chat/conversations/{id}`,
+  `GET/POST /v1/chat/conversations/{id}/messages`, `POST /v1/chat/conversations/{id}/read`,
+  `GET /v1/chat/unread-count`, `POST/DELETE /v1/chat/blocks`, `POST /v1/chat/reports`, and three
+  `bc_moderate_chat` routes under `/v1/admin/chat/reports`.
+- **Internal API**: none exposed. `chat` calls out through typed ports bound in the composition
+  root — booking eligibility, the historical seller snapshot, and business-inbox membership — and
+  nothing calls into it.
+- **Events produced**: `ConversationStarted` v1 and `MessageSent` v1. Ids, enums, counts, and
+  instants only; **no field can hold a message body**.
+- **Events consumed**: none.
+- **Data ownership rules**: the counterparty is the **immutable historical seller-party snapshot**
+  from `commerce.orders` (`source_type='booking'`), recorded at creation and never recomputed —
+  **no fallback** to current `business_staff` affiliation, and a missing snapshot fails closed.
+  A business conversation belongs to the business; inbox access is the **owner and active
+  managers only**, with practitioner-specific access deferred to the V3.3-C role matrix. Read
+  state is a monotonic watermark on the participant row, never a per-message flag.
+- **Erasure**: ADR-027-consistent and taking **no exception** to it. The erased subject's prose is
+  destroyed, leaving a neutral structural placeholder with no excerpt or reconstructable content;
+  the counterparty's own messages survive; the identity is tombstoned. 24-month retention swept by
+  hard delete and cascade.
+- **Moderation**: entry is a report id and nothing else — no conversation browsing, no user or
+  message search, no arbitrary conversation-id access. A moderator may not send, impersonate,
+  edit, or delete. Reading a reported window is itself audited.
+- **The AI boundary**: **no chat context port exists and none may be added.** Human chat is not AI
+  context, `V3.2_PRODUCT_ROADMAP.md` §4 states it as a non-goal, and the capability catalog lists
+  automatic use of it as `RETIRED`. Enforced structurally, not by policy: `ai`'s context type is a
+  closed three-key interface whose key set is asserted against a literal.
 
 ## journey
 

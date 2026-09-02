@@ -1,0 +1,40 @@
+name: Product or policy decision
+description: A binding choice engineering or design must not invent
+title: "[Decision] "
+labels: ["type:decision", "status:decision"]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Decision required
+      description: Ask one concrete question and name the approver.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Repository and product evidence
+      description: Record current behaviour, constraints, contradictions, and affected users.
+    validations:
+      required: true
+  - type: textarea
+    id: options
+    attributes:
+      label: Options and consequences
+      description: Present genuine alternatives separately; do not hide costs or external gates.
+    validations:
+      required: true
+  - type: textarea
+    id: recommendation
+    attributes:
+      label: Recommendation
+      description: Give a reasoned recommendation without changing status to decided.
+    validations:
+      required: true
+  - type: textarea
+    id: closure
+    attributes:
+      label: Closure record
+      description: Approver, selected option, exact numeric parameters, date, and documents to update.
+    validations:
+      required: true

@@ -190,16 +190,32 @@ describePg('V3.1 Phase E — privacy (real PostgreSQL)', () => {
       // The case that makes every other coverage assertion mean something.
       // A future migration adds a table and nobody registers it; this is what
       // must happen. The catalogue is the real one plus one invented row, so
-      // the contracts under test are the application's actual sixteen.
+      // the contracts under test are the application's actual set.
+      //
+      // The invented row used to be `referral.referrals`, and V3.2-C Story #27
+      // BUILT that table and claimed it — at which point this case stopped
+      // finding a violation and failed. It failed loudly, which is the system
+      // working; but it had silently become a probe for a table that was on the
+      // roadmap, which is a fragile thing for a non-vacuity guard to be.
+      //
+      // So the name is now deliberately un-buildable, and the test ASSERTS it is
+      // absent from the real catalogue before using it. If some future story
+      // does create it, this fails on the first assertion with an obvious cause
+      // rather than on the second with a confusing one.
       const catalogue = await coverage.readCatalogue();
+      const probe = { schema: 'referral', name: 'zz_never_a_real_table', columns: ['id', 'user_id'] };
 
-      const report = evaluateCoverage(
-        [...catalogue, { schema: 'referral', name: 'referrals', columns: ['id', 'user_id'] }],
-        contracts,
+      expect(catalogue.map((table) => `${table.schema}.${table.name}`)).not.toContain(
+        `${probe.schema}.${probe.name}`,
       );
 
+      const report = evaluateCoverage([...catalogue, probe], contracts);
+
       expect(report.violations).toHaveLength(1);
-      expect(report.violations[0]).toMatchObject({ kind: 'unclaimed', table: 'referral.referrals' });
+      expect(report.violations[0]).toMatchObject({
+        kind: 'unclaimed',
+        table: `${probe.schema}.${probe.name}`,
+      });
     });
   });
 

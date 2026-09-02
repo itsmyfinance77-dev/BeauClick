@@ -53,6 +53,31 @@ This was verified true, not merely designed-to-be-true, in every domain checked:
 2. **Default owner-only visibility, no implicit staff fallback**, for the most sensitive data (financial, AI) — V2 made this an explicit, deliberate deviation from its own more permissive default (which does allow a staff-role fallback for CRM/analytics). V3 should preserve this two-tier default: broad operational data (CRM, own-analytics) may have a staff-access fallback; money and AI-conversation content should not, unless a specific product decision widens it.
 3. **An adversarial test that actually forges the cross-tenant parameter**, not just a happy-path ownership test. V2's financial and AI tests do this correctly (seed party B with a distinguishable real value, ask as party A, assert the value never appears anywhere in A's response) — this exact test shape should be a required part of every V3 endpoint that touches tenant-scoped data, not an occasional nice-to-have.
 
+### 4.1 Chat, as implemented — V3.2-B
+
+Chat is the platform's second store of private subject-authored prose, and the first with **two**
+people in it. ADR-031 and ADR-032 carry the full model; three properties belong in this section
+because they are the isolation ones.
+
+**Eligibility is proven, not asserted, and is re-proven inside the send transaction.** V2 shipped
+chat with no eligibility rule at all — `start_or_get` rejected only self-conversation, so any
+holder of `bc_send_message` could open a thread against any user id. V3 requires a booking
+relationship, and specifically requires it to be provable: a `cancelled` booking qualifies only
+when the append-only `booking.booking_history` shows it previously reached `confirmed`, because
+`pending` is the one status a stranger can create unilaterally and a `pending`→`cancelled` hold
+would otherwise be an eligibility grant anybody could mint.
+
+**The counterparty is immutable.** It is read once from the historical seller-party snapshot on
+the booking's order and written onto the conversation. There is no recomputation and no fallback
+to current affiliation, so a professional changing salon cannot move an existing customer
+conversation to a business that customer never dealt with. A missing snapshot fails closed.
+
+**The adversarial test shape §4 requires is applied here in four forms**, not one: a forged
+counterparty has zero effect; a `pending`→`cancelled` booking grants nothing; a fabricated or
+missing order triggers no fallback; and changing a professional's affiliation after the fact
+moves no conversation. Missing, foreign, and ineligible targets return the one shared
+`NotFoundOrNotYoursException`, byte-identically.
+
 **Known, accepted gap to close, not repeat (`GAP-05`)**: V2's isolation for financial data is enforced only at the REST-controller boundary — `LedgerService` itself has no row-level access control independent of which caller reaches it. V3's data-access layer should not rely solely on "only gated controllers ever call this" as its security boundary; enforce isolation as close to the data as the stack reasonably allows (e.g., row-level security at the database, or a mandatory tenant-scoping parameter the query layer refuses to omit).
 
 ---
@@ -72,6 +97,51 @@ The AI provider (LLM or rule-based fallback) then only ever sees this pre-curate
 **System-prompt-level constraints** (for any real-LLM provider): explicit, enumerated forbidden actions (no mutating anything — booking, pricing, settlement, CRM; no inventing numbers/IDs/entities not present in the supplied context; no discussing another tenant's data even if the user names them or tries to redirect the conversation) plus a hard length cap and an injection-phrase blocklist checked *before* the provider is ever invoked, not relied upon as the prompt's only defense.
 
 **Same-tenant-only, adversarially verified**: see §4 — this is not optional for AI specifically, since AI is the domain most likely to be asked, directly, in natural language, to reveal another tenant's information ("what about my colleague's numbers?").
+
+### 5.1 As implemented — V3.2-A, and what ADR-030 adds
+
+**ADR-030 amends this section**, turning each rule above into a named threat with a named
+control and a named test. Read it alongside this; where they differ in detail, ADR-030 is the
+implemented one.
+
+The two-stage model is built as specified, with three things worth recording because they are
+stronger than what this section asked for:
+
+- **The curation stage cannot be widened by accident.** The context is not "a fixed, minimal,
+  pre-aggregated JSON blob" assembled by remembering what to leave out — it is a closed
+  TypeScript type with three keys, assembled field by field, whose key set is asserted against
+  a literal. The excluded material has no port that returns it and no field that could hold it.
+  A professional's public `bio` is excluded too, which this section did not require: a public
+  string authored by one party and fed into a prompt on behalf of another is an injection
+  surface with no compensating benefit.
+- **The injection blocklist is explicitly a mitigation, not the defence.** It runs before the
+  provider is invoked, as required, and it is checked by a spy that the provider was never
+  called. But ADR-030 T1 records what this section leaves implicit: a phrase list is defeated
+  by paraphrase, and that is what a phrase list is. The defence is that a successful injection
+  has nothing to reach. The list is Unicode-normalised (NFKC, zero-width stripped, Persian and
+  Arabic letter forms unified, digits folded), because a filter defeated by a ZWNJ is
+  decoration — and ZWNJ is how Persian half-spaces are written.
+- **Output-side validation is two steps, not one.** Validation proves SHAPE; verification
+  proves FACT. A UUID that parses and refers to a suspended professional passes the first and
+  fails the second, and only the second is what a customer acts on. Re-verification reads the
+  authoritative provider tables, **not** the search projection: the projection is eventually
+  consistent, so a professional suspended thirty seconds ago is still in the index, and
+  re-verifying there would confirm exactly the record the platform has just decided must not be
+  shown.
+
+**System-prompt-level constraints are not relied on at all in this phase**, because there is no
+real LLM to instruct. The only registered provider is deterministic and in-process. The
+forbidden actions this section enumerates are enforced structurally instead: the provider is
+handed no repository, no `EntityManager`, and no service, so there is no collaborator through
+which a mutation could be attempted, and the response schema is `strict()` so a provider
+returning an `actions` array is rejected outright rather than having the unknown key silently
+dropped.
+
+**Two controls this section does not mention, added by `V32-DEC-008` and `V32-DEC-009`:** a
+per-user daily cap enforced in PostgreSQL atomically with the message insert (not a
+read-then-write, and not the in-memory HTTP throttler, whose effective limit multiplies by
+instance count), and the complete absence of any privileged route that can read AI conversation
+content.
 
 ---
 

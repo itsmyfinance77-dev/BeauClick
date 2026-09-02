@@ -33,6 +33,10 @@ import { MediaModule, MEDIA_ENTITIES } from '@beauclick/media';
 import { SubjectDataModule } from '@beauclick/subject-data';
 import { HttpMetricsMiddleware, ObservabilityModule } from '@beauclick/observability';
 import { PRIVACY_ENTITIES } from '@beauclick/privacy';
+import { AI_ENTITIES } from '@beauclick/ai';
+import { CHAT_ENTITIES } from '@beauclick/chat';
+import { WISHLIST_ENTITIES } from '@beauclick/wishlist';
+import { REFERRAL_ENTITIES } from '@beauclick/referral';
 import { DomainCompositionModule } from './composition/domain-composition.module';
 import { PrivilegedCapabilityModule } from './composition/privileged-capability.module';
 import { PrivacyCompositionModule } from './composition/privacy-composition.module';
@@ -98,6 +102,35 @@ import { MetricsController } from './observability/metrics.controller';
           // orchestrates other modules' erasures inside ONE transaction on this
           // DataSource, which it could not do from an isolated connection.
           ...PRIVACY_ENTITIES,
+          // V3.2-A. Six ordinary application-role tables on the shared pool.
+          // The AI schema needs neither `financial`'s second DataSource nor
+          // `admin`'s owner-role isolation: the application both reads and
+          // writes every one of them, and the sensitivity of what they hold is
+          // answered by there being no route that reads another customer's row
+          // (`V32-DEC-009`) rather than by a connection-level grant.
+          ...AI_ENTITIES,
+          // V3.2-B. Seven ordinary application-role tables on the shared pool.
+          // Chat holds the platform's second store of private subject-authored
+          // prose, and like `ai`'s the sensitivity is answered by there being no
+          // route that reads another party's rows -- not by a connection-level
+          // grant.
+          ...CHAT_ENTITIES,
+          // V3.2-C Story #8. One ordinary application-role table on the shared
+          // pool. Registering it HERE and not only through
+          // `TypeOrmModule.forFeature` is what makes it exist at all:
+          // `forFeature` registers a repository PROVIDER, and a repository for
+          // an entity the DataSource has no metadata for fails at request time
+          // with `No metadata for "WishlistSavedItemEntity" was found` -- a 500
+          // that looks like a query bug rather than like a missing registration.
+          ...WISHLIST_ENTITIES,
+          // V3.2-C Story #11. One ordinary application-role table on the shared
+          // pool. Registered HERE and not only through
+          // `TypeOrmModule.forFeature` for the reason the wishlist line above
+          // records: `forFeature` registers a repository PROVIDER, and a
+          // repository for an entity the DataSource has no metadata for fails at
+          // REQUEST time with `No metadata for "ReferralCodeEntity" was found` --
+          // a 500 that looks like a query bug while the app boots cleanly.
+          ...REFERRAL_ENTITIES,
         ],
         // V3_DATABASE_BLUEPRINT.md §2 mandates lower_snake_case columns;
         // TypeORM's default naming strategy uses the JS property name
@@ -185,6 +218,13 @@ import { MetricsController } from './observability/metrics.controller';
     SubjectDataModule,
     IdentityModule,
     ProviderModule,
+    // V3.2-A's `AiCompositionModule` is reached THROUGH this one rather than
+    // listed here, exactly as `Phase3CompositionModule` is: it contributes an
+    // outbox source that `DomainCompositionModule`'s merged `OUTBOX_SOURCES`
+    // factory injects, and a token is resolved through the injector of the
+    // module declaring the consumer -- so being a sibling here would not have
+    // been enough. It still loads before `PrivacyCompositionModule` below, which
+    // is what the coverage assertion needs.
     DomainCompositionModule,
     // V3.1 Phase E. Imported AFTER DomainCompositionModule so the boot-order
     // is the honest one: every domain module is instantiated before the

@@ -194,12 +194,72 @@ Kafka is the transport per the architecture brief; nothing below assumes a speci
 - **Idempotency**: not required — analytics fact, append-only.
 - **V2 precedent**: `search_performed` — a real `wp_bc_events` fact, deliberately never logging raw query text for privacy reasons. Preserve that redaction discipline exactly in V3.
 
-### `AIConversationCreated` v1 (and `AIMessageSent`)
-- **Producer**: ai-service
-- **Payload**: `{ conversationId, userId or providerId, mode: "customer"|"professional" }`
-- **Consumers**: analytics-service
-- **Idempotency**: not required for the create event; message-level dedup not needed since messages are user-initiated turns.
-- **V2 precedent**: implicit in `wp_bc_ai_conversations`/`wp_bc_ai_professional_conversations` row creation, never a fired event. **Real gap to resolve, not just format**: V2's schema hard-caps one conversation per tenant (`UNIQUE(user_id)` / `UNIQUE(provider_id)`) — before this event's payload can support a real `conversationId` history concept, V3 must decide (per `GAP-12`) whether to keep or relax that constraint.
+### `AIConversationStarted` v1 and `AIMessageExchanged` v1 — IMPLEMENTED (V3.2-A)
+
+Renamed from this catalog's original `AIConversationCreated` / `AIMessageSent`. The second
+carries one accepted customer message AND the assistant reply it produced, so "sent" described
+half of it; `Exchanged` describes the fact the event actually records.
+
+- **Producer**: `ai` (added to the closed `ServiceName` contract in V3.2-A).
+- **`AIConversationStarted` payload**: `{ conversationId, userId, startedAt }`.
+- **`AIMessageExchanged` payload**: `{ conversationId, messageId, userId, providerState,
+  inputLength, recommendationCount, droppedRecommendationCount, latencyMs, occurredAt }`.
+- **Consumers**: analytics-service, through the platform's existing generic ingestion handler.
+  No bespoke AI consumer exists, so there is no second place an AI payload is read.
+- **Idempotency**: `conversationId` and `messageId` are natural keys generated once at insert;
+  the analytics fact table dedupes on the source event id, and
+  `uq_ai_messages_sequence` makes a redelivered exchange unwritable.
+- **`mode` is absent**, unlike the original payload: `V32-DEC-001` defers professional mode
+  entirely, so there is no second mode for a discriminator to distinguish. Adding one later is
+  a new version, not an edit.
+- **`providerState` rather than a provider key.** A key is a configuration value that could one
+  day hold a vendor's name, and an event payload fans out further than a log line. The enum
+  (`simulated` | `external` | `unavailable`) answers everything a consumer needs — chiefly
+  whether a real model answered — without naming anything.
+- **`inputLength` rather than the input.** A length, in Unicode code points. **No field in
+  either schema can hold prose**, and that is asserted mechanically: `ai.events.spec.ts` walks
+  the zod schema and fails any string field that is not an enum, a uuid, or a datetime. An AI
+  thread can contain a customer's stated beauty and health concerns, and an outbox row reaches
+  analytics, every registered consumer, and whatever the relay logs on a failed dispatch.
+- **`droppedRecommendationCount` is the operator's early warning.** A provider that starts
+  inventing identifiers shows up here as a rising drop rate long before it becomes a support
+  ticket (ADR-030 T3).
+- **`GAP-12` resolved**: V2's `UNIQUE(user_id)` hard cap was revisited and **not** re-adopted.
+  `V32-DEC-002` chose bounded sessions, so `conversationId` is a real history concept — many
+  conversations per customer, each closed after 24 hours of inactivity, capped at 20 retained
+  and swept at 30 days.
+- **A third event was considered and rejected.** `AIRecommendationClicked` has no consumer: the
+  click is recorded on the recommendation row itself, and emitting an event nothing reads would
+  be publishing because a table changed.
+
+### `ConversationStarted` v1 and `MessageSent` v1 — IMPLEMENTED (V3.2-B)
+
+Human chat. Both carry ids, enums, counts, and instants, and **neither has a field able to hold a
+message body** — asserted mechanically by walking the zod schema, the same check the AI contracts
+carry.
+
+- **Producer**: `chat` (added to the closed `ServiceName` contract in V3.2-B).
+- **`ConversationStarted` payload**: `{ conversationId, customerUserId, counterpartyType,
+  counterpartyId, startedAt }`.
+- **`MessageSent` payload**: `{ conversationId, messageId, senderUserId, recipientUserId,
+  sequence, bodyLength, occurredAt }`.
+- **Consumers**: `notification` (an in-app message notification under the new opt-outable `chat`
+  category) and `analytics`, through the existing generic ingestion handler.
+- **Idempotency**: `messageId` is the natural key; `UNIQUE (conversation_id, sequence)` makes a
+  redelivered exchange unwritable, the notification module's own idempotency key covers the
+  notification side, and the analytics fact table dedupes on the source event id.
+- **`bodyLength`, never the body.** A count of Unicode code points. The prose lives in
+  `chat.messages` and nowhere else — not in an event, a notification payload, an analytics
+  dimension, a metric label, or a log line.
+- **`recipientUserId` is carried** so the notification consumer needs no cross-domain join at
+  dispatch time. On a business-side conversation it is the specific recipient the notification is
+  for, resolved from the business-inbox membership at emit time.
+- **`counterpartyType` is `professional | business`**, reusing `commerce.orders`' existing party
+  vocabulary rather than inventing a second one.
+- **No report or moderation event exists.** No consumer justifies one, and a moderation event
+  would carry the reporter's free-text note — which ADR-032 keeps out of every channel.
+- **No attachment field**, in either event. Adding attachments later is a `MessageSent` v2, not an
+  edit.
 
 ---
 

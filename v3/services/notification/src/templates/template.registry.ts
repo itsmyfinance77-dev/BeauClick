@@ -33,6 +33,131 @@ export interface TemplateDefinition {
  */
 const TEMPLATES: TemplateDefinition[] = [
   {
+    /**
+     * V3.2-B. A new chat message.
+     *
+     * **Carries no message body and no sender name**, and `requiredVars` is
+     * empty so there is nothing a caller could pass one through. ADR-032 §1
+     * keeps prose out of notification payloads, and a preview would put the
+     * message into a channel the retention and erasure rules do not cover.
+     *
+     * The deep link is the inbox rather than the thread: a notification that
+     * named the conversation in its URL would leak which conversation it was
+     * about into browser history and any referrer.
+     */
+    key: 'chat_message_received',
+    category: 'chat',
+    requiredVars: [],
+    subject: 'پیام جدید',
+    body: 'پیام جدیدی دریافت کرده‌اید.',
+    short: 'پیام جدیدی دریافت کرده‌اید.',
+    deepLink: '/chat',
+  },
+  {
+    /**
+     * V3.2-C Story #12. Somebody the customer invited completed their first
+     * booking (`V32-DEC-033`, ADR-037 §11).
+     *
+     * **`requiredVars` is empty, and that is the mechanism rather than a
+     * coincidence.** `V32-DEC-033` keeps referral codes, phone numbers, display
+     * names, and free prose out of every notification payload — and a referral
+     * code is a bearer credential that never leaves the authenticated read
+     * route. With no declared variable there is nothing a caller could pass one
+     * through, exactly as `chat_message_received` above.
+     *
+     * **It names no points figure**, and that is correctness rather than
+     * restraint: `V32-DEC-016` sets both reward values to **0**, so a message
+     * claiming anything was earned would be false. It states the lifecycle
+     * fact, which is true whatever the configured economics are — and stays
+     * true on the day the business sets a real number, so this copy does not
+     * become a lie in either direction.
+     *
+     * **It does not name the person who was invited.** A referrer's export may
+     * not reveal referee identity (`V32-DEC-019`), and a notification is a
+     * weaker container than an export, not a stronger one.
+     *
+     * The deep link is the customer's own referral page rather than anything
+     * naming the referral, for the reason the chat template records: an id in a
+     * URL leaks into browser history and any referrer header.
+     */
+    key: 'referral_qualified_referrer',
+    category: 'referral',
+    requiredVars: [],
+    subject: 'دعوت شما به نتیجه رسید',
+    body: 'یکی از دعوت‌های شما تکمیل شد.',
+    short: 'یکی از دعوت‌های شما تکمیل شد.',
+    deepLink: '/referral',
+  },
+  {
+    /**
+     * V3.2-C Story #12. The invited customer's own referral qualified.
+     *
+     * The mirror of the template above and subject to the same rules: no
+     * variables, no points figure, and **no reference to the inviter**. A
+     * referee's export may never carry the referrer's bearer code, phone, or
+     * display name (`V32-DEC-019`); the same boundary applies here, and it is
+     * kept by the template having no slot for any of them.
+     */
+    key: 'referral_qualified_referee',
+    category: 'referral',
+    requiredVars: [],
+    subject: 'دعوت شما ثبت شد',
+    body: 'دعوتی که با آن ثبت‌نام کردید تکمیل شد.',
+    short: 'دعوتی که با آن ثبت‌نام کردید تکمیل شد.',
+    deepLink: '/referral',
+  },
+  {
+    /**
+     * V3.2-C Story #28. The inviter's referral was reversed — the qualifying
+     * booking's order was fully refunded (`V32-DEC-017`, ADR-038 §10).
+     *
+     * The second of `V32-DEC-033`'s two approved referral moments, and the
+     * last: the decision restricts referral notifications to the **qualified**
+     * and **reversed** moments and nothing else.
+     *
+     * **No points figure, and here that is more than caution.** Both configured
+     * values are 0 today, so a message saying points were taken back would be
+     * false. Even with a real figure it would be wrong: a balance is shown by
+     * the loyalty surface, which reads the ledger, and a notification quoting a
+     * number is a second source of truth free to disagree with it.
+     *
+     * **No reason and no order reference.** *Why* a refund happened is commerce
+     * and payment's business, and putting it here would put money detail into a
+     * referral message — while an order id in a deep link leaks into browser
+     * history and any referrer header, which is the reason the qualification
+     * templates already point at the customer's own referral page rather than
+     * at anything naming the referral.
+     *
+     * `requiredVars` is empty, so there is no slot a figure, a name, a code or
+     * an id could travel through even if a later author wanted one.
+     */
+    key: 'referral_reversed_referrer',
+    category: 'referral',
+    requiredVars: [],
+    subject: 'یکی از دعوت‌های شما لغو شد',
+    body: 'به دلیل بازگشت کامل وجه سفارش مربوط، یکی از دعوت‌های تکمیل‌شده شما لغو شد.',
+    short: 'یکی از دعوت‌های تکمیل‌شده شما لغو شد.',
+    deepLink: '/referral',
+  },
+  {
+    /**
+     * V3.2-C Story #28. The invited customer's own referral was reversed.
+     *
+     * The mirror of the template above and subject to the same rules: no
+     * variables, no points figure, no order reference, and **no reference to
+     * the inviter**. `V32-DEC-019` keeps the referrer's identity out of a
+     * referee's record, and the boundary is kept here by the template having no
+     * slot for it.
+     */
+    key: 'referral_reversed_referee',
+    category: 'referral',
+    requiredVars: [],
+    subject: 'دعوت شما لغو شد',
+    body: 'به دلیل بازگشت کامل وجه سفارش مربوط، دعوتی که با آن ثبت‌نام کردید لغو شد.',
+    short: 'دعوتی که با آن ثبت‌نام کردید لغو شد.',
+    deepLink: '/referral',
+  },
+  {
     key: 'booking_confirmed',
     category: 'booking',
     requiredVars: ['professionalName', 'date', 'time'],

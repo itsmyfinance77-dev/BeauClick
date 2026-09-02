@@ -1,0 +1,59 @@
+name: User story
+description: A testable product or engineering outcome for the BeauClick backlog
+title: "[Story] "
+labels: ["type:story", "status:proposed"]
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Outcome
+      description: Who needs what outcome, and why does it matter?
+      placeholder: "As a ..., I need ..., so that ..."
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Use observable, testable statements including important refusal or edge cases.
+      placeholder: |
+        - [ ] Given ... when ... then ...
+        - [ ] Missing/foreign/invalid ...
+    validations:
+      required: true
+  - type: textarea
+    id: boundaries
+    attributes:
+      label: Boundaries and non-goals
+      description: Record what this story must not build or claim.
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies and decisions
+      description: Link prerequisite issues, contracts, designs, external gates, or owner decisions.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Required evidence
+      description: Tests, CI, migration, security, privacy, design, or operational proof required for Done.
+    validations:
+      required: true
+  - type: dropdown
+    id: provisional_points
+    attributes:
+      label: Provisional story-point estimate
+      description: Triage applies the authoritative sp:* label. 21 means this item must be split.
+      options: ["1", "2", "3", "5", "8", "13", "21 — split required", "Not ready to estimate"]
+    validations:
+      required: true
+  - type: checkboxes
+    id: ready_check
+    attributes:
+      label: Readiness acknowledgement
+      options:
+        - label: No implementation starts until status:ready, one milestone, one priority, and one sp:* label are assigned.
+          required: true

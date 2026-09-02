@@ -36,7 +36,30 @@ export type ServiceName =
   | 'analytics'
   | 'business'
   | 'waitlist'
-  | 'privacy';
+  | 'privacy'
+  // V3.2-A. The AI assistant domain (ADR-029). Added to the CLOSED contract
+  // rather than left off it: an event whose producer is not in this union
+  // cannot be declared, which is what makes "exactly one service owns this
+  // fact" a compile-time property instead of a convention.
+  | 'ai'
+  // V3.2-B. Human messaging (ADR-031). A separate domain from `ai` and
+  // deliberately adjacent to it in this list: the two are the platform's only
+  // stores of private subject-authored prose, and the rule that neither may
+  // read the other is easier to remember when they are read together.
+  | 'chat'
+  // V3.2-C. The referral domain (ADR-035). Added by Story #11, which creates
+  // the module and emits NOTHING -- and that is the point of adding it now.
+  // `V32-DEC-033` already approves `ReferralQualified` and `ReferralReversed`
+  // by name for the reward path, and an event whose producer is not in this
+  // union cannot be DECLARED at all. Leaving `referral` out would mean Story
+  // #12 had to edit a closed vocabulary before it could declare its own event.
+  //
+  // Deliberately the OPPOSITE call from `wishlist`, which is absent from this
+  // union and stays absent: that module emits nothing and never will, because
+  // `V32-DEC-021` refuses a popularity or lifecycle event outright. The
+  // difference is whether a future event is already approved, not whether the
+  // module happens to be new.
+  | 'referral';
 
 export interface EventContract<TSchema extends z.ZodType = z.ZodType> {
   /** Wire name, e.g. `BookingCompleted`. Unique per version. */

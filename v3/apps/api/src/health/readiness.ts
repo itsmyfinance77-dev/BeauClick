@@ -71,6 +71,12 @@ export const DEPENDENCIES = [
   'sms',
   'error_reporting',
   'throttle_store',
+  // V3.2-A. The AI assistant's provider (ADR-029 §4). Present in this
+  // vocabulary from the first day the domain exists, rather than added later
+  // when a vendor is chosen -- the whole point is that a deployment serving the
+  // deterministic local assistant must be reportable as `simulated` BEFORE
+  // anybody can mistake it for something else.
+  'ai_provider',
 ] as const;
 export type DependencyName = (typeof DEPENDENCIES)[number];
 
@@ -164,6 +170,12 @@ export const EXTERNAL_VERIFICATION_LEDGER: Readonly<Record<DependencyName, Exter
     evidence:
       'Only applicable if the deployment topology is multi-instance. Single-instance in-memory throttling is correct and needs no external verification; a shared store must be verified if and only if more than one API instance runs.',
   },
+  ai_provider: {
+    verified: false,
+    gap: 'AI-PROVIDER',
+    evidence:
+      'A selected AI vendor, credentials, proven reachability from the hosting region, an agreed pricing model, and an approved platform-wide monetary spend ceiling (V32-DEC-008) -- which is itself still open, and without which a real provider must not be enabled. The deterministic local assistant shipped in V3.2-A is NOT a real AI provider and cannot advance this row.',
+  },
 } as const;
 
 /**
@@ -194,6 +206,11 @@ export const REQUIRED_FOR_TRAFFIC: Readonly<Record<DependencyName, boolean>> = {
   // dashboard is not a reason to stop serving customers.
   error_reporting: false,
   throttle_store: false,
+  // An unavailable assistant must never take an instance out of rotation. Every
+  // other surface in the marketplace works without it, and pulling instances
+  // because a provider is down would also remove the pages that tell customers
+  // it is down -- the same reasoning `payment` records one line up.
+  ai_provider: false,
 } as const;
 
 /**

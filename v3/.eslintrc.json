@@ -58,7 +58,11 @@
               "scope:analytics",
               "scope:business",
               "scope:waitlist",
-              "scope:privacy"
+              "scope:privacy",
+              "scope:ai",
+              "scope:chat",
+              "scope:wishlist",
+              "scope:referral"
             ]
           },
           {
@@ -79,7 +83,11 @@
               "scope:analytics",
               "scope:business",
               "scope:waitlist",
-              "scope:privacy"
+              "scope:privacy",
+              "scope:ai",
+              "scope:chat",
+              "scope:wishlist",
+              "scope:referral"
             ]
           },
           {
@@ -100,7 +108,11 @@
               "scope:analytics",
               "scope:business",
               "scope:waitlist",
-              "scope:privacy"
+              "scope:privacy",
+              "scope:ai",
+              "scope:chat",
+              "scope:wishlist",
+              "scope:referral"
             ]
           },
           {
@@ -121,7 +133,11 @@
               "scope:analytics",
               "scope:business",
               "scope:waitlist",
-              "scope:privacy"
+              "scope:privacy",
+              "scope:ai",
+              "scope:chat",
+              "scope:wishlist",
+              "scope:referral"
             ]
           },
           {
@@ -142,7 +158,11 @@
               "scope:analytics",
               "scope:business",
               "scope:waitlist",
-              "scope:privacy"
+              "scope:privacy",
+              "scope:ai",
+              "scope:chat",
+              "scope:wishlist",
+              "scope:referral"
             ]
           },
           {
@@ -163,7 +183,11 @@
               "scope:analytics",
               "scope:business",
               "scope:waitlist",
-              "scope:privacy"
+              "scope:privacy",
+              "scope:ai",
+              "scope:chat",
+              "scope:wishlist",
+              "scope:referral"
             ]
           },
           {
@@ -184,7 +208,11 @@
               "scope:analytics",
               "scope:business",
               "scope:waitlist",
-              "scope:privacy"
+              "scope:privacy",
+              "scope:ai",
+              "scope:chat",
+              "scope:wishlist",
+              "scope:referral"
             ]
           },
           {
@@ -205,7 +233,11 @@
               "scope:analytics",
               "scope:business",
               "scope:waitlist",
-              "scope:privacy"
+              "scope:privacy",
+              "scope:ai",
+              "scope:chat",
+              "scope:wishlist",
+              "scope:referral"
             ]
           },
           {
@@ -226,7 +258,11 @@
               "scope:analytics",
               "scope:business",
               "scope:waitlist",
-              "scope:privacy"
+              "scope:privacy",
+              "scope:ai",
+              "scope:chat",
+              "scope:wishlist",
+              "scope:referral"
             ]
           },
           {
@@ -247,7 +283,11 @@
               "scope:analytics",
               "scope:business",
               "scope:waitlist",
-              "scope:privacy"
+              "scope:privacy",
+              "scope:ai",
+              "scope:chat",
+              "scope:wishlist",
+              "scope:referral"
             ]
           },
           {
@@ -268,7 +308,11 @@
               "scope:notification",
               "scope:business",
               "scope:waitlist",
-              "scope:privacy"
+              "scope:privacy",
+              "scope:ai",
+              "scope:chat",
+              "scope:wishlist",
+              "scope:referral"
             ]
           },
           {
@@ -289,7 +333,11 @@
               "scope:notification",
               "scope:analytics",
               "scope:waitlist",
-              "scope:privacy"
+              "scope:privacy",
+              "scope:ai",
+              "scope:chat",
+              "scope:wishlist",
+              "scope:referral"
             ]
           },
           {
@@ -310,7 +358,11 @@
               "scope:notification",
               "scope:analytics",
               "scope:business",
-              "scope:privacy"
+              "scope:privacy",
+              "scope:ai",
+              "scope:chat",
+              "scope:wishlist",
+              "scope:referral"
             ]
           },
           {
@@ -331,7 +383,137 @@
               "scope:notification",
               "scope:analytics",
               "scope:business",
-              "scope:waitlist"
+              "scope:waitlist",
+              "scope:ai",
+              "scope:chat",
+              "scope:wishlist",
+              "scope:referral"
+            ]
+          },
+          {
+            "sourceTag": "scope:ai",
+            "onlyDependOnLibsWithTags": [
+              "scope:shared"
+            ],
+            "notDependOnLibsWithTags": [
+              "scope:identity",
+              "scope:provider",
+              "scope:booking",
+              "scope:commerce",
+              "scope:payment",
+              "scope:financial",
+              "scope:search",
+              "scope:loyalty",
+              "scope:journey",
+              "scope:notification",
+              "scope:analytics",
+              "scope:business",
+              "scope:waitlist",
+              "scope:privacy",
+              "scope:chat",
+              "scope:wishlist",
+              "scope:referral"
+            ]
+          },
+          {
+            "sourceTag": "scope:chat",
+            "onlyDependOnLibsWithTags": [
+              "scope:shared"
+            ],
+            "notDependOnLibsWithTags": [
+              "scope:identity",
+              "scope:provider",
+              "scope:booking",
+              "scope:commerce",
+              "scope:payment",
+              "scope:financial",
+              "scope:search",
+              "scope:loyalty",
+              "scope:journey",
+              "scope:notification",
+              "scope:analytics",
+              "scope:business",
+              "scope:waitlist",
+              "scope:privacy",
+              "scope:ai",
+              "scope:wishlist",
+              "scope:referral"
+            ]
+          },
+          {
+            "sourceTag": "scope:wishlist",
+            "onlyDependOnLibsWithTags": [
+              "scope:shared"
+            ],
+            "notDependOnLibsWithTags": [
+              "scope:identity",
+              "scope:provider",
+              "scope:booking",
+              "scope:commerce",
+              "scope:payment",
+              "scope:financial",
+              "scope:search",
+              "scope:loyalty",
+              "scope:journey",
+              "scope:notification",
+              "scope:analytics",
+              "scope:business",
+              "scope:waitlist",
+              "scope:privacy",
+              "scope:ai",
+              "scope:chat",
+              "scope:referral"
+            ]
+          },
+          {
+            "sourceTag": "scope:referral",
+            "onlyDependOnLibsWithTags": [
+              "scope:shared"
+            ],
+            "notDependOnLibsWithTags": [
+              "scope:identity",
+              "scope:provider",
+              "scope:booking",
+              "scope:commerce",
+              "scope:payment",
+              "scope:financial",
+              "scope:search",
+              "scope:loyalty",
+              "scope:journey",
+              "scope:notification",
+              "scope:analytics",
+              "scope:business",
+              "scope:waitlist",
+              "scope:privacy",
+              "scope:ai",
+              "scope:chat",
+              "scope:wishlist"
+            ]
+          },
+          {
+            "sourceTag": "scope:commercial-policy",
+            "onlyDependOnLibsWithTags": [
+              "scope:shared"
+            ],
+            "notDependOnLibsWithTags": [
+              "scope:identity",
+              "scope:provider",
+              "scope:booking",
+              "scope:commerce",
+              "scope:payment",
+              "scope:financial",
+              "scope:search",
+              "scope:loyalty",
+              "scope:journey",
+              "scope:notification",
+              "scope:analytics",
+              "scope:business",
+              "scope:waitlist",
+              "scope:privacy",
+              "scope:ai",
+              "scope:chat",
+              "scope:wishlist",
+              "scope:referral"
             ]
           },
           {
@@ -354,7 +536,12 @@
               "scope:business",
               "scope:waitlist",
               "scope:app",
-              "scope:privacy"
+              "scope:privacy",
+              "scope:ai",
+              "scope:chat",
+              "scope:wishlist",
+              "scope:referral",
+              "scope:commercial-policy"
             ]
           },
           {
@@ -374,7 +561,12 @@
               "scope:analytics",
               "scope:business",
               "scope:waitlist",
-              "scope:privacy"
+              "scope:privacy",
+              "scope:ai",
+              "scope:chat",
+              "scope:wishlist",
+              "scope:referral",
+              "scope:commercial-policy"
             ]
           }
         ]

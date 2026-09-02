@@ -19,6 +19,10 @@ import { BusinessModule, BusinessSubjectDataContract } from '@beauclick/business
 import { WaitlistModule, WaitlistSubjectDataContract } from '@beauclick/waitlist';
 import { SearchModule, SearchSubjectDataContract } from '@beauclick/search';
 import { ERASURE_RUNNER, PrivacyModule, PrivacyService, PrivacySubjectDataContract } from '@beauclick/privacy';
+import { AiModule, AiSubjectDataContract } from '@beauclick/ai';
+import { ChatModule, ChatSubjectDataContract } from '@beauclick/chat';
+import { WishlistModule, WishlistSubjectDataContract } from '@beauclick/wishlist';
+import { ReferralModule, ReferralSubjectDataContract } from '@beauclick/referral';
 
 /**
  * Erasure's one out-of-transaction step.
@@ -84,7 +88,7 @@ export class PrivacyErasureCompleter {
  * skipped by an export. The list is the wiring; the catalogue check is the
  * proof.
  *
- * Sixteen contracts. `financial`'s reads on its own connection (ADR-017);
+ * Eighteen contracts. `financial`'s reads on its own connection (ADR-017);
  * `search`'s is a claim with no work, because provider's `ProfessionalUpdated`
  * event already removes the document. Both are explained in their own files.
  */
@@ -108,6 +112,26 @@ export class PrivacyErasureCompleter {
     WaitlistModule,
     SearchModule,
     PrivacyModule,
+    // V3.2-A. Imported for its contract only. `ai`'s six tables are claimed
+    // like every other module's, and the boot assertion is what turns "somebody
+    // remembered to register" into a startup failure -- an unclaimed `ai` table
+    // stops the application, which is the intended severity for a schema
+    // holding the most sensitive prose in the platform.
+    AiModule,
+    // V3.2-B. Imported for its contract only. Chat's seven tables are claimed
+    // like every other module's, and the boot assertion is what turns "somebody
+    // remembered to register" into a startup failure.
+    ChatModule,
+    // V3.2-C Story #8. Imported for its contract only. One table, claimed like
+    // every other schema is -- and the boot assertion is what turns "somebody
+    // remembered to register" into a startup failure.
+    //
+    // Worth the extra line here: a wishlist row is DELETED on erasure rather
+    // than anonymized, which is the opposite of the platform default. That is a
+    // claim somebody had to make deliberately, and the coverage check is what
+    // made them make it.
+    WishlistModule,
+    ReferralModule,
   ],
   providers: [
     PrivacyErasureCompleter,
@@ -140,6 +164,10 @@ export class PrivacyErasureCompleter {
         MediaSubjectDataContract,
         AuditSubjectDataContract,
         PrivacySubjectDataContract,
+        AiSubjectDataContract,
+        ChatSubjectDataContract,
+        WishlistSubjectDataContract,
+        ReferralSubjectDataContract,
       ],
       useFactory: (...contracts: SubjectDataContract[]): SubjectDataContract[] => contracts,
     },

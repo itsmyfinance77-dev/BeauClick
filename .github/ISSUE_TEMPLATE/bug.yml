@@ -1,0 +1,39 @@
+name: Bug
+description: A reproducible defect or violated invariant
+title: "[Bug] "
+labels: ["type:bug", "status:proposed"]
+body:
+  - type: textarea
+    id: observed
+    attributes:
+      label: Observed behaviour
+      description: State what happened, where, and with which revision/environment.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour or invariant
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction and evidence
+      description: Include minimal steps, logs without secrets, failing test, or CI link.
+    validations:
+      required: true
+  - type: dropdown
+    id: impact
+    attributes:
+      label: Impact
+      options: ["P0 — incident/security/release blocker", "P1 — serious product or data risk", "P2 — normal defect", "P3 — minor/deferred"]
+    validations:
+      required: true
+  - type: textarea
+    id: boundaries
+    attributes:
+      label: Scope and regression evidence
+      description: Name affected domains and the test that must prevent recurrence.
+    validations:
+      required: true

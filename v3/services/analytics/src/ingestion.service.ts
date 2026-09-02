@@ -74,6 +74,47 @@ const FACT_MAPPINGS: Record<string, FactMapping> = {
     dimensions: (p) => ({ rescheduleCount: num(p.rescheduleCount) }),
   },
 
+  // ---- AI assistant (V3.2-A)
+  //
+  // The COUNTS and the provider mode, and nothing else. Neither contract has a
+  // field able to hold a message body, so there is nothing here to remember to
+  // strip -- the same structural position `BookingCancelled`'s free-text
+  // `reason` records one block down, arrived at by shaping the event rather
+  // than by filtering it.
+  //
+  // `subjectType: 'customer'` -- an existing member of the closed subject-type
+  // vocabulary, which the analytics schema also enforces as a CHECK constraint.
+  // The subject of an AI conversation is the customer, not a provider, and
+  // inventing a new subject type for it would mean a migration altering that
+  // constraint for a distinction the vocabulary already draws.
+  //
+  // `actorOf` is the same id, deliberately: the customer is both who this fact
+  // is about and who caused it, and reporting one without the other would make
+  // "conversations per customer" and "conversations started" two different
+  // numbers for one thing.
+  AIConversationStarted: {
+    subjectType: 'customer',
+    subjectOf: (p) => str(p.userId),
+    actorOf: (p) => str(p.userId),
+    timestampOf: (p) => str(p.startedAt),
+  },
+  AIMessageExchanged: {
+    subjectType: 'customer',
+    subjectOf: (p) => str(p.userId),
+    actorOf: (p) => str(p.userId),
+    // `providerState` is the honesty dimension: it lets an operator see how
+    // much of the assistant's traffic was served by the deterministic local
+    // assistant rather than a real model, which is the question `V32-DEC-008`
+    // requires to be answerable and `V32-DEC-009` limits them to.
+    dimensions: (p) => ({
+      providerState: str(p.providerState),
+      recommendationCount: num(p.recommendationCount),
+      droppedRecommendationCount: num(p.droppedRecommendationCount),
+    }),
+    metricOf: (p) => num(p.latencyMs),
+    timestampOf: (p) => str(p.occurredAt),
+  },
+
   // ---- reviews (V3.1 Phase D)
   //
   // The RATING is a dimension; the review TEXT is not carried at all.

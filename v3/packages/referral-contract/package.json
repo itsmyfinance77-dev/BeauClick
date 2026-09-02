@@ -1,0 +1,8 @@
+{
+  "name": "@beauclick/referral-contract",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The browser-safe half of the referral contract: the code alphabet and length, the invite path segment, the share payload shape, the closed share-channel vocabulary, and the attribution claim request/result with its three ratified limits. Zero dependencies, no framework, no TypeORM -- so the Next.js bundle and the NestJS server share ONE definition instead of two that drift. Deliberately carries NO reward value, point total, cap, qualification or reversal vocabulary (Stories #12, #28), and NO refusal vocabulary for the claim route, because V32-DEC-019 collapses every refusal into one indistinguishable answer.",
+  "main": "src/index.ts",
+  "types": "src/index.ts"
+}

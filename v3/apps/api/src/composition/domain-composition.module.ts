@@ -16,7 +16,14 @@ import { MediaModule } from '@beauclick/media';
 import { PrivacyModule, PrivacyOutboxEntity } from '@beauclick/privacy';
 
 import { Phase3CompositionModule } from './phase3-composition.module';
+import { AiCompositionModule } from './ai-composition.module';
+import { ChatCompositionModule } from './chat-composition.module';
+import { WishlistCompositionModule } from './wishlist-composition.module';
+import { ReferralCompositionModule } from './referral-composition.module';
+import { CHAT_OUTBOX_SOURCES } from './chat-tokens';
 import { PHASE3_EVENT_HANDLERS, PHASE3_OUTBOX_SOURCES } from './phase3-tokens';
+import { AI_OUTBOX_SOURCES } from './ai-tokens';
+import { REFERRAL_EVENT_HANDLERS, REFERRAL_OUTBOX_SOURCES } from './referral-tokens';
 
 import { DomainPortsModule } from './domain-ports.module';
 import { CheckoutService } from '../checkout/checkout.service';
@@ -89,6 +96,27 @@ import {
     // Phase 3's domains and their handlers/outboxes, contributed under their
     // own tokens and merged into the single relay below.
     Phase3CompositionModule,
+    // V3.2-A, for the same reason and by the same mechanism: it contributes
+    // `AI_OUTBOX_SOURCES`, which the merged `OUTBOX_SOURCES` factory below
+    // injects. A token is resolved through the injector of the module that
+    // declares the CONSUMER, so being a sibling under `AppModule` is not
+    // enough -- the module providing it has to be imported here.
+    AiCompositionModule,
+    // V3.2-B, for the same reason and by the same mechanism.
+    ChatCompositionModule,
+    // V3.2-C Story #8. Imported here for a DIFFERENT reason from the two above:
+    // `wishlist` contributes no outbox source, because it emits no events and
+    // has no outbox table at all (`V32-DEC-021`). It is listed here so it is
+    // instantiated before `PrivacyCompositionModule` runs the subject-data
+    // coverage assertion, which is the only ordering it actually needs.
+    WishlistCompositionModule,
+    // V3.2-C Story #11, and for the same ordering reason the wishlist line
+    // records rather than for the outbox reason the two above it do: `referral`
+    // contributes no outbox source, because it emits no event and has no outbox
+    // table. It is listed here so it is instantiated before
+    // `PrivacyCompositionModule` runs the subject-data coverage assertion, which
+    // is the only ordering it actually needs.
+    ReferralCompositionModule,
   ],
   controllers: [
     CheckoutController,
@@ -119,8 +147,13 @@ import {
       // Phase 2's three tables plus Phase 3's five, merged here because the
       // relay takes ONE list. Order matters only for tidiness -- each source
       // is drained independently and every handler is idempotent.
-      inject: [PHASE3_OUTBOX_SOURCES],
-      useFactory: (phase3: OutboxSource[]): OutboxSource[] => [
+      inject: [PHASE3_OUTBOX_SOURCES, AI_OUTBOX_SOURCES, CHAT_OUTBOX_SOURCES, REFERRAL_OUTBOX_SOURCES],
+      useFactory: (
+        phase3: OutboxSource[],
+        ai: OutboxSource[],
+        chat: OutboxSource[],
+        referral: OutboxSource[],
+      ): OutboxSource[] => [
         { name: 'booking', entity: BookingOutboxEntity },
         { name: 'commerce', entity: CommerceOutboxEntity },
         { name: 'payment', entity: PaymentOutboxEntity },
@@ -131,6 +164,18 @@ import {
         // analytics through the one relay rather than a second mechanism.
         { name: 'privacy', entity: PrivacyOutboxEntity },
         ...phase3,
+        // V3.2-A. On the shared DataSource like every source here except
+        // financial's, so the two AI lifecycle events reach analytics through
+        // the one relay rather than a second mechanism.
+        ...ai,
+        // V3.2-B. Same, and additionally the path by which `MessageSent` reaches
+        // the notification module.
+        ...chat,
+        // V3.2-C Story #12. The referral module`s first outbox source. Its only
+        // event is `ReferralQualified`, whose consumer is the in-app
+        // notification -- so this is the path by which a qualified referral
+        // reaches the person it belongs to.
+        ...referral,
       ],
     },
     {
@@ -150,6 +195,7 @@ import {
         waitlistSvc: WaitlistService,
         slots: Repository<AvailabilitySlotEntity>,
         phase3: DomainEventHandler[],
+        referral: DomainEventHandler[],
       ) => [
         orderPaid,
         orderRefunded,
@@ -165,6 +211,11 @@ import {
         new WaitlistMatcherHandler('WaitlistDeclined', waitlistSvc, slots),
         new WaitlistMatcherHandler('WaitlistExpired', waitlistSvc, slots),
         ...phase3,
+        // V3.2-C Story #12. Two handlers: BookingCompleted -> qualify, and
+        // ReferralQualified -> notify both parties. `BookingCompleted` now has
+        // THREE handlers (loyalty, review eligibility, referral), which is the
+        // fan-out this list is built for -- each is independently idempotent.
+        ...referral,
       ],
       inject: [
         OrderPaidLedgerHandler,
@@ -176,6 +227,7 @@ import {
         WaitlistService,
         getRepositoryToken(AvailabilitySlotEntity),
         PHASE3_EVENT_HANDLERS,
+        REFERRAL_EVENT_HANDLERS,
       ],
     },
     OutboxRelay,
@@ -187,6 +239,10 @@ import {
     OutboxRelay,
     OutboxSweepScheduler,
     Phase3CompositionModule,
+    AiCompositionModule,
+    ChatCompositionModule,
+    WishlistCompositionModule,
+    ReferralCompositionModule,
     FINANCIAL_OUTBOX_RELAY,
     PrivacyModule,
     // V3.1 Phase F. Re-exported so the root injector can resolve

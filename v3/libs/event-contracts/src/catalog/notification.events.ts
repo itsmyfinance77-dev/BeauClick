@@ -38,6 +38,12 @@ export const NOTIFICATION_CATEGORIES = [
   // A member REMOVED from this list would be the breaking change, and it would
   // deserve the version.
   'privacy',
+  // V3.2-B. Additive on exactly the terms the note above sets out: no existing
+  // payload shape changes, no consumer loses a value it understood, and the two
+  // mandatory categories the branching consumers care about are untouched.
+  // `chat` is deliberately not mandatory -- a message is not operationally
+  // required the way a booking confirmation is.
+  'chat',
 ] as const;
 
 export const NOTIFICATION_CHANNELS = ['in_app', 'email', 'sms'] as const;

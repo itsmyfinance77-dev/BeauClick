@@ -1,0 +1,8 @@
+{
+  "name": "@beauclick/commercial-policy-contract",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Browser-safe, zero-dependency commercial policy vocabulary: collection modes, immutable booking terms and validation. No framework, persistence, identity, price plan or production-provider promise.",
+  "main": "src/index.ts",
+  "types": "src/index.ts"
+}

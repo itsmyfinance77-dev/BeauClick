@@ -13,7 +13,9 @@ export const ROLES = ['customer', 'professional', 'business', 'moderator', 'plat
 export type Role = (typeof ROLES)[number];
 
 export const CAPABILITIES_BY_ROLE: Record<Role, string[]> = {
-  customer: ['bc_book_service', 'bc_use_ai_assistant', 'bc_view_own_orders'],
+  // V3.2-B adds `bc_use_chat`: either legitimate participant may initiate
+  // (`V32-DEC-011`), so both sides of a conversation hold it.
+  customer: ['bc_book_service', 'bc_use_ai_assistant', 'bc_view_own_orders', 'bc_use_chat'],
   professional: [
     'bc_manage_own_profile',
     'bc_manage_own_services',
@@ -23,6 +25,11 @@ export const CAPABILITIES_BY_ROLE: Record<Role, string[]> = {
     // capabilities gate the ACTION, never a party the caller names.
     'bc_manage_own_availability',
     'bc_view_own_finance',
+    // V3.2-B. A professional replying to their own customer is the ordinary
+    // case. The capability gates the ACTION; which conversations they may
+    // actually reach is decided per request by the seller-access port, never by
+    // a role grant.
+    'bc_use_chat',
   ],
   business: [
     'bc_manage_own_profile',
@@ -31,12 +38,22 @@ export const CAPABILITIES_BY_ROLE: Record<Role, string[]> = {
     'bc_manage_business_staff',
     'bc_manage_own_availability',
     'bc_view_own_finance',
+    // V3.2-B. The capability gates the ACTION -- "may this account use chat at
+    // all" -- and says nothing about WHICH conversations. Which ones is decided
+    // per request by the seller-access port: the business owner and active
+    // managers, and nobody else (`V32-DEC-010`).
+    //
+    // An earlier draft withheld this, reasoning that business access is
+    // membership rather than a role. That conflated two different questions and
+    // was simply wrong: the capability guard runs first, so a business owner was
+    // refused at the door and their membership was never consulted.
+    'bc_use_chat',
   ],
   // `bc_moderate_media` (V3.1 Phase C) sits with the other content-moderation
   // capabilities and deliberately NOT with platform_operator's -- the roles
   // migration records the reasoning: removing somebody's published work is
   // content moderation, not operational administration.
-  moderator: ['bc_moderate_verification', 'bc_moderate_reviews', 'bc_moderate_media'],
+  moderator: ['bc_moderate_verification', 'bc_moderate_reviews', 'bc_moderate_media', 'bc_moderate_chat'],
   // V3_SECURITY_MODEL.md §9: a narrower tier below full administrator that
   // V2 built but never actually used for a real account -- V3 should
   // default new privileged accounts to this, not full admin.
@@ -46,6 +63,10 @@ export const CAPABILITIES_BY_ROLE: Record<Role, string[]> = {
     'bc_moderate_verification',
     'bc_moderate_reviews',
     'bc_moderate_media',
+    // V3.2-B. Deliberately NOT granted to `platform_operator`: that tier exists
+    // to be the narrower one, and reading a customer's private messages is not
+    // platform operation.
+    'bc_moderate_chat',
     'bc_manage_own_profile',
   ],
 };

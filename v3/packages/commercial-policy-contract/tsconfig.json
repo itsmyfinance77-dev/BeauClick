@@ -1,0 +1,5 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "outDir": "../../dist/packages/commercial-policy-contract", "rootDir": "src" },
+  "include": ["src/**/*.ts"]
+}
