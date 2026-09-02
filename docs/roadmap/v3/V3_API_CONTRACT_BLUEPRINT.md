@@ -1,5 +1,10 @@
 # V3 API Contract Blueprint
 
+> **Current-status note (2026-09-02):** This is the preserved Phase 0 blueprint,
+> not a statement of current implementation. Controllers and browser-safe contracts now
+> exist throughout `v3/`; use the code, accepted ADRs and implementation reports for the
+> current surface.
+
 Status: Phase 0 blueprint. **No controllers have been implemented.** Strategy decision: `docs/roadmap/v3/adr/ADR-014-api-strategy.md`. This document covers the conventions every module's real API must follow, plus example contracts (illustrative only, not a full spec) and the authentication/security model this task's item 7 asks for.
 
 ---

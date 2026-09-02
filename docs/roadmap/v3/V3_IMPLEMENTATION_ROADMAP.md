@@ -1,5 +1,10 @@
 # V3 Implementation Roadmap
 
+> **Current-status note (2026-09-02):** This document is the preserved Phase 0
+> sequencing plan. V3.0 and V3.1 were subsequently implemented, and V3.2-A through
+> V3.2-C are engineering-complete. See the root README and version-specific roadmaps for
+> current programme, release and production-enablement status.
+
 Status: Phase 0 blueprint. **No implementation has started.** This document supersedes `V3_MIGRATION_PLAN.md` §5's phase grouping with this task's explicit phase structure (Phase 0-5) — the two are consistent in content and sequencing logic; this version is the authoritative one going forward. Where they differ (Journey's placement — see Phase 3 below), this document reflects the settled decision.
 
 ---

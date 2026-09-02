@@ -1,6 +1,6 @@
 # ADR-012: Frontend Architecture
 
-**Status:** Proposed — Phase 0 blueprint only, not decided/approved. No frontend project has been initialized.
+**Status:** Accepted — `apps/web` is implemented; later V3.2 production screens remain incomplete.
 **Date:** 2026-08-20.
 
 ## Context

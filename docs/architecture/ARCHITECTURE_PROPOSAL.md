@@ -215,7 +215,7 @@ A review insert is only permitted server-side if the referenced `booking_id` bel
 | Table | Purpose | Key fields |
 |---|---|---|
 | `wp_bc_ai_conversations` | Reuses the chat schema (`type='ai'`) or a dedicated table if AI context needs diverge (recommendation: reuse `wp_bc_conversations`/`wp_bc_messages`, add an `ai_context` JSON column for structured profile signals used in the prompt — skin type, hair type, budget, location) | |
-| `wp_bc_ai_recommendation_events` | Logs which product/service/provider IDs the AI actually recommended and whether the user clicked/converted | conversation_id, message_id, recommended_type, recommended_id, clicked (bool) | 
+| `wp_bc_ai_recommendation_events` | Logs which product/service/provider IDs the AI actually recommended and whether the user clicked/converted | conversation_id, message_id, recommended_type, recommended_id, clicked (bool) |
 
 The recommendation-events table matters twice: it lets you validate AI output against real catalog IDs before rendering (never trust the model's IDs blindly), and it's the seed data for measuring whether AI recommendations are actually driving bookings/purchases later.
 

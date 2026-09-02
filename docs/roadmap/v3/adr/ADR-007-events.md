@@ -1,6 +1,6 @@
 # ADR-007: Event Architecture
 
-**Status:** Proposed — discovery only, not decided/approved.
+**Status:** Accepted — typed in-process events and transactional outboxes implemented; no broker is implied.
 **Date:** 2026-08-19.
 
 ## Context

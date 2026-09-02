@@ -1,6 +1,6 @@
 # ADR-002: Target Architecture Style
 
-**Status:** Proposed — discovery only, not decided/approved.
+**Status:** Accepted in part — modular monolith implemented; day-one separate deployables superseded by ADR-040.
 **Date:** 2026-08-19.
 
 ## Context

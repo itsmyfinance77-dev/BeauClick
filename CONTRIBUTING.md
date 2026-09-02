@@ -30,9 +30,12 @@ priority, status, and story-point labels. The operating model is documented in
    branch after merge.
 
 Direct pushes to `master` are prohibited by project policy. GitHub branch
-protection is not currently enforceable for this private repository under the
-account's plan, so this is a mandatory human/agent gate until protection can be
-enabled. The repository must not be made public merely to obtain that feature.
+protection is not currently configured: the repository is public, but no branch
+protection rule or ruleset protects `master` as of 2026-09-02. The pull-request policy
+workflow checks branch names; it is not a substitute for GitHub merge enforcement.
+Until an administrator enables a ruleset, the prohibition above remains a mandatory
+human/agent gate. Repository visibility and branch protection are separate decisions;
+visibility must never be changed as a workaround for governance.
 
 ## CI meaning
 

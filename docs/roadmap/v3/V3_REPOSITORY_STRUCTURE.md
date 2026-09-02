@@ -1,5 +1,10 @@
 # V3 Repository Structure
 
+> **Current-status note (2026-09-02):** This is the preserved Phase 0 target.
+> The Nx/pnpm monorepo now exists. Its current deployable topology is recorded by
+> ADR-040; paths proposed below but absent from the repository are historical proposals,
+> not missing production services.
+
 Status: Phase 0 blueprint. **No repository has been created, no project initialized.** This document specifies the target structure; nothing here has been scaffolded. Decision and rationale: `docs/roadmap/v3/adr/ADR-011-repository-architecture.md`.
 
 ---

@@ -1,6 +1,6 @@
 # ADR-010: Migration Strategy
 
-**Status:** Proposed — discovery only, not decided/approved.
+**Status:** Accepted — implemented through ordered SQL migrations, idempotency checks and restore rehearsal.
 **Date:** 2026-08-19.
 
 ## Context

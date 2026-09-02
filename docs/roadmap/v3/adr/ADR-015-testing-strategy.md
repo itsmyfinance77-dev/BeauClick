@@ -1,6 +1,6 @@
 # ADR-015: Testing Strategy
 
-**Status:** Proposed — Phase 0 blueprint only, not decided/approved. No tests have been written.
+**Status:** Accepted — implemented across fast, real-PostgreSQL, search, object-storage and production-shaped gates.
 **Date:** 2026-08-20.
 
 ## Context

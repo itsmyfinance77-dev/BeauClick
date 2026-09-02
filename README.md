@@ -151,8 +151,9 @@ merely disappointing a reviewer.
 | Domain | Owns |
 |---|---|
 | `identity` | OTP lifecycle, JWT/refresh issuance, RBAC capabilities, devices, session revocation, phone conflicts |
-| `provider` | Professionals, businesses staff, services, specialties, cities, portfolio, verification, reviews |
-| `booking` | Availability, holds, claim/cancel/confirm/no-show/complete, rescheduling, CRM notes |
+| `provider` | Professionals, services, specialties, cities, portfolio, verification, reviews |
+| `business` | Businesses, locations and staff membership |
+| `booking` | Availability, holds, claim/cancel/confirm/no-show/complete and rescheduling |
 | `commerce` | Orders, items, the single unified pricing chain, idempotent order creation |
 | `payment` | Payment intents, attempts, refunds, provider-abstracted gateways, verification contract |
 | `financial` | Append-only commission ledger and settlements, on its own DataSource and role |
@@ -234,6 +235,17 @@ cd v3 && pnpm install --frozen-lockfile
 ```
 
 ### 2. Start the development services
+
+Create the ignored Compose environment file first. Secret-bearing values are never
+provided as tracked defaults:
+
+```bash
+cp v3/infra/docker/.env.example v3/infra/docker/.env
+```
+
+Fill every blank with an independently generated local value, following
+[`LOCAL_SECRETS.md`](docs/runbooks/LOCAL_SECRETS.md). Compose deliberately refuses to
+start when one is missing.
 
 ```bash
 docker compose -f v3/infra/docker/docker-compose.yml up -d
@@ -396,10 +408,10 @@ Four workflows in [`.github/workflows/`](.github/workflows):
 
 ## 8. Operations
 
-[`docs/runbooks/`](docs/runbooks/) holds five runbooks, each written around a command that
+[`docs/runbooks/`](docs/runbooks/) holds six runbooks, each written around a command that
 exists and can be run today, and each stating plainly which steps have actually been
 exercised and which are waiting on the hosting decision:
-[DEPLOY](docs/runbooks/DEPLOY.md), [ROLLBACK](docs/runbooks/ROLLBACK.md),
+[LOCAL_SECRETS](docs/runbooks/LOCAL_SECRETS.md), [DEPLOY](docs/runbooks/DEPLOY.md), [ROLLBACK](docs/runbooks/ROLLBACK.md),
 [RESTORE](docs/runbooks/RESTORE.md), [SECRET_ROTATION](docs/runbooks/SECRET_ROTATION.md),
 [PAYMENT_INCIDENT](docs/runbooks/PAYMENT_INCIDENT.md).
 
@@ -437,14 +449,14 @@ evidence.
 
 | Path | What it holds |
 |---|---|
-| [`docs/roadmap/v3/adr/`](docs/roadmap/v3/adr/) | **ADR-001 … ADR-039** — the binding architecture decisions. Start here. |
+| [`docs/roadmap/v3/adr/`](docs/roadmap/v3/adr/) | **ADR-001 … ADR-040** — architecture decisions and their dated status. ADR-040 reconciles the implemented deployment topology. |
 | [`docs/roadmap/v3/`](docs/roadmap/v3/) | The V3 blueprint corpus: domain boundaries, database and API blueprints, event architecture and catalog, security model, infrastructure plan, migration matrix, release audits |
 | [`docs/roadmap/v3.1/`](docs/roadmap/v3.1/) | V3.1 roadmap, phase reports, release strategy, and the external-enablement execution policy |
 | [`docs/roadmap/v3.2/`](docs/roadmap/v3.2/) | V3.2 roadmap, capability catalog, decision register, external-dependency ledger, phase reports |
 | [`docs/roadmap/v3.3/`](docs/roadmap/v3.3/) | **Current** — the commercial decision register and the parameter decision packet |
 | [`docs/product/`](docs/product/) | Backlog index and the backlog operating model; the live backlog is GitHub Issues |
 | [`docs/runbooks/`](docs/runbooks/) | Deploy, rollback, restore, secret rotation, payment incident |
-| [`docs/design/`](docs/design/) | Claude Design handoffs per phase; `V3.1.0_CLAUDE_DESIGN_HANDOFF.md` is the current baseline |
+| [`docs/design/`](docs/design/) | Handoffs merged to `master`. Later V3.2 workspace snapshots remain on `design/claude-design`; see `docs/design/README.md` before treating either location as current production UI. |
 | [`docs/business/`](docs/business/) | Business idea and business plan (Persian) |
 | [`docs/architecture/`](docs/architecture/) | The V2-era architecture proposal, superseded by the V3 ADRs |
 | [`docs/archive/`](docs/archive/) | Documents kept for the record — see [`ARCHIVE_NOTE.md`](docs/archive/ARCHIVE_NOTE.md) for what each one was and what replaced it |

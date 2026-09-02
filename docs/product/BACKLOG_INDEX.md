@@ -18,15 +18,18 @@ source of truth. Issues, labels, milestones, and the generated dashboard remain
 authoritative so progress measurement does not depend on a particular UI or
 account-level Project permission.
 
-| Milestone | Outcome | Delivery status at system adoption |
-|---|---|---|
-| V3.2-C | Referral and Wishlist | **Complete 2026-09-02 — 59/59 Story Points** |
-| V3.2-D | Professional CRM and Delegation | Planned; product decisions required |
-| V3.2-E | B2B Quotes and Campaigns | Owner-gated; payment gate applies to settlement |
-| V3.2-F | Payout and Calendar Automation | Predominantly external-gated |
-| V3.2-G | Evidence-Gated Scale | No commitment without evidence |
-| V3.3 | Product Maturity Programme | Active foundation: #39 complete; epic #38 in progress; Story #40 decomposed 2026-09-02 |
-| V3.4 | Conditional Expansion Programme | Written owner decision and evidence required |
+The three right-hand columns are intentionally separate. Closing a milestone or
+delivering its Story Points never creates a tag and never enables production.
+
+| Milestone | Outcome | Engineering | Release | Production enablement |
+|---|---|---|---|---|
+| V3.2-C | Referral and Wishlist | **Complete 2026-09-02 — 59/59 Story Points** | Unreleased; no `v3.2.0` tag is authorized | Backend only; external/legal and frontend gates remain |
+| V3.2-D | Professional CRM and Delegation | Planned; product decisions required | Not applicable | Not enabled |
+| V3.2-E | B2B Quotes and Campaigns | Owner-gated; payment gate applies to settlement | Not applicable | Not enabled |
+| V3.2-F | Payout and Calendar Automation | Predominantly external-gated | Not applicable | Not enabled |
+| V3.2-G | Evidence-Gated Scale | No commitment without evidence | Not applicable | Not enabled |
+| V3.3 | Product Maturity Programme | Active foundation: #39 complete; epic #38 in progress; Story #40 decomposed 2026-09-02 | No tag authorized | Real money blocked by #47; unresolved values/copy blocked by #46 |
+| V3.4 | Conditional Expansion Programme | Written owner decision and evidence required | Not applicable | Not enabled |
 
 V3.2-A and V3.2-B are completed historical milestones but are deliberately
 excluded from the initial velocity baseline because they were not estimated in

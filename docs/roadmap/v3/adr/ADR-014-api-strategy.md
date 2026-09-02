@@ -1,6 +1,6 @@
 # ADR-014: API Strategy
 
-**Status:** Proposed — Phase 0 blueprint only, not decided/approved.
+**Status:** Accepted — implemented in `apps/api` and browser-safe contract packages.
 **Date:** 2026-08-19.
 
 ## Context

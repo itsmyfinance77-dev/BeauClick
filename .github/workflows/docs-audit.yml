@@ -1,0 +1,33 @@
+name: Documentation Audit
+
+on:
+  pull_request:
+    paths:
+      - 'README.md'
+      - 'CONTRIBUTING.md'
+      - 'docs/**'
+      - 'scripts/docs-audit.mjs'
+      - '.github/workflows/docs-audit.yml'
+  push:
+    branches: [master]
+    paths:
+      - 'README.md'
+      - 'CONTRIBUTING.md'
+      - 'docs/**'
+      - 'scripts/docs-audit.mjs'
+      - '.github/workflows/docs-audit.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  docs-audit:
+    name: links · decisions · ADR sequence · hygiene
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/docs-audit.mjs

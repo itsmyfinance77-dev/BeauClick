@@ -1,6 +1,6 @@
 # ADR-003: TypeScript / NestJS Backend
 
-**Status:** Proposed — discovery only, not decided/approved.
+**Status:** Accepted — implemented in the V3 TypeScript/NestJS/Next.js workspace.
 **Date:** 2026-08-19.
 
 ## Context

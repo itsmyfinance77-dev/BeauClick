@@ -1,5 +1,11 @@
 # V3 Release Policy Exceptions
 
+> **Current release status (2026-09-02):** EXC-002 still covers only V3.0.x and
+> V3.1.x. The V3.2 tag audit did not authorize a tag and did not create EXC-003. Green
+> CI, milestone closure, or a prerelease suffix does not extend this exception. The
+> newest release remains `v3.1.0`; V3.2-A through V3.2-C are engineering milestones on
+> `master`, not a release or production enablement.
+
 A release-policy exception is a **deliberate, recorded decision to release despite an
 unmet release criterion**. It is not a gap closure, not a re-classification of the
 underlying work, and not a statement that the criterion no longer matters. Every

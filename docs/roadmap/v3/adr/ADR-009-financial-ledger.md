@@ -1,6 +1,6 @@
 # ADR-009: Financial Ledger Architecture
 
-**Status:** Proposed — discovery only, not decided/approved.
+**Status:** Accepted and amended — ledger implemented; isolation and money representation refined by ADR-017.
 **Date:** 2026-08-19.
 
 ## Context
