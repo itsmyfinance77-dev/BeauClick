@@ -170,5 +170,11 @@ thrown, and no event was emitted.
 docker compose -f v3/infra/docker/docker-compose.yml up -d
 ```
 
-Then §1.1's role scripts against `postgres://postgres:postgres@localhost:5433/beauclick_v3_dev`,
-then `pnpm migrate`, then `pnpm api:dev`.
+Compose reads its credentials from `v3/infra/docker/.env` — copy
+`v3/infra/docker/.env.example` and fill every blank first, or Compose refuses to
+start and names the missing variable.
+
+Then §1.1's role scripts against the local superuser, whose connection string is
+`postgres://postgres:$POSTGRES_PASSWORD@localhost:5433/beauclick_v3_dev` — take
+the value from that ignored `.env` rather than typing it, so it does not land in
+shell history. Then `pnpm migrate`, then `pnpm api:dev`.

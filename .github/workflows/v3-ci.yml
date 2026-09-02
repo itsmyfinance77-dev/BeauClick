@@ -170,9 +170,22 @@ jobs:
       # runs -- which is exactly what happened the first time this landed.
       - name: Start object storage
         run: |
+          # Ephemeral, per-run credentials. Generated here rather than committed:
+          # a literal in this file is a credential in every clone and every fork,
+          # it is identical on every run, and it survives any rotation performed
+          # elsewhere. Generating per run means CI shares no secret with a
+          # developer machine and there is nothing here worth stealing.
+          CI_MINIO_USER="ci$(openssl rand -hex 6)"
+          CI_MINIO_PASSWORD="$(openssl rand -base64 32 | tr -d '=+/')"
+          # Mask BEFORE any command can emit them -- including a failing
+          # 'docker run', which echoes its own arguments.
+          echo "::add-mask::$CI_MINIO_USER"
+          echo "::add-mask::$CI_MINIO_PASSWORD"
+          echo "CI_MINIO_USER=$CI_MINIO_USER" >> "$GITHUB_ENV"
+          echo "CI_MINIO_PASSWORD=$CI_MINIO_PASSWORD" >> "$GITHUB_ENV"
           docker run -d --name bc-ci-minio -p 9000:9000 \
-            -e MINIO_ROOT_USER=beauclick_test \
-            -e MINIO_ROOT_PASSWORD=beauclick_test_secret \
+            -e MINIO_ROOT_USER="$CI_MINIO_USER" \
+            -e MINIO_ROOT_PASSWORD="$CI_MINIO_PASSWORD" \
             minio/minio:latest server /data
           for i in $(seq 1 30); do
             if curl -sf http://localhost:9000/minio/health/live > /dev/null; then
@@ -309,6 +322,6 @@ jobs:
           # is no provisioning step to drift: a wrong signature fails in the
           # suite rather than being mistaken for a setup problem.
           TEST_S3_ENDPOINT: http://localhost:9000
-          TEST_S3_ACCESS_KEY_ID: beauclick_test
-          TEST_S3_SECRET_ACCESS_KEY: beauclick_test_secret
+          TEST_S3_ACCESS_KEY_ID: ${{ env.CI_MINIO_USER }}
+          TEST_S3_SECRET_ACCESS_KEY: ${{ env.CI_MINIO_PASSWORD }}
           TEST_S3_BUCKET: beauclick-media-ci

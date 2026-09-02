@@ -12,12 +12,10 @@
 #
 #   docker compose -f infra/docker/docker-compose.yml up -d
 #
-# Then provision the roles once and migrate:
-#   psql "postgres://postgres:postgres@localhost:5433/beauclick_v3_dev" \
-#     -v owner_password=dev_owner -v writer_password=dev_writer \
-#     -v reader_password=dev_reader -v db_name=beauclick_v3_dev \
-#     -v app_role=beauclick_app -f database/scripts/financial-roles.sql
-#
+# Then provision the roles once and migrate. The role scripts take their
+# passwords as psql variables -- read them from your ignored local
+# infra/docker/.env and never paste them into a shell that keeps history:
+#   docs/runbooks/DEPLOY.md documents the full sequence.
 # See docs/runbooks/DEPLOY.md for the full sequence.
 
 name: beauclick-v3-dev
@@ -28,7 +26,7 @@ services:
     container_name: bc-v3-pg
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required; set it in infra/docker/.env (see .env.example)}
       POSTGRES_DB: beauclick_v3_dev
     # 5433, not 5432: a developer running a system PostgreSQL should not have
     # to stop it to work on this project, and a silent port collision looks
@@ -66,8 +64,8 @@ services:
     container_name: bc-v3-minio
     command: server /data
     environment:
-      MINIO_ROOT_USER: beauclick_test
-      MINIO_ROOT_PASSWORD: beauclick_test_secret
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER is required; set it in infra/docker/.env (see .env.example)}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required; set it in infra/docker/.env (see .env.example)}
     # 9100 externally, because 9000 collides with too many other things.
     ports: ['9100:9000']
     healthcheck:
