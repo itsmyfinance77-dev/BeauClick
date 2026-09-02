@@ -25,7 +25,7 @@ account-level Project permission.
 | V3.2-E | B2B Quotes and Campaigns | Owner-gated; payment gate applies to settlement |
 | V3.2-F | Payout and Calendar Automation | Predominantly external-gated |
 | V3.2-G | Evidence-Gated Scale | No commitment without evidence |
-| V3.3 | Product Maturity Programme | Active foundation: #39 complete; epic #38 in progress |
+| V3.3 | Product Maturity Programme | Active foundation: #39 complete; epic #38 in progress; Story #40 decomposed 2026-09-02 |
 | V3.4 | Conditional Expansion Programme | Written owner decision and evidence required |
 
 V3.2-A and V3.2-B are completed historical milestones but are deliberately
@@ -80,3 +80,47 @@ to get wrong:
   itself satisfy the three-cycle calibration rule.
 - External referral delivery channels, approved public/legal copy, and public business profiles
   remain tracked gaps and are not silently counted as milestone delivery.
+
+## V3.3-A Story #40 decomposition, 2026-09-02
+
+The product owner ratified the **structure** of `V33-DEC-009` and `V33-DEC-010`
+after reviewing the Story #40 readiness packet. Commercial values, legal terms,
+accounting treatment and external activation remain open under #46 and #47, and
+**no implementation story was started**. No velocity is claimed or implied.
+
+The readiness review found Story #40 was carrying four separable outcomes with
+different triggers, dependencies and evidence, so it was decomposed rather than
+delivered as one 13-point item:
+
+| Item | Before | After | Outcome it owns |
+|---|---:|---:|---|
+| #40 (`#40a`) | 13 | 8 | Admin-versioned plan and price catalogue: immutable versions, activation windows, tier schedules, the `D-7` zero-price base workspace, administrator capability, audit and mandatory reason. No seller-facing purchase or consumption. |
+| #56 (`#40b`) | — | 8 | Seller subscription lifecycle and plan-included grants. Depends on #40. No payment collection. |
+| #57 (`#40c`) | — | 5 | Custom booking-credit purchase and immutable price snapshots. Depends on #40. No gateway or recurring billing. |
+| #58 (`#40d`) | — | 8 | Atomic consumption at first `confirmed` and idempotent return. Depends on #56, #57 and Story #41's zero-online-collection confirmation path. |
+| **Total** | **13** | **29** | Net V3.3 scope movement **+16**. |
+
+This is **scope discovery, not velocity loss**. The original 13 points estimated
+one story that could not have satisfied its own Definition of Ready: three of
+the four outcomes depend on facts the first one has to create, and the fourth
+depends on a capability that belongs to a different story entirely.
+
+Three corrections were recorded with the decomposition:
+
+- **Free booking is not a zero service price.** `V33-DEC-001` means the customer
+  pays no separate BeauClick booking fee. Under `pay_at_venue` the full service
+  price may be non-zero while the platform-collectible amount is zero. The
+  no-online-collection confirmation path therefore belongs to Story #41, and no
+  `#40-pre` story was created for a `totalToman === 0` branch. The existing
+  zero-total-order defect stays visible in #41's acceptance criteria.
+- **#47 was being read too broadly.** It blocks real paid collection and
+  settlement. It does not block the plan catalogue, immutable versions, the
+  zero-price base workspace, entitlement grants, sandbox consumption/return or
+  PostgreSQL concurrency tests, so `gate:product` was removed from #40 while
+  #46 and #47 both stay open.
+- **Story #41's estimate stays provisional.** It requires its own readiness and
+  re-estimation audit before implementation, because #58 now depends on it.
+
+One backlog-hygiene rule this pass exercised: a structural decision closing does
+not close its decision issue. #46 stays `status:decision` and keeps its 5 points
+because the commercial values it owns are untouched.
