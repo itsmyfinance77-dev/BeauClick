@@ -1,6 +1,6 @@
 # ADR-013: Infrastructure Strategy
 
-**Status:** Proposed — Phase 0 blueprint only, not decided/approved. Nothing has been deployed.
+**Status:** Accepted for local/CI infrastructure — production hosting and provider activation remain open.
 **Date:** 2026-08-20.
 
 ## Context

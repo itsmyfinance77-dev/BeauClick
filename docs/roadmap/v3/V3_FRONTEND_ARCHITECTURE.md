@@ -1,5 +1,9 @@
 # V3 Frontend Architecture
 
+> **Current-status note (2026-09-02):** This is a historical Phase 0 blueprint.
+> `v3/apps/web` now exists. It contains the V3.0/V3.1 production surface, while the
+> V3.2 AI, chat, wishlist and referral production screens remain incomplete.
+
 Status: Phase 0 blueprint. **No UI code has been written, no frontend project initialized.** Decision basis: `docs/roadmap/v3/adr/ADR-012-frontend-architecture.md`.
 
 ---

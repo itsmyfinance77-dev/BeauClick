@@ -1,6 +1,6 @@
 # ADR-001: WordPress/WooCommerce Exit Strategy
 
-**Status:** Proposed — discovery only, not decided/approved.
+**Status:** Accepted — implemented by the V3 replacement. Historical discovery rationale retained.
 **Date:** 2026-08-19.
 **Deciders:** Product/engineering owner (pending).
 

@@ -1,6 +1,6 @@
 # ADR-016: Deployment Strategy
 
-**Status:** Proposed — Phase 0 blueprint only, not decided/approved. Nothing has been deployed.
+**Status:** Accepted for CI/CD mechanics and amended — production remains undeployed; deployable topology superseded by ADR-040.
 **Date:** 2026-08-20.
 
 ## Context

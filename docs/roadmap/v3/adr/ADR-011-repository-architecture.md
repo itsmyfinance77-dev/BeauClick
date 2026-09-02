@@ -1,6 +1,6 @@
 # ADR-011: Repository Architecture
 
-**Status:** Proposed — Phase 0 blueprint only, not decided/approved. No repository has been created.
+**Status:** Accepted and amended — Nx/pnpm monorepo implemented; deployable examples superseded by ADR-040.
 **Date:** 2026-08-19.
 
 ## Context

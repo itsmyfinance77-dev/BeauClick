@@ -1,5 +1,10 @@
 # V3 Database Blueprint
 
+> **Current-status note (2026-09-02):** This file preserves the Phase 0 target model.
+> The implemented database now has ordered SQL migrations and later ADR amendments,
+> especially ADR-017 and ADR-027. Treat claims below about no database or migration as
+> historical baseline statements.
+
 Status: Phase 0 blueprint. **No migrations have been written, no database created.** Decision basis: `docs/roadmap/v3/adr/ADR-004-database-strategy.md`. This document specifies conventions and an initial entity list for Phase 1+ to implement against.
 
 ---

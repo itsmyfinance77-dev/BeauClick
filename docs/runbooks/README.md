@@ -12,10 +12,11 @@ which of its steps have actually been exercised and which are waiting on the
 
 | Runbook | What it covers | Exercised? |
 |---|---|---|
+| [LOCAL_SECRETS.md](LOCAL_SECRETS.md) | Creating and storing ignored local Compose/API credentials | Yes — local credentials rotated and verified 2026-09-02; production values are separate |
 | [DEPLOY.md](DEPLOY.md) | First-time provisioning and a routine deploy | Partly — every command except the deploy itself |
 | [ROLLBACK.md](ROLLBACK.md) | Reverting a bad deploy, and the migration question that comes first | No — needs a host |
 | [RESTORE.md](RESTORE.md) | Restoring the database from a backup | Mechanism yes, on a disposable target; the real drill no |
-| [SECRET_ROTATION.md](SECRET_ROTATION.md) | Rotating each secret without locking anyone out | Partly — the contract is enforced in code |
+| [SECRET_ROTATION.md](SECRET_ROTATION.md) | Rotating each secret without locking anyone out | Partly — local PostgreSQL rotation exercised 2026-09-02; production rotation still unexercised |
 | [PAYMENT_INCIDENT.md](PAYMENT_INCIDENT.md) | Unresolved verifications, duplicate charges, amount mismatches | The code paths yes; a real gateway no |
 
 ## The honest status of all of this

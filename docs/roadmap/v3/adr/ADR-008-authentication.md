@@ -1,6 +1,6 @@
 # ADR-008: Authentication & Authorization
 
-**Status:** Proposed — discovery only, not decided/approved.
+**Status:** Accepted — implemented and subsequently extended by the capability and privacy work.
 **Date:** 2026-08-19.
 
 ## Context

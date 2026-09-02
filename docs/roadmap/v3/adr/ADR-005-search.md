@@ -1,6 +1,6 @@
 # ADR-005: Search Architecture
 
-**Status:** Proposed — discovery only, not decided/approved.
+**Status:** Accepted — implemented with authoritative PostgreSQL state and an OpenSearch projection.
 **Date:** 2026-08-19.
 
 ## Context

@@ -1,6 +1,6 @@
 # ADR-006: Payment Architecture
 
-**Status:** Proposed — discovery only, not decided/approved.
+**Status:** Accepted for the verified sandbox lifecycle — real-provider activation remains externally gated.
 **Date:** 2026-08-19.
 
 ## Context

@@ -8,8 +8,15 @@ secret the application reads and what an attacker gets by learning it, and
 production refuses to boot on a placeholder, a too-short value, or one secret
 serving two purposes.
 
-The rotation **procedures** below are unexercised — they need a running
-deployment.
+The PostgreSQL procedure was exercised against the local development cluster on
+2026-09-02: six credentials were rotated, old credentials were rejected over the
+SCRAM-authenticated host connection, grants were re-verified, migrations remained
+idempotent and health/readiness passed. That proves the local mechanism, not production
+operations. Production rotation, provider-key rotation and a zero-downtime hosted drill
+remain unexercised and still require a real deployment.
+
+The local credential locations and generation rules are documented separately in
+[`LOCAL_SECRETS.md`](LOCAL_SECRETS.md).
 
 ---
 

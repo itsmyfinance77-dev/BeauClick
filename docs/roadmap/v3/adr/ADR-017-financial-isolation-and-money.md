@@ -2,7 +2,7 @@
 
 **Status:** Accepted — implemented and verified in Phase 2 (2026-08-20).
 **Supersedes in part:** `V3_DATABASE_BLUEPRINT.md` §1's "separate database" specification for `financial` and `payment`.
-**Related:** ADR-004 (database strategy), ADR-009 (financial ledger), ADR-002 (architecture style).
+**Related:** ADR-004 (database strategy), ADR-009 (financial ledger), ADR-002 (architecture style), ADR-040 (implemented deployment topology).
 
 ## Context
 

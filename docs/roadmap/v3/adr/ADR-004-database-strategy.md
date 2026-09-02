@@ -1,6 +1,6 @@
 # ADR-004: Database Strategy
 
-**Status:** Proposed — discovery only, not decided/approved.
+**Status:** Accepted and amended — PostgreSQL/schema ownership implemented; financial topology amended by ADR-017.
 **Date:** 2026-08-19.
 
 ## Context
