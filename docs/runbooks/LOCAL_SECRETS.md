@@ -73,6 +73,41 @@ more useful than a tidied history that hides it.
    existing sessions. After rotating, terminate sessions and reconnect, or a
    verification that "it still works" proves nothing.
 
+## The real-PostgreSQL suite's role URLs
+
+`pnpm test:pg` reads its connection strings from the environment, never from a
+tracked file. The variables, by name:
+
+| Variable | Role it connects as | Without it |
+|---|---|---|
+| `TEST_DATABASE_URL` | the application role | the entire suite skips |
+| `TEST_FINANCIAL_WRITER_URL` | the financial writer | the entire suite skips |
+| `TEST_FINANCIAL_OWNER_URL` | the financial owner | the two financial suites skip |
+| `TEST_FINANCIAL_READER_URL` | the financial reader | the reader assertions skip |
+| `TEST_OPENSEARCH_URL`, `TEST_S3_*` | not roles | the search and object-storage suites skip |
+
+Each is a full connection string and therefore carries a password. Supply them
+the way rule 4 above requires — from an ignored environment file or through the
+process environment — and never on a command line, where they are visible in
+process listings and shell history.
+
+**A skip is the designed outcome, not a workaround.** A suite whose credential is
+absent self-skips; it does not fail, and it does not connect. That matters more
+than it sounds: `pg` does not reject an undefined connection string, it falls
+back to `localhost:5432` with a null password, so a suite that reached the driver
+without its URL would aim `TRUNCATE financial.*` at whatever server holds the
+default port rather than at the test cluster. CI supplies every variable and runs
+[`assert-jest-zero-skipped.ts`](../../v3/database/scripts/assert-jest-zero-skipped.ts),
+so a suite that skips there fails the build.
+
+**Where the financial owner password comes from.** It is set by
+`database/scripts/financial-roles.sql` when that script provisions the roles.
+Run that script only against a disposable cluster you created for the purpose —
+never against the shared development cluster, where it would rotate
+cluster-global roles out from under every other database on the host. If you do
+not hold the owner password, run without `TEST_FINANCIAL_OWNER_URL` and accept
+the two skipped suites rather than rotating anything to obtain it.
+
 ## Generating a value
 
 ```bash

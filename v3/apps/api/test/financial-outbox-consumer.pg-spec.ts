@@ -5,7 +5,16 @@ import { uuidv7 } from 'uuidv7';
 import { LedgerService, SettlementService } from '@beauclick/financial';
 import { OutboxRelay } from '@beauclick/events';
 
-import { createPgTestApp, requiredPgEnv, resetDatabase, resetFinancial, seedProfessional, seedUser } from './pg-test-app.factory';
+import {
+  createPgTestApp,
+  financialOwnerUrl,
+  requireFinancialOwnerUrl,
+  requiredPgEnv,
+  resetDatabase,
+  resetFinancial,
+  seedProfessional,
+  seedUser,
+} from './pg-test-app.factory';
 import { FINANCIAL_OUTBOX_RELAY } from '../src/composition/financial-outbox-relay.provider';
 
 /**
@@ -19,8 +28,21 @@ import { FINANCIAL_OUTBOX_RELAY } from '../src/composition/financial-outbox-rela
  * ALL on the financial schema (ADR-017) and genuinely cannot read it any
  * other way.
  */
-const describeIfPg = requiredPgEnv() ? describe : describe.skip;
-const OWNER_URL = process.env.TEST_FINANCIAL_OWNER_URL;
+/**
+ * THREE dependencies, and the gate names all three.
+ *
+ * `requiredPgEnv()` covers `TEST_DATABASE_URL` and `TEST_FINANCIAL_WRITER_URL`.
+ * This suite also needs the OWNER connection, because `beforeEach` truncates
+ * `financial.*` and only the owner may (ADR-017). Gating on `requiredPgEnv()`
+ * alone let an absent owner URL through as `undefined`, and `as string` stopped
+ * the compiler from saying so -- see `resetFinancial` for what `pg` then did
+ * with it.
+ *
+ * `beforeEach` then calls `requireFinancialOwnerUrl()`, which returns `string`,
+ * so nothing below casts.
+ */
+const OWNER_URL = financialOwnerUrl();
+const describeIfPg = requiredPgEnv() && OWNER_URL ? describe : describe.skip;
 
 describeIfPg('Financial outbox consumer on real PostgreSQL', () => {
   let app: INestApplication;
@@ -44,7 +66,7 @@ describeIfPg('Financial outbox consumer on real PostgreSQL', () => {
 
   beforeEach(async () => {
     await resetDatabase(dataSource);
-    await resetFinancial(OWNER_URL as string);
+    await resetFinancial(requireFinancialOwnerUrl());
   });
 
   it('drains LedgerEntriesRecorded into an analytics fact row -- the ONLY path financial data can leave the isolated schema by', async () => {

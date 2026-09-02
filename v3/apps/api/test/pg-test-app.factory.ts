@@ -231,6 +231,55 @@ export function requiredPgEnv(): { database: string; financial: string } | null 
 }
 
 /**
+ * The financial OWNER connection, or null when it is not configured.
+ *
+ * ## Why this is a helper rather than two copies of `process.env.…`
+ *
+ * `requiredPgEnv()` deliberately covers only the two variables EVERY
+ * real-database suite needs. The owner role is different: exactly two suites
+ * need it, because only the owner may `TRUNCATE financial.*` (ADR-017 -- the
+ * application role has no USAGE on the schema at all, and the writer may not
+ * DELETE).
+ *
+ * Both of those suites used to read the variable themselves and then assert
+ * `as string` on the way into `resetFinancial`, and that cast is what let the
+ * gap through: `financial-outbox-consumer.pg-spec.ts` gated only on
+ * `requiredPgEnv()`, so with the owner URL absent `undefined` reached the
+ * driver and the compiler had been told not to mind.
+ *
+ * Returning `string | null` from one place makes the dependency a value a suite
+ * has to narrow rather than a variable it has to remember, and the narrowing is
+ * what the gate is built from.
+ */
+export function financialOwnerUrl(): string | null {
+  return process.env.TEST_FINANCIAL_OWNER_URL || null;
+}
+
+/**
+ * The same value, narrowed to `string` -- for the call site, once the gate above
+ * has already decided the suite runs.
+ *
+ * Two functions rather than one because the gate and the call need different
+ * types, and the alternative is the cast this pair exists to delete: with only a
+ * nullable reader, `resetFinancial(OWNER_URL)` does not compile, and the obvious
+ * way to make it compile is `as string`.
+ *
+ * The throw is unreachable while a suite's gate is right, and that is the point:
+ * it converts "the gate was wrong" from a truncate against an unintended server
+ * into a message naming the variable.
+ */
+export function requireFinancialOwnerUrl(): string {
+  const url = financialOwnerUrl();
+  if (!url) {
+    throw new Error(
+      'TEST_FINANCIAL_OWNER_URL is not set. Gate the suite on financialOwnerUrl() so it self-skips, ' +
+        'rather than reaching this point without the financial owner connection.',
+    );
+  }
+  return url;
+}
+
+/**
  * @param envOverrides applied AFTER the hermetic defaults, so a suite can
  * boot the real application under a different configuration -- used by
  * `throttling.pg-spec.ts` to run with deliberately tiny rate limits while
@@ -518,8 +567,38 @@ export async function resetDatabase(dataSource: DataSource): Promise<void> {
   await dataSource.query(`TRUNCATE ${RESETTABLE_TABLES.join(', ')} CASCADE`);
 }
 
-/** Clears the financial schema. Needs the OWNER connection -- neither app nor writer may DELETE. */
+/**
+ * Clears the financial schema. Needs the OWNER connection -- neither app nor
+ * writer may DELETE.
+ *
+ * ## The precondition is not defensive tidiness
+ *
+ * `new Client({ connectionString: undefined })` does NOT throw. `pg` falls back
+ * to libpq's defaults -- `localhost:5432`, a database named after the OS user,
+ * and a null password -- so an unset `TEST_FINANCIAL_OWNER_URL` does not fail to
+ * connect. It points this TRUNCATE at whatever PostgreSQL happens to be
+ * listening on the default port, which on a developer machine running the
+ * containerised dev cluster on 5433 is a DIFFERENT SERVER.
+ *
+ * What actually stopped it was the unintended server demanding SCRAM, which a
+ * null password cannot answer -- the opaque
+ * `SASL: SCRAM-SERVER-FIRST-MESSAGE: client password must be a string` that made
+ * this look like a product fault. A host with `trust` on loopback would have
+ * run the statement.
+ *
+ * So the check is here, at the last point before the connection, and not only
+ * in the two suites' gates: a gate protects the suite that remembers to write
+ * one, and this protects the next suite that does not.
+ */
 export async function resetFinancial(ownerUrl: string): Promise<void> {
+  if (!ownerUrl) {
+    throw new Error(
+      'resetFinancial requires the financial owner connection. Set TEST_FINANCIAL_OWNER_URL, ' +
+        'or gate the suite on financialOwnerUrl() so it self-skips instead. ' +
+        'Passing an absent URL would truncate financial.* on whatever server is listening on the default port.',
+    );
+  }
+
   const { Client } = await import('pg');
   const client = new Client({ connectionString: ownerUrl });
   await client.connect();
