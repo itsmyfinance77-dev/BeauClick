@@ -2,13 +2,28 @@ import { ConfigService } from '@nestjs/config';
 
 import { S3ObjectStorageDriver, pngFixture, presignS3Url } from '@beauclick/media';
 
+// Credentials are supplied by the environment and are NEVER defaulted here.
+// A committed fallback is a committed credential: it survives rotation, it is
+// searchable in history, and it silently re-points the suite at whatever server
+// happens to accept it. Missing configuration must skip loudly, not guess.
 const ENDPOINT = process.env.TEST_S3_ENDPOINT;
-const ACCESS_KEY = process.env.TEST_S3_ACCESS_KEY_ID ?? 'beauclick_test';
-const SECRET_KEY = process.env.TEST_S3_SECRET_ACCESS_KEY ?? 'beauclick_test_secret';
-const BUCKET = process.env.TEST_S3_BUCKET ?? 'beauclick-media-test';
+const configured = Boolean(
+  ENDPOINT &&
+    process.env.TEST_S3_ACCESS_KEY_ID &&
+    process.env.TEST_S3_SECRET_ACCESS_KEY &&
+    process.env.TEST_S3_BUCKET,
+);
+
+// Empty-string defaults, never a real credential. They exist only so the
+// constants below stay `string`; every use sits inside `describeS3`, which is
+// skipped unless all four variables are actually present, so an empty value can
+// never reach a server. An empty key also cannot authenticate anywhere.
+const ACCESS_KEY = process.env.TEST_S3_ACCESS_KEY_ID ?? '';
+const SECRET_KEY = process.env.TEST_S3_SECRET_ACCESS_KEY ?? '';
+const BUCKET = process.env.TEST_S3_BUCKET ?? '';
 const REGION = 'us-east-1';
 
-const describeS3 = ENDPOINT ? describe : describe.skip;
+const describeS3 = configured ? describe : describe.skip;
 
 /**
  * The S3 driver, against a real S3-compatible server.

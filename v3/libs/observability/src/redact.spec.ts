@@ -1,6 +1,19 @@
 import { REDACTED, redact, redactText } from './redact';
 
 /**
+ * A deliberately synthetic stand-in for a password, used wherever these tests
+ * need a connection string that looks real enough to exercise the redactor.
+ *
+ * It is NOT any credential this project has ever used, in any environment, at
+ * any time. A test fixture carrying a real development password is a committed
+ * credential: it outlives the rotation that was supposed to retire it, it stays
+ * searchable in history, and it teaches the next reader that pasting one here
+ * is normal. The string below is self-describing so that a future secret scan
+ * hitting it can be dismissed in one glance instead of investigated.
+ */
+const CANARY = 'CANARY_NOT_A_REAL_SECRET_8f3d21';
+
+/**
  * Redaction (V3.1 Phase F).
  *
  * The property under test is not "the deny-list is correct" -- a list is
@@ -17,11 +30,27 @@ describe('redact', () => {
   describe('by value shape — the half that reaches error messages', () => {
     it('removes a connection string with credentials', () => {
       // Every pg connection error and several TypeORM errors quote one.
-      const message = 'connect ECONNREFUSED postgres://beauclick_app:dev_app@db.internal:5432/beauclick_v3';
+      const message = `connect ECONNREFUSED postgres://beauclick_app:${CANARY}@db.internal:5432/beauclick_v3`;
       const out = redactText(message);
-      expect(out).not.toContain('dev_app');
+      expect(out).not.toContain(CANARY);
       expect(out).not.toContain('beauclick_app:');
       expect(out).toContain(REDACTED);
+    });
+
+    // Non-vacuity control. The assertion above is only meaningful if the canary
+    // is genuinely present before redaction -- otherwise `not.toContain` would
+    // pass against a typo, an empty string, or a fixture nobody updated. Both
+    // halves are asserted here: present before, absent after.
+    //
+    // Note what this deliberately does NOT assert: that `redactText` scrubs a
+    // bare `CANARY` on its own. Redaction is shape-driven -- it removes a
+    // credential from the position a credential occupies, and an unrecognised
+    // standalone token is passed through by design. Asserting otherwise would
+    // test a promise this redactor never made.
+    it('control: the canary is present before redaction and gone after', () => {
+      const message = `connect ECONNREFUSED postgres://beauclick_app:${CANARY}@db.internal:5432/beauclick_v3`;
+      expect(message).toContain(CANARY);
+      expect(redactText(message)).not.toContain(CANARY);
     });
 
     it('removes an access token', () => {
