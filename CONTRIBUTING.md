@@ -29,13 +29,20 @@ priority, status, and story-point labels. The operating model is documented in
    only when its Definition of Done is satisfied, then delete the short-lived
    branch after merge.
 
-Direct pushes to `master` are prohibited by project policy. GitHub branch
-protection is not currently configured: the repository is public, but no branch
-protection rule or ruleset protects `master` as of 2026-09-02. The pull-request policy
-workflow checks branch names; it is not a substitute for GitHub merge enforcement.
-Until an administrator enables a ruleset, the prohibition above remains a mandatory
-human/agent gate. Repository visibility and branch protection are separate decisions;
-visibility must never be changed as a workaround for governance.
+The active GitHub ruleset `Protect master` enforces the pull-request boundary on
+`master`: direct updates, force pushes, deletion, and non-linear history are blocked;
+all review threads must be resolved; only squash merge is allowed; and the
+always-running `branch and merge policy` check must pass against the latest base.
+No actor has bypass permission.
+
+The required approval count is deliberately zero while this is a single-maintainer
+repository; requiring a second approval would make compliant merges impossible.
+Path-filtered checks, including the complete V3 pipeline and documentation audit,
+remain mandatory under the workflow above whenever their paths are affected. They
+cannot be configured as unconditional required contexts until the workflows always
+publish a result for every pull request, because GitHub would otherwise wait forever
+on checks that were correctly not created. Repository visibility and branch protection
+remain separate decisions; visibility must never be changed as a governance workaround.
 
 ## CI meaning
 
