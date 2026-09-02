@@ -32,8 +32,10 @@ deployed, or maintained.
 
 ## 1. Where the project stands
 
-The latest release tag is **`v3.1.0`**. Three product milestones have landed on `master`
-since it, and the fourth programme — **V3.3** — is the current work.
+The latest release tag is **`v3.1.0`**. The V3.2-A through V3.2-C engineering
+milestones have landed on `master`; V3.3-A is the current work after an explicit
+owner reprioritisation. V3.2-D through V3.2-G remain roadmap scope and have not been
+silently counted as delivered.
 
 | Programme | Delivered | Status |
 |---|---|---|
@@ -41,15 +43,38 @@ since it, and the fourth programme — **V3.3** — is the current work.
 | **V3.1** (Task 1, Phases A–G) | Made what existed usable: the professional operating surface, the operability foundation, media/portfolio, reviews and the rating signal, privacy and the SMS provider port, and the non-external half of production enablement | Released — `v3.1.0` |
 | **V3.2-A** | AI assistant foundation — the `ai` domain, a provider port that refuses to guess, and a deterministic assistant that states what it is | Merged; deterministic sandbox only |
 | **V3.2-B** | Internal chat foundation — chat schema, immutable counterparty, proven eligibility, moderation and privacy boundary | Merged; backend only |
-| **V3.2-C** | Referral and Wishlist — code generation, attribution, qualification, two-sided reward, full-refund reversal and loyalty clawback; wishlist persistence, discovery integration and target-state projection | **Complete 2026-09-02 — 59/59 story points, 0 data-quality warnings** |
+| **V3.2-C** | Referral and Wishlist — code generation, attribution, qualification, two-sided reward, full-refund reversal and loyalty clawback; wishlist persistence, discovery integration and target-state projection | **Engineering complete 2026-09-02 — 59/59 story points, 0 data-quality warnings** |
 | **V3.3-A** | Commercial policy control plane (ADR-039) and the commercial parameter decision packet | **In progress** — epic #38 |
-| V3.2-D … V3.2-G, V3.4 | CRM/delegation, B2B quotes, payout and calendar automation, evidence-gated scale | Planned, product- or evidence-gated |
+| **V3.2-D … V3.2-G** | CRM/delegation, B2B quotes and campaigns, payout and calendar automation, evidence-gated improvements | **Planned, not started** — product-, external- or evidence-gated |
+| **V3.4** | Conditional mobile, marketplace, AI/realtime and scale expansion | Planned; no commitment without its evidence and gates |
 
-**V3.2 is engineering-complete on `master`, not released.** No `v3.2.0` tag exists, and
-none is authorized by any milestone above: `v3.1.0` is still the newest tag in the
-repository. Every V3.2 milestone shipped its backend and its tests behind the gates in
-[§9](#9-what-is-deliberately-not-enabled), and each phase report states what it
-deliberately refuses to claim.
+Four different states must not be collapsed into the word "done":
+
+| State | Current fact |
+|---|---|
+| **Engineering milestone** | V3.2-A, V3.2-B and V3.2-C are complete on `master`; the V3.2-C closure is commit `647162b`. V3.2-D through V3.2-G are still planned. |
+| **User-facing product surface** | The V3.2 AI, chat, wishlist and referral capabilities have backend contracts and tests, but no corresponding route in `v3/apps/web/app`; the design prototypes are not production frontend code. |
+| **Release** | No `v3.2.0` tag or GitHub Release exists. `v3.1.0` remains the newest release. |
+| **Production enablement** | No production host, real payment gateway, SMS vendor or AI provider has been activated; the gates in [§9](#9-what-is-deliberately-not-enabled) remain open. |
+
+Therefore **V3.2-A through V3.2-C are engineering-complete and unreleased**, not a
+user-facing V3.2 release and not a claim that V3.2-D through V3.2-G are finished. The
+release audit that prompted this clarification used baseline `e3f6b62`; that commit
+includes the V3.2-C closure and later V3.3 documentation, so it must not be presented as
+a pure V3.2 release commit.
+
+There is no clean historical commit where all completed V3.2-A–C work exists while the
+interleaved V3.3 control-plane work does not. In addition,
+[`EXC-002`](docs/roadmap/v3/V3_RELEASE_POLICY_EXCEPTIONS.md#exc-002--v30x--v31x-payment-sandbox-release-exception)
+covers only the V3.0.x and V3.1.x release lines and explicitly requires a new governance
+decision before any V3.2.x tag. A milestone closure, green CI run or prerelease suffix
+does not provide that authorization.
+
+One historical naming collision also remains visible: the older V3.1 release strategy
+reserved the name `v3.2.0` for externally gated V3.1 Phases E+F, while the later V3.2
+product programme means AI, chat, wishlist and referral. Until release governance
+reconciles those meanings, use the milestone names and immutable commit SHAs rather than
+inferring a release from the number alone.
 
 ### V3.3 in one paragraph
 
