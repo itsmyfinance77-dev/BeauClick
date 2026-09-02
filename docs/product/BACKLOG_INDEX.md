@@ -6,12 +6,12 @@ and issue labels.
 
 ## Live views
 
-- [Backlog Dashboard](https://github.com/marabi766/BeauClick/issues/2)
-- [V3.2-C full backlog](https://github.com/marabi766/BeauClick/issues?q=is%3Aissue+milestone%3AV3.2-C)
-- [Decisions awaiting closure](https://github.com/marabi766/BeauClick/issues?q=is%3Aissue+is%3Aopen+label%3Astatus%3Adecision)
-- [Ready work](https://github.com/marabi766/BeauClick/issues?q=is%3Aissue+is%3Aopen+label%3Astatus%3Aready)
-- [Work in progress](https://github.com/marabi766/BeauClick/issues?q=is%3Aissue+is%3Aopen+label%3Astatus%3Ain-progress)
-- [Blocked work](https://github.com/marabi766/BeauClick/issues?q=is%3Aissue+is%3Aopen+label%3Astatus%3Ablocked)
+- [Backlog Dashboard](https://github.com/itsmyfinance77-dev/BeauClick/issues/2)
+- [V3.2-C full backlog](https://github.com/itsmyfinance77-dev/BeauClick/issues?q=is%3Aissue+milestone%3AV3.2-C)
+- [Decisions awaiting closure](https://github.com/itsmyfinance77-dev/BeauClick/issues?q=is%3Aissue+is%3Aopen+label%3Astatus%3Adecision)
+- [Ready work](https://github.com/itsmyfinance77-dev/BeauClick/issues?q=is%3Aissue+is%3Aopen+label%3Astatus%3Aready)
+- [Work in progress](https://github.com/itsmyfinance77-dev/BeauClick/issues?q=is%3Aissue+is%3Aopen+label%3Astatus%3Ain-progress)
+- [Blocked work](https://github.com/itsmyfinance77-dev/BeauClick/issues?q=is%3Aissue+is%3Aopen+label%3Astatus%3Ablocked)
 
 A GitHub Project may provide additional visual views later, but it is never the
 source of truth. Issues, labels, milestones, and the generated dashboard remain
@@ -20,12 +20,12 @@ account-level Project permission.
 
 | Milestone | Outcome | Delivery status at system adoption |
 |---|---|---|
-| V3.2-C | Referral and Wishlist | Next; refinement required — see the reconciliation note below |
+| V3.2-C | Referral and Wishlist | **Complete 2026-09-02 — 59/59 Story Points** |
 | V3.2-D | Professional CRM and Delegation | Planned; product decisions required |
 | V3.2-E | B2B Quotes and Campaigns | Owner-gated; payment gate applies to settlement |
 | V3.2-F | Payout and Calendar Automation | Predominantly external-gated |
 | V3.2-G | Evidence-Gated Scale | No commitment without evidence |
-| V3.3 | Product Maturity Programme | Future programme |
+| V3.3 | Product Maturity Programme | Active foundation: #39 complete; epic #38 in progress |
 | V3.4 | Conditional Expansion Programme | Written owner decision and evidence required |
 
 V3.2-A and V3.2-B are completed historical milestones but are deliberately
@@ -70,3 +70,13 @@ to get wrong:
   data-quality warning whether it is open or closed.
 - Decision effort is counted once. `V32-DEC-032`'s closure issue is unpointed
   because its effort is already carried by issue #6 and by the decision packet.
+
+## V3.2-C final closure, 2026-09-02
+
+- Final scope: **59 Story Points**.
+- Delivered: **59 Story Points (100%)** after Stories #14 and #15.
+- Data-quality warnings: **0**.
+- V3.2-C is the first completed measured cycle; it is evidence for future velocity but does not by
+  itself satisfy the three-cycle calibration rule.
+- External referral delivery channels, approved public/legal copy, and public business profiles
+  remain tracked gaps and are not silently counted as milestone delivery.
