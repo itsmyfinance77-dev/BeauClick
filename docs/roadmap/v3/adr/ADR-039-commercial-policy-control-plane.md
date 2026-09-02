@@ -172,3 +172,39 @@ blast radius into search, chat, reviews, waitlist and financial attribution.
   refund and banking capability require a named provider and verified contract.
 - Medical/clinical data remains out of scope pending a separate privacy and
   legal decision.
+
+## Owner ratification note — 2026-09-02
+
+*Appended after acceptance. The decision text above is unchanged and is not
+retrospectively widened; this note records what the owner later ratified on top
+of it.*
+
+On 2026-09-02 the product owner ratified the **structure** of `V33-DEC-009`
+(plan catalogue and booking-credit pricing) and `V33-DEC-010` (consumption,
+return and overage). Those details were **not** part of this ADR's original
+decision. The binding wording lives in
+[`V3.3_DECISION_REGISTER.md`](../../v3.3/V3.3_DECISION_REGISTER.md).
+
+Three points bear directly on this ADR's own text:
+
+1. **Section 3's collection modes are refined, not changed.** Free customer
+   booking (`V33-DEC-001`) means the customer pays no separate BeauClick booking
+   fee. It does not mean the service price is zero. `pay_at_venue` may carry a
+   non-zero full service price with a zero platform-collectible amount, so a
+   confirmation path predicated on a zero order total is not an acceptable
+   reading of this ADR. That capability belongs to #41.
+2. **Section 7's "unavailable by construction" is narrower than #47.** #47
+   blocks real paid subscription/top-up collection and settlement. It does not
+   block the plan catalogue, immutable plan versions, a zero-price base
+   workspace, entitlement grants, sandbox consumption and return, or PostgreSQL
+   concurrency tests. Those may proceed with production paid behaviour disabled.
+3. **A new privileged capability is added to the control plane's authorization
+   surface.** `bc_manage_commercial_plans` gates administrator plan and
+   price-schedule mutations, joins `PRIVILEGED_CAPABILITIES`, receives
+   live-revocation rechecking, and requires an audited mutation with a mandatory
+   reason. Seller credit accounting remains an entitlement ledger in the shared
+   application cluster, not a money ledger in the Financial DataSource.
+
+The `#38` backlog effect is recorded in
+[`BACKLOG_INDEX.md`](../../../product/BACKLOG_INDEX.md): Story #40 is decomposed
+into #40, #56, #57 and #58.
