@@ -1,8 +1,11 @@
 # ADR-040 — Current deployment topology follows the implemented modular monolith
 
-**Status:** Accepted — documentation reconciliation, 2026-09-02.  
-**Approver:** product owner  
-**Amends:** ADR-002 decision 2, ADR-011 deployable examples, ADR-016 deployable count  
+**Status:** Accepted — documentation reconciliation, 2026-09-02.
+
+**Approver:** product owner
+
+**Amends:** ADR-002 decision 2, ADR-011 deployable examples, ADR-016 deployable count
+
 **Preserves:** ADR-017 financial role/DataSource isolation
 
 ## Context
@@ -68,4 +71,3 @@ calendar milestone and is not inferred from a module name ending in `service`.
   evidence outweighs that operational simplicity.
 - ADR-002's modular-monolith choice and ADR-011's monorepo choice remain accepted. Only
   their separate-day-one-deployable statements are superseded.
-
