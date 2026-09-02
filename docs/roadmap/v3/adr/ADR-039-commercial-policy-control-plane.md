@@ -198,6 +198,23 @@ Three points bear directly on this ADR's own text:
    block the plan catalogue, immutable plan versions, a zero-price base
    workspace, entitlement grants, sandbox consumption and return, or PostgreSQL
    concurrency tests. Those may proceed with production paid behaviour disabled.
+
+## Extension note — ADR-041, 2026-09-02
+
+*Appended after acceptance. This ADR's decision text is unchanged.*
+
+[ADR-041](ADR-041-commercial-plan-and-price-catalogue.md) decides the plan and
+booking-credit price catalogue for Story #40 (`#40a`) and is the first work to add
+persistence and administrator routes to `services/commercial-policy`.
+
+Two points bear on this ADR's own text:
+
+1. **Section 7's "not composed into the API" described Story #39's state.** The
+   catalogue IS composed, under `/api/v1/admin/commercial`, and the ratification
+   note above is what permits it. ADR-041 adds no payment, refund, payout or
+   settlement port, and moves no money.
+2. **Section 8 still holds.** ADR-041 defines no event, adds no `ServiceName`
+   member and creates no outbox table, because no consumer has been named.
 3. **A new privileged capability is added to the control plane's authorization
    surface.** `bc_manage_commercial_plans` gates administrator plan and
    price-schedule mutations, joins `PRIVILEGED_CAPABILITIES`, receives

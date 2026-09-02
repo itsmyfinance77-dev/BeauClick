@@ -23,6 +23,7 @@ import { AiModule, AiSubjectDataContract } from '@beauclick/ai';
 import { ChatModule, ChatSubjectDataContract } from '@beauclick/chat';
 import { WishlistModule, WishlistSubjectDataContract } from '@beauclick/wishlist';
 import { ReferralModule, ReferralSubjectDataContract } from '@beauclick/referral';
+import { CommercialCatalogueModule, CommercialSubjectDataContract } from '@beauclick/commercial-policy';
 
 /**
  * Erasure's one out-of-transaction step.
@@ -88,7 +89,9 @@ export class PrivacyErasureCompleter {
  * skipped by an export. The list is the wiring; the catalogue check is the
  * proof.
  *
- * Eighteen contracts. `financial`'s reads on its own connection (ADR-017);
+ * Twenty-one contracts (the count in this note had drifted; it is corrected
+ * here rather than left to mislead the next reader).
+ * `financial`'s reads on its own connection (ADR-017);
  * `search`'s is a claim with no work, because provider's `ProfessionalUpdated`
  * event already removes the document. Both are explained in their own files.
  */
@@ -132,6 +135,16 @@ export class PrivacyErasureCompleter {
     // made them make it.
     WishlistModule,
     ReferralModule,
+    // V3.3-A Story #40 (`#40a`). Imported for its contract only. Five tables,
+    // all claimed `retained` -- Issue #40 binds that directly, because a plan
+    // version carries `published_by_user_id` and an erasure able to blank it
+    // would let an operator launder their own commercial history.
+    //
+    // Worth the extra line here for the reason the wishlist note above gives:
+    // this module claims NOTHING as `no_subject_data`, which is unusual for a
+    // configuration schema and is a claim somebody had to make deliberately.
+    // The coverage check is what made them make it.
+    CommercialCatalogueModule,
   ],
   providers: [
     PrivacyErasureCompleter,
@@ -168,6 +181,7 @@ export class PrivacyErasureCompleter {
         ChatSubjectDataContract,
         WishlistSubjectDataContract,
         ReferralSubjectDataContract,
+        CommercialSubjectDataContract,
       ],
       useFactory: (...contracts: SubjectDataContract[]): SubjectDataContract[] => contracts,
     },

@@ -12,8 +12,12 @@
     "fall through to node_modules -- where each workspace package main points",
     "back at src/index.ts and the process dies on the first import.",
     "",
-    "Generated from tsconfig.base.json. Regenerate it when a path mapping is",
-    "added; infra/docker/Dockerfile.api asserts the API can start with it."
+    "Generated from tsconfig.base.json. A mapping added there and forgotten",
+    "here is a container that dies on its first import with MODULE_NOT_FOUND --",
+    "which is invisible to every CI gate, because CI runs the source and never",
+    "boots this image. Story #40 hit exactly that. So the two tables are now",
+    "compared by a test: apps/api/src/config/runtime-path-map.spec.ts fails when",
+    "a key is missing here or points somewhere other than its compiled output."
   ],
   "compilerOptions": {
     "baseUrl": "../..",
@@ -53,6 +57,9 @@
       ],
       "@beauclick/referral-contract": [
         "dist/packages/referral-contract/src/index.js"
+      ],
+      "@beauclick/commercial-policy-contract": [
+        "dist/packages/commercial-policy-contract/src/index.js"
       ],
       "@beauclick/money": [
         "dist/libs/money/src/index.js"
@@ -122,6 +129,9 @@
       ],
       "@beauclick/referral": [
         "dist/services/referral/src/index.js"
+      ],
+      "@beauclick/commercial-policy": [
+        "dist/services/commercial-policy/src/index.js"
       ]
     }
   }

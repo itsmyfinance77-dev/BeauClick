@@ -20,6 +20,7 @@ import { AiCompositionModule } from './ai-composition.module';
 import { ChatCompositionModule } from './chat-composition.module';
 import { WishlistCompositionModule } from './wishlist-composition.module';
 import { ReferralCompositionModule } from './referral-composition.module';
+import { CommercialCatalogueModule } from '@beauclick/commercial-policy';
 import { CHAT_OUTBOX_SOURCES } from './chat-tokens';
 import { PHASE3_EVENT_HANDLERS, PHASE3_OUTBOX_SOURCES } from './phase3-tokens';
 import { AI_OUTBOX_SOURCES } from './ai-tokens';
@@ -117,6 +118,18 @@ import {
     // `PrivacyCompositionModule` runs the subject-data coverage assertion, which
     // is the only ordering it actually needs.
     ReferralCompositionModule,
+    // V3.3-A Story #40 (`#40a`). Imported for the same ordering reason the two
+    // lines above record and for no other: the catalogue contributes no outbox
+    // source, because it emits no event and has no outbox table (ADR-041 §12 --
+    // no consumer has been named). It is listed here so it is instantiated
+    // before `PrivacyCompositionModule` runs the subject-data coverage
+    // assertion over the real `pg_tables` catalogue.
+    //
+    // Composed DIRECTLY rather than through a `*-composition.module.ts` of its
+    // own, because it declares no port: it reads and writes its own five tables
+    // and asks no other domain for a fact, so there is nothing for a
+    // composition module to bind.
+    CommercialCatalogueModule,
   ],
   controllers: [
     CheckoutController,
@@ -243,6 +256,7 @@ import {
     ChatCompositionModule,
     WishlistCompositionModule,
     ReferralCompositionModule,
+    CommercialCatalogueModule,
     FINANCIAL_OUTBOX_RELAY,
     PrivacyModule,
     // V3.1 Phase F. Re-exported so the root injector can resolve

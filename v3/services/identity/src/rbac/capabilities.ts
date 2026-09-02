@@ -67,6 +67,12 @@ export const CAPABILITIES_BY_ROLE: Record<Role, string[]> = {
     // to be the narrower one, and reading a customer's private messages is not
     // platform operation.
     'bc_moderate_chat',
+    // V3.3-A Story #40 (`#40a`). Deliberately NOT granted to
+    // `platform_operator`: that tier exists to be the narrower one, and
+    // publishing an immutable, activation-windowed commitment about what
+    // sellers pay is not routine platform operation. The same call, for the
+    // same reason, that `bc_moderate_chat` above records.
+    'bc_manage_commercial_plans',
     'bc_manage_own_profile',
   ],
 };

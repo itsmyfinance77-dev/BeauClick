@@ -356,6 +356,24 @@ export async function createPgTestApp(envOverrides: Record<string, string> = {})
  * schema really is.
  */
 export const RESETTABLE_TABLES = [
+  // V3.3-A Story #40 (`#40a`). The plan and price catalogue, children first:
+  // `price_tiers` references a schedule version, and a plan version references
+  // both a plan key and a schedule version.
+  //
+  // TRUNCATE bypasses the lifecycle triggers -- it is not a DELETE, so no row
+  // trigger fires -- which is exactly what a reset needs and is NOT a hole in
+  // the immutability guarantee: the application role reaches these tables only
+  // through the service, and the suite that clears them is the one proving the
+  // triggers refuse every write that goes through it.
+  //
+  // The `D-7` seed is truncated away with everything else, so any spec that
+  // asserts the base workspace re-seeds it explicitly rather than depending on
+  // migration state surviving a reset.
+  'commercial.price_tiers',
+  'commercial.plan_versions',
+  'commercial.price_schedule_versions',
+  'commercial.plans',
+  'commercial.price_schedules',
   // V3.2-C Story #27. Attribution and its claim throttle. Still no outbox --
   // `ReferralAttributed` is deliberately not defined because it has no consumer
   // (ADR-036 §10).
