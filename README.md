@@ -106,11 +106,25 @@ open under issue #46, and real money movement stays blocked by #47. No allowance
 exist as a code constant, default, fallback or seed; an unconfigured plan or price
 schedule refuses rather than falling back.
 
-Only the contract, registry and control gate exist in code so far
-([`v3/services/commercial-policy`](v3/services/commercial-policy),
-[`v3/packages/commercial-policy-contract`](v3/packages/commercial-policy-contract)).
-They are not yet composed into the API — there is no commercial route, schema or
-migration.
+Story #40 (`#40a`) is now implemented on top of that foundation
+([ADR-041](docs/roadmap/v3/adr/ADR-041-commercial-plan-and-price-catalogue.md)). The
+`commercial` schema holds the administrator-versioned plan and price catalogue on the
+shared application cluster: immutable versions with a one-way `draft -> published ->
+retired` lifecycle, activation windows whose non-overlap is enforced by PostgreSQL
+exclusion constraints rather than by application code, immutable tier schedules where a
+flat price is a one-tier schedule, and the `D-7` base workspace as a published,
+zero-price, automatically assignable plan version reached through a row property so no
+code names it. The administrator routes live under `/api/v1/admin/commercial`, gated on
+the new privileged `bc_manage_commercial_plans` capability, and every mutation writes an
+audit record with a mandatory reason in the mutation's own transaction.
+
+Story #39's contract, registry and control gate are unchanged; the catalogue is a second,
+additive surface in the same service. Still absent by design: any seller-facing
+subscription, purchase, grant, consumption or return (#56, #57, #58), any recurring
+billing or gateway, any commercial event, and any production price. No allowance —
+including 200 — exists as a code constant, default, fallback or seed, and a repository
+check in `v3/services/commercial-policy` enforces that against the implementation, its
+contract and its migration.
 
 ---
 

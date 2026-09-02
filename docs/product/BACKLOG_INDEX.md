@@ -28,7 +28,7 @@ delivering its Story Points never creates a tag and never enables production.
 | V3.2-E | B2B Quotes and Campaigns | Owner-gated; payment gate applies to settlement | Not applicable | Not enabled |
 | V3.2-F | Payout and Calendar Automation | Predominantly external-gated | Not applicable | Not enabled |
 | V3.2-G | Evidence-Gated Scale | No commitment without evidence | Not applicable | Not enabled |
-| V3.3 | Product Maturity Programme | Active foundation: #39 complete; epic #38 in progress; Story #40 decomposed 2026-09-02 | No tag authorized | Real money blocked by #47; unresolved values/copy blocked by #46 |
+| V3.3 | Product Maturity Programme | Active foundation: #39 and #40 (`#40a`) complete; epic #38 in progress; #56, #57 and #58 not started | No tag authorized | Real money blocked by #47; unresolved values/copy blocked by #46 |
 | V3.4 | Conditional Expansion Programme | Written owner decision and evidence required | Not applicable | Not enabled |
 
 V3.2-A and V3.2-B are completed historical milestones but are deliberately
@@ -127,3 +127,32 @@ Three corrections were recorded with the decomposition:
 One backlog-hygiene rule this pass exercised: a structural decision closing does
 not close its decision issue. #46 stays `status:decision` and keeps its 5 points
 because the commercial values it owns are untouched.
+
+## V3.3-A Story #40 (`#40a`) delivered, 2026-09-02
+
+8 Story Points. The administrator-versioned plan and booking-credit pricing
+catalogue, decided in
+[ADR-041](../roadmap/v3/adr/ADR-041-commercial-plan-and-price-catalogue.md) before
+any schema or code was written.
+
+What it delivered: the `commercial` schema on the shared application cluster;
+immutable plan and price-schedule versions with a one-way
+`draft -> published -> retired` lifecycle enforced by database triggers;
+activation-window non-overlap enforced by PostgreSQL exclusion constraints rather
+than by application code; immutable tier schedules with gap-free coverage checked
+at publication and exact integer resolution; the `D-7` base workspace as a
+published, zero-price, automatically assignable plan version reached through a row
+property so no production code names it; the privileged
+`bc_manage_commercial_plans` capability with live revocation; and audit records
+with a mandatory reason written in each mutation's own transaction.
+
+What it deliberately did not deliver: any seller-facing subscription, purchase,
+grant, consumption or return (#56, #57, #58); any recurring billing, gateway or
+external provider; any commercial event or `ServiceName` member; any frontend; and
+any production price. No allowance, including 200, exists as a code constant,
+default, fallback or seed, and a repository check enforces that rather than a
+reviewer having to.
+
+#46 and #47 are untouched. Every commercial value remains open, and closing the
+base-workspace definition under #46 will publish a NEW `D-7` version rather than
+edit the seeded one, because the model forbids editing.
