@@ -35,6 +35,8 @@ module.exports = {
     '^@beauclick/wishlist-contract$': '<rootDir>/../../packages/wishlist-contract/src/index.ts',
     '^@beauclick/referral$': '<rootDir>/../../services/referral/src/index.ts',
     '^@beauclick/referral-contract$': '<rootDir>/../../packages/referral-contract/src/index.ts',
+    '^@beauclick/commercial-policy$': '<rootDir>/../../services/commercial-policy/src/index.ts',
+    '^@beauclick/commercial-policy-contract$': '<rootDir>/../../packages/commercial-policy-contract/src/index.ts',
     '^@beauclick/ai-contract$': '<rootDir>/../../packages/ai-contract/src/index.ts',
     '^@beauclick/persian-utils$': '<rootDir>/../../packages/persian-utils/src/index.ts',
     '^@beauclick/search$': '<rootDir>/../../services/search/src/index.ts',

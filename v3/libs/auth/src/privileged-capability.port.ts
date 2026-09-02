@@ -54,4 +54,13 @@ export const PRIVILEGED_CAPABILITIES: readonly string[] = [
   // declares no audit record. Reading -- not only deciding -- is the privilege
   // that matters here, and the moderation controller audits both.
   'bc_moderate_chat',
+  // V3.3-A Story #40 (`#40a`). Authority to publish the commercial terms
+  // sellers are billed against -- immutable plan versions, their entitlements,
+  // their activation windows, and the price schedules behind them. A published
+  // version can never be edited or reactivated, so it carries both properties
+  // this list confers: the live revocation re-check, so a withdrawn
+  // administrator cannot publish a permanent commitment for another fifteen
+  // minutes; and `libs/audit`'s refusal to boot when a mutation gated on it
+  // declares no audit record.
+  'bc_manage_commercial_plans',
 ];
