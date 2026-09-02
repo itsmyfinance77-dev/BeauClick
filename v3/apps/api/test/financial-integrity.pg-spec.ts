@@ -13,7 +13,9 @@ import { CheckoutService } from '../src/checkout/checkout.service';
 import {
   PgTestApp,
   createPgTestApp,
+  financialOwnerUrl,
   futureSlotTime,
+  requireFinancialOwnerUrl,
   requiredPgEnv,
   resetDatabase,
   resetFinancial,
@@ -31,7 +33,17 @@ import {
  * unprivileged -- `usesuper = false` is asserted explicitly, since granting
  * SUPERUSER would make every other assertion here pass for the wrong reason.
  */
-const OWNER_URL = process.env.TEST_FINANCIAL_OWNER_URL;
+/**
+ * This suite's gate was already correct; its CAST was not.
+ *
+ * The gate reads `financialOwnerUrl()` and `beforeEach` calls
+ * `requireFinancialOwnerUrl()`, which returns `string` -- so `resetFinancial`
+ * receives a proven value rather than an asserted one. The assertion is removed
+ * rather than kept as harmless belt-and-braces: an `as string` that happens to
+ * be safe today is the line the next suite copies, which is how the sibling
+ * suite acquired it.
+ */
+const OWNER_URL = financialOwnerUrl();
 const READER_URL = process.env.TEST_FINANCIAL_READER_URL;
 const describeIfPg = requiredPgEnv() && OWNER_URL ? describe : describe.skip;
 
@@ -66,7 +78,7 @@ describeIfPg('Financial integrity on real PostgreSQL', () => {
 
   beforeEach(async () => {
     await resetDatabase(dataSource);
-    await resetFinancial(OWNER_URL as string);
+    await resetFinancial(requireFinancialOwnerUrl());
   });
 
   // -------------------------------------------------------------------

@@ -377,7 +377,7 @@ Two layers, and the split is deliberate (`ADR-015`).
 obvious break fails quickly. pg-mem does **not** honour TypeORM's `ROLLBACK`, so nothing
 about atomicity, isolation, locking, or a unique constraint can be proven here.
 
-**Real-PostgreSQL suite — `pnpm test:pg`.** 42 `*.pg-spec.ts` suites in
+**Real-PostgreSQL suite — `pnpm test:pg`.** 44 `*.pg-spec.ts` suites in
 [`v3/apps/api/test`](v3/apps/api/test) covering booking and waitlist concurrency, the
 append-only ledger and its grants, the outbox, payment retry/security/verification,
 referral attribution, qualification, reversal and adversarial abuse, chat eligibility and
@@ -391,8 +391,11 @@ the captured output — a silently skipped suite is the exact failure mode the g
 to prevent.
 
 Locally the suite reads `TEST_DATABASE_URL` and `TEST_FINANCIAL_WRITER_URL` (it skips
-entirely without them), plus `TEST_FINANCIAL_OWNER_URL`, `TEST_FINANCIAL_READER_URL`,
-`TEST_OPENSEARCH_URL` and the `TEST_S3_*` values. Run with `TZ=UTC`.
+entirely without them), plus `TEST_FINANCIAL_OWNER_URL` (the two financial suites skip
+without it, because only the owner role may clear `financial.*`),
+`TEST_FINANCIAL_READER_URL`, `TEST_OPENSEARCH_URL` and the `TEST_S3_*` values. Run with
+`TZ=UTC`. [`LOCAL_SECRETS.md`](docs/runbooks/LOCAL_SECRETS.md) says how to supply each one
+securely and where the financial owner password comes from.
 
 > Every pg-spec `TRUNCATE`s shared tables in `beforeEach`. Two concurrent runs against one
 > database deadlock on that truncate, and the fallout looks like product bugs — unrelated
