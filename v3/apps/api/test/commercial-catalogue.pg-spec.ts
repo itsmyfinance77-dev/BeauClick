@@ -1115,7 +1115,16 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
           WHERE table_schema = 'commercial' AND column_name LIKE '%user_id%'`,
       );
       const names = [...new Set(rows.map((r) => r.column_name))].sort();
-      expect(names).toEqual(['created_by_user_id', 'published_by_user_id', 'retired_by_user_id']);
+      // `cancelled_by_user_id` since V3.3-A Story #56 (`#56a`), which added
+      // `seller_subscriptions` to this schema. The assertion covers the whole
+      // `commercial` schema rather than this story's five tables, so a later
+      // story adding an undetectable identity column fails HERE.
+      expect(names).toEqual([
+        'cancelled_by_user_id',
+        'created_by_user_id',
+        'published_by_user_id',
+        'retired_by_user_id',
+      ]);
       // Non-vacuity: the platform's own detector agrees these are subject
       // columns, which is what makes a `no_subject_data` claim on these tables
       // impossible rather than merely discouraged.
@@ -1189,6 +1198,7 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
       );
       expect(rows.map((r) => r.filename)).toEqual([
         'commercial/20260902800001_create_commercial_catalogue.sql',
+        'commercial/20260903800001_create_seller_subscriptions.sql',
         'identity/20260902800002_add_commercial_plan_capability.sql',
       ]);
     });
@@ -1224,12 +1234,18 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
            JOIN pg_namespace n ON n.oid = cl.relnamespace
           WHERE n.nspname = 'commercial' AND NOT t.tgisinternal ORDER BY t.tgname`,
       );
+      // The last two arrived with V3.3-A Story #56 (`#56a`). Listed here rather
+      // than only in that story's own suite because this assertion is over the
+      // SCHEMA: a trigger dropped by a later migration must fail somewhere, and
+      // an exact set is the only shape that catches a removal.
       expect(triggers.map((t) => t.tgname)).toEqual([
+        'tg_booking_credit_grants_immutable',
         'tg_plan_versions_lifecycle',
         'tg_plans_immutable',
         'tg_price_schedule_versions_lifecycle',
         'tg_price_schedules_immutable',
         'tg_price_tiers_parent_is_draft',
+        'tg_seller_subscriptions_immutable',
       ]);
     });
 
