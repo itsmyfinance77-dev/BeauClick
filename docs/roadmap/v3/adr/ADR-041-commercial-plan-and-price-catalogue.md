@@ -6,7 +6,13 @@
 **Depends on:** ADR-039 (commercial policy is a versioned control plane), ADR-027
 (subject-data contract), ADR-018 (same-cluster consistency), ADR-017 (financial
 isolation), ADR-011 (module boundaries)
-**Constrains:** #56 (`#40b`), #57 (`#40c`), #58 (`#40d`)
+**Constrains:** #56 (`#56a`), #69 (`#56b`), #57 (`#40c`), #58 (`#40d`)
+
+**Amended 2026-09-03:** §6 said `#40b` "must not ship before #46 closes the
+base-workspace definition". The owner ratified **`V33-DEC-018`** on that date,
+splitting `#40b` into #56 (`#56a`) and #69 (`#56b`) and approving both with #46
+still open. §6 below records the supersession and what survives it. Nothing else
+in this ADR changes, and no catalogue behaviour is affected.
 
 ## Context
 
@@ -191,9 +197,19 @@ capability set are values still open under #46. It is seeded with **zero for
 every quantitative entitlement and an empty capability set** — the only values
 that confer nothing and therefore invent nothing. Zero is the absence of an
 allowance, not a choice of one. Nothing in this story reads those numbers: the
-first consumer is #40b, which must not ship before #46 closes the base-workspace
-definition. When #46 does close it, the administrator publishes a **new** `D-7`
-version. The model forbids editing this one, which is the point.
+first consumer is #40b. When #46 does close it, the administrator publishes a
+**new** `D-7` version. The model forbids editing this one, which is the point.
+
+**Amended 2026-09-03 (`V33-DEC-018`).** This paragraph originally added that
+#40b "must not ship before #46 closes the base-workspace definition". The owner
+superseded that constraint when approving the `#56a`/`#56b` split. The reasoning
+is narrowed rather than dismissed: nothing consumes booking credits until #58, so
+a base workspace conferring zero entitlements changes no seller's capabilities,
+and `V33-DEC-018` requires the zero-quantity grant to be **written** so the
+activation is an explicit auditable fact rather than an absent row. The
+consequence that does survive — sellers backfilled onto this seeded version stay
+on it when #46 publishes a new one, because assignment happens once per party —
+is recorded in `V33-DEC-018` and needs its own decision and migration.
 
 ### 7. Pricing: immutable tiers, exact integer arithmetic, and refusal
 

@@ -97,9 +97,15 @@ overage), and Story #40 was decomposed from one 13-point item into four:
 | Story | Points | Outcome it owns |
 |---|---:|---|
 | #40 (`#40a`) | 8 | Admin-versioned plan and price catalogue — immutable versions, non-overlapping activation windows, tier schedules, the `D-7` zero-price base workspace, the `bc_manage_commercial_plans` capability, audit with a mandatory reason |
-| #56 (`#40b`) | 8 | Seller subscription lifecycle and plan-included grants |
+| #56 (`#56a`) | 8 | Subscription foundation: snapshotted subscriber party, `D-7` backfill and lazy ensure, plan-included grants. No seller-facing route |
+| #69 (`#56b`) | 5 | Seller subscription surface: own subscription, history, zero-price selection and cancellation, `bc_manage_own_subscription` |
 | #57 (`#40c`) | 5 | Custom booking-credit purchase and immutable price snapshots |
 | #58 (`#40d`) | 8 | Atomic consumption at first `confirmed` and idempotent return |
+
+`#40b` was split again on 2026-09-03 (`V33-DEC-018`): #56 keeps its number and its
+8 points as the foundation, and #69 carries the 5-point seller surface, so the
+foundation can land with no seller-facing route while the capability and
+audit-charter questions that only affect those routes are settled.
 
 Prices, included allowances, bounds, cutoffs, legal copy and accounting treatment stay
 open under issue #46, and real money movement stays blocked by #47. No allowance may
@@ -120,7 +126,7 @@ audit record with a mandatory reason in the mutation's own transaction.
 
 Story #39's contract, registry and control gate are unchanged; the catalogue is a second,
 additive surface in the same service. Still absent by design: any seller-facing
-subscription, purchase, grant, consumption or return (#56, #57, #58), any recurring
+subscription, purchase, grant, consumption or return (#56, #69, #57, #58), any recurring
 billing or gateway, any commercial event, and any production price. No allowance —
 including 200 — exists as a code constant, default, fallback or seed, and a repository
 check in `v3/services/commercial-policy` enforces that against the implementation, its
