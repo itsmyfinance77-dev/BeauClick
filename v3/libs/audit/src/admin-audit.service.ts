@@ -103,9 +103,21 @@ export class AdminAuditService {
   }
 
   /**
-   * For actions with no session actor. The ONLY intended caller is the
-   * documented one-time bootstrap, which has no privileged account to act as
-   * yet -- and which must still leave a trace.
+   * For actions with no session actor.
+   *
+   * Two callers, and both are actions no human took:
+   *
+   *  * the documented one-time bootstrap, which has no privileged account to
+   *    act as yet -- and which must still leave a trace;
+   *  * V3.3-A `#56a`'s automatic base-workspace assignment and grant issuance,
+   *    which happen because a seller exists rather than because anyone decided
+   *    (ADR-042 §10). `V33-DEC-018` requires them audited and forbids
+   *    fabricating a human actor for them, and this is the shape that satisfies
+   *    both.
+   *
+   * The label is server-generated in every case. `ck_admin_audit_actor` already
+   * enforces that exactly one of `actor_user_id` and `actor_label` is present,
+   * so a row written here can never be mistaken for a session's own action.
    */
   async recordSystem(
     manager: EntityManager,

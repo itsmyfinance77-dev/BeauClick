@@ -1,11 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { EntityManager, IsNull, Repository } from 'typeorm';
 
 import { ProfessionalEntity, ServiceOfferingEntity } from '@beauclick/provider';
 import { ProfessionalDirectory } from '@beauclick/booking';
 import { ServiceCatalog, ServiceOfferingSnapshot } from '@beauclick/commerce';
 import { FinancialParty, FinancialPartyResolver } from '@beauclick/financial';
+import { OwnedSubscriberParty, OwnedSubscriberPartyResolver } from '@beauclick/commercial-policy';
 import { BusinessEntity, BusinessStaffEntity } from '@beauclick/business';
 
 /**
@@ -128,5 +129,87 @@ export class ProviderBackedFinancialPartyResolver implements FinancialPartyResol
     // says so.
     if (!professional) return null;
     return this.sellerParty.forProfessional(professional.id);
+  }
+}
+
+/**
+ * Resolves "which selling parties does this session OWN?" for
+ * commercial-policy's subscription foundation (ADR-042 §3, `V33-DEC-018`).
+ *
+ * ## Read this beside `ProviderBackedFinancialPartyResolver` above
+ *
+ * They look similar and they are deliberately different in two ways, both of
+ * which are load-bearing. Merging them would be the natural refactor and would
+ * be wrong.
+ *
+ * **It does not follow staff affiliation.** The financial resolver ends with
+ * `sellerParty.forProfessional(...)`, which maps an affiliated professional to
+ * their EMPLOYER — correct for earnings, and wrong for a subscription. Reading
+ * affiliation here would mean a professional joining a salon silently re-points
+ * "my subscription" at the salon, transferring a commercial commitment on the
+ * strength of an employment change. `V33-DEC-018` forbids it, and
+ * `V33-DEC-010` had already ruled the same way for credit returns.
+ *
+ * **It returns every owned party, not one.** `provider.professionals.owner_id`
+ * and `business.businesses.owner_id` are independent unique indexes, so a user
+ * may own both. The financial resolver picks business-first because earnings
+ * need a single answer; subscriptions are per PARTY, so a user owning two
+ * parties owns two unrelated subscriptions.
+ *
+ * ## Eligibility is `deleted_at IS NULL`, and nothing else
+ *
+ * `verification_status` is deliberately not consulted. An unverified
+ * professional is a seller whose identity is unconfirmed, not a seller without
+ * commercial terms, and conflating the two would deny the base workspace to
+ * everyone awaiting review.
+ *
+ * Erasure sets `deleted_at` (provider anonymizes in place), so an erased seller
+ * becomes ineligible through the same predicate — no separate erasure branch,
+ * and none to forget.
+ */
+@Injectable()
+export class OwnershipBackedSubscriberPartyResolver implements OwnedSubscriberPartyResolver {
+  /**
+   * Every query takes the CALLER's manager rather than an injected repository.
+   *
+   * A resolver that used its own repository would run on a different
+   * connection, could not see the activating transaction's uncommitted rows,
+   * and would not roll back with it (ADR-042 §9). The port's signature is what
+   * makes that impossible rather than merely discouraged, and this
+   * implementation honours it by holding no repository at all.
+   */
+  async ownedPartiesFor(manager: EntityManager, userId: string): Promise<OwnedSubscriberParty[]> {
+    const parties: OwnedSubscriberParty[] = [];
+
+    const professional = await manager.getRepository(ProfessionalEntity).findOne({
+      where: { ownerId: userId, deletedAt: IsNull() },
+      select: { id: true },
+    });
+    if (professional) parties.push({ partyType: 'professional', partyId: professional.id });
+
+    const business = await manager.getRepository(BusinessEntity).findOne({
+      where: { ownerId: userId, deletedAt: IsNull() },
+      select: { id: true },
+    });
+    if (business) parties.push({ partyType: 'business', partyId: business.id });
+
+    // Empty when they own neither -- never a fabricated party, and never one
+    // they merely work for.
+    return parties;
+  }
+
+  async isEligible(manager: EntityManager, party: OwnedSubscriberParty): Promise<boolean> {
+    if (party.partyType === 'professional') {
+      return (
+        (await manager.getRepository(ProfessionalEntity).count({
+          where: { id: party.partyId, deletedAt: IsNull() },
+        })) === 1
+      );
+    }
+    return (
+      (await manager.getRepository(BusinessEntity).count({
+        where: { id: party.partyId, deletedAt: IsNull() },
+      })) === 1
+    );
   }
 }

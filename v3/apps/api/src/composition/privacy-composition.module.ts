@@ -23,7 +23,12 @@ import { AiModule, AiSubjectDataContract } from '@beauclick/ai';
 import { ChatModule, ChatSubjectDataContract } from '@beauclick/chat';
 import { WishlistModule, WishlistSubjectDataContract } from '@beauclick/wishlist';
 import { ReferralModule, ReferralSubjectDataContract } from '@beauclick/referral';
-import { CommercialCatalogueModule, CommercialSubjectDataContract } from '@beauclick/commercial-policy';
+import {
+  CommercialCatalogueModule,
+  CommercialSubjectDataContract,
+  SellerSubscriptionModule,
+  SubscriptionSubjectDataContract,
+} from '@beauclick/commercial-policy';
 
 /**
  * Erasure's one out-of-transaction step.
@@ -145,6 +150,7 @@ export class PrivacyErasureCompleter {
     // configuration schema and is a claim somebody had to make deliberately.
     // The coverage check is what made them make it.
     CommercialCatalogueModule,
+    SellerSubscriptionModule,
   ],
   providers: [
     PrivacyErasureCompleter,
@@ -182,6 +188,7 @@ export class PrivacyErasureCompleter {
         WishlistSubjectDataContract,
         ReferralSubjectDataContract,
         CommercialSubjectDataContract,
+        SubscriptionSubjectDataContract,
       ],
       useFactory: (...contracts: SubjectDataContract[]): SubjectDataContract[] => contracts,
     },

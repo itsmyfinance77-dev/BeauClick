@@ -1,0 +1,537 @@
+import { Inject, Injectable } from '@nestjs/common';
+import { DataSource, EntityManager } from 'typeorm';
+import { uuidv7 } from 'uuidv7';
+
+import { AdminAuditService } from '@beauclick/audit';
+
+import { CommercialPlanVersionEntity, CommercialPriceScheduleVersionEntity, CommercialPriceTierEntity } from '../catalogue/commercial-catalogue.entities';
+import { BookingCreditGrantService } from './booking-credit-grant.service';
+import { BookingCreditGrantEntity, SellerSubscriptionEntity } from './seller-subscription.entities';
+import {
+  AUDIT_TARGET_SUBSCRIPTION,
+  SUBSCRIPTION_AUDIT_ACTIONS,
+  SUBSCRIPTION_AUDIT_REASONS,
+  SYSTEM_ACTOR_LABEL,
+} from './seller-subscription.audit';
+import {
+  SubscriptionChangedConcurrentlyException,
+  SubscriptionNotConfiguredException,
+  SubscriptionPaidActivationUnavailableException,
+  SubscriptionPlanNotSelectableException,
+  SubscriptionSellerNotEligibleException,
+} from './seller-subscription.exceptions';
+import {
+  OWNED_SUBSCRIBER_PARTY_RESOLVER,
+  OwnedSubscriberParty,
+  OwnedSubscriberPartyResolver,
+} from './owned-subscriber-party.port';
+
+/**
+ * The subscription lifecycle (ADR-042, `V33-DEC-018`, Story #56 / `#56a`).
+ *
+ * ## What this class is for
+ *
+ * Making "what is this seller entitled to?" a question with a ROW as its
+ * answer. ADR-041 built the catalogue of what MAY be sold and stopped exactly
+ * here; until a seller holds a row, every later story would have to invent an
+ * entitlement, and the invented answer is always a constant `V33-DEC-009`
+ * forbids.
+ *
+ * ## There is no controller in this story
+ *
+ * Story #56a ships no HTTP route — that is #69. Every method here is an
+ * internal domain operation, and the two that #69 will drive
+ * (`selectPlanVersion`, `cancel`) are complete and tested now so that story is
+ * a route layer rather than a second implementation.
+ *
+ * ## Three guarantees this class does NOT provide
+ *
+ * Stated because reading the code would otherwise suggest it does:
+ *
+ *  1. **One active subscription per party** is
+ *     `uq_seller_subscriptions_one_active_per_party`. The reads below are for
+ *     readable outcomes; the index is the protection. Check-then-insert cannot
+ *     survive a race at read committed and this never relies on it.
+ *  2. **Zero-price only** is `ck_seller_subscriptions_zero_price`. The refusal
+ *     raised here arrives first and says something useful, but the constraint
+ *     is what makes a paid subscription unwritable.
+ *  3. **Snapshot and party immutability** is
+ *     `tg_seller_subscriptions_immutable`. Nothing here updates those columns,
+ *     and nothing could.
+ *
+ * A guarantee upheld by this class is upheld by whoever remembers to come
+ * through this class.
+ */
+@Injectable()
+export class SellerSubscriptionService {
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly audit: AdminAuditService,
+    private readonly grants: BookingCreditGrantService,
+    @Inject(OWNED_SUBSCRIBER_PARTY_RESOLVER)
+    private readonly parties: OwnedSubscriberPartyResolver,
+  ) {}
+
+  // ---------------------------------------------------------------- reads
+
+  /** Every party this user owns. Empty for a caller who owns none — never a fabricated party. */
+  async ownedPartiesFor(userId: string): Promise<OwnedSubscriberParty[]> {
+    return this.dataSource.transaction((manager) => this.parties.ownedPartiesFor(manager, userId));
+  }
+
+  /**
+   * The party's active subscription, or null.
+   *
+   * Keyed by PARTY, never by user: nothing in this domain holds "the user's
+   * subscription", which is why a cross-party read is unrepresentable rather
+   * than merely refused (ADR-042 §3).
+   */
+  async findActive(party: OwnedSubscriberParty, manager?: EntityManager): Promise<SellerSubscriptionEntity | null> {
+    const runner = manager ?? this.dataSource.manager;
+    return runner.getRepository(SellerSubscriptionEntity).findOne({
+      where: {
+        subscriberPartyType: party.partyType,
+        subscriberPartyId: party.partyId,
+        lifecycleState: 'active',
+      },
+    });
+  }
+
+  /** The party's whole immutable chain, newest first. */
+  async historyFor(party: OwnedSubscriberParty): Promise<SellerSubscriptionEntity[]> {
+    return this.dataSource.getRepository(SellerSubscriptionEntity).find({
+      where: { subscriberPartyType: party.partyType, subscriberPartyId: party.partyId },
+      order: { effectiveAt: 'DESC', createdAt: 'DESC' },
+    });
+  }
+
+  /** Everything granted to a party. #58 will derive a balance from these and its own consumption rows. */
+  async grantsFor(party: OwnedSubscriberParty): Promise<BookingCreditGrantEntity[]> {
+    return this.dataSource.getRepository(BookingCreditGrantEntity).find({
+      where: { subscriberPartyType: party.partyType, subscriberPartyId: party.partyId },
+      order: { grantedAt: 'DESC' },
+    });
+  }
+
+  // --------------------------------------------------------------- writes
+
+  /**
+   * THE LAZY-ENSURE PATH (`V33-DEC-018`, ADR-042 §4).
+   *
+   * Gives a party the base workspace if it has no active subscription, and does
+   * nothing if it has. Safe to call on every commercial access, from any number
+   * of concurrent requests.
+   *
+   * ## Why the unique violation is caught rather than prevented
+   *
+   * Two concurrent first accesses both read no subscription and both insert.
+   * The partial unique index refuses one, and that refusal is the CORRECT
+   * outcome rather than an error to report: the caller wanted the party to have
+   * a subscription, and it does. So the loser re-reads and returns the winner's
+   * row, and the caller cannot tell which it was.
+   *
+   * Doing it the other way round — locking the party first — would need a lock
+   * on a row in another schema this module must not write to, or an advisory
+   * lock whose scope lives in application code. The index expresses the same
+   * guarantee where a future query cannot forget it.
+   */
+  async ensureBaseSubscription(party: OwnedSubscriberParty): Promise<SellerSubscriptionEntity> {
+    return this.dataSource.transaction(async (manager) => this.ensureBaseSubscriptionWithin(manager, party));
+  }
+
+  /** The same, inside a caller's transaction. Used by `cancel`, which must restore the base workspace atomically. */
+  async ensureBaseSubscriptionWithin(
+    manager: EntityManager,
+    party: OwnedSubscriberParty,
+  ): Promise<SellerSubscriptionEntity> {
+    const existing = await this.findActive(party, manager);
+    if (existing) return existing;
+
+    if (!(await this.parties.isEligible(manager, party))) {
+      throw new SubscriptionSellerNotEligibleException();
+    }
+
+    const version = await this.requireAutoAssignableVersion(manager);
+
+    const created = await this.activate(manager, {
+      party,
+      version,
+      action: SUBSCRIPTION_AUDIT_ACTIONS.assigned,
+      reason: SUBSCRIPTION_AUDIT_REASONS.baseWorkspaceAssigned,
+      actorUserId: null,
+      onConflict: 'ignore',
+    });
+
+    if (created) return created;
+
+    /*
+     * Lost the race, and the caller got what it asked for anyway.
+     *
+     * `ON CONFLICT DO NOTHING` rather than catching a unique violation, and the
+     * difference is not stylistic: in PostgreSQL a failed statement aborts the
+     * whole transaction, so a caught violation could not then re-read inside the
+     * same transaction without a savepoint. Letting the database decline the
+     * insert leaves the transaction healthy, which matters because `cancel`
+     * calls this INSIDE its own transaction.
+     */
+    const winner = await this.findActive(party, manager);
+    if (!winner) {
+      throw new SubscriptionNotConfiguredException(
+        'the base workspace could not be assigned and no active subscription exists for this party',
+      );
+    }
+    return winner;
+  }
+
+  /**
+   * Move a party onto a different published plan version.
+   *
+   * Upgrade and downgrade are the same operation and neither is a state
+   * transition: the active row is superseded and a NEW row is inserted with its
+   * own snapshot, in one transaction. History is immutable for free, because
+   * nothing was edited.
+   *
+   * Grants already issued are untouched (`V33-DEC-018`, `V33-DEC-010`).
+   *
+   * #69 drives this. It is implemented and tested here so that story adds a
+   * route rather than a second lifecycle.
+   */
+  async selectPlanVersion(
+    party: OwnedSubscriberParty,
+    planKey: string,
+    version: number,
+    actorUserId: string,
+  ): Promise<SellerSubscriptionEntity> {
+    return this.dataSource.transaction(async (manager) => {
+      if (!(await this.parties.isEligible(manager, party))) {
+        throw new SubscriptionSellerNotEligibleException();
+      }
+
+      const target = await this.requireSelectableVersion(manager, planKey, version);
+      const current = await this.findActive(party, manager);
+
+      // Idempotent replay: already on these exact terms. Nothing is written and
+      // nothing is audited, so a retried request leaves one row and one audit
+      // trail rather than two.
+      if (current && current.planVersionId === target.id) return current;
+
+      /*
+       * The successor's id is generated BEFORE either row is written.
+       *
+       * Two rules pull against each other here: the superseded row must name
+       * its successor (`ck_seller_subscriptions_superseded`), and the successor
+       * cannot exist while the predecessor is still active
+       * (`uq_seller_subscriptions_one_active_per_party`). Knowing the id up
+       * front lets the predecessor be superseded naming a row that does not
+       * exist yet, which the DEFERRABLE self-FK permits until COMMIT.
+       */
+      const successorId = uuidv7();
+
+      if (current) {
+        await this.supersede(manager, current, successorId, SUBSCRIPTION_AUDIT_REASONS.supersededBySelection);
+      }
+
+      // Never null: `onConflict` defaults to 'throw', so a conflict raises
+      // rather than returning, and the non-null assertion cannot be reached by
+      // a silent path.
+      const created = await this.activate(manager, {
+        id: successorId,
+        party,
+        version: target,
+        action: SUBSCRIPTION_AUDIT_ACTIONS.activated,
+        reason: SUBSCRIPTION_AUDIT_REASONS.planVersionSelected,
+        actorUserId,
+      });
+      return created as SellerSubscriptionEntity;
+    });
+  }
+
+  /**
+   * Cancel, and restore the base workspace in the same transaction.
+   *
+   * The restoration is not a courtesy: ADR-042 §2's invariant says every
+   * eligible party has exactly one active subscription at EVERY instant, and a
+   * cancellation that left the party with none would break it — reintroducing
+   * the state where the platform has to guess what a seller is entitled to.
+   */
+  async cancel(party: OwnedSubscriberParty, actorUserId: string): Promise<SellerSubscriptionEntity> {
+    return this.dataSource.transaction(async (manager) => {
+      const current = await this.findActive(party, manager);
+      if (!current) throw new SubscriptionSellerNotEligibleException();
+
+      await this.transition(manager, current, 'cancelled', {
+        cancelledAt: new Date(),
+        cancelledByUserId: actorUserId,
+        cancelledByLabel: null,
+      });
+
+      await this.audit.record(manager, {
+        actorUserId,
+        action: SUBSCRIPTION_AUDIT_ACTIONS.cancelled,
+        targetType: AUDIT_TARGET_SUBSCRIPTION,
+        targetId: current.id,
+        before: { lifecycleState: 'active', planKey: current.snapshotPlanKey, version: current.snapshotVersion },
+        after: { lifecycleState: 'cancelled' },
+        reason: SUBSCRIPTION_AUDIT_REASONS.cancelledBySeller,
+      });
+
+      const version = await this.requireAutoAssignableVersion(manager);
+      const restored = await this.activate(manager, {
+        party,
+        version,
+        action: SUBSCRIPTION_AUDIT_ACTIONS.assigned,
+        reason: SUBSCRIPTION_AUDIT_REASONS.baseWorkspaceRestored,
+        actorUserId: null,
+      });
+      return restored as SellerSubscriptionEntity;
+    });
+  }
+
+  // -------------------------------------------------------------- internals
+
+  /**
+   * Insert an active subscription with a full snapshot, and issue its grant.
+   *
+   * Every caller is inside a transaction, and the grant and audit rows are
+   * written with the SAME manager — so a failure anywhere leaves neither a
+   * subscription, nor a grant, nor an audit row (ADR-042 §9).
+   */
+  private async activate(
+    manager: EntityManager,
+    input: {
+      /** Pre-generated when a predecessor must name this row before it exists. */
+      id?: string;
+      party: OwnedSubscriberParty;
+      version: CommercialPlanVersionEntity;
+      action: string;
+      reason: string;
+      actorUserId: string | null;
+      /**
+       * `'ignore'` turns the insert into `ON CONFLICT DO NOTHING` and returns
+       * null when the partial unique index declined it. Only the lazy-ensure
+       * path wants that: a losing race there means the party already has what
+       * the caller wanted. Selection and cancellation use `'throw'`, because a
+       * conflict on those paths is a genuine concurrent change the caller must
+       * be told about.
+       */
+      onConflict?: 'throw' | 'ignore';
+    },
+  ): Promise<SellerSubscriptionEntity | null> {
+    const price = await this.snapshotPriceOf(manager, input.version);
+
+    const repository = manager.getRepository(SellerSubscriptionEntity);
+    const subscription = repository.create({
+      id: input.id ?? uuidv7(),
+      subscriberPartyType: input.party.partyType,
+      subscriberPartyId: input.party.partyId,
+      planVersionId: input.version.id,
+      lifecycleState: 'active',
+      // The snapshot, copied field by field. A join would make history a view
+      // (ADR-042 §5).
+      snapshotPlanKey: input.version.planKey,
+      snapshotVersion: input.version.version,
+      snapshotBillingTermDays: input.version.billingTermDays,
+      snapshotIncludedBookingCredits: input.version.includedBookingCredits,
+      snapshotStaffSeats: input.version.staffSeats,
+      snapshotIncludedLocations: input.version.includedLocations,
+      snapshotCapabilityKeys: input.version.capabilityKeys,
+      snapshotCurrencyCode: price.currencyCode,
+      snapshotUnitPriceToman: price.unitPriceToman,
+      snapshotPriceScheduleVersionId: input.version.priceScheduleVersionId,
+      effectiveAt: new Date(),
+      createdByUserId: input.actorUserId,
+      createdByLabel: input.actorUserId ? null : SYSTEM_ACTOR_LABEL,
+    });
+
+    if (input.onConflict === 'ignore') {
+      const result = await manager
+        .createQueryBuilder()
+        .insert()
+        .into(SellerSubscriptionEntity)
+        .values(subscription)
+        .orIgnore()
+        .returning('id')
+        .execute();
+      // No row came back: the index declined it, and nothing below must run --
+      // an audit row or a grant for a subscription that was not written would
+      // be a fact about nothing.
+      if ((result.raw as unknown[]).length === 0) return null;
+    } else {
+      await repository.insert(subscription);
+    }
+
+    const auditPayload = {
+      action: input.action,
+      targetType: AUDIT_TARGET_SUBSCRIPTION,
+      targetId: subscription.id,
+      after: {
+        subscriberPartyType: input.party.partyType,
+        lifecycleState: 'active',
+        planKey: subscription.snapshotPlanKey,
+        version: subscription.snapshotVersion,
+        includedBookingCredits: subscription.snapshotIncludedBookingCredits,
+      },
+      reason: input.reason,
+    };
+
+    if (input.actorUserId) {
+      await this.audit.record(manager, { ...auditPayload, actorUserId: input.actorUserId });
+    } else {
+      // No human took this action, so none is invented (`V33-DEC-018`).
+      await this.audit.recordSystem(manager, { ...auditPayload, actorLabel: SYSTEM_ACTOR_LABEL });
+    }
+
+    await this.grants.issueForActivation(manager, subscription);
+
+    return subscription;
+  }
+
+  private async supersede(
+    manager: EntityManager,
+    current: SellerSubscriptionEntity,
+    successorId: string,
+    reason: string,
+  ): Promise<void> {
+    await this.transition(manager, current, 'superseded', {
+      supersededAt: new Date(),
+      // Names a row that does not exist yet. Legal only because the self-FK is
+      // DEFERRABLE INITIALLY DEFERRED: if the successor is never inserted, the
+      // check fails at COMMIT and the whole transaction is lost, which is the
+      // correct outcome.
+      supersededById: successorId,
+    });
+
+    await this.audit.recordSystem(manager, {
+      actorLabel: SYSTEM_ACTOR_LABEL,
+      action: SUBSCRIPTION_AUDIT_ACTIONS.superseded,
+      targetType: AUDIT_TARGET_SUBSCRIPTION,
+      targetId: current.id,
+      before: { lifecycleState: 'active' },
+      after: { lifecycleState: 'superseded' },
+      reason,
+    });
+  }
+
+  /**
+   * COMPARE-AND-SWAP, with the expected state in the WHERE clause.
+   *
+   * This is what makes concurrent changes safe: two requests both read an
+   * active row, both attempt the update, and exactly one matches. The loser
+   * sees `affected === 0` and is refused rather than overwriting a colleague's
+   * transition instant and actor.
+   *
+   * The same shape `CommercialCatalogueService.transitionPlanVersion` uses, for
+   * the same reason.
+   */
+  private async transition(
+    manager: EntityManager,
+    current: SellerSubscriptionEntity,
+    to: 'superseded' | 'cancelled',
+    patch: Partial<SellerSubscriptionEntity>,
+  ): Promise<void> {
+    const updated = await manager
+      .getRepository(SellerSubscriptionEntity)
+      .update({ id: current.id, lifecycleState: 'active' }, { lifecycleState: to, ...patch });
+
+    if (updated.affected !== 1) throw new SubscriptionChangedConcurrentlyException();
+  }
+
+  /**
+   * The base workspace, resolved from the catalogue rather than a constant.
+   *
+   * `D-7` is never named. `ex_plan_versions_single_auto_assignable` guarantees
+   * at most one auto-assignable version is active at any instant, so this
+   * returns one row or refuses — it never has to choose between two
+   * (ADR-041 §6).
+   */
+  private async requireAutoAssignableVersion(manager: EntityManager): Promise<CommercialPlanVersionEntity> {
+    const now = new Date();
+    const found = await manager
+      .getRepository(CommercialPlanVersionEntity)
+      .createQueryBuilder('v')
+      .where('v.auto_assignable = true')
+      .andWhere("v.lifecycle_state = 'published'")
+      .andWhere('v.activation_starts_at <= :now', { now })
+      .andWhere('(v.activation_ends_at IS NULL OR v.activation_ends_at > :now)', { now })
+      .getOne();
+
+    if (!found) {
+      throw new SubscriptionNotConfiguredException(
+        'no automatically assignable published plan version is active at this instant',
+      );
+    }
+    return found;
+  }
+
+  /** A version a seller may move onto: published, and inside its activation window. */
+  private async requireSelectableVersion(
+    manager: EntityManager,
+    planKey: string,
+    version: number,
+  ): Promise<CommercialPlanVersionEntity> {
+    const now = new Date();
+    const found = await manager
+      .getRepository(CommercialPlanVersionEntity)
+      .createQueryBuilder('v')
+      .where('v.plan_key = :planKey', { planKey })
+      .andWhere('v.version = :version', { version })
+      .andWhere("v.lifecycle_state = 'published'")
+      .andWhere('v.activation_starts_at <= :now', { now })
+      .andWhere('(v.activation_ends_at IS NULL OR v.activation_ends_at > :now)', { now })
+      .getOne();
+
+    // One refusal for "no such version", "draft", "retired" and "not yet
+    // active". Distinguishing them would let a caller enumerate the catalogue
+    // through error messages.
+    if (!found) throw new SubscriptionPlanNotSelectableException();
+    return found;
+  }
+
+  /**
+   * The price a subscription is snapshotted at.
+   *
+   * Read from the tiers of the schedule version the plan version POINTS AT, not
+   * from `CommercialCatalogueService.resolvePrice`, which resolves whichever
+   * version is active at an instant. For a quote that is right; for a snapshot
+   * it would attach a price the seller was never offered (ADR-042 §5).
+   *
+   * A `seller_plan` schedule's quantity domain is exactly one, so the tier
+   * covering quantity 1 is the price.
+   */
+  private async snapshotPriceOf(
+    manager: EntityManager,
+    version: CommercialPlanVersionEntity,
+  ): Promise<{ currencyCode: string; unitPriceToman: number }> {
+    const scheduleVersion = await manager
+      .getRepository(CommercialPriceScheduleVersionEntity)
+      .findOne({ where: { id: version.priceScheduleVersionId } });
+
+    if (!scheduleVersion) {
+      throw new SubscriptionNotConfiguredException('the plan version references no price schedule version');
+    }
+
+    const tiers = await manager
+      .getRepository(CommercialPriceTierEntity)
+      .find({ where: { scheduleVersionId: version.priceScheduleVersionId } });
+
+    const covering = tiers.filter(
+      (tier) => tier.minQuantity <= 1 && (tier.maxQuantity === null || tier.maxQuantity >= 1),
+    );
+
+    if (covering.length !== 1) {
+      throw new SubscriptionNotConfiguredException(
+        'the plan version’s price schedule does not price a single subscription exactly once',
+      );
+    }
+
+    const unitPriceToman = covering[0].unitPriceToman;
+
+    // Refused here so the caller learns WHY, rather than reading a constraint
+    // name out of a database error. `ck_seller_subscriptions_zero_price` is
+    // still what makes it impossible (ADR-042 §6).
+    if (unitPriceToman !== 0) throw new SubscriptionPaidActivationUnavailableException();
+
+    return { currencyCode: scheduleVersion.currencyCode, unitPriceToman };
+  }
+
+}
