@@ -20,7 +20,7 @@ import { AiCompositionModule } from './ai-composition.module';
 import { ChatCompositionModule } from './chat-composition.module';
 import { WishlistCompositionModule } from './wishlist-composition.module';
 import { ReferralCompositionModule } from './referral-composition.module';
-import { CommercialCatalogueModule } from '@beauclick/commercial-policy';
+import { CommercialCatalogueModule, SellerSubscriptionModule } from '@beauclick/commercial-policy';
 import { CHAT_OUTBOX_SOURCES } from './chat-tokens';
 import { PHASE3_EVENT_HANDLERS, PHASE3_OUTBOX_SOURCES } from './phase3-tokens';
 import { AI_OUTBOX_SOURCES } from './ai-tokens';
@@ -130,6 +130,7 @@ import {
     // and asks no other domain for a fact, so there is nothing for a
     // composition module to bind.
     CommercialCatalogueModule,
+    SellerSubscriptionModule,
   ],
   controllers: [
     CheckoutController,
@@ -257,6 +258,7 @@ import {
     WishlistCompositionModule,
     ReferralCompositionModule,
     CommercialCatalogueModule,
+    SellerSubscriptionModule,
     FINANCIAL_OUTBOX_RELAY,
     PrivacyModule,
     // V3.1 Phase F. Re-exported so the root injector can resolve

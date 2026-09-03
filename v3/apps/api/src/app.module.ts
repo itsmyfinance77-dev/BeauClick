@@ -37,7 +37,7 @@ import { AI_ENTITIES } from '@beauclick/ai';
 import { CHAT_ENTITIES } from '@beauclick/chat';
 import { WISHLIST_ENTITIES } from '@beauclick/wishlist';
 import { REFERRAL_ENTITIES } from '@beauclick/referral';
-import { COMMERCIAL_ENTITIES } from '@beauclick/commercial-policy';
+import { COMMERCIAL_ENTITIES, SUBSCRIPTION_ENTITIES } from '@beauclick/commercial-policy';
 import { DomainCompositionModule } from './composition/domain-composition.module';
 import { PrivilegedCapabilityModule } from './composition/privileged-capability.module';
 import { PrivacyCompositionModule } from './composition/privacy-composition.module';
@@ -147,6 +147,7 @@ import { MetricsController } from './observability/metrics.controller';
           // metadata for "CommercialPlanVersionEntity" was found` -- a 500 that
           // looks like a query bug while the app boots cleanly.
           ...COMMERCIAL_ENTITIES,
+          ...SUBSCRIPTION_ENTITIES,
         ],
         // V3_DATABASE_BLUEPRINT.md §2 mandates lower_snake_case columns;
         // TypeORM's default naming strategy uses the JS property name

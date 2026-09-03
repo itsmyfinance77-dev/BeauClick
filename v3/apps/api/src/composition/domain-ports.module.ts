@@ -8,6 +8,7 @@ import { UserEntity } from '@beauclick/identity';
 import { PROFESSIONAL_DIRECTORY } from '@beauclick/booking';
 import { PRICING_RULES, SERVICE_CATALOG } from '@beauclick/commerce';
 import { FINANCIAL_DATA_SOURCE, FINANCIAL_PARTY_RESOLVER } from '@beauclick/financial';
+import { OWNED_SUBSCRIBER_PARTY_RESOLVER } from '@beauclick/commercial-policy';
 import { PROVIDER_REINDEX_SOURCE } from '@beauclick/search';
 import { RECIPIENT_RESOLVER } from '@beauclick/notification';
 import { ANALYTICS_SUBJECT_RESOLVER } from '@beauclick/analytics';
@@ -17,6 +18,7 @@ import { PROFESSIONAL_OWNER_LOOKUP } from '@beauclick/waitlist';
 
 import {
   ProviderBackedFinancialPartyResolver,
+  OwnershipBackedSubscriberPartyResolver,
   ProviderBackedProfessionalDirectory,
   ProviderBackedServiceCatalog,
   SellerPartyLookup,
@@ -61,6 +63,7 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     ProviderBackedProfessionalDirectory,
     ProviderBackedServiceCatalog,
     ProviderBackedFinancialPartyResolver,
+    OwnershipBackedSubscriberPartyResolver,
     { provide: PROFESSIONAL_DIRECTORY, useExisting: ProviderBackedProfessionalDirectory },
     // waitlist-service's port for the identical question booking-service's
     // PROFESSIONAL_DIRECTORY already answers -- ADR-011 forbids waitlist
@@ -70,6 +73,9 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     { provide: PROFESSIONAL_OWNER_LOOKUP, useExisting: ProviderBackedProfessionalDirectory },
     { provide: SERVICE_CATALOG, useExisting: ProviderBackedServiceCatalog },
     { provide: FINANCIAL_PARTY_RESOLVER, useExisting: ProviderBackedFinancialPartyResolver },
+    // V3.3-A #56a. A SECOND party resolver, deliberately not the one above: it
+    // resolves ownership only and returns every owned party (ADR-042 §3).
+    { provide: OWNED_SUBSCRIBER_PARTY_RESOLVER, useExisting: OwnershipBackedSubscriberPartyResolver },
     financialDataSourceProvider,
 
     // Phase 3's ports, global for the same reason as Phase 2's: search,
@@ -111,6 +117,7 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     PROFESSIONAL_OWNER_LOOKUP,
     SERVICE_CATALOG,
     FINANCIAL_PARTY_RESOLVER,
+    OWNED_SUBSCRIBER_PARTY_RESOLVER,
     FINANCIAL_DATA_SOURCE,
     PROVIDER_REINDEX_SOURCE,
     RECIPIENT_RESOLVER,
