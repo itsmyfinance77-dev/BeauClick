@@ -322,9 +322,21 @@ Actions recorded: `commercial.subscription_assigned`,
 | `commercial.seller_subscriptions` | `retained` | Carries `selected_by_user_id` and `cancelled_by_user_id`, and is the immutable record of what the platform was obliged to provide a seller. |
 | `commercial.booking_credit_grants` | `retained` | Operational evidence of entitlements conferred, referenced by #58's consumption rows. |
 
-Neither may be claimed `no_subject_data`. Both carry `_user_id` columns, and
-ADR-027's `wrongly_declared_empty` check exists precisely to catch a table
-claimed empty because it *could* have been designed without an actor column.
+Neither may be claimed `no_subject_data` — and the two are protected
+differently, which is worth stating rather than blurring.
+
+`seller_subscriptions` carries `created_by_user_id` and `cancelled_by_user_id`,
+so ADR-027's `wrongly_declared_empty` check catches a dishonest claim on it
+automatically. **`booking_credit_grants` carries no `_user_id` or `_by` column
+at all** — a grant is issued by the system and there is no actor to record — so
+the detector would *not* catch one. Its `retained` disposition rests on the
+claim's stated reason and on the suite that asserts it, not on a structural
+backstop.
+
+Adding a permanently-NULL `granted_by_user_id` so the detector fires was
+rejected: inventing a column to satisfy a check is the mirror image of the
+evasion ADR-027 forbids, and it would make the schema less honest in order to
+make a document more comfortable. The asymmetry is real, so it is recorded.
 
 **Erasure genuinely does nothing here, and the report says so.** `provider`
 anonymizes a professional in place — tombstone alias, `bio` nulled, `deleted_at`
