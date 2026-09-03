@@ -8,6 +8,13 @@ contract), ADR-023 (business is its own party), ADR-018 (same-cluster
 consistency), ADR-017 (financial isolation), ADR-011 (module boundaries)
 **Constrains:** #69 (`#56b`), #57 (`#40c`), #58 (`#40d`)
 
+**Amended 2026-09-03:** the owner ratified **`V33-DEC-019`** on the same day,
+correcting Story #69's route contract. Two clauses below are affected and are
+annotated in place: §4's lazy ensure keeps its mechanism but moves its trigger
+out of a read into an explicit initialization command, and §7's
+`selectPlanVersion` is recorded as carrying a concurrency defect #69 must
+repair. No decision in this ADR is reversed and no schema changes.
+
 ## Context
 
 ADR-041 built a catalogue of what *may* be sold and left one sentence for this
@@ -117,6 +124,15 @@ sellers and future sellers are genuinely different problems:
 |---|---|---|
 | Migration backfill | Every eligible party that already exists | One `INSERT … SELECT` per party type, in the migration's own transaction |
 | Lazy ensure | Every party created afterwards | `ensureBaseSubscription(party)`, idempotent, called by later stories |
+
+**Amended 2026-09-03 (`V33-DEC-019`).** The lazy-ensure MECHANISM is unchanged —
+the same idempotent call, arbitrated by the same partial unique index. What
+changed is its TRIGGER. This ADR anticipated it running on "first commercial
+read or write"; the owner moved it into an explicit
+`POST /api/v1/me/subscriptions/initialization` command, so no `GET` route
+creates a subscription, a grant or an audit row. A read that writes makes a
+retried or prefetched request inflate the audit trail, and no `GET` in this
+repository has ever written. Story #69 owns the command.
 
 **They converge on the same invariants** because both go through the same index
 and the same CHECK constraints. Neither is allowed to be the "real" one.
@@ -235,6 +251,16 @@ already uses.
 
 Immediate rather than future-effective, because a future-effective change needs
 something to make it take effect later — a scheduler, which nobody has approved.
+
+**Amended 2026-09-03 (`V33-DEC-019`) — a defect this section did not anticipate.**
+The compare-and-swap above protects a transition, and `selectPlanVersion` guards
+it with `if (current)`. When a party holds NO active subscription there is no row
+to contend over: two concurrent first selections both reach a bare insert, and
+`uq_seller_subscriptions_one_active_per_party` refuses one as an untranslated
+`QueryFailedError` — an HTTP 500 rather than a refusal. The invariant holds; the
+error does not. Story #69 repairs it by ensuring the base subscription
+transactionally before selection, so a row always exists and the swap always
+arbitrates. No schema change is authorized for it.
 
 ### 8. Grants: once, from the snapshot, and written even when they are zero
 

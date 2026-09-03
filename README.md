@@ -98,7 +98,7 @@ overage), and Story #40 was decomposed from one 13-point item into four:
 |---|---:|---|
 | #40 (`#40a`) | 8 | Admin-versioned plan and price catalogue — immutable versions, non-overlapping activation windows, tier schedules, the `D-7` zero-price base workspace, the `bc_manage_commercial_plans` capability, audit with a mandatory reason |
 | #56 (`#56a`) | 8 | Subscription foundation: snapshotted subscriber party, `D-7` backfill and lazy ensure, plan-included grants. No seller-facing route |
-| #69 (`#56b`) | 5 | Seller subscription surface: own subscription, history, zero-price selection and cancellation, `bc_manage_own_subscription` |
+| #69 (`#56b`) | 8 | Seller subscription surface: a workspace collection reached by an opaque `workspaceRef`, explicit initialization, history, zero-price selection and cancellation |
 | #57 (`#40c`) | 5 | Custom booking-credit purchase and immutable price snapshots |
 | #58 (`#40d`) | 8 | Atomic consumption at first `confirmed` and idempotent return |
 
@@ -106,6 +106,12 @@ overage), and Story #40 was decomposed from one 13-point item into four:
 8 points as the foundation, and #69 carries the 5-point seller surface, so the
 foundation can land with no seller-facing route while the capability and
 audit-charter questions that only affect those routes are settled.
+
+#56 shipped on 2026-09-03. #69 was re-estimated to 8 points the same day by
+`V33-DEC-019`, which rejected its singular `/me/subscription` contract: one user
+may own both a professional and a business workspace, so a singular route has no
+answer that is not a silent choice. It becomes a workspace collection reached by
+an opaque, server-issued `workspaceRef`.
 
 Prices, included allowances, bounds, cutoffs, legal copy and accounting treatment stay
 open under issue #46, and real money movement stays blocked by #47. No allowance may
