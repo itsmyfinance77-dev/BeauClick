@@ -8,10 +8,20 @@ This connection now resolves `marabi766/BeauClick` (the owner recorded by every 
 
 ## Last sync
 
-date: 2026-09-02T04:20:00Z
-commit: repository `master@1e5f519177b4491662cb1a4c57eb2e9035934b69`. Correction: this commit/PR #54 was produced by Story #13 (the Referral adversarial test suite) — it is the repository baseline this Story #14 design sync is read against, not Story #14 itself.
+date: 2026-09-02T20:41:00Z
+commit: `itsmyfinance77-dev/BeauClick@master` resolved to `12c92f974529...`, identical to the baseline commit named in this pass's sync brief. `origin/master` had not advanced past it.
 
-### V3.2-C Story #14 — Referral design synchronisation (this pass, design workspace only — no repo write)
+### V3.3-A Story #40 (`#40a`) — admin commercial plan and price catalogue sync (this pass, design workspace only — no repo write)
+
+- Read the real merged implementation: `docs/roadmap/v3/adr/ADR-041-commercial-plan-and-price-catalogue.md`, `v3/packages/commercial-policy-contract/src/{commercial-catalogue-contract.ts, commercial-policy-contract.ts}`, `v3/services/commercial-policy/src/catalogue/{commercial-catalogue.controller.ts, .service.ts, .dto.ts, .entities.ts, .exceptions.ts, commercial-subject-data.contract.ts, base-workspace-is-not-a-code-path.spec.ts}`, `v3/services/commercial-policy/src/commercial-policy-control.gate.ts`, `v3/database/migrations/commercial/20260902800001_create_commercial_catalogue.sql`, `v3/database/migrations/identity/20260902800002_add_commercial_plan_capability.sql`, `v3/libs/auth/src/{capability.guard.ts, privileged-capability.port.ts}`.
+- **Contradiction found and reported, not silently corrected:** the sync brief states "16 administrator routes"; the merged controller declares 18. Designed against the real 18 — full table in `40_ADMIN_COMMERCIAL_CATALOGUE.md` §1.
+- **Not read:** GitHub Issue #40's thread and PR #66's review conversation — no tool in this workspace reads GitHub Issues/PRs. Cross-checked instead against ADR-041 (which restates the issue's asks line-by-line) and the capability catalog's "Delivered 2026-09-02" entry, which agree with the merged code.
+- Added `docs/design/screens/40_ADMIN_COMMERCIAL_CATALOGUE.md`; added `Prototype - Pro and Admin.dc.html` §19 (plan catalogue list, D-7 base-workspace card, plan-version table, create-draft form matching `WritePlanVersionDto`, dirty/save/conflict states, publish/retire dialogs with mandatory reason and frozen-terms summary, price-schedule tier editor with gap/overlap/invalid-boundary errors, permission-required/access-revoked states).
+- Preserved exactly: no plan name, allowance, price, billing term, seat/location count, or capability bundle invented anywhere — every number in the forms is labeled SAMPLE; D-7's real seeded facts (published, zero price, auto-assignable, zero/empty entitlements) are the only non-sample values shown. No seller-facing route or screen exists upstream, so none was designed.
+- Customer prototype, seller-facing screens, and Referral (Story #14) untouched — confirmed no Story #40a customer-facing contract exists (there is none: every route requires `bc_manage_commercial_plans`, which no seller role holds).
+- No production repository code changed; no commit, issue, or branch touched.
+
+### V3.2-C Story #14 — Referral design synchronisation (previous pass, design workspace only — no repo write)
 
 - Read the real contract before designing: `packages/referral-contract/src/referral-contract.ts`, `services/referral/src/{referral.controller.ts, referral.service.ts, referral.exceptions.ts, referral-reward.config.ts, referral-code.generator.ts, referral-qualification.service.ts, referral-reversal.service.ts, referral.module.ts, entities/referral.entities.ts}`, `libs/event-contracts/src/catalog/referral.events.ts`, `apps/api/src/events/{referral-qualification.handlers.ts, referral-reversal.handlers.ts}`, `services/notification/src/templates/template.registry.ts`, ADR-035, ADR-037, ADR-038, `V3.2_DECISION_REGISTER.md` (`V32-DEC-016`–`019`, `033`, `034`).
 - **Central finding:** only two routes exist (`GET /v1/me/referral/code`, `POST /v1/me/referral/claim`). No route reads a *persistent* lifecycle status, reward grant, reversal, or cap counter — pending qualification, expired, and capped (3 of the 10 requested states) have no data source at all. Qualified and reversed are narrower: `template.registry.ts` defines four real, implemented notification templates (verbatim Persian subject/body, deep-linked to `/referral`) that do deliver both facts once, honestly, through the existing Notifications surface (§18) — what is missing is a persistent status screen, plus the narrower, optional `REFERRAL-NOTIFICATION-OUTCOME-VARS` gap (empty `vars` means the notification cannot yet distinguish `capped`/`disabled_zero`/`awarded`).
@@ -143,6 +153,7 @@ commit at that time: d2e11ea0f0f760c850997182f900748923e7418b (V3.2-B chat imple
 
 ## Sync history
 
+- 2026-09-02T20:41:00Z — V3.3-A Story #40 (`#40a`) admin commercial plan and price catalogue sync (route-to-screen matrix for the real 18 admin routes — brief said 16, corrected; plan/schedule catalogue, D-7 base-workspace card, create-draft form, publish/retire dialogs, tier editor; `40_ADMIN_COMMERCIAL_CATALOGUE.md`, Pro/Admin §19) @12c92f974529... (baseline unchanged from brief).
 - 2026-09-02T04:20:00Z — V3.2-C Story #14 Referral design synchronisation (own-code/share + claim box + one-time attributed reveal + collapsed refusal/throttle + distinct 400 + real notification templates; `39_REFERRAL.md`, Customer §20; central finding: no persistent status-read route exists for pending/expired/capped; qualified/reversed reach the customer once via real, implemented notification copy) @1e5f519177b4491662cb1a4c57eb2e9035934b69 (Story #13/PR #54 baseline).
 - 2026-09-01T12:00:00Z — Logo exploration, 10 concepts (pure design-workspace brand exploration; new `BeauClick Logo Explorations — 10 Concepts.dc.html` + 10 SVG sources; both prior logo assets confirmed untouched). No repo read/write.
 - 2026-08-31T16:30:00Z — V3.2-C Story #10 closure pass (exact-commit audit vs master@462dd4d7f1a87ba01b46778c5490f2e72a05146b, Story #8@9aa59c0, Story #9@240c2dd; closed the 01_SEARCH/02_PROVIDER_PROFILE/§19-states/handoff-§29 gaps).
