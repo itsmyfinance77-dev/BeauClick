@@ -28,7 +28,7 @@ delivering its Story Points never creates a tag and never enables production.
 | V3.2-E | B2B Quotes and Campaigns | Owner-gated; payment gate applies to settlement | Not applicable | Not enabled |
 | V3.2-F | Payout and Calendar Automation | Predominantly external-gated | Not applicable | Not enabled |
 | V3.2-G | Evidence-Gated Scale | No commitment without evidence | Not applicable | Not enabled |
-| V3.3 | Product Maturity Programme | Active foundation: #39 and #40 (`#40a`) complete; epic #38 in progress; #56, #57 and #58 not started | No tag authorized | Real money blocked by #47; unresolved values/copy blocked by #46 |
+| V3.3 | Product Maturity Programme | Active foundation: #39 and #40 (`#40a`) complete; epic #38 in progress; #56 (`#40b`) split into #56 (`#56a`) and #69 (`#56b`) by `V33-DEC-018`; #56, #69, #57 and #58 not started | No tag authorized | Real money blocked by #47; unresolved values/copy blocked by #46 |
 | V3.4 | Conditional Expansion Programme | Written owner decision and evidence required | Not applicable | Not enabled |
 
 V3.2-A and V3.2-B are completed historical milestones but are deliberately
@@ -98,10 +98,18 @@ delivered as one 13-point item:
 | Item | Before | After | Outcome it owns |
 |---|---:|---:|---|
 | #40 (`#40a`) | 13 | 8 | Admin-versioned plan and price catalogue: immutable versions, activation windows, tier schedules, the `D-7` zero-price base workspace, administrator capability, audit and mandatory reason. No seller-facing purchase or consumption. |
-| #56 (`#40b`) | — | 8 | Seller subscription lifecycle and plan-included grants. Depends on #40. No payment collection. |
+| #56 (`#56a`) | — | 8 | Subscription foundation: schema, snapshotted subscriber party, `D-7` backfill and lazy ensure, plan-included grants, audit and privacy. Depends on #40. **No seller-facing route.** No payment collection. |
+| #69 (`#56b`) | — | 5 | Seller subscription surface: the caller's own subscription, history, published plans, zero-price selection and cancellation, `bc_manage_own_subscription`. Depends on #56. No paid activation. |
 | #57 (`#40c`) | — | 5 | Custom booking-credit purchase and immutable price snapshots. Depends on #40. No gateway or recurring billing. |
 | #58 (`#40d`) | — | 8 | Atomic consumption at first `confirmed` and idempotent return. Depends on #56, #57 and Story #41's zero-online-collection confirmation path. |
-| **Total** | **13** | **29** | Net V3.3 scope movement **+16**. |
+| **Total** | **13** | **34** | Net V3.3 scope movement **+21**. |
+
+`#40b` was split a second time on 2026-09-03 (`V33-DEC-018`), after the Story #56
+readiness audit found it bundled two separately deliverable outcomes. #56 keeps
+its 8 points and its number as the foundation; #69 (`#56b`) carries the 5-point seller
+surface. The foundation is provable end to end with no seller-facing route at
+all, so it can land while the capability and audit-charter questions that only
+affect those routes are still being settled.
 
 This is **scope discovery, not velocity loss**. The original 13 points estimated
 one story that could not have satisfied its own Definition of Ready: three of
@@ -147,7 +155,7 @@ property so no production code names it; the privileged
 with a mandatory reason written in each mutation's own transaction.
 
 What it deliberately did not deliver: any seller-facing subscription, purchase,
-grant, consumption or return (#56, #57, #58); any recurring billing, gateway or
+grant, consumption or return (#56, #69, #57, #58); any recurring billing, gateway or
 external provider; any commercial event or `ServiceName` member; any frontend; and
 any production price. No allowance, including 200, exists as a code constant,
 default, fallback or seed, and a repository check enforces that rather than a

@@ -67,7 +67,7 @@ function assertDecisionSequence(file, prefix, expected) {
 }
 
 assertDecisionSequence('docs/roadmap/v3.2/V3.2_DECISION_REGISTER.md', 'V32-DEC-', 36);
-assertDecisionSequence('docs/roadmap/v3.3/V3.3_DECISION_REGISTER.md', 'V33-DEC-', 17);
+assertDecisionSequence('docs/roadmap/v3.3/V3.3_DECISION_REGISTER.md', 'V33-DEC-', 18);
 
 const adrFiles = readdirSync(resolve(root, 'docs/roadmap/v3/adr'))
   .map((name) => /^ADR-(\d{3})-.*\.md$/.exec(name))
