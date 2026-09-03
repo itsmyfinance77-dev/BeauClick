@@ -1089,14 +1089,19 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
       // evaluator over just this schema, so a failure names this story.
       const rows: Array<{ schema: string; name: string; columns: string[] }> = await dataSource.query(
         `SELECT t.schemaname AS schema, t.tablename AS name,
-                array_agg(c.column_name ORDER BY c.ordinal_position) AS columns
+                array_agg(c.column_name::text ORDER BY c.ordinal_position) AS columns
            FROM pg_tables t
            JOIN information_schema.columns c
              ON c.table_schema = t.schemaname AND c.table_name = t.tablename
           WHERE t.schemaname = 'commercial'
           GROUP BY t.schemaname, t.tablename`,
       );
-      expect(rows).toHaveLength(5);
+      // Seven since V3.3-A Story #56 (`#56a`) added `seller_subscriptions` and
+      // `booking_credit_grants` to this schema. The count is asserted exactly,
+      // rather than loosened to a minimum, because an exact number is what
+      // makes a table added without a subject-data claim fail HERE with a
+      // readable message instead of at application boot.
+      expect(rows).toHaveLength(7);
 
       const contracts = app.get<SubjectDataContract[]>(SUBJECT_DATA_CONTRACTS);
       const report = evaluateCoverage(rows, contracts);

@@ -405,6 +405,19 @@ export async function createPgTestApp(envOverrides: Record<string, string> = {})
  * schema really is.
  */
 export const RESETTABLE_TABLES = [
+  // V3.3-A Story #56 (`#56a`). The subscription foundation, BEFORE the
+  // catalogue it references and children first within itself: a grant
+  // references a subscription, and a subscription references a plan version and
+  // a price schedule version.
+  //
+  // TRUNCATE bypasses `tg_seller_subscriptions_immutable` and
+  // `tg_booking_credit_grants_immutable` -- it is not an UPDATE or a DELETE, so
+  // no row trigger fires. That is what a reset needs and is NOT a hole in the
+  // immutability guarantee: the application role reaches these tables only
+  // through the service, and the suites that clear them are the ones proving
+  // the triggers refuse every write that goes through it.
+  'commercial.booking_credit_grants',
+  'commercial.seller_subscriptions',
   // V3.3-A Story #40 (`#40a`). The plan and price catalogue, children first:
   // `price_tiers` references a schedule version, and a plan version references
   // both a plan key and a schedule version.
