@@ -5,6 +5,17 @@
 **Relates to:** ADR-011 (repository architecture / module boundaries), ADR-017 (financial isolation).
 **Closes:** the "Business seller party" item Phase 3 explicitly left as `LATER`; GAP-13 (flat staff model), partially.
 
+**Amended 2026-09-04 (`V33-DEC-021`):** one sentence in *"`owner` is not a
+`business_staff` role"* below said V3 never grants the identity-level
+`professional`/`business` roles dynamically. That was an accurate description of
+V3 at the time and became a defect once Story #69 shipped a route that enforces
+a capability only those roles carry (#75). The owner ratified `V33-DEC-021` on
+this date: the roles are now granted atomically on OWNERSHIP CREATION. The
+sentence is annotated in place and superseded **only to that extent** — the
+financial-party model, the structural consent rule, the one-active-affiliation
+invariant and every consequence recorded here stand unchanged, and
+`business_staff` still grants no `business` role.
+
 ## Context
 
 Phase 1 scoped Business entities out entirely, recording the open question honestly: "Business (a structurally similar but distinct V2 CPT, not one-owner-per-profile once staff exist) is deliberately out of this phase." Phase 2 and 3 both built financial-service and commerce's order model already *typed* `sellerPartyType: 'professional' | 'business'` and `FinancialParty.partyType` the same way — the shape was anticipated, but every real code path hardcoded `'professional'`.
@@ -49,6 +60,36 @@ A `business_staff` row always starts `invited`, created by someone who is **not*
 
 The owner is `BusinessEntity.ownerId` — a raw identity id, exactly `ProfessionalEntity.ownerId`'s own pattern (self-service creation, ownership-gated, no dynamic identity-role grant required; V3 never populates `identity.users.roles` dynamically for `professional` either — see the account-resolver's `roles: ['customer']`-only reality). An owner is never a row that could be edited, removed, or raced against by the authorization code that governs everyone else.
 
+**Amended 2026-09-04 (`V33-DEC-021`) — the parenthesis above is superseded, the
+sentence around it is not.** "No dynamic identity-role grant required" described
+V3 accurately until Story #69 enforced `bc_manage_own_subscription`, a capability
+carried only by the `professional` and `business` roles. Account creation grants
+only `customer`, so a genuine seller was refused `403` on every subscription
+mutation — an active API-path defect, recorded as #75.
+
+Four statements now hold together, and the distinction between the first two is
+the one this ADR was already drawing:
+
+- **beneficiary resolution may follow affiliation.** §3 above is unchanged: an
+  affiliated professional's earnings belong to the business. That is
+  attribution, and it answers *whose money is this?*
+- **seller workspace authorization follows ownership.** It answers *who may act
+  on this workspace?* — a different question, settled by `V33-DEC-020` for
+  finance and by `V33-DEC-021` here.
+- **owner role assignment follows ownership creation.** `ProviderService.create`
+  and `BusinessService.create` grant the matching role atomically, in their own
+  existing transaction, through a composition-root port. Verification is not the
+  trigger; a caller-supplied field never is.
+- **`business_staff` never grants a `business` role.** Manager and staff alike.
+  The owner is still `BusinessEntity.ownerId` and still never a row in that
+  table, which is exactly what makes the ownership predicate a lookup rather
+  than a policy decision.
+
+What does **not** change: the role is never sufficient authorization. Every
+seller route keeps authentication, its declared capability, live ownership and
+any lifecycle predicate it already had. A role held without ownership resolves
+no party and reaches nothing.
+
 ## Consequences
 
 - **Positive:** zero risk to booking/availability's existing, hard-won concurrency guarantees. The riskiest code in the platform was not touched.
@@ -60,3 +101,7 @@ The owner is `BusinessEntity.ownerId` — a raw identity id, exactly `Profession
 
 - **Invite-by-email/lookup.** `InviteStaffDto.userId` requires the owner to already know the invitee's identity user id. A directory/lookup flow is real product work with its own privacy questions (can any authenticated user search for any other by phone/email?) that this phase did not scope.
 - **A business-scoped capability system reusing `CAPABILITIES_BY_ROLE`.** Business authorization is entirely local to `services/business` (owner/manager/staff resolved from `business_staff`, not from the identity-level role/capability map), matching how professional-service's ownership-based authorization already works independent of that map.
+  *Amended 2026-09-04 (`V33-DEC-021`): still true, and now load-bearing.* #75
+  adds a GLOBAL role for the business OWNER and touches none of this
+  intra-business model. The two systems stay disjoint, and business-scoped staff
+  roles and permissions remain Story #44's territory.
