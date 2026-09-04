@@ -105,6 +105,38 @@ export class SubscriptionChangedConcurrentlyException extends DomainException {
 }
 
 /**
+ * The party is already on exactly these terms.
+ *
+ * Story #69 (`V33-DEC-019`): selecting the currently active plan version
+ * returns `selection_already_applied` and writes no subscription, no grant and
+ * no audit row.
+ *
+ * ## Why a refusal rather than a 200 echoing the unchanged workspace
+ *
+ * `V33-DEC-019` groups this with `subscription_changed_concurrently` and
+ * `paid_activation_unavailable` as outcomes that "stay distinct, because each
+ * names an outcome the caller can act on". The other two are refusals, and a
+ * vocabulary where one member is a status code and the others are error codes
+ * is a vocabulary a client has to special-case. So this is the same shape they
+ * are: a `409`, because the request was well-formed and authorized and the
+ * conflict is with the state, not the input.
+ *
+ * The asymmetry with CANCELLATION is deliberate and is not an oversight.
+ * Cancelling while the base workspace is already active is a genuine no-op that
+ * returns the unchanged workspace with a `200`, because the ratified vocabulary
+ * contains no code for it — and inventing one would widen a closed list.
+ */
+export class SubscriptionSelectionAlreadyAppliedException extends DomainException {
+  constructor() {
+    super(
+      'SUBSCRIPTION_SELECTION_ALREADY_APPLIED',
+      'این نسخه از طرح هم‌اکنون برای شما فعال است.',
+      HttpStatus.CONFLICT,
+    );
+  }
+}
+
+/**
  * No automatically assignable published plan version is active at this instant.
  *
  * `V33-DEC-018` and ADR-041 §6: there is deliberately no fallback. A platform

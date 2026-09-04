@@ -202,18 +202,92 @@ export class SellerSubscriptionService {
     version: number,
     actorUserId: string,
   ): Promise<SellerSubscriptionEntity> {
+    return (await this.applyPlanSelection(party, planKey, version, actorUserId)).subscription;
+  }
+
+  /**
+   * The same operation, reporting WHICH outcome occurred.
+   *
+   * Story #69 needs to tell a seller that their selection was already applied
+   * (`selection_already_applied`), and `selectPlanVersion` above cannot say so
+   * — it returns the active row either way, which is the right domain contract
+   * and an ambiguous one for a route. Rather than duplicate the transaction,
+   * `selectPlanVersion` delegates here and discards the discriminator, so
+   * `#56a`'s contract is unchanged and there is exactly one implementation.
+   *
+   * The refusal itself is raised by the ROUTE, not here. A domain method that
+   * threw on a replay would make `selectPlanVersion`'s documented "returns the
+   * active row" impossible to honour, and #56a's suite asserts that behaviour
+   * directly.
+   *
+   * ## The `#56a` first-selection race, repaired here
+   *
+   * `V33-DEC-019` records the defect: this method used to read `current`, find
+   * NOTHING when the party had no subscription yet, skip the supersede
+   * entirely, and insert an active row with `onConflict: 'throw'`. Two
+   * concurrent first selections therefore both inserted, and
+   * `uq_seller_subscriptions_one_active_per_party` refused one — as a raw
+   * `QueryFailedError`, which reached the client as an untranslated 500.
+   *
+   * The fix is the `ensureBaseSubscriptionWithin` call below, and it is a fix
+   * rather than a retry loop because of WHERE it sits: inside this
+   * transaction, before the read. Afterwards `current` is never null, so the
+   * compare-and-swap in `transition` always runs, and the loser of a race gets
+   * `affected === 0` and the translated `SUBSCRIPTION_CHANGED_CONCURRENTLY`
+   * that every other concurrent change already produced.
+   *
+   * No schema change was needed and none is authorized: the existing partial
+   * unique index is what serialises the two ensures, and the existing
+   * compare-and-swap is what serialises the two selections. The defect was that
+   * one code path walked past both.
+   */
+  async applyPlanSelection(
+    party: OwnedSubscriberParty,
+    planKey: string,
+    version: number,
+    actorUserId: string,
+  ): Promise<{ outcome: 'selected' | 'already_applied'; subscription: SellerSubscriptionEntity }> {
     return this.dataSource.transaction(async (manager) => {
+      // Eligibility BEFORE the plan lookup (`V33-DEC-019`). An ineligible
+      // caller must not be able to probe which plan versions exist by comparing
+      // which refusal comes back.
       if (!(await this.parties.isEligible(manager, party))) {
         throw new SubscriptionSellerNotEligibleException();
       }
 
-      const target = await this.requireSelectableVersion(manager, planKey, version);
-      const current = await this.findActive(party, manager);
+      /*
+       * Read BEFORE the ensure, and that ordering is what makes the two
+       * outcomes below distinguishable.
+       *
+       * `already_applied` must mean "you already held these terms and nothing
+       * was written". A seller who holds NOTHING and selects the base plan
+       * version is a different case with the same end state: the ensure just
+       * delivered exactly what they asked for, so that is a real selection with
+       * a real audit row, and reporting it as a replay would be a lie about
+       * what the request did.
+       */
+      const existing = await this.findActive(party, manager);
 
-      // Idempotent replay: already on these exact terms. Nothing is written and
-      // nothing is audited, so a retried request leaves one row and one audit
-      // trail rather than two.
-      if (current && current.planVersionId === target.id) return current;
+      /*
+       * The race repair, and the source of `current`.
+       *
+       * `ensureBaseSubscriptionWithin` RETURNS the party's active subscription
+       * either way — the one that was already there, or the base workspace it
+       * just assigned, or the winner's row when it lost the insert race. So
+       * this is both the fix and the read, and there is no branch in which
+       * `current` can be null. That is what guarantees the compare-and-swap
+       * below always runs.
+       */
+      const current = await this.ensureBaseSubscriptionWithin(manager, party);
+
+      const target = await this.requireSelectableVersion(manager, planKey, version);
+
+      if (current.planVersionId === target.id) {
+        return {
+          outcome: existing ? 'already_applied' : 'selected',
+          subscription: current,
+        };
+      }
 
       /*
        * The successor's id is generated BEFORE either row is written.
@@ -227,9 +301,11 @@ export class SellerSubscriptionService {
        */
       const successorId = uuidv7();
 
-      if (current) {
-        await this.supersede(manager, current, successorId, SUBSCRIPTION_AUDIT_REASONS.supersededBySelection);
-      }
+      // UNCONDITIONAL, where it used to be `if (current)`. That guard was the
+      // `#56a` defect: it is exactly the branch two concurrent first selections
+      // both took, past the only compare-and-swap on this path. `current` can
+      // no longer be null, so the swap is no longer skippable.
+      await this.supersede(manager, current, successorId, SUBSCRIPTION_AUDIT_REASONS.supersededBySelection);
 
       // Never null: `onConflict` defaults to 'throw', so a conflict raises
       // rather than returning, and the non-null assertion cannot be reached by
@@ -242,7 +318,7 @@ export class SellerSubscriptionService {
         reason: SUBSCRIPTION_AUDIT_REASONS.planVersionSelected,
         actorUserId,
       });
-      return created as SellerSubscriptionEntity;
+      return { outcome: 'selected', subscription: created as SellerSubscriptionEntity };
     });
   }
 
@@ -255,9 +331,53 @@ export class SellerSubscriptionService {
    * the state where the platform has to guess what a seller is entitled to.
    */
   async cancel(party: OwnedSubscriberParty, actorUserId: string): Promise<SellerSubscriptionEntity> {
+    return (await this.applyCancellation(party, actorUserId)).subscription;
+  }
+
+  /**
+   * The same operation, reporting whether there was anything to cancel.
+   *
+   * ## Cancelling the base workspace is a NO-OP, not a cancel-and-recreate
+   *
+   * Story #69 requires it by name, and the reason is not tidiness. The
+   * cancel-then-restore path below writes four rows — a cancellation, its audit
+   * record, a fresh base subscription and its grant — and applied to a party
+   * that is ALREADY on the base workspace it produces exactly the state it
+   * started in, with a cancellation in the permanent history that no seller
+   * performed against terms they had not chosen. Repeat it and the history
+   * grows without bound, each entry a lie about a decision.
+   *
+   * So a party already on the base workspace gets its current subscription back
+   * unchanged, and nothing is written or audited.
+   *
+   * ## "Already on the base workspace" is read from the VERSION, not a name
+   *
+   * `auto_assignable` is an immutable property of the plan version the
+   * subscription points at, and `ex_plan_versions_single_auto_assignable`
+   * guarantees at most one is active at an instant. So the question is answered
+   * by the row rather than by comparing against `D-7`, which appears in no
+   * production code (ADR-041 §6) — and it stays correct for a party still
+   * holding a base version that has since been superseded by a newer one.
+   *
+   * ## Why this returns an outcome instead of raising a refusal
+   *
+   * The ratified vocabulary (`V33-DEC-019`) contains `selection_already_applied`
+   * and no cancellation equivalent. Inventing one would widen a closed list, so
+   * the no-op is reported as what it is: a successful request whose answer is
+   * the unchanged workspace. The asymmetry with selection is recorded in
+   * `SubscriptionSelectionAlreadyAppliedException`.
+   */
+  async applyCancellation(
+    party: OwnedSubscriberParty,
+    actorUserId: string,
+  ): Promise<{ outcome: 'cancelled' | 'already_base'; subscription: SellerSubscriptionEntity }> {
     return this.dataSource.transaction(async (manager) => {
       const current = await this.findActive(party, manager);
       if (!current) throw new SubscriptionSellerNotEligibleException();
+
+      if (await this.isBaseSubscription(manager, current)) {
+        return { outcome: 'already_base', subscription: current };
+      }
 
       await this.transition(manager, current, 'cancelled', {
         cancelledAt: new Date(),
@@ -283,11 +403,34 @@ export class SellerSubscriptionService {
         reason: SUBSCRIPTION_AUDIT_REASONS.baseWorkspaceRestored,
         actorUserId: null,
       });
-      return restored as SellerSubscriptionEntity;
+      return { outcome: 'cancelled', subscription: restored as SellerSubscriptionEntity };
     });
   }
 
   // -------------------------------------------------------------- internals
+
+  /**
+   * Whether this subscription IS the base workspace.
+   *
+   * Answered from `plan_versions.auto_assignable`, which is the mechanism
+   * ADR-041 §6 defines the base workspace by, rather than from the snapshot's
+   * plan key — the snapshot deliberately does not carry `auto_assignable`,
+   * and adding it would be the schema change this story is not authorized to
+   * make.
+   */
+  private async isBaseSubscription(
+    manager: EntityManager,
+    subscription: SellerSubscriptionEntity,
+  ): Promise<boolean> {
+    const version = await manager
+      .getRepository(CommercialPlanVersionEntity)
+      .findOne({ where: { id: subscription.planVersionId }, select: { id: true, autoAssignable: true } });
+
+    // A subscription whose plan version has vanished is not evidence that the
+    // seller is on the base workspace, so this fails towards "not base" and the
+    // ordinary cancellation path runs.
+    return version?.autoAssignable === true;
+  }
 
   /**
    * Insert an active subscription with a full snapshot, and issue its grant.
