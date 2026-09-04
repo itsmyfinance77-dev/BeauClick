@@ -28,7 +28,7 @@ delivering its Story Points never creates a tag and never enables production.
 | V3.2-E | B2B Quotes and Campaigns | Owner-gated; payment gate applies to settlement | Not applicable | Not enabled |
 | V3.2-F | Payout and Calendar Automation | Predominantly external-gated | Not applicable | Not enabled |
 | V3.2-G | Evidence-Gated Scale | No commitment without evidence | Not applicable | Not enabled |
-| V3.3 | Product Maturity Programme | Active foundation: #39, #40 (`#40a`) and #56 (`#56a`) complete; epic #38 in progress; #69 (`#56b`) contract corrected and re-estimated to 8 by `V33-DEC-019`; #69, #57, #58 and #72 not started | No tag authorized | Real money blocked by #47; unresolved values/copy blocked by #46 |
+| V3.3 | Product Maturity Programme | Active foundation: #39, #40 (`#40a`), #56 (`#56a`) and #69 (`#56b`) complete; epic #38 in progress; #72 security and contract closed by `V33-DEC-020` and re-estimated to 8; #57, #58 and #72 not started | No tag authorized | Real money blocked by #47; unresolved values/copy blocked by #46 |
 | V3.4 | Conditional Expansion Programme | Written owner decision and evidence required | Not applicable | Not enabled |
 
 V3.2-A and V3.2-B are completed historical milestones but are deliberately
@@ -164,3 +164,31 @@ reviewer having to.
 #46 and #47 are untouched. Every commercial value remains open, and closing the
 base-workspace definition under #46 will publish a NEW `D-7` version rather than
 edit the seeded one, because the model forbids editing.
+
+## V3.3 Bug #72 re-estimated, 2026-09-04
+
+5 -> 8 Story Points, by
+[`V33-DEC-020`](../roadmap/v3.3/V3.3_DECISION_REGISTER.md). Not a re-scoping: the
+readiness audit found a **second defect** on the same boundary as the filed one,
+and the two cannot be fixed apart.
+
+The filed defect is that `/api/v1/me/finance` resolves one party per caller,
+business-first, so a dual owner cannot reach their professional earnings. The
+second is that the same resolver follows an active `business_staff` affiliation,
+so an affiliated professional reads the **employing business's** receivable,
+settlement, outstanding balance and ledger. Both come from using
+beneficiary/seller-party resolution as read authorization, which is correct for
+attribution (ADR-023 §3) and wrong for permission.
+
+The decision keeps #72 as one issue, adds the additive workspace-aware route
+family alongside the four singular routes, and reuses Story #69's `workspaceRef`
+unchanged through a shared, domain-neutral primitive. It requires no migration,
+writes no row of any kind, and deliberately does **not** enforce
+`bc_view_own_finance` — no complete production role-grant lifecycle makes that
+capability reliably present in a seller's token, so enforcing it would lock
+legitimate sellers out.
+
+That capability gap is recorded as **#75** rather than folded in: the seller
+capabilities exist, but account resolution assigns only `customer` and no
+self-service path grants `professional` or `business`, so every seller
+capability is currently inert. #57, #58, #41, #46 and #47 are untouched.
