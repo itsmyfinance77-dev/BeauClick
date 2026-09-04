@@ -111,7 +111,19 @@ audit-charter questions that only affect those routes are settled.
 `V33-DEC-019`, which rejected its singular `/me/subscription` contract: one user
 may own both a professional and a business workspace, so a singular route has no
 answer that is not a silent choice. It becomes a workspace collection reached by
-an opaque, server-issued `workspaceRef`.
+an opaque, server-issued `workspaceRef`. #69 shipped on 2026-09-04.
+
+The same readiness audit found the pattern already shipped on the finance
+surface, and `V33-DEC-020` closed it on 2026-09-04. `/api/v1/me/finance`
+resolves one party per caller, business-first, so a dual owner cannot reach
+their professional earnings — and the same resolver follows staff affiliation,
+so an affiliated professional can read the employing business's financial
+position. **Staff affiliation is not financial ownership:** finance reads move to
+live ownership only, the workspace-aware routes reuse #69's `workspaceRef`
+unchanged through a shared primitive, and the four singular routes stay,
+corrected, refusing with `finance_workspace_selection_required` rather than
+choosing a workspace for the caller. Tracked as #72, re-estimated to 8 points,
+not yet started.
 
 Prices, included allowances, bounds, cutoffs, legal copy and accounting treatment stay
 open under issue #46, and real money movement stays blocked by #47. No allowance may
