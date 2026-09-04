@@ -11,5 +11,6 @@ export * from './auth/refresh-cookie';
 export * from './auth/csrf';
 export * from './entities/role.entities';
 export * from './rbac/role.service';
+export * from './rbac/owner-role.audit';
 export * from './admin/phone-conflict.service';
 export * from './identity-subject-data.contract';
