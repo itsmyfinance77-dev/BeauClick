@@ -225,6 +225,34 @@ export class LedgerService {
     return this.dataSource.getRepository(LedgerEntryEntity).find({ where: { orderId }, order: { id: 'ASC' } });
   }
 
+  /**
+   * One order's ledger rows FOR ONE PARTY — V3.3 #72, `V33-DEC-020`.
+   *
+   * The party predicate is in the WHERE clause, not applied afterwards.
+   * `MyFinanceService.myLedgerForOrder` used to call `entriesForOrder` above and
+   * filter the result in JavaScript, which produced the right answer and the
+   * wrong shape: every row of the order — the platform's commission row and any
+   * other party's receivable — was loaded into the process before being
+   * discarded. `V33-DEC-020` requires the workspace to scope the query at the
+   * predicate rather than filter an already-loaded cross-workspace result.
+   *
+   * `ix_ledger_entries_party` covers `(party_type, party_id)`, so this is a
+   * narrower read as well as a safer one.
+   *
+   * An order belonging to another party returns `[]`, exactly like an order that
+   * does not exist.
+   */
+  async entriesForOrderAndParty(
+    orderId: string,
+    partyType: LedgerPartyType,
+    partyId: string,
+  ): Promise<LedgerEntryEntity[]> {
+    return this.dataSource.getRepository(LedgerEntryEntity).find({
+      where: { orderId, partyType, partyId },
+      order: { id: 'ASC' },
+    });
+  }
+
   /** Net receivable (payments minus refund reversals) for one order. */
   async orderReceivableNet(orderId: string, manager?: EntityManager): Promise<number> {
     return this.sumAmount(manager, 'order_receivable', {

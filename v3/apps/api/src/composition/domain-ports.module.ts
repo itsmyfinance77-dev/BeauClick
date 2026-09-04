@@ -1,5 +1,5 @@
 import { Global, Inject, Logger, Module, OnApplicationShutdown } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 
@@ -7,7 +7,7 @@ import { ProfessionalEntity, ProviderModule, ServiceOfferingEntity } from '@beau
 import { UserEntity } from '@beauclick/identity';
 import { PROFESSIONAL_DIRECTORY } from '@beauclick/booking';
 import { PRICING_RULES, SERVICE_CATALOG } from '@beauclick/commerce';
-import { FINANCIAL_DATA_SOURCE, FINANCIAL_PARTY_RESOLVER } from '@beauclick/financial';
+import { FINANCE_WORKSPACE_OWNER_RESOLVER, FINANCIAL_DATA_SOURCE, FINANCIAL_PARTY_RESOLVER } from '@beauclick/financial';
 import { OWNED_SUBSCRIBER_PARTY_RESOLVER } from '@beauclick/commercial-policy';
 import { PROVIDER_REINDEX_SOURCE } from '@beauclick/search';
 import { RECIPIENT_RESOLVER } from '@beauclick/notification';
@@ -15,10 +15,15 @@ import { ANALYTICS_SUBJECT_RESOLVER } from '@beauclick/analytics';
 import { LoyaltyModule } from '@beauclick/loyalty';
 import { BusinessEntity, BusinessStaffEntity } from '@beauclick/business';
 import { PROFESSIONAL_OWNER_LOOKUP } from '@beauclick/waitlist';
+import {
+  DEVELOPMENT_WORKSPACE_REFERENCE_SECRET,
+  WORKSPACE_REFERENCE_SECRET,
+} from '@beauclick/workspace-reference';
 
 import {
   ProviderBackedFinancialPartyResolver,
   OwnershipBackedSubscriberPartyResolver,
+  OwnershipBackedFinanceWorkspaceResolver,
   ProviderBackedProfessionalDirectory,
   ProviderBackedServiceCatalog,
   SellerPartyLookup,
@@ -76,6 +81,42 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     // V3.3-A #56a. A SECOND party resolver, deliberately not the one above: it
     // resolves ownership only and returns every owned party (ADR-042 §3).
     { provide: OWNED_SUBSCRIBER_PARTY_RESOLVER, useExisting: OwnershipBackedSubscriberPartyResolver },
+    /*
+     * V3.3 #72 (`V33-DEC-020`). The SAME ownership answer, bound a second time
+     * under finance's own token.
+     *
+     * One adapter, two tokens — the arrangement `PROFESSIONAL_DIRECTORY` and
+     * `PROFESSIONAL_OWNER_LOOKUP` already use above, and for the same reason:
+     * `services/financial` may not import `services/commercial-policy`, and a
+     * second implementation of "which parties does this user OWN" is a second
+     * answer to a question that must have exactly one.
+     *
+     * This is deliberately NOT `FINANCIAL_PARTY_RESOLVER`. That one answers
+     * "whose money is this?" and follows staff affiliation, which is correct
+     * for attribution and was the #72 defect when used to decide who may READ.
+     */
+    OwnershipBackedFinanceWorkspaceResolver,
+    { provide: FINANCE_WORKSPACE_OWNER_RESOLVER, useExisting: OwnershipBackedFinanceWorkspaceResolver },
+    /**
+     * The workspace-reference secret, read ONCE for the whole application.
+     *
+     * `V33-DEC-020` shares one reference vocabulary between the subscription
+     * and finance surfaces, so the secret is bound here rather than in each
+     * feature module: two `config.get(...)` calls would be two places a later
+     * edit could point at `JWT_ACCESS_SECRET`, and two copies of the
+     * development fallback.
+     *
+     * `env.validation.ts` independently refuses to boot in production when the
+     * value is missing, too short, a placeholder, or shared with another
+     * secret. This factory does not restate those rules — two implementations
+     * of one rule are one waiting to disagree — and it never logs the value.
+     */
+    {
+      provide: WORKSPACE_REFERENCE_SECRET,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService): string =>
+        config.get<string>('WORKSPACE_REFERENCE_HMAC_SECRET') ?? DEVELOPMENT_WORKSPACE_REFERENCE_SECRET,
+    },
     financialDataSourceProvider,
 
     // Phase 3's ports, global for the same reason as Phase 2's: search,
@@ -118,6 +159,8 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     SERVICE_CATALOG,
     FINANCIAL_PARTY_RESOLVER,
     OWNED_SUBSCRIBER_PARTY_RESOLVER,
+    FINANCE_WORKSPACE_OWNER_RESOLVER,
+    WORKSPACE_REFERENCE_SECRET,
     FINANCIAL_DATA_SOURCE,
     PROVIDER_REINDEX_SOURCE,
     RECIPIENT_RESOLVER,
