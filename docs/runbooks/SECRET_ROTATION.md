@@ -33,6 +33,7 @@ Three shapes:
 |---|---|---|
 | **Instant invalidation** | `JWT_ACCESS_SECRET` | Every issued access token becomes unverifiable. All sessions drop. |
 | **Silent data loss** | `OTP_HMAC_SECRET`, `MEDIA_*_TOKEN_SECRET` | Existing stored hashes and issued tokens can never be verified again. |
+| **Recoverable invalidation** | `WORKSPACE_REFERENCE_HMAC_SECRET` | Every outstanding `workspaceRef` stops resolving. Nothing is lost; clients recover by re-reading the collection. |
 | **Connection-scoped** | `DATABASE_URL`, `FINANCIAL_DATABASE_URL`, `MEDIA_S3_*` | Nothing user-visible if the credential is changed on both sides atomically. |
 
 ---
@@ -76,6 +77,43 @@ seconds.
 Do **not** try to keep the old secret around for a grace period. Two live OTP
 secrets means two valid codes per phone, which is a doubled brute-force
 surface for a five-attempt, six-digit code.
+
+## `WORKSPACE_REFERENCE_HMAC_SECRET`
+
+**Effect:** every outstanding `workspaceRef` stops resolving. No data is lost
+and nothing needs migrating.
+
+V3.3-A Story #69 (`V33-DEC-019`) DERIVES the opaque workspace reference from
+this secret rather than storing it, so rotating the key changes every reference
+the platform would issue. A client holding an old one gets the ordinary
+`SUBSCRIPTION_SELLER_NOT_ELIGIBLE` refusal — the same one a foreign or malformed
+reference gets, because the surface deliberately cannot distinguish them.
+
+**Recovery is a re-read, and clients need no special handling.** The references
+live only in the response a client last fetched; re-issuing them is
+`GET /api/v1/me/subscriptions`, or
+`POST /api/v1/me/subscriptions/initialization`, either of which returns the new
+values. A user whose browser tab predates the rotation sees one refusal, and a
+refresh fixes it.
+
+1. Rotate during a low-traffic window, like any other in-flight invalidation.
+2. Expect a burst of `SUBSCRIPTION_SELLER_NOT_ELIGIBLE` on the subscription
+   routes. It is the rotation, not an authorization fault.
+
+**Single key, deliberately.** `V33-DEC-019` accepted this cost rather than
+building a current/previous-key framework: the repository has no key-schedule
+convention to follow, the reference is NOT a credential — it is not
+authorization, and live ownership is re-verified on every request regardless —
+and the recovery is one idempotent read. A grace window would mean two valid
+references per workspace and a key schedule somebody has to operate, bought
+against a cost measured in one page refresh.
+
+**It must never be set to the value of another secret.** The production
+validator refuses to boot on a shared value, and the reason is specific to this
+key: it is what makes a reference unmintable, so a leak through any other
+purpose would let an attacker forge a reference for any party id they can guess.
+
+---
 
 ## `DATABASE_URL` / `FINANCIAL_DATABASE_URL`
 

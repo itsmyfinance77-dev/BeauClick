@@ -23,6 +23,9 @@ function validProduction(overrides: Record<string, string | undefined> = {}): Re
     FINANCIAL_DATABASE_URL: 'postgres://fin:3Ln8bYc5tWq2eXr6@db.internal:5432/beauclick',
     JWT_ACCESS_SECRET: 'Zk4Rr9Tq2Lm7Wx1Vb6Nc3Hs8Jd5Fg0Py',
     OTP_HMAC_SECRET: 'Qw3Er7Ty1Ui9Op5As2Df8Gh4Jk6Lz0Xc',
+    // V3.3-A Story #69. A DEDICATED value, sharing with nothing above -- the
+    // baseline must not itself be an example of the reuse the rule refuses.
+    WORKSPACE_REFERENCE_HMAC_SECRET: 'Mn6Bv4Cx2Zl8Ka5Sd1Fj7Gh3Rt9Yu0Iq',
     PUBLIC_API_BASE_URL: 'https://api.beauclick.example/api',
     PUBLIC_WEB_BASE_URL: 'https://beauclick.example',
     CORS_ALLOWED_ORIGINS: 'https://beauclick.example',
@@ -78,6 +81,38 @@ describe('validateEnv', () => {
       ['is missing the financial writer URL', { FINANCIAL_DATABASE_URL: undefined }, /FINANCIAL_DATABASE_URL is required/],
       ['is missing the token secret', { JWT_ACCESS_SECRET: undefined }, /JWT_ACCESS_SECRET is required/],
       ['is missing the OTP secret', { OTP_HMAC_SECRET: undefined }, /OTP_HMAC_SECRET is required/],
+      /*
+       * V3.3-A Story #69 (`V33-DEC-019`). Four cases rather than one, because
+       * the story requires all four failure modes to be refused and each is a
+       * different rule in `checkSecrets`.
+       *
+       * The reuse case is the one worth naming: `WORKSPACE_REFERENCE_HMAC_SECRET`
+       * set to the SAME string as `JWT_ACCESS_SECRET` boots happily under any
+       * check that only asks whether a variable is present, and it is exactly
+       * what a hurried operator does when told "add another secret". A leak of
+       * either would then be a leak of both, and the workspace reference's
+       * whole security property is that only the server can mint one.
+       */
+      [
+        'is missing the dedicated workspace-reference secret',
+        { WORKSPACE_REFERENCE_HMAC_SECRET: undefined },
+        /WORKSPACE_REFERENCE_HMAC_SECRET is required/,
+      ],
+      [
+        'has a workspace-reference secret shorter than its own digest',
+        { WORKSPACE_REFERENCE_HMAC_SECRET: 'Mn6Bv4Cx2Zl8Ka5' },
+        /WORKSPACE_REFERENCE_HMAC_SECRET is 15 characters; at least 32 are required/,
+      ],
+      [
+        'carries a placeholder workspace-reference secret',
+        { WORKSPACE_REFERENCE_HMAC_SECRET: 'dev-only-insecure-workspace-reference-secret-override-in-env' },
+        /WORKSPACE_REFERENCE_HMAC_SECRET contains the placeholder text/,
+      ],
+      [
+        'reuses the token secret for workspace references',
+        { WORKSPACE_REFERENCE_HMAC_SECRET: 'Zk4Rr9Tq2Lm7Wx1Vb6Nc3Hs8Jd5Fg0Py' },
+        /These share one secret value and must not: JWT_ACCESS_SECRET, WORKSPACE_REFERENCE_HMAC_SECRET/,
+      ],
 
       [
         'carries the code\'s own development fallback secret',
@@ -184,6 +219,14 @@ describe('validateEnv', () => {
       ['a short secret', { JWT_ACCESS_SECRET: 'Rr9Tq2Lm7Wx1' }],
       ['a placeholder secret', { OTP_HMAC_SECRET: 'changeme-Zk4Rr9Tq2Lm7Wx1Vb6Nc3Hs' }],
       ['a reused secret', { OTP_HMAC_SECRET: 'Zk4Rr9Tq2Lm7Wx1Vb6Nc3Hs8Jd5Fg0Py' }],
+      // V3.3-A Story #69. The workspace-reference secret is held to the same
+      // rule as every other: its VALUE never reaches a message, whichever of
+      // the three ways it is wrong.
+      ['a short workspace-reference secret', { WORKSPACE_REFERENCE_HMAC_SECRET: 'Mn6Bv4Cx2Zl8Ka5' }],
+      [
+        'a reused workspace-reference secret',
+        { WORKSPACE_REFERENCE_HMAC_SECRET: 'Zk4Rr9Tq2Lm7Wx1Vb6Nc3Hs8Jd5Fg0Py' },
+      ],
     ])('%s', (_label, overrides) => {
       const config = validProduction(overrides);
       let message = '';

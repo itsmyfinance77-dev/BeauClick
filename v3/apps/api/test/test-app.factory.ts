@@ -70,6 +70,15 @@ const HERMETIC_TEST_ENV: Record<string, string> = {
   JWT_ACCESS_SECRET: TEST_JWT_SECRET,
   JWT_ACCESS_TTL: '15m',
   REFRESH_TOKEN_TTL_DAYS: '30',
+  /*
+   * V3.3-A Story #69. A DEDICATED value, distinct from every other secret in
+   * this map — the suite asserts that a shared one is refused in production, so
+   * the harness must not itself be an example of the thing being refused.
+   *
+   * A throwaway literal that exists only in this file. It is not a real secret,
+   * it is not the development fallback, and it is never printed.
+   */
+  WORKSPACE_REFERENCE_HMAC_SECRET: 'fast-test-workspace-reference-secret',
   OTP_HMAC_SECRET: 'test-otp-secret',
   OTP_EXPIRY_SECONDS: '2', // short expiry so expiry tests don't need to sleep long
   OTP_MAX_ATTEMPTS: '3',

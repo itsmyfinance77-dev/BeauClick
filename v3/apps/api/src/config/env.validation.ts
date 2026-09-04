@@ -118,6 +118,20 @@ export const SECRET_CONTRACT: readonly SecretContractEntry[] = [
     minLength: 32,
   },
   {
+    name: 'WORKSPACE_REFERENCE_HMAC_SECRET',
+    protects:
+      'the opaque seller workspace references; learning it lets an attacker MINT a reference for any party id they can guess (V3.3-A #69)',
+    // Required, and not "falls back to JWT_ACCESS_SECRET" like the two media
+    // entries below. `V33-DEC-019` requires a DEDICATED secret, and a fallback
+    // is sharing with extra steps: the reuse rule further down would never see
+    // it, because that loop only compares variables that are SET.
+    requiredInProduction: true,
+    // The same floor the two authentication secrets carry. An HMAC key shorter
+    // than its own digest is the one length at which the construction is
+    // weaker than the primitive it is built from.
+    minLength: 32,
+  },
+  {
     name: 'MEDIA_UPLOAD_TOKEN_SECRET',
     protects: 'upload authorization tokens. Falls back to JWT_ACCESS_SECRET when unset',
     requiredInProduction: false,
