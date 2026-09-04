@@ -1163,7 +1163,7 @@ describePg('subscription foundation — assignment, snapshots, grants (real Post
       });
     });
 
-    it('exposes no seller-facing HTTP route', async () => {
+    it('exposes exactly the seller routes #69 ratified, and no credit or grant route at all', async () => {
       const server = app.getHttpServer();
       const router = server._events.request._router as {
         stack: Array<{ route?: { path: string } }>;
@@ -1173,9 +1173,36 @@ describePg('subscription foundation — assignment, snapshots, grants (real Post
         .map((layer) => layer.route!.path)
         .filter((path) => /subscription|my-plan|credits|grant/i.test(path));
 
-      // Story #56a's boundary, asserted over the REAL route table rather than
-      // against the absence of a controller file. The routes are #69.
-      expect(paths).toEqual([]);
+      /*
+       * This case used to assert `[]`, with the note "the routes are #69".
+       *
+       * #69 (`#56b`) has landed, so the empty set is no longer the boundary —
+       * and deleting the case with it would throw away the useful half. What it
+       * actually guards is that the SURFACE stays the ratified one: an exact
+       * set over the real route table catches a seventh route added to this
+       * family by anybody, including a story that has no business adding one.
+       *
+       * The `credits|grant` half of the filter is unchanged and still asserts an
+       * absence: `V33-DEC-019` puts no credit purchase (#57), no consumption or
+       * return (#58) and no grant route in this story, and none has appeared.
+       */
+      expect(paths.sort()).toEqual(
+        [
+          '/api/v1/me/subscriptions/initialization',
+          '/api/v1/me/subscriptions',
+          '/api/v1/me/subscriptions/:workspaceRef/history',
+          '/api/v1/me/subscriptions/:workspaceRef/selection',
+          '/api/v1/me/subscriptions/:workspaceRef/cancellation',
+        ].sort(),
+      );
+
+      // `/me/commercial-plans` does not match the filter above, so it is named
+      // separately rather than silently uncovered — the sixth ratified route.
+      const planRoutes = router.stack
+        .filter((layer) => layer.route)
+        .map((layer) => layer.route!.path)
+        .filter((path) => path.includes('commercial-plans'));
+      expect(planRoutes).toEqual(['/api/v1/me/commercial-plans']);
     });
   });
 });

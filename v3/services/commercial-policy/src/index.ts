@@ -22,3 +22,12 @@ export * from './subscription/booking-credit-grant.service';
 export * from './subscription/seller-subscription.service';
 export * from './subscription/subscription-subject-data.contract';
 export * from './subscription/seller-subscription.module';
+// V3.3-A Story #69 (`#56b`). The seller-facing surface over #56a's foundation
+// (`V33-DEC-019`): the workspace collection, the opaque `workspaceRef`, and the
+// seller-visible plan catalogue. A fourth, additive surface — Story #39's
+// registry, #40a's catalogue and #56a's foundation are unchanged.
+export * from './seller-surface/workspace-reference';
+export * from './seller-surface/seller-subscription-surface.dto';
+export * from './seller-surface/seller-subscription-surface.service';
+export * from './seller-surface/seller-subscription-surface.controller';
+export * from './seller-surface/seller-subscription-surface.module';

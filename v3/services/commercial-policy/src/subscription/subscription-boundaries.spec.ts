@@ -13,6 +13,15 @@ import { SUBSCRIPTION_AUDIT_REASONS, SYSTEM_ACTOR_LABEL } from './seller-subscri
 /**
  * The structural boundaries of Story #56 (`#56a`), asserted against the source.
  *
+ * ## Read this first if you arrived from #69
+ *
+ * Story #69 (`#56b`) has landed and added the seller-facing routes. They live
+ * in `src/seller-surface/`, not here, and every case below still passes
+ * unchanged — because each one is scoped to THIS directory, and the separation
+ * between the foundation and the surface is exactly what they now guard. The
+ * one docblock that promised routes were merely "not yet" written has been
+ * rewritten to say what it actually protects.
+ *
  * ## Why these are file assertions rather than behaviour tests
  *
  * Each one guards a property that is true by ABSENCE — no expiry writer, no
@@ -45,12 +54,33 @@ function sourceFiles(dir: string): string[] {
   });
 }
 
-/** Comments state what the code must not do; only executable lines are evidence that it does not. */
+/**
+ * Comments state what the code must not do; only executable lines are evidence
+ * that it does not.
+ *
+ * ## Splitting on `\r?\n` is a correctness fix, not tidiness
+ *
+ * This used to split on `'\n'` alone, which leaves a trailing `\r` on every
+ * line of a CRLF checkout. JavaScript's `.` does not match `\r` — it is a line
+ * terminator — and `$` without the `m` flag matches only the very end of the
+ * string, so `line.replace(/\/\/.*$/, '')` matched NOTHING and every `//`
+ * comment survived into the "executable" set.
+ *
+ * The damage was asymmetric, which is why it went unnoticed. The exact-set
+ * cases failed loudly on a CRLF checkout and passed in CI. The `toEqual([])`
+ * cases did the opposite: they silently became STRICTER than intended, and
+ * passed only because no comment happened to contain a forbidden word — so a
+ * later comment mentioning one would have failed a case that was never about
+ * comments at all.
+ *
+ * A helper whose behaviour depends on how git checked the file out proves
+ * something different on each machine.
+ */
 function executableLines(path: string): string[] {
   const source = readFileSync(path, 'utf8');
   const withoutBlockComments = source.replace(/\/\*[\s\S]*?\*\//g, '');
   return withoutBlockComments
-    .split('\n')
+    .split(/\r?\n/)
     .map((line) => line.replace(/\/\/.*$/, '').trim())
     .filter((line) => line.length > 0);
 }
@@ -133,13 +163,24 @@ describe('subscription foundation — structural boundaries (#56a)', () => {
     });
   });
 
-  describe('no seller-facing route exists in this story', () => {
+  describe('the foundation carries no route layer', () => {
     /**
      * Probe: add `@Controller('me/subscription')` to any file in this
      * directory. This case fails.
      *
-     * #69 adds the routes. Until then the boundary is checkable against the
-     * source rather than against intention.
+     * ## Why this survives #69 rather than being deleted with it
+     *
+     * The original wording was "#69 adds the routes. Until then the boundary is
+     * checkable against the source." #69 has now added them — in
+     * `src/seller-surface/`, as `SellerSubscriptionSurfaceModule`, which is a
+     * different directory and a different module.
+     *
+     * That separation is the property this block now guards, and it is worth
+     * more than the temporary one it replaces. The foundation is called by
+     * anything needing a seller's entitlement — #58's consumption will — and it
+     * must not acquire an HTTP dependency to do it. Keeping the assertion
+     * pointed at THIS directory turns "the domain does not depend on a route
+     * layer" from a comment into a failing test.
      */
     it('declares no controller, route decorator or DTO', () => {
       const routeShaped = /@(?:Controller|Get|Post|Put|Patch|Delete|Body|Param|Query)\b/;
