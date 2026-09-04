@@ -28,7 +28,7 @@ delivering its Story Points never creates a tag and never enables production.
 | V3.2-E | B2B Quotes and Campaigns | Owner-gated; payment gate applies to settlement | Not applicable | Not enabled |
 | V3.2-F | Payout and Calendar Automation | Predominantly external-gated | Not applicable | Not enabled |
 | V3.2-G | Evidence-Gated Scale | No commitment without evidence | Not applicable | Not enabled |
-| V3.3 | Product Maturity Programme | Active foundation: #39, #40 (`#40a`), #56 (`#56a`) and #69 (`#56b`) complete; epic #38 in progress; #72 security and contract closed by `V33-DEC-020` and re-estimated to 8; #57, #58 and #72 not started | No tag authorized | Real money blocked by #47; unresolved values/copy blocked by #46 |
+| V3.3 | Product Maturity Programme | Active foundation: #39, #40 (`#40a`), #56 (`#56a`), #69 (`#56b`) and #72 complete; epic #38 in progress; #75 security and contract closed by `V33-DEC-021` and re-estimated to 8; #57, #58 and #75 not started | No tag authorized | Real money blocked by #47; unresolved values/copy blocked by #46 |
 | V3.4 | Conditional Expansion Programme | Written owner decision and evidence required | Not applicable | Not enabled |
 
 V3.2-A and V3.2-B are completed historical milestones but are deliberately
@@ -192,3 +192,32 @@ That capability gap is recorded as **#75** rather than folded in: the seller
 capabilities exist, but account resolution assigns only `customer` and no
 self-service path grants `professional` or `business`, so every seller
 capability is currently inert. #57, #58, #41, #46 and #47 are untouched.
+
+## V3.3 Bug #75 re-estimated, 2026-09-04
+
+5 -> 8 Story Points, by
+[`V33-DEC-021`](../roadmap/v3.3/V3.3_DECISION_REGISTER.md). Not a re-scoping: the
+readiness audit found the defect is **active rather than latent**, and that
+repairing it needs a trigger in two domains plus a backfill.
+
+Story #69 enforces `bc_manage_own_subscription` on three mounted, unflagged
+production routes while account creation grants only `customer`. A genuine
+seller is therefore refused `403` on subscription initialization, plan selection
+and cancellation, and never receives the base `D-7` workspace. The filed issue
+recorded "no user-visible breakage"; that is superseded. The refusal reaches no
+BeauClick-shipped screen only because the in-repository web client has no
+subscription surface, which is a property of the client rather than of the API.
+
+The decision keeps #75 as one issue. The `professional` and `business` roles are
+granted atomically on ownership creation — never on verification, never from
+`business_staff`, never from a caller-supplied field — with an idempotent
+ownership-only backfill for existing owners. `customer` is never removed, live
+ownership remains the authorization boundary, a grant becomes effective at the
+next access-token issuance, and no new revocation machinery is built. Role
+provenance is deliberately excluded and left to a future additive,
+migration-backed decision if multiple grant sources ever need to coexist.
+
+ADR-023 is amended rather than reversed: beneficiary resolution may still follow
+affiliation, while workspace authorization and owner-role assignment follow
+ownership. Business-scoped staff roles and permissions remain **#44's**
+territory. #57, #58, #41, #46 and #47 are untouched.

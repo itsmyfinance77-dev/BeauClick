@@ -123,7 +123,22 @@ live ownership only, the workspace-aware routes reuse #69's `workspaceRef`
 unchanged through a shared primitive, and the four singular routes stay,
 corrected, refusing with `finance_workspace_selection_required` rather than
 choosing a workspace for the caller. Tracked as #72, re-estimated to 8 points,
-not yet started.
+shipped on 2026-09-04.
+
+`V33-DEC-020` deliberately did **not** enforce `bc_view_own_finance`, because no
+production path grants a seller the role that carries it. That gap became #75,
+and `V33-DEC-021` closed it on 2026-09-04 after the readiness audit found it is
+an **active** defect rather than a latent one: #69 enforces
+`bc_manage_own_subscription` on three mounted routes while account creation
+grants only `customer`, so a genuine seller is refused `403` on subscription
+initialization, plan selection and cancellation and never receives the base
+`D-7` workspace. The `professional` and `business` roles will be granted
+atomically on ownership creation — never on verification, never from
+`business_staff`, never from a caller-supplied field — with an idempotent
+ownership-only backfill, `customer` never removed, live ownership still the
+authorization boundary, and a grant taking effect at the next access-token
+issuance rather than inside an already-issued one. Tracked as #75, re-estimated
+to 8 points, not yet started.
 
 Prices, included allowances, bounds, cutoffs, legal copy and accounting treatment stay
 open under issue #46, and real money movement stays blocked by #47. No allowance may
