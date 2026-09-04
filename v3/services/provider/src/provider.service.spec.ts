@@ -1,4 +1,4 @@
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
 import { createInMemoryDataSource } from '@beauclick/testing';
 import { ProviderService, ProviderAlreadyExistsException } from './provider.service';
@@ -8,10 +8,32 @@ import { CityEntity } from './entities/city.entity';
 import { ProviderOutboxEntity } from './entities/provider-outbox.entity';
 import { ProviderEventsService } from './provider-events.service';
 import { createEventContractRegistry } from '@beauclick/event-contracts';
+import { SellerOwnerRoleGrantPort } from './ports';
+
+/**
+ * The #75 owner-role port, recorded rather than executed.
+ *
+ * These pg-mem specs exercise `services/provider` alone; `identity.user_roles`
+ * does not exist in this DataSource and the real grant belongs to the
+ * composition root. What this module IS responsible for is calling the port with
+ * the session-derived owner, on the transaction's own manager -- so the double
+ * records exactly that, and the cases assert it.
+ */
+class RecordingOwnerRoleGrant implements SellerOwnerRoleGrantPort {
+  readonly calls: Array<{ ownerUserId: string; hasManager: boolean }> = [];
+  shouldFail = false;
+
+  async grantProfessionalOwnerRole(manager: EntityManager, ownerUserId: string): Promise<boolean> {
+    this.calls.push({ ownerUserId, hasManager: Boolean(manager) });
+    if (this.shouldFail) throw new Error('owner role grant failed');
+    return true;
+  }
+}
 
 describe('ProviderService (integration, pg-mem)', () => {
   let dataSource: DataSource;
   let service: ProviderService;
+  let ownerRoles: RecordingOwnerRoleGrant;
 
   beforeEach(async () => {
     dataSource = await createInMemoryDataSource([ProfessionalEntity, SpecialtyEntity, CityEntity, ProviderOutboxEntity]);
@@ -25,6 +47,7 @@ describe('ProviderService (integration, pg-mem)', () => {
       dataSource.getRepository(SpecialtyEntity),
       dataSource.getRepository(CityEntity),
       events,
+      (ownerRoles = new RecordingOwnerRoleGrant()),
     );
   });
 
@@ -38,6 +61,49 @@ describe('ProviderService (integration, pg-mem)', () => {
       const created = await service.create(ownerId, { displayName: 'Sara Beauty', bio: 'expert' });
       expect(created.ownerId).toBe(ownerId);
       expect(created.verificationStatus).toBe('unverified');
+    });
+
+    /**
+     * V3.3 #75 (`V33-DEC-021` Rulings 2 and 8).
+     *
+     * What this module is responsible for is calling the port with the
+     * SESSION-derived owner, on the TRANSACTION's own manager. Whether the role
+     * row lands, and whether it rolls back with the profile, belongs to
+     * `seller-owner-role-lifecycle.pg-spec.ts` -- pg-mem honours no ROLLBACK, so
+     * asserting it here would prove nothing.
+     */
+    it('grants the professional owner role through the port, on the transaction manager', async () => {
+      const ownerId = uuidv7();
+      await service.create(ownerId, { displayName: 'Sara Beauty' });
+
+      expect(ownerRoles.calls).toEqual([{ ownerUserId: ownerId, hasManager: true }]);
+    });
+
+    it('propagates a role-grant failure instead of creating a profile the owner cannot act on', async () => {
+      const ownerId = uuidv7();
+      ownerRoles.shouldFail = true;
+
+      await expect(service.create(ownerId, { displayName: 'Sara Beauty' })).rejects.toThrow('owner role grant failed');
+      // The port was reached, so the failure is the grant's and not a missing
+      // call. (pg-mem does not roll back, so the profile row's absence is
+      // asserted against real PostgreSQL, not here.)
+      expect(ownerRoles.calls).toHaveLength(1);
+    });
+
+    it('never passes a caller-supplied owner to the port', async () => {
+      const sessionOwner = uuidv7();
+      const someoneElse = uuidv7();
+
+      await service.create(sessionOwner, {
+        displayName: 'Sara Beauty',
+        // Not part of `CreateProfessionalDto`; present here to show that even a
+        // value smuggled past validation cannot reach the port, because
+        // `create()` passes its own `ownerId` argument and nothing from the DTO.
+        ...({ ownerId: someoneElse } as Record<string, unknown>),
+      });
+
+      expect(ownerRoles.calls).toEqual([{ ownerUserId: sessionOwner, hasManager: true }]);
+      expect(ownerRoles.calls.map((c) => c.ownerUserId)).not.toContain(someoneElse);
     });
 
     it('rejects a second profile for the same owner (one profile per identity)', async () => {

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, IsNull, Repository } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
@@ -12,6 +12,7 @@ import { UpdateProfessionalDto } from './dto/update-professional.dto';
 import { ListProvidersDto } from './dto/list-providers.dto';
 import { ProviderEventsService } from './provider-events.service';
 import { AuditLogger } from '@beauclick/events';
+import { SELLER_OWNER_ROLE_GRANT, SellerOwnerRoleGrantPort } from './ports';
 
 export class ProviderAlreadyExistsException extends DomainException {
   constructor() {
@@ -39,6 +40,16 @@ export class ProviderService {
     @InjectRepository(SpecialtyEntity) private readonly specialtyRepo: Repository<SpecialtyEntity>,
     @InjectRepository(CityEntity) private readonly cityRepo: Repository<CityEntity>,
     private readonly events: ProviderEventsService,
+    /**
+     * V3.3 #75 (`V33-DEC-021`). The owner-role grant, bound by the composition
+     * root because `provider` may not import `identity` (ADR-011).
+     *
+     * NOT `@Optional()`, deliberately. A composition that forgets to bind it
+     * fails to boot, which is loud — where a silent fallback would recreate #75
+     * exactly: sellers created without the role that makes every seller
+     * capability reachable, with nothing failing anywhere.
+     */
+    @Inject(SELLER_OWNER_ROLE_GRANT) private readonly ownerRoles: SellerOwnerRoleGrantPort,
   ) {}
 
   /** ownerId is ALWAYS the session-derived caller -- never accepted from the request body (V3_DOMAIN_BOUNDARIES.md provider section: "No client supplied owner IDs"). */
@@ -66,6 +77,27 @@ export class ProviderService {
         deletedAt: null,
       });
       const saved = await manager.getRepository(ProfessionalEntity).save(entity);
+
+      /*
+       * V3.3 #75 (`V33-DEC-021` Rulings 2 and 8). The `professional` role is
+       * granted HERE, on the caller's own manager, so the profile row and the
+       * role commit together or not at all.
+       *
+       * Placed after the profile insert and before the outbox event because the
+       * grant is a fact ABOUT the ownership that was just established. A failure
+       * in the role lookup, the role insert or its audit row aborts this
+       * transaction and takes the profile with it -- which is the intended
+       * behaviour and not a hazard to route around: a seller who owns a
+       * workspace they cannot act on is the defect this story exists to remove.
+       *
+       * `ownerId` is the SESSION-derived caller, never a DTO field. Verification
+       * status is deliberately not consulted: `V33-DEC-021` Ruling 2 makes
+       * ownership the trigger, and ADR-042 §4 had already ruled that an
+       * unverified professional is a seller whose identity is unconfirmed, not
+       * a seller without commercial terms.
+       */
+      await this.ownerRoles.grantProfessionalOwnerRole(manager, ownerId);
+
       await this.events.emitProfessionalUpdated(manager, saved.id);
       this.auditLog.log({ action: 'provider.created', ownerId, professionalId: saved.id });
       return manager.getRepository(ProfessionalEntity).findOneOrFail({ where: { id: saved.id }, relations: ['specialties'] });
