@@ -2,12 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, IsNull, Repository } from 'typeorm';
 
-import { ProfessionalEntity, ServiceOfferingEntity } from '@beauclick/provider';
+import { ProfessionalEntity, SellerOwnerRoleGrantPort, ServiceOfferingEntity } from '@beauclick/provider';
 import { ProfessionalDirectory } from '@beauclick/booking';
 import { ServiceCatalog, ServiceOfferingSnapshot } from '@beauclick/commerce';
 import { FinanceWorkspaceOwnerResolver, FinancialParty, FinancialPartyResolver } from '@beauclick/financial';
 import { OwnedSubscriberParty, OwnedSubscriberPartyResolver } from '@beauclick/commercial-policy';
-import { BusinessEntity, BusinessStaffEntity } from '@beauclick/business';
+import { BusinessEntity, BusinessOwnerRoleGrantPort, BusinessStaffEntity } from '@beauclick/business';
+import { RoleService } from '@beauclick/identity';
 
 /**
  * The composition root's implementations of the ports booking-, commerce-,
@@ -263,5 +264,57 @@ export class OwnershipBackedFinanceWorkspaceResolver implements FinanceWorkspace
     // the same reason. Mapped explicitly rather than cast, so a future field on
     // either side is a compile error here instead of a silent pass-through.
     return parties.map((party) => ({ partyType: party.partyType, partyId: party.partyId }));
+  }
+}
+
+/**
+ * Grants the seller OWNER role atomically with the ownership row — V3.3 #75,
+ * `V33-DEC-021`.
+ *
+ * ## One adapter, two domain tokens
+ *
+ * `provider` declares `SELLER_OWNER_ROLE_GRANT` and `business` declares
+ * `BUSINESS_OWNER_ROLE_GRANT`, because neither may import the other and neither
+ * may import `identity` (ADR-011). Both are bound to THIS instance in
+ * `DomainPortsModule` — the arrangement `PROFESSIONAL_DIRECTORY` and
+ * `PROFESSIONAL_OWNER_LOOKUP` already use, and for the same reason: two tokens
+ * are a boundary artefact, while two implementations of "grant the owner role"
+ * would be two answers to a question that must have exactly one.
+ *
+ * ## It delegates rather than reimplementing
+ *
+ * `RoleService.assignOwnerRole` owns the whole rule: slug lookup from the data,
+ * additive insert with `ON CONFLICT DO NOTHING`, denormalized-column sync, and
+ * the system-actor audit row — all on the caller's manager. This class adds
+ * nothing except the fixed role slug, which is exactly what a composition-root
+ * adapter should be.
+ *
+ * ## Why the slug is hard-coded here and not passed through
+ *
+ * The two port methods take no role argument, so the choice has to be made
+ * somewhere; making it here means `provider` and `business` are structurally
+ * incapable of asking for a role they should not have. There is no request
+ * field, DTO property or port parameter anywhere in the chain that could carry
+ * `administrator`, so escalation through the ownership path is unrepresentable
+ * rather than merely checked (`V33-DEC-021` Rulings 2, 3 and 5).
+ */
+@Injectable()
+export class IdentityBackedOwnerRoleGrant implements SellerOwnerRoleGrantPort, BusinessOwnerRoleGrantPort {
+  constructor(private readonly roles: RoleService) {}
+
+  /**
+   * Takes the CALLER's manager and passes it straight through.
+   *
+   * The adapter holds no repository and no DataSource of its own, which is what
+   * makes "runs on a different connection" impossible rather than discouraged —
+   * the same property `OwnershipBackedSubscriberPartyResolver` above relies on
+   * (ADR-042 §9).
+   */
+  async grantProfessionalOwnerRole(manager: EntityManager, ownerUserId: string): Promise<boolean> {
+    return this.roles.assignOwnerRole(manager, ownerUserId, 'professional');
+  }
+
+  async grantBusinessOwnerRole(manager: EntityManager, ownerUserId: string): Promise<boolean> {
+    return this.roles.assignOwnerRole(manager, ownerUserId, 'business');
   }
 }
