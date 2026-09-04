@@ -8,11 +8,13 @@ import { useProProfile } from '@/lib/pro-context';
 import { useAuth } from '@/lib/auth-context';
 import {
   financeSummary,
+  financeWorkspaces,
   listMyServices,
   listMySlots,
   listProfessionalBookings,
   type BookingSummary,
   type FinanceSummary,
+  type FinanceWorkspace,
   type MySlot,
   type ServiceOffering,
 } from '@/lib/pro-api';
@@ -35,6 +37,8 @@ export default function ProOverviewPage() {
   const [services, setServices] = useState<ServiceOffering[]>([]);
   const [slots, setSlots] = useState<MySlot[]>([]);
   const [finance, setFinance] = useState<FinanceSummary | null>(null);
+  // A dual owner has no single dashboard figure, so the tile becomes a link.
+  const [multipleWorkspaces, setMultipleWorkspaces] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -51,15 +55,37 @@ export default function ProOverviewPage() {
           from: new Date().toISOString(),
           to: new Date(Date.now() + 30 * 86_400_000).toISOString(),
         }),
-        // A professional with no paid order yet has no seller party, and the
-        // finance route correctly answers NOT_FOUND_OR_NOT_YOURS. That is not
-        // an error worth failing the whole dashboard over.
-        financeSummary(api).catch(() => ({ data: null as FinanceSummary | null })),
+        /*
+         * V3.3 #72 (`V33-DEC-020`). The dashboard reads the WORKSPACE LIST
+         * rather than a singular summary.
+         *
+         * A seller may own both a professional profile and a business, each
+         * with its own financial position, and there is no honest single
+         * figure for such a caller -- picking one is exactly the silent choice
+         * the decision forbids. So the tile below is shown only when the list
+         * holds one workspace, and a dual owner is sent to the finance screen
+         * where they can choose.
+         *
+         * A caller who owns nothing gets `[]` rather than a refusal, which is
+         * not an error worth failing the whole dashboard over either.
+         */
+        financeWorkspaces(api).catch(() => ({ data: { items: [] as FinanceWorkspace[] } })),
       ]);
       setBookings(bookingRes.data ?? []);
       setServices(serviceRes.data ?? []);
       setSlots(slotRes.data ?? []);
-      setFinance(financeRes.data ?? null);
+
+      const workspaces = financeRes.data?.items ?? [];
+      // Exactly one, or nothing. Never the first of several.
+      if (workspaces.length === 1) {
+        const summaryRes = await financeSummary(api, workspaces[0].workspaceRef).catch(() => ({
+          data: null as FinanceSummary | null,
+        }));
+        setFinance(summaryRes.data ?? null);
+      } else {
+        setFinance(null);
+      }
+      setMultipleWorkspaces(workspaces.length > 1);
       setLoaded(true);
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : 'اطلاعات نمای کلی بارگذاری نشد.');
@@ -146,6 +172,12 @@ export default function ProOverviewPage() {
             <StatCard label="خدمات" value={toPersianDigits(services.length)} />
             {finance ? (
               <StatCard label="خالص قابل دریافت" value={formatToman(finance.receivableNetToman)} />
+            ) : null}
+            {multipleWorkspaces ? (
+              // Two workspaces, two positions, and no honest way to add them
+              // into one figure. The tile says where the answer is instead of
+              // inventing one.
+              <StatCard label="خالص قابل دریافت" value="در صفحه مالی" />
             ) : null}
           </StatGrid>
         </div>
