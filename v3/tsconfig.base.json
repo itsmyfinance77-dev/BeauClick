@@ -34,6 +34,7 @@
       "@beauclick/referral-contract": ["packages/referral-contract/src/index.ts"],
       "@beauclick/commercial-policy-contract": ["packages/commercial-policy-contract/src/index.ts"],
       "@beauclick/money": ["libs/money/src/index.ts"],
+      "@beauclick/workspace-reference": ["libs/workspace-reference/src/index.ts"],
       "@beauclick/media": ["libs/media/src/index.ts"],
       "@beauclick/subject-data": ["libs/subject-data/src/index.ts"],
       "@beauclick/events": ["libs/events/src/index.ts"],

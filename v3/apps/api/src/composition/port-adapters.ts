@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, IsNull, Repository } from 'typeorm';
+import { DataSource, EntityManager, IsNull, Repository } from 'typeorm';
 
 import { ProfessionalEntity, ServiceOfferingEntity } from '@beauclick/provider';
 import { ProfessionalDirectory } from '@beauclick/booking';
 import { ServiceCatalog, ServiceOfferingSnapshot } from '@beauclick/commerce';
-import { FinancialParty, FinancialPartyResolver } from '@beauclick/financial';
+import { FinanceWorkspaceOwnerResolver, FinancialParty, FinancialPartyResolver } from '@beauclick/financial';
 import { OwnedSubscriberParty, OwnedSubscriberPartyResolver } from '@beauclick/commercial-policy';
 import { BusinessEntity, BusinessStaffEntity } from '@beauclick/business';
 
@@ -211,5 +211,57 @@ export class OwnershipBackedSubscriberPartyResolver implements OwnedSubscriberPa
         where: { id: party.partyId, deletedAt: IsNull() },
       })) === 1
     );
+  }
+}
+
+/**
+ * Resolves "which seller workspaces does this session OWN?" for
+ * financial-service — V3.3 #72, `V33-DEC-020`.
+ *
+ * ## It delegates rather than reimplementing, deliberately
+ *
+ * `OwnershipBackedSubscriberPartyResolver` above already answers exactly this
+ * question, correctly, for the subscription surface: `owner_id` only, soft-
+ * deleted rows excluded, and `business_staff` never consulted. Writing a second
+ * ownership predicate here would be a second answer to a question that must
+ * have exactly one — and the two would drift the first time either changed.
+ *
+ * So this is an ADAPTER, not an implementation. It exists only because
+ * `services/financial` may not import `services/commercial-policy`
+ * (`@nx/enforce-module-boundaries` restricts `scope:financial` to
+ * `scope:shared`), so finance declares its own token and the composition root
+ * binds the one real resolver behind it. The same arrangement
+ * `PROFESSIONAL_DIRECTORY` and `PROFESSIONAL_OWNER_LOOKUP` already use.
+ *
+ * ## Why it supplies the manager rather than taking one
+ *
+ * The subscription port takes the caller's `EntityManager` so an ownership read
+ * inside an activation transaction sees that transaction's own uncommitted rows
+ * (ADR-042 §9). Finance has no such transaction to join: its rows live on a
+ * physically separate DataSource connected as the append-only writer role
+ * (ADR-017), and `V33-DEC-020` forbids a cross-database transaction. Ownership
+ * is therefore an independent read on the application DataSource, and this
+ * adapter supplies that manager so finance never has to know which database
+ * ownership lives in.
+ *
+ * ## What it must never become
+ *
+ * A place that consults `SellerPartyLookup`. That lookup answers "whose money
+ * is this?", follows an active affiliation, and using it here would reinstate
+ * the #72 disclosure exactly.
+ */
+@Injectable()
+export class OwnershipBackedFinanceWorkspaceResolver implements FinanceWorkspaceOwnerResolver {
+  constructor(
+    private readonly owned: OwnershipBackedSubscriberPartyResolver,
+    private readonly dataSource: DataSource,
+  ) {}
+
+  async ownedWorkspacesFor(userId: string): Promise<FinancialParty[]> {
+    const parties = await this.owned.ownedPartiesFor(this.dataSource.manager, userId);
+    // `OwnedSubscriberParty` and `FinancialParty` are the same two fields for
+    // the same reason. Mapped explicitly rather than cast, so a future field on
+    // either side is a compile error here instead of a silent pass-through.
+    return parties.map((party) => ({ partyType: party.partyType, partyId: party.partyId }));
   }
 }

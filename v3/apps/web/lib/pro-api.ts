@@ -243,20 +243,46 @@ export interface LedgerEntry {
   createdAt: string;
 }
 
-export function financeSummary(api: ApiClient) {
-  return api.get<FinanceSummary>('/v1/me/finance/summary');
+/**
+ * One finance workspace the signed-in seller OWNS -- V3.3 #72,
+ * `V33-DEC-020`.
+ *
+ * `workspaceRef` is opaque and issued by the server. It is NOT a credential:
+ * live ownership is re-verified on every request, so it stops working the
+ * moment the workspace stops being owned. Never persist it as if it granted
+ * anything -- if it stops resolving, re-read the list.
+ *
+ * One user may own both a professional profile and a business, and each has its
+ * own separate financial position. That is why this is a list and not a field.
+ */
+export interface FinanceWorkspace {
+  workspaceRef: string;
+  workspaceType: 'professional' | 'business';
 }
 
-export function outstandingOrders(api: ApiClient) {
-  return api.get<OutstandingOrder[]>('/v1/me/finance/outstanding-orders');
+export interface SettlementPage {
+  items: SettlementBatch[];
+  nextCursor: string | null;
 }
 
-export function settlements(api: ApiClient) {
-  return api.get<SettlementBatch[]>('/v1/me/finance/settlements');
+export function financeWorkspaces(api: ApiClient) {
+  return api.get<{ items: FinanceWorkspace[] }>('/v1/me/finance/workspaces');
 }
 
-export function orderLedger(api: ApiClient, orderId: string) {
-  return api.get<LedgerEntry[]>(`/v1/me/finance/orders/${orderId}/ledger`);
+export function financeSummary(api: ApiClient, workspaceRef: string) {
+  return api.get<FinanceSummary>(`/v1/me/finance/${workspaceRef}/summary`);
+}
+
+export function outstandingOrders(api: ApiClient, workspaceRef: string) {
+  return api.get<OutstandingOrder[]>(`/v1/me/finance/${workspaceRef}/outstanding-orders`);
+}
+
+export function settlements(api: ApiClient, workspaceRef: string) {
+  return api.get<SettlementPage>(`/v1/me/finance/${workspaceRef}/settlements`);
+}
+
+export function orderLedger(api: ApiClient, workspaceRef: string, orderId: string) {
+  return api.get<LedgerEntry[]>(`/v1/me/finance/${workspaceRef}/orders/${orderId}/ledger`);
 }
 
 // ------------------------------------------------------------- analytics

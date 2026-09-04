@@ -64,6 +64,9 @@
       "@beauclick/money": [
         "dist/libs/money/src/index.js"
       ],
+      "@beauclick/workspace-reference": [
+        "dist/libs/workspace-reference/src/index.js"
+      ],
       "@beauclick/media": [
         "dist/libs/media/src/index.js"
       ],

@@ -165,19 +165,37 @@ describe('seller subscription surface — structural boundaries (#69)', () => {
     });
   });
 
-  describe('the secret is read once, and never leaves', () => {
+  describe('this surface reads no secret at all', () => {
     /**
-     * Probe: change the module factory to read `JWT_ACCESS_SECRET`, or add a
-     * second `config.get` for the workspace secret in the service. This case
-     * fails.
+     * Probe: add
+     * `config.get('WORKSPACE_REFERENCE_HMAC_SECRET')` back into the module or
+     * the service. This case fails.
+     *
+     * ## Why the assertion got STRONGER when #72 moved the binding
+     *
+     * Story #69 read the secret here, once, in the surface module's own
+     * factory, and this case pinned it at exactly one mention. `V33-DEC-020`
+     * shares the reference with the finance surface, so the read moved to the
+     * composition root (`DomainPortsModule`, `@Global()`) and both domains
+     * inject the one binding under `WORKSPACE_REFERENCE_SECRET`.
+     *
+     * Two modules each calling `config.get(...)` would be two places a later
+     * edit could point at `JWT_ACCESS_SECRET`, and two copies of the
+     * development fallback. So the property this directory now guarantees is
+     * the stronger one: it names no environment variable whatsoever, and
+     * receives a secret it cannot misread.
      */
-    it('reads WORKSPACE_REFERENCE_HMAC_SECRET in exactly one place', () => {
-      const mentions = executable.filter((line) => line.includes('WORKSPACE_REFERENCE_HMAC_SECRET'));
-      expect(mentions).toHaveLength(1);
-      expect(mentions[0]).toContain('seller-subscription-surface.module.ts');
+    it('names no environment variable', () => {
+      const offenders = executable.filter(
+        (line) => /\bconfig\.get\b/.test(line) || /\b[A-Z][A-Z0-9_]{6,}\b/.test(line.replace(/'[^']*'/g, '')),
+      );
+      // `WORKSPACE_REFERENCE_HMAC_SECRET` specifically, and any other SHOUTING
+      // env-shaped identifier read from configuration.
+      expect(executable.filter((line) => line.includes('WORKSPACE_REFERENCE_HMAC_SECRET'))).toEqual([]);
+      expect(offenders.filter((line) => /config\.get/.test(line))).toEqual([]);
     });
 
-    /** Probe: add `JWT_ACCESS_SECRET` as a fallback in the module factory. This case fails. */
+    /** Probe: add `JWT_ACCESS_SECRET` as a fallback anywhere here. This case fails. */
     it('names no other application secret', () => {
       const offenders = executable.filter((line) =>
         /\b(?:JWT_ACCESS_SECRET|OTP_HMAC_SECRET|MEDIA_UPLOAD_TOKEN_SECRET|MEDIA_DOWNLOAD_TOKEN_SECRET|METRICS_AUTH_TOKEN)\b/.test(
@@ -188,26 +206,20 @@ describe('seller subscription surface — structural boundaries (#69)', () => {
     });
 
     /**
-     * Probe: change the development fallback to
-     * `dev-only-insecure-secret-override-in-env`, the literal `app.module.ts`
-     * uses for the JWT. This case fails.
+     * Probe: change `DEVELOPMENT_WORKSPACE_REFERENCE_SECRET` in
+     * `libs/workspace-reference` to `dev-only-insecure-secret-override-in-env`,
+     * the literal `app.module.ts` uses for the JWT. That library's own suite
+     * fails.
      *
-     * Sharing that literal would make this secret EQUAL the token-signing
-     * secret on every developer machine — the exact reuse the production
-     * validator refuses — so the dedicated-secret property would hold only
-     * where it is checked.
+     * Asserted THERE rather than duplicated here: the fallback now lives with
+     * the primitive, and a copy of the assertion in this file would be a second
+     * statement of one rule.
      */
-    it('has a development fallback that is distinct and that production refuses by name', () => {
+    it('delegates the development fallback to the shared primitive', () => {
       const module = readFileSync(join(SURFACE_DIR, 'seller-subscription-surface.module.ts'), 'utf8');
-      const fallback = module.match(/'(dev-only-[a-z-]+)'/)?.[1];
-
-      expect(fallback).toBe('dev-only-insecure-workspace-reference-secret-override-in-env');
-      expect(fallback).not.toBe('dev-only-insecure-secret-override-in-env');
-      // Both fragments are in `FORBIDDEN_SECRET_FRAGMENTS`, so this value
-      // cannot reach production. Asserted here rather than assumed, because the
-      // fallback is only safe BECAUSE that list contains them.
-      expect(fallback).toContain('dev-only');
-      expect(fallback).toContain('insecure');
+      // No `dev-only-...` literal survives in this directory at all.
+      expect(module).not.toMatch(/'dev-only-[a-z-]+'/);
+      expect(executable.filter((line) => line.includes('dev-only'))).toEqual([]);
     });
   });
 

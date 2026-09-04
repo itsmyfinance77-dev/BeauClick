@@ -5,7 +5,12 @@ import { uuidv7 } from 'uuidv7';
 
 import { StaffService, BusinessService } from '@beauclick/business';
 import { OrderService } from '@beauclick/commerce';
-import { MyFinanceService } from '@beauclick/financial';
+import {
+  FINANCIAL_PARTY_RESOLVER,
+  FinanceWorkspaceService,
+  FinancialPartyResolver,
+  MyFinanceService,
+} from '@beauclick/financial';
 
 import { createPgTestApp, requiredPgEnv, resetDatabase, seedBusiness, seedProfessional, seedUser } from './pg-test-app.factory';
 
@@ -28,6 +33,8 @@ describeIfPg('Business authorization on real PostgreSQL', () => {
   let staff: StaffService;
   let orders: OrderService;
   let myFinance: MyFinanceService;
+  let workspaces: FinanceWorkspaceService;
+  let financialParties: FinancialPartyResolver;
 
   beforeAll(async () => {
     const ctx = await createPgTestApp();
@@ -37,6 +44,8 @@ describeIfPg('Business authorization on real PostgreSQL', () => {
     staff = app.get(StaffService);
     orders = app.get(OrderService);
     myFinance = app.get(MyFinanceService);
+    workspaces = app.get(FinanceWorkspaceService);
+    financialParties = app.get<FinancialPartyResolver>(FINANCIAL_PARTY_RESOLVER);
   });
 
   afterAll(async () => {
@@ -195,7 +204,7 @@ describeIfPg('Business authorization on real PostgreSQL', () => {
       expect(summary?.partyId).toBe(professional.id);
     });
 
-    it('a professional actively affiliated with a business sells FOR the business, not themselves', async () => {
+    it('a professional affiliated with a business SELLS for it but may not READ its finance', async () => {
       const businessOwner = await seedUser(app, dataSource, `+98937${String(Date.now()).slice(-6)}`, ['business']);
       const business = await businesses.create(businessOwner.id, { displayName: 'سالن بزرگ' });
       const proOwner = await seedUser(app, dataSource, `+98938${String(Date.now()).slice(-6)}`, ['professional']);
@@ -217,17 +226,67 @@ describeIfPg('Business authorization on real PostgreSQL', () => {
       expect(detail.order.sellerPartyType).toBe('business');
       expect(detail.order.sellerPartyId).toBe(business.id);
 
-      // The now-affiliated professional's own session ALSO resolves to the
-      // business -- their earnings genuinely moved, this is not merely an
-      // order-time label.
-      const proSummary = await myFinance.mySummary(proOwner.id);
-      expect(proSummary?.partyType).toBe('business');
-      expect(proSummary?.partyId).toBe(business.id);
+      /*
+       * ATTRIBUTION is unchanged, and that is the half this case still proves.
+       *
+       * The order sells FOR the business, the ledger rows are written against
+       * the business party, and `FinancialPartyResolver` — the BENEFICIARY
+       * port — still answers `business` for the affiliated professional's own
+       * user id. Their earnings genuinely moved; this is not an order-time
+       * label.
+       */
+      const beneficiary = await financialParties.resolveForUser(proOwner.id);
+      expect(beneficiary).toEqual({ partyType: 'business', partyId: business.id });
 
-      // The business owner sees the identical party directly.
+      /*
+       * READ AUTHORIZATION is not attribution — V3.3 #72, `V33-DEC-020`.
+       *
+       * ## What this case used to assert, and why it was wrong
+       *
+       * Until #72 it read:
+       *
+       *     const proSummary = await myFinance.mySummary(proOwner.id);
+       *     expect(proSummary?.partyType).toBe('business');
+       *     expect(proSummary?.partyId).toBe(business.id);
+       *
+       * — i.e. it asserted that an affiliated professional's own finance screen
+       * shows the EMPLOYER's receivable, settlement and outstanding position,
+       * aggregated across every other staff member and the owner. That is a
+       * cross-party financial disclosure, and the assertion was codifying it as
+       * correct because attribution and permission were being answered by one
+       * resolver.
+       *
+       * `V33-DEC-020` ruled that staff affiliation is not financial ownership.
+       * The staff member now sees their OWN professional party, which may
+       * legitimately be empty or zero, and the server must not fall back to the
+       * employer's figures to avoid an empty screen.
+       *
+       * ## This fails against the old resolver
+       *
+       * Restore `MyFinanceService` to `FINANCIAL_PARTY_RESOLVER` and the first
+       * expectation below returns `business` — the probe is exactly the diff
+       * this bug reverted.
+       */
+      const proSummary = await myFinance.mySummary(proOwner.id);
+      expect(proSummary?.partyType).toBe('professional');
+      expect(proSummary?.partyId).toBe(professional.id);
+      // Truthfully zero: every Toman they earned belongs to the business.
+      expect(proSummary?.receivableNetToman).toBe(0);
+
+      // POSITIVE CONTROL 1 — the business owner still reads the business.
+      // Without this, the assertion above would pass against a service that had
+      // simply stopped resolving anybody.
       const ownerSummary = await myFinance.mySummary(businessOwner.id);
       expect(ownerSummary?.partyType).toBe('business');
       expect(ownerSummary?.partyId).toBe(business.id);
+
+      // POSITIVE CONTROL 2 — the staff professional's own party is genuinely
+      // readable, so "restricted to their own" is distinguishable from
+      // "refused everything".
+      const ownWorkspaces = await workspaces.ownedWorkspaces(proOwner.id);
+      expect(ownWorkspaces).toEqual([{ partyType: 'professional', partyId: professional.id }]);
+      // And the employer's workspace is nowhere in it.
+      expect(ownWorkspaces.some((party) => party.partyId === business.id)).toBe(false);
     });
 
     it('deactivating the staff membership reverts the professional to their own party for FUTURE orders', async () => {

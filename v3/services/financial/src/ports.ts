@@ -31,5 +31,39 @@ export interface FinancialPartyResolver {
 
 export const FINANCIAL_PARTY_RESOLVER = Symbol('BEAUCLICK_FINANCIAL_PARTY_RESOLVER');
 
+/**
+ * financial-service's outbound port for workspace OWNERSHIP — V3.3 #72,
+ * `V33-DEC-020`.
+ *
+ * ## Why this is not `FinancialPartyResolver`
+ *
+ * That port answers "whose money is this?" and its implementation follows an
+ * active `business_staff` affiliation, because an affiliated professional's
+ * earnings genuinely belong to the business (ADR-023 §3). Correct for
+ * attribution, and it was the #72 defect the moment it was used to decide who
+ * may READ: an employee reached the employer's whole financial position, and a
+ * dual owner reached only whichever party the resolver preferred.
+ *
+ * This port answers a different question — **which seller parties does this
+ * user OWN** — and it must never follow affiliation. Both ports keep existing,
+ * bound to different adapters, because merging them would force one answer on
+ * two questions that must be allowed to disagree.
+ *
+ * ## It returns a SET, and that is load-bearing
+ *
+ * `provider.professionals.owner_id` and `business.businesses.owner_id` are
+ * independent unique indexes, so one user may own both. Returning one preferred
+ * party is precisely the silent choice `V33-DEC-020` forbids, so the shape
+ * here makes that choice unrepresentable rather than merely discouraged.
+ *
+ * Empty for a caller who owns none — never a fabricated party, and never one
+ * they merely work for.
+ */
+export interface FinanceWorkspaceOwnerResolver {
+  ownedWorkspacesFor(userId: string): Promise<FinancialParty[]>;
+}
+
+export const FINANCE_WORKSPACE_OWNER_RESOLVER = Symbol('BEAUCLICK_FINANCE_WORKSPACE_OWNER_RESOLVER');
+
 /** The dedicated, INSERT-only DataSource financial-service uses. See ADR-017. */
 export const FINANCIAL_DATA_SOURCE = Symbol('BEAUCLICK_FINANCIAL_DATA_SOURCE');

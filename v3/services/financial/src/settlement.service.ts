@@ -139,6 +139,41 @@ export class SettlementService {
     });
   }
 
+  /**
+   * One keyset page of a party's settlements, newest first — V3.3 #72.
+   *
+   * `settlementsForParty` above returns a party's ENTIRE settlement history
+   * unbounded, and stays that way so the legacy singular route's response is
+   * byte-for-byte what it was. The workspace-aware route uses this instead.
+   *
+   * Keyset rather than offset, on `id DESC`: settlement batch ids are uuidv7,
+   * so `id` orders by creation time, and a page taken while a new settlement
+   * lands neither skips nor repeats a row the way `OFFSET` would.
+   * `ix_settlement_batches_party (party_type, party_id, id DESC)` already
+   * covers exactly this, so no migration and no new index were needed.
+   *
+   * The party predicate is always present. `after` narrows a page WITHIN one
+   * party; it never selects one.
+   */
+  async settlementPageForParty(
+    partyType: LedgerPartyType,
+    partyId: string,
+    after: string | null,
+    limit: number,
+  ): Promise<SettlementBatchEntity[]> {
+    const query = this.dataSource
+      .getRepository(SettlementBatchEntity)
+      .createQueryBuilder('b')
+      .where('b.party_type = :partyType', { partyType })
+      .andWhere('b.party_id = :partyId', { partyId })
+      .orderBy('b.id', 'DESC')
+      .limit(limit);
+
+    if (after) query.andWhere('b.id < :after', { after });
+
+    return query.getMany();
+  }
+
   async itemsFor(settlementId: string): Promise<SettlementItemEntity[]> {
     return this.dataSource.getRepository(SettlementItemEntity).find({
       where: { settlementId },

@@ -24,6 +24,7 @@ module.exports = {
     '^@beauclick/identity$': '<rootDir>/../../services/identity/src/index.ts',
     '^@beauclick/provider$': '<rootDir>/../../services/provider/src/index.ts',
     '^@beauclick/money$': '<rootDir>/../../libs/money/src/index.ts',
+    '^@beauclick/workspace-reference$': '<rootDir>/../../libs/workspace-reference/src/index.ts',
     '^@beauclick/events$': '<rootDir>/../../libs/events/src/index.ts',
     '^@beauclick/booking$': '<rootDir>/../../services/booking/src/index.ts',
     '^@beauclick/commerce$': '<rootDir>/../../services/commerce/src/index.ts',
