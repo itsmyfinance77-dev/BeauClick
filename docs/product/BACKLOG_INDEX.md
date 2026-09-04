@@ -188,5 +188,7 @@ writes no row of any kind, and deliberately does **not** enforce
 capability reliably present in a seller's token, so enforcing it would lock
 legitimate sellers out.
 
-That capability gap is recorded as its own bug rather than folded in. #57, #58,
-#41, #46 and #47 are untouched.
+That capability gap is recorded as **#75** rather than folded in: the seller
+capabilities exist, but account resolution assigns only `customer` and no
+self-service path grants `professional` or `business`, so every seller
+capability is currently inert. #57, #58, #41, #46 and #47 are untouched.
