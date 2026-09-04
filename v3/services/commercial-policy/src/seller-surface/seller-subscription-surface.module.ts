@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { COMMERCIAL_ENTITIES } from '../catalogue/commercial-catalogue.entities';
@@ -10,7 +9,7 @@ import {
   SellerSubscriptionSurfaceController,
 } from './seller-subscription-surface.controller';
 import { SellerSubscriptionSurfaceService } from './seller-subscription-surface.service';
-import { WORKSPACE_REFERENCE_SECRET, WorkspaceReferenceService } from './workspace-reference';
+import { WorkspaceReferenceService } from './workspace-reference';
 
 /**
  * The seller subscription surface — Story #69 (`#56b`), `V33-DEC-019`.
@@ -29,24 +28,19 @@ import { WORKSPACE_REFERENCE_SECRET, WorkspaceReferenceService } from './workspa
  * route layer?" a question a reviewer has to answer by reading, rather than one
  * the import graph answers.
  *
- * ## The dedicated secret is bound HERE, and its absence is visible
+ * ## The dedicated secret is NOT read here any more
  *
- * `WORKSPACE_REFERENCE_HMAC_SECRET` is read once, in the factory below, and
- * nowhere else. Three properties follow from putting it here rather than in a
- * `config.get(...)` inside the service:
+ * `V33-DEC-020` shares the workspace reference with the finance surface, so
+ * `WORKSPACE_REFERENCE_HMAC_SECRET` is now read ONCE in the composition root
+ * (`DomainPortsModule`, which is `@Global()`) and injected under
+ * `WORKSPACE_REFERENCE_SECRET`. Two modules each calling `config.get(...)`
+ * would be two places a later edit could point at `JWT_ACCESS_SECRET`, and two
+ * copies of the development fallback.
  *
- *  * the dedicated-secret requirement is visible at the wiring, so pointing it
- *    at `JWT_ACCESS_SECRET` would be an edit a reviewer sees rather than a
- *    default nobody notices;
- *  * `env.validation.ts` independently refuses to boot in production when it is
- *    missing, too short, a placeholder, or shared with another secret — this
- *    factory does not restate those rules, because two implementations of one
- *    rule are one waiting to disagree;
- *  * the development fallback is the SAME literal the rest of this codebase
- *    uses, which production validation rejects by name. A developer gets a
- *    working application; a production deployment carrying it does not start.
- *
- * The value is never logged, never returned, and never reaches a metric label.
+ * This module therefore reads no environment variable at all, which the
+ * boundary suite asserts. `env.validation.ts` independently refuses to boot in
+ * production when the secret is missing, too short, a placeholder, or shared
+ * with another secret.
  *
  * ## What this module does NOT introduce
  *
@@ -58,7 +52,6 @@ import { WORKSPACE_REFERENCE_SECRET, WorkspaceReferenceService } from './workspa
  */
 @Module({
   imports: [
-    ConfigModule,
     SellerSubscriptionModule,
     // The surface reads plan versions, schedule versions and tiers directly to
     // project the seller-visible catalogue in one query, and reads
@@ -70,25 +63,7 @@ import { WORKSPACE_REFERENCE_SECRET, WorkspaceReferenceService } from './workspa
     TypeOrmModule.forFeature([...SUBSCRIPTION_ENTITIES, ...COMMERCIAL_ENTITIES]),
   ],
   controllers: [SellerSubscriptionSurfaceController, SellerCommercialPlansController],
-  providers: [
-    SellerSubscriptionSurfaceService,
-    WorkspaceReferenceService,
-    {
-      provide: WORKSPACE_REFERENCE_SECRET,
-      inject: [ConfigService],
-      useFactory: (config: ConfigService): string =>
-        // A DISTINCT development literal, not the shared
-        // `dev-only-insecure-secret-override-in-env` that `app.module.ts` falls
-        // back to for the JWT. Reusing that one would make this secret equal to
-        // the token-signing secret on every developer machine — the exact
-        // sharing the production validator refuses — so the dedicated-secret
-        // property would hold only where it is checked. Both literals carry
-        // `dev-only` and `insecure`, which `FORBIDDEN_SECRET_FRAGMENTS` refuses
-        // by name, so neither can reach production.
-        config.get<string>('WORKSPACE_REFERENCE_HMAC_SECRET') ??
-        'dev-only-insecure-workspace-reference-secret-override-in-env',
-    },
-  ],
+  providers: [SellerSubscriptionSurfaceService, WorkspaceReferenceService],
   exports: [SellerSubscriptionSurfaceService, WorkspaceReferenceService],
 })
 export class SellerSubscriptionSurfaceModule {}
