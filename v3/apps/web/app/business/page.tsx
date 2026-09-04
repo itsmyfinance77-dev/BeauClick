@@ -21,6 +21,15 @@ import {
   type BusinessStaffMember,
 } from '@/lib/phase4-api';
 
+/**
+ * Shown when the business was created but the session could not be rotated.
+ *
+ * Not phrased as a failed save: the business exists, and saying otherwise would
+ * push the user toward a second `POST` that correctly conflicts.
+ */
+const SESSION_STALE_MESSAGE =
+  'کسب‌وکار شما ثبت شد. برای فعال شدن دسترسی‌های فروشنده، یک‌بار از حساب خود خارج و دوباره وارد شوید.';
+
 const ROLE_LABELS: Record<string, string> = { manager: 'مدیر', staff: 'کارمند' };
 
 const ROLE_OPTIONS = [
@@ -74,7 +83,7 @@ export default function BusinessPage() {
 }
 
 function BusinessDashboard() {
-  const { api, user } = useAuth();
+  const { api, user, refreshSession } = useAuth();
   const [owned, setOwned] = useState<Business | null>(null);
   const [memberships, setMemberships] = useState<BusinessStaffMember[]>([]);
   const [staffBusiness, setStaffBusiness] = useState<Business | null>(null);
@@ -135,7 +144,21 @@ function BusinessDashboard() {
     setError(null);
     try {
       await createBusiness(api, { displayName });
+
+      /*
+       * V3.3 #75 (`V33-DEC-021` Ruling 9). The `business` role was granted
+       * server-side in the same transaction as the business row, but this
+       * browser still holds the token it had before. Rotating the session here
+       * is what makes the seller surfaces reachable now rather than at the next
+       * natural refresh.
+       *
+       * The business EXISTS whether or not the rotation succeeds, so a failed
+       * refresh is reported as a stale session and never as a failed creation --
+       * retrying would `409` against the business just created.
+       */
+      const rotated = await refreshSession();
       await load();
+      if (!rotated) setError(SESSION_STALE_MESSAGE);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'ثبت کسب‌وکار انجام نشد.');
     } finally {

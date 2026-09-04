@@ -32,6 +32,26 @@ interface AuthContextValue {
   requestOtp: (phone: string) => Promise<void>;
   verifyOtp: (phone: string, code: string) => Promise<void>;
   logout: () => Promise<void>;
+  /**
+   * Rotates the session so the next request carries a freshly issued access
+   * token — V3.3 #75, `V33-DEC-021` Ruling 9.
+   *
+   * The seller roles are granted atomically with ownership, but an
+   * already-issued JWT is never rewritten: the new role and its capabilities
+   * arrive at the NEXT token issuance. A user who has just created their
+   * professional profile is holding a token minted seconds before they became a
+   * seller, so the seller surfaces would refuse them until the token expired on
+   * its own — up to the access-token TTL later.
+   *
+   * This exposes the refresh the provider already performs on `401`; it is not a
+   * new token or session contract, and it stores nothing new. Callers use it
+   * immediately after a successful ownership creation and nowhere else.
+   *
+   * Resolves `false` when the refresh failed. The caller must treat that as "the
+   * profile was created but the session is stale", never as "creation failed" —
+   * retrying the creation would hit a correct `409`.
+   */
+  refreshSession: () => Promise<boolean>;
   api: ApiClient;
 }
 
@@ -211,8 +231,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [authApi]);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, status, requestOtp, verifyOtp, logout, api }),
-    [user, status, requestOtp, verifyOtp, logout, api],
+    () => ({ user, status, requestOtp, verifyOtp, logout, refreshSession, api }),
+    [user, status, requestOtp, verifyOtp, logout, refreshSession, api],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
