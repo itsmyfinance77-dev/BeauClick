@@ -41,6 +41,7 @@ import {
   BookingConfirmedLogHandler,
   BookingExpiredOrderHandler,
   OrderPaidLedgerHandler,
+  OrderCollectionCapturedLedgerHandler,
   OrderRefundedLedgerHandler,
   RefundCompletedCommerceHandler,
 } from '../events/financial-projection.handlers';
@@ -185,6 +186,7 @@ import {
     OutboxSweepScheduler,
 
     OrderPaidLedgerHandler,
+    OrderCollectionCapturedLedgerHandler,
     OrderRefundedLedgerHandler,
     RefundCompletedCommerceHandler,
     BookingCancelledRefundHandler,
@@ -236,6 +238,7 @@ import {
       // independently idempotent, so the fan-out needs no coordination.
       useFactory: (
         orderPaid: OrderPaidLedgerHandler,
+        collectionCaptured: OrderCollectionCapturedLedgerHandler,
         orderRefunded: OrderRefundedLedgerHandler,
         refundCompleted: RefundCompletedCommerceHandler,
         bookingCancelled: BookingCancelledRefundHandler,
@@ -247,6 +250,10 @@ import {
         referral: DomainEventHandler[],
       ) => [
         orderPaid,
+        // V3.3 #82. A SECOND registration rather than a widened handler: the
+        // relay indexes by one `eventType` string per handler, so two event
+        // names need two entries. Same projection, same idempotency.
+        collectionCaptured,
         orderRefunded,
         refundCompleted,
         bookingCancelled,
@@ -268,6 +275,7 @@ import {
       ],
       inject: [
         OrderPaidLedgerHandler,
+        OrderCollectionCapturedLedgerHandler,
         OrderRefundedLedgerHandler,
         RefundCompletedCommerceHandler,
         BookingCancelledRefundHandler,

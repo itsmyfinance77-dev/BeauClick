@@ -109,6 +109,39 @@ export type ZeroCollectibleTransition =
   | { outcome: 'already' }
   | { outcome: 'ineligible'; reason: 'positive_collectible' | 'not_transitionable' | 'missing' };
 
+/**
+ * What `recordVerifiedCapture` did — V3.3 #82 (`#41c`), ADR-045 §4.
+ *
+ * A closed union rather than the boolean `markPaid` returned, because the caller
+ * must tell three different situations apart and a boolean collapses two of
+ * them: a winner that must go on to confirm the booking, a replay that must not,
+ * and a genuine refusal that means the verified amount does not match what this
+ * order agreed to collect.
+ *
+ * `status` is carried out of the database rather than recomputed, so the caller
+ * emits the event matching the row that was actually written.
+ */
+export type CaptureOutcome =
+  | { outcome: 'captured'; status: 'paid' | 'online_collection_completed'; collectedToman: number }
+  | { outcome: 'already'; status: OrderStatus; collectedToman: number }
+  | {
+      outcome: 'refused';
+      reason: 'missing' | 'non_positive_amount' | 'amount_not_collectible' | 'collectible_exceeds_total';
+    };
+
+/**
+ * The statuses a refund may be recorded against — V3.3 #82, ADR-045 §5.
+ *
+ * `online_collection_completed` joins the two existing ones because BeauClick
+ * genuinely holds money in that state. The refund ceiling that bounds it is
+ * `collected_total_toman`, not the service total.
+ */
+const REFUNDABLE_STATUSES = [
+  'paid',
+  'partially_refunded',
+  'online_collection_completed',
+] as const satisfies readonly OrderStatus[];
+
 export interface CreateBookingOrderInput {
   bookingId: string;
   customerId: string;
@@ -306,28 +339,96 @@ export class OrderService {
   }
 
   /**
-   * pending -> paid. Called by the payment verification path, inside the
-   * same transaction that records the verified payment.
+   * Record a gateway-verified capture — V3.3 #82 (`#41c`), ADR-045 §4.
    *
-   * Compare-and-swap on `status = 'pending'`, so a replayed gateway callback
-   * finds zero rows and returns false rather than re-emitting `OrderPaid`
-   * and double-recording a commission downstream.
+   * Replaces `markPaid(orderId, manager)`, which transitioned to `paid`
+   * unconditionally and emitted `OrderPaid` carrying `order.totalToman`. That
+   * was correct while full-online was the only mode and becomes a false money
+   * fact the moment a deposit is possible.
+   *
+   * Called by the payment verification path inside the same transaction that
+   * records the verified payment, and given the **server-verified** amount from
+   * `VerificationOutcome.amountToman` — never a callback parameter, never a
+   * client field, and never `order.totalToman`.
+   *
+   * Emits exactly one commerce event: `OrderPaid v1` when the capture is the
+   * whole service total, `OrderCollectionCaptured v1` otherwise. Never both.
    */
-  async markPaid(orderId: string, manager: EntityManager): Promise<boolean> {
-    const result = await manager
-      .createQueryBuilder()
-      .update(OrderEntity)
-      .set({ status: 'paid', paidAt: new Date() })
-      .where('id = :orderId AND status = :pending', { orderId, pending: 'pending' satisfies OrderStatus })
-      .execute();
+  async recordVerifiedCapture(
+    orderId: string,
+    verifiedAmountToman: number,
+    manager: EntityManager,
+  ): Promise<CaptureOutcome> {
+    assertNonNegativeAmount(verifiedAmountToman, 'verified capture amount');
 
-    if (result.affected !== 1) return false;
+    /*
+     * One statement proves every precondition, and that is the whole design.
+     *
+     * `status = 'pending'` is the compare-and-swap a replayed callback loses.
+     * `collected_total_toman = 0` makes the write once-only even if the status
+     * predicate were ever loosened. The join onto the immutable schedule proves
+     * the amount is the one this order agreed to -- inside the same statement,
+     * so there is no window between checking and writing.
+     *
+     * The status is decided HERE, by comparing the verified amount with the
+     * service total, and returned. That is what makes "exactly one event" a
+     * property rather than a convention: the caller emits the event matching
+     * the status the database just wrote, and no second reader can disagree.
+     */
+    const raw = await manager.query(
+      `UPDATE commerce.orders o
+          SET collected_total_toman = $2,
+              status = CASE WHEN $2 = o.total_toman THEN 'paid' ELSE 'online_collection_completed' END,
+              paid_at = now(),
+              updated_at = now()
+         FROM commerce.order_payment_schedules s
+        WHERE o.id = $1
+          AND s.order_id = o.id
+          AND o.status = 'pending'
+          AND o.collected_total_toman = 0
+          AND $2 > 0
+          AND $2 = s.platform_collectible_toman
+          AND $2 <= o.total_toman
+       RETURNING o.status`,
+      [orderId, verifiedAmountToman],
+    );
+
+    const rows = returningRows<{ status: OrderStatus }>(raw);
+    if (rows.length !== 1) return this.explainCaptureRefusal(manager, orderId, verifiedAmountToman);
 
     const order = await manager.findOneOrFail(OrderEntity, { where: { id: orderId } });
+    const schedule = await manager.findOneOrFail(OrderPaymentScheduleEntity, { where: { orderId } });
+    const capturedAt = (order.paidAt ?? new Date()).toISOString();
+
+    if (rows[0].status === 'paid') {
+      /*
+       * `OrderPaid v1`, byte-for-byte as it has always been. Not one field
+       * added, because every consumer's meaning depends on it not moving.
+       */
+      await emitEvent(manager, CommerceOutboxEntity, {
+        aggregateType: 'order',
+        aggregateId: orderId,
+        eventType: 'OrderPaid',
+        payload: {
+          orderId,
+          sourceType: order.sourceType,
+          sourceId: order.sourceId,
+          customerId: order.customerId,
+          sellerPartyType: order.sellerPartyType,
+          sellerPartyId: order.sellerPartyId,
+          totalToman: order.totalToman,
+          currency: order.currency,
+          paidAt: capturedAt,
+        },
+      });
+      this.auditLog.log({ action: 'order.paid', orderId, total: order.totalToman });
+      return { outcome: 'captured', status: 'paid', collectedToman: order.collectedTotalToman };
+    }
+
     await emitEvent(manager, CommerceOutboxEntity, {
       aggregateType: 'order',
       aggregateId: orderId,
-      eventType: 'OrderPaid',
+      eventType: 'OrderCollectionCaptured',
       payload: {
         orderId,
         sourceType: order.sourceType,
@@ -335,14 +436,52 @@ export class OrderService {
         customerId: order.customerId,
         sellerPartyType: order.sellerPartyType,
         sellerPartyId: order.sellerPartyId,
-        totalToman: order.totalToman,
+        serviceTotalToman: schedule.serviceTotalToman,
+        platformCollectedToman: order.collectedTotalToman,
+        venueBalanceToman: schedule.venueBalanceToman,
         currency: order.currency,
-        paidAt: (order.paidAt ?? new Date()).toISOString(),
+        capturedAt,
       },
     });
+    this.auditLog.log({
+      action: 'order.collection_captured',
+      orderId,
+      collected: order.collectedTotalToman,
+    });
+    return {
+      outcome: 'captured',
+      status: 'online_collection_completed',
+      collectedToman: order.collectedTotalToman,
+    };
+  }
 
-    this.auditLog.log({ action: 'order.paid', orderId, total: order.totalToman });
-    return true;
+  /**
+   * Why the capture statement affected no row.
+   *
+   * Read after the fact, never before it: a preceding check would be a second
+   * source of truth for a decision the statement already made, and the two
+   * could disagree under concurrency. This runs only on the failure path, where
+   * the answer is a diagnosis rather than a control.
+   */
+  private async explainCaptureRefusal(
+    manager: EntityManager,
+    orderId: string,
+    verifiedAmountToman: number,
+  ): Promise<CaptureOutcome> {
+    const order = await manager.findOne(OrderEntity, { where: { id: orderId } });
+    if (!order) return { outcome: 'refused', reason: 'missing' };
+    if (order.status !== 'pending' || order.collectedTotalToman > 0) {
+      // The common case, and not an error: a replayed callback.
+      return { outcome: 'already', status: order.status, collectedToman: order.collectedTotalToman };
+    }
+
+    const schedule = await manager.findOne(OrderPaymentScheduleEntity, { where: { orderId } });
+    if (!schedule) throw new MissingOrderPaymentScheduleException(orderId);
+    if (verifiedAmountToman <= 0) return { outcome: 'refused', reason: 'non_positive_amount' };
+    if (verifiedAmountToman !== schedule.platformCollectibleToman) {
+      return { outcome: 'refused', reason: 'amount_not_collectible' };
+    }
+    return { outcome: 'refused', reason: 'collectible_exceeds_total' };
   }
 
   /**
@@ -465,14 +604,18 @@ export class OrderService {
    * Records a completed refund against the order.
    *
    * Never rewrites history: `refundedTotalToman` only ever increases, and
-   * the original `totalToman` is left exactly as charged. The status becomes
-   * `partially_refunded` or `refunded` depending on whether the cumulative
-   * refunded amount has reached the total.
+   * neither `totalToman` nor `collectedTotalToman` is ever reduced.
    *
-   * The `refunded_total + :amount <= total` predicate is in the UPDATE's own
-   * WHERE clause, not a preceding read: that is what makes two concurrent
-   * refunds unable to over-refund an order between each other's check and
-   * write.
+   * **The ceiling is `collected_total_toman`, not `total_toman`** — V3.3 #82
+   * (`#41c`), ADR-045 §5. Under a deposit those differ, and the service total
+   * would permit refunding a venue balance BeauClick never held. `refunded`
+   * therefore means the refunded amount reached the **captured principal**, and
+   * `partially_refunded` that some of that principal remains.
+   *
+   * The `refunded_total + :amount <= collected_total` predicate is in the
+   * UPDATE's own WHERE clause, not a preceding read: that is what makes two
+   * concurrent refunds unable to over-refund an order between each other's
+   * check and write.
    */
   async recordRefund(
     orderId: string,
@@ -504,18 +647,20 @@ export class OrderService {
       .set({
         refundedTotalToman: () => `refunded_total_toman + ${amountToman}`,
         status: () =>
-          `CASE WHEN refunded_total_toman + ${amountToman} >= total_toman THEN 'refunded' ELSE 'partially_refunded' END`,
+          `CASE WHEN refunded_total_toman + ${amountToman} >= collected_total_toman THEN 'refunded' ELSE 'partially_refunded' END`,
       })
       .where(
-        'id = :orderId AND status IN (:...refundable) AND refunded_total_toman + :amount <= total_toman',
-        { orderId, refundable: ['paid', 'partially_refunded'] satisfies OrderStatus[], amount: amountToman },
+        'id = :orderId AND status IN (:...refundable) AND refunded_total_toman + :amount <= collected_total_toman',
+        { orderId, refundable: REFUNDABLE_STATUSES, amount: amountToman },
       )
       .execute();
 
     if (result.affected !== 1) {
       const order = await manager.findOne(OrderEntity, { where: { id: orderId } });
       if (!order) throw new OrderNotFoundException();
-      if (order.refundedTotalToman + amountToman > order.totalToman) throw new RefundExceedsOrderException();
+      if (order.refundedTotalToman + amountToman > order.collectedTotalToman) {
+        throw new RefundExceedsOrderException();
+      }
       return false;
     }
 
@@ -538,9 +683,17 @@ export class OrderService {
     return true;
   }
 
-  /** What is still refundable on this order right now. Always recomputed, never cached -- V2's proven discipline. */
+  /**
+   * What is still refundable on this order right now. Always recomputed, never
+   * cached -- V2's proven discipline.
+   *
+   * **Bounded by the captured principal**, not the service total (V3.3 #82,
+   * ADR-045 §5). Returning the service total for a deposit order would offer
+   * back a venue balance BeauClick never held, and every caller of this method
+   * spends real money on the answer.
+   */
   remainingRefundable(order: OrderEntity): number {
-    return Math.max(0, order.totalToman - order.refundedTotalToman);
+    return Math.max(0, order.collectedTotalToman - order.refundedTotalToman);
   }
 
   // ---------------------------------------------------------------------

@@ -142,6 +142,29 @@ export const NOTIFICATION_RULES: NotificationRule[] = [
     }),
   },
   {
+    /*
+     * V3.3 #82 (`#41c`), ADR-045 §7. The deposit's own notification.
+     *
+     * `platformCollectedToman`, never `serviceTotalToman`. Telling a customer
+     * they paid the full service price when they paid a deposit is the platform
+     * stating something untrue about that person's own money -- and the
+     * `OrderPaid` mapping above would have done exactly that if this event had
+     * been folded into it, because its variable reads `totalToman`.
+     *
+     * Same template, channel and category as a full capture: from the
+     * customer's side a payment succeeded, and only the amount differs.
+     */
+    eventType: 'OrderCollectionCaptured',
+    templateKey: 'payment_succeeded',
+    channels: ['in_app'],
+    entityType: 'order',
+    build: async (p) => ({
+      userId: str(p.customerId),
+      entityId: str(p.orderId),
+      vars: { amountToman: formatToman(num(p.platformCollectedToman)) },
+    }),
+  },
+  {
     eventType: 'LoyaltyTierChanged',
     templateKey: 'loyalty_tier_changed',
     channels: ['in_app'],
