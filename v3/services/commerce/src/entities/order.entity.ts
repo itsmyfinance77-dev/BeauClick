@@ -28,6 +28,18 @@ import { CurrencyCode, requiredMoneyTransformer } from '@beauclick/money';
  * by the zero-collectible confirmation path, only from `pending`, and only when
  * the order's immutable schedule says `platformCollectibleToman === 0`.
  *
+ * `online_collection_completed` -- V3.3 #82 (`#41c`), ADR-045, `V33-DEC-024`
+ * Rulings 2 and 3 -- means BeauClick's scheduled ONLINE collection completed
+ * while a venue balance may remain. It is **not** paid in full, delivered,
+ * settled or paid at the venue. It is written only by the verification path,
+ * only from `pending`, and only when the gateway-verified amount is positive,
+ * equals the order's immutable `platform_collectible_toman`, and is less than
+ * the service total. When the verified amount equals the service total the
+ * status is `paid` instead, exactly as before.
+ *
+ * The two additive states are disjoint by construction: one requires a zero
+ * collectible and the other a positive one.
+ *
  * No transition returns to `pending`, and `paid` is not reachable from
  * `online_collection_not_required` -- an order the platform decided not to
  * collect for online is not one a gateway may later claim to have collected.
@@ -39,6 +51,7 @@ export const ORDER_STATUSES = [
   'refunded',
   'cancelled',
   'online_collection_not_required',
+  'online_collection_completed',
 ] as const;
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
@@ -100,6 +113,26 @@ export class OrderEntity {
   /** Cumulative refunded amount. Never decreases -- a refund is never un-done, only added to. */
   @Column({ type: 'bigint', default: 0, transformer: requiredMoneyTransformer })
   refundedTotalToman!: number;
+
+  /**
+   * What BeauClick actually collected -- V3.3 #82 (`#41c`), ADR-045 §3.
+   *
+   * The captured PRINCIPAL, not a balance: refunds move `refundedTotalToman`
+   * and never touch this. A column that fell when money went back could not
+   * bound refunds, because it would be bounding itself.
+   *
+   * Zero before capture, written once by the verification transaction from the
+   * server-verified amount, and required by that statement to equal the
+   * immutable schedule's `platformCollectibleToman`. Never reconstructed from
+   * `totalToman` -- the two differ the moment a deposit is possible, which is
+   * the whole reason this column exists.
+   *
+   * `ck_orders_refund_within_collected` makes it the refund ceiling in
+   * PostgreSQL, so the guarantee survives a future service, a migration, and a
+   * psql session.
+   */
+  @Column({ type: 'bigint', default: 0, transformer: requiredMoneyTransformer })
+  collectedTotalToman!: number;
 
   @Column({ type: 'timestamptz', nullable: true })
   paidAt!: Date | null;

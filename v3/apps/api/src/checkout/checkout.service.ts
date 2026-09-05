@@ -73,6 +73,31 @@ export class ZeroCollectibleConfirmationRefusedException extends DomainException
   }
 }
 
+/**
+ * The gateway verified an amount this order never agreed to collect — V3.3 #82
+ * (`#41c`), ADR-045 §4.
+ *
+ * A plain `Error`, like its sibling below, so `BeauclickExceptionFilter` logs
+ * and reports it server-side and answers the client with the generic Persian
+ * `INTERNAL_ERROR`. The order id and the reason reach a log, never a browser.
+ *
+ * Throwing rolls back the whole verification transaction, so **no** payment
+ * fact, order transition, collected principal, booking confirmation or commerce
+ * event is recorded against a mismatch. The attempt stays open and an operator
+ * sees a loud failure — which is the correct outcome, because the alternative is
+ * recording a capture whose amount the order's own immutable schedule
+ * contradicts.
+ */
+export class CaptureAmountMismatchException extends Error {
+  constructor(
+    orderId: string,
+    readonly reason: 'missing' | 'non_positive_amount' | 'amount_not_collectible' | 'collectible_exceeds_total',
+  ) {
+    super(`Verified capture for order ${orderId} was refused (${reason}); the amount is not what this order agreed to collect.`);
+    this.name = 'CaptureAmountMismatchException';
+  }
+}
+
 export class InconsistentZeroCollectibleOrderException extends Error {
   constructor(orderId: string, bookingId: string) {
     super(
@@ -220,12 +245,16 @@ export class CheckoutService {
       orderId: order.order.id,
       customerId: order.order.customerId,
       /*
-       * Still the TOTAL, deliberately. Under the only reachable mode the total
-       * and the collectible are equal, and changing the charged amount to the
-       * collectible is #82's decision with its own `OrderPaid` and ledger
-       * consequences (`V33-DEC-022` Ruling 7). #81 changes no charged amount.
+       * The SCHEDULE's collectible — V3.3 #82 (`#41c`), ADR-045 §8.
+       *
+       * Was `order.totalToman` until #82. The two are equal under the only
+       * reachable mode, so this changes nothing today and is exactly what makes
+       * a deposit correct tomorrow: the gateway is asked for the amount
+       * BeauClick is entitled to collect, never the full service price. The
+       * verification path then requires the captured amount to equal this same
+       * schedule figure.
        */
-      amountToman: order.order.totalToman,
+      amountToman: order.schedule.platformCollectibleToman,
     });
 
     const initiated = await this.payments.initiate(
@@ -372,7 +401,31 @@ export class CheckoutService {
         return { outcome: verification, bookingUnavailable: false, duplicateCharge: false };
       }
 
-      const marked = await this.orders.markPaid(verification.orderId, manager);
+      /*
+       * V3.3 #82. The verified amount comes from the server-to-server
+       * verification, never from a callback parameter and never from the order
+       * total. `recordVerifiedCapture` re-proves inside its own statement that
+       * it equals the immutable schedule's collectible, so a gateway that
+       * confirmed some other figure cannot capture against this order.
+       */
+      const captured = await this.orders.recordVerifiedCapture(
+        verification.orderId,
+        verification.amountToman,
+        manager,
+      );
+
+      if (captured.outcome === 'refused') {
+        /*
+         * The gateway verified an amount this order never agreed to collect.
+         * Throwing rolls the whole transaction back -- including the payment
+         * facts -- so nothing is recorded against a mismatch. The attempt stays
+         * open and the operator sees a loud failure rather than a quietly
+         * mis-booked capture.
+         */
+        throw new CaptureAmountMismatchException(verification.orderId, captured.reason);
+      }
+
+      const marked = captured.outcome === 'captured';
       if (!marked) {
         // THIS attempt just won its own compare-and-swap, meaning the gateway
         // confirmed a payment that had not been recorded before -- yet the

@@ -484,10 +484,14 @@ describePg('zero-collectible confirmation (real PostgreSQL)', () => {
      */
     it('control: the same handler DOES reach the refund path for a paid order', async () => {
       const booked = await bookThroughRoute(150_000);
-      await dataSource.query('UPDATE commerce.orders SET status = $2, paid_at = now() WHERE id = $1', [
-        booked.orderId,
-        'paid',
-      ]);
+      // V3.3 #82: `collected_total_toman` moves with the status. A `paid` order
+      // that captured nothing has a zero refund ceiling, so the handler would
+      // reach `remainingRefundable() === 0` and return early -- never touching
+      // the provider, which is the branch this control exists to prove.
+      await dataSource.query(
+        'UPDATE commerce.orders SET status = $2, collected_total_toman = total_toman, paid_at = now() WHERE id = $1',
+        [booked.orderId, 'paid'],
+      );
 
       const handler = app.get(BookingCancelledRefundHandler);
 

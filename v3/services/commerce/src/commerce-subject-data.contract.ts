@@ -116,6 +116,11 @@ export class CommerceSubjectDataContract implements SubjectDataContract {
           feeTotalToman: o.feeTotalToman,
           totalToman: o.totalToman,
           refundedTotalToman: o.refundedTotalToman,
+          // V3.3 #82. The customer's own money fact: what BeauClick actually
+          // collected from them. A server-derived integer on a row already
+          // claimed for this subject -- it names no counterparty and exposes no
+          // catalogue or policy internal.
+          collectedTotalToman: o.collectedTotalToman,
           paidAt: o.paidAt,
           cancelledAt: o.cancelledAt,
           createdAt: o.createdAt,

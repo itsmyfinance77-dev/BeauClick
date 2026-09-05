@@ -29,7 +29,12 @@ import { BookingService } from '@beauclick/booking';
 
 @Injectable()
 export class OrderPaidLedgerHandler implements DomainEventHandler {
-  readonly eventType = 'OrderPaid';
+  /**
+   * Annotated `string`, matching `DomainEventHandler`, rather than left to
+   * infer the literal `'OrderPaid'` — otherwise the #82 subclass below cannot
+   * declare its own event name.
+   */
+  readonly eventType: string = 'OrderPaid';
   private readonly logger = new Logger('OrderPaidLedgerHandler');
 
   constructor(
@@ -54,8 +59,24 @@ export class OrderPaidLedgerHandler implements DomainEventHandler {
       sourceId: string;
       sellerPartyType: 'professional' | 'business';
       sellerPartyId: string;
-      totalToman: number;
+      /** `OrderPaid v1` — the whole service total, which it also collected. */
+      totalToman?: number;
+      /** `OrderCollectionCaptured v1` — the only money BeauClick holds. */
+      platformCollectedToman?: number;
     };
+
+    /*
+     * V3.3 #82 (ADR-045 §6). The ledger records COLLECTED money, whichever
+     * event carried it.
+     *
+     * For `OrderPaid` the collected amount IS the service total, so full-online
+     * ledger behaviour is byte-identical to before. For
+     * `OrderCollectionCaptured` it is the platform-collected figure and the
+     * venue balance is deliberately absent from this payload's reach: the
+     * event carries `venueBalanceToman`, and nothing here reads it, because it
+     * is money BeauClick neither holds nor is owed.
+     */
+    const collectedToman = payload.platformCollectedToman ?? payload.totalToman ?? 0;
 
     // The payment intent id is the ledger's reference, so the ledger entry is
     // tied to the specific payment that produced it -- not merely to the
@@ -65,7 +86,7 @@ export class OrderPaidLedgerHandler implements DomainEventHandler {
       // A zero-total order legitimately has no intent to reference. Anything
       // else means the events arrived out of order; leaving it unpublished
       // lets the sweep retry once the intent exists.
-      if (payload.totalToman === 0) return;
+      if (collectedToman === 0) return;
       throw new Error(`No payment intent found for paid order ${payload.orderId}`);
     }
 
@@ -74,7 +95,7 @@ export class OrderPaidLedgerHandler implements DomainEventHandler {
       sourceId: payload.sourceType === 'booking' ? payload.sourceId : null,
       sellerPartyType: payload.sellerPartyType,
       sellerPartyId: payload.sellerPartyId,
-      netAmountToman: payload.totalToman,
+      netAmountToman: collectedToman,
       paymentReferenceId: intent.id,
     });
 
@@ -82,6 +103,27 @@ export class OrderPaidLedgerHandler implements DomainEventHandler {
       this.logger.debug(`Ledger already recorded payment for order ${payload.orderId} -- idempotent no-op`);
     }
   }
+}
+
+/**
+ * The same ledger projection, bound to the partial-capture fact — V3.3 #82
+ * (`#41c`), ADR-045 §6 and §7.
+ *
+ * ## Why a second class rather than a widened `eventType`
+ *
+ * `OutboxRelay` indexes handlers by a single `eventType` string, so one handler
+ * subscribes to exactly one event name. Two names therefore need two
+ * registrations, and this subclass is the smallest honest way to say that. It
+ * changes no dispatch behaviour and adds no version handling — deliberately, per
+ * `V33-DEC-024` Ruling 1.
+ *
+ * The inherited `handle` reads `platformCollectedToman` when present and
+ * `totalToman` otherwise, so both events post exactly the money BeauClick
+ * collected and neither can post a venue balance.
+ */
+@Injectable()
+export class OrderCollectionCapturedLedgerHandler extends OrderPaidLedgerHandler {
+  readonly eventType = 'OrderCollectionCaptured';
 }
 
 @Injectable()
@@ -124,7 +166,14 @@ export class RefundCompletedCommerceHandler implements DomainEventHandler {
     // would attempt a second increment and (correctly) be rejected by the
     // CHECK constraint -- but as a thrown error rather than a quiet no-op,
     // which would keep the row un-published and retry forever.
-    const alreadyCounted = order.refundedTotalToman >= order.totalToman;
+    /*
+     * V3.3 #82 (ADR-045 §5). Compared against the CAPTURED PRINCIPAL, not the
+     * service total. Under a deposit the service total is larger, so this guard
+     * would fail to fire and the second delivery would hit the CHECK constraint
+     * as a thrown error -- leaving the outbox row unpublished and retrying for
+     * ever, which is exactly what the guard exists to prevent.
+     */
+    const alreadyCounted = order.refundedTotalToman >= order.collectedTotalToman;
     if (alreadyCounted) return;
 
     await this.orders.recordRefund(payload.orderId, payload.amountToman, payload.refundId);
@@ -172,6 +221,12 @@ export class OrderRefundedLedgerHandler implements DomainEventHandler {
  *
  * The list is explicit rather than an inverted "not paid-ish" test: a future
  * status must be classified deliberately, and a wrong answer here spends money.
+ *
+ * **`online_collection_completed` is deliberately NOT here** (V3.3 #82,
+ * ADR-045 §5). BeauClick genuinely holds money in that state, so a cancelled
+ * deposit falls through to the refund branch below and gets back exactly its
+ * remaining collected principal — which `remainingRefundable` now computes from
+ * `collectedTotalToman`, so the refund can never include a venue balance.
  */
 const NEVER_COLLECTED_STATUSES: readonly OrderStatus[] = ['pending', 'online_collection_not_required'];
 

@@ -155,6 +155,27 @@ const FACT_MAPPINGS: Record<string, FactMapping> = {
     dimensions: (p) => ({ sourceType: str(p.sourceType), sellerPartyId: str(p.sellerPartyId) }),
     timestampOf: (p) => str(p.paidAt),
   },
+  /*
+   * V3.3 #82 (`#41c`), ADR-045 §7. A SEPARATE fact, deliberately.
+   *
+   * The measure is `platformCollectedToman` -- money BeauClick actually
+   * collected -- and never the service total, so a venue balance can never
+   * appear in a BeauClick revenue figure.
+   *
+   * It is not folded into `OrderPaid`'s fact because that metric is
+   * full-payment-only by construction and is already summed into historical
+   * seller revenue. Redefining it would silently change what past numbers mean;
+   * a distinct event type keeps history intact and lets a future report combine
+   * them deliberately.
+   */
+  OrderCollectionCaptured: {
+    subjectType: 'order',
+    subjectOf: (p) => str(p.orderId),
+    actorOf: (p) => str(p.customerId),
+    metricOf: (p) => num(p.platformCollectedToman),
+    dimensions: (p) => ({ sourceType: str(p.sourceType), sellerPartyId: str(p.sellerPartyId) }),
+    timestampOf: (p) => str(p.capturedAt),
+  },
   OrderRefunded: {
     subjectType: 'order',
     subjectOf: (p) => str(p.orderId),
