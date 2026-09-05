@@ -163,9 +163,23 @@ not the same as paid, free or settled — and **no new event is added**, because
 confirmation transaction transitions the order, runs a mandatory entitlement hook and
 confirms the booking in that order, matching the gateway callback's relative mutation
 order so the two paths cannot invert lock order, and it creates no payment intent,
-attempt, `OrderPaid`, receivable or refund for money that was never collected. #81 is
-Ready at 8 points and needs its own ADR before any schema or code; no commercial or legal
+attempt, `OrderPaid`, receivable or refund for money that was never collected. #81 was
+implemented at 8 points under ADR-044 and merged the same day; no commercial or legal
 value was approved by that ratification.
+
+The remaining question — what a *partial* capture means to `OrderPaid` and to the
+ledger — was ratified on 2026-09-05 as `V33-DEC-024`, and it was answered by separating
+the fact rather than redefining one. A verified collection below the service total emits
+a new `OrderCollectionCaptured v1`; `OrderPaid v1` keeps its whole-capture meaning and
+its exact payload and is emitted only for a full capture, never both. It is deliberately
+not an `OrderPaid v2`, because the outbox relay dispatches by event name and ignores
+`eventVersion`, so a same-name second version would poison the existing consumers. #82
+also gains an additive `online_collection_completed` order state and an additive
+`collected_total_toman` column that replaces the service total as the refund ceiling, so
+a refund can never exceed money BeauClick actually collected and the ledger never records
+a venue balance as a receivable. #82 is Ready, re-estimated from 8 to 13 points, and
+needs ADR-045 before any schema or code; that ratification approved no deposit value,
+percentage, retention rule, commission rate or legal copy either.
 
 Prices, included allowances, bounds, cutoffs, legal copy and accounting treatment stay
 open under issue #46, and real money movement stays blocked by #47. No allowance may
