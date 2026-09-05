@@ -65,6 +65,25 @@ export interface OrderAdjustment {
   amountToman: number;
 }
 
+/**
+ * The order's collection schedule — V3.3 `#41a`.
+ *
+ * All three amounts are served by the API and rendered as given. The client
+ * never derives one from another: a split computed here could be computed from
+ * a stale total or a wrong rounding assumption, and would show a number the
+ * server never agreed to.
+ *
+ * Today every order is `full_payment_online`, so `venueBalanceToman` is `0` and
+ * `platformCollectibleNowToman` equals `serviceTotalToman`. That is the honest
+ * current state rather than a placeholder.
+ */
+export interface OrderPaymentSchedule {
+  collectionMode: 'pay_at_venue' | 'deposit_online_balance_at_venue' | 'full_payment_online';
+  serviceTotalToman: number;
+  platformCollectibleNowToman: number;
+  venueBalanceToman: number;
+}
+
 export interface OrderDetail {
   id: string;
   sourceType: string;
@@ -80,6 +99,8 @@ export interface OrderDetail {
   createdAt: string;
   items: { id: string; name: string; quantity: number; unitPriceToman: number; lineTotalToman: number }[];
   adjustments: OrderAdjustment[];
+  /** Additive in `#41a`; every field above keeps its existing meaning. */
+  paymentSchedule: OrderPaymentSchedule;
 }
 
 export interface CheckoutResponse {

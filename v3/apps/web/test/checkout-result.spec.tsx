@@ -61,6 +61,20 @@ const ORDER = {
   createdAt: '2099-09-01T06:30:00.000Z',
   items: [{ id: 'i1', name: 'میکاپ', quantity: 1, unitPriceToman: 200000, lineTotalToman: 200000 }],
   adjustments: [],
+  /*
+   * V3.3 `#41a`. The API always serves this, so the fixture always has it --
+   * deliberately not made optional in the component, because an order without a
+   * schedule is an integrity failure the browser must not paper over.
+   *
+   * Full-online, which is what every order is today: BeauClick collects the
+   * whole service total and nothing is payable at the venue.
+   */
+  paymentSchedule: {
+    collectionMode: 'full_payment_online',
+    serviceTotalToman: 200000,
+    platformCollectibleNowToman: 200000,
+    venueBalanceToman: 0,
+  },
 };
 
 let getOrder: jest.SpyInstance;
@@ -561,5 +575,76 @@ describe('preserved behaviour', () => {
     const receipt = await screen.findByText('رسید');
     expect(receipt).toBeInTheDocument();
     expect(within(receipt.closest('div') as HTMLElement).getByText('میکاپ')).toBeInTheDocument();
+  });
+});
+
+/**
+ * The collection schedule on the receipt — V3.3 `#41a`, ADR-043 §8.
+ *
+ * Two properties matter and they pull against each other: the split must be
+ * visible when it says something, and it must not change a full-online receipt,
+ * which is every receipt today.
+ */
+describe('the payment schedule on the receipt', () => {
+  it('leaves a full-online receipt showing exactly the total it showed before #41a', async () => {
+    renderResult({ status: 'succeeded', orderId: 'o1' });
+    const receipt = (await screen.findByText('رسید')).closest('div') as HTMLElement;
+
+    // `مبلغ کل` is untouched: the schedule is additive, never a replacement.
+    expect(within(receipt).getByText('مبلغ کل')).toBeInTheDocument();
+    expect(within(receipt).getByText('۲۰۰٬۰۰۰ تومان')).toBeInTheDocument();
+
+    // ...and the split rows are absent, because "collect 200,000 / pay 0 at the
+    // venue" is noise on a receipt where nothing is payable at the venue.
+    expect(within(receipt).queryByText('پرداخت‌شده به بیوکلیک')).not.toBeInTheDocument();
+    expect(within(receipt).queryByText('قابل پرداخت در محل')).not.toBeInTheDocument();
+  });
+
+  it('shows both server-owned amounts when a venue balance exists, and computes neither', async () => {
+    /*
+     * No collection mode can produce this today -- `V33-DEC-011` is open and
+     * `#41a` writes `full_payment_online` for every order. The case exists so
+     * the projection is proved to render the SERVER's numbers before a mode can
+     * produce them, rather than being discovered wrong by #82.
+     *
+     * The amounts are deliberately NOT a clean split of the total: if the
+     * component ever subtracts instead of reading, these values are what
+     * catches it.
+     */
+    /*
+     * `totalToman` is deliberately NOT the service total here.
+     *
+     * A mutation probe found the first version of this case vacuous: with
+     * `totalToman === serviceTotalToman`, a component that computed
+     * `totalToman - collectible` produced exactly the stored venue balance and
+     * the test could not tell the two apart. Making them differ is what turns
+     * this into a real assertion that the component READS the schedule.
+     */
+    getOrder.mockResolvedValue({
+      data: {
+        ...ORDER,
+        // A THIRD distinct value: different from the service total and from the
+        // collectible, so a component that derives from it produces 35,000 --
+        // wrong, and visibly so -- and so no rendered amount collides with
+        // another and makes the query ambiguous.
+        totalToman: 95000,
+        paymentSchedule: {
+          collectionMode: 'deposit_online_balance_at_venue',
+          serviceTotalToman: 200000,
+          platformCollectibleNowToman: 60000,
+          venueBalanceToman: 140000,
+        },
+      },
+      meta: null,
+      error: null,
+    });
+
+    renderResult({ status: 'succeeded', orderId: 'o1' });
+    const receipt = (await screen.findByText('رسید')).closest('div') as HTMLElement;
+
+    expect(within(receipt).getByText('پرداخت‌شده به بیوکلیک')).toBeInTheDocument();
+    expect(within(receipt).getByText('۶۰٬۰۰۰ تومان')).toBeInTheDocument();
+    expect(within(receipt).getByText('قابل پرداخت در محل')).toBeInTheDocument();
+    expect(within(receipt).getByText('۱۴۰٬۰۰۰ تومان')).toBeInTheDocument();
   });
 });
