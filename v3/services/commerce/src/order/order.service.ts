@@ -255,6 +255,13 @@ export class OrderService {
       feeTotalToman: priced.feeTotalToman,
       totalToman: priced.totalToman,
       refundedTotalToman: 0,
+      /*
+       * V3.3 #82. Explicit, not left to the column default: `requiredMoneyTransformer`
+       * refuses `undefined`, and an order that has collected nothing has
+       * collected exactly zero -- which is a fact worth writing rather than a
+       * gap for the database to fill.
+       */
+      collectedTotalToman: 0,
       paidAt: null,
       cancelledAt: null,
     });

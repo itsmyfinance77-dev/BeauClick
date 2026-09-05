@@ -156,7 +156,7 @@ service price — stays open under #46 and is not decided here.
 | `OrderPaidLoyaltyHandler` (`loyalty-journey.handlers.ts`) | **Full-capture only, intentionally** — awards nothing for booking orders anyway; a deposit must not broaden loyalty |
 | Journey timeline (`loyalty-journey.handlers.ts`) | **Full-capture only, intentionally** |
 | Referral qualification / reversal (`referral-ports.ts`) | **Intentionally unaffected** — `OrderPaid` never qualifies a referral, and neither does a deposit |
-| `analytics.controller.ts` ingestion allowlist | **New-capture consumer** — the new name is added so the fact can be ingested at all |
+| `SERIES_EVENTS` query allow-list (`analytics.controller.ts`) | **Intentionally unaffected** — it gates the public *series query* surface, not ingestion, and its own comment explains it is kept minimal because "a caller probing arbitrary names would learn exactly which events the platform emits". The new fact is ingested without it, so widening a public enumerable surface would buy nothing |
 
 No string-keyed consumer is left unclassified.
 
