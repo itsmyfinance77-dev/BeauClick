@@ -138,7 +138,22 @@ atomically on ownership creation — never on verification, never from
 ownership-only backfill, `customer` never removed, live ownership still the
 authorization boundary, and a grant taking effect at the next access-token
 issuance rather than inside an already-issued one. Tracked as #75, re-estimated
-to 8 points, not yet started.
+to 8 points, and **implemented and merged on 2026-09-05**: the roles are granted
+atomically inside the professional and business creation transactions through a
+composition-root port, with an idempotent ownership-only migration backfill for
+existing owners.
+
+Story #41 — deposit online, balance at venue, and pay at venue — was decomposed on
+2026-09-05 by `V33-DEC-022` after its readiness audit, from a provisional 13 points to
+37 across four children delivered in order: #41 (`#41a`) an immutable per-order payment
+schedule that represents all three collection modes but **enables none**; #81 (`#41b`)
+the zero-collectible confirmation path a pay-at-venue booking needs, plus the mandatory
+transaction seam #58 hooks; #82 (`#41c`) sandbox deposit execution with the refund
+ceiling and the ledger limited to money actually collected; and #83 (`#41d`) the
+administrator-versioned policy publication that stays blocked by #46. That closure fixes
+sequencing only — no deposit value, percentage base, rounding value or enabled mode was
+chosen, and #47 gates real provider collection and settlement rather than the structural
+work.
 
 Prices, included allowances, bounds, cutoffs, legal copy and accounting treatment stay
 open under issue #46, and real money movement stays blocked by #47. No allowance may
