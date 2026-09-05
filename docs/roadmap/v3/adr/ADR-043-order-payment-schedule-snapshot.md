@@ -8,6 +8,13 @@
 isolation), ADR-011 (module boundaries)
 **Constrains:** #81 (`#41b`), #82 (`#41c`), #83 (`#41d`)
 
+**Amended 2026-09-05 (`V33-DEC-023`):** the owner ratified the zero-collectible
+order lifecycle and confirmation contract that `V33-DEC-022` Ruling 6 had left
+open. Nothing this ADR decided changes — `#41a` still enables no mode and still
+changes no `OrderStatus` — but the successor story's vocabulary is now fixed
+rather than pending, and *What was deliberately not built* and *Open gates* below
+are annotated accordingly.
+
 ## Context
 
 `commerce.orders` holds one monetary total. `total_toman` is simultaneously the
@@ -216,6 +223,15 @@ unclaimed, so the classification cannot be forgotten.
 - Zero-collectible confirmation, and any path that confirms a booking without a
   gateway callback — **#81 (`#41b`)**, which must also carry #58's mandatory
   seam.
+
+  *Amended 2026-09-05 (`V33-DEC-023`): still not built here, and now fully
+  specified for #81.* That story adds the `OrderStatus` value
+  `online_collection_not_required` and **no** new event, transitions the order
+  before confirming the booking so its lock order matches the gateway callback's
+  (H-a), and creates no intent, attempt, `OrderPaid`, receivable or refund for
+  money never collected. This ADR's §6 is untouched by that: a missing schedule
+  remains an integrity failure, and the new status is read from a schedule that
+  exists, never from its absence.
 - Deposit execution, the refund ceiling correction and the ledger amount
   correction — **#82 (`#41c`)**.
 - Policy publication, selection, activation windows and the admin surface —
@@ -239,3 +255,8 @@ unclaimed, so the classification cannot be forgotten.
   the readiness audit found ratified in no document — `V33-DEC-012` and #46.
 - The `OrderPaid` and financial meaning of a partial capture — `#41c`.
 - Real provider collection and settlement — #47.
+
+*Amended 2026-09-05 (`V33-DEC-023`).* The gate this ADR inherited from
+`V33-DEC-022` Ruling 6 — the zero-collectible order-status and event vocabulary —
+is **closed**, and no longer blocks #81. The four gates listed above are
+unaffected and remain open.

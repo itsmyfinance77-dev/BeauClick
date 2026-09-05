@@ -101,7 +101,7 @@ delivered as one 13-point item:
 | #56 (`#56a`) | — | 8 | Subscription foundation: schema, snapshotted subscriber party, `D-7` backfill and lazy ensure, plan-included grants, audit and privacy. Depends on #40. **No seller-facing route.** No payment collection. |
 | #69 (`#56b`) | — | 8 | Seller subscription surface: a workspace COLLECTION with an opaque `workspaceRef`, explicit initialization, history, published plans, zero-price selection and cancellation, `bc_manage_own_subscription`. Re-estimated 5 -> 8 by `V33-DEC-019` after the readiness audit found the singular contract unimplementable for a dual owner. Depends on #56. No paid activation. |
 | #57 (`#40c`) | — | 5 | Custom booking-credit purchase and immutable price snapshots. Depends on #40. No gateway or recurring billing. |
-| #58 (`#40d`) | — | 8 | Atomic consumption at first `confirmed` and idempotent return. Depends on #56, #57 and the zero-collectible confirmation path, which `V33-DEC-022` moved into #81 (`#41b`) together with the mandatory transaction seam this story hooks. |
+| #58 (`#40d`) | — | 8 | Atomic consumption at first `confirmed` and idempotent return. Depends on #56, #57 and the zero-collectible confirmation path, which `V33-DEC-022` moved into #81 (`#41b`) together with the mandatory transaction seam this story hooks. `V33-DEC-023` Ruling 8 fixes that seam's shape: mandatory and non-optional, taking the caller's `EntityManager`, keyed by booking id only and accepting no client-supplied owner, party or quantity. #81 ships the no-op binding; this story replaces it with real consumption. |
 | **Total** | **13** | **37** | Net V3.3 scope movement **+24**. |
 
 `#40b` was split a second time on 2026-09-03 (`V33-DEC-018`), after the Story #56
@@ -242,7 +242,7 @@ What is missing is a consumer: `CommercialPolicyModule` is composed into no
 | Item | Before | After | Outcome it owns |
 |---|---:|---:|---|
 | #41 (`#41a`) | 13 | 8 | Immutable one-to-one `commerce.order_payment_schedules` snapshot, truthful full-online backfill, additive three-amount browser/receipt fields, and wiring the existing contract into the API. Represents all three modes; **enables none**. Changes no `OrderStatus`, `OrderPaid`, `totalToman`, refund, ledger or public response meaning. |
-| #81 (`#41b`) | — | 8 | Zero-collectible confirmation orchestrator with no public confirm route and no fabricated intent, attempt, event or receivable, plus the **mandatory** composition seam #58 hooks. Gated on the zero-collectible order-status/event ruling. |
+| #81 (`#41b`) | — | 8 | Zero-collectible confirmation orchestrator with no public confirm route and no fabricated intent, attempt, event or receivable, plus the **mandatory** composition seam #58 hooks. Contract ratified 2026-09-05 by `V33-DEC-023`: the order takes the explicit status `online_collection_not_required`, no new event is added, and the transaction transitions the order before confirming the booking (H-a). ADR-044 is required before schema or code. |
 | #82 (`#41c`) | — | 8 | Sandbox deposit execution; intent amount becomes the platform collectible; refund ceiling and financial projection limited to collected money. Gated on the `OrderPaid` meaning of a partial capture. |
 | #83 (`#41d`) | — | 13 | Database-backed administrator publication and selection of versioned collection policy, fail-closed. Blocked by `V33-DEC-011`, `V33-DEC-012`, the percentage calculation base and `V33-DEC-017`. |
 | **Total** | **13** | **37** | Delivery order #41 -> #81 -> #82 -> #83. |
@@ -262,3 +262,16 @@ all — cancellation, no-show, reschedule, dispute, settlement, commission, tax 
 approved copy. #47 gates real provider collection, settlement and production
 activation only, and does not gate #41. #42, #43, #46, #47 and #58 are untouched
 apart from #58's dependency now naming #81.
+
+**`V33-DEC-023` closed #81's public vocabulary on 2026-09-05.** The one gate
+`V33-DEC-022` Ruling 6 left open is resolved: a zero-collectible order takes the
+explicit `OrderStatus` value `online_collection_not_required`, and **no** new
+commerce event or `ServiceName` is added, because `BookingConfirmed` already
+carries the fact and already has named consumers. The lifecycle is
+`pending -> online_collection_not_required -> cancelled`, `paid` stays reachable
+only through verified payment, the confirmation transaction transitions the order
+before confirming the booking so its lock order matches the gateway callback's,
+and no intent, attempt, `OrderPaid`, receivable or refund is created for money
+never collected. #81 stays 8 SP, becomes Ready, and needs ADR-044 before any
+schema or executable code. It closed no commercial or legal value: #46 and #47
+are untouched.
