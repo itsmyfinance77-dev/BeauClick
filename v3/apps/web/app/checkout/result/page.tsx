@@ -174,6 +174,9 @@ const ORDER_STATUS_FA: Record<string, string> = {
   partially_refunded: 'بازگشت جزئی وجه',
   refunded: 'بازگشت کامل وجه',
   cancelled: 'لغو شده',
+  // V3.3 `#41b`. Deliberately not «رایگان» or «پرداخت‌شده»: nothing was
+  // collected online, which is not the same as nothing being owed.
+  online_collection_not_required: 'بدون پرداخت آنلاین',
 };
 
 /**
