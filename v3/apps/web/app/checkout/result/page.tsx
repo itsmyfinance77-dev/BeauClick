@@ -447,6 +447,37 @@ function ResultContent() {
                 </td>
               </tr>
 
+              {/*
+                V3.3 `#41a`. Shown ONLY when BeauClick did not collect the whole
+                service price -- today never, because every order is
+                `full_payment_online`. Rendering "پرداخت‌شده به بیوکلیک: X /
+                پرداخت در محل: ۰" on every receipt would be noise that says
+                nothing, so the split appears exactly when it means something.
+
+                Both numbers come from the server's snapshot. Nothing here
+                subtracts, and `مبلغ کل` above is untouched.
+              */}
+              {order.paymentSchedule.venueBalanceToman > 0 ? (
+                <>
+                  <tr>
+                    <th scope="row" style={{ textAlign: 'start', padding: '6px 0', fontWeight: 400 }}>
+                      پرداخت‌شده به بیوکلیک
+                    </th>
+                    <td style={{ textAlign: 'end', padding: '6px 0' }}>
+                      {formatToman(order.paymentSchedule.platformCollectibleNowToman)} تومان
+                    </td>
+                  </tr>
+                  <tr>
+                    <th scope="row" style={{ textAlign: 'start', padding: '6px 0', fontWeight: 400 }}>
+                      قابل پرداخت در محل
+                    </th>
+                    <td style={{ textAlign: 'end', padding: '6px 0' }}>
+                      {formatToman(order.paymentSchedule.venueBalanceToman)} تومان
+                    </td>
+                  </tr>
+                </>
+              ) : null}
+
               {order.refundedTotalToman > 0 ? (
                 <tr>
                   <th

@@ -3,6 +3,7 @@ export * from './ports';
 export * from './entities/order.entity';
 export * from './entities/order-item.entity';
 export * from './entities/order-adjustment.entity';
+export * from './entities/order-payment-schedule.entity';
 export * from './entities/commerce-outbox.entity';
 export * from './pricing/pricing.types';
 export * from './pricing/pricing.service';

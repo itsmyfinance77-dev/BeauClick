@@ -48,6 +48,21 @@ export class CommerceSubjectDataContract implements SubjectDataContract {
       reason: 'Discounts and fees applied to a retained order, by rule key. No subject appears in it.',
     },
     {
+      /*
+       * V3.3 `#41a` (ADR-043 §10). `retained`, and the absence of a `_user_id`
+       * column is NOT the reason it could have been `no_subject_data`.
+       *
+       * The row is part of an immutable transaction record reachable through a
+       * retained order, and a subject's exported receipt is incomplete without
+       * the amounts they actually agreed to. Same obligation as the order
+       * itself, so the same disposition.
+       */
+      table: 'commerce.order_payment_schedules',
+      disposition: 'retained',
+      reason:
+        'The immutable collection schedule of a retained order: what the service cost, what BeauClick collected online, and what was payable at the venue. Part of the same commercial record as the order.',
+    },
+    {
       table: 'commerce.outbox_events',
       disposition: 'retained',
       reason: 'Transactional outbox.',
@@ -75,6 +90,16 @@ export class CommerceSubjectDataContract implements SubjectDataContract {
           [orderIds],
         )
       : [];
+    // V3.3 `#41a`. Batched by order id like the two above -- an export of a
+    // customer with many orders must not become one query per order.
+    const schedules = orderIds.length
+      ? await manager.query(
+          `SELECT order_id, collection_mode, service_total_toman, platform_collectible_toman,
+                  venue_balance_toman, created_at
+             FROM commerce.order_payment_schedules WHERE order_id = ANY($1::uuid[]) ORDER BY order_id`,
+          [orderIds],
+        )
+      : [];
 
     return [
       {
@@ -97,6 +122,17 @@ export class CommerceSubjectDataContract implements SubjectDataContract {
         })),
       },
       { key: 'order_items', description: 'اقلام سفارش‌های شما', rows: items as Array<Record<string, unknown>> },
+      {
+        /*
+         * The policy reference is deliberately not exported. Which published
+         * terms produced these amounts is an administrative fact; what the
+         * subject is entitled to is what they were charged and what remained
+         * payable at the venue.
+         */
+        key: 'order_payment_schedules',
+        description: 'تفکیک پرداخت سفارش‌های شما',
+        rows: schedules as Array<Record<string, unknown>>,
+      },
       {
         key: 'order_adjustments',
         description: 'تخفیف‌ها و کارمزدهای سفارش‌های شما',

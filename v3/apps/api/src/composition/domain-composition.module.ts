@@ -22,6 +22,7 @@ import { WishlistCompositionModule } from './wishlist-composition.module';
 import { ReferralCompositionModule } from './referral-composition.module';
 import {
   CommercialCatalogueModule,
+  CommercialPolicyModule,
   SellerSubscriptionModule,
   SellerSubscriptionSurfaceModule,
 } from '@beauclick/commercial-policy';
@@ -133,6 +134,25 @@ import {
     // own, because it declares no port: it reads and writes its own five tables
     // and asks no other domain for a fact, so there is nothing for a
     // composition module to bind.
+    /*
+     * V3.3 `#41a` (ADR-043 §9). ADR-039's control plane, composed with ZERO
+     * definitions.
+     *
+     * This is what makes the module reachable from the running application at
+     * all -- the Story #41 readiness audit found it composed nowhere, so
+     * `collectionBreakdownV1()` and the whole policy vocabulary shipped in #39
+     * with no consumer.
+     *
+     * It activates nothing. An empty registry resolves no policy,
+     * `readiness()` still reports `productionAvailable: false`, and commerce
+     * does not query it in `#41a`: the compatibility snapshot is written
+     * directly, because `V33-DEC-011` still decides which modes may be enabled
+     * and is open under #46.
+     *
+     * It is composed now so #83 (`#41d`) extends a wired module rather than
+     * introducing one alongside its own publication surface.
+     */
+    CommercialPolicyModule.register([]),
     CommercialCatalogueModule,
     SellerSubscriptionModule,
     // V3.3-A Story #69 (`#56b`). The seller-facing routes over the foundation
