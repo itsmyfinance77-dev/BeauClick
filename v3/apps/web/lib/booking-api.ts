@@ -99,13 +99,19 @@ export interface OrderDetail {
     | 'partially_refunded'
     | 'refunded'
     | 'cancelled'
-    | 'online_collection_not_required';
+    | 'online_collection_not_required'
+    | 'online_collection_completed';
   currency: string;
   subtotalToman: number;
   discountTotalToman: number;
   feeTotalToman: number;
   totalToman: number;
   refundedTotalToman: number;
+  /**
+   * What BeauClick actually collected — V3.3 `#41c`. A server fact, never
+   * derived here: the client must not subtract schedule amounts to reach it.
+   */
+  collectedTotalToman: number;
   paidAt: string | null;
   createdAt: string;
   items: { id: string; name: string; quantity: number; unitPriceToman: number; lineTotalToman: number }[];

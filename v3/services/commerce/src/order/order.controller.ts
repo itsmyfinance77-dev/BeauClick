@@ -20,6 +20,16 @@ function toOrderSummary(order: OrderEntity) {
     feeTotalToman: order.feeTotalToman,
     totalToman: order.totalToman,
     refundedTotalToman: order.refundedTotalToman,
+    /*
+     * ADDITIVE — V3.3 #82 (`#41c`), ADR-045 §8.
+     *
+     * What BeauClick actually collected, as a server fact. The browser needs it
+     * to say "you paid X" truthfully next to a service total it must not
+     * confuse with money paid, and it must not subtract one schedule amount
+     * from another to get there: a client that can compute the split can compute
+     * it wrongly, and this is the number a customer checks against their bank.
+     */
+    collectedTotalToman: order.collectedTotalToman,
     paidAt: order.paidAt?.toISOString() ?? null,
     createdAt: order.createdAt.toISOString(),
   };

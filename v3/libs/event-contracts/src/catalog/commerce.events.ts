@@ -73,7 +73,71 @@ export const OrderRefunded = defineEvent({
   }),
 });
 
-export const COMMERCE_EVENTS = [OrderCreated, OrderPaid, OrderCancelled, OrderRefunded];
+/**
+ * BeauClick collected part of the service price — V3.3 #82 (`#41c`), ADR-045
+ * §1, `V33-DEC-024` Ruling 1.
+ *
+ * ## Why a new NAME rather than `OrderPaid v2`
+ *
+ * The outbox relay indexes and dispatches handlers by `eventType` alone;
+ * `DomainEventHandler.eventVersion` is declared and never read by it, and
+ * `parseEnvelope` throws on a version mismatch. Every contract here is
+ * `version: 1`, so versioning has never been exercised — a same-name v2 would be
+ * delivered to the v1 handlers and throw on every delivery, leaving a poison
+ * outbox row the sweep retried for ever.
+ *
+ * A new name uses the mechanism that already works: its own handler set, its own
+ * boot-time producer/consumer assertion, and no relay change.
+ *
+ * ## Why no field is called `totalToman`
+ *
+ * That name is the ambiguity this story exists to remove. `OrderPaid.totalToman`
+ * means "the whole service price, and we captured all of it" — true only while
+ * full-online is the one mode that runs. Here the three amounts are separate
+ * facts and are named separately, so a consumer cannot read "the money we hold"
+ * off a field that means something else.
+ *
+ * ## Exactly one of this and `OrderPaid` per capture
+ *
+ * The capture statement compares the verified amount with the service total and
+ * emits one event in the same transaction. `OrderPaid v1` is emitted only for a
+ * full capture and is otherwise byte-for-byte unchanged, so every existing
+ * consumer keeps its exact meaning.
+ */
+export const OrderCollectionCaptured = defineEvent({
+  name: 'OrderCollectionCaptured',
+  version: 1,
+  aggregateType: 'order',
+  producer: 'commerce',
+  description:
+    'A gateway confirmed BeauClick collected PART of the service price. The venue balance is not BeauClick money and is reported only so consumers need not derive it.',
+  idempotency:
+    'Emitted inside the pending->online_collection_completed CAS, which succeeds at most once per order.',
+  schema: z.object({
+    orderId: uuid(),
+    sourceType: orderSourceType(),
+    sourceId: uuid(),
+    customerId: uuid(),
+    sellerPartyType: partyType(),
+    sellerPartyId: uuid(),
+    /** The full disclosed service price. NOT an amount BeauClick holds. */
+    serviceTotalToman: positiveToman(),
+    /** What the gateway confirmed BeauClick collected. The only money fact here. */
+    platformCollectedToman: positiveToman(),
+    /** Owed to the seller at their own counter. Never a BeauClick receivable. */
+    venueBalanceToman: positiveToman(),
+    currency: currency(),
+    capturedAt: instant(),
+  }),
+});
+
+export const COMMERCE_EVENTS = [
+  OrderCreated,
+  OrderPaid,
+  OrderCollectionCaptured,
+  OrderCancelled,
+  OrderRefunded,
+];
 
 export const PaymentInitiated = defineEvent({
   name: 'PaymentInitiated',
