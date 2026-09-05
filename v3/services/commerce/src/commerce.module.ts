@@ -5,6 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { OrderEntity } from './entities/order.entity';
 import { OrderItemEntity } from './entities/order-item.entity';
 import { OrderAdjustmentEntity } from './entities/order-adjustment.entity';
+import { OrderPaymentScheduleEntity } from './entities/order-payment-schedule.entity';
 import { CommerceOutboxEntity } from './entities/commerce-outbox.entity';
 
 import { PricingService } from './pricing/pricing.service';
@@ -13,7 +14,16 @@ import { OrderOwnerResolver } from './order/order-owner.resolver';
 import { OrderController } from './order/order.controller';
 import { CommerceSubjectDataContract } from './commerce-subject-data.contract';
 
-export const COMMERCE_ENTITIES = [OrderEntity, OrderItemEntity, OrderAdjustmentEntity, CommerceOutboxEntity];
+export const COMMERCE_ENTITIES = [
+  OrderEntity,
+  OrderItemEntity,
+  OrderAdjustmentEntity,
+  // V3.3 `#41a` (ADR-043). Registered here and nowhere else: every DataSource in
+  // the platform spreads `COMMERCE_ENTITIES`, so a second registration path
+  // would be a second place to forget it.
+  OrderPaymentScheduleEntity,
+  CommerceOutboxEntity,
+];
 
 /**
  * `PRICING_RULES` is intentionally left unbound here.
