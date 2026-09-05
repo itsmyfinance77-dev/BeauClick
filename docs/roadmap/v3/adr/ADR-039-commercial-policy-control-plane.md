@@ -5,6 +5,14 @@
 **Backlog:** #38, #39  
 **Depends on:** ADR-018 (same-cluster consistency), ADR-023 (business seller party), ADR-025 (financial outbox), ADR-028 (honest readiness)
 
+**Amended 2026-09-05 (`V33-DEC-022`):** the owner closed the STRUCTURE and
+DELIVERY CONTRACT for Story #41, which this ADR's §3 and §4 anticipated. Three
+things are recorded in place below: #41 is decomposed into four children
+(#41 as `#41a`, #81, #82, #83) delivered in that order; the first child is a
+compatibility-preserving foundation that enables no collection mode; and #47's
+gate is narrower than #41's issue body claimed. **No decision in this ADR is
+reversed, no commercial or legal value is closed, and no schema changes here.**
+
 ## Context
 
 The product owner approved one redesign made of three inseparable directions:
@@ -77,6 +85,27 @@ caps collection at the full service price. This is a safety invariant rather
 than a configurable business preference: BeauClick must never collect more than
 the disclosed service total, and the platform-collected amount plus the venue
 balance must equal that total exactly.
+
+**Amended 2026-09-05 (`V33-DEC-022`) — the vocabulary shipped, the consumer did not.**
+
+`packages/commercial-policy-contract` implements every rule above:
+`BookingCollectionMode`, `DepositTerms`, `BookingCommercialTermsV1` and
+`collectionBreakdownV1()`, with BigInt floor division, min/max application and
+the service-total cap, all validated at the boundary.
+
+What the Story #41 readiness audit found on 2026-09-05 is that
+`CommercialPolicyModule` is composed into **no** `apps/api` module, so none of it
+is reachable from the running application, and `CommercialPolicyRegistry` is
+in-memory and code-registered with `productionAvailable: false`. #39 shipped a
+contract with no consumer.
+
+Wiring the module is `#41a`'s work and activates nothing on its own. Building the
+database-backed publication surface behind the registry is `#41d`'s, and stays
+blocked by `V33-DEC-011`/`V33-DEC-012`.
+
+**No parallel money vocabulary may be invented.** The three amounts keep the
+contract's own names: `serviceTotalToman`, `platformCollectibleToman` and
+`venueBalanceToman`.
 
 ### 4. Policies are immutable versions; bookings receive snapshots
 
@@ -165,6 +194,31 @@ Rejected. It would replace the proven professional/slot model and widen the
 blast radius into search, chat, reviews, waitlist and financial attribution.
 
 ## Open gates
+
+**Amended 2026-09-05 (`V33-DEC-022`).** Two corrections to how these gates were
+being read.
+
+**#47 is narrower than Story #41's body claimed.** The *External-gate scope
+correction* of 2026-09-02 already ruled it, and `V33-DEC-022` Ruling 9 restates
+it: **#47 gates real provider collection, settlement and production activation
+only.** It does not gate deterministic contract, schema or sandbox work, and it
+does not gate `#41a`. #41's original "depends on the gateway capability blocker
+#47" is superseded to that extent.
+
+**Story #41 is decomposed** into `#41a` (#41, retained), `#41b` (#81), `#41c`
+(#82) and `#41d` (#83), delivered in that order, and re-estimated from a
+provisional 13 SP to 37 SP against the actual code. `#41a` is a
+compatibility-preserving foundation: it may represent all three collection modes
+and make existing full-online facts explicit, but it enables no new mode, selects
+no policy, introduces no deposit value or percentage base, and changes no
+`OrderStatus`, `OrderPaid`, `totalToman`, refund, ledger or public response
+meaning.
+
+Everything else stays open exactly where it was: `V33-DEC-011` (enabled modes),
+`V33-DEC-012` (deposit bounds and rounding values), the percentage calculation
+base — which the audit found ratified in no document — `V33-DEC-013`–`017`, and
+#47.
+
 
 - #46: numeric plan, deposit, cutoff, retention, dispute, commission and copy
   parameters require product-owner and legal closure.
