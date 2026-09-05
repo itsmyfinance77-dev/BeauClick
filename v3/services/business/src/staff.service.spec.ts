@@ -8,6 +8,15 @@ import { BusinessOutboxEntity } from './entities/business-outbox.entity';
 import { BusinessService } from './business.service';
 import { StaffService } from './staff.service';
 import { StaffInviteRejectedException, StaffMembershipNotFoundException } from './business.errors';
+import { BusinessOwnerRoleGrantPort } from './ports';
+
+/**
+ * `StaffService`'s cases need a business to attach staff to, and nothing more.
+ * The owner-role port is a no-op here on purpose: `V33-DEC-021` Ruling 6 says a
+ * staff affiliation grants NO global role, so a staff spec that exercised the
+ * grant would be testing the wrong thing.
+ */
+const noOpOwnerRoles: BusinessOwnerRoleGrantPort = { grantBusinessOwnerRole: async () => true };
 
 describe('StaffService (integration, pg-mem)', () => {
   let dataSource: DataSource;
@@ -16,7 +25,7 @@ describe('StaffService (integration, pg-mem)', () => {
 
   beforeEach(async () => {
     dataSource = await createInMemoryDataSource([BusinessEntity, BusinessStaffEntity, BusinessOutboxEntity]);
-    businesses = new BusinessService(dataSource.getRepository(BusinessEntity), dataSource);
+    businesses = new BusinessService(dataSource.getRepository(BusinessEntity), dataSource, noOpOwnerRoles);
     staff = new StaffService(dataSource.getRepository(BusinessEntity), dataSource.getRepository(BusinessStaffEntity), dataSource);
   });
 

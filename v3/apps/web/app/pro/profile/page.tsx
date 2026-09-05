@@ -26,9 +26,20 @@ import { myVerification, submitVerification, type MyVerificationRequest } from '
  * exists. On this screen the consequence would be an overwritten display name
  * and a wiped bio and specialty list.
  */
+/**
+ * Shown when the profile was created but the session could not be rotated.
+ *
+ * Deliberately not phrased as a failure of the save: the profile exists, and
+ * telling the user otherwise would push them toward a second `POST` that
+ * correctly conflicts with the profile they just made.
+ */
+const SESSION_STALE_MESSAGE =
+  'پروفایل شما ساخته شد. برای فعال شدن دسترسی‌های فروشنده، یک‌بار از حساب خود خارج و دوباره وارد شوید.';
+
 export default function ProProfilePage() {
   const { api } = useAuth();
   const { state, profile, error: profileError, reload, setProfile } = useProProfile();
+  const { refreshSession } = useAuth();
 
   const [cities, setCities] = useState<ReferenceItem[]>([]);
   const [specialties, setSpecialties] = useState<ReferenceItem[]>([]);
@@ -131,13 +142,32 @@ export default function ProProfilePage() {
         specialtyIds,
       };
 
-      const res =
-        state === 'ready' && profile
-          ? await updateProvider(api, profile.id, payload)
-          : await createProvider(api, payload);
+      const creating = !(state === 'ready' && profile);
+      const res = creating ? await createProvider(api, payload) : await updateProvider(api, profile!.id, payload);
 
       if (res.data) setProfile(res.data);
       setSaved(true);
+
+      /*
+       * V3.3 #75 (`V33-DEC-021` Ruling 9). Creating the profile granted the
+       * `professional` role server-side, but this browser is still holding the
+       * access token it had a moment ago — the one minted before the user was a
+       * seller. Rotating the session now is what makes the seller surfaces
+       * reachable immediately instead of at the next natural refresh.
+       *
+       * ONLY on creation. An update changes no role, and refreshing on every
+       * save would rotate the session on each keystroke-sized edit.
+       *
+       * The profile EXISTS either way, so a failed refresh is not a failed
+       * creation and must never be reported as one — and must never re-POST,
+       * which would correctly `409`. The user is told their session needs
+       * renewing and given a sign-in link; nothing is invented client-side, and
+       * no role or capability is assumed before the server says so.
+       */
+      if (creating) {
+        const rotated = await refreshSession();
+        if (!rotated) setSaveError(SESSION_STALE_MESSAGE);
+      }
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'ذخیره پروفایل انجام نشد.');
     } finally {

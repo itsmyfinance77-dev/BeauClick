@@ -5,6 +5,13 @@ import { DomainException } from '@beauclick/http';
 import { AdminAuditService } from '@beauclick/audit';
 import { CapabilityEntity, RoleCapabilityEntity, RoleEntity, UserRoleEntity } from '../entities/role.entities';
 import { UserEntity } from '../entities/user.entity';
+import {
+  AUDIT_TARGET_USER_ROLE,
+  OWNER_ROLE_AUDIT_ACTIONS,
+  OWNER_ROLE_AUDIT_REASONS,
+  OWNER_ROLE_SYSTEM_ACTOR_LABEL,
+  OwnerRoleSlug,
+} from './owner-role.audit';
 
 export class RoleNotFoundException extends DomainException {
   constructor() {
@@ -153,6 +160,110 @@ export class RoleService {
       .getRepository(UserRoleEntity)
       .insert({ userId, roleSlug: slug, grantedBy: null, reason: 'default role at account creation' });
     return [slug];
+  }
+
+  /**
+   * Grants a seller OWNER role inside the caller's transaction (`V33-DEC-021`).
+   *
+   * ## Why this is not `grant()`
+   *
+   * `grant()` is the administrator surface: it opens its own transaction,
+   * requires a human actor, enforces the escalation rules, and writes an audit
+   * row naming that human. Every one of those is wrong here.
+   *
+   * This path has no human actor — a role is granted because a seller created a
+   * workspace, and `V33-DEC-018`/`V33-DEC-021` both forbid fabricating one. It
+   * must also join the CALLER's transaction rather than opening its own, so the
+   * ownership row and its role commit together or not at all. A method that
+   * opened `this.dataSource.transaction` here would produce exactly the window
+   * `V33-DEC-021` Ruling 8 forbids: committed ownership with no role, or a role
+   * for ownership that rolled back.
+   *
+   * So it is a second, narrower method rather than a widening of the first, and
+   * the two must not be merged: they are correct in different ways.
+   *
+   * ## The role is not a parameter the domain chooses freely
+   *
+   * `OwnerRoleSlug` admits `professional` and `business` and nothing else, and
+   * the composition-root adapters bind one fixed value each. There is no shape
+   * in this signature that could carry `administrator`, so escalation through
+   * this path is not something a check could fail to catch — it is
+   * unrepresentable.
+   *
+   * ## `customer` is never touched
+   *
+   * There is no delete, no replace and no `set`. The insert is additive and the
+   * denormalized column is recomputed from `user_roles` afterwards, so the
+   * default role survives by construction rather than by remembering to keep it
+   * (`V33-DEC-021` Ruling 4).
+   *
+   * ## Idempotent, and the audit follows the INSERT rather than the intent
+   *
+   * `ON CONFLICT DO NOTHING` makes a replayed creation a no-op. The audit row is
+   * written only when a row was actually inserted, so a retry does not inflate
+   * the trail — which is why this returns the boolean rather than `void`.
+   *
+   * @returns `true` when a role row was created, `false` when the user already held it.
+   */
+  async assignOwnerRole(
+    manager: EntityManager,
+    userId: string,
+    roleSlug: OwnerRoleSlug,
+  ): Promise<boolean> {
+    // Resolved from the DATA, never assumed. A deployment whose roles table is
+    // missing `professional` is a misconfiguration, and failing here fails the
+    // whole ownership transaction rather than creating a seller the platform
+    // cannot authorize.
+    const role = await manager.getRepository(RoleEntity).findOne({ where: { slug: roleSlug } });
+    if (!role) throw new RoleNotFoundException();
+
+    const inserted = await manager
+      .getRepository(UserRoleEntity)
+      .createQueryBuilder()
+      .insert()
+      .values({
+        userId,
+        roleSlug: role.slug,
+        // No granting human exists. `admin.admin_audit_log` carries the
+        // provenance through `actor_label`; this column records that nobody
+        // decided, which is the truth.
+        grantedBy: null,
+        reason:
+          roleSlug === 'professional'
+            ? OWNER_ROLE_AUDIT_REASONS.professionalOwnershipCreated
+            : OWNER_ROLE_AUDIT_REASONS.businessOwnershipCreated,
+      })
+      .orIgnore()
+      .execute();
+
+    // `orIgnore()` reports zero identifiers when the row already existed. That
+    // is the whole idempotency signal, and it is read from the database rather
+    // than from a prior SELECT that another transaction could invalidate
+    // between the check and the write.
+    const created = (inserted.identifiers?.length ?? 0) > 0;
+    if (!created) return false;
+
+    // The legacy denormalized column, kept in sync during the expand window
+    // (ADR-016), recomputed from the authority rather than appended to.
+    const after = await this.rolesForUser(userId, manager);
+    await manager.getRepository(UserEntity).update({ id: userId }, { roles: after });
+
+    await this.audit.recordSystem(manager, {
+      actorLabel: OWNER_ROLE_SYSTEM_ACTOR_LABEL,
+      action:
+        roleSlug === 'professional'
+          ? OWNER_ROLE_AUDIT_ACTIONS.professionalGranted
+          : OWNER_ROLE_AUDIT_ACTIONS.businessGranted,
+      targetType: AUDIT_TARGET_USER_ROLE,
+      targetId: userId,
+      after: { roles: after.join(','), role: role.slug },
+      reason:
+        roleSlug === 'professional'
+          ? OWNER_ROLE_AUDIT_REASONS.professionalOwnershipCreated
+          : OWNER_ROLE_AUDIT_REASONS.businessOwnershipCreated,
+    });
+
+    return true;
   }
 
   async grant(input: {

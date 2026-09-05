@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { DataSource } from 'typeorm';
@@ -10,6 +10,7 @@ import { BusinessOutboxEntity } from './entities/business-outbox.entity';
 import { CreateBusinessDto } from './dto/create-business.dto';
 import { UpdateBusinessDto } from './dto/update-business.dto';
 import { BusinessAlreadyExistsException } from './business.errors';
+import { BUSINESS_OWNER_ROLE_GRANT, BusinessOwnerRoleGrantPort } from './ports';
 
 /**
  * Profile CRUD, deliberately mirroring `ProviderService`'s professional-
@@ -26,6 +27,15 @@ export class BusinessService {
   constructor(
     @InjectRepository(BusinessEntity) private readonly businesses: Repository<BusinessEntity>,
     private readonly dataSource: DataSource,
+    /**
+     * V3.3 #75 (`V33-DEC-021`). The owner-role grant, bound by the composition
+     * root because `business` may not import `identity` (ADR-011).
+     *
+     * NOT `@Optional()`: a composition that forgets to bind it fails to boot
+     * rather than silently creating business owners who are refused on every
+     * capability-gated route.
+     */
+    @Inject(BUSINESS_OWNER_ROLE_GRANT) private readonly ownerRoles: BusinessOwnerRoleGrantPort,
   ) {}
 
   async create(ownerId: string, dto: CreateBusinessDto): Promise<BusinessEntity> {
@@ -44,6 +54,22 @@ export class BusinessService {
         revision: 1,
         deletedAt: null,
       });
+
+      /*
+       * V3.3 #75 (`V33-DEC-021` Rulings 3 and 8). The `business` role is granted
+       * HERE, on the caller's own manager, so the business row and the role
+       * commit together or not at all.
+       *
+       * `ownerId` is the SESSION-derived caller. `business_staff` is not
+       * consulted and is not reachable from this call -- Ruling 6's "affiliation
+       * grants no global role" is a property of the port's shape, not a rule
+       * this method has to remember.
+       *
+       * `verification_status` is deliberately not consulted either: no business
+       * verification workflow exists (`V33-DEC-021` Ruling 3), and gating on a
+       * column nothing ever writes would deny the role to every business.
+       */
+      await this.ownerRoles.grantBusinessOwnerRole(manager, ownerId);
 
       await emitEvent(manager, BusinessOutboxEntity, {
         aggregateType: 'business',

@@ -1,5 +1,5 @@
 import { Test } from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { Global, INestApplication, Module, ValidationPipe } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, Reflector } from '@nestjs/core';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
@@ -10,7 +10,10 @@ import { BeauClickExceptionFilter, ResponseEnvelopeInterceptor, ValidationExcept
 import { JwtAuthGuard, CapabilityGuard } from '@beauclick/auth';
 import { OwnershipGuard } from '@beauclick/ownership';
 import { IdentityModule, IDENTITY_ENTITIES, OTP_DEBUG_OBSERVER, OtpDebugObserver } from '@beauclick/identity';
-import { ProviderModule, PROVIDER_ENTITIES } from '@beauclick/provider';
+import { ProviderModule, PROVIDER_ENTITIES, SELLER_OWNER_ROLE_GRANT } from '@beauclick/provider';
+import { CAPABILITIES_BY_ROLE, ROLES } from '@beauclick/identity';
+import { PRIVILEGED_CAPABILITIES } from '@beauclick/auth';
+import { IdentityBackedOwnerRoleGrant } from '../src/composition/port-adapters';
 import { WISHLIST_ENTITIES } from '@beauclick/wishlist';
 import { EventContractsModule } from '@beauclick/event-contracts';
 import { AuditModule, AUDIT_ENTITIES } from '@beauclick/audit';
@@ -97,6 +100,95 @@ function applyHermeticTestEnv(): void {
   delete process.env.DATABASE_URL;
 }
 
+/**
+ * The #75 owner-role port, bound `@Global()` for the pg-mem layer — V3.3
+ * `V33-DEC-021`.
+ *
+ * ## Why a module and not a root-level provider
+ *
+ * `ProviderService` resolves `SELLER_OWNER_ROLE_GRANT` from `ProviderModule`'s
+ * OWN injector. A provider listed in `Test.createTestingModule({ providers })`
+ * sits in the root injector, which that module cannot see — so the graph fails
+ * to compile with a message that looks like a missing binding rather than a
+ * misplaced one. `DomainPortsModule`'s `PRICING_RULES` comment records the same
+ * trap costing a silent, money-affecting bug in production.
+ *
+ * ## The REAL adapter, not a stub
+ *
+ * `IdentityBackedOwnerRoleGrant` is the same class the composition root binds,
+ * and it needs only `RoleService`, which `IdentityModule` provides. A stub that
+ * granted nothing would make this layer agree with itself and prove nothing
+ * about the wiring — the failure Story #8 shipped and the reason the wishlist
+ * ports above are real too.
+ */
+@Global()
+@Module({
+  imports: [IdentityModule],
+  providers: [
+    IdentityBackedOwnerRoleGrant,
+    { provide: SELLER_OWNER_ROLE_GRANT, useExisting: IdentityBackedOwnerRoleGrant },
+  ],
+  exports: [SELLER_OWNER_ROLE_GRANT],
+})
+class OwnerRoleTestPortsModule {}
+
+/**
+ * Seeds `identity.roles`, `identity.capabilities` and `identity.role_capabilities`
+ * into the pg-mem DataSource.
+ *
+ * ## Why this did not exist before, and why it has to now
+ *
+ * `synchronize: true` creates the TABLES from the entities; it does not run the
+ * migrations, so the role catalogue those migrations SEED was empty here.
+ * Nothing noticed, because of a second-order accident worth naming:
+ * `AccountResolverService.resolveOrCreate` catches every failure of its creation
+ * transaction and falls back to reading the row by phone — and pg-mem does not
+ * honour ROLLBACK, so the user row written inside the failed transaction
+ * survived and was found. Every fast-layer account was therefore created down
+ * the CONFLICT path with no roles at all, and every test passed because none of
+ * them needed a capability.
+ *
+ * V3.3 #75 makes that unsustainable: `ProviderService.create` now grants the
+ * owner role inside its own transaction, and a missing `professional` row is a
+ * `RoleNotFoundException` the route correctly answers `400` to. Seeding is the
+ * honest fix — the fast layer should agree with the real schema rather than
+ * depend on an accident.
+ *
+ * ## Seeded FROM the code constant, not from a second copy
+ *
+ * `ROLES` and `CAPABILITIES_BY_ROLE` are the same values
+ * `20260824100001_create_roles_and_capabilities.sql` and its successors seed, and
+ * `PRIVILEGED_CAPABILITIES` is the same list the guard and `libs/audit` consult.
+ * Transcribing the rows here would create a third copy to keep in step.
+ */
+async function seedRoleCatalogue(dataSource: DataSource): Promise<void> {
+  // The three tiers the migration marks privileged. Kept explicit rather than
+  // derived, because "which ROLE is dangerous" is a product decision the data
+  // records, not something inferable from its capabilities.
+  const privilegedRoles = new Set(['moderator', 'platform_operator', 'administrator']);
+  const capabilities = new Set<string>();
+  for (const role of ROLES) for (const capability of CAPABILITIES_BY_ROLE[role]) capabilities.add(capability);
+
+  for (const capability of capabilities) {
+    await dataSource.query(
+      'INSERT INTO identity.capabilities (slug, description, is_privileged) VALUES ($1, $2, $3)',
+      [capability, capability, PRIVILEGED_CAPABILITIES.includes(capability)],
+    );
+  }
+  for (const role of ROLES) {
+    await dataSource.query(
+      'INSERT INTO identity.roles (slug, name, description, is_privileged, is_default) VALUES ($1, $2, $3, $4, $5)',
+      [role, role, role, privilegedRoles.has(role), role === 'customer'],
+    );
+    for (const capability of CAPABILITIES_BY_ROLE[role]) {
+      await dataSource.query(
+        'INSERT INTO identity.role_capabilities (role_slug, capability_slug) VALUES ($1, $2)',
+        [role, capability],
+      );
+    }
+  }
+}
+
 export async function createTestApp(): Promise<TestApp> {
   applyHermeticTestEnv();
   // AUDIT_ENTITIES joins the list because Phase A made an audit record part of
@@ -117,6 +209,7 @@ export async function createTestApp(): Promise<TestApp> {
   // TypeOrmTestingModule's docblock for why this must be synchronous, not
   // an async dynamic module.
   const dataSource = await createInMemoryDataSource(entities);
+  await seedRoleCatalogue(dataSource);
   const otpObserver = new CapturingOtpObserver();
 
   const moduleBuilder = Test.createTestingModule({
@@ -147,8 +240,26 @@ export async function createTestApp(): Promise<TestApp> {
       // into the wishlist, which is the one `ProviderController` needs.
       WishlistPortsModule,
       WishlistSavedStateModule,
+      // V3.3 #75 (`V33-DEC-021`). See the module's own docblock: a provider
+      // declared at the testing-module ROOT is not visible inside
+      // `ProviderModule`'s own injector, which is the exact trap the
+      // `PRICING_RULES` comment in `DomainPortsModule` records.
+      OwnerRoleTestPortsModule,
     ],
     providers: [
+      /*
+       * V3.3 #75 (`V33-DEC-021`). The REAL adapter, not a stub.
+       *
+       * `ProviderService` requires this port and does not declare an
+       * `@Optional()` fallback, so a module graph without it fails to compile --
+       * which is the property that makes the binding impossible to forget in
+       * production. This layer honours the same rule the WishlistPorts comment
+       * above records: a stub that quietly granted nothing would make this
+       * factory agree with itself and prove nothing about the wiring.
+       *
+       * `IdentityBackedOwnerRoleGrant` needs only `RoleService`, which
+       * `IdentityModule` above already provides.
+       */
       { provide: APP_FILTER, useClass: BeauClickExceptionFilter },
       { provide: APP_INTERCEPTOR, useClass: ResponseEnvelopeInterceptor },
       {

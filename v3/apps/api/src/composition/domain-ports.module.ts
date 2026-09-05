@@ -3,8 +3,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 
-import { ProfessionalEntity, ProviderModule, ServiceOfferingEntity } from '@beauclick/provider';
-import { UserEntity } from '@beauclick/identity';
+import { ProfessionalEntity, ProviderModule, SELLER_OWNER_ROLE_GRANT, ServiceOfferingEntity } from '@beauclick/provider';
+import { IdentityModule, UserEntity } from '@beauclick/identity';
 import { PROFESSIONAL_DIRECTORY } from '@beauclick/booking';
 import { PRICING_RULES, SERVICE_CATALOG } from '@beauclick/commerce';
 import { FINANCE_WORKSPACE_OWNER_RESOLVER, FINANCIAL_DATA_SOURCE, FINANCIAL_PARTY_RESOLVER } from '@beauclick/financial';
@@ -13,7 +13,7 @@ import { PROVIDER_REINDEX_SOURCE } from '@beauclick/search';
 import { RECIPIENT_RESOLVER } from '@beauclick/notification';
 import { ANALYTICS_SUBJECT_RESOLVER } from '@beauclick/analytics';
 import { LoyaltyModule } from '@beauclick/loyalty';
-import { BusinessEntity, BusinessStaffEntity } from '@beauclick/business';
+import { BUSINESS_OWNER_ROLE_GRANT, BusinessEntity, BusinessStaffEntity } from '@beauclick/business';
 import { PROFESSIONAL_OWNER_LOOKUP } from '@beauclick/waitlist';
 import {
   DEVELOPMENT_WORKSPACE_REFERENCE_SECRET,
@@ -26,6 +26,7 @@ import {
   OwnershipBackedFinanceWorkspaceResolver,
   ProviderBackedProfessionalDirectory,
   ProviderBackedServiceCatalog,
+  IdentityBackedOwnerRoleGrant,
   SellerPartyLookup,
 } from './port-adapters';
 import {
@@ -62,6 +63,11 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     // uses rather than growing a second implementation of "what images does
     // this professional have".
     ProviderModule,
+    // V3.3 #75 (`V33-DEC-021`). `IdentityBackedOwnerRoleGrant` delegates the
+    // whole grant rule to `RoleService`, which lives here. Imported rather than
+    // reimplemented for the same reason the finance workspace resolver
+    // delegates: a second "grant the owner role" would be a second answer.
+    IdentityModule,
   ],
   providers: [
     SellerPartyLookup,
@@ -97,6 +103,24 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
      */
     OwnershipBackedFinanceWorkspaceResolver,
     { provide: FINANCE_WORKSPACE_OWNER_RESOLVER, useExisting: OwnershipBackedFinanceWorkspaceResolver },
+    /*
+     * V3.3 #75 (`V33-DEC-021`). ONE adapter, bound under BOTH domain tokens.
+     *
+     * `provider` and `business` each declare their own token because neither
+     * may import the other and neither may import `identity` (ADR-011). The
+     * arrangement above for `PROFESSIONAL_DIRECTORY` /
+     * `PROFESSIONAL_OWNER_LOOKUP` is the precedent, and the reasoning is the
+     * same: two tokens are a module-boundary artefact; two implementations of
+     * "grant the owner role atomically with ownership" would be two answers to
+     * a question that must have exactly one.
+     *
+     * Both bindings are MANDATORY. Neither domain declares an `@Optional()`
+     * fallback, so a composition that forgot one would fail to boot rather than
+     * quietly recreating #75 for half the sellers on the platform.
+     */
+    IdentityBackedOwnerRoleGrant,
+    { provide: SELLER_OWNER_ROLE_GRANT, useExisting: IdentityBackedOwnerRoleGrant },
+    { provide: BUSINESS_OWNER_ROLE_GRANT, useExisting: IdentityBackedOwnerRoleGrant },
     /**
      * The workspace-reference secret, read ONCE for the whole application.
      *
@@ -160,6 +184,8 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     FINANCIAL_PARTY_RESOLVER,
     OWNED_SUBSCRIBER_PARTY_RESOLVER,
     FINANCE_WORKSPACE_OWNER_RESOLVER,
+    SELLER_OWNER_ROLE_GRANT,
+    BUSINESS_OWNER_ROLE_GRANT,
     WORKSPACE_REFERENCE_SECRET,
     FINANCIAL_DATA_SOURCE,
     PROVIDER_REINDEX_SOURCE,
