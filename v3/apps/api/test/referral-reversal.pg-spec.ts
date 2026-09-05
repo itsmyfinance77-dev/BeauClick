@@ -182,8 +182,13 @@ describePg('referral reversal — full refund, clawback, convergence (real Postg
     await dataSource.query(
       `INSERT INTO commerce.orders
          (id, source_type, source_id, customer_id, seller_party_type, seller_party_id,
-          status, currency, subtotal_toman, discount_total_toman, fee_total_toman, total_toman, paid_at)
-       VALUES ($1, $2, $3, $4, 'professional', $5, 'paid', 'IRT', $6, 0, 0, $6, now())`,
+          status, currency, subtotal_toman, discount_total_toman, fee_total_toman, total_toman,
+          collected_total_toman, paid_at)
+       -- collected_total_toman = the total: under the pre-deposit contract a
+       -- paid order had captured its whole price, and V3.3 #82 makes that
+       -- fact explicit rather than implied. Without it the refund ceiling is
+       -- zero and every reversal in this suite is correctly refused.
+       VALUES ($1, $2, $3, $4, 'professional', $5, 'paid', 'IRT', $6, 0, 0, $6, $6, now())`,
       [orderId, sourceType, bookingId, customerId, uuidv7(), total],
     );
     return orderId;

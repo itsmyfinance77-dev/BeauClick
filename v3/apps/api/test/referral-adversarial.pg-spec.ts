@@ -256,8 +256,11 @@ describePg('referral — abuse, security and concurrency adversarial suite (real
     await dataSource.query(
       `INSERT INTO commerce.orders
          (id, source_type, source_id, customer_id, seller_party_type, seller_party_id,
-          status, currency, subtotal_toman, discount_total_toman, fee_total_toman, total_toman, paid_at)
-       VALUES ($1, 'booking', $2, $3, 'professional', $4, 'paid', 'IRT', $5, 0, 0, $5, now())`,
+          status, currency, subtotal_toman, discount_total_toman, fee_total_toman, total_toman,
+          collected_total_toman, paid_at)
+       -- #82: a pre-deposit paid order captured its whole price. Explicit
+       -- now, because the refund ceiling is the captured principal.
+       VALUES ($1, 'booking', $2, $3, 'professional', $4, 'paid', 'IRT', $5, 0, 0, $5, $5, now())`,
       [orderId, bookingId, customerId, uuidv7(), total],
     );
     return orderId;
