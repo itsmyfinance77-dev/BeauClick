@@ -28,7 +28,7 @@ delivering its Story Points never creates a tag and never enables production.
 | V3.2-E | B2B Quotes and Campaigns | Owner-gated; payment gate applies to settlement | Not applicable | Not enabled |
 | V3.2-F | Payout and Calendar Automation | Predominantly external-gated | Not applicable | Not enabled |
 | V3.2-G | Evidence-Gated Scale | No commitment without evidence | Not applicable | Not enabled |
-| V3.3 | Product Maturity Programme | Active foundation: #39, #40 (`#40a`), #56 (`#56a`), #69 (`#56b`) and #72 complete; epic #38 in progress; #75 security and contract closed by `V33-DEC-021` and re-estimated to 8; #57, #58 and #75 not started | No tag authorized | Real money blocked by #47; unresolved values/copy blocked by #46 |
+| V3.3 | Product Maturity Programme | Active foundation: #39, #40 (`#40a`), #56 (`#56a`), #69 (`#56b`), #72 and #75 complete; epic #38 in progress; Story #41 decomposed by `V33-DEC-022` into #41 (`#41a`), #81 (`#41b`), #82 (`#41c`) and #83 (`#41d`) and re-estimated 13 -> 37; #57, #58 and the whole #41 family not started | No tag authorized | Real money blocked by #47; unresolved values/copy blocked by #46 |
 | V3.4 | Conditional Expansion Programme | Written owner decision and evidence required | Not applicable | Not enabled |
 
 V3.2-A and V3.2-B are completed historical milestones but are deliberately
@@ -101,7 +101,7 @@ delivered as one 13-point item:
 | #56 (`#56a`) | — | 8 | Subscription foundation: schema, snapshotted subscriber party, `D-7` backfill and lazy ensure, plan-included grants, audit and privacy. Depends on #40. **No seller-facing route.** No payment collection. |
 | #69 (`#56b`) | — | 8 | Seller subscription surface: a workspace COLLECTION with an opaque `workspaceRef`, explicit initialization, history, published plans, zero-price selection and cancellation, `bc_manage_own_subscription`. Re-estimated 5 -> 8 by `V33-DEC-019` after the readiness audit found the singular contract unimplementable for a dual owner. Depends on #56. No paid activation. |
 | #57 (`#40c`) | — | 5 | Custom booking-credit purchase and immutable price snapshots. Depends on #40. No gateway or recurring billing. |
-| #58 (`#40d`) | — | 8 | Atomic consumption at first `confirmed` and idempotent return. Depends on #56, #57 and Story #41's zero-online-collection confirmation path. |
+| #58 (`#40d`) | — | 8 | Atomic consumption at first `confirmed` and idempotent return. Depends on #56, #57 and the zero-collectible confirmation path, which `V33-DEC-022` moved into #81 (`#41b`) together with the mandatory transaction seam this story hooks. |
 | **Total** | **13** | **37** | Net V3.3 scope movement **+24**. |
 
 `#40b` was split a second time on 2026-09-03 (`V33-DEC-018`), after the Story #56
@@ -221,3 +221,44 @@ ADR-023 is amended rather than reversed: beneficiary resolution may still follow
 affiliation, while workspace authorization and owner-role assignment follow
 ownership. Business-scoped staff roles and permissions remain **#44's**
 territory. #57, #58, #41, #46 and #47 are untouched.
+
+
+## V3.3 Story #41 decomposed and re-estimated, 2026-09-05
+
+13 -> 37 Story Points across four children, by
+[`V33-DEC-022`](../roadmap/v3.3/V3.3_DECISION_REGISTER.md). Net V3.3 scope
+movement **+24**. The 13 was explicitly provisional: #41 acquired the
+zero-collectible confirmation capability in the `V33-DEC-001` correction of
+2026-09-02, after it was first sized, and its own body required a readiness audit
+before implementation.
+
+That audit found #41 bundled four independently reviewable outcomes, and that the
+three-amount vocabulary it was assumed to need **already exists and is already
+tested** — `collectionBreakdownV1()` in `packages/commercial-policy-contract`
+computes the platform-collectible and venue-balance split for all three modes.
+What is missing is a consumer: `CommercialPolicyModule` is composed into no
+`apps/api` module.
+
+| Item | Before | After | Outcome it owns |
+|---|---:|---:|---|
+| #41 (`#41a`) | 13 | 8 | Immutable one-to-one `commerce.order_payment_schedules` snapshot, truthful full-online backfill, additive three-amount browser/receipt fields, and wiring the existing contract into the API. Represents all three modes; **enables none**. Changes no `OrderStatus`, `OrderPaid`, `totalToman`, refund, ledger or public response meaning. |
+| #81 (`#41b`) | — | 8 | Zero-collectible confirmation orchestrator with no public confirm route and no fabricated intent, attempt, event or receivable, plus the **mandatory** composition seam #58 hooks. Gated on the zero-collectible order-status/event ruling. |
+| #82 (`#41c`) | — | 8 | Sandbox deposit execution; intent amount becomes the platform collectible; refund ceiling and financial projection limited to collected money. Gated on the `OrderPaid` meaning of a partial capture. |
+| #83 (`#41d`) | — | 13 | Database-backed administrator publication and selection of versioned collection policy, fail-closed. Blocked by `V33-DEC-011`, `V33-DEC-012`, the percentage calculation base and `V33-DEC-017`. |
+| **Total** | **13** | **37** | Delivery order #41 -> #81 -> #82 -> #83. |
+
+#41 keeps its number and its Epic #38 relationship, so every existing reference
+survives.
+
+The audit also recorded two latent money defects, both harmless only while the
+order total and the collected amount are the same number, and both #82's to
+correct: the refund ceiling is `refunded_total + amount <= total_toman`, and the
+ledger posts the order total as the receivable.
+
+**`V33-DEC-022` closes structure only.** Every commercial and legal value stays
+open: enabled collection modes, deposit bounds and rounding values, the
+percentage calculation base — which the audit found ratified in no document at
+all — cancellation, no-show, reschedule, dispute, settlement, commission, tax and
+approved copy. #47 gates real provider collection, settlement and production
+activation only, and does not gate #41. #42, #43, #46, #47 and #58 are untouched
+apart from #58's dependency now naming #81.
