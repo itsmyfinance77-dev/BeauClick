@@ -92,6 +92,18 @@ describeIfPg('Order-scoped payment retry on real PostgreSQL', () => {
       [result.paymentIntentId],
     );
 
+    /*
+     * `paymentIntentId` became `string | null` in V3.3 `#41b`: a zero-collectible
+     * checkout creates no intent at all. This helper only ever books a
+     * positive-priced service, so an intent MUST exist — and asserting that is
+     * better than widening `Booked.intentId` to accept null, which would have
+     * pushed a `?? ''` or a `!` into every retry assertion below and quietly
+     * turned "no intent was created" into "the intent id is empty string".
+     */
+    if (result.paymentIntentId === null) {
+      throw new Error(`Expected a payment intent for a ${priceToman} Toman booking, got none`);
+    }
+
     return { customer, orderId: result.order.order.id, intentId: result.paymentIntentId, reference };
   }
 
