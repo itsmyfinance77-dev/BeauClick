@@ -155,6 +155,18 @@ sequencing only — no deposit value, percentage base, rounding value or enabled
 chosen, and #47 gates real provider collection and settlement rather than the structural
 work.
 
+The one public-vocabulary question that closure left open was ratified the same day as
+`V33-DEC-023`: a zero-collectible order takes the explicit `OrderStatus` value
+`online_collection_not_required` — BeauClick is not collecting money online now, which is
+not the same as paid, free or settled — and **no new event is added**, because
+`BookingConfirmed` already carries the fact and already has named consumers. The
+confirmation transaction transitions the order, runs a mandatory entitlement hook and
+confirms the booking in that order, matching the gateway callback's relative mutation
+order so the two paths cannot invert lock order, and it creates no payment intent,
+attempt, `OrderPaid`, receivable or refund for money that was never collected. #81 is
+Ready at 8 points and needs its own ADR before any schema or code; no commercial or legal
+value was approved by that ratification.
+
 Prices, included allowances, bounds, cutoffs, legal copy and accounting treatment stay
 open under issue #46, and real money movement stays blocked by #47. No allowance may
 exist as a code constant, default, fallback or seed; an unconfigured plan or price
