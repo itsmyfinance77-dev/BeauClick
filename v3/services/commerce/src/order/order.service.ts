@@ -48,7 +48,28 @@ export class RefundExceedsOrderException extends DomainException {
  * reconstruction would keep working, silently, while describing something else
  * on a customer's receipt.
  *
- * The message carries no order id: it reaches a log, never a browser.
+ * The message DOES carry the order id, deliberately — bug #87 corrected an
+ * earlier comment here that claimed the opposite.
+ *
+ * It is safe and it is useful, and both halves matter. This is a plain `Error`,
+ * not a `DomainException`, so `BeauclickExceptionFilter` takes its
+ * non-`HttpException` branch: it logs the stack and hands the error to the
+ * reporter server-side, then answers the client with the generic Persian
+ * `INTERNAL_ERROR` body and nothing else. The id therefore reaches a log and a
+ * report, never a browser — which is precisely what makes naming the order
+ * worth doing, because the one person who sees this message is whoever has to
+ * find the order whose invariant broke.
+ *
+ * Two consequences follow, and they are the reason this is documented rather
+ * than left to be inferred:
+ *
+ *   * this exception must NOT be converted into a `DomainException` or any
+ *     `HttpException` subclass. That would route it through the branch above,
+ *     where a `code`-bearing body is returned verbatim, and the order id would
+ *     start reaching clients;
+ *   * the message must not be echoed into a response, a header or a redirect
+ *     by any future caller. There is exactly one throw site and no catch, and
+ *     it should stay that way.
  */
 export class MissingOrderPaymentScheduleException extends Error {
   constructor(orderId: string) {
