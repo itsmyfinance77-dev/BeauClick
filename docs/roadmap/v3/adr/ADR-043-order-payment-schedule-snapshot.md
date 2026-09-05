@@ -15,6 +15,23 @@ changes no `OrderStatus` — but the successor story's vocabulary is now fixed
 rather than pending, and *What was deliberately not built* and *Open gates* below
 are annotated accordingly.
 
+**Amended 2026-09-05 (`V33-DEC-024`) — the partial-capture gate is closed.** This
+ADR's *Open gates* listed "the `OrderPaid` and financial meaning of a partial
+capture" as `#41c`'s to settle. It is settled: a verified collection below the
+service total emits a distinct **`OrderCollectionCaptured v1`**, `OrderPaid v1`
+keeps its whole-capture meaning and exact payload, and the financial ledger
+receives only the gateway-verified collected amount — never a venue balance.
+Story #82 also gains an additive `online_collection_completed` order state and an
+additive `commerce.orders.collected_total_toman`, which becomes the refund
+ceiling in place of `total_toman`.
+
+**Nothing this ADR built changes, and #82 is not implemented.** `#41a`'s snapshot
+is untouched: the same three amounts, the same immutability trigger, the same
+constraints, and §6's rule that a missing schedule is an integrity failure rather
+than a reconstruction. What changes is that the successor story now has a
+ratified contract instead of an open gate. ADR-045 records the implementation and
+does not exist yet.
+
 ## Context
 
 `commerce.orders` holds one monetary total. `total_toman` is simultaneously the
@@ -253,7 +270,11 @@ unclaimed, so the classification cannot be forgotten.
 - Which collection modes may be enabled — `V33-DEC-011`.
 - Deposit bounds, rounding values, and the percentage calculation base, which
   the readiness audit found ratified in no document — `V33-DEC-012` and #46.
-- The `OrderPaid` and financial meaning of a partial capture — `#41c`.
+- ~~The `OrderPaid` and financial meaning of a partial capture — `#41c`.~~
+  **CLOSED 2026-09-05 by `V33-DEC-024`:** a partial capture emits a distinct
+  `OrderCollectionCaptured v1` rather than reinterpreting `OrderPaid v1`, and the
+  ledger receives only the gateway-verified collected amount. See the amendment
+  note below.
 - Real provider collection and settlement — #47.
 
 *Amended 2026-09-05 (`V33-DEC-023`).* The gate this ADR inherited from

@@ -8,6 +8,21 @@
 consistency), ADR-017 (financial isolation), ADR-011 (module boundaries)
 **Constrains:** #58 (`#40d`), #82 (`#41c`)
 
+**Amended 2026-09-05 (`V33-DEC-024`) — the deposit path is disjoint from this
+one, and this ADR is unchanged.** #82's contract adds a second additive order
+state, `online_collection_completed`, for an order whose *positive* scheduled
+collection was verified. It does not touch the zero-collectible path: the trigger
+here is still `platformCollectibleToman === 0`, `online_collection_not_required`
+still means BeauClick is not collecting money online now, and it still never
+becomes `paid`.
+
+The two states are mutually exclusive by their own triggers — zero versus
+positive collectible — so no order can be eligible for both. The H-a lock order
+this ADR fixed (§3) is inherited by the deposit callback rather than replaced:
+that path writes payment facts, then the order, then the booking, which is the
+same relative order for the two aggregates. #82 is **not** implemented, and
+ADR-045 will record its implementation.
+
 ## Context
 
 `CheckoutService.checkout()` creates a payment intent for **every** order and

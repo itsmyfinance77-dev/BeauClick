@@ -28,7 +28,7 @@ delivering its Story Points never creates a tag and never enables production.
 | V3.2-E | B2B Quotes and Campaigns | Owner-gated; payment gate applies to settlement | Not applicable | Not enabled |
 | V3.2-F | Payout and Calendar Automation | Predominantly external-gated | Not applicable | Not enabled |
 | V3.2-G | Evidence-Gated Scale | No commitment without evidence | Not applicable | Not enabled |
-| V3.3 | Product Maturity Programme | Active foundation: #39, #40 (`#40a`), #56 (`#56a`), #69 (`#56b`), #72 and #75 complete; epic #38 in progress; Story #41 decomposed by `V33-DEC-022` into #41 (`#41a`), #81 (`#41b`), #82 (`#41c`) and #83 (`#41d`) and re-estimated 13 -> 37; #57, #58 and the whole #41 family not started | No tag authorized | Real money blocked by #47; unresolved values/copy blocked by #46 |
+| V3.3 | Product Maturity Programme | Active foundation: #39, #40 (`#40a`), #56 (`#56a`), #69 (`#56b`), #72 and #75 complete; epic #38 in progress; Story #41 decomposed by `V33-DEC-022` into #41 (`#41a`), #81 (`#41b`), #82 (`#41c`) and #83 (`#41d`) and re-estimated 13 -> 42 (#82 raised 8 -> 13 by `V33-DEC-024`); #41 (`#41a`) and #81 (`#41b`) complete, #82 (`#41c`) Ready, #83 (`#41d`) gated; #57 and #58 not started | No tag authorized | Real money blocked by #47; unresolved values/copy blocked by #46 |
 | V3.4 | Conditional Expansion Programme | Written owner decision and evidence required | Not applicable | Not enabled |
 
 V3.2-A and V3.2-B are completed historical milestones but are deliberately
@@ -243,9 +243,9 @@ What is missing is a consumer: `CommercialPolicyModule` is composed into no
 |---|---:|---:|---|
 | #41 (`#41a`) | 13 | 8 | Immutable one-to-one `commerce.order_payment_schedules` snapshot, truthful full-online backfill, additive three-amount browser/receipt fields, and wiring the existing contract into the API. Represents all three modes; **enables none**. Changes no `OrderStatus`, `OrderPaid`, `totalToman`, refund, ledger or public response meaning. |
 | #81 (`#41b`) | — | 8 | Zero-collectible confirmation orchestrator with no public confirm route and no fabricated intent, attempt, event or receivable, plus the **mandatory** composition seam #58 hooks. Contract ratified 2026-09-05 by `V33-DEC-023`: the order takes the explicit status `online_collection_not_required`, no new event is added, and the transaction transitions the order before confirming the booking (H-a). ADR-044 is required before schema or code. |
-| #82 (`#41c`) | — | 8 | Sandbox deposit execution; intent amount becomes the platform collectible; refund ceiling and financial projection limited to collected money. Gated on the `OrderPaid` meaning of a partial capture. |
+| #82 (`#41c`) | — | 8 -> **13** | Sandbox deposit execution; intent amount becomes the platform collectible; refund ceiling and financial projection limited to collected money. Contract ratified 2026-09-05 by `V33-DEC-024`: a partial capture emits a distinct `OrderCollectionCaptured v1` rather than reinterpreting `OrderPaid v1`; additive `online_collection_completed` state; additive `collected_total_toman` replaces `total_toman` as the refund ceiling; the ledger receives collected money only. Re-estimated 8 -> 13 and requires ADR-045 before schema or code. |
 | #83 (`#41d`) | — | 13 | Database-backed administrator publication and selection of versioned collection policy, fail-closed. Blocked by `V33-DEC-011`, `V33-DEC-012`, the percentage calculation base and `V33-DEC-017`. |
-| **Total** | **13** | **37** | Delivery order #41 -> #81 -> #82 -> #83. |
+| **Total** | **13** | **42** | Delivery order #41 -> #81 -> #82 -> #83. Was 37; #82 was re-estimated 8 -> 13 by `V33-DEC-024` on 2026-09-05. |
 
 #41 keeps its number and its Epic #38 relationship, so every existing reference
 survives.
@@ -275,3 +275,27 @@ and no intent, attempt, `OrderPaid`, receivable or refund is created for money
 never collected. #81 stays 8 SP, becomes Ready, and needs ADR-044 before any
 schema or executable code. It closed no commercial or legal value: #46 and #47
 are untouched.
+
+*(#81 was implemented and merged later the same day and is now closed; the
+sentence above records what the ratification said at the time.)*
+
+**`V33-DEC-024` closed #82's accounting and event contract on 2026-09-05.** The
+gate `V33-DEC-022` Ruling 7 left open — the `OrderPaid` and accounting meaning of
+a partial capture — is resolved by **separating the fact** rather than redefining
+one: a verified collection below the service total emits a new
+`OrderCollectionCaptured v1`, while `OrderPaid v1` keeps its whole-capture
+meaning and exact payload and is emitted only for a full capture. Never both, and
+deliberately not an `OrderPaid v2`, because the outbox relay dispatches by event
+name and ignores `eventVersion`, so a same-name v2 would poison existing v1
+consumers.
+
+#82 also gains the additive `online_collection_completed` order state and an
+additive monotonic `commerce.orders.collected_total_toman`, set once from the
+gateway-verified amount and required to equal the schedule's collectible. That
+column replaces `total_toman` as the refund ceiling under a PostgreSQL chain
+enforcing `0 <= refunded <= collected <= total`, and the financial ledger
+receives collected money only — a venue balance is never a BeauClick receivable,
+liability or revenue fact. Execution is schedule-driven with no mode selector and
+no part of #83. #82 stays one story, is re-estimated **8 -> 13 SP**, becomes
+Ready, and needs ADR-045 before any schema or executable code. It approved no
+commercial or legal value: #46, #47 and #83 keep their gates.
