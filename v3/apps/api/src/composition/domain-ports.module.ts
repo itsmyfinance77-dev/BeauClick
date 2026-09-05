@@ -8,7 +8,7 @@ import { IdentityModule, UserEntity } from '@beauclick/identity';
 import { BOOKING_CANCELLATION_ENTITLEMENT_HOOK, PROFESSIONAL_DIRECTORY } from '@beauclick/booking';
 import { PRICING_RULES, SERVICE_CATALOG, BOOKING_CONFIRMATION_ENTITLEMENT_HOOK } from '@beauclick/commerce';
 import { FINANCE_WORKSPACE_OWNER_RESOLVER, FINANCIAL_DATA_SOURCE, FINANCIAL_PARTY_RESOLVER } from '@beauclick/financial';
-import { OWNED_SUBSCRIBER_PARTY_RESOLVER } from '@beauclick/commercial-policy';
+import { OWNED_SUBSCRIBER_PARTY_RESOLVER, SellerSubscriptionModule } from '@beauclick/commercial-policy';
 import { PROVIDER_REINDEX_SOURCE } from '@beauclick/search';
 import { RECIPIENT_RESOLVER } from '@beauclick/notification';
 import { ANALYTICS_SUBJECT_RESOLVER } from '@beauclick/analytics';
@@ -67,6 +67,13 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     // uses rather than growing a second implementation of "what images does
     // this professional have".
     ProviderModule,
+    /*
+     * V3.3 #58a. The credit ledger lives in commercial-policy; the two
+     * entitlement adapters bound below delegate to it. Imported rather than
+     * reimplemented for the same reason the role grant is: a second "how much
+     * credit does this party have" would be a second answer.
+     */
+    SellerSubscriptionModule,
     // V3.3 #75 (`V33-DEC-021`). `IdentityBackedOwnerRoleGrant` delegates the
     // whole grant rule to `RoleService`, which lives here. Imported rather than
     // reimplemented for the same reason the finance workspace resolver

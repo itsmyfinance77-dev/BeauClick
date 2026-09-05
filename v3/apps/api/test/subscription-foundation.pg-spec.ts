@@ -970,8 +970,13 @@ describePg('subscription foundation — assignment, snapshots, grants (real Post
       const contract = contractFor('commercial-subscription');
       const claims = contract.tables.filter((t) => t.table.startsWith('commercial.'));
 
+      // V3.3 #58a added the ledger's two halves. Extended, never loosened to
+      // `toContain`: the exact set is what proves nothing was claimed by
+      // accident or left unclaimed.
       expect(claims.map((c) => c.table).sort()).toEqual([
+        'commercial.booking_credit_consumptions',
         'commercial.booking_credit_grants',
+        'commercial.booking_credit_returns',
         'commercial.seller_subscriptions',
       ]);
       for (const claim of claims) {
