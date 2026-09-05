@@ -144,6 +144,18 @@ grant of somebody else's credits.
 `#41b` binds a no-op that creates no row and no event. #58 replaces the binding
 without touching booking, commerce or payment.
 
+*Amended 2026-09-06 (`V33-DEC-025`) — the seam is renamed and widened, not
+merely rebound.* This ADR named the port for the path that first needed it, and
+that name became a contract claim it cannot keep: `#82` added a second
+confirmation path (`checkout.service.ts:453`) which does **not** invoke this
+hook, so "the credit is consumed when a booking first enters `confirmed`" is not
+satisfied by a zero-collectible-only seam. `#58a` replaces it with one
+**confirmation-wide** entitlement port invoked from **both** paths, keeping this
+ADR's shape rules exactly — mandatory, non-optional, `EntityManager` and
+`bookingId` only, bound in the composition root, an absent binding still a boot
+failure. Nothing about `#41b`'s own transaction or H-a ordering changes, and
+`#58a` is not implemented.
+
 ### 7. Nothing money-shaped is created on this path
 
 No payment intent, payment attempt, provider call, `PaymentSucceeded`,
