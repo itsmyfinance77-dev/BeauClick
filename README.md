@@ -100,7 +100,8 @@ overage), and Story #40 was decomposed from one 13-point item into four:
 | #56 (`#56a`) | 8 | Subscription foundation: snapshotted subscriber party, `D-7` backfill and lazy ensure, plan-included grants. No seller-facing route |
 | #69 (`#56b`) | 8 | Seller subscription surface: a workspace collection reached by an opaque `workspaceRef`, explicit initialization, history, zero-price selection and cancellation |
 | #57 (`#40c`) | 5 | Custom booking-credit purchase and immutable price snapshots |
-| #58 (`#40d`) | 8 | Atomic consumption at first `confirmed` and idempotent return |
+| #58 (`#40d`) → `#58a` | 8 -> **13** | Atomic consumption at first `confirmed` and idempotent return, enforced **selectively** — active only for a seller who holds a positive grant |
+| `#58b` | **3** | Global fail-closed enforcement activation. Blocked on #46 |
 
 `#40b` was split again on 2026-09-03 (`V33-DEC-018`): #56 keeps its number and its
 8 points as the foundation, and #69 carries the 5-point seller surface, so the
@@ -180,6 +181,20 @@ a refund can never exceed money BeauClick actually collected and the ledger neve
 a venue balance as a receivable. #82 is Ready, re-estimated from 8 to 13 points, and
 needs ADR-045 before any schema or code; that ratification approved no deposit value,
 percentage, retention rule, commission rate or legal copy either.
+
+Booking-credit consumption (#58) was split on 2026-09-06 as `V33-DEC-025`, and the reason
+is worth stating plainly: the seeded base plan grants **zero** credits, every seller is on
+it, and no other positive grant source is reachable — so switching on fail-closed
+enforcement today would refuse the next confirmation of every seller on the platform.
+Zero is an absence of entitlement, never a free allowance, so neither enforcing it nor
+treating it as unlimited was available. `#58a` (13 points) therefore installs the whole
+immutable accounting model and enforces it **selectively** — active only for a party that
+holds a positive grant, dormant for one that has never held any — and `#58b` (3 points)
+is the later explicit switch to global enforcement once #46 ratifies a positive source.
+The same ratification corrected three stale claims: #57 is not a prerequisite, the
+entitlement seam must cover **both** confirmation paths rather than only the
+zero-collectible one, and the `business` and `administrator` cancellation returns the
+issue described do not exist in the booking actor vocabulary.
 
 Prices, included allowances, bounds, cutoffs, legal copy and accounting treatment stay
 open under issue #46, and real money movement stays blocked by #47. No allowance may
