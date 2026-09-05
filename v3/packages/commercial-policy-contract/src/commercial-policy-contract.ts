@@ -213,3 +213,45 @@ export function collectionBreakdownV1(
     venueBalanceToman: serviceTotalToman - platformCollectibleToman,
   };
 }
+
+/**
+ * The browser-safe projection of one order's collection schedule — V3.3 `#41a`,
+ * ADR-043 §8.
+ *
+ * ## Why it lives in the contract and not in a controller
+ *
+ * The three amounts are the same three facts `CollectionBreakdownV1` already
+ * names, so their shape belongs beside it: a projection type declared in a
+ * controller would be a second place the vocabulary could drift, which
+ * `V33-DEC-022` Ruling 2 forbids. This package stays zero-dependency, so the
+ * API and the web client can both import it without either depending on the
+ * other.
+ *
+ * ## `platformCollectibleNowToman`, not `platformCollectibleToman`
+ *
+ * The `Now` is load-bearing at the boundary and absent inside. Internally the
+ * field is a property of the snapshot; to a customer reading a receipt it
+ * answers "what am I paying right now, as opposed to at the venue", which is
+ * the question the field exists to settle. #41's own acceptance criteria use
+ * this name.
+ *
+ * ## What is deliberately absent
+ *
+ * No policy internals. `policyKey`, `policyVersion` and `policyAcceptedAt` are
+ * administrative facts about which published terms were selected; a customer's
+ * receipt shows the AMOUNTS those terms produced, not the terms' identity. The
+ * same line `SellerCommercialPlansController` draws for the plan catalogue.
+ *
+ * ## The client never computes the split
+ *
+ * All three amounts are served. A client that can derive one from the others
+ * can derive it wrongly — from a stale total, a rounded percentage, or a
+ * currency assumption — and would then display a number the server never
+ * agreed to.
+ */
+export interface OrderPaymentScheduleViewV1 {
+  readonly collectionMode: BookingCollectionMode;
+  readonly serviceTotalToman: number;
+  readonly platformCollectibleNowToman: number;
+  readonly venueBalanceToman: number;
+}

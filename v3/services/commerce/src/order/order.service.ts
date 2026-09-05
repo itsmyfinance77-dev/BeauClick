@@ -9,9 +9,12 @@ import { assertNonNegativeAmount } from '@beauclick/money';
 import { OrderEntity, OrderStatus } from '../entities/order.entity';
 import { OrderItemEntity } from '../entities/order-item.entity';
 import { OrderAdjustmentEntity } from '../entities/order-adjustment.entity';
+import { OrderPaymentScheduleEntity } from '../entities/order-payment-schedule.entity';
 import { CommerceOutboxEntity } from '../entities/commerce-outbox.entity';
 import { PricingService } from '../pricing/pricing.service';
 import { PricingResult } from '../pricing/pricing.types';
+import { COMMERCIAL_POLICY_CONTRACT_VERSION } from '@beauclick/commercial-policy-contract';
+
 import { SERVICE_CATALOG, ServiceCatalog } from '../ports';
 
 export class OrderNotFoundException extends DomainException {
@@ -32,6 +35,28 @@ export class RefundExceedsOrderException extends DomainException {
   }
 }
 
+/**
+ * An order exists with no collection schedule — V3.3 `#41a`, ADR-043 §6.
+ *
+ * A 500, not a 404 or a 409, and that is the point: this is not a state the
+ * product can be in. Every order gets a schedule inside its own creation
+ * transaction and every order that predates the table was backfilled, so
+ * reaching this means the invariant broke.
+ *
+ * The alternative -- reconstructing a schedule from `order.totalToman` -- is
+ * refused because the total's meaning is exactly what #82 (`#41c`) changes. A
+ * reconstruction would keep working, silently, while describing something else
+ * on a customer's receipt.
+ *
+ * The message carries no order id: it reaches a log, never a browser.
+ */
+export class MissingOrderPaymentScheduleException extends Error {
+  constructor(orderId: string) {
+    super(`Order ${orderId} has no payment schedule; refusing to reconstruct one from a mutable total.`);
+    this.name = 'MissingOrderPaymentScheduleException';
+  }
+}
+
 export interface CreateBookingOrderInput {
   bookingId: string;
   customerId: string;
@@ -43,6 +68,15 @@ export interface OrderWithDetail {
   order: OrderEntity;
   items: OrderItemEntity[];
   adjustments: OrderAdjustmentEntity[];
+  /**
+   * The immutable collection schedule — V3.3 `#41a`, ADR-043.
+   *
+   * Never optional and never null. Every order has exactly one, written inside
+   * the same transaction as the order itself and backfilled for every order
+   * that predates the table, so an absent schedule is an integrity failure
+   * rather than a state a caller has to handle.
+   */
+  schedule: OrderPaymentScheduleEntity;
 }
 
 @Injectable()
@@ -166,6 +200,37 @@ export class OrderService {
         })),
       );
     }
+
+    /*
+     * V3.3 `#41a` (ADR-043 §5). The collection schedule, on the SAME manager as
+     * the order, its item, its adjustments and the outbox row below.
+     *
+     * There is therefore no window in which an order exists without its
+     * schedule, and a failure anywhere in this transaction leaves neither. An
+     * event would have manufactured a window that does not need to exist: both
+     * tables are in one cluster (ADR-018), so a real transaction is available.
+     *
+     * `full_payment_online` with the whole total collectible is not a default
+     * standing in for a decision -- it is what today's flow actually does, and
+     * `V33-DEC-022` Ruling 3 forbids `#41a` from making any other mode
+     * reachable. `V33-DEC-011` decides when that changes.
+     *
+     * The policy reference is absent, which `ck_ops_policy_reference` permits
+     * explicitly: `#41a` selects no policy, and fabricating a key or version
+     * would put a policy on a receipt that never had one. #83 (`#41d`) fills it
+     * in.
+     */
+    await manager.insert(OrderPaymentScheduleEntity, {
+      orderId,
+      collectionMode: 'full_payment_online',
+      serviceTotalToman: priced.totalToman,
+      platformCollectibleToman: priced.totalToman,
+      venueBalanceToman: 0,
+      policyKey: null,
+      policyVersion: null,
+      policyAcceptedAt: null,
+      contractVersion: COMMERCIAL_POLICY_CONTRACT_VERSION,
+    });
 
     await emitEvent(manager, CommerceOutboxEntity, {
       aggregateType: 'order',
@@ -373,11 +438,27 @@ export class OrderService {
     // Two bounded queries by order id, never a per-order loop -- an order
     // list page must not become an N+1 (a bug class this project has already
     // found and fixed several times in V2).
-    const [items, adjustments] = await Promise.all([
+    const [items, adjustments, schedule] = await Promise.all([
       manager.find(OrderItemEntity, { where: { orderId }, order: { id: 'ASC' } }),
       manager.find(OrderAdjustmentEntity, { where: { orderId }, order: { sortOrder: 'ASC' } }),
+      manager.findOne(OrderPaymentScheduleEntity, { where: { orderId } }),
     ]);
-    return { order, items, adjustments };
+
+    /*
+     * V3.3 `#41a` (ADR-043 §6). A missing schedule is an INTEGRITY FAILURE, and
+     * deliberately not a reconstruction from `order.totalToman`.
+     *
+     * Reconstructing would be the most dangerous available behaviour: the
+     * total's meaning is exactly what #82 (`#41c`) changes, so a reconstructed
+     * schedule would silently start describing something else on the day that
+     * ships -- and it would do so on a receipt, with no error anywhere.
+     *
+     * After the backfill the condition cannot arise, so this throws rather than
+     * degrading.
+     */
+    if (!schedule) throw new MissingOrderPaymentScheduleException(orderId);
+
+    return { order, items, adjustments, schedule };
   }
 
   private runInTransaction<T>(manager: EntityManager | undefined, fn: (m: EntityManager) => Promise<T>): Promise<T> {
