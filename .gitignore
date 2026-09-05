@@ -75,6 +75,10 @@ Thumbs.db
 .idea/
 *.swp
 
+# === Local AI coordination artifacts ===
+/ClaudeResultReport.md
+/CodexPrompt.md
+
 # === Test artifacts ===
 coverage/
 .phpunit.result.cache
