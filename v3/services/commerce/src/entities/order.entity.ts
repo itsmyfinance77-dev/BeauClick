@@ -5,9 +5,13 @@ import { CurrencyCode, requiredMoneyTransformer } from '@beauclick/money';
  * Order lifecycle.
  *
  *   [*] --> pending --> paid --> partially_refunded --> refunded
- *              |          |                                ^
- *              v          +--------------------------------+
- *          cancelled
+ *              |  |       |                                ^
+ *              |  |       +--------------------------------+
+ *              |  v
+ *              | online_collection_not_required
+ *              |  |
+ *              v  v
+ *              cancelled
  *
  * `paid` means a gateway confirmed money actually moved -- never merely
  * "status looks payment-ish". V2 chose `woocommerce_payment_complete` over
@@ -15,8 +19,27 @@ import { CurrencyCode, requiredMoneyTransformer } from '@beauclick/money';
  * catalog makes it an explicit contract: an `OrderPaid` event must mean
  * payment-confirmed. The status is only ever written by the payment
  * verification path.
+ *
+ * `online_collection_not_required` -- V3.3 #81 (`#41b`), ADR-044,
+ * `V33-DEC-023` Rulings 1 and 2 -- means BeauClick is not collecting money
+ * online now. It is **not** a synonym for paid, free, settled, completed or
+ * written off: under `pay_at_venue` the full service price may still be owed
+ * to the seller, and that balance is not BeauClick's money. It is written only
+ * by the zero-collectible confirmation path, only from `pending`, and only when
+ * the order's immutable schedule says `platformCollectibleToman === 0`.
+ *
+ * No transition returns to `pending`, and `paid` is not reachable from
+ * `online_collection_not_required` -- an order the platform decided not to
+ * collect for online is not one a gateway may later claim to have collected.
  */
-export const ORDER_STATUSES = ['pending', 'paid', 'partially_refunded', 'refunded', 'cancelled'] as const;
+export const ORDER_STATUSES = [
+  'pending',
+  'paid',
+  'partially_refunded',
+  'refunded',
+  'cancelled',
+  'online_collection_not_required',
+] as const;
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
 /**
@@ -50,7 +73,12 @@ export class OrderEntity {
   @Column({ type: 'uuid' })
   sellerPartyId!: string;
 
-  @Column({ type: 'varchar', length: 20, default: 'pending' })
+  /**
+   * 32, not 20: `online_collection_not_required` is 30 characters, and the
+   * column would otherwise refuse the value the #81 path writes. Mirrors the
+   * width `20260905900002_add_online_collection_not_required_status.sql` sets.
+   */
+  @Column({ type: 'varchar', length: 32, default: 'pending' })
   status!: OrderStatus;
 
   @Column({ type: 'varchar', length: 3, default: 'IRT' })

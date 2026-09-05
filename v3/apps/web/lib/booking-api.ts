@@ -88,7 +88,18 @@ export interface OrderDetail {
   id: string;
   sourceType: string;
   sourceId: string;
-  status: 'pending' | 'paid' | 'partially_refunded' | 'refunded' | 'cancelled';
+  /**
+   * `online_collection_not_required` is V3.3 `#41b`: BeauClick collects nothing
+   * online for this order. It is not paid, not free and not settled — a venue
+   * balance may still be owed to the seller.
+   */
+  status:
+    | 'pending'
+    | 'paid'
+    | 'partially_refunded'
+    | 'refunded'
+    | 'cancelled'
+    | 'online_collection_not_required';
   currency: string;
   subtotalToman: number;
   discountTotalToman: number;
@@ -106,7 +117,13 @@ export interface OrderDetail {
 export interface CheckoutResponse {
   booking: BookingSummary | null;
   order: OrderDetail;
-  payment: { intentId: string; redirectUrl: string | null };
+  /**
+   * Both keys are always present; both are null when nothing is collected
+   * online (V3.3 `#41b`, `V33-DEC-023` Ruling 7). The key is never omitted and
+   * `intentId` is never a placeholder — a sentinel id is indistinguishable from
+   * a real one at every call site that receives it.
+   */
+  payment: { intentId: string | null; redirectUrl: string | null };
 }
 
 export const bookingApi = {
