@@ -5,8 +5,8 @@ import { BookingService, CreateBookingInput } from '@beauclick/booking';
 import {
   OrderService,
   OrderWithDetail,
-  ZERO_COLLECTIBLE_CONFIRMATION_HOOK,
-  ZeroCollectibleConfirmationHook,
+  BOOKING_CONFIRMATION_ENTITLEMENT_HOOK,
+  BookingConfirmationEntitlementHook,
 } from '@beauclick/commerce';
 import { DomainException } from '@beauclick/http';
 import {
@@ -63,7 +63,15 @@ export interface CheckoutResult {
 export class ZeroCollectibleConfirmationRefusedException extends DomainException {
   constructor(
     readonly orderId: string,
-    readonly reason: 'positive_collectible' | 'not_transitionable' | 'missing' | 'booking_unavailable',
+    readonly reason:
+      | 'positive_collectible'
+      | 'not_transitionable'
+      | 'missing'
+      | 'booking_unavailable'
+      // V3.3 #58a: the seller has no booking credit left. The customer sees the
+      // same generic refusal -- a balance must never be inferable from a
+      // checkout response (ADR-046 §9).
+      | 'insufficient_credit',
   ) {
     super(
       'BOOKING_NOT_CONFIRMABLE',
@@ -170,8 +178,8 @@ export class CheckoutService {
      * without this binding fails to construct at boot rather than confirming
      * bookings that silently consume nothing.
      */
-    @Inject(ZERO_COLLECTIBLE_CONFIRMATION_HOOK)
-    private readonly hook: ZeroCollectibleConfirmationHook,
+    @Inject(BOOKING_CONFIRMATION_ENTITLEMENT_HOOK)
+    private readonly hook: BookingConfirmationEntitlementHook,
     /**
      * `@Optional()` for the same reason the exception filter's reporter is:
      * a composition that omits `ObservabilityModule` must still be able to
@@ -323,10 +331,22 @@ export class CheckoutService {
         return { replayed: true as const };
       }
 
-      // The entitlement seam. Mandatory, injected without `@Optional()`, and
-      // called with no `?.` -- an absent binding is a boot failure, never a
-      // silently skipped money effect (ADR-044 §6).
-      await this.hook.onZeroCollectibleConfirmation(manager, bookingId);
+      /*
+       * The entitlement seam. Mandatory, injected without `@Optional()`, and
+       * called with no `?.` -- an absent binding is a boot failure, never a
+       * silently skipped money effect (ADR-044 §6, ADR-046 §3).
+       *
+       * Nothing was collected on this path, so a refusal simply rolls the
+       * whole transaction back: no consumption, no order transition, booking
+       * still pending, and no refund to issue (ADR-046 §6).
+       */
+      const entitlement = await this.hook.onBookingConfirmation(manager, bookingId);
+      if (entitlement.outcome !== 'permitted') {
+        throw new ZeroCollectibleConfirmationRefusedException(
+          orderId,
+          entitlement.outcome === 'insufficient_credit' ? 'insufficient_credit' : 'not_transitionable',
+        );
+      }
 
       const confirmed = await this.bookings.confirm(bookingId, { type: 'system', id: null }, manager);
       if (!confirmed) {
@@ -448,6 +468,27 @@ export class CheckoutService {
       const order = await this.orders.findById(verification.orderId, manager);
       if (!order || order.sourceType !== 'booking') {
         return { outcome: verification, bookingUnavailable: false, duplicateCharge: false };
+      }
+
+      /*
+       * The SAME entitlement seam, on the path that never had one -- V3.3 #58
+       * (`#58a`), ADR-046 §3. Its absence here is why "one credit at first
+       * `confirmed`" was unsatisfiable before this story.
+       *
+       * A refusal here is treated exactly as an unavailable booking already
+       * is, and that is the whole resolution of "money must commit but credit
+       * must be atomic": the verified capture STAYS committed, no consumption
+       * is written, the booking stays unconfirmed, and the existing
+       * compensation below refunds precisely the verified collected amount
+       * under its deterministic key. No savepoint, no second connection, no
+       * asynchronous compensation (ADR-046 §6).
+       */
+      const entitlement = await this.hook.onBookingConfirmation(manager, order.sourceId);
+      if (entitlement.outcome !== 'permitted') {
+        this.logger.error(
+          `Entitlement refused confirmation for order ${verification.orderId} (${entitlement.outcome}); the capture stands and will be refunded.`,
+        );
+        return { outcome: verification, bookingUnavailable: true, duplicateCharge: false };
       }
 
       const confirmed = await this.bookings.confirm(order.sourceId, { type: 'system', id: null }, manager);
