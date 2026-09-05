@@ -2,9 +2,11 @@ import { INestApplication } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
 import request from 'supertest';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 
 import { AI_MAX_RETAINED_CONVERSATIONS } from '@beauclick/ai-contract';
-import { AiConversationService, AiSubjectDataContract } from '@beauclick/ai';
+import { AI_CONVERSATION_LOCK_NAMESPACE, AiConversationService, AiSubjectDataContract } from '@beauclick/ai';
 import { SUBJECT_DATA_CONTRACTS, SubjectDataContract, evaluateCoverage } from '@beauclick/subject-data';
 
 import { PgTestApp, createPgTestApp, requiredPgEnv, resetDatabase, seedUser } from './pg-test-app.factory';
@@ -369,8 +371,19 @@ describePg('ai assistant — lifecycle, retention, and privacy (real PostgreSQL)
     });
 
     /**
-     * `SELECT ... FOR UPDATE` on the customer's rows, so two concurrent creates
-     * cannot both see nineteen and both insert.
+     * Serialised by a transaction-scoped, per-user PostgreSQL advisory lock —
+     * bug #86.
+     *
+     * The row lock this case used to name does NOT close the race, and saying
+     * so was the defect: `SELECT ... FOR UPDATE` locks the rows it found and
+     * says nothing about the absence of a twentieth. Under `READ COMMITTED` a
+     * blocked `SELECT ... FOR UPDATE` re-checks only the rows it waits on, so
+     * five transactions each saw nineteen and each inserted. CI run
+     * 33953016131 (failed attempt, job 101271169256) recorded exactly that:
+     * five creates where one was allowed.
+     *
+     * `pg_advisory_xact_lock` serialises the whole read-decide-insert sequence
+     * for one user, which is what the invariant actually needs.
      */
     it('never exceeds the cap under concurrent creation', async () => {
       const user = await seedUser(app, dataSource, '+989128001060');
@@ -385,11 +398,222 @@ describePg('ai assistant — lifecycle, retention, and privacy (real PostgreSQL)
 
       const created = responses.filter((r) => r.status === 201).length;
       expect(created).toBe(1);
+      // The other four meet the ratified refusal, unchanged by #86: twenty
+      // retained and every one of them active, so there is nothing evictable.
+      for (const refused of responses.filter((r) => r.status !== 201)) {
+        expect(refused.status).toBe(409);
+        // The envelope's `code` is the domain-wide `AI_REFUSED`; the specific
+        // reason lives in `details`, which is the vocabulary every other AI
+        // refusal case in this suite asserts and which #86 must not change.
+        expect(refused.body.error.details.reason).toBe('conversation_limit_reached');
+      }
 
       const rows = await dataSource.query('SELECT count(*)::int AS n FROM ai.conversations WHERE user_id = $1', [
         user.id,
       ]);
       expect(rows[0].n).toBe(AI_MAX_RETAINED_CONVERSATIONS);
+    });
+
+    /**
+     * The same race, run repeatedly, because once is not evidence.
+     *
+     * The original single-shot version passed on almost every run and failed on
+     * CI once — which is exactly how a broken invariant hides. Six rounds make
+     * the unfixed implementation fail reliably rather than occasionally; the
+     * fixed one cannot fail at all, because the advisory lock removes the
+     * interleaving rather than making it unlikely.
+     */
+    it('never exceeds the cap across repeated races', async () => {
+      for (let round = 0; round < 6; round += 1) {
+        const user = await seedUser(app, dataSource, `+9891280011${String(round).padStart(2, '0')}`);
+        await acceptConsent(user.accessToken);
+        for (let i = 0; i < AI_MAX_RETAINED_CONVERSATIONS - 1; i += 1) await startConversation(user.accessToken);
+
+        const responses = await Promise.all(
+          Array.from({ length: 5 }, () =>
+            api().post('/api/v1/me/ai/conversations').set('Authorization', `Bearer ${user.accessToken}`),
+          ),
+        );
+
+        const created = responses.filter((r) => r.status === 201).length;
+        const rows = await dataSource.query('SELECT count(*)::int AS n FROM ai.conversations WHERE user_id = $1', [
+          user.id,
+        ]);
+        // Reported per round, so a failure names the round rather than leaving
+        // the reader to guess which one lost.
+        expect({ round, created, retained: rows[0].n }).toEqual({
+          round,
+          created: 1,
+          retained: AI_MAX_RETAINED_CONVERSATIONS,
+        });
+      }
+    });
+
+    /**
+     * The DETERMINISTIC proof, and the one that does not depend on scheduling
+     * at all.
+     *
+     * An outside transaction takes the very lock `create()` must take, then a
+     * create is fired for the same user. If the service acquires the lock, the
+     * request cannot finish while the holder is open — no timing luck involved.
+     * Against the pre-#86 implementation this fails immediately and reliably,
+     * because nothing in `create()` waits for anything.
+     *
+     * Bounded throughout: the holder is released on a timer and the assertions
+     * use short windows, so a regression fails the test rather than hanging CI.
+     */
+    it('blocks a second create for the same user while the advisory lock is held, and not another user', async () => {
+      const user = await seedUser(app, dataSource, '+989128001070');
+      const other = await seedUser(app, dataSource, '+989128001071');
+      await acceptConsent(user.accessToken);
+      await acceptConsent(other.accessToken);
+
+      let released = false;
+      let releaseHolder: () => void = () => undefined;
+      let signalReady: () => void = () => undefined;
+      const holderReady = new Promise<void>((r) => {
+        signalReady = r;
+      });
+      const holderDone = new Promise<void>((r) => {
+        releaseHolder = r;
+      });
+      // A separate pooled connection, holding the same key `create()` uses.
+      // The transaction promise is KEPT and awaited at the end: an unawaited
+      // holder can outlive this case and carry its lock into the next one,
+      // which is a test-isolation bug that looks exactly like a product bug.
+      const holder = dataSource.transaction(async (manager) => {
+        await manager.query('SELECT pg_advisory_xact_lock($1, hashtext($2))', [
+          AI_CONVERSATION_LOCK_NAMESPACE,
+          user.id,
+        ]);
+        signalReady();
+        await holderDone;
+      });
+      await holderReady;
+
+      const blocked = api()
+        .post('/api/v1/me/ai/conversations')
+        .set('Authorization', `Bearer ${user.accessToken}`)
+        .then((res) => {
+          if (!released) throw new Error('create completed while the advisory lock was held');
+          return res;
+        });
+
+      try {
+        // A DIFFERENT user is not coupled to that key and proceeds immediately,
+        // which is what makes the lock per-user rather than global.
+        await api()
+          .post('/api/v1/me/ai/conversations')
+          .set('Authorization', `Bearer ${other.accessToken}`)
+          .expect(201);
+
+        // Bounded: if the create has not been blocked by now it never will be.
+        await new Promise((r) => setTimeout(r, 1_000));
+        const blockedRows = await dataSource.query(
+          'SELECT count(*)::int AS n FROM ai.conversations WHERE user_id = $1',
+          [user.id],
+        );
+        expect(blockedRows[0].n).toBe(0);
+      } finally {
+        // The release is in a `finally` because a FAILED assertion above must
+        // not leave this transaction open: its lock would outlive the case and
+        // fail the next one, turning one honest failure into two misleading
+        // ones. Found exactly that way while proving the pre-fix behaviour.
+        released = true;
+        releaseHolder();
+        await holder;
+      }
+
+      await expect(blocked).resolves.toMatchObject({ status: 201 });
+    }, 20_000);
+
+    /**
+     * ROLLBACK must release the lock, or a failed create would poison every
+     * later create for that customer on a pooled connection.
+     *
+     * `pg_advisory_xact_lock` gives this for free and `pg_advisory_lock` would
+     * not, which is the whole reason the transaction-scoped form is required.
+     */
+    it('releases the lock on rollback, so a later create for the same user succeeds', async () => {
+      const user = await seedUser(app, dataSource, '+989128001080');
+      await acceptConsent(user.accessToken);
+
+      await expect(
+        dataSource.transaction(async (manager) => {
+          await manager.query('SELECT pg_advisory_xact_lock($1, hashtext($2))', [
+            AI_CONVERSATION_LOCK_NAMESPACE,
+            user.id,
+          ]);
+          throw new Error('planted rollback while holding the lock');
+        }),
+      ).rejects.toThrow('planted rollback');
+
+      // No lock survives the rollback, so this must not hang.
+      await api()
+        .post('/api/v1/me/ai/conversations')
+        .set('Authorization', `Bearer ${user.accessToken}`)
+        .expect(201);
+
+      const held = await dataSource.query(
+        `SELECT count(*)::int AS n FROM pg_locks WHERE locktype = 'advisory' AND classid = $1`,
+        [AI_CONVERSATION_LOCK_NAMESPACE],
+      );
+      expect(held[0].n).toBe(0);
+    }, 20_000);
+  });
+
+  /**
+   * The namespace is a claim on a globally shared space, so it is asserted
+   * structurally rather than trusted.
+   *
+   * PostgreSQL's advisory-lock space is per-database and untyped: two modules
+   * that pick the same namespace serialise each other's unrelated work, and
+   * nothing anywhere reports it. This walks the SOURCE for every namespace in
+   * the repository and proves they are distinct -- so a future third lock that
+   * copies one of these two fails here rather than in production.
+   */
+  describe('the advisory-lock namespace', () => {
+    it('is distinct from every other advisory-lock namespace in the repository', () => {
+      const roots = [
+        join(__dirname, '..', '..', '..', 'services'),
+        join(__dirname, '..', '..', '..', 'libs'),
+        join(__dirname, '..', '..', '..', 'apps', 'api', 'src'),
+        join(__dirname, '..', '..', '..', 'packages'),
+      ];
+
+      const files: string[] = [];
+      const walk = (dir: string): void => {
+        for (const entry of readdirSync(dir, { withFileTypes: true })) {
+          if (entry.name === 'node_modules' || entry.name === 'dist') continue;
+          const full = join(dir, entry.name);
+          if (entry.isDirectory()) walk(full);
+          else if (entry.name.endsWith('.ts') && !entry.name.endsWith('.spec.ts')) files.push(full);
+        }
+      };
+      for (const root of roots) walk(root);
+
+      // Every `<NAME>_LOCK_NAMESPACE = <literal>` declaration in the tree.
+      const declarations = new Map<string, number>();
+      for (const file of files) {
+        const source = readFileSync(file, 'utf8');
+        for (const match of source.matchAll(/const\s+([A-Z0-9_]*LOCK_NAMESPACE)\s*=\s*(0x[0-9a-f_]+)\s*\|\s*0/g)) {
+          declarations.set(match[1], Number(match[2].replaceAll('_', '')));
+        }
+      }
+
+      // Non-vacuity: this must have FOUND the two locks that exist, not zero.
+      expect(declarations.has('AI_CONVERSATION_LOCK_NAMESPACE')).toBe(true);
+      expect(declarations.has('WISHLIST_LOCK_NAMESPACE')).toBe(true);
+      expect(declarations.get('AI_CONVERSATION_LOCK_NAMESPACE')).toBe(AI_CONVERSATION_LOCK_NAMESPACE);
+
+      const values = [...declarations.values()];
+      expect(new Set(values).size).toBe(values.length);
+      // A signed 32-bit integer, which is what the two-argument form takes.
+      for (const value of values) {
+        expect(Number.isInteger(value)).toBe(true);
+        expect(value).toBeGreaterThanOrEqual(-(2 ** 31));
+        expect(value).toBeLessThanOrEqual(2 ** 31 - 1);
+      }
     });
   });
 
