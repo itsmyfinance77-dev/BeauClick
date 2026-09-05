@@ -8,7 +8,11 @@ import {
   SubjectTableClaim,
 } from '@beauclick/subject-data';
 
-import { BookingCreditGrantEntity, SellerSubscriptionEntity } from './seller-subscription.entities';
+import {
+  BookingCreditConsumptionEntity,
+  BookingCreditGrantEntity,
+  SellerSubscriptionEntity,
+} from './seller-subscription.entities';
 import { OwnedSubscriberParty } from './owned-subscriber-party.port';
 
 /**
@@ -92,6 +96,18 @@ export class SubscriptionSubjectDataContract implements SubjectDataContract {
       reason:
         'Operational evidence of the entitlements a subscription conferred, and the credit side of the balance #58 derives. A consumption row outlives its grant, so deleting the grant would not produce a smaller balance -- it would produce a wrong one.',
     },
+    {
+      table: 'commercial.booking_credit_consumptions',
+      disposition: 'retained',
+      reason:
+        'The debit side of the seller balance (#58a). Immutable by trigger and one row per booking. It names a booking id and the charged party and carries no customer identity, so there is nothing personal to the counterparty to erase; deleting it would silently return a credit the seller genuinely spent.',
+    },
+    {
+      table: 'commercial.booking_credit_returns',
+      disposition: 'retained',
+      reason:
+        'The reversal side of the seller balance (#58a). At most one per consumption, immutable, and carrying a closed server-authored cause rather than any cancellation prose. Deleting it would re-spend a credit that was already given back.',
+    },
   ];
 
   async exportSubjectData(manager: EntityManager, userId: string): Promise<SubjectExportSection[]> {
@@ -110,6 +126,19 @@ export class SubscriptionSubjectDataContract implements SubjectDataContract {
       .createQueryBuilder('g')
       .where(this.partyPredicate(parties, 'g'), this.partyParameters(parties))
       .orderBy('g.granted_at', 'DESC')
+      .getMany();
+
+    /*
+     * V3.3 #58a. The seller's own debit side, exported with the same care as
+     * the credit side: what they spent and when, and NOT who they spent it on.
+     * A booking id is a counterparty-linked identifier, so it is deliberately
+     * absent from the export even though it is the row's own key.
+     */
+    const consumptions = await manager
+      .getRepository(BookingCreditConsumptionEntity)
+      .createQueryBuilder('c')
+      .where(this.partyPredicate(parties, 'c'), this.partyParameters(parties))
+      .orderBy('c.consumed_at', 'DESC')
       .getMany();
 
     const sections: SubjectExportSection[] = [];
@@ -149,6 +178,18 @@ export class SubscriptionSubjectDataContract implements SubjectDataContract {
           periodIndex: g.periodIndex,
           grantedAt: g.grantedAt.toISOString(),
           expiresAt: g.expiresAt ? g.expiresAt.toISOString() : null,
+        })),
+      });
+    }
+
+    if (consumptions.length > 0) {
+      sections.push({
+        key: 'commercial.booking_credit_consumptions',
+        description: 'اعتبارهای نوبت‌دهی مصرف‌شده توسط کسب‌وکار شما',
+        rows: consumptions.map((c) => ({
+          subscriberPartyType: c.subscriberPartyType,
+          periodIndex: c.periodIndex,
+          consumedAt: c.consumedAt.toISOString(),
         })),
       });
     }
