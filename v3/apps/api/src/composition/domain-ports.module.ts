@@ -6,7 +6,7 @@ import { DataSource } from 'typeorm';
 import { ProfessionalEntity, ProviderModule, SELLER_OWNER_ROLE_GRANT, ServiceOfferingEntity } from '@beauclick/provider';
 import { IdentityModule, UserEntity } from '@beauclick/identity';
 import { PROFESSIONAL_DIRECTORY } from '@beauclick/booking';
-import { PRICING_RULES, SERVICE_CATALOG } from '@beauclick/commerce';
+import { PRICING_RULES, SERVICE_CATALOG, ZERO_COLLECTIBLE_CONFIRMATION_HOOK } from '@beauclick/commerce';
 import { FINANCE_WORKSPACE_OWNER_RESOLVER, FINANCIAL_DATA_SOURCE, FINANCIAL_PARTY_RESOLVER } from '@beauclick/financial';
 import { OWNED_SUBSCRIBER_PARTY_RESOLVER } from '@beauclick/commercial-policy';
 import { PROVIDER_REINDEX_SOURCE } from '@beauclick/search';
@@ -34,6 +34,7 @@ import {
   ProviderBackedAnalyticsSubjectResolver,
   ProviderBackedReindexSource,
 } from './phase3-ports';
+import { NoopZeroCollectibleConfirmationHook } from './zero-collectible-hook.adapter';
 import { MembershipDiscountRule } from '../pricing/membership-discount.rule';
 import { financialDataSourceProvider } from './financial-datasource.provider';
 
@@ -83,6 +84,19 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     // implementation answering the same question a second way.
     { provide: PROFESSIONAL_OWNER_LOOKUP, useExisting: ProviderBackedProfessionalDirectory },
     { provide: SERVICE_CATALOG, useExisting: ProviderBackedServiceCatalog },
+    /*
+     * V3.3 #81 (`#41b`, ADR-044 §6). The entitlement seam a zero-collectible
+     * confirmation passes through, bound to an explicit no-op until #58.
+     *
+     * Bound here rather than left to each composition to remember, and exported
+     * below, so that "is the hook present?" has exactly one answer for the whole
+     * application. `V33-DEC-023` Ruling 8 makes it mandatory: `CheckoutService`
+     * injects it without `@Optional()`, so a composition that drops this line
+     * fails to construct at boot instead of quietly confirming bookings that
+     * consume nothing.
+     */
+    NoopZeroCollectibleConfirmationHook,
+    { provide: ZERO_COLLECTIBLE_CONFIRMATION_HOOK, useExisting: NoopZeroCollectibleConfirmationHook },
     { provide: FINANCIAL_PARTY_RESOLVER, useExisting: ProviderBackedFinancialPartyResolver },
     // V3.3-A #56a. A SECOND party resolver, deliberately not the one above: it
     // resolves ownership only and returns every owned party (ADR-042 §3).
@@ -181,6 +195,7 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     PROFESSIONAL_DIRECTORY,
     PROFESSIONAL_OWNER_LOOKUP,
     SERVICE_CATALOG,
+    ZERO_COLLECTIBLE_CONFIRMATION_HOOK,
     FINANCIAL_PARTY_RESOLVER,
     OWNED_SUBSCRIBER_PARTY_RESOLVER,
     FINANCE_WORKSPACE_OWNER_RESOLVER,

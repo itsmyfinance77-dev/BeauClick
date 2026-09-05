@@ -27,9 +27,23 @@ import type { ReferralOrderFacts, ReferralOrderLookupPort } from '@beauclick/ref
  *
  * `cancelled` is **not** fully refunded and must not be: a cancelled order is
  * one that was never paid, so there is no reward it could have earned and
- * nothing to take back. The `satisfies` annotation means adding a status to
- * `ORDER_STATUSES` without deciding its meaning here is a **type error**, not a
- * default.
+ * nothing to take back. The same holds for `online_collection_not_required`
+ * (V3.3 `#41b`): BeauClick collected nothing online, so there is nothing to
+ * reverse.
+ *
+ * **Corrected in V3.3 `#41b`.** This comment previously claimed the `satisfies`
+ * annotation made adding a status to `ORDER_STATUSES` "a type error, not a
+ * default". It does not, and it never did: `satisfies OrderStatus` only checks
+ * that the literal `'refunded'` is a member of the union, so widening the union
+ * leaves it valid and every new status silently answers `fullyRefunded: false`.
+ *
+ * That default happens to be right for both `cancelled` and
+ * `online_collection_not_required`, and the comparison below is deliberately
+ * equality against the one status that means fully refunded rather than
+ * inequality against a list of ones that do not — so a future status is
+ * excluded by construction rather than by remembering to add it. What was wrong
+ * was the claim that the compiler would stop anyone. It will not, so the
+ * meaning of a new status has to be decided here on purpose.
  */
 const FULLY_REFUNDED = 'refunded' satisfies OrderStatus;
 

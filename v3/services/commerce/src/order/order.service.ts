@@ -2,7 +2,7 @@ import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
-import { emitEvent, AuditLogger } from '@beauclick/events';
+import { emitEvent, AuditLogger, returningRows } from '@beauclick/events';
 import { DomainException } from '@beauclick/http';
 import { assertNonNegativeAmount } from '@beauclick/money';
 
@@ -77,6 +77,37 @@ export class MissingOrderPaymentScheduleException extends Error {
     this.name = 'MissingOrderPaymentScheduleException';
   }
 }
+
+/**
+ * The statuses `cancel()` may leave — V3.3 #81, ADR-044 §10.
+ *
+ * Both mean BeauClick collected nothing, which is the whole criterion: there is
+ * no money to give back, so cancelling is free. `paid` and the refunded
+ * statuses are deliberately absent — those go through refund — and `cancelled`
+ * is absent because it is terminal.
+ */
+const CANCELLABLE_STATUSES = ['pending', 'online_collection_not_required'] as const satisfies readonly OrderStatus[];
+
+/**
+ * What `confirmNoOnlineCollection` did — V3.3 #81 (`#41b`), ADR-044 §8.
+ *
+ * A closed union rather than a boolean, because the caller must tell three
+ * genuinely different situations apart and a boolean collapses two of them:
+ *
+ *   * `transitioned` — this caller won the compare-and-swap and owns the
+ *     confirmation that follows;
+ *   * `already` — the order is already in the state, so this is a replay. The
+ *     caller returns the authoritative existing result and must NOT rerun the
+ *     entitlement hook;
+ *   * `ineligible` — the transition was refused. `positive_collectible` means
+ *     the schedule says BeauClick does have money to collect, and is a caller
+ *     bug; `not_transitionable` means the order is `paid`, `cancelled` or
+ *     refunded, which a concurrent cancellation can legitimately produce.
+ */
+export type ZeroCollectibleTransition =
+  | { outcome: 'transitioned' }
+  | { outcome: 'already' }
+  | { outcome: 'ineligible'; reason: 'positive_collectible' | 'not_transitionable' | 'missing' };
 
 export interface CreateBookingOrderInput {
   bookingId: string;
@@ -314,14 +345,108 @@ export class OrderService {
     return true;
   }
 
-  /** pending -> cancelled. An unpaid order only; a paid one goes through refund instead. */
+  /**
+   * pending -> online_collection_not_required — V3.3 #81 (`#41b`), ADR-044 §2
+   * and §8, `V33-DEC-023` Rulings 1 and 3.
+   *
+   * The first of the three mutations in the zero-collectible confirmation
+   * transaction, and deliberately the first: the gateway callback writes the
+   * order before the booking, so this path does too and the two can never form
+   * a lock-order cycle.
+   *
+   * ## The eligibility rule is IN the statement, not before it
+   *
+   * `platform_collectible_toman = 0` is an `EXISTS` in the UPDATE's own WHERE
+   * clause, so an order BeauClick does have money to collect for is
+   * *structurally* unable to take this transition. A preceding `SELECT` would
+   * be a check-then-act with a window between them; more importantly it would
+   * put the rule in the service, where a second caller could simply not call it.
+   *
+   * The schedule is immutable (ADR-043 §4), so the subquery reads a row that
+   * cannot change underneath it — but the rule belongs in the statement anyway,
+   * because that is what makes it true for every future writer.
+   *
+   * ## Never `total_toman`
+   *
+   * ADR-044 §2. The two agree only because `full_payment_online` is the only
+   * mode that has ever run, and #82 exists to break exactly that.
+   *
+   * ## Emits nothing
+   *
+   * No order event (ADR-044 §5). `BookingConfirmed`, emitted by the booking
+   * confirmation this transaction goes on to perform, is the only fact.
+   *
+   * @param manager required, not optional: this must run in the caller's
+   *   transaction with the hook and the booking confirmation.
+   */
+  async confirmNoOnlineCollection(orderId: string, manager: EntityManager): Promise<ZeroCollectibleTransition> {
+    const raw = await manager.query(
+      `UPDATE commerce.orders o
+          SET status = $2, updated_at = now()
+        WHERE o.id = $1
+          AND o.status = $3
+          AND EXISTS (
+                SELECT 1
+                  FROM commerce.order_payment_schedules s
+                 WHERE s.order_id = o.id
+                   AND s.platform_collectible_toman = 0)
+       RETURNING o.id`,
+      [orderId, 'online_collection_not_required' satisfies OrderStatus, 'pending' satisfies OrderStatus],
+    );
+
+    /*
+     * `returningRows`, never `raw.length`. TypeORM's PostgreSQL driver returns
+     * `[rows, rowCount]` for an UPDATE even with RETURNING, so `raw.length` is
+     * always 2 -- the exact shape that let a revoked refresh token mint a
+     * session once already (`libs/events/src/sql-result.ts`).
+     */
+    if (returningRows(raw).length === 1) {
+      this.auditLog.log({ action: 'order.online_collection_not_required', orderId });
+      return { outcome: 'transitioned' };
+    }
+
+    // The CAS lost. Exactly why matters to the caller, so read the row rather
+    // than reporting one undifferentiated failure.
+    const order = await manager.findOne(OrderEntity, { where: { id: orderId } });
+    if (!order) return { outcome: 'ineligible', reason: 'missing' };
+    if (order.status === 'online_collection_not_required') return { outcome: 'already' };
+
+    const schedule = await manager.findOne(OrderPaymentScheduleEntity, { where: { orderId } });
+    if (!schedule) throw new MissingOrderPaymentScheduleException(orderId);
+    if (schedule.platformCollectibleToman > 0) {
+      return { outcome: 'ineligible', reason: 'positive_collectible' };
+    }
+
+    return { outcome: 'ineligible', reason: 'not_transitionable' };
+  }
+
+  /**
+   * pending | online_collection_not_required -> cancelled.
+   *
+   * An order that was never collected for, only. A paid one goes through refund
+   * instead, and a refunded or already-cancelled one is terminal.
+   *
+   * **`online_collection_not_required` was added in V3.3 #81** (ADR-044 §10,
+   * `V33-DEC-023` Ruling 10). It belongs here for the same reason `pending`
+   * does: BeauClick collected nothing, so cancelling costs nobody anything and
+   * there is nothing to give back. It is emphatically NOT here because it
+   * resembles `paid` — it does not, and the refund handler asks this question
+   * separately.
+   *
+   * Still one compare-and-swap. Two concurrent cancellations both narrow to
+   * `status IN (...)` in the UPDATE's own WHERE clause, so exactly one affects a
+   * row and exactly one `OrderCancelled` is emitted.
+   */
   async cancel(orderId: string, reason: string, manager?: EntityManager): Promise<boolean> {
     return this.runInTransaction(manager, async (m) => {
       const result = await m
         .createQueryBuilder()
         .update(OrderEntity)
         .set({ status: 'cancelled', cancelledAt: new Date() })
-        .where('id = :orderId AND status = :pending', { orderId, pending: 'pending' satisfies OrderStatus })
+        .where('id = :orderId AND status IN (:...cancellable)', {
+          orderId,
+          cancellable: CANCELLABLE_STATUSES,
+        })
         .execute();
 
       if (result.affected !== 1) return false;

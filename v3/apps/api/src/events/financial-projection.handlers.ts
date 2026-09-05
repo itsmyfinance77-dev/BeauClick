@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DomainEventHandler, EventEnvelope, AuditLogger } from '@beauclick/events';
 import { LedgerService } from '@beauclick/financial';
-import { OrderService } from '@beauclick/commerce';
+import { OrderService, OrderStatus } from '@beauclick/commerce';
 import { PaymentService } from '@beauclick/payment';
 import { BookingService } from '@beauclick/booking';
 
@@ -12,8 +12,9 @@ import { BookingService } from '@beauclick/booking';
  *   OrderPaid        -> record commission + receivable in the ledger
  *   RefundCompleted  -> record the refund against the order
  *   OrderRefunded    -> reverse the ledger at the ORIGINAL captured rate
- *   BookingCancelled -> refund the linked order if it was paid
- *   BookingExpired   -> cancel the unpaid order
+ *   BookingCancelled -> refund the linked order if it was paid, cancel it if
+ *                       BeauClick never collected for it (V3.3 #81)
+ *   BookingExpired   -> cancel the uncollected order
  *
  * Every handler is idempotent, because the outbox guarantees at-least-once
  * delivery and never exactly-once. Each one says below what makes it so --
@@ -152,6 +153,28 @@ export class OrderRefundedLedgerHandler implements DomainEventHandler {
   }
 }
 
+/**
+ * The order statuses that mean **BeauClick collected nothing** — V3.3 #81
+ * (`#41b`), ADR-044 §10, `V33-DEC-023` Ruling 10.
+ *
+ * ## This closed a real money defect, not a hypothetical one
+ *
+ * The handler below used to ask `status === 'pending'` and send **everything
+ * else** to `remainingRefundable(order)`, which is
+ * `totalToman - refundedTotalToman`.
+ *
+ * `online_collection_not_required` would have fallen into that else. Its
+ * `totalToman` is the full service price — non-zero under `pay_at_venue`, where
+ * the whole amount is a venue balance owed to the seller — so a cancelled
+ * pay-at-venue booking would have called the payment provider and refunded
+ * money that never reached BeauClick. The customer would have been "refunded"
+ * an amount they had not paid, out of a gateway balance that funds real refunds.
+ *
+ * The list is explicit rather than an inverted "not paid-ish" test: a future
+ * status must be classified deliberately, and a wrong answer here spends money.
+ */
+const NEVER_COLLECTED_STATUSES: readonly OrderStatus[] = ['pending', 'online_collection_not_required'];
+
 @Injectable()
 export class BookingCancelledRefundHandler implements DomainEventHandler {
   readonly eventType = 'BookingCancelled';
@@ -163,7 +186,8 @@ export class BookingCancelledRefundHandler implements DomainEventHandler {
   ) {}
 
   /**
-   * A cancelled booking whose order was already paid gets its money back.
+   * A cancelled booking whose order was already paid gets its money back — and
+   * one BeauClick never collected for gets cancelled, with no provider call.
    *
    * This closes V2's FIN-02 gap by construction: there, the customer-facing
    * cancel path did not trigger a refund at all for an already-paid booking
@@ -186,8 +210,8 @@ export class BookingCancelledRefundHandler implements DomainEventHandler {
     if (!detail) return;
 
     const order = detail.order;
-    if (order.status === 'pending') {
-      // Never paid -- nothing to refund. Cancel the order so it stops
+    if (NEVER_COLLECTED_STATUSES.includes(order.status)) {
+      // Never collected -- nothing to refund. Cancel the order so it stops
       // appearing as awaiting payment.
       await this.orders.cancel(order.id, `booking_cancelled:${payload.bookingId}`);
       return;
@@ -217,9 +241,16 @@ export class BookingExpiredOrderHandler implements DomainEventHandler {
 
   /**
    * An abandoned hold's order is cancelled so it stops showing as awaiting
-   * payment. `cancel()` only touches a `pending` order, so an order that was
-   * in fact paid just as the hold lapsed is left alone -- that case is the
-   * paid-but-unconfirmable path's responsibility, not this one's.
+   * payment. `cancel()` only touches an order BeauClick never collected for --
+   * `pending` or, since V3.3 #81, `online_collection_not_required` -- so an
+   * order that was in fact paid just as the hold lapsed is left alone. That
+   * case is the paid-but-unconfirmable path's responsibility, not this one's.
+   *
+   * The `online_collection_not_required` case is reachable but rare: the
+   * booking is confirmed inside the same transaction that sets that status, so
+   * a `BookingExpired` for it means the hold lapsed before confirmation and the
+   * order never left `pending`. The widened predicate costs nothing and stops
+   * the handler being the one place the new status is silently unhandled.
    */
   async handle(envelope: EventEnvelope): Promise<void> {
     const payload = envelope.payload as { bookingId: string };

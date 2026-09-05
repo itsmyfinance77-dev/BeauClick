@@ -1,8 +1,14 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 
 import { BookingService, CreateBookingInput } from '@beauclick/booking';
-import { OrderService, OrderWithDetail } from '@beauclick/commerce';
+import {
+  OrderService,
+  OrderWithDetail,
+  ZERO_COLLECTIBLE_CONFIRMATION_HOOK,
+  ZeroCollectibleConfirmationHook,
+} from '@beauclick/commerce';
+import { DomainException } from '@beauclick/http';
 import {
   PaymentIntentNotFoundException,
   PaymentRetryNotAvailableException,
@@ -15,8 +21,66 @@ import { METRICS, MetricsRegistry } from '@beauclick/observability';
 export interface CheckoutResult {
   bookingId: string;
   order: OrderWithDetail;
-  paymentIntentId: string;
+  /**
+   * `null` when nothing is collected online — V3.3 `#41b`, ADR-044 §11.
+   *
+   * Null rather than a placeholder id, and never an omitted key: a sentinel is
+   * indistinguishable from a real intent at every call site that receives it,
+   * and an absent key becomes `undefined` in a client compiled against a
+   * required field.
+   */
+  paymentIntentId: string | null;
   redirectUrl: string | null;
+}
+
+/**
+ * An order reached `online_collection_not_required` without its booking being
+ * confirmed — V3.3 `#41b`, ADR-044 §8.
+ *
+ * A plain `Error`, so `BeauclickExceptionFilter` logs and reports it
+ * server-side and answers the client with the generic Persian `INTERNAL_ERROR`.
+ * The ids reach a log, never a browser — the same treatment, and the same
+ * reasoning, as `MissingOrderPaymentScheduleException`.
+ *
+ * **This state is not repaired, deliberately.** The transition and the
+ * confirmation commit in one transaction, so neither can exist without the
+ * other; reaching here means an invariant broke somewhere this code cannot see.
+ * Confirming the booking now would convert a broken invariant into one that
+ * looks intact, and the evidence would be gone by the time anybody asked.
+ */
+/**
+ * A zero-collectible confirmation could not proceed — V3.3 `#41b`, ADR-044 §8.
+ *
+ * A `DomainException`, unlike its sibling below, because every reason it
+ * carries is a real thing that can happen to an honest customer: the hold
+ * lapsed while the request was in flight, or a cancellation won the race. The
+ * client is told the booking was not confirmed, in a closed vocabulary, and is
+ * told nothing about which order or which internal state.
+ *
+ * The `reason` is deliberately NOT in the Persian message. It is a code for the
+ * client's own switch, and the message is one sentence a customer can act on.
+ */
+export class ZeroCollectibleConfirmationRefusedException extends DomainException {
+  constructor(
+    readonly orderId: string,
+    readonly reason: 'positive_collectible' | 'not_transitionable' | 'missing' | 'booking_unavailable',
+  ) {
+    super(
+      'BOOKING_NOT_CONFIRMABLE',
+      'این نوبت دیگر قابل تأیید نیست. لطفاً زمان دیگری را انتخاب کنید.',
+      HttpStatus.CONFLICT,
+    );
+  }
+}
+
+export class InconsistentZeroCollectibleOrderException extends Error {
+  constructor(orderId: string, bookingId: string) {
+    super(
+      `Order ${orderId} is online_collection_not_required but booking ${bookingId} is not confirmed; ` +
+        'refusing to repair a state this transaction cannot produce.',
+    );
+    this.name = 'InconsistentZeroCollectibleOrderException';
+  }
 }
 
 export interface CallbackResult {
@@ -73,6 +137,17 @@ export class CheckoutService {
     private readonly payments: PaymentService,
     private readonly relay: OutboxRelay,
     /**
+     * V3.3 #81 (`#41b`, ADR-044 §6; `V33-DEC-023` Ruling 8). **Mandatory.**
+     *
+     * Note the absence of `@Optional()` immediately below the one dependency
+     * that has it, and the contrast is the point: a metric is never worth
+     * failing a checkout for, and an entitlement effect always is. A composition
+     * without this binding fails to construct at boot rather than confirming
+     * bookings that silently consume nothing.
+     */
+    @Inject(ZERO_COLLECTIBLE_CONFIRMATION_HOOK)
+    private readonly hook: ZeroCollectibleConfirmationHook,
+    /**
      * `@Optional()` for the same reason the exception filter's reporter is:
      * a composition that omits `ObservabilityModule` must still be able to
      * take a payment. A metric is never worth failing a checkout for.
@@ -115,24 +190,157 @@ export class CheckoutService {
       return { bookingId: booking.id, order: created };
     });
 
+    /*
+     * V3.3 #81 (`#41b`, ADR-044 §2). The branch is the SCHEDULE's collectible,
+     * never `order.totalToman`.
+     *
+     * The two agree today only because `full_payment_online` is the one mode
+     * that has ever run, and #82 (`#41c`) exists to break that: under
+     * `pay_at_venue` the service price is non-zero and the collectible is zero.
+     * A total-based branch would keep passing every test it has and start doing
+     * the wrong thing on the day that ships.
+     *
+     * The schedule is already loaded, non-optional and non-null (ADR-043 §6), so
+     * this costs no query.
+     */
+    if (order.schedule.platformCollectibleToman === 0) {
+      return this.confirmWithoutOnlineCollection(bookingId, order);
+    }
+
     // Outside the transaction: creating an intent touches the payment
     // provider registry, and a gateway misconfiguration must not roll back a
     // perfectly valid booking. If this throws, the customer still has their
     // booking and can retry payment until the hold expires.
+    //
+    // V3.3 #81 moved this INSIDE the positive-collectible branch. It used to
+    // run for every order, including ones the platform will never ask a bank
+    // about -- an intent for an amount nobody will charge is a payment-domain
+    // row asserting something untrue (ADR-044 §7).
     const intent = await this.payments.createIntentForOrder({
       orderId: order.order.id,
       customerId: order.order.customerId,
+      /*
+       * Still the TOTAL, deliberately. Under the only reachable mode the total
+       * and the collectible are equal, and changing the charged amount to the
+       * collectible is #82's decision with its own `OrderPaid` and ledger
+       * consequences (`V33-DEC-022` Ruling 7). #81 changes no charged amount.
+       */
       amountToman: order.order.totalToman,
     });
 
-    let redirectUrl: string | null = null;
-    if (order.order.totalToman > 0) {
-      const initiated = await this.payments.initiate(intent.id, input.callbackBaseUrl, `رزرو نوبت — سفارش ${order.order.id}`);
-      redirectUrl = initiated.redirectUrl;
-    }
+    const initiated = await this.payments.initiate(
+      intent.id,
+      input.callbackBaseUrl,
+      `رزرو نوبت — سفارش ${order.order.id}`,
+    );
 
     await this.drainQuietly();
-    return { bookingId, order, paymentIntentId: intent.id, redirectUrl };
+    return { bookingId, order, paymentIntentId: intent.id, redirectUrl: initiated.redirectUrl };
+  }
+
+  /**
+   * Confirm a booking BeauClick collects nothing online for — V3.3 #81
+   * (`#41b`), ADR-044 §3, §4 and §8; `V33-DEC-023` Rulings 3, 4 and 9.
+   *
+   * ## The order of the three mutations is a lock-order ruling
+   *
+   * Order transition, then the mandatory entitlement hook, then booking
+   * confirmation. The gateway callback writes *payment facts, order, booking*;
+   * this path has no payment facts to write, so keeping the remaining two in
+   * that relative order means the two paths can never take
+   * `commerce.orders` and `booking.bookings` in opposite orders and deadlock.
+   *
+   * It costs nothing to get right now and is expensive to retrofit once both
+   * paths have callers, which is why `V33-DEC-023` made it binding rather than
+   * advisory.
+   *
+   * The hook sits BETWEEN them because #58 will spend a booking credit there,
+   * and a credit must not be spent for a booking that then fails to confirm.
+   *
+   * ## One transaction, and no compensation
+   *
+   * All three share one `EntityManager`. Anything that throws rolls back all
+   * three: the order returns to `pending`, the booking stays unconfirmed, and no
+   * refund is issued because nothing was ever collected. That is the deliberate
+   * difference from the callback path, where a real charge against an
+   * unconfirmable booking must stand and be given back afterwards.
+   *
+   * ## Replay
+   *
+   * The transition is a compare-and-swap, so a concurrent second caller sees
+   * `already` and returns the authoritative existing result **without rerunning
+   * the hook**. Rerunning a no-op is harmless today and is exactly the habit
+   * that must not be inherited by #58.
+   */
+  private async confirmWithoutOnlineCollection(bookingId: string, created: OrderWithDetail): Promise<CheckoutResult> {
+    const orderId = created.order.id;
+
+    const settled = await this.dataSource.transaction(async (manager) => {
+      const transition = await this.orders.confirmNoOnlineCollection(orderId, manager);
+
+      if (transition.outcome === 'ineligible') {
+        // `positive_collectible` cannot happen -- the caller branched on the
+        // same schedule -- and the others mean a concurrent cancellation or
+        // expiry won. Either way this checkout confirms nothing.
+        throw new ZeroCollectibleConfirmationRefusedException(orderId, transition.reason);
+      }
+
+      if (transition.outcome === 'already') {
+        /*
+         * A replay. The hook is NOT rerun and the booking is not re-confirmed;
+         * the authoritative facts already exist. What must still be true is that
+         * they are consistent -- see the impossible-state check below.
+         */
+        return { replayed: true as const };
+      }
+
+      // The entitlement seam. Mandatory, injected without `@Optional()`, and
+      // called with no `?.` -- an absent binding is a boot failure, never a
+      // silently skipped money effect (ADR-044 §6).
+      await this.hook.onZeroCollectibleConfirmation(manager, bookingId);
+
+      const confirmed = await this.bookings.confirm(bookingId, { type: 'system', id: null }, manager);
+      if (!confirmed) {
+        /*
+         * The hold lapsed, or somebody else took the slot, between order
+         * creation and here. Throwing rolls back the transition and the hook.
+         *
+         * No refund, and no auto-refund branch like the callback's: nothing was
+         * collected, so there is nothing to give back. Inventing a refund here
+         * would create the first money fact on a path whose entire contract is
+         * that it creates none.
+         */
+        throw new ZeroCollectibleConfirmationRefusedException(orderId, 'booking_unavailable');
+      }
+
+      return { replayed: false as const };
+    });
+
+    if (settled.replayed) await this.assertBookingConfirmed(orderId, bookingId);
+
+    await this.drainQuietly();
+
+    /*
+     * Re-read rather than reuse `created`: that snapshot was taken before the
+     * transition, so its `status` still says `pending`. The response must carry
+     * the state that is now true.
+     */
+    const authoritative = (await this.orders.detailFor(orderId)) ?? created;
+    return { bookingId, order: authoritative, paymentIntentId: null, redirectUrl: null };
+  }
+
+  /**
+   * The impossible state, checked rather than assumed — ADR-044 §8.
+   *
+   * Only reachable on a replay, and only if something outside this transaction
+   * moved the order without confirming the booking. It is checked because the
+   * alternative is to return a success whose booking is not booked.
+   */
+  private async assertBookingConfirmed(orderId: string, bookingId: string): Promise<void> {
+    const booking = await this.bookings.findById(bookingId);
+    if (booking?.status !== 'confirmed') {
+      throw new InconsistentZeroCollectibleOrderException(orderId, bookingId);
+    }
   }
 
   /**
