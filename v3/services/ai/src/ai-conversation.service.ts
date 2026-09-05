@@ -16,6 +16,26 @@ import { AiConversationLimitException, AiConversationNotFoundException } from '.
 import { AiConversationEntity, AiMessageEntity, AiRecommendationEntity } from './entities/ai.entities';
 
 /**
+ * This module's advisory-lock namespace — bug #86.
+ *
+ * PostgreSQL's advisory-lock space is global to the database, so an unqualified
+ * key would collide with any other caller that happened to hash the same user
+ * id into the same number. The two-argument form takes a namespace and a key;
+ * this is the namespace.
+ *
+ * `0x61_69_63_6e` is ASCII `aicn` ("ai conversation"), and it is deliberately
+ * NOT `WishlistService`'s `0x77_69_73_68` (`wish`) -- the only other advisory
+ * lock in the repository, checked at implementation time and asserted by
+ * `ai-lifecycle-privacy.pg-spec.ts` so a future third namespace cannot silently
+ * duplicate either. `| 0` coerces to the signed 32-bit integer the two-argument
+ * form takes.
+ *
+ * Exported because the suite needs the exact value to hold the same lock from
+ * outside and prove `create()` actually waits on it.
+ */
+export const AI_CONVERSATION_LOCK_NAMESPACE = 0x61_69_63_6e | 0; // 'aicn'
+
+/**
  * The bounded-session lifecycle (`V32-DEC-002`, `V32-DEC-003`, `V32-DEC-007`).
  *
  * Four rules, and each one is here because leaving it to a sweep somebody has
@@ -86,16 +106,65 @@ export class AiConversationService {
    * one; they do not get their oldest live conversation destroyed underneath
    * them to make room for a new one they can always start later.
    *
-   * `SELECT ... FOR UPDATE` on the customer's rows, so two concurrent creates
-   * cannot both see nineteen and both insert.
+   * ## Serialisation, corrected — bug #86
+   *
+   * A transaction-scoped, per-user PostgreSQL advisory lock is taken FIRST, and
+   * it is the only thing that makes the cap hold under concurrency.
+   *
+   * This docblock previously credited `SELECT ... FOR UPDATE`, and that was
+   * wrong. A row lock covers the rows the statement found; it says nothing
+   * about the ABSENCE of a twentieth row. Under `READ COMMITTED` a blocked
+   * `SELECT ... FOR UPDATE` re-checks only the rows it is waiting on -- it does
+   * not discover rows another transaction inserted meanwhile -- so five
+   * concurrent creates each saw nineteen, each found `19 >= 20` false, and each
+   * inserted. CI run 33953016131 (failed attempt, job 101271169256) recorded
+   * five successful creates where exactly one was allowed.
+   *
+   * The lock covers stale closure, the count, the eviction and the insert
+   * together, which is the whole sequence the invariant depends on. Ordering
+   * matters: acquiring it after the count would serialise nothing that needed
+   * serialising.
+   *
+   * `WishlistService` solves the same phantom-insert class the same way, and
+   * for the same reason.
    */
   async create(userId: string): Promise<AiConversationEntity> {
     return this.dataSource.transaction(async (manager) => {
+      /*
+       * FIRST, before anything reads or decides anything.
+       *
+       * `pg_advisory_xact_lock` and never `pg_advisory_lock`: the
+       * transaction-scoped form is released by COMMIT or ROLLBACK
+       * automatically. The session-scoped form would need an explicit unlock,
+       * and any path that threw in between would leak the lock into a POOLED
+       * connection, where it would outlive this request and block that
+       * customer's next one for the life of the process.
+       *
+       * The key is the authenticated owner id and nothing else. No caller
+       * supplies it, so there is no request field that could aim this lock at
+       * another customer.
+       *
+       * `hashtext` maps the id into 32 bits, so two different users CAN collide
+       * onto one key. The consequence is bounded and worth stating: they would
+       * briefly wait for each other. Correctness is unaffected -- every query
+       * below is still scoped by `user_id` -- and no identity is exposed,
+       * because a lock key is not readable as a user id.
+       *
+       * Taken on the transaction's OWN manager, so it is held on the same
+       * connection as the work it protects.
+       */
+      await manager.query('SELECT pg_advisory_xact_lock($1, hashtext($2))', [
+        AI_CONVERSATION_LOCK_NAMESPACE,
+        userId,
+      ]);
+
       await this.closeStaleFor(manager, userId);
 
-      // Locks this customer's conversation rows for the duration. Scoped to one
-      // user, so it contends with nothing except that user's own concurrent
-      // request -- which is exactly the race being closed.
+      // `FOR UPDATE` is kept for the row it may DELETE below: the eviction
+      // target must not be modified by a concurrent transaction between this
+      // read and that delete. It does NOT serialise inserts and is not what
+      // upholds the cap -- the advisory lock above is. Two mechanisms, two
+      // different jobs, and neither is a spare for the other.
       const owned: Array<{ id: string; status: string; closed_at: Date | null }> = await manager.query(
         `SELECT id, status, closed_at FROM ai.conversations WHERE user_id = $1 ORDER BY created_at ASC FOR UPDATE`,
         [userId],
