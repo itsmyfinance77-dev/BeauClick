@@ -1,7 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
-import { AuditLogger, returningRows } from '@beauclick/events';
+import { returningRows } from '@beauclick/events';
+import { AdminAuditService } from '@beauclick/audit';
+
+import {
+  AUDIT_TARGET_SUBSCRIPTION,
+  SUBSCRIPTION_AUDIT_ACTIONS,
+  SUBSCRIPTION_AUDIT_REASONS,
+  SYSTEM_ACTOR_LABEL,
+} from './seller-subscription.audit';
 
 import {
   BookingCreditConsumptionEntity,
@@ -92,7 +100,19 @@ interface PartyRef {
  */
 @Injectable()
 export class BookingCreditAccountingService {
-  private readonly auditLog = new AuditLogger('commercial');
+  /**
+   * The PERSISTENT audit trail, not the operational logger.
+   *
+   * `AdminAuditService.recordSystem` writes inside the caller's own
+   * transaction, so the audit row and the ledger row commit together or
+   * neither does. An `AuditLogger` line would survive a rollback and record a
+   * credit that was never spent, which is the failure this seam exists to
+   * prevent. The actor is a server-generated label because nobody decided
+   * anything here -- the credit moved because a booking was confirmed -- and
+   * `ck_admin_audit_actor` keeps that structurally distinct from a human's
+   * action (`V33-DEC-018`, restated for credits by `V33-DEC-025` Ruling 9).
+   */
+  constructor(private readonly audit: AdminAuditService) {}
 
   /**
    * Spend one credit for a booking that is about to be confirmed.
@@ -185,12 +205,30 @@ export class BookingCreditAccountingService {
       subscriberPartyId: chosen.subscriberPartyId,
     });
 
-    this.auditLog.log({
-      action: 'booking_credit.consumed',
-      bookingId,
-      grantId: chosen.id,
-      partyType: chosen.subscriberPartyType,
-      partyId: chosen.subscriberPartyId,
+    /*
+     * Audited only HERE, where a row was genuinely inserted.
+     *
+     * `already_consumed`, `not_configured` and `insufficient_credit` return
+     * above without touching this, because an audit trail that records
+     * no-ops as if a credit moved cannot be used to answer the one question
+     * it exists for.
+     *
+     * No booking id in the record: the consumption row already holds it, and
+     * a booking identifies a counterparty. `consumptionId` reaches the same
+     * fact through the ledger without putting a customer-linked identifier in
+     * the seller's audit trail.
+     */
+    await this.audit.recordSystem(manager, {
+      actorLabel: SYSTEM_ACTOR_LABEL,
+      action: SUBSCRIPTION_AUDIT_ACTIONS.creditConsumed,
+      targetType: AUDIT_TARGET_SUBSCRIPTION,
+      targetId: chosen.subscriptionId,
+      after: {
+        consumptionId,
+        grantId: chosen.id,
+        periodIndex: chosen.periodIndex,
+      },
+      reason: SUBSCRIPTION_AUDIT_REASONS.creditConsumed,
     });
 
     return { outcome: 'consumed', consumptionId, grantId: chosen.id };
@@ -235,13 +273,18 @@ export class BookingCreditAccountingService {
     );
     if (returningRows(raw).length !== 1) return { outcome: 'already_returned' };
 
-    this.auditLog.log({
-      action: 'booking_credit.returned',
-      bookingId,
-      consumptionId: consumption.id,
-      cause,
-      partyType: consumption.subscriberPartyType,
-      partyId: consumption.subscriberPartyId,
+    await this.audit.recordSystem(manager, {
+      actorLabel: SYSTEM_ACTOR_LABEL,
+      action: SUBSCRIPTION_AUDIT_ACTIONS.creditReturned,
+      targetType: AUDIT_TARGET_SUBSCRIPTION,
+      targetId: consumption.subscriptionId,
+      after: {
+        returnId,
+        consumptionId: consumption.id,
+        // The closed cause, never the canceller's own words.
+        cause,
+      },
+      reason: SUBSCRIPTION_AUDIT_REASONS.creditReturned,
     });
 
     return { outcome: 'returned', returnId };

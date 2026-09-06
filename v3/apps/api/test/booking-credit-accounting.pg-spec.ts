@@ -2,7 +2,11 @@ import { INestApplication } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { BookingService } from '@beauclick/booking';
+import { SandboxPaymentProvider } from '@beauclick/payment';
 import {
   BookingCreditAccountingService,
   SellerSubscriptionService,
@@ -56,6 +60,7 @@ describePg('booking-credit accounting (real PostgreSQL)', () => {
   let bookings: BookingService;
   let credits: BookingCreditAccountingService;
   let subscriptions: SellerSubscriptionService;
+  let sandbox: SandboxPaymentProvider;
 
   let sequence = 0;
   const nextPhone = (): string => `+98914${String(1000000 + (sequence += 1)).slice(-7)}`;
@@ -69,6 +74,7 @@ describePg('booking-credit accounting (real PostgreSQL)', () => {
     bookings = app.get(BookingService);
     credits = app.get(BookingCreditAccountingService);
     subscriptions = app.get(SellerSubscriptionService);
+    sandbox = app.get(SandboxPaymentProvider);
   });
 
   afterAll(async () => {
@@ -663,6 +669,416 @@ describePg('booking-credit accounting (real PostgreSQL)', () => {
         'commercial.booking_credit_grants:retained',
         'commercial.booking_credit_returns:retained',
       ]);
+    });
+  });
+
+  // =========================================================================
+  // 6. The verified-capture path — the seam #58a added, and the money rule
+  // =========================================================================
+
+  /**
+   * A positively priced booking, taken through the real public checkout route
+   * and left waiting on the gateway.
+   *
+   * The zero-collectible fixture above cannot exercise any of this: it never
+   * creates an intent, so there is no capture to preserve and no amount to
+   * refund. This is the second production confirmation path (#82), and the one
+   * that had no entitlement seam at all before this story.
+   */
+  interface PaidBooked extends Booked {
+    reference: string;
+    priceToman: number;
+  }
+
+  async function bookPaid(priceToman: number, hours: number): Promise<PaidBooked> {
+    sequence += 1;
+    const customer = await seedUser(app, dataSource, nextPhone(), ['customer']);
+    const owner = await seedUser(app, dataSource, nextPhone(), ['customer', 'professional']);
+    const professional = await seedProfessional(dataSource, owner.id, 'متخصص پرداختی', priceToman);
+    const slotId = await seedSlot(dataSource, professional.id, professional.serviceId, futureSlotTime(hours + sequence));
+
+    const result = await checkout.checkout({
+      customerId: customer.id,
+      professionalId: professional.id,
+      slotId,
+      serviceId: professional.serviceId,
+      callbackBaseUrl: CALLBACK_BASE,
+    });
+
+    const [attempt] = await dataSource.query(
+      'SELECT provider_reference FROM payment.payment_attempts WHERE payment_intent_id = $1',
+      [result.paymentIntentId],
+    );
+    const [order] = await dataSource.query(
+      'SELECT seller_party_type, seller_party_id FROM commerce.orders WHERE id = $1',
+      [result.order.order.id],
+    );
+
+    return {
+      customer,
+      bookingId: result.bookingId,
+      orderId: result.order.order.id,
+      partyType: order.seller_party_type as SubscriberPartyType,
+      partyId: order.seller_party_id,
+      reference: attempt.provider_reference as string,
+      priceToman,
+    };
+  }
+
+  /** Drive a booked order through a successful sandbox capture, as production does. */
+  const captureOf = async (booked: PaidBooked) => {
+    await sandbox.decide(booked.reference, 'success');
+    return checkout.handleCallback('sandbox', booked.reference, { reference: booked.reference });
+  };
+
+  const orderRow = async (orderId: string) => {
+    const [row] = await dataSource.query('SELECT * FROM commerce.orders WHERE id = $1', [orderId]);
+    return row;
+  };
+
+  const refundsFor = async (orderId: string) =>
+    dataSource.query('SELECT amount_toman, request_key FROM payment.refunds WHERE order_id = $1', [orderId]);
+
+  /** Spend a party's entire balance against synthetic bookings, leaving it exhausted. */
+  async function exhaust(party: { partyType: SubscriberPartyType; partyId: string }): Promise<void> {
+    let balance = await credits.balanceFor(dataSource.manager, party);
+    while (balance > 0) {
+      await dataSource.transaction((m) => credits.consumeForConfirmation(m, uuidv7(), party));
+      balance -= 1;
+    }
+    expect(await credits.balanceFor(dataSource.manager, party)).toBe(0);
+  }
+
+  describe('the verified-capture path', () => {
+    it('control: a verified capture consumes exactly one credit and confirms', async () => {
+      const booked = await bookPaid(250_000, 300);
+      await grantCredits(booked, 1);
+
+      const result = await captureOf(booked);
+
+      expect(result.outcome.status).toBe('succeeded');
+      expect(result.refundIssued).toBe(false);
+      expect((await bookingRow(booked.bookingId)).status).toBe('confirmed');
+      expect(await consumptions(booked.bookingId)).toHaveLength(1);
+      expect(await refundsFor(booked.orderId)).toHaveLength(0);
+      expect(await credits.balanceFor(dataSource.manager, booked)).toBe(0);
+    });
+
+    it('an exhausted party keeps the captured money and is refunded exactly what was collected', async () => {
+      const booked = await bookPaid(250_000, 340);
+      await grantCredits(booked, 1);
+      await exhaust(booked);
+
+      const result = await captureOf(booked);
+
+      /*
+       * The whole resolution of "money must commit but credit must be atomic",
+       * asserted as four facts that have to hold together:
+       *
+       *   the capture is RECORDED -- `collected_total_toman` carries the
+       *   gateway-verified amount and the money fact was never rolled back;
+       *   the booking is NOT confirmed;
+       *   NO consumption exists;
+       *   exactly ONE refund exists, for exactly the collected amount.
+       */
+      const order = await orderRow(booked.orderId);
+      expect(Number(order.collected_total_toman)).toBe(booked.priceToman);
+      expect((await bookingRow(booked.bookingId)).status).toBe('pending');
+      expect(await consumptions(booked.bookingId)).toHaveLength(0);
+
+      const refunds = await refundsFor(booked.orderId);
+      expect(refunds).toHaveLength(1);
+      expect(Number(refunds[0].amount_toman)).toBe(booked.priceToman);
+      expect(result.refundIssued).toBe(true);
+    });
+
+    it('a replayed callback after an entitlement refusal refunds nothing further', async () => {
+      const booked = await bookPaid(250_000, 380);
+      await grantCredits(booked, 1);
+      await exhaust(booked);
+
+      await captureOf(booked);
+      const afterFirst = await refundsFor(booked.orderId);
+      expect(afterFirst).toHaveLength(1);
+
+      // The same callback again, exactly as a gateway retry delivers it.
+      await checkout.handleCallback('sandbox', booked.reference, { reference: booked.reference });
+
+      const afterReplay = await refundsFor(booked.orderId);
+      expect(afterReplay).toHaveLength(1);
+      // Deterministic key, so the replay reuses the refund rather than issuing a
+      // second one -- #82's idempotency, unchanged by this story.
+      expect(afterReplay[0].request_key).toBe(afterFirst[0].request_key);
+      expect(await consumptions(booked.bookingId)).toHaveLength(0);
+    });
+
+    it('both production confirmation paths call the one entitlement port', () => {
+      /*
+       * A structural assertion, because the behavioural halves live in two
+       * different describes and neither of them alone catches a call site
+       * DELETED from the other. Two mutation probes remove one call each and
+       * both are killed by the behavioural tests; this asserts the shape those
+       * probes mutate.
+       */
+      const source = readFileSync(join(__dirname, '..', 'src', 'checkout', 'checkout.service.ts'), 'utf8');
+      const calls = source.match(/onBookingConfirmation\(/g) ?? [];
+      // One per production confirmation path, and no third.
+      expect(calls).toHaveLength(2);
+      expect(source).toContain('onBookingConfirmation(manager, bookingId)');
+      expect(source).toContain('onBookingConfirmation(manager, order.sourceId)');
+    });
+  });
+
+  // =========================================================================
+  // 7. The zero-collectible refusal — a rollback, and no money anywhere
+  // =========================================================================
+
+  describe('the zero-collectible refusal', () => {
+    it('rolls the order transition back, leaves the booking pending and calls no refund', async () => {
+      const owner = await seedUser(app, dataSource, nextPhone(), ['customer', 'professional']);
+      const professional = await seedProfessional(dataSource, owner.id, 'متخصص رایگان', 0);
+      const customer = await seedUser(app, dataSource, nextPhone(), ['customer']);
+
+      // One free booking to create the party, then configure and exhaust it.
+      const warmSlot = await seedSlot(dataSource, professional.id, professional.serviceId, futureSlotTime(420));
+      const warm = await checkout.checkout({
+        customerId: customer.id,
+        professionalId: professional.id,
+        slotId: warmSlot,
+        serviceId: professional.serviceId,
+        callbackBaseUrl: CALLBACK_BASE,
+      });
+      const [o] = await dataSource.query(
+        'SELECT seller_party_type, seller_party_id FROM commerce.orders WHERE id = $1',
+        [warm.order.order.id],
+      );
+      const party = { partyType: o.seller_party_type as SubscriberPartyType, partyId: o.seller_party_id };
+      await grantCredits(party, 1);
+      await exhaust(party);
+
+      const before = await consumptions();
+      const slotId = await seedSlot(dataSource, professional.id, professional.serviceId, futureSlotTime(444));
+      await expect(
+        checkout.checkout({
+          customerId: customer.id,
+          professionalId: professional.id,
+          slotId,
+          serviceId: professional.serviceId,
+          callbackBaseUrl: CALLBACK_BASE,
+        }),
+      ).rejects.toThrow();
+
+      /*
+       * Nothing moved. The order never reached
+       * `online_collection_not_required`, the booking is still pending, no
+       * consumption was written -- and, the part that matters most, no refund
+       * exists, because no money was ever collected. A refund here would be the
+       * platform inventing a payment to give back.
+       */
+      const stranded = await dataSource.query(
+        `SELECT o.status AS order_status, b.status AS booking_status
+           FROM commerce.orders o JOIN booking.bookings b ON b.id = o.source_id
+          WHERE b.slot_id = $1`,
+        [slotId],
+      );
+      expect(stranded).toHaveLength(1);
+      expect(stranded[0].order_status).toBe('pending');
+      expect(stranded[0].booking_status).toBe('pending');
+      expect(await consumptions()).toHaveLength(before.length);
+      const [{ count }] = await dataSource.query('SELECT count(*)::int AS count FROM payment.refunds');
+      expect(count).toBe(0);
+    });
+  });
+
+  // =========================================================================
+  // 8. A charge stays in the term it was made in
+  // =========================================================================
+
+  describe('reschedule', () => {
+    it('rescheduling across a future term boundary leaves the charge byte-identical', async () => {
+      const booked = await bookZeroCollectible();
+      await grantCredits(booked, 1);
+      await dataSource.transaction((m) => credits.consumeForConfirmation(m, booked.bookingId, booked));
+      const [before] = await consumptions(booked.bookingId);
+
+      /*
+       * A LATER grant, standing in for the next billing term.
+       *
+       * If anything re-derived the charge at reschedule time it would find this
+       * newer grant and a higher period, so the four snapshotted columns are
+       * exactly where a re-derivation would show up.
+       */
+      await grantCredits(booked, 5);
+
+      const row = await bookingRow(booked.bookingId);
+      const newSlot = await seedSlot(dataSource, row.professional_id, row.service_id, futureSlotTime(500));
+      await bookings.reschedule(booked.bookingId, newSlot, { type: 'professional', id: null });
+
+      const [after] = await consumptions(booked.bookingId);
+      expect(after.id).toBe(before.id);
+      expect(after.grant_id).toBe(before.grant_id);
+      expect(after.subscription_id).toBe(before.subscription_id);
+      expect(Number(after.period_index)).toBe(Number(before.period_index));
+      // And the reschedule itself consumed and returned nothing.
+      expect(await consumptions()).toHaveLength(1);
+      expect(await returns()).toHaveLength(0);
+    });
+  });
+
+  // =========================================================================
+  // 9. Audit — one row per real mutation, and none for a no-op
+  // =========================================================================
+
+  /**
+   * The credit audit rows for ONE party's subscription.
+   *
+   * Scoped rather than global on purpose: `admin.admin_audit_log` is
+   * deliberately absent from `RESETTABLE_TABLES` -- an append-only audit trail
+   * that a test helper truncates is not one -- so it carries every earlier
+   * case's rows. A global count here would have asserted the suite's own
+   * history, which is how a test ends up measuring nothing.
+   */
+  const subscriptionIdFor = async (party: { partyType: SubscriberPartyType; partyId: string }): Promise<string> => {
+    const [row] = await dataSource.query(
+      `SELECT id FROM commercial.seller_subscriptions
+        WHERE subscriber_party_type = $1 AND subscriber_party_id = $2 LIMIT 1`,
+      [party.partyType, party.partyId],
+    );
+    return row?.id ?? null;
+  };
+
+  const creditAudit = async (subscriptionId: string | null) =>
+    subscriptionId === null
+      ? []
+      : dataSource.query(
+          `SELECT action, target_type, target_id, actor_user_id, actor_label, reason, after_state
+             FROM admin.admin_audit_log
+            WHERE action IN ('commercial.credit_consumed', 'commercial.credit_returned')
+              AND target_id = $1
+            ORDER BY id`,
+          [subscriptionId],
+        );
+
+  describe('audit', () => {
+    it('writes exactly one row per real consumption and return, and none for a no-op', async () => {
+      const booked = await bookZeroCollectible();
+      await grantCredits(booked, 1);
+
+      // A no-op first: a DIFFERENT party that is dormant.
+      const other = await bookZeroCollectible();
+      const dormant = await dataSource.transaction((m) =>
+        credits.consumeForConfirmation(m, uuidv7(), { partyType: other.partyType, partyId: other.partyId }),
+      );
+      expect(dormant.outcome).toBe('not_configured');
+      // Dormant writes nothing at all -- there is not even a subscription to
+      // attribute a row to.
+      expect(await creditAudit(await subscriptionIdFor(other))).toHaveLength(0);
+
+      await dataSource.transaction((m) => credits.consumeForConfirmation(m, booked.bookingId, booked));
+      // A replay: an outcome, but not a mutation.
+      await dataSource.transaction((m) => credits.consumeForConfirmation(m, booked.bookingId, booked));
+      await dataSource.transaction((m) => credits.returnForCancellation(m, booked.bookingId, 'seller_cancelled'));
+      await dataSource.transaction((m) => credits.returnForCancellation(m, booked.bookingId, 'seller_cancelled'));
+
+      const rows = await creditAudit(await subscriptionIdFor(booked));
+      expect(rows.map((r: { action: string }) => r.action)).toEqual([
+        'commercial.credit_consumed',
+        'commercial.credit_returned',
+      ]);
+      // No fabricated human actor, and a server label instead.
+      expect(rows.every((r: { actor_user_id: string | null }) => r.actor_user_id === null)).toBe(true);
+      expect(rows.every((r: { actor_label: string | null }) => r.actor_label === 'system')).toBe(true);
+      // Closed reasons, and no counterparty identifier anywhere in the record.
+      const serialized = JSON.stringify(rows);
+      expect(serialized).toContain('one booking credit consumed at first booking confirmation');
+      expect(serialized).toContain('seller_cancelled');
+      expect(serialized).not.toContain(booked.bookingId);
+      expect(serialized).not.toContain(booked.customer.id);
+    });
+
+    it('a rolled-back consumption leaves no audit row either', async () => {
+      const booked = await bookZeroCollectible();
+      await grantCredits(booked, 1);
+      const bookingId = uuidv7();
+      const subscriptionId = await subscriptionIdFor(booked);
+      expect(await creditAudit(subscriptionId)).toHaveLength(0);
+
+      await expect(
+        dataSource.transaction(async (m) => {
+          const outcome = await credits.consumeForConfirmation(m, bookingId, booked);
+          expect(outcome.outcome).toBe('consumed');
+          // The audit row is already there, INSIDE this transaction...
+          const [{ n }] = await m.query(
+            `SELECT count(*)::int AS n FROM admin.admin_audit_log
+              WHERE action = 'commercial.credit_consumed' AND target_id = $1`,
+            [subscriptionId],
+          );
+          expect(n).toBe(1);
+          throw new Error('rollback');
+        }),
+      ).rejects.toThrow('rollback');
+
+      // ...and it left with the consumption, because they are one transaction.
+      expect(await consumptions(bookingId)).toHaveLength(0);
+      expect(await creditAudit(subscriptionId)).toHaveLength(0);
+      expect(await credits.balanceFor(dataSource.manager, booked)).toBe(1);
+    });
+  });
+
+  // =========================================================================
+  // 10. No new surface — routes, events, producers
+  // =========================================================================
+
+  describe('no new surface', () => {
+    it('adds no HTTP route for credits, consumption, returns or balance', () => {
+      const server = app.getHttpServer();
+      const router = server._events.request._router as {
+        stack: Array<{ route?: { path: string } }>;
+      };
+      const paths = router.stack.filter((layer) => layer.route).map((layer) => layer.route!.path);
+
+      // Non-vacuity: the enumerator really can see this application's routes.
+      expect(paths.length).toBeGreaterThan(20);
+      expect(paths).toContain('/api/v1/me/subscriptions');
+
+      expect(paths.filter((p) => /credit|consumption|entitlement|balance|allowance/i.test(p))).toEqual([]);
+    });
+
+    it('emits no event: the commercial domain still has no outbox at all', async () => {
+      const booked = await bookZeroCollectible();
+      await grantCredits(booked, 1);
+      await dataSource.transaction((m) => credits.consumeForConfirmation(m, booked.bookingId, booked));
+      await dataSource.transaction((m) => credits.returnForCancellation(m, booked.bookingId, 'seller_cancelled'));
+
+      const outboxes = await dataSource.query(
+        "SELECT tablename FROM pg_tables WHERE schemaname = 'commercial' AND tablename = 'outbox_events'",
+      );
+      expect(outboxes).toEqual([]);
+
+      // And nothing leaked into a neighbour's outbox either. The control is the
+      // booking's own real event, which must be present in the same query.
+      const types: Array<{ event_type: string }> = await dataSource.query(
+        `SELECT event_type FROM booking.outbox_events
+          UNION ALL SELECT event_type FROM commerce.outbox_events`,
+      );
+      expect(types.length).toBeGreaterThan(0);
+      expect(types.map((r) => r.event_type)).toContain('BookingConfirmed');
+      expect(types.filter((r) => /Credit|Entitlement|Consumption/i.test(r.event_type))).toEqual([]);
+    });
+
+    it('adds no producer to the closed ServiceName union', () => {
+      const source = readFileSync(
+        join(__dirname, '..', '..', '..', 'libs', 'event-contracts', 'src', 'event-contract.ts'),
+        'utf8',
+      );
+      const union = source.slice(source.indexOf('export type ServiceName'));
+      const members = (union.slice(0, union.indexOf(';')).match(/'[a-z-]+'/g) ?? []).map((m) => m.slice(1, -1));
+
+      // Non-vacuity: the parser found the real union.
+      expect(members).toContain('commerce');
+      expect(members).toContain('booking');
+      expect(members).not.toContain('commercial');
+      expect(members).not.toContain('commercial-policy');
     });
   });
 });
