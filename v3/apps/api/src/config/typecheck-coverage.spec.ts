@@ -41,11 +41,15 @@ import ts from 'typescript';
  * `tsc` itself takes, which is the only reading that proves anything about what
  * `tsc` will check.
  *
- * ## The other half: the BUILD program must NOT contain them
+ * ## The other half: the BUILD program must NOT ship them
  *
- * A test file emitted into `dist/` is a test file in the production image. The
- * build config stays source-only, and that is asserted here beside its
- * counterpart rather than left to a reviewer noticing two files at once.
+ * A test file emitted into `dist/` is a test file in the production image, and
+ * `include` is not the emitted set: TypeScript compiles whatever a root file
+ * IMPORTS. On master one did — `financial-owner-preflight.spec.ts` imports the
+ * real-database harness `test/pg-test-app.factory`, so
+ * `dist/apps/api/test/pg-test-app.factory.js` shipped while the build config
+ * truthfully said `src` only. Both questions are asked below, because they have
+ * different answers.
  */
 
 /** `apps/api`. */
@@ -136,14 +140,55 @@ describe('the API typecheck program covers the API test tree', () => {
     expect(typecheck.options.noEmit).toBe(true);
   });
 
-  it('keeps the production build source-only', () => {
-    /*
-     * The other half of the trade. `api:build` emits to `dist/`, so a test file
-     * in ITS program is a test file in the production image.
-     */
+  it('keeps the production build source-only, by its configured inputs', () => {
     expect(build.files.filter((f) => f.startsWith(TEST_DIR))).toEqual([]);
+    expect(build.files.filter((f) => f.endsWith('.spec.ts'))).toEqual([]);
     expect(build.files).toContain('apps/api/src/main.ts');
     expect(build.options.noEmit).toBeFalsy();
+  });
+
+  it('and by what it would actually EMIT, which is a different question', () => {
+    /*
+     * `include` is not the emitted set. TypeScript compiles and emits whatever a
+     * root file IMPORTS, whether or not the config mentions it -- so a build
+     * whose `include` truthfully says `src` only can still ship a test file.
+     *
+     * It did. `financial-owner-preflight.spec.ts` imports
+     * `../../test/pg-test-app.factory`, and that put a real-database test
+     * harness -- `dist/apps/api/test/pg-test-app.factory.js` -- into the
+     * production image, on master, invisibly to any assertion about `include`.
+     * Excluding the spec roots is what removes it; an `exclude` on `test/**`
+     * would not, because exclusion filters the include glob and does not stop
+     * transitive emission.
+     *
+     * So this builds the real program and asks what would land in `dist/`.
+     */
+    const program = ts.createProgram(
+      build.files.map((f) => resolve(WORKSPACE_ROOT, f)),
+      build.options,
+    );
+    const emitted = program
+      .getSourceFiles()
+      .filter((f) => !f.isDeclarationFile)
+      .map((f) => posix(f.fileName));
+
+    // Non-vacuity: a program that resolved nothing would satisfy every
+    // absence below.
+    expect(emitted.length).toBeGreaterThan(100);
+    expect(emitted).toContain('apps/api/src/main.ts');
+
+    expect(emitted.filter((f) => f.startsWith(TEST_DIR))).toEqual([]);
+    expect(emitted.filter((f) => f.endsWith('.spec.ts'))).toEqual([]);
+  });
+
+  it('still type-checks the src specs the build now refuses to ship', () => {
+    // The trade has to cut one way only. `tsconfig.json` excludes
+    // `**/*.spec.ts` so they are not SHIPPED; `exclude: []` here keeps them
+    // CHECKED. Losing that would swap one blind spot for another.
+    const specs = typecheck.files.filter((f) => f.endsWith('.spec.ts'));
+    expect(specs).toContain('apps/api/src/config/typecheck-coverage.spec.ts');
+    expect(specs).toContain('apps/api/src/config/financial-owner-preflight.spec.ts');
+    expect(specs.length).toBeGreaterThan(5);
   });
 
   it('weakens no compiler flag to achieve any of this', () => {

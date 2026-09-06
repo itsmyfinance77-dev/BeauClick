@@ -32,5 +32,23 @@
     // admin-audit-log'`. Inheriting removes the class of bug rather than
     // lengthening the list.
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  // Specs are not production code, and this config EMITS -- `dist/` is what
+  // the container image copies.
+  //
+  // Without this, seven `src/**/*.spec.js` files shipped in the image, and one
+  // of them dragged a test file in with it: `financial-owner-preflight.spec.ts`
+  // imports `../../test/pg-test-app.factory`, and TypeScript compiles and emits
+  // whatever a root file imports whether or not `include` mentions it. So
+  // `dist/apps/api/test/pg-test-app.factory.js` existed -- a database test
+  // harness, in the production build -- while `include` truthfully said
+  // `src` only. Excluding the roots that reach it is what actually removes it;
+  // an `exclude` on `test/**` would not, because exclusion filters the include
+  // glob and does not stop transitive emission.
+  //
+  // `tsconfig.typecheck.json` re-opens this to `[]`: nothing here should stop a
+  // spec being TYPE-CHECKED, only from being shipped. That pair is asserted by
+  // `src/config/typecheck-coverage.spec.ts`, so the two cannot drift apart
+  // silently.
+  "exclude": ["**/*.spec.ts"]
 }

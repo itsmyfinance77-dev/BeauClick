@@ -48,5 +48,12 @@
     // `noEmit`; the build config remains the only thing that writes `dist/`.
     "noEmit": true
   },
-  "include": ["src/**/*.ts", "test/**/*.ts"]
+  "include": ["src/**/*.ts", "test/**/*.ts"],
+  // `tsconfig.json` excludes `**/*.spec.ts` so the production build does not
+  // SHIP them. `exclude` is inherited through `extends`, so without this line
+  // that build-time decision would silently stop the seven `src/**/*.spec.ts
+  // files being type-checked at all -- trading one blind spot for another.
+  //
+  // Empty, not absent: an absent `exclude` inherits the parent`s.
+  "exclude": []
 }
