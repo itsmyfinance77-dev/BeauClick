@@ -25,6 +25,7 @@ import { WishlistModule, WishlistSubjectDataContract } from '@beauclick/wishlist
 import { ReferralModule, ReferralSubjectDataContract } from '@beauclick/referral';
 import {
   CommercialCatalogueModule,
+  CollectionPolicyAssignmentSubjectDataContract,
   CommercialSubjectDataContract,
   SellerSubscriptionModule,
   SubscriptionSubjectDataContract,
@@ -187,7 +188,8 @@ export class PrivacyErasureCompleter {
         ChatSubjectDataContract,
         WishlistSubjectDataContract,
         ReferralSubjectDataContract,
-        CommercialSubjectDataContract,
+        CollectionPolicyAssignmentSubjectDataContract,
+  CommercialSubjectDataContract,
         SubscriptionSubjectDataContract,
       ],
       useFactory: (...contracts: SubjectDataContract[]): SubjectDataContract[] => contracts,
