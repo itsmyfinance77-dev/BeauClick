@@ -11,6 +11,34 @@ contract), ADR-023 (business is its own seller party), ADR-018 (same-cluster
 consistency), ADR-011 (module boundaries)
 **Constrains:** #83 (`#41d-1`), #104 (`#41d-2`)
 
+**Amended 2026-09-07 (Story #104 readiness audit) — order resolution.** The
+`#41d-2` readiness recheck against the shipped `#41d-1` code found two
+load-bearing engineering defects and one internal inconsistency in this ADR, all
+of which had to be settled before order-integration code could be written. Five
+rules are bound in place below and are marked **R1**–**R5** where they appear:
+
+- **R1 — the schedule's `collection_mode` is derived from the computed amounts,
+  never copied from the policy terms.** `bookingCollectionAmountsV1` legitimately
+  returns a collectible of `0` (a percentage flooring to zero) or of exactly
+  `serviceTotalToman` (a fixed amount or minimum clamped to the total), while
+  `commerce.order_payment_schedules`'s shipped `ck_ops_mode_consistent` admits
+  `deposit_online_balance_at_venue` only when `0 < collectible < total`
+  **strictly**. Without R1 a policy an administrator is entitled to publish would
+  refuse a booking for particular order amounts. See §2.
+- **R2 — assignment presence *is* enrollment.** There is no separate enrollment
+  marker and no runtime un-enrollment. See §3 and §6.
+- **R3 — one transaction and connection, one seller-party selection.** See §1
+  and §4.
+- **R4 — the runtime resolver is separate from the administrator writer.** See
+  §1.
+- **R5 — `FOR SHARE` and compare-and-swap linearization.** See §4.
+
+This is an **engineering consistency correction** inside the already-ratified
+`V33-DEC-028` and `V33-DEC-029` structure. It chooses no price, percentage,
+amount, bound, enabled mode, rollout percentage, legal wording or external
+provider behaviour, and it creates no new ADR id. The original text of every
+corrected passage is preserved and marked rather than rewritten.
+
 **Amended 2026-09-06 (Story #83 implementation audit) — the exclusion interval.**
 §3 as accepted specified a plain `tstzrange(activation_starts_at,
 activation_ends_at, '[)')` partial on `lifecycle_state <> 'draft'`, while §4
@@ -85,6 +113,48 @@ single-refusal precedent
 assignment. `commerce` owns the immutable per-order schedule and the snapshot
 written into it. Neither reaches into the other's tables.
 
+*(**R3/R4, added 2026-09-07.** Two things this paragraph assumed are not true of
+the shipped code, and both are corrected here.*
+
+*First, **`ServiceCatalog.findServiceOffering` and `SellerPartyLookup.forProfessional`
+must be made manager-scoped**. Today neither accepts an `EntityManager`
+(`services/commerce/src/ports.ts:36`), and `ProviderBackedServiceCatalog` and
+`SellerPartyLookup` both read through injected repositories
+(`apps/api/src/composition/port-adapters.ts:71-92`, `:54-68`) — that is, on a
+**different pooled connection** from the transaction
+`OrderService.createForBookingWithin` is running in. Under `#41d-1` that is
+merely a possibly-stale read and two extra pooled connections held open per order
+creation. Under `#41d-2` it becomes a split-brain: the seller party would be read
+on one connection while its assignment and policy version are read on the
+transaction's, and one immutable order snapshot would be assembled from two.
+Both must take the caller's `EntityManager` and query through it, exactly as
+`OwnedSubscriberPartyResolver` already does for the same reason.*
+
+***Be precise about what that guarantees.*** *PostgreSQL's default `READ
+COMMITTED` isolation gives every statement its own fresh snapshot, so sharing one
+`EntityManager` does **not** mean every statement observes one immutable
+transaction snapshot, and this ADR does **not** authorize changing the isolation
+level. The guarantee R3 actually establishes is narrower and sufficient:*
+
+- *one transaction on one connection, with no out-of-transaction read;*
+- *the seller party is selected **once**, at the offering-read statement;*
+- *that exact value is written to the order and passed unchanged to policy
+  resolution — it is **never re-resolved** later in the same order path;*
+- *a later affiliation change therefore cannot reinterpret an order that has
+  already been written.*
+
+*Second, **the runtime resolver is a separate service from the administrator
+writer**. A resolution method must not be added to `BookingCollectionPolicyService`:
+that class's entire contract is that every method takes an `actorUserId` and
+writes an audit row in the same transaction, whereas resolution is an unaudited,
+actor-free read on a caller's transaction. Merging them would combine two
+distinct authorization and audit surfaces and put the audited administrator
+writer on the order hot path. The resolver receives the already-selected seller
+party and never a client-supplied identity; it returns exactly
+`legacy_unenrolled` or a validated `BookingCollectionPolicySnapshotV1`, with a
+closed identity-free internal cause on an enrolled failure and **no fallback,
+cache, "latest", environment key, default or fabricated policy**.)*
+
 Commerce consumes a **narrow, manager-scoped resolver port** declared in
 `services/commerce/src/ports.ts` beside `ServiceCatalog`, bound at the API
 composition root exactly as `ProviderBackedServiceCatalog` is. The port takes the
@@ -137,6 +207,64 @@ chosen. **Neither `#41d-1` nor `#41d-2` chooses one.**
 clamp, then the maximum clamp, then the final clamp to the service total — the
 order `collectionBreakdownV1` already implements. Integer Toman throughout; never
 a float, never a decimal string.
+
+**R1 — the schedule records the computed outcome, not the policy's mode.**
+*(Added 2026-09-07. The paragraph above is correct about the amounts and silent
+about the mode, and that silence is what the Story #104 audit found.)*
+
+A published policy version records the **administrator's rule**. The immutable
+order schedule records the **result of applying that rule to one order's
+amounts**. They are not the same fact, and `#41d-2` must not copy
+`terms.collectionMode` onto the schedule. After `bookingCollectionAmountsV1` has
+computed the exact amounts, the recorded mode is derived from them:
+
+| Computed amounts | `commerce.order_payment_schedules.collection_mode` |
+|---|---|
+| `platformCollectibleToman === 0` | `pay_at_venue` |
+| `platformCollectibleToman === serviceTotalToman` | `full_payment_online` |
+| `0 < platformCollectibleToman < serviceTotalToman` | `deposit_online_balance_at_venue` |
+
+**Why this is required rather than tidy.** The shipped
+`ck_ops_mode_consistent` admits `deposit_online_balance_at_venue` only when
+`platform_collectible_toman > 0 AND platform_collectible_toman < service_total_toman`
+— **strictly**
+(`database/migrations/commerce/20260905900001_create_order_payment_schedules.sql:96-104`).
+The shipped helper legitimately produces both excluded values for terms that pass
+`validateBookingCollectionTermsV1` **and** every
+`commercial.booking_collection_policy_versions` CHECK:
+
+- a **percentage flooring to zero** — `ck_bcpv_deposit_rate` permits
+  `deposit_basis_points >= 1`, and one basis point of a 9,999 total floors to `0`
+  (asserted at
+  `packages/commercial-policy-contract/src/booking-collection-policy-contract.spec.ts:220-223`);
+- a **fixed amount or minimum reaching the total** — `ck_bcpv_deposit_amount`
+  permits any `deposit_amount_toman > 0`, and the final clamp returns exactly the
+  service total (asserted at `…spec.ts:247`);
+- a **zero-priced service**, where every amount is zero.
+
+Publication validation cannot prevent this, and that is the point: whether a
+policy would violate the CHECK depends on the **order's** amounts, not on the
+policy. The same published policy is writable for one booking and not for the
+next. The contract is not wrong either — it computes the correct amount; only the
+recorded mode was undefined.
+
+Deriving it is also what the database already says these modes mean:
+*"A deposit equal to the total is `full_payment_online` and a deposit of zero is
+`pay_at_venue`; permitting either spelling here would make 'which mode was this?'
+ambiguous at the row level"* (same file, `:90-94`). It is `V33-DEC-028` Ruling 6
+restated at the row: **the row records the outcome, the referenced policy version
+records the rule.** No policy history is lost, because the snapshotted
+`policy_key` and `policy_version` still identify exactly which rule produced the
+amounts.
+
+The rejected alternative is to refuse the booking. That would turn a
+one-basis-point rounding artefact into a customer-visible failure with no
+operator signal, and it would make an administrator's valid publication
+unusable at amounts nobody predicted.
+
+**This is not a commercial-value decision.** It selects no rate, amount, bound or
+enabled mode; it decides only which of three already-ratified vocabulary members
+truthfully describes an outcome the arithmetic has already produced.
 
 ### 3. Schema blueprint
 
@@ -213,7 +341,30 @@ Constraints and triggers required on it:
 `(seller_party_type, seller_party_id)`, the assigned **policy key**, an
 enrollment marker, actor and time facts, and **one current assignment per party**
 enforced by a partial unique index. History is kept by explicit supersession — a
-superseded row is never deleted or rewritten. **No foreign key to an external
+superseded row is never deleted or rewritten.
+
+*(**R2, corrected 2026-09-07.** The phrase "an enrollment marker" above is
+superseded and is preserved only as the original wording. **There is no separate
+enrollment marker, boolean or state column.** The presence of one current
+assignment row **is** the enrollment fact:*
+
+- *no current row → the party is **unenrolled** and keeps the legacy path;*
+- *one current row → the party is **enrolled**; order creation must resolve that
+  key or **fail closed**;*
+- *superseded rows are immutable history;*
+- *replacing an assignment is **supersession**, never an in-place mutation of
+  `policy_key` on the current row.*
+
+*A separate marker would immediately admit the incoherent state "enrolled with no
+assignment", which `V33-DEC-029` Ruling 8 gives no behaviour for. Presence is
+also the only thing that distinguishes an **enrolled party whose key currently
+has no resolvable active published version** — which must fail closed — from a
+party that was never enrolled, which must not.*
+
+***No runtime un-enrollment, clear or delete path is authorized by `#41d-2`.***
+*Returning an enrolled party to the legacy full-online path by removing its row
+is the post-lookup fallback `V33-DEC-029` Ruling 8 forbids, wearing a different
+name. If un-enrollment is ever wanted it is its own story and its own decision.)* **No foreign key to an external
 domain's identity table**, in keeping with the repository's cross-schema
 convention, so a provider or business row's lifecycle cannot cascade away
 commercial history.
@@ -251,6 +402,23 @@ route.
 
 Overlap is decided by PostgreSQL, not by an application check. Assignment and
 resolution both occur inside the caller's transaction.
+
+**R5 — linearization during enrolled order creation.** *(Added 2026-09-07. The
+sentence above says where resolution happens and not what decides a race.)*
+Each row below names the database operation that decides the outcome; "whichever
+commits first" is not a mechanism.
+
+| Race | Mechanism | Acceptable outcome |
+|---|---|---|
+| Order creation reading the current assignment | `SELECT … FOR SHARE` on the current assignment row | A concurrent supersession **waits** until the order transaction ends, so the order cannot snapshot a key superseded mid-transaction. The order is a reader, so `FOR UPDATE` would be wrong |
+| Order creation reading the resolved policy version | `SELECT … FOR SHARE` on that version row | Retirement is an `UPDATE` of `lifecycle_state`/`retired_at` on that row and therefore **waits**. Without the share lock the version could be retired between resolution and the schedule insert |
+| Assignment supersession racing another supersession | Compare-and-swap `UPDATE … WHERE superseded_at IS NULL`, then insert; the **partial unique index on the current row** is the guarantee | Exactly one wins. The loser sees `affected !== 1` (or the unique violation) and is refused readably; the index decides, not the read |
+| Two order creations for one booking | The **existing unique index** on the order's booking source | Unchanged by `#41d-2`. It remains the order-creation idempotency arbiter |
+| Affiliation changing during order creation | **No lock, and no re-read.** R3's single seller-party selection | The value selected at the offering-read statement is the one written and passed on. Locking `business_staff` would be the wrong repair for a value that must simply not be read twice |
+
+Offering and affiliation are **not** re-read or locked after the seller party has
+been selected once; a second read is the defect R3 removes, not a race to
+serialize.
 
 **An assignment binds a stable key; an order snapshots an exact version.** Order
 creation resolves the published version of the assigned key whose window contains
@@ -302,6 +470,14 @@ The clean migration creates **zero policies and zero assignments** and introduce
 - there is **no "use full online when the lookup failed" fallback** for an
   enrolled party. An unversioned commercial outcome produced *after* a failure is
   precisely the silent default `V33-DEC-028` Ruling 8 exists to forbid.
+
+*(**R2, added 2026-09-07.** "Enrolled" and "unenrolled" above mean exactly
+"has a current assignment row" and "has none" — there is no separate marker, and
+no path clears a row to move a party back. `policy_accepted_at` remains
+**independently nullable and is populated by neither child**; the resolution
+instant is never renamed into acceptance. Per-service override stays deferred
+behind #44, and #42, #43, #47, #95, #99, every commercial value and all Legal
+copy remain out of scope for both children.)*
 
 **Exit criteria for removing the legacy path**, measurable and requiring no
 numeric policy:
@@ -410,8 +586,14 @@ honest once a key and version can actually be resolved.
   no number reaches an order from code. The order snapshot gains its missing
   meaning without gaining a false one.
 - **Positive.** The dark launch means the story that touches live bookings can
-  ship, be observed and be reverted by clearing an assignment, without a flag that
-  rewrites anything already written.
+  ship and be observed without a flag that rewrites anything already written.
+  *(**Corrected 2026-09-07 by R2.** This sentence originally read "…ship, be
+  observed and be reverted by clearing an assignment, without a flag…". Clearing
+  an assignment is **not** an authorized rollback: it would return an enrolled
+  party to the legacy full-online path, which is exactly the post-lookup fallback
+  §6 forbids. The dark launch is reverted by **not enrolling further parties**,
+  and an enrolled party's failure is a refusal, never a downgrade. The original
+  wording is preserved here as history.)*
 - **Negative, disclosed.** For a period, two order paths exist. That is the cost of
   not stopping every booking on merge, and §6's exit criteria are what stop it
   becoming permanent.
