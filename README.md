@@ -108,7 +108,8 @@ overage), and Story #40 was decomposed from one 13-point item into four:
 | #58 (`#40d`) → `#58a` | 8 -> **13** | Atomic consumption at first `confirmed` and idempotent return, enforced **selectively** — active only for a seller who holds a positive grant |
 | `#58b` (#95) | 3 -> **5** | Global fail-closed enforcement activation. **Ready** since `V33-DEC-028`; it owns the legacy-exempt rollout, the non-mutating preview, the atomic activation and the audited kill switch |
 | #83 (`#41d`) -> `#41d-1` | **13** | Administrator-published versioned booking collection policy. Publication only; changes no order behaviour |
-| #104 (`#41d-2`) | **8** | Seller-party assignment and the immutable order snapshot, behind an explicit dark-launch boundary. Created 2026-09-06 by `V33-DEC-029` |
+| #104 (`#41d-2a`) | **8** | Seller collection-policy assignment: immutable history, one current row per party, the seller-readable assignable-policy catalogue and the new non-privileged capability. Changes no order behaviour |
+| #115 (`#41d-2b`) | **8** | Order collection-policy resolution and the immutable schedule snapshot, behind an explicit dark-launch boundary. Split out 2026-09-07 by `V33-DEC-031` |
 
 `#40b` was split again on 2026-09-03 (`V33-DEC-018`): #56 keeps its number and its
 8 points as the foundation, and #69 carries the 5-point seller surface, so the
@@ -160,7 +161,8 @@ transaction seam #58 hooks; #82 (`#41c`) sandbox deposit execution with the refu
 ceiling and the ledger limited to money actually collected; and #83 (`#41d`) the
 administrator-versioned policy publication, which was blocked by #46, became Ready
 on 2026-09-06 when `V33-DEC-028` closed it structurally, and was split the same day by
-`V33-DEC-029` into `#41d-1` (#83, 13) and #104 (`#41d-2`, 8). That closure fixes
+`V33-DEC-029` into `#41d-1` (#83, 13) and #104 (`#41d-2`, 8) — the latter split again on
+2026-09-07 by `V33-DEC-031` into #104 (`#41d-2a`, 8) and #115 (`#41d-2b`, 8). That closure fixes
 sequencing only — no deposit value, percentage base, rounding value or enabled mode was
 chosen, and #47 gates real provider collection and settlement rather than the structural
 work.
@@ -255,6 +257,15 @@ enrolled one resolves or fails closed with no post-lookup fallback. Acceptance i
 fabricated — `policy_accepted_at` stays null until #42 and Legal supply approved copy — and
 per-service override is deferred behind #44 because a service is owned by a professional
 while the booking is sold by the business.
+
+#104 was split again on 2026-09-07 as `V33-DEC-031`, and the reason is the same kind of
+fact: it required a seller to supply a stable policy key while giving them no way to learn
+one, because the administrator publication routes are privileged. It also carried two
+outcomes with different blast radii — choosing a policy cannot break a booking, and pricing
+every enrolled booking with it is the only thing in the family that can. #104 keeps its
+number as `#41d-2a` and owns assignment; #115 (`#41d-2b`) owns order resolution and the
+immutable snapshot behind a dark launch. ADR-048's 2026-09-07 amendment already binds both,
+so no new ADR was written.
 
 Prices, included allowances, bounds, cutoffs, legal copy and accounting treatment stay
 **unpublished**, and real money movement stays blocked by #47. No allowance may
