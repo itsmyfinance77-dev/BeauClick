@@ -9,11 +9,9 @@ import {
   CatalogueLifecycleState,
   PlanVersionTermsV1,
   PriceQuoteV1,
-  PriceResolutionError,
   PriceScheduleTermsV1,
   PriceSchedulePurpose,
   isPermittedLifecycleTransition,
-  resolvePriceV1,
   validatePlanVersionTermsV1,
   validatePriceScheduleTermsV1,
 } from '@beauclick/commercial-policy-contract';
