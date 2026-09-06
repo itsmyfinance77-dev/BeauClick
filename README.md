@@ -99,10 +99,10 @@ overage), and Story #40 was decomposed from one 13-point item into four:
 | #40 (`#40a`) | 8 | Admin-versioned plan and price catalogue — immutable versions, non-overlapping activation windows, tier schedules, the `D-7` zero-price base workspace, the `bc_manage_commercial_plans` capability, audit with a mandatory reason |
 | #56 (`#56a`) | 8 | Subscription foundation: snapshotted subscriber party, `D-7` backfill and lazy ensure, plan-included grants. No seller-facing route |
 | #69 (`#56b`) | 8 | Seller subscription surface: a workspace collection reached by an opaque `workspaceRef`, explicit initialization, history, zero-price selection and cancellation |
-| #57 (`#40c`) -> `#40c-1` | 5 -> 8 -> **13** | Custom booking-credit purchase **record** and immutable price snapshot. Writes no grant |
+| #57 (`#40c`) -> `#40c-1` | 5 -> 8 -> **13** | Custom booking-credit purchase **record** and immutable price snapshot. Writes no grant. **Complete** |
 | #99 (`#40c-2`) | **5** | Paid activation of a custom purchase. Blocked on #47 |
 | #58 (`#40d`) → `#58a` | 8 -> **13** | Atomic consumption at first `confirmed` and idempotent return, enforced **selectively** — active only for a seller who holds a positive grant |
-| `#58b` | **3** | Global fail-closed enforcement activation. Blocked on #46 |
+| `#58b` (#95) | 3 -> **5** | Global fail-closed enforcement activation. **Ready** since `V33-DEC-028`; it owns the legacy-exempt rollout, the non-mutating preview, the atomic activation and the audited kill switch |
 
 `#40b` was split again on 2026-09-03 (`V33-DEC-018`): #56 keeps its number and its
 8 points as the foundation, and #69 carries the 5-point seller surface, so the
@@ -152,7 +152,8 @@ schedule that represents all three collection modes but **enables none**; #81 (`
 the zero-collectible confirmation path a pay-at-venue booking needs, plus the mandatory
 transaction seam #58 hooks; #82 (`#41c`) sandbox deposit execution with the refund
 ceiling and the ledger limited to money actually collected; and #83 (`#41d`) the
-administrator-versioned policy publication that stays blocked by #46. That closure fixes
+administrator-versioned policy publication, which was blocked by #46 and became Ready
+on 2026-09-06 when `V33-DEC-028` closed it structurally. That closure fixes
 sequencing only — no deposit value, percentage base, rounding value or enabled mode was
 chosen, and #47 gates real provider collection and settlement rather than the structural
 work.
@@ -191,8 +192,11 @@ Zero is an absence of entitlement, never a free allowance, so neither enforcing 
 treating it as unlimited was available. `#58a` (13 points) therefore installs the whole
 immutable accounting model and enforces it **selectively** — active only for a party that
 holds a positive grant, dormant for one that has never held any — and `#58b` (3 points)
-is the later explicit switch to global enforcement once #46 ratifies a positive source.
-The same ratification corrected three stale claims: #57 is not a prerequisite, the
+is the later explicit switch to global enforcement. *(Corrected 2026-09-06 by
+`V33-DEC-028`: a positive source is already reachable through an administrator-published
+zero-price plan version carrying a positive allowance, so what `#58b` was really waiting
+for was the rollout treatment — see below.)* The same ratification corrected three stale
+claims: #57 is not a prerequisite, the
 entitlement seam must cover **both** confirmation paths rather than only the
 zero-collectible one, and the `business` and `administrator` cancellation returns the
 issue described do not exist in the booking actor vocabulary.
@@ -227,9 +231,27 @@ a schedule and a plan version that carries its key. #57 is re-estimated 8 -> 13
 points.
 
 Prices, included allowances, bounds, cutoffs, legal copy and accounting treatment stay
-open under issue #46, and real money movement stays blocked by #47. No allowance may
+**unpublished**, and real money movement stays blocked by #47. No allowance may
 exist as a code constant, default, fallback or seed; an unconfigured plan or price
 schedule refuses rather than falling back.
+
+On 2026-09-06 `V33-DEC-028` closed #46 **structurally, not numerically**, and every one
+of those values moved rather than filling in: collection and deposit policy to #83,
+cancellation, no-show, dispute, retention and customer copy to #42 (which keeps its
+legal gate), commission, pending funds and settlement to #43, and the production rail to
+#47. The ruling is that every commercial parameter is an administrator-managed immutable
+version — non-overlapping effective windows, one-way `draft -> published -> retired`,
+privileged publication with live revocation, mandatory transactional audit — so no
+commercial number may survive as a code constant, fallback, seed or environment
+variable. That makes `FinancialConfig.DEFAULT_COMMISSION_RATE_BP = 1500` and
+`FINANCIAL_COMMISSION_RATE_BP` a verified contradiction #43 must replace with a
+versioned commission policy, with a commission-bearing ledger write failing closed until
+one exists and existing ledger rows keeping their snapshotted rate. Administrator
+publication is deliberately **not** retroactive, retention stays a cancellation outcome
+rather than a collection mode, and configurability authorizes nothing: publishing a
+policy changes what the platform records, not what a bank does. **This is product-owner
+structural approval only — it is not Legal approval and claims none.** ADR-048 is
+required before the first schema or executable implementation.
 
 Story #40 (`#40a`) is now implemented on top of that foundation
 ([ADR-041](docs/roadmap/v3/adr/ADR-041-commercial-plan-and-price-catalogue.md)). The
@@ -581,9 +603,9 @@ evidence.
 | AI provider | No vendor, SDK, credential or external call. The `ai` domain runs a deterministic assistant that states what it is. |
 | Object storage vendor | MinIO proves the S3 API locally and in CI; the production vendor is undecided and downstream of hosting. |
 | Error tracking | Generic JSON collector only; no backend selected. |
-| Commercial values | Plan prices, allowances, deposit bounds, cancellation cutoffs, dispute windows, settlement policy, tax and revenue recognition are open under #46. |
+| Commercial values | Plan prices, allowances, deposit bounds, cancellation cutoffs, dispute windows, settlement policy, tax and revenue recognition are **unpublished**. #46 closed structurally on 2026-09-06 (`V33-DEC-028`) without publishing any of them; they are now administrator-published values tracked on #83, #42, #43 and #47. |
 | Real money movement | Blocked by #47. Structural and deterministic sandbox work may proceed; paid collection and settlement may not. |
-| Legal copy | Approved Persian policy text and terminology are open under #46. |
+| Legal copy | Approved Persian policy text and terminology are open under **#42 and Legal** (`V33-DEC-017`). `V33-DEC-028` was a product-owner structural approval and is not Legal approval. |
 
 ---
 

@@ -5,6 +5,21 @@
 **Backlog:** #38, #39  
 **Depends on:** ADR-018 (same-cluster consistency), ADR-023 (business seller party), ADR-025 (financial outbox), ADR-028 (honest readiness)
 
+**Amended 2026-09-06 (`V33-DEC-028`):** the owner closed #46 as a **structural**
+product decision with every launch value explicitly `OPEN / UNPUBLISHED`. Two
+normative sentences below are therefore superseded in place, and nothing else in this
+ADR changes. §7's "blocked by #46 and #47" now reads **blocked by #47**, plus the
+value families #46 used to hold, which moved to #83 (collection and deposit policy),
+#42 with Legal (cancellation, no-show, dispute, retention, customer copy) and #43
+with #47 (commission, pending funds, settlement). The Open questions entry for #46
+is likewise re-homed: its product half is decided and its numeric and legal halves
+moved to those issues. The ADR's own decisions are unchanged, **no commercial value
+became published, and no Legal approval was given or claimed.** `V33-DEC-028` also
+requires that the four control planes this ADR defines gain real persistence and a
+production caller before global enforcement, and that ordinary administrator
+publication use a database-authoritative activation instant at or after publication —
+both of which are **ADR-048's** to specify before any schema or code.
+
 **Amended 2026-09-05 (`V33-DEC-022`):** the owner closed the STRUCTURE and
 DELIVERY CONTRACT for Story #41, which this ADR's §3 and §4 anticipated. Three
 things are recorded in place below: #41 is decomposed into four children

@@ -235,6 +235,14 @@ CONSTRAINT ck_seller_subscriptions_zero_price_only
 `V33-DEC-018` permits only zero-price activation while #46 and #47 are open, and
 requires it enforced in PostgreSQL rather than only in application code.
 
+*(Amended 2026-09-06, `V33-DEC-028`: #46 closed **structurally**, with every
+commercial value still `OPEN / UNPUBLISHED` and re-homed to #83, #42 with Legal, and
+#43 with #47. The paid-activation decisions this constraint waits on now live on #47
+and #99, so the constraint stands unchanged. `V33-DEC-028` Ruling 10 also records
+what this constraint does **not** say: it bounds the plan **price**, not its
+entitlement, so an administrator-published zero-price plan version may carry a
+positive `included_booking_credits`.)*
+
 The constraint is unconditional rather than scoped to `active`, and that is the
 stronger form on purpose: a paid subscription cannot be written **in any state**,
 so there is no `superseded` or `cancelled` row that a later bug could revive into
@@ -245,7 +253,8 @@ payment intent, no awaiting-payment state, no draft-paid or sandbox-paid
 subscription, no order, no payment intent, no ledger entry, no provider call. A
 dormant "awaiting payment" row is not a smaller version of paid activation — it
 is a state machine that #46 and #47 will define differently, committed to before
-they have spoken.
+they have spoken. *(Amended 2026-09-06, `V33-DEC-028`: #46 closed structurally and
+defined none of it; #47, #99 and #43 do. The refusal is unchanged.)*
 
 Removing the constraint is a later, visible migration once the required decisions
 and a payment fact model exist. That visibility is the point: a review sees a
