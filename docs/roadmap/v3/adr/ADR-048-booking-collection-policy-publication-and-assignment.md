@@ -11,6 +11,19 @@ contract), ADR-023 (business is its own seller party), ADR-018 (same-cluster
 consistency), ADR-011 (module boundaries)
 **Constrains:** #83 (`#41d-1`), #104 (`#41d-2`)
 
+**Amended 2026-09-06 (Story #83 implementation audit) — the exclusion interval.**
+§3 as accepted specified a plain `tstzrange(activation_starts_at,
+activation_ends_at, '[)')` partial on `lifecycle_state <> 'draft'`, while §4
+required that retirement never rewrite the activation window and permitted an
+open-ended published version. Those three are jointly unsatisfiable: a version
+published open-ended and then retired keeps `activation_ends_at IS NULL`, so its
+indexed interval stays `[start, infinity)` for ever and **every later version of
+the same key overlaps it permanently** — forward republication, which §4
+explicitly requires, becomes impossible after the first retirement. This is an
+engineering consistency correction, not a new commercial decision: it approves
+no value and changes no ruling of `V33-DEC-028` or `V33-DEC-029`. The original
+§3 sentence is preserved below with the corrected invariant stated beside it.
+
 ## Context
 
 `V33-DEC-028` closed the commercial structure: every commercial parameter is an
@@ -161,6 +174,38 @@ Constraints and triggers required on it:
   `ex_price_schedule_versions_no_overlap`, and for the same reason: under READ
   COMMITTED two concurrent publications each observe a free timeline and both
   commit;
+
+  *(**Corrected 2026-09-06.** The sentence above states the mechanism correctly
+  and the interval incorrectly. The indexed value is not the configured window
+  but the version's **effective** window, computed by an `IMMUTABLE` PostgreSQL
+  expression as:*
+
+  - *the interval starts at `activation_starts_at`;*
+  - *it ends at the **earlier** of the configured `activation_ends_at` — absent
+    meaning `infinity` — and, **when and only when the row is retired**,
+    `retired_at`;*
+  - *the upper bound is floored at the lower bound, so a version retired before
+    it ever activated yields an **empty** interval, which overlaps nothing and
+    raises no range error;*
+  - *the range stays half-open `[)`, so a replacement may start at the exact
+    database instant its predecessor retired.*
+
+  *Consequences, all of them required by §4 and none of them weakened: an
+  open-ended published version becomes a **finite historical interval** the
+  moment it is retired; **retirement writes only lifecycle and retirement
+  facts** and never touches `activation_starts_at` or `activation_ends_at`;
+  historical effective intervals still cannot overlap, because the retired
+  version's interval is closed at its own retirement rather than dropped from
+  the index; and forward republication works for ever.*
+
+  *The constraint is deliberately **not** narrowed to published rows only.
+  Excluding retired rows from the index would also make historical overlap
+  representable — two versions could be recorded as simultaneously effective in
+  the past — and the whole purpose of the constraint is that the effective
+  timeline of a key is a function of the database's own history rather than of
+  which rows happen to be live. A raw-SQL and concurrency suite proves the
+  open-ended publish → retire → replacement-publish sequence, adjacency at the
+  exact retirement instant, and the impossibility of historical overlap.)*
 - an immutability trigger refusing edits to a published or retired row, and
   refusing revival of a retired one.
 
@@ -197,6 +242,8 @@ two live conditions, exactly as ADR-041 §5 already decided.
 
 **The database clock sets publication.** `published_at` and
 `activation_starts_at` are set from the database in the publishing statement.
+Retirement likewise sets `retired_at` from the database clock, which the
+corrected effective-interval expression above depends on.
 **The ordinary runtime route accepts no activation-start value at all** — not an
 optional one, not a validated one. A genuinely historical import is
 migration-only, separately audited, and unreachable from any public or admin
