@@ -100,6 +100,15 @@ no party and reaches nothing.
 ## What was deliberately not built
 
 - **Invite-by-email/lookup.** `InviteStaffDto.userId` requires the owner to already know the invitee's identity user id. A directory/lookup flow is real product work with its own privacy questions (can any authenticated user search for any other by phone/email?) that this phase did not scope.
+  *Amended 2026-09-06 (`V33-DEC-030` D5): the privacy question named here is now
+  answered, and the gap is scoped.* Invitation is by **phone number**, resolved
+  server-side and never echoed back; known, unknown, ineligible, duplicate and
+  foreign cases must be externally indistinguishable. **No public user directory
+  or search is authorized.** The structural consent this ADR built is preserved
+  unchanged — an invitation still starts `invited` and only the invitee's own
+  session may accept it. Delivery lands in #44's child `#44c`, and the exact
+  persistence and notification behaviour for an absent user must be made explicit
+  in ADR-049 and the child's contract before any code.
 - **A business-scoped capability system reusing `CAPABILITIES_BY_ROLE`.** Business authorization is entirely local to `services/business` (owner/manager/staff resolved from `business_staff`, not from the identity-level role/capability map), matching how professional-service's ownership-based authorization already works independent of that map.
   *Amended 2026-09-04 (`V33-DEC-021`): still true, and now load-bearing.* #75
   adds a GLOBAL role for the business OWNER and touches none of this
