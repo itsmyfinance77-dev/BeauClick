@@ -31,3 +31,4 @@ export * from './seller-surface/seller-subscription-surface.dto';
 export * from './seller-surface/seller-subscription-surface.service';
 export * from './seller-surface/seller-subscription-surface.controller';
 export * from './seller-surface/seller-subscription-surface.module';
+export * from './subscription/booking-credit-accounting.service';

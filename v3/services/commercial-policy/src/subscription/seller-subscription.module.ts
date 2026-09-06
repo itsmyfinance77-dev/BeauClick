@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { COMMERCIAL_ENTITIES } from '../catalogue/commercial-catalogue.entities';
+import { BookingCreditAccountingService } from './booking-credit-accounting.service';
 import { BookingCreditGrantService } from './booking-credit-grant.service';
 import { SUBSCRIPTION_ENTITIES } from './seller-subscription.entities';
 import { SellerSubscriptionService } from './seller-subscription.service';
@@ -62,7 +63,19 @@ import { SubscriptionSubjectDataContract } from './subscription-subject-data.con
  */
 @Module({
   imports: [TypeOrmModule.forFeature([...SUBSCRIPTION_ENTITIES, ...COMMERCIAL_ENTITIES])],
-  providers: [SellerSubscriptionService, BookingCreditGrantService, SubscriptionSubjectDataContract],
-  exports: [SellerSubscriptionService, BookingCreditGrantService, SubscriptionSubjectDataContract],
+  providers: [
+    SellerSubscriptionService,
+    BookingCreditGrantService,
+    BookingCreditAccountingService,
+    SubscriptionSubjectDataContract,
+  ],
+  exports: [
+    SellerSubscriptionService,
+    BookingCreditGrantService,
+    // V3.3 #58a. Exported so the composition root can bind the two
+    // entitlement adapters against it; nothing outside apps/api uses it.
+    BookingCreditAccountingService,
+    SubscriptionSubjectDataContract,
+  ],
 })
 export class SellerSubscriptionModule {}

@@ -1,7 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, LessThan, Repository } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
+import {
+  BOOKING_CANCELLATION_ENTITLEMENT_HOOK,
+  BookingCancellationEntitlementHook,
+} from '../ports';
 import { emitEvent, AuditLogger } from '@beauclick/events';
 
 import { AvailabilitySlotEntity } from '../entities/availability-slot.entity';
@@ -66,6 +70,16 @@ export class BookingService {
     @InjectRepository(BookingEntity) private readonly bookings: Repository<BookingEntity>,
     private readonly dataSource: DataSource,
     private readonly config: BookingConfig,
+    /**
+     * V3.3 #58 (`#58a`). **Mandatory**, deliberately without `@Optional()`.
+     *
+     * A cancellation that silently skipped the entitlement seam would owe a
+     * seller a credit that no row records, and nothing in the response or the
+     * logs would say so. A composition missing the binding fails to construct
+     * at boot instead.
+     */
+    @Inject(BOOKING_CANCELLATION_ENTITLEMENT_HOOK)
+    private readonly cancellationEntitlement: BookingCancellationEntitlementHook,
   ) {}
 
   // ---------------------------------------------------------------------
@@ -355,6 +369,25 @@ export class BookingService {
         'report',
       );
       if (!moved) return false;
+
+      /*
+       * V3.3 #58 (`#58a`), ADR-046 §8. The entitlement seam, inside THIS
+       * transaction.
+       *
+       * booking-service does not know what a credit is; it offers the
+       * transaction and the two facts the decision needs -- who cancelled, and
+       * whether the booking had actually been confirmed. An expired pending
+       * hold consumed nothing, so `wasConfirmed` false returns nothing.
+       *
+       * Mandatory and unconditional: a cancellation that rolls back must leave
+       * no return, and a failed return must roll back the cancellation.
+       */
+      await this.cancellationEntitlement.onBookingCancellation(
+        m,
+        bookingId,
+        actor.type,
+        before.status === 'confirmed',
+      );
 
       await this.releaseSlot(m, before.slotId, bookingId);
 

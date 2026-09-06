@@ -39,8 +39,16 @@ export interface ServiceCatalog {
 export const SERVICE_CATALOG = Symbol('BEAUCLICK_SERVICE_CATALOG');
 
 /**
- * The entitlement seam a zero-collectible confirmation must pass through —
- * V3.3 #81 (`#41b`), ADR-044 §6, `V33-DEC-023` Ruling 8.
+ * The entitlement seam every booking confirmation passes through —
+ * V3.3 #58 (`#58a`), ADR-046 §3, `V33-DEC-025` Ruling 3.
+ *
+ * ## Renamed in #58a, and the old name was the bug
+ *
+ * It was `ZeroCollectibleConfirmationHook`, introduced by #81 (ADR-044 §6) and
+ * called from the zero-collectible path alone. #82 then added a second
+ * confirmation path that never entered it, so "one credit at first
+ * `confirmed`" was unsatisfiable by construction. The name was accurate and
+ * the coverage was not; both are corrected here.
  *
  * ## Why it exists before anything needs it
  *
@@ -65,14 +73,16 @@ export const SERVICE_CATALOG = Symbol('BEAUCLICK_SERVICE_CATALOG');
  * else's credits, chosen by the caller. The implementation resolves everything
  * it needs from the booking itself.
  */
-export interface ZeroCollectibleConfirmationHook {
+export interface BookingConfirmationEntitlementHook {
   /**
    * Runs inside the confirmation transaction, between the order transition and
    * the booking confirmation (ADR-044 §3).
    *
-   * Throwing rolls the whole transaction back: the order stays `pending`, the
-   * booking stays unconfirmed, and no money fact exists to compensate because
-   * none was ever created.
+   * Returns a closed outcome rather than throwing for an ordinary refusal:
+   * "this seller has no credit left" is routed differently on each
+   * confirmation path -- the zero-collectible path rolls back, and the
+   * verified-capture path must keep the money fact and refund it (ADR-046 §6).
+   * Only a genuine fault throws.
    *
    * @param manager the caller's transaction. Every read and write must use it;
    *   anything on another connection is outside the transaction that is about
@@ -80,7 +90,20 @@ export interface ZeroCollectibleConfirmationHook {
    * @param bookingId the booking being confirmed, and the entire identity of
    *   the entitlement effect.
    */
-  onZeroCollectibleConfirmation(manager: EntityManager, bookingId: string): Promise<void>;
+  onBookingConfirmation(manager: EntityManager, bookingId: string): Promise<BookingConfirmationEntitlement>;
 }
 
-export const ZERO_COLLECTIBLE_CONFIRMATION_HOOK = Symbol('BEAUCLICK_ZERO_COLLECTIBLE_CONFIRMATION_HOOK');
+/**
+ * What the entitlement layer decided -- V3.3 #58 (`#58a`), ADR-046 §2.
+ *
+ * `permitted` carries WHY it was permitted, because the three reasons are
+ * operationally different: a credit was spent, this booking was already
+ * charged, or this party has never been configured with one. The last is a
+ * rollout state and never an unlimited allowance.
+ */
+export type BookingConfirmationEntitlement =
+  | { outcome: 'permitted'; detail: 'consumed' | 'already_consumed' | 'not_configured' }
+  | { outcome: 'insufficient_credit' }
+  | { outcome: 'ineligible'; reason: 'no_order' | 'no_subscription' };
+
+export const BOOKING_CONFIRMATION_ENTITLEMENT_HOOK = Symbol('BEAUCLICK_BOOKING_CONFIRMATION_ENTITLEMENT_HOOK');

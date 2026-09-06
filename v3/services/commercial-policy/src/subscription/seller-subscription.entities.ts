@@ -160,4 +160,96 @@ export class BookingCreditGrantEntity {
   expiresAt!: Date | null;
 }
 
-export const SUBSCRIPTION_ENTITIES = [SellerSubscriptionEntity, BookingCreditGrantEntity];
+/**
+ * Why a credit came back — V3.3 #58 (`#58a`), ADR-046 §8.
+ *
+ * A closed server-authored vocabulary, never the customer's cancellation
+ * sentence: free text written by one party would travel into the other party's
+ * commercial ledger, audit trail and exports.
+ *
+ * Two values because two cancellation actors are reachable today. `customer`
+ * cancellation and no-show retention are absent because whether they return the
+ * seller's credit is retention policy under `V33-DEC-013`/#46; `admin` because
+ * no production route produces that actor; `business` because no such booking
+ * actor exists.
+ */
+export const BOOKING_CREDIT_RETURN_CAUSES = ['seller_cancelled', 'platform_cancelled'] as const;
+export type BookingCreditReturnCause = (typeof BOOKING_CREDIT_RETURN_CAUSES)[number];
+
+/**
+ * One booking credit spent — V3.3 #58 (`#58a`), ADR-046 §1.
+ *
+ * Append-only. `uq_bcc_booking_once` makes one row per booking a storage
+ * guarantee rather than a service convention, and the immutability trigger
+ * refuses UPDATE and DELETE outright: a return is a NEW ROW, never an edit here.
+ *
+ * The grant, subscription, period and charged party are all **snapshotted**.
+ * Nothing recomputes them, which is what makes "a booking confirmed in term N
+ * stays charged to term N" structural rather than remembered — rescheduling
+ * across a future term boundary changes nothing on this row.
+ */
+@Entity({ name: 'booking_credit_consumptions', schema: 'commercial' })
+export class BookingCreditConsumptionEntity {
+  @PrimaryColumn({ name: 'id', type: 'uuid' })
+  id!: string;
+
+  /**
+   * Deliberately not a foreign key: `booking.bookings` is another domain's
+   * table, and the entitlement ledger must outlive the scheduling row rather
+   * than cascade with it.
+   */
+  @Column({ name: 'booking_id', type: 'uuid' })
+  bookingId!: string;
+
+  @Column({ name: 'grant_id', type: 'uuid' })
+  grantId!: string;
+
+  @Column({ name: 'subscription_id', type: 'uuid' })
+  subscriptionId!: string;
+
+  @Column({ name: 'period_index', type: 'int' })
+  periodIndex!: number;
+
+  /** Copied from the order's immutable seller snapshot. Never re-resolved. */
+  @Column({ name: 'subscriber_party_type', type: 'varchar', length: 16 })
+  subscriberPartyType!: SubscriberPartyType;
+
+  @Column({ name: 'subscriber_party_id', type: 'uuid' })
+  subscriberPartyId!: string;
+
+  @CreateDateColumn({ name: 'consumed_at', type: 'timestamptz' })
+  consumedAt!: Date;
+}
+
+/**
+ * A consumed credit returned by a qualifying cancellation — V3.3 #58 (`#58a`),
+ * ADR-046 §8.
+ *
+ * Append-only, at most one per consumption (`uq_bcr_consumption_once`), and it
+ * never touches the consumption it reverses. Written inside the cancellation's
+ * own transaction, so a cancellation that rolls back leaves no return.
+ */
+@Entity({ name: 'booking_credit_returns', schema: 'commercial' })
+export class BookingCreditReturnEntity {
+  @PrimaryColumn({ name: 'id', type: 'uuid' })
+  id!: string;
+
+  @Column({ name: 'consumption_id', type: 'uuid' })
+  consumptionId!: string;
+
+  @Column({ name: 'return_cause', type: 'varchar', length: 24 })
+  returnCause!: BookingCreditReturnCause;
+
+  @CreateDateColumn({ name: 'returned_at', type: 'timestamptz' })
+  returnedAt!: Date;
+}
+
+export const SUBSCRIPTION_ENTITIES = [
+  SellerSubscriptionEntity,
+  BookingCreditGrantEntity,
+  BookingCreditConsumptionEntity,
+  BookingCreditReturnEntity,
+];
+
+/** Re-exported so ledger entities in this package can name the same type. */
+export type { SubscriberPartyType };

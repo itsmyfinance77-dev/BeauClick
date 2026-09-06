@@ -86,7 +86,7 @@ function harness() {
       },
     } as never,
     { async drain() {} } as never,
-    { async onZeroCollectibleConfirmation() {} },
+    { async onBookingConfirmation() { return { outcome: 'permitted' as const, detail: 'not_configured' as const }; } },
   );
 
   return { service, requestedAmounts };

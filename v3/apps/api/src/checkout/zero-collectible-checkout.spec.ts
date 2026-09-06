@@ -68,6 +68,11 @@ function harness(options: { collectible: number }): Harness {
   const payments = { createIntentCalls: 0, initiateCalls: 0 };
   const bookingConfirmResult = { value: true };
   const hookError: { value: Error | null } = { value: null };
+  // V3.3 #58a: the port now returns a closed outcome. Default permitted, so
+  // these #81 cases still exercise exactly what they were written to prove.
+  const entitlement: { value: { outcome: 'permitted'; detail: 'not_configured' } | { outcome: 'insufficient_credit' } } = {
+    value: { outcome: 'permitted', detail: 'not_configured' },
+  };
   const transition: { value: ZeroCollectibleTransition } = { value: { outcome: 'transitioned' } };
   const bookingStatus = { value: 'confirmed' };
   const transactionRolledBack = { value: false };
@@ -130,9 +135,10 @@ function harness(options: { collectible: number }): Harness {
   const relay = { async drain() {} };
 
   const hook = {
-    async onZeroCollectibleConfirmation(manager: EntityManager) {
+    async onBookingConfirmation(manager: EntityManager) {
       calls.push({ step: 'hook', manager });
       if (hookError.value) throw hookError.value;
+      return entitlement.value;
     },
   };
 

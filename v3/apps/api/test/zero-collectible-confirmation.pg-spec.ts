@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { uuidv7 } from 'uuidv7';
 
 import { BookingService } from '@beauclick/booking';
-import { OrderService, ZERO_COLLECTIBLE_CONFIRMATION_HOOK } from '@beauclick/commerce';
+import { OrderService, BOOKING_CONFIRMATION_ENTITLEMENT_HOOK } from '@beauclick/commerce';
 
 import { PaymentIntentNotFoundException } from '@beauclick/payment';
 
@@ -586,7 +586,7 @@ describePg('zero-collectible confirmation (real PostgreSQL)', () => {
 
   describe('the entitlement hook', () => {
     it('is bound in the running application', () => {
-      expect(app.get(ZERO_COLLECTIBLE_CONFIRMATION_HOOK)).toBeDefined();
+      expect(app.get(BOOKING_CONFIRMATION_ENTITLEMENT_HOOK)).toBeDefined();
     });
 
     /**
@@ -621,7 +621,7 @@ describePg('zero-collectible confirmation (real PostgreSQL)', () => {
 
       await expect(
         Test.createTestingModule({ providers: [CheckoutService, ...others] }).compile(),
-      ).rejects.toThrow(/ZERO_COLLECTIBLE_CONFIRMATION_HOOK|hook/i);
+      ).rejects.toThrow(/BOOKING_CONFIRMATION_ENTITLEMENT_HOOK|hook/i);
     });
 
     it('control: the same composition WITH the hook constructs', async () => {
@@ -641,7 +641,14 @@ describePg('zero-collectible confirmation (real PostgreSQL)', () => {
           { provide: OrderService, useValue: {} },
           { provide: PaymentService, useValue: {} },
           { provide: OutboxRelay, useValue: {} },
-          { provide: ZERO_COLLECTIBLE_CONFIRMATION_HOOK, useValue: { async onZeroCollectibleConfirmation() {} } },
+          {
+            provide: BOOKING_CONFIRMATION_ENTITLEMENT_HOOK,
+            useValue: {
+              async onBookingConfirmation() {
+                return { outcome: 'permitted', detail: 'not_configured' };
+              },
+            },
+          },
         ],
       }).compile();
 

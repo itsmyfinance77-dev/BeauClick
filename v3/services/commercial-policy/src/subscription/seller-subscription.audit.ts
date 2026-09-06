@@ -55,6 +55,10 @@ export const SUBSCRIPTION_AUDIT_ACTIONS = {
   superseded: 'commercial.subscription_superseded',
   cancelled: 'commercial.subscription_cancelled',
   creditsGranted: 'commercial.credits_granted',
+  /** V3.3 #58a: one booking credit spent at a booking's first confirmation. */
+  creditConsumed: 'commercial.credit_consumed',
+  /** V3.3 #58a: that consumption given back by a qualifying cancellation. */
+  creditReturned: 'commercial.credit_returned',
 } as const;
 
 export const SUBSCRIPTION_AUDIT_REASONS = {
@@ -70,6 +74,14 @@ export const SUBSCRIPTION_AUDIT_REASONS = {
   baseWorkspaceRestored: 'base workspace restored after cancellation',
   /** Credits conferred by an activation, read from the subscription snapshot. */
   creditsGranted: 'plan-included booking credits granted from the subscription snapshot',
+  /** #58a. Written only when a consumption row is actually inserted. */
+  creditConsumed: 'one booking credit consumed at first booking confirmation',
+  /**
+   * #58a. The cause is the closed server-authored classification, never the
+   * canceller's own sentence: a customer's cancellation prose must not travel
+   * into the seller's commercial audit trail (`V33-DEC-025` Ruling 9).
+   */
+  creditReturned: 'one consumed booking credit returned by a qualifying cancellation',
 } as const;
 
 export type SubscriptionAuditReason =

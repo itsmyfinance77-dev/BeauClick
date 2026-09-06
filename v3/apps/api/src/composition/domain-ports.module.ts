@@ -5,10 +5,10 @@ import { DataSource } from 'typeorm';
 
 import { ProfessionalEntity, ProviderModule, SELLER_OWNER_ROLE_GRANT, ServiceOfferingEntity } from '@beauclick/provider';
 import { IdentityModule, UserEntity } from '@beauclick/identity';
-import { PROFESSIONAL_DIRECTORY } from '@beauclick/booking';
-import { PRICING_RULES, SERVICE_CATALOG, ZERO_COLLECTIBLE_CONFIRMATION_HOOK } from '@beauclick/commerce';
+import { BOOKING_CANCELLATION_ENTITLEMENT_HOOK, PROFESSIONAL_DIRECTORY } from '@beauclick/booking';
+import { PRICING_RULES, SERVICE_CATALOG, BOOKING_CONFIRMATION_ENTITLEMENT_HOOK } from '@beauclick/commerce';
 import { FINANCE_WORKSPACE_OWNER_RESOLVER, FINANCIAL_DATA_SOURCE, FINANCIAL_PARTY_RESOLVER } from '@beauclick/financial';
-import { OWNED_SUBSCRIBER_PARTY_RESOLVER } from '@beauclick/commercial-policy';
+import { OWNED_SUBSCRIBER_PARTY_RESOLVER, SellerSubscriptionModule } from '@beauclick/commercial-policy';
 import { PROVIDER_REINDEX_SOURCE } from '@beauclick/search';
 import { RECIPIENT_RESOLVER } from '@beauclick/notification';
 import { ANALYTICS_SUBJECT_RESOLVER } from '@beauclick/analytics';
@@ -34,7 +34,10 @@ import {
   ProviderBackedAnalyticsSubjectResolver,
   ProviderBackedReindexSource,
 } from './phase3-ports';
-import { NoopZeroCollectibleConfirmationHook } from './zero-collectible-hook.adapter';
+import {
+  BookingCreditCancellationAdapter,
+  BookingCreditEntitlementAdapter,
+} from './booking-credit-entitlement.adapter';
 import { MembershipDiscountRule } from '../pricing/membership-discount.rule';
 import { financialDataSourceProvider } from './financial-datasource.provider';
 
@@ -64,6 +67,13 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     // uses rather than growing a second implementation of "what images does
     // this professional have".
     ProviderModule,
+    /*
+     * V3.3 #58a. The credit ledger lives in commercial-policy; the two
+     * entitlement adapters bound below delegate to it. Imported rather than
+     * reimplemented for the same reason the role grant is: a second "how much
+     * credit does this party have" would be a second answer.
+     */
+    SellerSubscriptionModule,
     // V3.3 #75 (`V33-DEC-021`). `IdentityBackedOwnerRoleGrant` delegates the
     // whole grant rule to `RoleService`, which lives here. Imported rather than
     // reimplemented for the same reason the finance workspace resolver
@@ -95,8 +105,12 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
      * fails to construct at boot instead of quietly confirming bookings that
      * consume nothing.
      */
-    NoopZeroCollectibleConfirmationHook,
-    { provide: ZERO_COLLECTIBLE_CONFIRMATION_HOOK, useExisting: NoopZeroCollectibleConfirmationHook },
+    BookingCreditEntitlementAdapter,
+    BookingCreditCancellationAdapter,
+    { provide: BOOKING_CONFIRMATION_ENTITLEMENT_HOOK, useExisting: BookingCreditEntitlementAdapter },
+    // The cancellation half, bound to booking-service's own port so the
+    // return is written inside the cancellation transaction (ADR-046 §8).
+    { provide: BOOKING_CANCELLATION_ENTITLEMENT_HOOK, useExisting: BookingCreditCancellationAdapter },
     { provide: FINANCIAL_PARTY_RESOLVER, useExisting: ProviderBackedFinancialPartyResolver },
     // V3.3-A #56a. A SECOND party resolver, deliberately not the one above: it
     // resolves ownership only and returns every owned party (ADR-042 §3).
@@ -195,7 +209,8 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     PROFESSIONAL_DIRECTORY,
     PROFESSIONAL_OWNER_LOOKUP,
     SERVICE_CATALOG,
-    ZERO_COLLECTIBLE_CONFIRMATION_HOOK,
+    BOOKING_CONFIRMATION_ENTITLEMENT_HOOK,
+    BOOKING_CANCELLATION_ENTITLEMENT_HOOK,
     FINANCIAL_PARTY_RESOLVER,
     OWNED_SUBSCRIBER_PARTY_RESOLVER,
     FINANCE_WORKSPACE_OWNER_RESOLVER,

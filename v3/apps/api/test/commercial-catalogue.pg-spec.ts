@@ -1097,11 +1097,12 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
           GROUP BY t.schemaname, t.tablename`,
       );
       // Seven since V3.3-A Story #56 (`#56a`) added `seller_subscriptions` and
-      // `booking_credit_grants` to this schema. The count is asserted exactly,
-      // rather than loosened to a minimum, because an exact number is what
-      // makes a table added without a subject-data claim fail HERE with a
-      // readable message instead of at application boot.
-      expect(rows).toHaveLength(7);
+      // `booking_credit_grants`; nine since V3.3 Story #58 (`#58a`) added
+      // `booking_credit_consumptions` and `booking_credit_returns`. The count is
+      // asserted exactly, rather than loosened to a minimum, because an exact
+      // number is what makes a table added without a subject-data claim fail HERE
+      // with a readable message instead of at application boot.
+      expect(rows).toHaveLength(9);
 
       const contracts = app.get<SubjectDataContract[]>(SUBJECT_DATA_CONTRACTS);
       const report = evaluateCoverage(rows, contracts);
@@ -1190,7 +1191,7 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
   // =========================================================================
 
   describe('§9 migration', () => {
-    it('recorded both new migrations exactly once on an already-migrated database', async () => {
+    it('recorded every commercial migration exactly once on an already-migrated database', async () => {
       const rows: Array<{ filename: string }> = await dataSource.query(
         `SELECT filename FROM public.schema_migrations
           WHERE filename LIKE 'commercial/%' OR filename LIKE '%add_commercial_plan_capability%'
@@ -1199,6 +1200,7 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
       expect(rows.map((r) => r.filename)).toEqual([
         'commercial/20260902800001_create_commercial_catalogue.sql',
         'commercial/20260903800001_create_seller_subscriptions.sql',
+        'commercial/20260906800001_create_booking_credit_accounting.sql',
         'identity/20260902800002_add_commercial_plan_capability.sql',
       ]);
     });
@@ -1234,11 +1236,15 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
            JOIN pg_namespace n ON n.oid = cl.relnamespace
           WHERE n.nspname = 'commercial' AND NOT t.tgisinternal ORDER BY t.tgname`,
       );
-      // The last two arrived with V3.3-A Story #56 (`#56a`). Listed here rather
-      // than only in that story's own suite because this assertion is over the
-      // SCHEMA: a trigger dropped by a later migration must fail somewhere, and
-      // an exact set is the only shape that catches a removal.
+      // `tg_booking_credit_grants_immutable` and `tg_seller_subscriptions_immutable`
+      // arrived with V3.3-A Story #56 (`#56a`); `tg_bcc_immutable` and
+      // `tg_bcr_immutable` with V3.3 Story #58 (`#58a`). Listed here rather than
+      // only in each story's own suite because this assertion is over the SCHEMA:
+      // a trigger dropped by a later migration must fail somewhere, and an exact
+      // set is the only shape that catches a removal.
       expect(triggers.map((t) => t.tgname)).toEqual([
+        'tg_bcc_immutable',
+        'tg_bcr_immutable',
         'tg_booking_credit_grants_immutable',
         'tg_plan_versions_lifecycle',
         'tg_plans_immutable',
