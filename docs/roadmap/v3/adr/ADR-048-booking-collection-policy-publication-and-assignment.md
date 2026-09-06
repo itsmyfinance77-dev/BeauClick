@@ -9,7 +9,11 @@ per-order schedule this writes into), ADR-044 (zero-collectible confirmation),
 ADR-045 (deposit capture and collected accounting), ADR-027 (subject-data
 contract), ADR-023 (business is its own seller party), ADR-018 (same-cluster
 consistency), ADR-011 (module boundaries)
-**Constrains:** #83 (`#41d-1`), #104 (`#41d-2`)
+**Constrains:** #83 (`#41d-1`), #104 (`#41d-2a`), #115 (`#41d-2b`)
+*(`#41d-2` was split 2026-09-07 by `V33-DEC-031` into #104 `#41d-2a`, seller
+assignment, and #115 `#41d-2b`, order resolution and the immutable snapshot. Every
+technical rule below is unchanged and now binds whichever child owns it: R1 and R3–R5's
+order-path rules bind #115, and R2's assignment rules bind #104.)*
 
 **Amended 2026-09-07 (Story #104 readiness audit) — order resolution.** The
 `#41d-2` readiness recheck against the shipped `#41d-1` code found two

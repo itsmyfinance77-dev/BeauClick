@@ -28,7 +28,7 @@ delivering its Story Points never creates a tag and never enables production.
 | V3.2-E | B2B Quotes and Campaigns | Owner-gated; payment gate applies to settlement | Not applicable | Not enabled |
 | V3.2-F | Payout and Calendar Automation | Predominantly external-gated | Not applicable | Not enabled |
 | V3.2-G | Evidence-Gated Scale | No commitment without evidence | Not applicable | Not enabled |
-| V3.3 | Product Maturity Programme | Active foundation: #39, #40 (`#40a`), #56 (`#56a`), #69 (`#56b`), #72 and #75 complete; epic #38 in progress; Story #41 decomposed by `V33-DEC-022` into #41 (`#41a`), #81 (`#41b`), #82 (`#41c`) and #83 (`#41d`) and re-estimated 13 -> 42 (#82 raised 8 -> 13 by `V33-DEC-024`); #41 (`#41a`), #81 (`#41b`) and #82 (`#41c`) complete, #83 (`#41d`) gated; #58 split by `V33-DEC-025` into `#58a` (13, **complete**) and `#58b` (3, blocked on #46); #57 split by `V33-DEC-026` into `#40c-1` (#57, **complete** at 13 after `V33-DEC-027` re-estimated it 8 -> 13) and #99 (`#40c-2`, 5, blocked on #47); bug #97 (2) complete; commercial structure ratified and **#46 closed** 2026-09-06 by `V33-DEC-028`, which moved #83 (13) and #95 (`#58b`, 3 -> 5) to Ready and re-estimated #43 13 -> 21; #83 then split 2026-09-06 by `V33-DEC-029` into `#41d-1` (#83, 13, Ready) and #104 (`#41d-2`, 8, proposed); **#44 decomposed 2026-09-06 by `V33-DEC-030`** into an umbrella carrying no Story Points plus five children — #107 (`#44a`, 5, Ready), #108 (`#44b`, 8), #109 (`#44c`, 13), #110 (`#44d`, 13) and #111 (`#44e`, 8) — re-estimated 13 -> 47, a net **+34** with done unchanged | No tag authorized | Real money blocked by #47; every commercial value and all legal copy remain **unpublished**, now tracked on #83, #42 (Legal), #43 and #47 rather than #46 |
+| V3.3 | Product Maturity Programme | Active foundation: #39, #40 (`#40a`), #56 (`#56a`), #69 (`#56b`), #72 and #75 complete; epic #38 in progress; Story #41 decomposed by `V33-DEC-022` into #41 (`#41a`), #81 (`#41b`), #82 (`#41c`) and #83 (`#41d`) and re-estimated 13 -> 42 (#82 raised 8 -> 13 by `V33-DEC-024`); #41 (`#41a`), #81 (`#41b`) and #82 (`#41c`) complete, #83 (`#41d`) gated; #58 split by `V33-DEC-025` into `#58a` (13, **complete**) and `#58b` (3, blocked on #46); #57 split by `V33-DEC-026` into `#40c-1` (#57, **complete** at 13 after `V33-DEC-027` re-estimated it 8 -> 13) and #99 (`#40c-2`, 5, blocked on #47); bug #97 (2) complete; commercial structure ratified and **#46 closed** 2026-09-06 by `V33-DEC-028`, which moved #83 (13) and #95 (`#58b`, 3 -> 5) to Ready and re-estimated #43 13 -> 21; #83 then split 2026-09-06 by `V33-DEC-029` into `#41d-1` (#83, 13, Ready) and #104 (`#41d-2`, 8, proposed); #104 then split 2026-09-07 by `V33-DEC-031` into `#41d-2a` (#104, 8, Ready) and #115 (`#41d-2b`, 8, proposed); **#44 decomposed 2026-09-06 by `V33-DEC-030`** into an umbrella carrying no Story Points plus five children — #107 (`#44a`, 5, Ready), #108 (`#44b`, 8), #109 (`#44c`, 13), #110 (`#44d`, 13) and #111 (`#44e`, 8) — re-estimated 13 -> 47, a net **+34** with done unchanged | No tag authorized | Real money blocked by #47; every commercial value and all legal copy remain **unpublished**, now tracked on #83, #42 (Legal), #43 and #47 rather than #46 |
 | V3.4 | Conditional Expansion Programme | Written owner decision and evidence required | Not applicable | Not enabled |
 
 V3.2-A and V3.2-B are completed historical milestones but are deliberately
@@ -380,7 +380,7 @@ own contract honestly:
 | Item | Before | After | Outcome it owns |
 |---|---:|---:|---|
 | #83 (`#41d`) → `#41d-1` | 13 | **13** | The collection-only contract split; the policy key and version tables; lifecycle, immutability, non-overlap and database-authoritative non-retroactivity; the `{service_subtotal, service_total}` percentage-base vocabulary as required data with no default; privileged audited administrator publication; a zero-row fail-closed foundation; ADR-027 coverage. **Changes no order behaviour.** No assignment, no order integration, no acceptance, no commercial default |
-| #104 (`#41d-2`) | — | **8** | Seller-party assignment and the immutable order snapshot: the assignment table and owner routes, the new non-privileged `bc_manage_own_collection_policy`, the manager-scoped resolver port, order integration behind an explicit dark-launch boundary, and the `ck_ops_policy_reference` split into key/version all-or-none with independently nullable acceptance. Depends on #83 |
+| #104 (`#41d-2`) -> `#41d-2a` + #115 (`#41d-2b`) | — | 8 -> **8 + 8** | *(Split 2026-09-07 by `V33-DEC-031`; the description below is the unsplit story. #104 keeps its number as `#41d-2a` and owns assignment only; #115 owns order resolution and the immutable snapshot.)* Seller-party assignment and the immutable order snapshot: the assignment table and owner routes, the new non-privileged `bc_manage_own_collection_policy`, the manager-scoped resolver port, order integration behind an explicit dark-launch boundary, and the `ck_ops_policy_reference` split into key/version all-or-none with independently nullable acceptance. Depends on #83 |
 | **Total** | **13** | **21** | Net V3.3 scope movement **+8**. Done unchanged — this decision completes no story |
 
 **Two things the split deliberately refused to do.** It did not fill the missing contract
@@ -475,3 +475,36 @@ absorbed. #42 keeps `gate:legal`, #43 keeps `gate:external`, #47 and #99 stay bl
 **ADR-049 is required before any child schema, contract or executable code**, and must be
 committed alone as its own pull request containing exactly one new file. It was deliberately
 **not** written in this governance change.
+
+## V3.3 Story #104 split into assignment and order resolution, 2026-09-07
+
+`V33-DEC-031` decomposed Story #104 after a read-only readiness recheck against the merged
+`#41d-1` code. **Scope only** — no commercial value, no Legal wording, no provider,
+payment, retention or settlement was approved, and no implementation started.
+
+**Why.** The story carried two outcomes with different blast radii: choosing a policy, and
+pricing every enrolled booking with it. Assignment cannot break a booking; order
+integration is the only thing in this family that can. The recheck also found a body gap —
+#104 required a seller to supply a stable `policyKey` while giving them no way to learn one,
+because the administrator publication routes are class-gated on the privileged
+`bc_manage_commercial_plans` — and two engineering defects since bound by the ADR-048
+amendment of 2026-09-07 rather than by this card.
+
+| Item | Before | After | Outcome it owns |
+|---|---:|---:|---|
+| #104 (`#41d-2`) → `#41d-2a` | 8 | **8** | Immutable assignment history with one current row per seller party; assignment presence as the enrollment fact, with no marker and no un-enrollment path; supersession that never mutates a key in place; live ownership through the opaque `workspaceRef`, with `business_staff` affiliation granting nothing; the new non-privileged `bc_manage_own_collection_policy`; a seller-readable assignable-policy catalogue exposing only a key and a display name and reusing no administrator route; current-assignment read; one non-enumerating refusal; `FOR SHARE` plus compare-and-swap linearization with same-transaction audit; ADR-027 treatment. **Changes no order, booking, schedule, amount, mode, `policy_accepted_at` or customer-facing response** |
+| #115 (`#41d-2b`) | — | **8** | The manager-scoped `ServiceCatalog`/`SellerPartyLookup` repair with the seller party selected once and never re-resolved; the Commerce-owned manager-scoped resolver port bound at the composition root, with no Commercial Policy ORM import; resolution of the active published version at the database clock instant; the immutable snapshot; **derivation of `collection_mode` from the computed amounts** rather than from the policy terms; the `ck_ops_policy_reference` replacement with existing rows byte-identical; the dark-launch boundary, its metrics and its stated exit criterion. Depends on #83 and #104 |
+| **Total** | **8** | **16** | Net V3.3 scope movement **+8**. Done unchanged — the split completes no story |
+
+**Recorded route family**, audited against every existing `v1/me/*` namespace for collision
+and wildcard shadowing: `GET /api/v1/me/collection-policies` for the catalogue, and
+`GET`/`PUT /api/v1/me/collection-policy-assignments/:workspaceRef` for the assignment. No
+route accepts a user, party, business, professional, seller, owner or actor id, a policy
+version, an amount, a mode or a timestamp.
+
+**ADR-048 governs both children and no new ADR was created.** Its 2026-09-07 amendment
+already binds mode derivation, assignment-presence enrollment, the manager-scoped read with
+its `READ COMMITTED` precision, the separate resolver, and the `FOR SHARE`/CAS
+linearization. `policy_accepted_at` remains independently nullable and is populated by
+neither child; per-service override stays deferred behind #44; and #42, #43, #47, #95 and
+#99 keep every gate they had.
