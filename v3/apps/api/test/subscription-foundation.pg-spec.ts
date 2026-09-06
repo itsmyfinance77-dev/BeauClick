@@ -1105,7 +1105,7 @@ describePg('subscription foundation — assignment, snapshots, grants (real Post
       expect(JSON.stringify(sections)).not.toContain(business.id);
     });
 
-    it('reports erasure truthfully: nothing anonymized, nothing deleted, both retained', async () => {
+    it('reports erasure truthfully: nothing anonymized, nothing deleted, all four retained', async () => {
       await baseWorkspace();
       const { user, party } = await professionalParty();
       await subscriptions.ensureBaseSubscription(party);
@@ -1121,8 +1121,13 @@ describePg('subscription foundation — assignment, snapshots, grants (real Post
 
       expect(outcome.anonymized).toBe(0);
       expect(outcome.deleted).toBe(0);
+      // V3.3 #58a added the debit and reversal sides of the ledger. The set is
+      // EXTENDED rather than loosened: a table that stops being claimed, or a
+      // fifth that appears unclaimed, still fails here.
       expect(outcome.retained.map((r) => r.table).sort()).toEqual([
+        'commercial.booking_credit_consumptions',
         'commercial.booking_credit_grants',
+        'commercial.booking_credit_returns',
         'commercial.seller_subscriptions',
       ]);
       // And the rows really are still there, so the report is not merely honest
