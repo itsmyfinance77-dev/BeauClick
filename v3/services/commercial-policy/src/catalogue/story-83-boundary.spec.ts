@@ -23,12 +23,6 @@ import { join, resolve } from 'node:path';
 
 const WORKSPACE_ROOT = resolve(__dirname, '../../../..');
 
-/** The directories Story #83 was allowed to touch. */
-const STORY_SOURCE_DIRECTORIES = [
-  'services/commercial-policy/src',
-  'packages/commercial-policy-contract/src',
-];
-
 /** Files Story #83 created or edited, by name. Everything else in those trees pre-dates it. */
 const STORY_FILES = [
   'services/commercial-policy/src/catalogue/booking-collection-policy.entities.ts',

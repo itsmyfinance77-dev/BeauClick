@@ -29,8 +29,14 @@ const PG_UNIQUE_VIOLATION = '23505';
 const PG_EXCLUSION_VIOLATION = '23P01';
 const PG_RESTRICT_VIOLATION = '23001';
 
-const AUDIT_TARGET_POLICY = 'commercial_booking_collection_policy';
-const AUDIT_TARGET_POLICY_VERSION = 'commercial_booking_collection_policy_version';
+/*
+ * `admin.admin_audit_log.target_type` is VARCHAR(40), so these are shortened
+ * rather than spelled out in full: `commercial_booking_collection_policy_version`
+ * is 44 characters and would be refused at write time -- the kind of failure
+ * that would only appear on the audit row of a real publication.
+ */
+const AUDIT_TARGET_POLICY = 'commercial_collection_policy';
+const AUDIT_TARGET_POLICY_VERSION = 'commercial_collection_policy_version';
 
 /** How many times a draft creation re-derives its version number after losing a race. */
 const VERSION_ALLOCATION_ATTEMPTS = 3;

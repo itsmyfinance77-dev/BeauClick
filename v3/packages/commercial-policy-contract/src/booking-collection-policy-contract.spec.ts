@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import {
   BOOKING_COLLECTION_DEPOSIT_KINDS,
   BOOKING_COLLECTION_MODES,
@@ -344,10 +347,7 @@ describe('booking collection policy contract (#41d-1)', () => {
       // `BookingCommercialPolicySnapshotV1` (the #42-era type) calls its instant
       // `acceptedAt`, because it means acceptance. This one must not, and the
       // difference is the whole of `V33-DEC-029` Ruling 3.
-      const source = require('node:fs').readFileSync(
-        require('node:path').join(__dirname, 'booking-collection-policy-contract.ts'),
-        'utf8',
-      ) as string;
+      const source = readFileSync(join(__dirname, 'booking-collection-policy-contract.ts'), 'utf8');
       const declarations = source
         .split('\n')
         .filter((line) => /^\s+readonly \w+/.test(line))
@@ -389,11 +389,13 @@ describe('booking collection policy contract (#41d-1)', () => {
 
     it('still requires the #42/#43 fields this story does not own', () => {
       const { disputeWindowMinutes: _dispute, ...withoutDispute } = wholePolicy;
+      void _dispute;
       expect(validateBookingCommercialTermsV1(withoutDispute as never)).toContain(
         'disputeWindowMinutes must be a non-negative safe integer',
       );
 
       const { settlementDelayMinutes: _settlement, ...withoutSettlement } = wholePolicy;
+      void _settlement;
       expect(validateBookingCommercialTermsV1(withoutSettlement as never)).toContain(
         'settlementDelayMinutes must be a non-negative safe integer',
       );
@@ -416,6 +418,7 @@ describe('booking collection policy contract (#41d-1)', () => {
       // collection-only validator does not share the hole -- it narrows with
       // `typeof` before testing the pattern, and §4 proves that.
       const { customerPolicyCopyVersion: _copy, ...withoutCopy } = wholePolicy;
+      void _copy;
       expect(validateBookingCommercialTermsV1(withoutCopy as never)).toEqual([]);
 
       expect(validateBookingCommercialTermsV1({ ...wholePolicy, customerPolicyCopyVersion: '!!' })).toContain(
