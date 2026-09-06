@@ -1,5 +1,7 @@
 import { Column, CreateDateColumn, Entity, PrimaryColumn } from 'typeorm';
 
+import { CreditPurchaseEntity } from './credit-purchase.entity';
+
 import type {
   BookingCreditGrantSource,
   SellerSubscriptionState,
@@ -83,6 +85,23 @@ export class SellerSubscriptionEntity {
 
   @Column({ name: 'snapshot_price_schedule_version_id', type: 'uuid' })
   snapshotPriceScheduleVersionId!: string;
+
+  /**
+   * The plan version's booking-credit schedule key, copied at activation —
+   * V3.3 #57 (`#40c-1`), `V33-DEC-027` R3.
+   *
+   * NULL for every subscription that exists today and for every one
+   * activated from a plan version that offers no custom credits. Nothing
+   * backfills it.
+   *
+   * Snapshotted so a later plan edit, supersession or affiliation change
+   * cannot redirect which schedule this seller's credit purchases are
+   * priced by. The schedule VERSION is deliberately not snapshotted: that
+   * is resolved per request, which is what lets prices move forward without
+   * migrating a subscription.
+   */
+  @Column({ name: 'snapshot_booking_credit_schedule_key', type: 'varchar', length: 64, nullable: true })
+  snapshotBookingCreditScheduleKey!: string | null;
 
   @Column({ name: 'effective_at', type: 'timestamptz' })
   effectiveAt!: Date;
@@ -249,6 +268,10 @@ export const SUBSCRIPTION_ENTITIES = [
   BookingCreditGrantEntity,
   BookingCreditConsumptionEntity,
   BookingCreditReturnEntity,
+  // V3.3 #57 (`#40c-1`). Registered here so the composition root and every
+  // module that spreads this list see it at boot, rather than at the first
+  // request against a route that then 500s.
+  CreditPurchaseEntity,
 ];
 
 /** Re-exported so ledger entities in this package can name the same type. */

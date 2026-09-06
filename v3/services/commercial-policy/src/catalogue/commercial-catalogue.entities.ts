@@ -213,6 +213,27 @@ export class CommercialPlanVersionEntity {
   priceScheduleVersionId!: string;
 
   /**
+   * Which price schedule this plan version sells CUSTOM booking credits at
+   * — V3.3 #57 (`#40c-1`), `V33-DEC-027` R1.
+   *
+   * Distinct from `priceScheduleVersionId` above, which is what the PLAN
+   * itself costs. Nullable because most plan versions offer no custom
+   * credits and because the seeded `D-7` must stay honestly unconfigured;
+   * there is no default and no fallback.
+   *
+   * A stable KEY, never a version id. Binding a version would freeze every
+   * subscription's top-up price at activation, so an administrator could
+   * never reprice credits without rewriting immutable rows (ADR-047 §3).
+   *
+   * The database refuses a `seller_plan` target through a composite foreign
+   * key over a GENERATED purpose discriminator, so a wrong-purpose binding
+   * is unwritable rather than merely rejected by whichever code path
+   * happened to construct it.
+   */
+  @Column({ name: 'booking_credit_schedule_key', type: 'varchar', length: 64, nullable: true })
+  bookingCreditScheduleKey!: string | null;
+
+  /**
    * The base workspace mechanism (ADR-041 §6).
    *
    * A row's property, so no code anywhere names `D-7`. A database exclusion
