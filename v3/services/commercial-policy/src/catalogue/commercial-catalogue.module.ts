@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { COMMERCIAL_ENTITIES } from './commercial-catalogue.entities';
+import { PriceResolutionModule } from './price-resolution.service';
 import { CommercialCatalogueController } from './commercial-catalogue.controller';
 import { CommercialCatalogueService } from './commercial-catalogue.service';
 import { CommercialSubjectDataContract } from './commercial-subject-data.contract';
@@ -43,7 +44,7 @@ import { CommercialSubjectDataContract } from './commercial-subject-data.contrac
  * all record.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature(COMMERCIAL_ENTITIES)],
+  imports: [TypeOrmModule.forFeature(COMMERCIAL_ENTITIES), PriceResolutionModule],
   controllers: [CommercialCatalogueController],
   providers: [CommercialCatalogueService, CommercialSubjectDataContract],
   exports: [CommercialCatalogueService, CommercialSubjectDataContract],

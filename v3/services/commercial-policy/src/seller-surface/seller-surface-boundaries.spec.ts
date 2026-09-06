@@ -60,7 +60,11 @@ describe('seller subscription surface — structural boundaries (#69)', () => {
   it('has source files to assert against', () => {
     // Guards every case below: a glob that silently matched nothing would make
     // all of them pass while proving nothing.
-    expect(files.length).toBe(5);
+    // Eight since V3.3 Story #57 (`#40c-1`) added the credit-purchase service,
+    // its DTOs and its one exception. Asserted exactly, not as a minimum: a
+    // file added to this directory without being read by a human would
+    // otherwise slip past every case below.
+    expect(files.length).toBe(8);
     expect(executable.length).toBeGreaterThan(150);
   });
 
@@ -76,7 +80,13 @@ describe('seller subscription surface — structural boundaries (#69)', () => {
     it('names no user, owner, party or subscription identifier in any request contract', () => {
       const forbidden =
         /\b(?:userId|ownerId|professionalId|businessId|partyId|subscriberId|actorId|subscriptionId)\b/;
-      const requestSurface = ['seller-subscription-surface.dto.ts', 'seller-subscription-surface.controller.ts'];
+      const requestSurface = [
+        'seller-subscription-surface.dto.ts',
+        'seller-subscription-surface.controller.ts',
+        // V3.3 #57. Held to the same rule: `quantity` and an opaque cursor are
+        // all a caller may send.
+        'credit-purchase.dto.ts',
+      ];
 
       const offenders = executable.filter(
         (line) => requestSurface.some((name) => line.startsWith(`${name}:`)) && forbidden.test(line),
@@ -91,6 +101,11 @@ describe('seller subscription surface — structural boundaries (#69)', () => {
         'seller-subscription-surface.controller.ts: return { items: await this.surface.history(user.userId, workspaceRef) };',
         'seller-subscription-surface.controller.ts: return this.surface.cancel(user.userId, workspaceRef);',
         'seller-subscription-surface.controller.ts: return this.surface.select(user.userId, workspaceRef, dto.planKey, dto.version);',
+        // V3.3 #57. Same shape and same reading: `user.userId` is the SESSION,
+        // and the workspace is still named by the opaque reference.
+        'seller-subscription-surface.controller.ts: return this.purchases.quote(user.userId, workspaceRef, dto.quantity);',
+        'seller-subscription-surface.controller.ts: return this.purchases.create(user.userId, workspaceRef, dto.quantity, requestKey);',
+        'seller-subscription-surface.controller.ts: return { items: await this.purchases.list(user.userId, workspaceRef, query.cursor) };',
       ].sort());
     });
 
@@ -120,7 +135,18 @@ describe('seller subscription surface — structural boundaries (#69)', () => {
      */
     it('accepts no reason, note or comment from a caller', () => {
       const offenders = executable.filter((line) => /\b(?:reason|note|comment|message)\s*[!?]?\s*:/.test(line));
-      expect(offenders).toEqual([]);
+      // Pinned EXACTLY rather than filtered, so the one permitted line has to
+      // be read by a human before this passes again.
+      //
+      // That line is a SERVER-authored constant from the closed audit
+      // vocabulary — the opposite of caller prose. `V33-DEC-018` closes the
+      // vocabulary precisely so that `admin.admin_audit_log`, which the
+      // application may INSERT into and never edit, cannot receive arbitrary
+      // content. A `reason` field on a DTO, or a reason threaded from a
+      // request, appears here and fails.
+      expect(offenders).toEqual([
+        'credit-purchase.service.ts: reason: SUBSCRIPTION_AUDIT_REASONS.creditPurchaseRequested,',
+      ]);
     });
 
     /** Probe: return `auditId` or `actorUserId` from `toEntry`. This case fails. */
@@ -253,13 +279,17 @@ describe('seller subscription surface — structural boundaries (#69)', () => {
      * — which `CapabilityGuard.getAllAndOverride` would honour — would gate the
      * reads too without anything else changing.
      */
-    it('gates the three mutations and neither of the read routes', () => {
+    it('gates the four mutations and none of the read routes', () => {
       const controller = readFileSync(join(SURFACE_DIR, 'seller-subscription-surface.controller.ts'), 'utf8');
 
       const decorated = [...controller.matchAll(/@RequireCapability\(MANAGE_OWN_SUBSCRIPTION\)\s*\n\s*async (\w+)/g)]
         .map((match) => match[1])
         .sort();
-      expect(decorated).toEqual(['cancel', 'initialize', 'select']);
+      // Four since V3.3 #57 added `createCreditPurchase`. The QUOTE and the
+      // LIST are deliberately absent: `V33-DEC-020` Ruling 9 established that
+      // enforcing a seller capability on a read would lock legitimate sellers
+      // out of their own data, and #57 changes nothing about that split.
+      expect(decorated).toEqual(['cancel', 'createCreditPurchase', 'initialize', 'select']);
 
       // The decorator is never on a class, which is the form that would leak
       // onto the reads.
@@ -276,7 +306,7 @@ describe('seller subscription surface — structural boundaries (#69)', () => {
      * a renamed path fails on the fast layer in a second rather than after a
      * container boot.
      */
-    it('declares the six approved routes and no others', () => {
+    it('declares the nine approved routes and no others', () => {
       const controller = readFileSync(join(SURFACE_DIR, 'seller-subscription-surface.controller.ts'), 'utf8');
 
       const controllers = [...controller.matchAll(/@Controller\('([^']+)'\)/g)].map((match) => match[1]);
@@ -293,6 +323,12 @@ describe('seller subscription surface — structural boundaries (#69)', () => {
           'Post :workspaceRef/cancellation',
           'Post :workspaceRef/selection',
           'Post initialization',
+          // V3.3 #57 (`#40c-1`). Three, and no fourth: no balance route,
+          // no grant route, no admin route and nothing that names a
+          // schedule, version, tier or price.
+          'Post :workspaceRef/credit-purchases/quote',
+          'Post :workspaceRef/credit-purchases',
+          'Get :workspaceRef/credit-purchases',
         ].sort(),
       );
 

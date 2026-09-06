@@ -7,6 +7,7 @@ export * from './commercial-policy-control.gate';
 export * from './catalogue/commercial-catalogue.entities';
 export * from './catalogue/commercial-catalogue.exceptions';
 export * from './catalogue/commercial-catalogue.dto';
+export * from './catalogue/price-resolution.service';
 export * from './catalogue/commercial-catalogue.service';
 export * from './catalogue/commercial-catalogue.controller';
 export * from './catalogue/commercial-subject-data.contract';
@@ -31,4 +32,10 @@ export * from './seller-surface/seller-subscription-surface.dto';
 export * from './seller-surface/seller-subscription-surface.service';
 export * from './seller-surface/seller-subscription-surface.controller';
 export * from './seller-surface/seller-subscription-surface.module';
+// V3.3 Story #57 (`#40c-1`). The custom booking-credit purchase record and
+// its immutable price snapshot (ADR-047). It writes no grant and no payment.
+export * from './subscription/credit-purchase.entity';
+export * from './seller-surface/credit-purchase.exceptions';
+export * from './seller-surface/credit-purchase.dto';
+export * from './seller-surface/credit-purchase.service';
 export * from './subscription/booking-credit-accounting.service';

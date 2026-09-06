@@ -1,8 +1,13 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Headers, Param, Post, Query } from '@nestjs/common';
 
 import { RequireCapability } from '@beauclick/auth';
 import { AuthenticatedUser, CurrentUser } from '@beauclick/http';
 
+import {
+  CreditPurchaseListQueryDto,
+  CreditPurchaseQuantityDto,
+} from './credit-purchase.dto';
+import { CreditPurchaseService } from './credit-purchase.service';
 import { EmptyBodyDto, EmptyQueryDto, SelectPlanVersionDto } from './seller-subscription-surface.dto';
 import {
   HistoryEntry,
@@ -10,6 +15,14 @@ import {
   SellerSubscriptionSurfaceService,
   WorkspaceEntry,
 } from './seller-subscription-surface.service';
+import type {
+  CreditPurchaseQuoteViewV1,
+  CreditPurchaseViewV1,
+} from '@beauclick/commercial-policy-contract';
+import {
+  REQUEST_KEY_MAX_LENGTH,
+  REQUEST_KEY_MIN_LENGTH,
+} from '@beauclick/commercial-policy-contract';
 
 /**
  * The capability a seller needs to CHANGE their own commercial terms.
@@ -77,7 +90,10 @@ export const MANAGE_OWN_SUBSCRIPTION = 'bc_manage_own_subscription';
  */
 @Controller('v1/me/subscriptions')
 export class SellerSubscriptionSurfaceController {
-  constructor(private readonly surface: SellerSubscriptionSurfaceService) {}
+  constructor(
+    private readonly surface: SellerSubscriptionSurfaceService,
+    private readonly purchases: CreditPurchaseService,
+  ) {}
 
   /**
    * `POST /api/v1/me/subscriptions/initialization` — the ONLY route that writes
@@ -162,6 +178,82 @@ export class SellerSubscriptionSurfaceController {
   ): Promise<WorkspaceEntry> {
     return this.surface.cancel(user.userId, workspaceRef);
   }
+  // ========================================================================
+  // Custom booking-credit purchases — V3.3 #57 (`#40c-1`), ADR-047 §7
+  // ========================================================================
+  //
+  // Three routes and no new capability. `bc_manage_own_subscription` already
+  // exists, is non-privileged, and is granted to the `professional` and
+  // `business` roles by the lifecycle #75 fixed (`V33-DEC-026` R6).
+  //
+  // The read/mutation split is #69's, unchanged: `V33-DEC-020` Ruling 9
+  // established that enforcing a seller capability on a READ would lock
+  // legitimate sellers out of their own data, so the quote and the list require
+  // authentication plus live ownership, and only the write requires the
+  // capability. A quote is a read that happens to be a POST, because a quantity
+  // belongs in a body rather than in a query string.
+  //
+  // None of the three writes a booking-credit grant, a payment, an order, an
+  // intent, a ledger entry or an event.
+
+  /**
+   * `POST /api/v1/me/subscriptions/:workspaceRef/credit-purchases/quote`.
+   *
+   * Side-effect-free. Not even an audit row: nothing happened.
+   */
+  @Post(':workspaceRef/credit-purchases/quote')
+  async quoteCreditPurchase(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('workspaceRef') workspaceRef: string,
+    @Body() dto: CreditPurchaseQuantityDto,
+    @Query() _query: EmptyQueryDto,
+  ): Promise<CreditPurchaseQuoteViewV1> {
+    return this.purchases.quote(user.userId, workspaceRef, dto.quantity);
+  }
+
+  /**
+   * `POST /api/v1/me/subscriptions/:workspaceRef/credit-purchases`.
+   *
+   * `Idempotency-Key` is a HEADER and mandatory, following the checkout route's
+   * precedent: it is a property of the REQUEST rather than of the purchase, and
+   * keeping it out of the body means `forbidNonWhitelisted` still rejects every
+   * other field — including anything price-shaped.
+   *
+   * Missing or malformed is a `400`, because a retry-safety token the server
+   * silently invented would make a replay create a second row. The width is a
+   * protocol bound matching the column's own CHECK, and expresses no product
+   * policy.
+   */
+  @Post(':workspaceRef/credit-purchases')
+  @RequireCapability(MANAGE_OWN_SUBSCRIPTION)
+  async createCreditPurchase(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('workspaceRef') workspaceRef: string,
+    @Body() dto: CreditPurchaseQuantityDto,
+    @Query() _query: EmptyQueryDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ): Promise<CreditPurchaseViewV1> {
+    const requestKey = (idempotencyKey ?? '').trim();
+    if (requestKey.length < REQUEST_KEY_MIN_LENGTH || requestKey.length > REQUEST_KEY_MAX_LENGTH) {
+      throw new BadRequestException('Idempotency-Key is required');
+    }
+    return this.purchases.create(user.userId, workspaceRef, dto.quantity, requestKey);
+  }
+
+  /**
+   * `GET /api/v1/me/subscriptions/:workspaceRef/credit-purchases`.
+   *
+   * Newest first, keyset-paged. Bounded by the server, so a caller cannot ask
+   * for the whole history in one request.
+   */
+  @Get(':workspaceRef/credit-purchases')
+  async listCreditPurchases(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('workspaceRef') workspaceRef: string,
+    @Query() query: CreditPurchaseListQueryDto,
+  ): Promise<{ items: CreditPurchaseViewV1[] }> {
+    return { items: await this.purchases.list(user.userId, workspaceRef, query.cursor) };
+  }
 }
 
 /**
@@ -207,4 +299,5 @@ export class SellerCommercialPlansController {
   ): Promise<{ items: PlanEntry[] }> {
     return { items: await this.surface.plans() };
   }
+
 }

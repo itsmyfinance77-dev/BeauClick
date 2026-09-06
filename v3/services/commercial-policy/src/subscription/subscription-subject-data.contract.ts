@@ -8,6 +8,7 @@ import {
   SubjectTableClaim,
 } from '@beauclick/subject-data';
 
+import { CreditPurchaseEntity } from './credit-purchase.entity';
 import {
   BookingCreditConsumptionEntity,
   BookingCreditGrantEntity,
@@ -103,6 +104,12 @@ export class SubscriptionSubjectDataContract implements SubjectDataContract {
         'The debit side of the seller balance (#58a). Immutable by trigger and one row per booking. It names a booking id and the charged party and carries no customer identity, so there is nothing personal to the counterparty to erase; deleting it would silently return a credit the seller genuinely spent.',
     },
     {
+      table: 'commercial.credit_purchases',
+      disposition: 'retained',
+      reason:
+        'The immutable record of a price a seller was offered for a custom booking-credit quantity, and of their request against it (#57). Retained as an obligation record: it names the charged party and the catalogue rows that priced it, carries no customer identity at all, and deleting it would destroy the only proof of what was quoted. Nothing here has been paid and no credit has been granted.',
+    },
+    {
       table: 'commercial.booking_credit_returns',
       disposition: 'retained',
       reason:
@@ -140,6 +147,23 @@ export class SubscriptionSubjectDataContract implements SubjectDataContract {
       .where(this.partyPredicate(parties, 'c'), this.partyParameters(parties))
       .orderBy('c.consumed_at', 'DESC')
       .getMany();
+
+    /*
+     * V3.3 #57 (`#40c-1`). The seller's own purchase requests.
+     *
+     * Reached through the SUBSCRIPTIONS already resolved above, so the export
+     * inherits the same ownership predicate rather than restating it — a staff
+     * member gets nothing here for exactly the reason they get nothing above.
+     */
+    const purchases =
+      subscriptions.length === 0
+        ? []
+        : await manager
+            .getRepository(CreditPurchaseEntity)
+            .createQueryBuilder('p')
+            .where('p.subscription_id IN (:...ids)', { ids: subscriptions.map((s) => s.id) })
+            .orderBy('p.created_at', 'DESC')
+            .getMany();
 
     const sections: SubjectExportSection[] = [];
 
@@ -190,6 +214,28 @@ export class SubscriptionSubjectDataContract implements SubjectDataContract {
           subscriberPartyType: c.subscriberPartyType,
           periodIndex: c.periodIndex,
           consumedAt: c.consumedAt.toISOString(),
+        })),
+      });
+    }
+
+    if (purchases.length > 0) {
+      sections.push({
+        key: 'commercial.credit_purchases',
+        description: 'درخواست‌های خرید اعتبار نوبت‌دهی کسب‌وکار شما',
+        rows: purchases.map((purchase) => ({
+          quantity: purchase.quantity,
+          unitPriceToman: purchase.unitPriceToman,
+          totalToman: purchase.totalToman,
+          currency: purchase.currencyCode,
+          state: purchase.lifecycleState,
+          effectiveAt: purchase.effectiveAt.toISOString(),
+          createdAt: purchase.createdAt.toISOString(),
+          // No `requestKey`: the caller's own protocol token, which echoing
+          // adds nothing to. No `requestedByUserId`: which of a workspace's
+          // owners pressed the button is an actor fact for the audit trail. No
+          // `scheduleKey`, `priceScheduleVersionId` or `priceTierId`: catalogue
+          // internals a seller is not shown, here for the same reason the quote
+          // route omits them.
         })),
       });
     }
