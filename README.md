@@ -99,7 +99,7 @@ overage), and Story #40 was decomposed from one 13-point item into four:
 | #40 (`#40a`) | 8 | Admin-versioned plan and price catalogue — immutable versions, non-overlapping activation windows, tier schedules, the `D-7` zero-price base workspace, the `bc_manage_commercial_plans` capability, audit with a mandatory reason |
 | #56 (`#56a`) | 8 | Subscription foundation: snapshotted subscriber party, `D-7` backfill and lazy ensure, plan-included grants. No seller-facing route |
 | #69 (`#56b`) | 8 | Seller subscription surface: a workspace collection reached by an opaque `workspaceRef`, explicit initialization, history, zero-price selection and cancellation |
-| #57 (`#40c`) -> `#40c-1` | 5 -> **8** | Custom booking-credit purchase **record** and immutable price snapshot. Writes no grant |
+| #57 (`#40c`) -> `#40c-1` | 5 -> 8 -> **13** | Custom booking-credit purchase **record** and immutable price snapshot. Writes no grant |
 | #99 (`#40c-2`) | **5** | Paid activation of a custom purchase. Blocked on #47 |
 | #58 (`#40d`) → `#58a` | 8 -> **13** | Atomic consumption at first `confirmed` and idempotent return, enforced **selectively** — active only for a seller who holds a positive grant |
 | `#58b` | **3** | Global fail-closed enforcement activation. Blocked on #46 |
@@ -210,6 +210,21 @@ credit at exactly one transition — the same transaction that records the verif
 payment. The audit also found a constraint that would have allowed each seller exactly
 one custom purchase for ever, and the ratification replaces it with a partial index that
 keeps #56's invariant intact.
+
+A code audit after that ratification found one question it had not answered, closed
+the same day as `V33-DEC-027`: nothing said **which** price schedule prices a
+quantity. The resolver needs a schedule key, the seller may not supply one, several
+`booking_credit` schedules are legal, and the constraint that stops two versions
+overlapping is scoped to a single key — so two schedules could each be active at
+once with nothing to choose between them. Every shortcut broke something already
+ratified, so the administrator now binds a nullable schedule **key** to an immutable
+plan version, a subscription snapshots that key when it activates, and each request
+resolves whichever version of the key is active at that instant. Binding the key
+rather than a version is what lets prices move forward without migrating
+subscriptions while every past purchase keeps what it was offered. Nothing existing
+is backfilled, so #57 ships **safely unavailable** until an administrator configures
+a schedule and a plan version that carries its key. #57 is re-estimated 8 -> 13
+points.
 
 Prices, included allowances, bounds, cutoffs, legal copy and accounting treatment stay
 open under issue #46, and real money movement stays blocked by #47. No allowance may
