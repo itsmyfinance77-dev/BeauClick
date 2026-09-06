@@ -16,6 +16,17 @@ import {
   WriteScheduleVersionDto,
 } from './commercial-catalogue.dto';
 import { CommercialCatalogueService } from './commercial-catalogue.service';
+// V3.3 Story #83 (`#41d-1`). The booking collection policy plane, on the SAME
+// controller so the class-level privileged guard covers it too (ADR-048 5).
+import { BookingCollectionPolicyVersionEntity } from './booking-collection-policy.entities';
+import {
+  CreateBookingCollectionPolicyDto,
+  WriteBookingCollectionPolicyVersionDto,
+} from './booking-collection-policy.dto';
+import {
+  BookingCollectionPolicyService,
+  WriteCollectionPolicyVersionInput,
+} from './booking-collection-policy.service';
 
 /**
  * The administrator surface for the plan and price catalogue — Issue #40
@@ -61,7 +72,10 @@ import { CommercialCatalogueService } from './commercial-catalogue.service';
 @Controller('v1/admin/commercial')
 @RequireCapability('bc_manage_commercial_plans')
 export class CommercialCatalogueController {
-  constructor(private readonly catalogue: CommercialCatalogueService) {}
+  constructor(
+    private readonly catalogue: CommercialCatalogueService,
+    private readonly collectionPolicies: BookingCollectionPolicyService,
+  ) {}
 
   // =========================================================================
   // Catalogue keys
@@ -297,8 +311,189 @@ export class CommercialCatalogueController {
   }
 
   // =========================================================================
+  // V3.3 Story #83 (`#41d-1`) — booking collection policy publication
+  // =========================================================================
+  //
+  // Publication only. There is no assignment route, no owner route, no
+  // `workspaceRef` and no order resolution here: those are #104 (`#41d-2`), and
+  // `story-83-boundary.spec.ts` asserts their absence structurally.
+
+  @Get('collection-policies')
+  async listCollectionPolicies() {
+    const policies = await this.collectionPolicies.listPolicies();
+    return {
+      items: policies.map((policy) => ({
+        policyKey: policy.policyKey,
+        displayName: policy.displayName,
+        createdAt: policy.createdAt.toISOString(),
+      })),
+    };
+  }
+
+  @Post('collection-policies')
+  @AuditAction('commercial.collection_policy_created')
+  async createCollectionPolicy(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: CreateBookingCollectionPolicyDto,
+  ) {
+    const policy = await this.collectionPolicies.createPolicy(
+      user.userId,
+      dto.policyKey,
+      dto.displayName,
+      dto.reason,
+    );
+    return {
+      policyKey: policy.policyKey,
+      displayName: policy.displayName,
+      createdAt: policy.createdAt.toISOString(),
+    };
+  }
+
+  @Get('collection-policies/:policyKey/versions')
+  async listCollectionPolicyVersions(@Param('policyKey') policyKey: string) {
+    const versions = await this.collectionPolicies.listVersions(policyKey);
+    return { items: versions.map((version) => this.collectionPolicyVersionView(version)) };
+  }
+
+  @Get('collection-policies/:policyKey/versions/:version')
+  async getCollectionPolicyVersion(
+    @Param('policyKey') policyKey: string,
+    @Param('version', new ParseIntPipe()) version: number,
+  ) {
+    return this.collectionPolicyVersionView(await this.collectionPolicies.getVersion(policyKey, version));
+  }
+
+  @Post('collection-policies/:policyKey/versions')
+  @AuditAction('commercial.collection_policy_version_drafted')
+  async draftCollectionPolicyVersion(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('policyKey') policyKey: string,
+    @Body() dto: WriteBookingCollectionPolicyVersionDto,
+  ) {
+    const draft = await this.collectionPolicies.createVersionDraft(
+      user.userId,
+      { policyKey, ...this.collectionPolicyInput(dto) },
+      dto.reason,
+    );
+    return this.collectionPolicyVersionView(draft);
+  }
+
+  @Put('collection-policies/:policyKey/versions/:version')
+  @AuditAction('commercial.collection_policy_version_updated')
+  async replaceCollectionPolicyVersion(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('policyKey') policyKey: string,
+    @Param('version', new ParseIntPipe()) version: number,
+    @Body() dto: WriteBookingCollectionPolicyVersionDto,
+  ) {
+    const updated = await this.collectionPolicies.replaceVersionDraft(
+      user.userId,
+      policyKey,
+      version,
+      this.collectionPolicyInput(dto),
+      dto.reason,
+    );
+    return this.collectionPolicyVersionView(updated);
+  }
+
+  @Post('collection-policies/:policyKey/versions/:version/publish')
+  @AuditAction('commercial.collection_policy_version_published')
+  async publishCollectionPolicyVersion(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('policyKey') policyKey: string,
+    @Param('version', new ParseIntPipe()) version: number,
+    @Body() dto: ReasonDto,
+  ) {
+    const published = await this.collectionPolicies.publishVersion(user.userId, policyKey, version, dto.reason);
+    return this.collectionPolicyVersionView(published);
+  }
+
+  @Post('collection-policies/:policyKey/versions/:version/retire')
+  @AuditAction('commercial.collection_policy_version_retired')
+  async retireCollectionPolicyVersion(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('policyKey') policyKey: string,
+    @Param('version', new ParseIntPipe()) version: number,
+    @Body() dto: ReasonDto,
+  ) {
+    const retired = await this.collectionPolicies.retireVersion(user.userId, policyKey, version, dto.reason);
+    return this.collectionPolicyVersionView(retired);
+  }
+
+  @Delete('collection-policies/:policyKey/versions/:version')
+  @AuditAction('commercial.collection_policy_version_discarded')
+  async discardCollectionPolicyVersion(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('policyKey') policyKey: string,
+    @Param('version', new ParseIntPipe()) version: number,
+    @Body() dto: ReasonDto,
+  ) {
+    await this.collectionPolicies.discardVersionDraft(user.userId, policyKey, version, dto.reason);
+    return { policyKey, version, discarded: true };
+  }
+
+  // =========================================================================
   // Views. Explicit field lists, never a spread entity.
   // =========================================================================
+
+  /**
+   * Assembles the flat DTO into the discriminated union the domain speaks.
+   *
+   * Every field not belonging to the declared kind is dropped HERE rather than
+   * carried through as `undefined`, so a leftover `percentageBase` from an
+   * edited draft cannot reach a column. The service re-validates the assembled
+   * union, and the database CHECK refuses it a third time.
+   */
+  private collectionPolicyInput(
+    dto: WriteBookingCollectionPolicyVersionDto,
+  ): WriteCollectionPolicyVersionInput {
+    const deposit = dto.deposit;
+    const rule: WriteCollectionPolicyVersionInput['terms']['deposit'] =
+      deposit.kind === 'fixed'
+        ? { kind: 'fixed', amountToman: deposit.amountToman as number }
+        : deposit.kind === 'percentage'
+          ? {
+              kind: 'percentage',
+              basisPoints: deposit.basisPoints as number,
+              percentageBase: deposit.percentageBase as NonNullable<typeof deposit.percentageBase>,
+              minimumToman: deposit.minimumToman as number,
+              maximumToman: deposit.maximumToman ?? null,
+            }
+          : { kind: 'none' };
+
+    return {
+      terms: { contractVersion: 1, collectionMode: dto.collectionMode, deposit: rule },
+      activationEndsAt: dto.activationEndsAt ? new Date(dto.activationEndsAt) : null,
+    };
+  }
+
+  private collectionPolicyVersionView(row: BookingCollectionPolicyVersionEntity) {
+    return {
+      policyKey: row.policyKey,
+      version: row.version,
+      lifecycleState: row.lifecycleState,
+      collectionMode: row.collectionMode,
+      deposit:
+        row.depositKind === 'fixed'
+          ? { kind: row.depositKind, amountToman: row.depositAmountToman }
+          : row.depositKind === 'percentage'
+            ? {
+                kind: row.depositKind,
+                basisPoints: row.depositBasisPoints,
+                percentageBase: row.percentageBase,
+                minimumToman: row.depositMinimumToman,
+                maximumToman: row.depositMaximumToman,
+              }
+            : { kind: row.depositKind },
+      contractVersion: row.contractVersion,
+      activationStartsAt: row.activationStartsAt ? row.activationStartsAt.toISOString() : null,
+      activationEndsAt: row.activationEndsAt ? row.activationEndsAt.toISOString() : null,
+      publishedAt: row.publishedAt ? row.publishedAt.toISOString() : null,
+      retiredAt: row.retiredAt ? row.retiredAt.toISOString() : null,
+      // `createdByUserId`, `publishedByUserId` and `retiredByUserId` are
+      // deliberately absent. See the class docblock.
+    };
+  }
 
   private planVersionView(row: CommercialPlanVersionEntity) {
     return {

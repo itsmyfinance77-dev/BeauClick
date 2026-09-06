@@ -445,6 +445,11 @@ export const RESETTABLE_TABLES = [
   'commercial.price_schedule_versions',
   'commercial.plans',
   'commercial.price_schedules',
+  // V3.3 Story #83 (`#41d-1`). Versions before their key, so the FK does not
+  // decide the order for us. The migration seeds NEITHER table, so a reset
+  // returns them to exactly the state a clean migration leaves.
+  'commercial.booking_collection_policy_versions',
+  'commercial.booking_collection_policies',
   // V3.2-C Story #27. Attribution and its claim throttle. Still no outbox --
   // `ReferralAttributed` is deliberately not defined because it has no consumer
   // (ADR-036 §10).

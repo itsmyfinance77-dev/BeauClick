@@ -1066,13 +1066,18 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
   // =========================================================================
 
   describe('§8 privacy coverage', () => {
-    it('claims all five tables as `retained`, with a reason on each', () => {
+    it('claims all seven tables as `retained`, with a reason on each', () => {
       const contracts = app.get<SubjectDataContract[]>(SUBJECT_DATA_CONTRACTS);
       const commercial = contracts.find((c) => c.moduleKey === 'commercial');
       expect(commercial).toBeDefined();
 
       const claims = commercial!.tables;
+      // Five when Issue #40 wrote this; seven since V3.3 Story #83 (`#41d-1`)
+      // added the collection-policy key and its versions. Listed exactly rather
+      // than counted, so a table added without a claim fails here by name.
       expect(claims.map((c) => c.table).sort()).toEqual([
+        'commercial.booking_collection_policies',
+        'commercial.booking_collection_policy_versions',
         'commercial.plan_versions',
         'commercial.plans',
         'commercial.price_schedule_versions',
@@ -1103,11 +1108,13 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
       // Seven since V3.3-A Story #56 (`#56a`) added `seller_subscriptions` and
       // `booking_credit_grants`; nine since V3.3 Story #58 (`#58a`) added
       // `booking_credit_consumptions` and `booking_credit_returns`; ten since
-      // Story #57 (`#40c-1`) added `credit_purchases`. The count is asserted
-      // exactly, rather than loosened to a minimum, because an exact number is
-      // what makes a table added without a subject-data claim fail HERE with a
+      // Story #57 (`#40c-1`) added `credit_purchases`; twelve since Story #83
+      // (`#41d-1`) added `booking_collection_policies` and
+      // `booking_collection_policy_versions`. The count is asserted exactly,
+      // rather than loosened to a minimum, because an exact number is what
+      // makes a table added without a subject-data claim fail HERE with a
       // readable message instead of at application boot.
-      expect(rows).toHaveLength(10);
+      expect(rows).toHaveLength(12);
 
       const contracts = app.get<SubjectDataContract[]>(SUBJECT_DATA_CONTRACTS);
       const report = evaluateCoverage(rows, contracts);
@@ -1159,7 +1166,7 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
       expect(report.violations.map((v) => v.kind)).toContain('wrongly_declared_empty');
     });
 
-    it('reports erasure truthfully: nothing anonymized, nothing deleted, five tables retained', async () => {
+    it('reports erasure truthfully: nothing anonymized, nothing deleted, seven tables retained', async () => {
       const contracts = app.get<SubjectDataContract[]>(SUBJECT_DATA_CONTRACTS);
       const commercial = contracts.find((c) => c.moduleKey === 'commercial')!;
       const outcome = await commercial.eraseSubjectData(dataSource.manager, admin.id, {
@@ -1169,7 +1176,9 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
         erasedAt: new Date(),
       });
       expect(outcome).toMatchObject({ moduleKey: 'commercial', anonymized: 0, deleted: 0 });
-      expect(outcome.retained).toHaveLength(5);
+      // Seven since Story #83 (`#41d-1`) added the two collection-policy
+      // tables to this contract's five.
+      expect(outcome.retained).toHaveLength(7);
       expect(await commercial.exportSubjectData(dataSource.manager, admin.id)).toEqual([]);
     });
 
@@ -1212,6 +1221,8 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
         'commercial/20260903800001_create_seller_subscriptions.sql',
         'commercial/20260906800001_create_booking_credit_accounting.sql',
         'commercial/20260906900001_create_credit_purchases.sql',
+        // V3.3 Story #83 (`#41d-1`). The collection-policy publication plane.
+        'commercial/20260906950001_create_booking_collection_policies.sql',
         'identity/20260902800002_add_commercial_plan_capability.sql',
       ]);
     });
@@ -1235,6 +1246,9 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
           WHERE n.nspname = 'commercial' AND c.contype = 'x' ORDER BY conname`,
       );
       expect(constraints.map((c) => c.conname)).toEqual([
+        // V3.3 Story #83 (`#41d-1`). Indexes the EFFECTIVE window, not the
+        // configured one -- see the ADR-048 amendment.
+        'ex_bcpv_no_effective_overlap',
         'ex_plan_versions_no_overlap',
         'ex_plan_versions_single_auto_assignable',
         'ex_price_schedule_versions_no_overlap',
@@ -1255,7 +1269,11 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
       // set is the only shape that catches a removal.
       expect(triggers.map((t) => t.tgname)).toEqual([
         'tg_bcc_immutable',
+        // V3.3 Story #83 (`#41d-1`): the collection-policy lifecycle and the
+        // key's permanence.
+        'tg_bcpv_lifecycle',
         'tg_bcr_immutable',
+        'tg_booking_collection_policies_immutable',
         'tg_booking_credit_grants_immutable',
         // V3.3 Story #57 (`#40c-1`).
         'tg_credit_purchases_immutable',
