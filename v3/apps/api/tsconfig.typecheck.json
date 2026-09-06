@@ -1,0 +1,52 @@
+{
+  // The API's typecheck program: production source AND the whole test tree.
+  //
+  // ## Why this file exists at all
+  //
+  // `tsconfig.json` is the BUILD config. Its `include` is `src/**/*.ts` and it
+  // must stay that way: it emits to `dist/`, and a test file compiled into the
+  // production image is a test file shipped to production.
+  //
+  // `api:typecheck` used to run that same build config with `--noEmit`, which
+  // meant the 57 files under `apps/api/test` -- 52 of them `*.pg-spec.ts` --
+  // were never statically checked by anything. ts-jest compiled each one for
+  // the first time at RUN TIME, inside the real-PostgreSQL suite. A stale
+  // import therefore surfaced roughly 36 minutes into a database run while
+  // `pnpm typecheck` reported success in seconds; V3.3 Story #58 (`#58a`) hit
+  // exactly that, on a hook rename (bug #97).
+  //
+  // Every other project in the workspace keeps its specs beside the code in
+  // `src/`, so `src/**/*.ts` already covers them. `apps/api` is the only one
+  // whose tests live outside `src`, and it was the only one they were invisible
+  // to. `apps/web` has no such gap either -- its config already spans its own
+  // `test/` directory.
+  //
+  // ## Why a second config rather than widening the first
+  //
+  // Widening `tsconfig.json` to `test/**/*.ts` would make `api:build` emit the
+  // test tree into `dist/`. Adding an `exclude` to compensate would then leave
+  // the build's include and exclude disagreeing about the same glob, which is
+  // the shape that quietly drifts. Two files, each with one job, cannot.
+  //
+  // ## Why the name is not `tsconfig.test.json`
+  //
+  // `apps/web/tsconfig.test.json` already exists and is the OPPOSITE kind of
+  // thing: an emitting config (`noEmit: false`) used to compile tests. Reusing
+  // that filename here for a non-emitting whole-program check would make the
+  // two mean different things in the same repository.
+  //
+  // ## What it does NOT do
+  //
+  // It declares no `paths`, no `types` and no compiler flag of its own beyond
+  // `noEmit`. Everything else is inherited from `tsconfig.json` and through it
+  // from `tsconfig.base.json` -- including `strict`, `types: ["jest", "node"]`
+  // and the single path map. A second path table here would be one more thing
+  // to drift, which is the very bug `runtime-path-map.spec.ts` exists to catch.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // Checking only. `outDir` and `rootDir` are inherited and inert under
+    // `noEmit`; the build config remains the only thing that writes `dist/`.
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts"]
+}
