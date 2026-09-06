@@ -39,3 +39,9 @@ export * from './seller-surface/credit-purchase.exceptions';
 export * from './seller-surface/credit-purchase.dto';
 export * from './seller-surface/credit-purchase.service';
 export * from './subscription/booking-credit-accounting.service';
+// V3.3 Story #83 (`#41d-1`). The administrator-published booking collection
+// policy catalogue (ADR-048). A fifth, additive surface: publication only, and
+// it changes no order, checkout, payment or booking behaviour.
+export * from './catalogue/booking-collection-policy.entities';
+export * from './catalogue/booking-collection-policy.dto';
+export * from './catalogue/booking-collection-policy.service';

@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { COMMERCIAL_ENTITIES } from './commercial-catalogue.entities';
+import { BOOKING_COLLECTION_POLICY_ENTITIES } from './booking-collection-policy.entities';
+import { BookingCollectionPolicyService } from './booking-collection-policy.service';
 import { PriceResolutionModule } from './price-resolution.service';
 import { CommercialCatalogueController } from './commercial-catalogue.controller';
 import { CommercialCatalogueService } from './commercial-catalogue.service';
@@ -44,9 +46,12 @@ import { CommercialSubjectDataContract } from './commercial-subject-data.contrac
  * all record.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature(COMMERCIAL_ENTITIES), PriceResolutionModule],
+  imports: [
+    TypeOrmModule.forFeature([...COMMERCIAL_ENTITIES, ...BOOKING_COLLECTION_POLICY_ENTITIES]),
+    PriceResolutionModule,
+  ],
   controllers: [CommercialCatalogueController],
-  providers: [CommercialCatalogueService, CommercialSubjectDataContract],
-  exports: [CommercialCatalogueService, CommercialSubjectDataContract],
+  providers: [CommercialCatalogueService, BookingCollectionPolicyService, CommercialSubjectDataContract],
+  exports: [CommercialCatalogueService, BookingCollectionPolicyService, CommercialSubjectDataContract],
 })
 export class CommercialCatalogueModule {}

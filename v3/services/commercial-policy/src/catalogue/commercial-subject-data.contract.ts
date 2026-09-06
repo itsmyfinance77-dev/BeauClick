@@ -8,9 +8,10 @@ import {
 } from '@beauclick/subject-data';
 
 /**
- * `commercial`'s subject-data contract — ADR-027, ADR-041 §10, Issue #40.
+ * `commercial`'s subject-data contract — ADR-027, ADR-041 §10, Issue #40, and
+ * ADR-048 §6 for the two collection-policy tables Story #83 (`#41d-1`) adds.
  *
- * ## All five tables are `retained`, and NONE is `no_subject_data`
+ * ## All seven tables are `retained`, and NONE is `no_subject_data`
  *
  * Every table here carries administrator identity: `created_by_user_id`
  * throughout, and on versions also `published_by_user_id` and
@@ -96,6 +97,32 @@ export class CommercialSubjectDataContract implements SubjectDataContract {
       disposition: 'retained',
       reason:
         'Carries created_by_user_id, published_by_user_id and retired_by_user_id. The permanent record of who published a price; erasure must not be able to detach a price from the administrator who set it.',
+    },
+    /*
+     * V3.3 Story #83 (`#41d-1`), ADR-048 6. Both collection-policy tables are
+     * claimed on exactly the footing the five above are claimed on, and for the
+     * same reason rather than by analogy: each carries `created_by_user_id`,
+     * and the version table also carries `published_by_user_id` and
+     * `retired_by_user_id`.
+     *
+     * The reason is stronger here than for a price. A collection policy decides
+     * how much of a booking's price BeauClick takes online at all, so the
+     * record of which administrator published one is the record of who changed
+     * where customers' money goes. An erasure able to blank that attribution
+     * would let an operator publish a deposit rule, request deletion, and leave
+     * a permanently immutable policy with nobody attached to it.
+     */
+    {
+      table: 'commercial.booking_collection_policies',
+      disposition: 'retained',
+      reason:
+        'Carries created_by_user_id. The immutable record of which administrator opened a collection-policy key; erasing the attribution would detach a published money-routing rule from the person who created it.',
+    },
+    {
+      table: 'commercial.booking_collection_policy_versions',
+      disposition: 'retained',
+      reason:
+        'Carries created_by_user_id, published_by_user_id and retired_by_user_id. A published version decides how much of a booking price is collected online and can never be edited; an attribution that could be erased would make it changeable in the one way that matters.',
     },
     {
       table: 'commercial.price_tiers',

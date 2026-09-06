@@ -169,6 +169,103 @@ export function findSeededNumbers(file: string, sql: string): AllowanceFinding[]
   return findings;
 }
 
+/**
+ * RULE C -- the collection-policy family, added by V3.3 Story #83 (`#41d-1`).
+ *
+ * A SEPARATE vocabulary rather than a widening of `ALLOWANCE_IDENTIFIER`, and
+ * that is deliberate. Adding `basispoints` to the existing pattern would have
+ * fired on `providerCancellationRefundBasisPointsOfDeposit: 10_000` in
+ * `BookingCommercialTermsV1` -- a TYPE annotation pinning a ratified structural
+ * invariant (provider fault always refunds in full), not an unpublished value.
+ * Destabilising a passing rule to reach a new one is how an exemption list
+ * grows until it means nothing.
+ *
+ * `V33-DEC-028` R2 and `V33-DEC-029` R4: no deposit amount, rate, bound, mode
+ * or percentage base may exist as a constant, default, fallback or seed.
+ */
+const COLLECTION_VALUE_IDENTIFIER =
+  /(depositamount|deposit_amount|depositbasispoints|deposit_basis_points|depositminimum|deposit_minimum|depositmaximum|deposit_maximum|percentagebase|percentage_base|collectionmode|collection_mode|depositkind|deposit_kind)/i;
+
+/** Columns whose value would be a deposit rule or a collection mode. */
+const COLLECTION_VALUE_COLUMNS = [
+  'collection_mode',
+  'deposit_kind',
+  'deposit_amount_toman',
+  'deposit_basis_points',
+  'deposit_minimum_toman',
+  'deposit_maximum_toman',
+  'percentage_base',
+];
+
+/**
+ * C1 -- no non-zero number is assigned to a collection-value identifier.
+ *
+ * Zero is exempt for the same reason it is in Rule A: it is the absence of a
+ * value, not a choice of one. In practice nothing here should even reach zero.
+ */
+export function findCollectionValueLiterals(file: string, source: string): AllowanceFinding[] {
+  const findings: AllowanceFinding[] = [];
+  const cleaned = stripTypeScriptNoise(source);
+  const assignment = /([A-Za-z_$][A-Za-z0-9_$]*)\s*(?:\??\s*:\s*[A-Za-z0-9_$<>[\]| ]*)?\s*[:=]\s*(\d[\d_]*)(?![\d_.eE])/g;
+
+  for (const match of cleaned.matchAll(assignment)) {
+    const [, identifier, literal] = match;
+    if (!COLLECTION_VALUE_IDENTIFIER.test(identifier)) continue;
+    if (isZeroLiteral(literal)) continue;
+    findings.push({
+      file,
+      rule: 'collection-value-literal',
+      detail: `${identifier} is initialised to ${literal}`,
+    });
+  }
+
+  return findings;
+}
+
+/**
+ * C2 -- no STRING literal is assigned to a mode, kind or base identifier.
+ *
+ * The dangerous default in this family is not a number. `collectionMode:
+ * 'full_payment_online'` or `percentageBase: 'service_total'` in the
+ * commercial-policy implementation would be engineering choosing the value
+ * `V33-DEC-029` R4 explicitly leaves to an administrator.
+ *
+ * `stripTypeScriptNoise` has already replaced every string literal with an
+ * empty one, so this looks for `identifier: ''` -- assignment of ANY string
+ * literal, whatever it held. A comparison (`=== ''`) is not an assignment and
+ * is not matched, which is what lets the contract's own `mode === 'x'` branches
+ * pass.
+ */
+export function findCollectionValueStrings(file: string, source: string): AllowanceFinding[] {
+  const findings: AllowanceFinding[] = [];
+  const cleaned = stripTypeScriptNoise(source);
+  const assignment = /(?<![=!<>])([A-Za-z_$][A-Za-z0-9_$]*)\s*[:=](?!=)\s*(''|"")/g;
+
+  for (const match of cleaned.matchAll(assignment)) {
+    const identifier = match[1];
+    if (!COLLECTION_VALUE_IDENTIFIER.test(identifier)) continue;
+    findings.push({
+      file,
+      rule: 'collection-value-string',
+      detail: `${identifier} is assigned a string literal`,
+    });
+  }
+
+  return findings;
+}
+
+/** C3 -- no collection-value column carries a DEFAULT. */
+export function findCollectionColumnDefaults(file: string, sql: string): AllowanceFinding[] {
+  const findings: AllowanceFinding[] = [];
+  for (const line of stripSqlNoise(sql).split(/\r?\n/)) {
+    const lowered = line.toLowerCase();
+    if (!COLLECTION_VALUE_COLUMNS.some((column) => lowered.includes(column))) continue;
+    if (!/\bdefault\b/.test(lowered)) continue;
+    findings.push({ file, rule: 'collection-column-default', detail: line.trim() });
+  }
+  return findings;
+}
+
 function readTypeScriptSources(...directories: string[]): Array<{ file: string; source: string }> {
   const collected: Array<{ file: string; source: string }> = [];
 
@@ -233,6 +330,40 @@ describe('no hard-coded allowance exists in the commercial-policy implementation
 
   it('exempts exactly two bound constants, so widening the exemption is a visible edit', () => {
     expect(EXEMPT_BOUND_CONSTANTS).toEqual(['MAX_CATALOGUE_QUANTITY', 'MAX_UNIT_PRICE_TOMAN']);
+  });
+
+  // -------------------------------------------------------------------------
+  // V3.3 Story #83 (`#41d-1`) -- the collection-policy family
+  // -------------------------------------------------------------------------
+
+  it('assigns no non-zero number to any deposit amount, rate or bound', () => {
+    const findings = sources.flatMap(({ file, source }) => findCollectionValueLiterals(file, source));
+    expect(findings).toEqual([]);
+  });
+
+  it('assigns no string literal to a collection mode, deposit kind or percentage base', () => {
+    const findings = sources.flatMap(({ file, source }) => findCollectionValueStrings(file, source));
+    expect(findings).toEqual([]);
+  });
+
+  it('puts no DEFAULT on a collection mode, deposit or percentage-base column', () => {
+    const findings = migrations.flatMap(({ file, source }) => findCollectionColumnDefaults(file, source));
+    expect(findings).toEqual([]);
+  });
+
+  it('scans the collection-policy files that Story #83 actually added', () => {
+    // The discovery half again: these rules would pass vacuously if the new
+    // files were outside the walked directories.
+    const scanned = sources.map((s) => s.file);
+    expect(scanned).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('booking-collection-policy.service.ts'),
+        expect.stringContaining('booking-collection-policy-contract.ts'),
+      ]),
+    );
+    expect(migrations.map((m) => m.file)).toEqual(
+      expect.arrayContaining([expect.stringContaining('booking_collection_policies')]),
+    );
   });
 });
 
@@ -331,5 +462,74 @@ describe('the allowance detector does not cry wolf — controls', () => {
   it('does not flag an INSERT into another schema', () => {
     const control = "INSERT INTO identity.capabilities (slug, weight) VALUES ('bc_x', 200);";
     expect(findSeededNumbers('control.sql', control)).toEqual([]);
+  });
+});
+
+/**
+ * V3.3 Story #83 (`#41d-1`) -- the collection-policy rules, planted and
+ * controlled exactly as Rules A and B are above.
+ */
+describe('the collection-value detector is not vacuous -- planted positives', () => {
+  it.each([
+    ['a fixed deposit amount', 'const depositAmountToman = 100000;'],
+    ['a deposit rate', 'const config = { depositBasisPoints: 2000 };'],
+    ['a deposit minimum', 'depositMinimumToman = 50000;'],
+    ['a deposit maximum', 'class C { depositMaximumToman: number = 5000000; }'],
+    ['a snake-cased column value', 'const row = { deposit_basis_points: 2500 };'],
+    ['a deposit rate hidden behind a typed declaration', 'const depositBasisPoints: number = 1500;'],
+  ])('C1 catches %s', (_label, planted) => {
+    expect(findCollectionValueLiterals('planted.ts', planted)).not.toEqual([]);
+  });
+
+  it.each([
+    ['a default collection mode', "const collectionMode = 'full_payment_online';"],
+    ['a default percentage base', "const x = { percentageBase: 'service_total' };"],
+    ['a default deposit kind', "depositKind = 'percentage';"],
+    ['a snake-cased default', "const row = { collection_mode: 'pay_at_venue' };"],
+  ])('C2 catches %s', (_label, planted) => {
+    expect(findCollectionValueStrings('planted.ts', planted)).not.toEqual([]);
+  });
+
+  it('C3 catches a DEFAULT on a collection-value column', () => {
+    const planted = "    collection_mode VARCHAR(40) NOT NULL DEFAULT 'full_payment_online',";
+    expect(findCollectionColumnDefaults('planted.sql', planted)).not.toEqual([]);
+    const planted2 = '    deposit_basis_points INTEGER DEFAULT 2000,';
+    expect(findCollectionColumnDefaults('planted.sql', planted2)).not.toEqual([]);
+  });
+});
+
+describe('the collection-value detector does not cry wolf -- controls', () => {
+  it('does not flag a COMPARISON against a mode, which is how the contract branches', () => {
+    const control = "if (terms.collectionMode === 'full_payment_online') { return 1; }";
+    expect(findCollectionValueStrings('control.ts', control)).toEqual([]);
+    const control2 = "const isDeposit = deposit.kind !== 'none';";
+    expect(findCollectionValueStrings('control.ts', control2)).toEqual([]);
+  });
+
+  it('does not flag a value READ from an administrator-supplied input', () => {
+    const control = 'const row = { collectionMode: dto.collectionMode, depositBasisPoints: deposit.basisPoints };';
+    expect(findCollectionValueLiterals('control.ts', control)).toEqual([]);
+    expect(findCollectionValueStrings('control.ts', control)).toEqual([]);
+  });
+
+  it('does not flag a null assignment, which is the absence of a rule', () => {
+    const control = 'const row = { depositAmountToman: null, percentageBase: null };';
+    expect(findCollectionValueLiterals('control.ts', control)).toEqual([]);
+    expect(findCollectionValueStrings('control.ts', control)).toEqual([]);
+  });
+
+  it('does not flag a validation BOUND expressed as a decorator argument', () => {
+    const control = '@Max(10000)\n  basisPoints?: number;';
+    expect(findCollectionValueLiterals('control.ts', control)).toEqual([]);
+  });
+
+  it('does not flag the lifecycle DEFAULT, which cannot choose a commercial outcome', () => {
+    const control = "    lifecycle_state VARCHAR(16) NOT NULL DEFAULT 'draft',";
+    expect(findCollectionColumnDefaults('control.sql', control)).toEqual([]);
+  });
+
+  it('does not flag a mode named only inside a comment', () => {
+    const control = '// full_payment_online is what the legacy path writes; see #104.';
+    expect(findCollectionValueStrings('control.ts', control)).toEqual([]);
   });
 });
