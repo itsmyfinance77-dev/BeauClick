@@ -24,6 +24,19 @@ Two gaps this ADR left for `#40c` are recorded there rather than closed here:
 own `DataSource` rather than a caller's `EntityManager`, so a snapshot taken
 atomically with a purchase needs a manager-accepting variant.
 
+**Amended 2026-09-06 (`V33-DEC-027`) — a selection this ADR left open.** §-level
+design here allows any number of `booking_credit` price schedules: `price_schedules`
+is keyed by `schedule_key`, `purpose` carries no uniqueness, and
+`ex_price_schedule_versions_no_overlap` is scoped to a single key, so two different
+keys may each hold a published version active at the same instant. That is correct
+for a catalogue and insufficient for a purchase: `resolvePrice` needs a key and
+nothing named one, because `plan_versions.price_schedule_version_id` is what the PLAN
+costs, not what its credits cost. `V33-DEC-027` adds a **nullable, stable**
+`bookingCreditScheduleKey` to the plan version, whose target purpose the database
+must enforce, and requires the ACTIVE VERSION of that key to be resolved per
+request. No constraint in this ADR is relaxed and the seeded `D-7` keeps a null
+binding.
+
 ## Context
 
 ADR-039 established that commercial terms are versioned control-plane data

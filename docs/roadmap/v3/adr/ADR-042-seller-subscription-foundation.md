@@ -28,6 +28,17 @@ untouched. The replacement belongs to `#40c-2` and must land before any custom
 grant exists (#99). §9 and §13 are annotated in place; nothing else in this ADR
 changes.
 
+**Amended 2026-09-06 (`V33-DEC-027`) — one more snapshotted field.** A subscription
+will additionally snapshot the plan version's **nullable booking-credit schedule
+key** when it activates, so that later plan edits, plan supersession or an
+affiliation change cannot redirect which price schedule a seller's credit purchases
+resolve against. This is §5's rule — a subscription reads its own snapshot, never
+live catalogue state — extended to one field, not a new mechanism. The key is
+snapshotted; the schedule VERSION deliberately is not, so an administrator can
+reprice credits forward without migrating any subscription. Existing subscriptions
+keep a null value and are **not** backfilled. The field belongs to #57; nothing in
+this ADR is reversed.
+
 ## Context
 
 ADR-041 built a catalogue of what *may* be sold and left one sentence for this
