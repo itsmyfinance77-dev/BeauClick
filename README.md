@@ -99,7 +99,8 @@ overage), and Story #40 was decomposed from one 13-point item into four:
 | #40 (`#40a`) | 8 | Admin-versioned plan and price catalogue — immutable versions, non-overlapping activation windows, tier schedules, the `D-7` zero-price base workspace, the `bc_manage_commercial_plans` capability, audit with a mandatory reason |
 | #56 (`#56a`) | 8 | Subscription foundation: snapshotted subscriber party, `D-7` backfill and lazy ensure, plan-included grants. No seller-facing route |
 | #69 (`#56b`) | 8 | Seller subscription surface: a workspace collection reached by an opaque `workspaceRef`, explicit initialization, history, zero-price selection and cancellation |
-| #57 (`#40c`) | 5 | Custom booking-credit purchase and immutable price snapshots |
+| #57 (`#40c`) -> `#40c-1` | 5 -> **8** | Custom booking-credit purchase **record** and immutable price snapshot. Writes no grant |
+| #99 (`#40c-2`) | **5** | Paid activation of a custom purchase. Blocked on #47 |
 | #58 (`#40d`) → `#58a` | 8 -> **13** | Atomic consumption at first `confirmed` and idempotent return, enforced **selectively** — active only for a seller who holds a positive grant |
 | `#58b` | **3** | Global fail-closed enforcement activation. Blocked on #46 |
 
@@ -195,6 +196,20 @@ The same ratification corrected three stale claims: #57 is not a prerequisite, t
 entitlement seam must cover **both** confirmation paths rather than only the
 zero-collectible one, and the `business` and `administrator` cancellation returns the
 issue described do not exist in the booking actor vocabulary.
+
+Custom credit purchase (#57) was split the same day as `V33-DEC-026`, and the reason is
+a fact rather than a policy: **no payment gateway adapter exists in the repository at
+all**. The only provider is the sandbox, disabled under `NODE_ENV=production`, so the
+story's central verb — buy — has nothing to execute against. Its other half needs
+nothing: the tiered pricing engine and its exact integer arithmetic already exist, and
+an administrator can publish a booking-credit schedule through the admin plane, so a
+purchase record and its immutable price snapshot can be built and proved while
+engineering chooses no commercial number. `#40c-1` (#57, 8 points) records the purchase
+and **writes no grant of any kind**; #99 (`#40c-2`, 5 points) binds a real adapter and grants
+credit at exactly one transition — the same transaction that records the verified
+payment. The audit also found a constraint that would have allowed each seller exactly
+one custom purchase for ever, and the ratification replaces it with a partial index that
+keeps #56's invariant intact.
 
 Prices, included allowances, bounds, cutoffs, legal copy and accounting treatment stay
 open under issue #46, and real money movement stays blocked by #47. No allowance may

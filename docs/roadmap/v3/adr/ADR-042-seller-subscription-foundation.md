@@ -6,7 +6,7 @@
 **Depends on:** ADR-041 (the catalogue this story snapshots), ADR-027 (subject-data
 contract), ADR-023 (business is its own party), ADR-018 (same-cluster
 consistency), ADR-017 (financial isolation), ADR-011 (module boundaries)
-**Constrains:** #69 (`#56b`), #57 (`#40c`), #58 (`#40d`)
+**Constrains:** #69 (`#56b`), #57 (`#40c-1`), #99 (`#40c-2`), #58 (`#40d`)
 
 **Amended 2026-09-03:** the owner ratified **`V33-DEC-019`** on the same day,
 correcting Story #69's route contract. Two clauses below are affected and are
@@ -14,6 +14,19 @@ annotated in place: §4's lazy ensure keeps its mechanism but moves its trigger
 out of a read into an explicit initialization command, and §7's
 `selectPlanVersion` is recorded as carrying a concurrency defect #69 must
 repair. No decision in this ADR is reversed and no schema changes.
+
+**Amended 2026-09-06 (`V33-DEC-026`) — a constraint this section did not
+anticipate.** §9's `uq_booking_credit_grants_once UNIQUE (subscription_id,
+source, period_index)` is correct for the only source that existed when it was
+written, and wrong the moment a second one does: with `period_index` defaulting
+to zero it permits each seller **exactly one** `custom_purchase` grant for ever.
+`V33-DEC-026` Ruling 5 supersedes it with a **partial** unique index restricted
+to `source = 'plan_included'`, which preserves this section's invariant exactly
+— one plan-included grant per subscription and period — and leaves the rest of
+the table, including `#58a`'s `uq_bcg_identity` and its consumption foreign key,
+untouched. The replacement belongs to `#40c-2` and must land before any custom
+grant exists (#99). §9 and §13 are annotated in place; nothing else in this ADR
+changes.
 
 ## Context
 
@@ -280,6 +293,15 @@ CONSTRAINT uq_booking_credit_grants_once
     UNIQUE (subscription_id, source, period_index)
 ```
 
+**Amended 2026-09-06 (`V33-DEC-026`).** This constraint says "one grant per
+subscription, source and period", which reads as source-scoped and is not: with
+one source and a period index pinned at zero, it is indistinguishable from "one
+grant per subscription". A `custom_purchase` grant would therefore collide with
+itself on a seller's second purchase. It is replaced by a partial unique index
+on `source = 'plan_included'` in `#40c-2`. The invariant this section actually
+wanted — a replayed or concurrent activation writes nothing — survives
+unchanged.
+
 **No recurrence.** `billing_term_days IS NULL` on every publishable version
 today — the seeded `D-7` has no recurring term, and NULL is deliberately
 different from a zero somebody could read as "renews immediately". Recurrence is
@@ -393,7 +415,8 @@ accumulates rows nobody drains.
 | Subscription and grant tables, with their constraints and triggers | Any HTTP route, controller or DTO (#69) |
 | `OwnedSubscriberPartyResolver` and the lifecycle service | `bc_manage_own_subscription`, or any seller capability grant (#69) |
 | `D-7` backfill and idempotent lazy ensure | Plan selection by a seller (#69) |
-| One-time grants from the snapshot | Custom-quantity purchase, top-ups, quotes (#57) |
+| One-time grants from the snapshot | Custom-quantity purchase, top-ups, quotes (`#40c-1`) |
+| — | A `custom_purchase` grant, or the partial-index replacement it needs (#99 `#40c-2`) |
 | The grant rows a balance will later be derived from | A balance table, consumption or return (#58) |
 | — | Any payment fact, order, intent, ledger entry or provider call |
 | — | Recurring billing, renewal, a scheduler, or expiry activation |

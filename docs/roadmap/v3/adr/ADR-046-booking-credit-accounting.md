@@ -7,7 +7,7 @@
 confirmation), ADR-045 (deposit capture and collected accounting), ADR-027
 (subject-data contract), ADR-018 (same-cluster consistency), ADR-011 (module
 boundaries)
-**Constrains:** #95 (`#58b`), #57 (`#40c`)
+**Constrains:** #95 (`#58b`), #57 (`#40c-1`), #99 (`#40c-2`)
 
 ## Context
 
@@ -239,7 +239,10 @@ at zero balance; only a genuinely new first confirmation can be refused.
 
 - Global fail-closed enforcement — **#95 (`#58b`)**, blocked on #46.
 - Any positive quantity, grace, expiry, overage, cutoff, retention rule, no-show penalty or notification threshold — **#46**.
-- `custom_purchase` grants; `ck_booking_credit_grants_source` is **not** widened — **#57**.
+- `custom_purchase` grants; `ck_booking_credit_grants_source` is **not** widened — **#99 (`#40c-2`)**.
+  *(Amended 2026-09-06, `V33-DEC-026`: attributed to #57 when written; the split moved
+  the widening, and the partial-index replacement of `uq_booking_credit_grants_once`, to
+  the paid child. `uq_bcg_identity` and `fk_bcc_grant_identity` are untouched by it.)*
 - Customer-cancellation return or retention — **#46**.
 - Any commercial event, `ServiceName`, HTTP route, balance response or client selector.
 - Any change to booking, order, payment or ledger semantics.
@@ -249,4 +252,7 @@ at zero balance; only a genuinely new first confirmation can be refused.
 - The production-positive grant or allowance source, and the rollout treatment for existing sellers — #46, then #95.
 - Customer-cancellation return, no-show retention and cutoffs — `V33-DEC-013`, #46.
 - Credit expiry, if it is ever approved — would version the allocation rule in §4.
-- Paid purchase of credits — #57, itself gated by #47.
+- Paid purchase of credits — **#99 (`#40c-2`)**, itself gated by #47. *(Amended 2026-09-06,
+  `V33-DEC-026`.)* The purchase RECORD and its immutable price snapshot are `#40c-1`
+  (#57) and are not gated: that child writes no grant, so nothing it produces enters
+  the balance this ADR defines.

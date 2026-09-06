@@ -6,13 +6,23 @@
 **Depends on:** ADR-039 (commercial policy is a versioned control plane), ADR-027
 (subject-data contract), ADR-018 (same-cluster consistency), ADR-017 (financial
 isolation), ADR-011 (module boundaries)
-**Constrains:** #56 (`#56a`), #69 (`#56b`), #57 (`#40c`), #58 (`#40d`)
+**Constrains:** #56 (`#56a`), #69 (`#56b`), #57 (`#40c-1`), #99 (`#40c-2`), #58 (`#40d`)
 
 **Amended 2026-09-03:** §6 said `#40b` "must not ship before #46 closes the
 base-workspace definition". The owner ratified **`V33-DEC-018`** on that date,
 splitting `#40b` into #56 (`#56a`) and #69 (`#56b`) and approving both with #46
 still open. §6 below records the supersession and what survives it. Nothing else
 in this ADR changes, and no catalogue behaviour is affected.
+
+**Amended 2026-09-06 (`V33-DEC-026`):** `#40c` was split into `#40c-1` (#57, the
+purchase record and its immutable price snapshot) and `#40c-2` (paid activation,
+blocked on #47). This ADR's catalogue is unchanged and remains the single source
+of every price a purchase resolves against; what changed is which child resolves
+it and which one may act on the result. §13's boundary row is annotated below.
+Two gaps this ADR left for `#40c` are recorded there rather than closed here:
+`PriceQuoteV1` carries no schedule-version identity, and `resolvePrice` reads its
+own `DataSource` rather than a caller's `EntityManager`, so a snapshot taken
+atomically with a purchase needs a manager-accepting variant.
 
 ## Context
 
@@ -387,7 +397,8 @@ intention.
 |---|---|
 | Plan versions and price schedule versions | Any seller subscription row (#40b) |
 | The `auto_assignable` flag and the seeded `D-7` version | Assignment of `D-7`, or any seller, to anything (#40b) |
-| Tier resolution and exact totals as a domain service | Any purchase, checkout, quote or top-up route (#40c) |
+| Tier resolution and exact totals as a domain service | Any purchase, checkout, quote or top-up route (`#40c-1`) |
+| — | Any grant, payment fact or paid activation (#99 `#40c-2`, blocked on #47) |
 | The catalogue rows a snapshot will later copy | The snapshot itself, and any grant or balance (#40c) |
 | — | Consumption, return, overage or grace (#40d) |
 | — | Recurring billing, gateway, provider or real collection (#46, #47) |
