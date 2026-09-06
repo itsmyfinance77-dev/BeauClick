@@ -252,7 +252,14 @@ unclaimed, so the classification cannot be forgotten.
 - Deposit execution, the refund ceiling correction and the ledger amount
   correction — **#82 (`#41c`)**.
 - Policy publication, selection, activation windows and the admin surface —
-  **#83 (`#41d`)**, blocked by `V33-DEC-011`/`V33-DEC-012`.
+  **#83 (`#41d`)**, blocked by `V33-DEC-011`/`V33-DEC-012`. *(Amended 2026-09-06,
+  `V33-DEC-028` and `V33-DEC-029`: both decisions' structural halves are closed and
+  #83 is Ready, so it is no longer blocked. `V33-DEC-029` then split the work —
+  **publication** is `#41d-1` (#83, 13 SP) and changes no order behaviour; **selection
+  and the order snapshot** are `#41d-2` (8 SP), which also replaces this schema's
+  all-three `ck_ops_policy_reference` with key/version all-or-none and independently
+  nullable acceptance, because `policy_accepted_at` may not be fabricated. Existing
+  rows stay byte-identical. ADR-048 constrains both.)*
 - Any deposit value, percentage base, rounding value, default, minimum, maximum
   or seller choice. `V33-DEC-022` Ruling 3 forbids all of them here.
 - Any change to `OrderStatus`, `OrderPaid`, `OrderCreated`, `OrderRefunded`,
@@ -268,8 +275,13 @@ unclaimed, so the classification cannot be forgotten.
   new surface. It needs its own ruling, and it is recorded rather than
   improvised.
 - Which collection modes may be enabled — `V33-DEC-011`.
-- Deposit bounds, rounding values, and the percentage calculation base, which
-  the readiness audit found ratified in no document — `V33-DEC-012` and #46.
+- Deposit bounds and rounding values — `V33-DEC-012`, still **unpublished**, now
+  tracked on #83 rather than #46. *(Amended 2026-09-06, `V33-DEC-028`.)*
+- ~~The percentage calculation base, which the readiness audit found ratified in no
+  document.~~ **STRUCTURALLY CLOSED 2026-09-06 by `V33-DEC-029` Ruling 4:** the base is
+  **required policy data with no default**, over exactly
+  `{service_subtotal, service_total}` — both amounts exist authoritatively at order
+  creation. **Neither value is chosen**, and `#41d-1` must not choose one.
 - ~~The `OrderPaid` and financial meaning of a partial capture — `#41c`.~~
   **CLOSED 2026-09-05 by `V33-DEC-024`:** a partial capture emits a distinct
   `OrderCollectionCaptured v1` rather than reinterpreting `OrderPaid v1`, and the

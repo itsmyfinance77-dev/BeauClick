@@ -28,7 +28,7 @@ delivering its Story Points never creates a tag and never enables production.
 | V3.2-E | B2B Quotes and Campaigns | Owner-gated; payment gate applies to settlement | Not applicable | Not enabled |
 | V3.2-F | Payout and Calendar Automation | Predominantly external-gated | Not applicable | Not enabled |
 | V3.2-G | Evidence-Gated Scale | No commitment without evidence | Not applicable | Not enabled |
-| V3.3 | Product Maturity Programme | Active foundation: #39, #40 (`#40a`), #56 (`#56a`), #69 (`#56b`), #72 and #75 complete; epic #38 in progress; Story #41 decomposed by `V33-DEC-022` into #41 (`#41a`), #81 (`#41b`), #82 (`#41c`) and #83 (`#41d`) and re-estimated 13 -> 42 (#82 raised 8 -> 13 by `V33-DEC-024`); #41 (`#41a`), #81 (`#41b`) and #82 (`#41c`) complete, #83 (`#41d`) gated; #58 split by `V33-DEC-025` into `#58a` (13, **complete**) and `#58b` (3, blocked on #46); #57 split by `V33-DEC-026` into `#40c-1` (#57, **complete** at 13 after `V33-DEC-027` re-estimated it 8 -> 13) and #99 (`#40c-2`, 5, blocked on #47); bug #97 (2) complete; commercial structure ratified and **#46 closed** 2026-09-06 by `V33-DEC-028`, which moved #83 (13) and #95 (`#58b`, 3 -> 5) to Ready and re-estimated #43 13 -> 21 | No tag authorized | Real money blocked by #47; every commercial value and all legal copy remain **unpublished**, now tracked on #83, #42 (Legal), #43 and #47 rather than #46 |
+| V3.3 | Product Maturity Programme | Active foundation: #39, #40 (`#40a`), #56 (`#56a`), #69 (`#56b`), #72 and #75 complete; epic #38 in progress; Story #41 decomposed by `V33-DEC-022` into #41 (`#41a`), #81 (`#41b`), #82 (`#41c`) and #83 (`#41d`) and re-estimated 13 -> 42 (#82 raised 8 -> 13 by `V33-DEC-024`); #41 (`#41a`), #81 (`#41b`) and #82 (`#41c`) complete, #83 (`#41d`) gated; #58 split by `V33-DEC-025` into `#58a` (13, **complete**) and `#58b` (3, blocked on #46); #57 split by `V33-DEC-026` into `#40c-1` (#57, **complete** at 13 after `V33-DEC-027` re-estimated it 8 -> 13) and #99 (`#40c-2`, 5, blocked on #47); bug #97 (2) complete; commercial structure ratified and **#46 closed** 2026-09-06 by `V33-DEC-028`, which moved #83 (13) and #95 (`#58b`, 3 -> 5) to Ready and re-estimated #43 13 -> 21; #83 then split 2026-09-06 by `V33-DEC-029` into `#41d-1` (#83, 13, Ready) and `#41d-2` (8, proposed) | No tag authorized | Real money blocked by #47; every commercial value and all legal copy remain **unpublished**, now tracked on #83, #42 (Legal), #43 and #47 rather than #46 |
 | V3.4 | Conditional Expansion Programme | Written owner decision and evidence required | Not applicable | Not enabled |
 
 V3.2-A and V3.2-B are completed historical milestones but are deliberately
@@ -252,8 +252,8 @@ What is missing is a consumer: `CommercialPolicyModule` is composed into no
 | #41 (`#41a`) | 13 | 8 | Immutable one-to-one `commerce.order_payment_schedules` snapshot, truthful full-online backfill, additive three-amount browser/receipt fields, and wiring the existing contract into the API. Represents all three modes; **enables none**. Changes no `OrderStatus`, `OrderPaid`, `totalToman`, refund, ledger or public response meaning. |
 | #81 (`#41b`) | — | 8 | Zero-collectible confirmation orchestrator with no public confirm route and no fabricated intent, attempt, event or receivable, plus the **mandatory** composition seam #58 hooks. Contract ratified 2026-09-05 by `V33-DEC-023`: the order takes the explicit status `online_collection_not_required`, no new event is added, and the transaction transitions the order before confirming the booking (H-a). ADR-044 is required before schema or code. |
 | #82 (`#41c`) | — | 8 -> **13** | Sandbox deposit execution; intent amount becomes the platform collectible; refund ceiling and financial projection limited to collected money. Contract ratified 2026-09-05 by `V33-DEC-024`: a partial capture emits a distinct `OrderCollectionCaptured v1` rather than reinterpreting `OrderPaid v1`; additive `online_collection_completed` state; additive `collected_total_toman` replaces `total_toman` as the refund ceiling; the ledger receives collected money only. Re-estimated 8 -> 13 and requires ADR-045 before schema or code. |
-| #83 (`#41d`) | — | 13 | Database-backed administrator publication and selection of versioned collection policy, fail-closed. Blocked by `V33-DEC-011`, `V33-DEC-012`, the percentage calculation base and `V33-DEC-017`. |
-| **Total** | **13** | **42** | Delivery order #41 -> #81 -> #82 -> #83. Was 37; #82 was re-estimated 8 -> 13 by `V33-DEC-024` on 2026-09-05. |
+| #83 (`#41d`) -> `#41d-1` | — | 13 -> **13 + 8** | Database-backed administrator publication and selection of versioned collection policy, fail-closed. Unblocked and made Ready 2026-09-06 by `V33-DEC-028`. **Split 2026-09-06 by `V33-DEC-029`, net 13 -> 21:** the readiness audit found #83 could not populate its own contract honestly — `BookingCommercialTermsV1` requires six values owned by #42 and #43 plus a mandatory copy version that does not exist, `PercentageDepositTerms` carries no calculation base, and `ck_ops_policy_reference` refuses a key/version without an acceptance instant that would be false. #83 keeps its number as **`#41d-1` (13)** and owns publication only, changing no order behaviour; **`#41d-2` (8)** owns seller-party assignment and the immutable order snapshot. Per-service override is deferred behind #44. ADR-048 is required before any schema or code. |
+| **Total** | **13** | **50** | Delivery order #41 -> #81 -> #82 -> #83 (`#41d-1`) -> `#41d-2`. Was 37; #82 was re-estimated 8 -> 13 by `V33-DEC-024` on 2026-09-05, and #83 was split 13 -> 21 by `V33-DEC-029` on 2026-09-06. |
 
 #41 keeps its number and its Epic #38 relationship, so every existing reference
 survives.
@@ -343,7 +343,7 @@ model before any timing value can mean anything.
 | Issue | Before | After | Change |
 |---|---|---|---|
 | #46 | OPEN, `status:decision`, `gate:product`, `gate:legal`, `sp:5` | **CLOSED**, `sp:5` retained | Structural closure. Status and both gates removed; Legal did not approve, and the legal gates live on #42 and #47 |
-| #83 (`#41d`) | `status:proposed`, `gate:product`, `gate:legal`, 13 | **`status:ready`**, 13 | Publishes and selects versioned policy; activates no provider; stays fail-closed |
+| #83 (`#41d`) | `status:proposed`, `gate:product`, `gate:legal`, 13 | **`status:ready`**, 13 | Publishes and selects versioned policy; activates no provider; stays fail-closed. *(Split the same day by `V33-DEC-029` into `#41d-1` at 13 and `#41d-2` at 8 — see the section below.)* |
 | #42 | `status:proposed`, `gate:product`, `gate:legal`, 13 | `status:proposed`, **`gate:legal` retained**, 13 | `gate:product` removed; it owns cancellation, no-show evidence, dispute, retention and customer copy |
 | #43 | `status:proposed`, `gate:product`, `gate:external`, 13 | `status:proposed`, **`gate:external` retained**, **21** | `gate:product` removed; it now also owns versioned commission policy, retiring the 1500/env fallback, pending funds, reserve/hold, settlement release, reversal/clawback and exact reconciliation |
 | #95 (`#58b`) | `status:blocked`, `gate:product`, 3 | **`status:ready`**, **5** | Premise corrected; it now owns the legacy-exempt preview, migration, atomic activation and kill-switch contract |
@@ -357,3 +357,53 @@ contract or test changed, and **no implementation started**.
 **ADR-048 is required before the first schema or executable implementation** of
 `V33-DEC-028`, and was deliberately not written in the governance change that
 recorded the decision.
+
+## V3.3 Story #83 decomposed and re-estimated, 2026-09-06
+
+`V33-DEC-029` split Story #83 after a read-only readiness audit. **Structure, contract and
+security only** — no commercial value, no Legal wording, no provider, payment, retention or
+settlement was approved or activated, and no implementation started.
+
+**The reason is a fact about the code, not a preference.** #83 could not have populated its
+own contract honestly:
+
+- `BookingCommercialTermsV1` **requires** six values owned by other issues — cancellation
+  cutoff, late-cancellation and no-show retention, reschedule action and dispute window
+  (**#42**), and settlement delay (**#43**) — plus a mandatory `customerPolicyCopyVersion`
+  for which no approved Persian copy exists.
+- `PercentageDepositTerms` carries **no calculation base**.
+- `ck_ops_policy_reference` refuses a policy key and version **without** an acceptance
+  instant that would be false today.
+- One hard-coded writer serves every order, so a fail-closed path on merge would have
+  stopped **every booking on the platform**.
+
+| Item | Before | After | Outcome it owns |
+|---|---:|---:|---|
+| #83 (`#41d`) → `#41d-1` | 13 | **13** | The collection-only contract split; the policy key and version tables; lifecycle, immutability, non-overlap and database-authoritative non-retroactivity; the `{service_subtotal, service_total}` percentage-base vocabulary as required data with no default; privileged audited administrator publication; a zero-row fail-closed foundation; ADR-027 coverage. **Changes no order behaviour.** No assignment, no order integration, no acceptance, no commercial default |
+| `#41d-2` | — | **8** | Seller-party assignment and the immutable order snapshot: the assignment table and owner routes, the new non-privileged `bc_manage_own_collection_policy`, the manager-scoped resolver port, order integration behind an explicit dark-launch boundary, and the `ck_ops_policy_reference` split into key/version all-or-none with independently nullable acceptance. Depends on #83 |
+| **Total** | **13** | **21** | Net V3.3 scope movement **+8**. Done unchanged — this decision completes no story |
+
+**Two things the split deliberately refused to do.** It did not fill the missing contract
+fields with zeros, placeholders or an invented copy version — a zero cutoff and a zero
+retention are *values*, and a fabricated copy version is *legal metadata*. And it did not
+populate `policy_accepted_at` with the resolution instant, which would assert that a
+customer accepted terms that do not exist. Acceptance stays #42's, after Legal.
+
+**Rollout is an explicit dark launch, not a fallback.** `#41d-1` changes no order
+behaviour. Under `#41d-2` an unenrolled legacy party stays on the named full-online /
+null-policy path with a stated exit, while an **enrolled** party resolves an assigned
+eligible policy or **fails closed** — there is no "use full online when the lookup failed"
+path, and no seed or invented full-payment policy is created. That clarifies
+`V33-DEC-028` Ruling 8 without weakening it: fail-closed binds from the moment a party is
+enrolled.
+
+**Per-service override is deferred behind #44**, not silently promised: `provider.services`
+is owned by a professional while the booking is sold by the business that professional is
+affiliated with, and no precedence rule repairs an ownership mismatch. No issue was created
+for it.
+
+Boundaries unchanged: #42 keeps `gate:legal`, #43 keeps `gate:external` at 21, #47 and #99
+stay blocked, #95 is untouched, and #46 was not reopened.
+
+**ADR-048 is required before any schema, contract or executable code**, and must be
+committed alone as its own pull request containing exactly one new file.

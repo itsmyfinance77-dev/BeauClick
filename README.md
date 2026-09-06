@@ -103,6 +103,8 @@ overage), and Story #40 was decomposed from one 13-point item into four:
 | #99 (`#40c-2`) | **5** | Paid activation of a custom purchase. Blocked on #47 |
 | #58 (`#40d`) → `#58a` | 8 -> **13** | Atomic consumption at first `confirmed` and idempotent return, enforced **selectively** — active only for a seller who holds a positive grant |
 | `#58b` (#95) | 3 -> **5** | Global fail-closed enforcement activation. **Ready** since `V33-DEC-028`; it owns the legacy-exempt rollout, the non-mutating preview, the atomic activation and the audited kill switch |
+| #83 (`#41d`) -> `#41d-1` | **13** | Administrator-published versioned booking collection policy. Publication only; changes no order behaviour |
+| `#41d-2` | **8** | Seller-party assignment and the immutable order snapshot, behind an explicit dark-launch boundary. Created 2026-09-06 by `V33-DEC-029` |
 
 `#40b` was split again on 2026-09-03 (`V33-DEC-018`): #56 keeps its number and its
 8 points as the foundation, and #69 carries the 5-point seller surface, so the
@@ -152,8 +154,9 @@ schedule that represents all three collection modes but **enables none**; #81 (`
 the zero-collectible confirmation path a pay-at-venue booking needs, plus the mandatory
 transaction seam #58 hooks; #82 (`#41c`) sandbox deposit execution with the refund
 ceiling and the ledger limited to money actually collected; and #83 (`#41d`) the
-administrator-versioned policy publication, which was blocked by #46 and became Ready
-on 2026-09-06 when `V33-DEC-028` closed it structurally. That closure fixes
+administrator-versioned policy publication, which was blocked by #46, became Ready
+on 2026-09-06 when `V33-DEC-028` closed it structurally, and was split the same day by
+`V33-DEC-029` into `#41d-1` (#83, 13) and `#41d-2` (8). That closure fixes
 sequencing only — no deposit value, percentage base, rounding value or enabled mode was
 chosen, and #47 gates real provider collection and settlement rather than the structural
 work.
@@ -229,6 +232,25 @@ subscriptions while every past purchase keeps what it was offered. Nothing exist
 is backfilled, so #57 ships **safely unavailable** until an administrator configures
 a schedule and a plan version that carries its key. #57 is re-estimated 8 -> 13
 points.
+
+Story #83 was split on 2026-09-06 as `V33-DEC-029`, and the reason is a fact about the
+code rather than a preference: **#83 could not populate its own contract honestly.**
+`BookingCommercialTermsV1` requires six values owned by #42 and #43 — cancellation cutoff,
+late-cancellation and no-show retention, reschedule action, dispute window and settlement
+delay — plus a mandatory `customerPolicyCopyVersion` for which no approved Persian copy
+exists; `PercentageDepositTerms` carries no calculation base; and
+`ck_ops_policy_reference` refuses a policy key and version without an acceptance instant
+that would be false. Filling any of those with a zero, a placeholder or an invented version
+identifier would have put commercial and legal values into code, which `V33-DEC-028`
+forbids. So the foundation gains a **collection-only** contract — mode, deposit rule,
+calculation base, contract version, key/version, resolution instant — `#41d-1` (#83, 13
+points) publishes versioned policy and changes no order behaviour, and `#41d-2` (8 points)
+adds seller-party assignment and the immutable order snapshot behind an explicit **dark
+launch**: an unenrolled party stays on today's named legacy path with a stated exit, and an
+enrolled one resolves or fails closed with no post-lookup fallback. Acceptance is never
+fabricated — `policy_accepted_at` stays null until #42 and Legal supply approved copy — and
+per-service override is deferred behind #44 because a service is owned by a professional
+while the booking is sold by the business.
 
 Prices, included allowances, bounds, cutoffs, legal copy and accounting treatment stay
 **unpublished**, and real money movement stays blocked by #47. No allowance may
