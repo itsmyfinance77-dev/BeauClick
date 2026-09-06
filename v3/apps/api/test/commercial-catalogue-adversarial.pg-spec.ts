@@ -118,6 +118,7 @@ describePg('commercial catalogue — authorization, audit and adversarial (real 
       includedLocations: 0,
       capabilityKeys: [],
       priceScheduleVersionId: scheduleVersionId,
+      bookingCreditScheduleKey: null,
       autoAssignable: false,
       activationStartsAt: T0,
       activationEndsAt: null,
@@ -354,6 +355,7 @@ describePg('commercial catalogue — authorization, audit and adversarial (real 
         {
           planKey,
           priceScheduleVersionId: schedule.id,
+          bookingCreditScheduleKey: null,
           autoAssignable: false,
           activationStartsAt: new Date(T0),
           activationEndsAt: null,
@@ -397,6 +399,7 @@ describePg('commercial catalogue — authorization, audit and adversarial (real 
         {
           planKey,
           priceScheduleVersionId: schedule.id,
+          bookingCreditScheduleKey: null,
           autoAssignable: false,
           activationStartsAt: new Date(T0),
           activationEndsAt: null,

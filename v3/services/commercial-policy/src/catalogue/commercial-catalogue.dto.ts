@@ -220,6 +220,29 @@ export class WritePlanVersionDto extends ActivationWindowDto {
   priceScheduleVersionId!: string;
 
   /**
+   * Which price schedule this plan version sells CUSTOM booking credits at —
+   * V3.3 #57 (`#40c-1`), `V33-DEC-027` R1.
+   *
+   * OPTIONAL, and `null` is the honest default state: most plan versions offer
+   * no custom credits, and there is no fallback schedule anywhere. Distinct
+   * from `priceScheduleVersionId` above, which is what the plan itself costs.
+   *
+   * A stable KEY, not a version id. The version is resolved per purchase, so an
+   * administrator can reprice credits by publishing a new version of this key
+   * without migrating a single subscription (ADR-047 SS3).
+   *
+   * The pattern matches `ck_price_schedules_key_shape`. It is a SHAPE check,
+   * not an existence check: whether the key names a real schedule whose purpose
+   * is `booking_credit` is decided by
+   * `fk_plan_versions_booking_credit_schedule`, which makes a wrong-purpose
+   * binding unwritable rather than merely rejected here.
+   */
+  @IsOptional()
+  @IsString()
+  @Matches(/^[A-Za-z][A-Za-z0-9_-]{0,63}$/)
+  bookingCreditScheduleKey?: string | null;
+
+  /**
    * The base workspace flag (ADR-041 §6).
    *
    * An administrator-controlled property of a ROW, which is what keeps `D-7`

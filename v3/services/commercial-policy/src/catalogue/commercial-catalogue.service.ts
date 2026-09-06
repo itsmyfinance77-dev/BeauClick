@@ -9,14 +9,14 @@ import {
   CatalogueLifecycleState,
   PlanVersionTermsV1,
   PriceQuoteV1,
-  PriceResolutionError,
   PriceScheduleTermsV1,
   PriceSchedulePurpose,
   isPermittedLifecycleTransition,
-  resolvePriceV1,
   validatePlanVersionTermsV1,
   validatePriceScheduleTermsV1,
 } from '@beauclick/commercial-policy-contract';
+
+import { PriceResolutionService } from './price-resolution.service';
 
 import {
   CommercialActivationOverlapException,
@@ -57,12 +57,15 @@ export interface CreatePlanVersionInput extends ActivationWindowInput {
   readonly planKey: string;
   readonly terms: PlanVersionTermsV1;
   readonly priceScheduleVersionId: string;
+  /** V3.3 #57. `null` when this plan version offers no custom booking credits. */
+  readonly bookingCreditScheduleKey: string | null;
   readonly autoAssignable: boolean;
 }
 
 export interface UpdatePlanVersionInput extends ActivationWindowInput {
   readonly terms: PlanVersionTermsV1;
   readonly priceScheduleVersionId: string;
+  readonly bookingCreditScheduleKey: string | null;
   readonly autoAssignable: boolean;
 }
 
@@ -123,6 +126,7 @@ export class CommercialCatalogueService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly audit: AdminAuditService,
+    private readonly prices: PriceResolutionService,
   ) {}
 
   // =========================================================================
@@ -387,6 +391,7 @@ export class CommercialCatalogueService {
           includedLocations: input.terms.includedLocations,
           capabilityKeys: [...input.terms.capabilityKeys],
           priceScheduleVersionId: input.priceScheduleVersionId,
+          bookingCreditScheduleKey: input.bookingCreditScheduleKey,
           autoAssignable: input.autoAssignable,
           activationStartsAt: input.activationStartsAt,
           activationEndsAt: input.activationEndsAt,
@@ -441,6 +446,7 @@ export class CommercialCatalogueService {
               includedLocations: input.terms.includedLocations,
               capabilityKeys: [...input.terms.capabilityKeys],
               priceScheduleVersionId: input.priceScheduleVersionId,
+              bookingCreditScheduleKey: input.bookingCreditScheduleKey,
               autoAssignable: input.autoAssignable,
               activationStartsAt: input.activationStartsAt,
               activationEndsAt: input.activationEndsAt,
@@ -595,38 +601,10 @@ export class CommercialCatalogueService {
    * price.
    */
   async resolvePrice(scheduleKey: string, at: Date, quantity: number): Promise<PriceQuoteV1> {
-    const active = await this.dataSource
-      .getRepository(CommercialPriceScheduleVersionEntity)
-      .createQueryBuilder('v')
-      .where('v.schedule_key = :scheduleKey', { scheduleKey })
-      .andWhere("v.lifecycle_state = 'published'")
-      .andWhere('v.activation_starts_at <= :at', { at })
-      .andWhere('(v.activation_ends_at IS NULL OR v.activation_ends_at > :at)', { at })
-      .getOne();
-
-    if (!active) {
-      throw new CommercialNotConfiguredException(
-        'no published price schedule version is active for this key at this instant',
-      );
-    }
-
-    const terms = await this.termsFor(this.dataSource.manager, active);
-
-    try {
-      return resolvePriceV1(terms, quantity);
-    } catch (error) {
-      if (error instanceof PriceResolutionError) {
-        // A schedule that reached `published` cannot be incomplete — the
-        // publication trigger refuses it — so this branch means the data
-        // changed underneath a guarantee, and a refusal is the only honest
-        // answer. It is NOT translated into a zero price.
-        if (error.refusal === 'schedule_incomplete') {
-          throw new CommercialNotConfiguredException('the active price schedule version does not resolve a price');
-        }
-        throw new CommercialTermsInvalidException([error.message]);
-      }
-      throw error;
-    }
+    // Delegates to the read-only core, so there is ONE resolution path
+    // rather than two that can drift. The signature and return type are
+    // unchanged, which is why #40a's callers and their suite needed no edit.
+    return this.prices.resolveWithin(this.dataSource.manager, scheduleKey, at, quantity);
   }
 
   async tiersFor(scheduleVersionId: string): Promise<CommercialPriceTierEntity[]> {
@@ -966,7 +944,11 @@ export class CommercialCatalogueService {
 
   private planSnapshot(
     terms: PlanVersionTermsV1,
-    input: { priceScheduleVersionId: string; autoAssignable: boolean } & ActivationWindowInput,
+    input: {
+      priceScheduleVersionId: string;
+      bookingCreditScheduleKey: string | null;
+      autoAssignable: boolean;
+    } & ActivationWindowInput,
   ): Record<string, string | number | boolean | null> {
     return {
       displayName: terms.displayName,
@@ -979,6 +961,7 @@ export class CommercialCatalogueService {
       // what that type exists to keep out of the audit log.
       capabilityKeys: terms.capabilityKeys.join(','),
       priceScheduleVersionId: input.priceScheduleVersionId,
+      bookingCreditScheduleKey: input.bookingCreditScheduleKey,
       autoAssignable: input.autoAssignable,
       activationStartsAt: input.activationStartsAt.toISOString(),
       activationEndsAt: input.activationEndsAt ? input.activationEndsAt.toISOString() : null,
@@ -995,6 +978,7 @@ export class CommercialCatalogueService {
       includedLocations: row.includedLocations,
       capabilityKeys: row.capabilityKeys.join(','),
       priceScheduleVersionId: row.priceScheduleVersionId,
+      bookingCreditScheduleKey: row.bookingCreditScheduleKey,
       autoAssignable: row.autoAssignable,
       activationStartsAt: row.activationStartsAt.toISOString(),
       activationEndsAt: row.activationEndsAt ? row.activationEndsAt.toISOString() : null,

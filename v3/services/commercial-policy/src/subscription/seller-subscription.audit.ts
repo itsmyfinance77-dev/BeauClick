@@ -59,6 +59,15 @@ export const SUBSCRIPTION_AUDIT_ACTIONS = {
   creditConsumed: 'commercial.credit_consumed',
   /** V3.3 #58a: that consumption given back by a qualifying cancellation. */
   creditReturned: 'commercial.credit_returned',
+  /**
+   * V3.3 #57 (`#40c-1`): a seller asked to buy a quantity of booking credits
+   * and the price they were offered was recorded immutably.
+   *
+   * The name says REQUESTED, not purchased. Nothing was paid and no credit was
+   * granted -- `V33-DEC-026` R2 -- and an audit action that implied otherwise
+   * would be the first place a reader learned the wrong thing.
+   */
+  creditPurchaseRequested: 'commercial.credit_purchase_requested',
 } as const;
 
 export const SUBSCRIPTION_AUDIT_REASONS = {
@@ -82,6 +91,11 @@ export const SUBSCRIPTION_AUDIT_REASONS = {
    * into the seller's commercial audit trail (`V33-DEC-025` Ruling 9).
    */
   creditReturned: 'one consumed booking credit returned by a qualifying cancellation',
+  /**
+   * #57. Written only when a purchase row is actually inserted; a replayed
+   * idempotency key returns the original row and writes nothing.
+   */
+  creditPurchaseRequested: 'seller requested a custom booking-credit quantity at the price then published',
 } as const;
 
 export type SubscriptionAuditReason =

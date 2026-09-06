@@ -1041,7 +1041,21 @@ describePg('booking-credit accounting (real PostgreSQL)', () => {
       expect(paths.length).toBeGreaterThan(20);
       expect(paths).toContain('/api/v1/me/subscriptions');
 
-      expect(paths.filter((p) => /credit|consumption|entitlement|balance|allowance/i.test(p))).toEqual([]);
+      /*
+       * Amended by V3.3 Story #57 (`#40c-1`), which added three
+       * credit-PURCHASE routes. They are named exactly, and the claim this
+       * case makes is unchanged and still exact: #58a's own surface —
+       * consumption, return, balance, allowance, entitlement — is still
+       * empty, and a route from any of those families fails here.
+       */
+      expect(paths.filter((p) => /credit|consumption|entitlement|balance|allowance/i.test(p)).sort()).toEqual(
+        [
+          '/api/v1/me/subscriptions/:workspaceRef/credit-purchases/quote',
+          '/api/v1/me/subscriptions/:workspaceRef/credit-purchases',
+          '/api/v1/me/subscriptions/:workspaceRef/credit-purchases',
+        ].sort(),
+      );
+      expect(paths.filter((p) => /consumption|entitlement|balance|allowance/i.test(p))).toEqual([]);
     });
 
     it('emits no event: the commercial domain still has no outbox at all', async () => {

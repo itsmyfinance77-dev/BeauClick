@@ -312,6 +312,7 @@ export class CommercialCatalogueController {
       includedLocations: row.includedLocations,
       capabilityKeys: row.capabilityKeys,
       priceScheduleVersionId: row.priceScheduleVersionId,
+      bookingCreditScheduleKey: row.bookingCreditScheduleKey,
       autoAssignable: row.autoAssignable,
       activationStartsAt: row.activationStartsAt.toISOString(),
       activationEndsAt: row.activationEndsAt ? row.activationEndsAt.toISOString() : null,
@@ -363,6 +364,9 @@ export class CommercialCatalogueController {
   private planInput(dto: WritePlanVersionDto) {
     return {
       priceScheduleVersionId: dto.priceScheduleVersionId,
+      // `?? null` rather than `?? someKey`: an omitted binding means this plan
+      // version sells no custom credits, and there is no fallback schedule.
+      bookingCreditScheduleKey: dto.bookingCreditScheduleKey ?? null,
       autoAssignable: dto.autoAssignable,
       activationStartsAt: new Date(dto.activationStartsAt),
       activationEndsAt: dto.activationEndsAt ? new Date(dto.activationEndsAt) : null,

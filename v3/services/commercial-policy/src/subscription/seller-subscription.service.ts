@@ -481,6 +481,13 @@ export class SellerSubscriptionService {
       snapshotCurrencyCode: price.currencyCode,
       snapshotUnitPriceToman: price.unitPriceToman,
       snapshotPriceScheduleVersionId: input.version.priceScheduleVersionId,
+      // V3.3 #57 (`#40c-1`), `V33-DEC-027` R3. Copied like every other
+      // snapshot field, from the ONE construction site every activation path
+      // goes through -- automatic assignment, selection and the restoration
+      // after cancellation -- so none of them can forget it. NULL when the
+      // plan version offers no custom credits, which is every version that
+      // exists today.
+      snapshotBookingCreditScheduleKey: input.version.bookingCreditScheduleKey,
       effectiveAt: new Date(),
       createdByUserId: input.actorUserId,
       createdByLabel: input.actorUserId ? null : SYSTEM_ACTOR_LABEL,

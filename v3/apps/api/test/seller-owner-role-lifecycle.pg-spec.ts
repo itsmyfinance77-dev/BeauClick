@@ -251,6 +251,7 @@ describePg('seller owner role lifecycle — ownership triggers, backfill, token 
       {
         planKey,
         priceScheduleVersionId: schedule.id,
+        bookingCreditScheduleKey: null,
         autoAssignable: true,
         activationStartsAt: ACTIVE_FROM,
         activationEndsAt: null,
@@ -306,6 +307,7 @@ describePg('seller owner role lifecycle — ownership triggers, backfill, token 
       {
         planKey,
         priceScheduleVersionId: schedule.id,
+        bookingCreditScheduleKey: null,
         // NOT auto-assignable: exactly one version may be, and the base
         // workspace already holds that slot.
         autoAssignable: false,

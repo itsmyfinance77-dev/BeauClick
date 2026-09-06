@@ -125,6 +125,7 @@ describePg('seller subscription surface — workspaces, references, refusals (re
       {
         planKey,
         priceScheduleVersionId: schedule.id,
+        bookingCreditScheduleKey: null,
         autoAssignable: options.autoAssignable ?? false,
         activationStartsAt: options.activationStartsAt ?? ACTIVE_FROM,
         activationEndsAt: options.activationEndsAt === undefined ? null : options.activationEndsAt,
@@ -1307,7 +1308,7 @@ describePg('seller subscription surface — workspaces, references, refusals (re
       expect(domainBefore['commercial.outbox_events_absent']).toBe(0);
     });
 
-    it('maps all six routes on the running application', async () => {
+    it('maps all nine routes on the running application', async () => {
       /*
        * Asserted against the ROUTE TABLE Nest actually built, not against the
        * decorators — the same reasoning `audit-enforcement` records. A
@@ -1338,7 +1339,23 @@ describePg('seller subscription surface — workspaces, references, refusals (re
       const own = paths.filter(
         (path) => path.includes('/me/subscriptions') || path.includes('/me/commercial-plans'),
       );
-      expect(own).toHaveLength(6);
+      // Nine since V3.3 Story #57 (`#40c-1`) added three credit-purchase
+      // routes. Pinned as an exact SET rather than a count, so a route added
+      // to this family by any story has to be read by a human before this
+      // passes again.
+      expect(own.sort()).toEqual(
+        [
+          'POST /api/v1/me/subscriptions/initialization',
+          'GET /api/v1/me/subscriptions',
+          'GET /api/v1/me/subscriptions/:workspaceRef/history',
+          'POST /api/v1/me/subscriptions/:workspaceRef/selection',
+          'POST /api/v1/me/subscriptions/:workspaceRef/cancellation',
+          'POST /api/v1/me/subscriptions/:workspaceRef/credit-purchases/quote',
+          'POST /api/v1/me/subscriptions/:workspaceRef/credit-purchases',
+          'GET /api/v1/me/subscriptions/:workspaceRef/credit-purchases',
+          'GET /api/v1/me/commercial-plans',
+        ].sort(),
+      );
       expect(SellerSubscriptionSurfaceController.name).toBe('SellerSubscriptionSurfaceController');
     });
   });

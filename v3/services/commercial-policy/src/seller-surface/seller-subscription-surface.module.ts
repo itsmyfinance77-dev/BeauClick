@@ -2,6 +2,11 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { COMMERCIAL_ENTITIES } from '../catalogue/commercial-catalogue.entities';
+// The READ-ONLY pricing core, not `CommercialCatalogueModule`. Importing the
+// administrator's mutation surface here is the boundary violation this module
+// already refuses; a seller route needs to read a price and nothing more.
+import { PriceResolutionModule } from '../catalogue/price-resolution.service';
+import { CreditPurchaseService } from './credit-purchase.service';
 import { SUBSCRIPTION_ENTITIES } from '../subscription/seller-subscription.entities';
 import { SellerSubscriptionModule } from '../subscription/seller-subscription.module';
 import {
@@ -61,9 +66,10 @@ import { WorkspaceReferenceService } from './workspace-reference';
     // the same reason: a seller route that could publish a plan version would
     // be a boundary violation one autocomplete away.
     TypeOrmModule.forFeature([...SUBSCRIPTION_ENTITIES, ...COMMERCIAL_ENTITIES]),
+    PriceResolutionModule,
   ],
   controllers: [SellerSubscriptionSurfaceController, SellerCommercialPlansController],
-  providers: [SellerSubscriptionSurfaceService, WorkspaceReferenceService],
-  exports: [SellerSubscriptionSurfaceService, WorkspaceReferenceService],
+  providers: [SellerSubscriptionSurfaceService, WorkspaceReferenceService, CreditPurchaseService],
+  exports: [SellerSubscriptionSurfaceService, WorkspaceReferenceService, CreditPurchaseService],
 })
 export class SellerSubscriptionSurfaceModule {}
