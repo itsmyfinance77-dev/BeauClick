@@ -1199,6 +1199,60 @@ describePg('custom booking-credit purchases (real PostgreSQL)', () => {
       expect(paths.filter((p) => /balance|grant|allowance/i.test(p))).toEqual([]);
     });
 
+    it('resolves the price on the caller’s manager, not a fresh connection', () => {
+      /*
+       * A structural assertion, because the consequence is not observable from
+       * outside: a price read on a second connection produces the same body
+       * until an administrator publishes between the read and the write, and
+       * staging that interleaving from a test would prove the staging rather
+       * than the code.
+       *
+       * What IS checkable is the shape a mutation would have to break — the
+       * same reasoning `#58a` used for its two call sites. `priceFor` must
+       * thread the manager it was given, and must not reach for
+       * `this.dataSource.manager`, which is a different pooled connection.
+       */
+      const source = readFileSync(
+        join(__dirname, '..', '..', '..', 'services', 'commercial-policy', 'src', 'seller-surface', 'credit-purchase.service.ts'),
+        'utf8',
+      );
+      const priceFor = source.slice(source.indexOf('  private async priceFor('));
+      const body = priceFor.slice(0, priceFor.indexOf('  }'));
+
+      // Non-vacuity: the method really was found and really resolves a price.
+      expect(body).toContain('resolveBookingCreditWithin');
+      expect(body).toContain('resolveBookingCreditWithin(manager,');
+      expect(body).not.toContain('this.dataSource');
+
+      // And the write path hands it the transaction's own manager.
+      expect(source).toContain('this.priceFor(manager, subscription, quantity, effectiveAt)');
+    });
+
+    it('writes the audit on that same manager, so a rollback takes it too', () => {
+      /*
+       * `#58a` had to make this correction after auditing a ledger through a
+       * logger whose lines survive a ROLLBACK. The same mistake here would
+       * record a purchase that never happened, and it is invisible to a
+       * counting test: a successful path writes exactly one row either way.
+       *
+       * So the shape is asserted. `recordSystem` must receive the
+       * transaction's own manager, and the insert path must not reach for a
+       * second connection.
+       */
+      const source = readFileSync(
+        join(__dirname, '..', '..', '..', 'services', 'commercial-policy', 'src', 'seller-surface', 'credit-purchase.service.ts'),
+        'utf8',
+      );
+      const insertOnce = source.slice(source.indexOf('  private async insertOnce('));
+
+      // Non-vacuity: the method was found and really does audit.
+      expect(insertOnce).toContain('this.audit.recordSystem(');
+      expect(insertOnce).toContain('this.audit.recordSystem(manager, {');
+      // …and never on a second connection. `insertOnce` legitimately opens
+      // its transaction through `this.dataSource.transaction`, so the
+      // assertion names the exact misuse rather than banning the field.
+      expect(source).not.toContain('recordSystem(this.dataSource');
+    });
     it('adds no capability and no ServiceName member', async () => {
       const capabilities: Array<{ slug: string }> = await dataSource.query(
         "SELECT slug FROM identity.capabilities WHERE slug LIKE '%credit%' OR slug LIKE '%purchase%'",
