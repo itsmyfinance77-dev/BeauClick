@@ -151,6 +151,14 @@ finance operator and B2B seller are scoped memberships/capabilities, not global
 identity types. Salon, laser/beauty clinic, maison, retail, wholesale, academy,
 mobile team and multi-location organisation are business verticals, not roles.
 
+*Amended 2026-09-06 (`V33-DEC-030` D1): the sentence above stands except for its
+last two members.* `mobile` and `multi_location` are **operating traits**, not
+verticals — they describe how an organisation is arranged and where delivery
+happens, not what it provides. The closed vertical vocabulary becomes
+`salon | clinic | maison | retail | wholesale | academy`, and traits are a
+separate additive set. Neither a vertical nor a trait grants any permission,
+capability, financial access or booking authority.
+
 ### 7. Production money movement is unavailable by construction
 
 This foundation registers vocabulary and policy definitions only. It has no

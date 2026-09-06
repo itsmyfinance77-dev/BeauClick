@@ -28,7 +28,7 @@ delivering its Story Points never creates a tag and never enables production.
 | V3.2-E | B2B Quotes and Campaigns | Owner-gated; payment gate applies to settlement | Not applicable | Not enabled |
 | V3.2-F | Payout and Calendar Automation | Predominantly external-gated | Not applicable | Not enabled |
 | V3.2-G | Evidence-Gated Scale | No commitment without evidence | Not applicable | Not enabled |
-| V3.3 | Product Maturity Programme | Active foundation: #39, #40 (`#40a`), #56 (`#56a`), #69 (`#56b`), #72 and #75 complete; epic #38 in progress; Story #41 decomposed by `V33-DEC-022` into #41 (`#41a`), #81 (`#41b`), #82 (`#41c`) and #83 (`#41d`) and re-estimated 13 -> 42 (#82 raised 8 -> 13 by `V33-DEC-024`); #41 (`#41a`), #81 (`#41b`) and #82 (`#41c`) complete, #83 (`#41d`) gated; #58 split by `V33-DEC-025` into `#58a` (13, **complete**) and `#58b` (3, blocked on #46); #57 split by `V33-DEC-026` into `#40c-1` (#57, **complete** at 13 after `V33-DEC-027` re-estimated it 8 -> 13) and #99 (`#40c-2`, 5, blocked on #47); bug #97 (2) complete; commercial structure ratified and **#46 closed** 2026-09-06 by `V33-DEC-028`, which moved #83 (13) and #95 (`#58b`, 3 -> 5) to Ready and re-estimated #43 13 -> 21; #83 then split 2026-09-06 by `V33-DEC-029` into `#41d-1` (#83, 13, Ready) and #104 (`#41d-2`, 8, proposed) | No tag authorized | Real money blocked by #47; every commercial value and all legal copy remain **unpublished**, now tracked on #83, #42 (Legal), #43 and #47 rather than #46 |
+| V3.3 | Product Maturity Programme | Active foundation: #39, #40 (`#40a`), #56 (`#56a`), #69 (`#56b`), #72 and #75 complete; epic #38 in progress; Story #41 decomposed by `V33-DEC-022` into #41 (`#41a`), #81 (`#41b`), #82 (`#41c`) and #83 (`#41d`) and re-estimated 13 -> 42 (#82 raised 8 -> 13 by `V33-DEC-024`); #41 (`#41a`), #81 (`#41b`) and #82 (`#41c`) complete, #83 (`#41d`) gated; #58 split by `V33-DEC-025` into `#58a` (13, **complete**) and `#58b` (3, blocked on #46); #57 split by `V33-DEC-026` into `#40c-1` (#57, **complete** at 13 after `V33-DEC-027` re-estimated it 8 -> 13) and #99 (`#40c-2`, 5, blocked on #47); bug #97 (2) complete; commercial structure ratified and **#46 closed** 2026-09-06 by `V33-DEC-028`, which moved #83 (13) and #95 (`#58b`, 3 -> 5) to Ready and re-estimated #43 13 -> 21; #83 then split 2026-09-06 by `V33-DEC-029` into `#41d-1` (#83, 13, Ready) and #104 (`#41d-2`, 8, proposed); **#44 decomposed 2026-09-06 by `V33-DEC-030`** into an umbrella carrying no Story Points plus five children — #107 (`#44a`, 5, Ready), #108 (`#44b`, 8), #109 (`#44c`, 13), #110 (`#44d`, 13) and #111 (`#44e`, 8) — re-estimated 13 -> 47, a net **+34** with done unchanged | No tag authorized | Real money blocked by #47; every commercial value and all legal copy remain **unpublished**, now tracked on #83, #42 (Legal), #43 and #47 rather than #46 |
 | V3.4 | Conditional Expansion Programme | Written owner decision and evidence required | Not applicable | Not enabled |
 
 V3.2-A and V3.2-B are completed historical milestones but are deliberately
@@ -407,3 +407,71 @@ stay blocked, #95 is untouched, and #46 was not reopened.
 
 **ADR-048 is required before any schema, contract or executable code**, and must be
 committed alone as its own pull request containing exactly one new file.
+
+## V3.3 Story #44 decomposed and re-estimated, 2026-09-06
+
+`V33-DEC-030` decomposed Story #44 after a read-only readiness audit. **Structure, contract
+and security only** — no commercial value, no Legal wording, no schema, no ADR and no
+implementation. #44 is now an **umbrella carrying no Story Points**.
+
+**The reason is a fact about the repository, not a preference.** #44 could not have been
+started as written:
+
+- `V33-DEC-002` had already ratified `multi_location` and `mobile` as **verticals**, in the
+  same closed set as `salon` and `clinic`. A salon that opens a second branch would have had
+  to *stop being a salon*.
+- #44 asked for an **`owner` scoped role**, which would re-open the exact edit/remove/race
+  hazard ADR-023 closed and break the ownership predicate `V33-DEC-020` and `V33-DEC-021`
+  rest on.
+- #44 asked for **`reception`**, whose whole job is acting on *other people's* calendars —
+  while every such route resolves the professional's own owning user.
+- #44 assumed a **`finance`** role that `V33-DEC-020` Ruling 2 had explicitly left **open**.
+- #44 named **`inventory`** and **`B2B sales`** roles. No inventory, product, stock,
+  order-book or wholesale table exists, so they would have authorized nothing.
+- #44 cited **"the V3.3-C staff-role decisions"** as a dependency. **No such register entry
+  exists.**
+- `InviteStaffDto.userId` means a salon cannot invite a receptionist without already knowing
+  their UUID, so every role would have shipped administratively unusable.
+
+| Item | Before | After | Outcome it owns |
+|---|---:|---:|---|
+| #44 | 13 | **0 (umbrella)** | Retained OPEN as the parent under #38, converted to `type:epic`, `sp:13` and `gate:product` removed. **Delivers no schema or code and closes only when all five children close.** |
+| #107 (`#44a`) | — | **5** | Business classification and operating traits: closed vertical and trait vocabularies, one primary vertical per business, owner-only mutation, transactional audit, ADR-027 claims, a structural proof that classification authorizes nothing, and the `uq_businesses_owner_id` partial-index correction. The **only** Ready child |
+| #108 (`#44b`) | — | **8** | Organisation locations with an `active \| suspended \| closed` lifecycle and an opaque `locationRef`. `businesses.city_id` is deprecated **as a service-delivery location**, with the column and all data preserved. No booking behaviour changes |
+| #109 (`#44c`) | — | **13** | Scoped staff roles and permissions: the grant store anchored on `business_staff.id`, a **new scoped** verifier port, owner-only grant/revoke with live re-checks, the `business_staff` status vocabulary and CHECK correction, consented non-enumerating invite-by-phone, and the chat practitioner grant |
+| #110 (`#44d`) | — | **13** | Bookable resources and `ex_booking_resource_no_overlap`, assigned in the same transaction as the slot claim. `booking.bookings` byte-identical |
+| #111 (`#44e`) | — | **8** | Scoped **read-only** finance visibility for exactly one business, with every existing #72 finance-security assertion still passing unchanged |
+| **Total** | **13** | **47** | Net V3.3 scope movement **+34**. Done unchanged — this decision completes no story |
+
+**Story Points are not double-counted.** The parent carries none; `sp:47` was deliberately
+**not** placed on #44. The live backlog report shows V3.3 moving **226 → 260** scope with
+**done unchanged at 122**, and zero data-quality warnings.
+
+**Two things the decomposition deliberately refused to do.** It did not deliver
+**`reception`'s real job** — a receptionist creating slots, cancelling, rescheduling,
+completing or marking a no-show on a practitioner's behalf. That requires opening `booking`
+and `provider` to business-scoped delegation, the module ADR-023 was written to protect. It
+is a named future story and **no issue was created for it**. And it did not store
+`inventory` or `B2B sales` roles, which would be permission strings with no referent.
+
+**`V33-DEC-002` is amended, not reinterpreted.** Its original wording is preserved in the
+register with an explicit historical annotation. Vertical is now
+`salon | clinic | maison | retail | wholesale | academy`; `multi_location` and `mobile` are
+**operating traits** on a separate axis. Neither axis grants any permission, capability,
+financial access or booking authority, and `clinic` is a commercial classification carrying
+no medical data.
+
+**A documentation defect was corrected.** `README.md` claimed the location model is
+`Iran → Province → City → District/Neighborhood` and listed the `business` domain twice, once
+claiming it owns locations. The only geography table in the platform is
+`provider.locations_cities (id, name, is_launched)`. The README now says what exists and what
+#44's children will add; **no planned table is presented as shipped**.
+
+Boundaries unchanged: #45 stays 13 SP and is untouched — it is design work that *consumes*
+these contracts. #104's per-service override stays deferred behind #44 and is **not**
+absorbed. #42 keeps `gate:legal`, #43 keeps `gate:external`, #47 and #99 stay blocked, and
+#95 is untouched.
+
+**ADR-049 is required before any child schema, contract or executable code**, and must be
+committed alone as its own pull request containing exactly one new file. It was deliberately
+**not** written in this governance change.

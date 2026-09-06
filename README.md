@@ -2,9 +2,13 @@
 
 Persian-first, nationwide Iranian beauty technology platform — marketplace, booking,
 commerce, payments, loyalty, referral, wishlist, internal chat, and an AI beauty
-assistant. Launch market: **Yazd**. The location model is
-`Iran → Province → City → District/Neighborhood`; Yazd is a starting point, never a
-hard limit.
+assistant. Launch market: **Yazd**. Geography today is a single flat table of
+launched cities (`provider.locations_cities`) — there is no province, district,
+neighbourhood, address or coordinate anywhere in the database. A richer
+`Iran → Province → City → District/Neighborhood` model remains an aspiration and
+is **not** shipped. Organisation-level locations are the first real step and are
+owned by #44's children (`V33-DEC-030`); Yazd is a starting point, never a hard
+limit.
 
 **The active line of development is V3** — a TypeScript modular monolith that replaced
 the original WordPress/WooCommerce implementation. It lives in [`v3/`](v3/). The V2 tree
@@ -335,7 +339,7 @@ merely disappointing a reviewer.
 |---|---|
 | `identity` | OTP lifecycle, JWT/refresh issuance, RBAC capabilities, devices, session revocation, phone conflicts |
 | `provider` | Professionals, services, specialties, cities, portfolio, verification, reviews |
-| `business` | Businesses, locations and staff membership |
+| `business` | Businesses and staff membership. **No location table exists yet** — organisation locations are `V33-DEC-030`'s child of #44 |
 | `booking` | Availability, holds, claim/cancel/confirm/no-show/complete and rescheduling |
 | `commerce` | Orders, items, the single unified pricing chain, idempotent order creation |
 | `payment` | Payment intents, attempts, refunds, provider-abstracted gateways, verification contract |
@@ -507,7 +511,7 @@ in the default CORS allow-list.
 
 ### Seeding
 
-Reference data (provinces, cities, specialties) lives in
+Reference data (launched cities and specialties — there is no province table) lives in
 [`v3/database/seeds/reference-data.seed.ts`](v3/database/seeds/reference-data.seed.ts).
 `v3/database/scripts/grant-platform-operator.ts` grants the administrative capability set
 to a user so the admin surfaces become reachable.
