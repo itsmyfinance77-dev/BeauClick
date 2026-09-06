@@ -132,6 +132,7 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
       {
         planKey,
         priceScheduleVersionId: options.scheduleVersionId,
+        bookingCreditScheduleKey: null,
         autoAssignable: options.autoAssignable ?? false,
         activationStartsAt: options.startsAt ?? T0,
         activationEndsAt: options.endsAt ?? null,
@@ -256,6 +257,7 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
         plan.version,
         {
           priceScheduleVersionId: schedule.id,
+          bookingCreditScheduleKey: null,
           autoAssignable: false,
           activationStartsAt: T1,
           activationEndsAt: T2,
@@ -289,6 +291,7 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
           plan.version,
           {
             priceScheduleVersionId: schedule.id,
+            bookingCreditScheduleKey: null,
             autoAssignable: false,
             activationStartsAt: T0,
             activationEndsAt: null,
@@ -602,6 +605,7 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
           {
             planKey,
             priceScheduleVersionId: schedule.id,
+            bookingCreditScheduleKey: null,
             autoAssignable: false,
             activationStartsAt: T0,
             activationEndsAt: null,
@@ -1098,11 +1102,12 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
       );
       // Seven since V3.3-A Story #56 (`#56a`) added `seller_subscriptions` and
       // `booking_credit_grants`; nine since V3.3 Story #58 (`#58a`) added
-      // `booking_credit_consumptions` and `booking_credit_returns`. The count is
-      // asserted exactly, rather than loosened to a minimum, because an exact
-      // number is what makes a table added without a subject-data claim fail HERE
-      // with a readable message instead of at application boot.
-      expect(rows).toHaveLength(9);
+      // `booking_credit_consumptions` and `booking_credit_returns`; ten since
+      // Story #57 (`#40c-1`) added `credit_purchases`. The count is asserted
+      // exactly, rather than loosened to a minimum, because an exact number is
+      // what makes a table added without a subject-data claim fail HERE with a
+      // readable message instead of at application boot.
+      expect(rows).toHaveLength(10);
 
       const contracts = app.get<SubjectDataContract[]>(SUBJECT_DATA_CONTRACTS);
       const report = evaluateCoverage(rows, contracts);
@@ -1124,6 +1129,11 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
         'cancelled_by_user_id',
         'created_by_user_id',
         'published_by_user_id',
+        // V3.3 Story #57 (`#40c-1`): which of a workspace's owners made the
+        // request. Named with the detectable suffix on purpose, so the
+        // ADR-027 coverage check SEES the identity rather than having to be
+        // told about it.
+        'requested_by_user_id',
         'retired_by_user_id',
       ]);
       // Non-vacuity: the platform's own detector agrees these are subject
@@ -1201,6 +1211,7 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
         'commercial/20260902800001_create_commercial_catalogue.sql',
         'commercial/20260903800001_create_seller_subscriptions.sql',
         'commercial/20260906800001_create_booking_credit_accounting.sql',
+        'commercial/20260906900001_create_credit_purchases.sql',
         'identity/20260902800002_add_commercial_plan_capability.sql',
       ]);
     });
@@ -1246,6 +1257,8 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
         'tg_bcc_immutable',
         'tg_bcr_immutable',
         'tg_booking_credit_grants_immutable',
+        // V3.3 Story #57 (`#40c-1`).
+        'tg_credit_purchases_immutable',
         'tg_plan_versions_lifecycle',
         'tg_plans_immutable',
         'tg_price_schedule_versions_lifecycle',

@@ -1,4 +1,3 @@
-import { Type } from 'class-transformer';
 import { IsInt, IsOptional, IsString, Length, Max, Min } from 'class-validator';
 
 import { MAX_PURCHASABLE_QUANTITY } from '@beauclick/commercial-policy-contract';
@@ -30,12 +29,17 @@ import { MAX_PURCHASABLE_QUANTITY } from '@beauclick/commercial-policy-contract'
  */
 export class CreditPurchaseQuantityDto {
   /**
-   * `@Type(() => Number)` then `@IsInt()`: a JSON string body still arrives as
-   * a string, and `"7"` must become `7` before `IsInt` can reject `"7.5"` and
-   * `"abc"` honestly. `Min(1)` refuses zero and negatives; `IsInt` refuses
-   * fractions and `NaN`.
+   * A real JSON number, with **no** `@Type(() => Number)` coercion.
+   *
+   * The coercion looks harmless and is not: `Number(true)` is `1`, so a body of
+   * `{ "quantity": true }` would have bought one credit that nobody asked for.
+   * `Number({})` is `NaN` and `Number(null)` is `0`, which `IsInt`/`Min` do
+   * catch — but a rule that happens to catch two of three cases is not a rule.
+   *
+   * Without the coercion, `true`, `{}`, `null`, `"7"`, `1.5`, `0` and `-1` are
+   * all refused, and the only accepted value is the one a caller meant. This is
+   * also the precedent `SelectPlanVersionDto.version` already sets.
    */
-  @Type(() => Number)
   @IsInt()
   @Min(1)
   @Max(MAX_PURCHASABLE_QUANTITY)

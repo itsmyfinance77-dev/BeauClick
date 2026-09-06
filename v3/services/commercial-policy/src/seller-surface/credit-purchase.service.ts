@@ -134,6 +134,39 @@ export class CreditPurchaseService {
     quantity: number,
     requestKey: string,
   ): Promise<CreditPurchaseViewV1> {
+    try {
+      return await this.insertOnce(userId, workspaceRef, quantity, requestKey);
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+
+      /*
+       * A concurrent request with the same key won.
+       *
+       * The INSERT is deliberately NOT `ON CONFLICT DO NOTHING`. That form does
+       * not wait, so the loser would fall out while the winner was still
+       * uncommitted and find nothing to return. A plain insert BLOCKS on the
+       * unique index until the winner commits or rolls back — so by the time
+       * this catch runs, the winner's row is committed and visible, and the
+       * re-read below is deterministic rather than a retry loop.
+       *
+       * The re-read is outside the failed transaction because that transaction
+       * is aborted; the resolution runs again on a fresh one.
+       */
+      const { subscription } = await this.resolveWorkspace(this.dataSource.manager, userId, workspaceRef);
+      const winner = await this.dataSource
+        .getRepository(CreditPurchaseEntity)
+        .findOne({ where: { subscriptionId: subscription.id, requestKey } });
+      if (!winner) throw error;
+      return this.toView(winner);
+    }
+  }
+
+  private async insertOnce(
+    userId: string,
+    workspaceRef: string,
+    quantity: number,
+    requestKey: string,
+  ): Promise<CreditPurchaseViewV1> {
     return this.dataSource.transaction(async (manager) => {
       const { subscription } = await this.resolveWorkspace(manager, userId, workspaceRef);
 
@@ -170,25 +203,9 @@ export class CreditPurchaseService {
         requestedByUserId: userId,
       });
 
-      const inserted = await manager
-        .createQueryBuilder()
-        .insert()
-        .into(CreditPurchaseEntity)
-        .values(row)
-        .orIgnore()
-        .returning('id')
-        .execute();
-
-      if ((inserted.identifiers?.length ?? 0) === 0) {
-        // The unique constraint declined it: a concurrent submission of the
-        // same key won. Re-read the winner and return it byte-for-byte. No
-        // audit row, because nothing was written here.
-        const winner = await repository.findOne({
-          where: { subscriptionId: subscription.id, requestKey },
-        });
-        if (!winner) throw new CreditPurchaseUnavailableException();
-        return this.toView(winner);
-      }
+      // A plain insert. `uq_credit_purchases_request` raises on a duplicate,
+      // and `create` above turns that into the winner's own row.
+      await repository.insert(row);
 
       /*
        * The audit row, in the SAME transaction as the insert.
@@ -330,6 +347,11 @@ export class CreditPurchaseService {
       createdAt: row.createdAt.toISOString(),
     };
   }
+}
+
+/** PostgreSQL's `unique_violation`. */
+function isUniqueViolation(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && (error as { code?: string }).code === '23505';
 }
 
 /**

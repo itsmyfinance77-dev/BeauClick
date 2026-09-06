@@ -141,6 +141,7 @@ describePg('subscription foundation — assignment, snapshots, grants (real Post
       {
         planKey,
         priceScheduleVersionId: schedule.id,
+        bookingCreditScheduleKey: null,
         autoAssignable: options.autoAssignable ?? false,
         activationStartsAt: ACTIVE_FROM,
         activationEndsAt: null,
@@ -966,7 +967,7 @@ describePg('subscription foundation — assignment, snapshots, grants (real Post
       return found;
     };
 
-    it('claims both tables as retained, with reasons, and never as no_subject_data', async () => {
+    it('claims all five tables as retained, with reasons, and never as no_subject_data', async () => {
       const contract = contractFor('commercial-subscription');
       const claims = contract.tables.filter((t) => t.table.startsWith('commercial.'));
 
@@ -977,6 +978,8 @@ describePg('subscription foundation — assignment, snapshots, grants (real Post
         'commercial.booking_credit_consumptions',
         'commercial.booking_credit_grants',
         'commercial.booking_credit_returns',
+        // V3.3 Story #57 (`#40c-1`).
+        'commercial.credit_purchases',
         'commercial.seller_subscriptions',
       ]);
       for (const claim of claims) {
@@ -1105,7 +1108,7 @@ describePg('subscription foundation — assignment, snapshots, grants (real Post
       expect(JSON.stringify(sections)).not.toContain(business.id);
     });
 
-    it('reports erasure truthfully: nothing anonymized, nothing deleted, all four retained', async () => {
+    it('reports erasure truthfully: nothing anonymized, nothing deleted, all five retained', async () => {
       await baseWorkspace();
       const { user, party } = await professionalParty();
       await subscriptions.ensureBaseSubscription(party);
@@ -1128,6 +1131,9 @@ describePg('subscription foundation — assignment, snapshots, grants (real Post
         'commercial.booking_credit_consumptions',
         'commercial.booking_credit_grants',
         'commercial.booking_credit_returns',
+        // V3.3 Story #57 (`#40c-1`): the purchase request and the price it was
+        // offered at, retained as an obligation record.
+        'commercial.credit_purchases',
         'commercial.seller_subscriptions',
       ]);
       // And the rows really are still there, so the report is not merely honest
@@ -1192,9 +1198,10 @@ describePg('subscription foundation — assignment, snapshots, grants (real Post
        * set over the real route table catches a seventh route added to this
        * family by anybody, including a story that has no business adding one.
        *
-       * The `credits|grant` half of the filter is unchanged and still asserts an
-       * absence: `V33-DEC-019` puts no credit purchase (#57), no consumption or
-       * return (#58) and no grant route in this story, and none has appeared.
+       * The `credits|grant` half of the filter now MATCHES, because V3.3 Story
+       * #57 (`#40c-1`) added three credit-purchase routes. It still asserts an
+       * absence, and a sharper one: the set is exact, so a balance, grant,
+       * consumption or return route added by anybody fails here.
        */
       expect(paths.sort()).toEqual(
         [
@@ -1203,6 +1210,11 @@ describePg('subscription foundation — assignment, snapshots, grants (real Post
           '/api/v1/me/subscriptions/:workspaceRef/history',
           '/api/v1/me/subscriptions/:workspaceRef/selection',
           '/api/v1/me/subscriptions/:workspaceRef/cancellation',
+          // #57. The POST path appears twice: the quote and the creation
+          // share it. No balance, grant, consumption or return route.
+          '/api/v1/me/subscriptions/:workspaceRef/credit-purchases/quote',
+          '/api/v1/me/subscriptions/:workspaceRef/credit-purchases',
+          '/api/v1/me/subscriptions/:workspaceRef/credit-purchases',
         ].sort(),
       );
 

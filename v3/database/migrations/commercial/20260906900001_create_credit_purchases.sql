@@ -89,13 +89,13 @@ RETURNS TRIGGER
 LANGUAGE plpgsql
 AS $$
 DECLARE
-    schedule_state TEXT;
+    schedule_state VARCHAR(16);
     tier_count INTEGER;
     priced_tier_count INTEGER;
 BEGIN
     IF TG_OP = 'INSERT' THEN
         IF NEW.lifecycle_state <> 'draft' THEN
-            RAISE EXCEPTION 'commercial.plan_versions must be created as a draft: a row cannot be born published'
+            RAISE EXCEPTION 'commercial.plan_versions must be created as draft: publication is a transition, not an initial state'
                 USING ERRCODE = 'restrict_violation';
         END IF;
         RETURN NEW;
@@ -103,10 +103,15 @@ BEGIN
 
     IF TG_OP = 'DELETE' THEN
         IF OLD.lifecycle_state <> 'draft' THEN
-            RAISE EXCEPTION 'commercial.plan_versions may only be deleted while it is a draft: a published version is a historical record'
+            RAISE EXCEPTION 'commercial.plan_versions cannot be deleted once published: a version somebody may have subscribed against is not removable'
                 USING ERRCODE = 'restrict_violation';
         END IF;
         RETURN OLD;
+    END IF;
+
+    IF OLD.lifecycle_state = 'retired' THEN
+        RAISE EXCEPTION 'commercial.plan_versions is retired and permanently immutable: it can neither be reactivated nor edited, and restoring earlier terms requires a new version'
+            USING ERRCODE = 'restrict_violation';
     END IF;
 
     IF NEW.id IS DISTINCT FROM OLD.id
@@ -114,7 +119,8 @@ BEGIN
        OR NEW.version IS DISTINCT FROM OLD.version
        OR NEW.created_at IS DISTINCT FROM OLD.created_at
        OR NEW.created_by_user_id IS DISTINCT FROM OLD.created_by_user_id
-       OR NEW.created_by_label IS DISTINCT FROM OLD.created_by_label THEN
+       OR NEW.created_by_label IS DISTINCT FROM OLD.created_by_label
+    THEN
         RAISE EXCEPTION 'commercial.plan_versions identity is immutable: id, plan_key, version and the creation record cannot be changed'
             USING ERRCODE = 'restrict_violation';
     END IF;
@@ -138,8 +144,8 @@ BEGIN
         OR NEW.included_locations IS DISTINCT FROM OLD.included_locations
         OR NEW.capability_keys IS DISTINCT FROM OLD.capability_keys
         OR NEW.price_schedule_version_id IS DISTINCT FROM OLD.price_schedule_version_id
-        -- V3.3 #57 (`#40c-1`), `V33-DEC-027` R1: the binding is a published
-        -- term like every other, so repricing a seller's credits means
+        -- V3.3 #57 (`#40c-1`), `V33-DEC-027` R1: the booking-credit binding is a
+        -- published term like every other, so repricing a seller's credits means
         -- publishing a new plan version, never editing this one.
         OR NEW.booking_credit_schedule_key IS DISTINCT FROM OLD.booking_credit_schedule_key
         OR NEW.auto_assignable IS DISTINCT FROM OLD.auto_assignable
@@ -157,11 +163,16 @@ BEGIN
         SELECT lifecycle_state INTO schedule_state
           FROM commercial.price_schedule_versions WHERE id = NEW.price_schedule_version_id;
 
+        -- A published plan priced by a draft schedule would be selectable at a
+        -- price still being edited.
         IF schedule_state IS DISTINCT FROM 'published' THEN
             RAISE EXCEPTION 'commercial.plan_versions cannot be published against a price schedule version that is not itself published'
                 USING ERRCODE = 'restrict_violation';
         END IF;
 
+        -- The base workspace cannot silently become paid. `V33-DEC-009` fixes
+        -- `D-7` as ZERO-price, and this is where that survives a later edit
+        -- attempt -- it does not depend on anyone remembering.
         IF NEW.auto_assignable THEN
             SELECT count(*), count(*) FILTER (WHERE unit_price_toman <> 0)
               INTO tier_count, priced_tier_count
@@ -238,6 +249,9 @@ BEGIN
             USING ERRCODE = 'restrict_violation';
     END IF;
 
+    -- `active` is only ever an INITIAL state. Nothing returns to it, so a
+    -- cancelled subscription cannot be revived -- which would also be a second
+    -- way past the partial unique index.
     IF OLD.lifecycle_state <> 'active' THEN
         RAISE EXCEPTION 'seller_subscriptions.% is terminal: no transition leaves %', OLD.lifecycle_state, OLD.lifecycle_state
             USING ERRCODE = 'restrict_violation';
