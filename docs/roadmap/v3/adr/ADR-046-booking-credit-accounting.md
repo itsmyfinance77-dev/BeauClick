@@ -85,7 +85,11 @@ than locked out.
 `V33-DEC-009` forbids it, and a repository check already enforces that against
 the catalogue.
 
-Global fail-closed enforcement is `#95` (`#58b`), blocked on #46.
+Global fail-closed enforcement is `#95` (`#58b`), blocked on #46. *(Amended
+2026-09-06, `V33-DEC-028`: #46 closed structurally and #95 is now **Ready** at 5 SP.
+The blocker was never the grant source — an administrator may publish a zero-price
+plan version carrying a positive `included_booking_credits` today — but the rollout
+treatment for sellers holding the seeded zero grant, which #95 now owns.)*
 
 ### 3. One confirmation-wide port
 
@@ -237,20 +241,31 @@ at zero balance; only a genuinely new first confirmation can be refused.
 
 ## What was deliberately not built
 
-- Global fail-closed enforcement — **#95 (`#58b`)**, blocked on #46.
-- Any positive quantity, grace, expiry, overage, cutoff, retention rule, no-show penalty or notification threshold — **#46**.
+- Global fail-closed enforcement — **#95 (`#58b`)**, blocked on #46. *(Amended 2026-09-06, `V33-DEC-028`: unblocked and Ready; still not built here.)*
+- Any positive quantity, grace, expiry, overage, cutoff, retention rule, no-show penalty or notification threshold — **#46**. *(Amended 2026-09-06, `V33-DEC-028`: all still unpublished; the quantity is an administrator-published plan value, and the cutoff, retention and no-show rules moved to **#42** with Legal.)*
 - `custom_purchase` grants; `ck_booking_credit_grants_source` is **not** widened — **#99 (`#40c-2`)**.
   *(Amended 2026-09-06, `V33-DEC-026`: attributed to #57 when written; the split moved
   the widening, and the partial-index replacement of `uq_booking_credit_grants_once`, to
   the paid child. `uq_bcg_identity` and `fk_bcc_grant_identity` are untouched by it.)*
-- Customer-cancellation return or retention — **#46**.
+- Customer-cancellation return or retention — **#46**. *(Amended 2026-09-06, `V33-DEC-028`: moved to **#42**, which owns cancellation, no-show evidence, dispute and retention; retention is an outcome, never a collection mode, and stays inert until Legal.)*
 - Any commercial event, `ServiceName`, HTTP route, balance response or client selector.
 - Any change to booking, order, payment or ledger semantics.
 
 ## Open gates
 
-- The production-positive grant or allowance source, and the rollout treatment for existing sellers — #46, then #95.
-- Customer-cancellation return, no-show retention and cutoffs — `V33-DEC-013`, #46.
+- The rollout treatment for existing sellers — **#95**. *(Corrected 2026-09-06 by
+  `V33-DEC-028` Ruling 10. This entry previously read "The production-positive grant or
+  allowance source, and the rollout treatment for existing sellers — #46, then #95." The
+  first half was stale: `plan_versions.included_booking_credits` is administrator-supplied,
+  `NOT NULL` and has no default, `ck_seller_subscriptions_zero_price` constrains the plan
+  price rather than its entitlement, and `issueForActivation` writes the subscription's
+  snapshotted quantity — so a positive source is already reachable through an
+  administrator-published zero-price plan version. No synthetic backfill is created;
+  existing `D-7` sellers stay legacy-exempt until explicitly transitioned, and #95's
+  activation must fail closed while any eligible active seller remains unintentionally
+  legacy-exempt, offer a non-mutating preview and count, and retain a persistent audited
+  kill switch.)*
+- Customer-cancellation return, no-show retention and cutoffs — `V33-DEC-013`, now on **#42** with Legal. *(Amended 2026-09-06, `V33-DEC-028`.)*
 - Credit expiry, if it is ever approved — would version the allocation rule in §4.
 - Paid purchase of credits — **#99 (`#40c-2`)**, itself gated by #47. *(Amended 2026-09-06,
   `V33-DEC-026`.)* The purchase RECORD and its immutable price snapshot are `#40c-1`

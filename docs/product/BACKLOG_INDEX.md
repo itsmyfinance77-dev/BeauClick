@@ -28,7 +28,7 @@ delivering its Story Points never creates a tag and never enables production.
 | V3.2-E | B2B Quotes and Campaigns | Owner-gated; payment gate applies to settlement | Not applicable | Not enabled |
 | V3.2-F | Payout and Calendar Automation | Predominantly external-gated | Not applicable | Not enabled |
 | V3.2-G | Evidence-Gated Scale | No commitment without evidence | Not applicable | Not enabled |
-| V3.3 | Product Maturity Programme | Active foundation: #39, #40 (`#40a`), #56 (`#56a`), #69 (`#56b`), #72 and #75 complete; epic #38 in progress; Story #41 decomposed by `V33-DEC-022` into #41 (`#41a`), #81 (`#41b`), #82 (`#41c`) and #83 (`#41d`) and re-estimated 13 -> 42 (#82 raised 8 -> 13 by `V33-DEC-024`); #41 (`#41a`), #81 (`#41b`) and #82 (`#41c`) complete, #83 (`#41d`) gated; #58 split by `V33-DEC-025` into `#58a` (13, **complete**) and `#58b` (3, blocked on #46); #57 split by `V33-DEC-026` into `#40c-1` (#57, Ready) and #99 (`#40c-2`, 5, blocked on #47), #57 then re-estimated 8 -> 13 by `V33-DEC-027`; bug #97 (2) complete | No tag authorized | Real money blocked by #47; unresolved values/copy blocked by #46 |
+| V3.3 | Product Maturity Programme | Active foundation: #39, #40 (`#40a`), #56 (`#56a`), #69 (`#56b`), #72 and #75 complete; epic #38 in progress; Story #41 decomposed by `V33-DEC-022` into #41 (`#41a`), #81 (`#41b`), #82 (`#41c`) and #83 (`#41d`) and re-estimated 13 -> 42 (#82 raised 8 -> 13 by `V33-DEC-024`); #41 (`#41a`), #81 (`#41b`) and #82 (`#41c`) complete, #83 (`#41d`) gated; #58 split by `V33-DEC-025` into `#58a` (13, **complete**) and `#58b` (3, blocked on #46); #57 split by `V33-DEC-026` into `#40c-1` (#57, **complete** at 13 after `V33-DEC-027` re-estimated it 8 -> 13) and #99 (`#40c-2`, 5, blocked on #47); bug #97 (2) complete; commercial structure ratified and **#46 closed** 2026-09-06 by `V33-DEC-028`, which moved #83 (13) and #95 (`#58b`, 3 -> 5) to Ready and re-estimated #43 13 -> 21 | No tag authorized | Real money blocked by #47; every commercial value and all legal copy remain **unpublished**, now tracked on #83, #42 (Legal), #43 and #47 rather than #46 |
 | V3.4 | Conditional Expansion Programme | Written owner decision and evidence required | Not applicable | Not enabled |
 
 V3.2-A and V3.2-B are completed historical milestones but are deliberately
@@ -103,7 +103,7 @@ delivered as one 13-point item:
 | #57 (`#40c`) → `#40c-1` | — | 5 -> 8 -> **13** | Custom booking-credit purchase **record** and immutable price snapshot. Depends on #40; requires ADR-047 before schema or code. **Split and re-estimated 2026-09-06 by `V33-DEC-026`:** the story's paid half cannot be written because **no gateway adapter exists in the repository** — the only provider is the sandbox, disabled under `NODE_ENV=production` — while the purchase record and its snapshot are fully buildable against an administrator-published schedule with no commercial value chosen by engineering. This child writes **no grant of any kind**, its lifecycle is `awaiting_payment | abandoned`, and neither state confers entitlement. Reuses `bc_manage_own_subscription` and `workspaceRef`; adds no capability, order, payment intent, ledger entry, event or provider. **Re-estimated 8 -> 13 on 2026-09-06 by `V33-DEC-027`**, which answered a question `V33-DEC-026` left open: nothing selected WHICH `booking_credit` schedule prices a quantity, because several are legal and the anti-overlap constraint is key-scoped. The administrator now binds a nullable, stable schedule key to an immutable plan version, the subscription snapshots it at activation, and each request resolves that key's version active at the request instant. Existing `D-7` plan versions and subscriptions stay null and are **not** backfilled, so this story ships safely unavailable. |
 | #99 (`#40c-2`) | — | **5** | Paid activation of a custom booking-credit purchase: a dedicated authoritative purchase-payment fact, a verified adapter boundary the commercial domain cannot self-attest to, and one atomic transition from that fact to a `custom_purchase` grant. Created 2026-09-06 by `V33-DEC-026`. Widens `ck_booking_credit_grants_source`, replaces `uq_booking_credit_grants_once` with a **partial** index on `source = 'plan_included'` — the current constraint permits each seller exactly one custom purchase for ever — adds `UNIQUE (purchase_id)` and leaves `uq_bcg_identity` untouched. Depends on #57 and **#47**; blocked until a real rail exists. |
 | #58 (`#40d`) → `#58a` | — | 8 -> **13** | Atomic consumption at first `confirmed` and idempotent return. Depends on #56 and the mandatory transaction seam #81 shipped; `V33-DEC-023` Ruling 8 fixes that seam's shape (mandatory, non-optional, caller's `EntityManager`, booking id only, no client-supplied owner/party/quantity) and this story replaces its no-op binding with real consumption. **Split and corrected 2026-09-06 by `V33-DEC-025`:** re-estimated 8 -> 13; **#57 is no longer a prerequisite** — the balance model reads any immutable grant row; the zero-collectible-only seam becomes one confirmation-wide port invoked from **both** confirmation paths; and enforcement is **selective**, active only for a party holding a positive grant, because the seeded `D-7` grant is zero and global enforcement would refuse every seller's next confirmation. Global activation is `#58b`. |
-| `#58b` | — | **3** | Global booking-credit enforcement activation: the explicit switch from `#58a`'s selective enforcement to fail-closed, plus its rollout proof. Created 2026-09-06 by `V33-DEC-025`. Depends on `#58a` and **#46**; blocked until #46 ratifies a production-positive grant source and a rollout treatment for existing sellers. Redesigns no schema, consumption algorithm or return model. |
+| `#58b` (#95) | — | 3 -> **5** | Global booking-credit enforcement activation: the explicit switch from `#58a`'s selective enforcement to fail-closed, plus its rollout proof. Created 2026-09-06 by `V33-DEC-025`. Depends on `#58a`. Redesigns no schema, consumption algorithm or return model. **Corrected and unblocked 2026-09-06 by `V33-DEC-028` Ruling 10:** the claim that no production-positive grant source is reachable was stale — an administrator may publish a zero-price plan version carrying a positive `included_booking_credits` today — so the real gap was the rollout treatment. This story now owns it, with no synthetic backfill: existing `D-7` sellers stay legacy-exempt until explicitly transitioned, the activation command fails closed while any eligible active seller remains unintentionally legacy-exempt, offers a non-mutating preview and count, retains a persistent audited emergency kill switch, and only then activates atomically. Re-estimated 3 -> 5 and moved to Ready. |
 | **Total** | **13** | **58** | Net V3.3 scope movement **+45**. Was 53; `V33-DEC-027` raised #57 8 -> 13. |
 
 `#40b` was split a second time on 2026-09-03 (`V33-DEC-018`), after the Story #56
@@ -137,6 +137,12 @@ Three corrections were recorded with the decomposition:
 One backlog-hygiene rule this pass exercised: a structural decision closing does
 not close its decision issue. #46 stays `status:decision` and keeps its 5 points
 because the commercial values it owns are untouched.
+
+*(Superseded 2026-09-06 by `V33-DEC-028`, which closed #46 itself as a structural
+product decision. The rule above is still correct for the pass it describes: what
+changed is that #46's own structural question was finally decided, not that its
+values were published. Every value it carried remains `OPEN / UNPUBLISHED` and moved
+to #83, #42, #43 and #47. #46 keeps `sp:5` and its 5 points now count as done.)*
 
 ## V3.3-A Story #40 (`#40a`) delivered, 2026-09-02
 
@@ -301,3 +307,53 @@ liability or revenue fact. Execution is schedule-driven with no mode selector an
 no part of #83. #82 stays one story, is re-estimated **8 -> 13 SP**, becomes
 Ready, and needs ADR-045 before any schema or executable code. It approved no
 commercial or legal value: #46, #47 and #83 keep their gates.
+
+## V3.3 commercial structure ratified and #46 closed, 2026-09-06
+
+`V33-DEC-028` closed the long-open commercial decision **structurally, not
+numerically**. Every launch value stays explicitly `OPEN / UNPUBLISHED`, no legal
+wording was approved or invented, and **Legal did not sign off** — the legal gates
+moved to the issues that actually carry them rather than disappearing.
+
+**What the ruling settled.** Every commercial parameter is an administrator-managed
+immutable version with non-overlapping effective windows, a one-way
+`draft -> published -> retired` lifecycle, privileged publication with live
+revocation, and mandatory transactional audit; no commercial number may survive as a
+code constant, fallback, seed or environment-variable product truth. Every commitment
+snapshots the effective version and the exact money or quantity, and nothing
+downstream re-reads live policy. Ordinary administrator publication is **not**
+retroactive: the activation instant is database-authoritative and never earlier than
+publication. Collection modes stay exactly three, with fixed and percentage deposits
+as calculation rules rather than modes. Deposit retention is a cancellation/no-show
+outcome owned by #42, bounded by money actually collected and inert before Legal.
+Missing configuration fails closed everywhere. Optional four-eyes publication approval
+is deferred as a **named future decision**, and no issue was created for it.
+
+**Two verified contradictions were recorded rather than assumed away.**
+`FinancialConfig.DEFAULT_COMMISSION_RATE_BP = 1500` and
+`FINANCIAL_COMMISSION_RATE_BP` are a deployment-time commercial decision with no
+version, window, audit row or capability — #43 must replace them with a versioned
+commission policy, and until one is published a new commission-bearing ledger write
+fails closed rather than defaulting to 15%. And the **pending-funds model does not
+exist**: settlement is an immediate manual administrator action, so #43 builds the
+model before any timing value can mean anything.
+
+**Issue transitions.**
+
+| Issue | Before | After | Change |
+|---|---|---|---|
+| #46 | OPEN, `status:decision`, `gate:product`, `gate:legal`, `sp:5` | **CLOSED**, `sp:5` retained | Structural closure. Status and both gates removed; Legal did not approve, and the legal gates live on #42 and #47 |
+| #83 (`#41d`) | `status:proposed`, `gate:product`, `gate:legal`, 13 | **`status:ready`**, 13 | Publishes and selects versioned policy; activates no provider; stays fail-closed |
+| #42 | `status:proposed`, `gate:product`, `gate:legal`, 13 | `status:proposed`, **`gate:legal` retained**, 13 | `gate:product` removed; it owns cancellation, no-show evidence, dispute, retention and customer copy |
+| #43 | `status:proposed`, `gate:product`, `gate:external`, 13 | `status:proposed`, **`gate:external` retained**, **21** | `gate:product` removed; it now also owns versioned commission policy, retiring the 1500/env fallback, pending funds, reserve/hold, settlement release, reversal/clawback and exact reconciliation |
+| #95 (`#58b`) | `status:blocked`, `gate:product`, 3 | **`status:ready`**, **5** | Premise corrected; it now owns the legacy-exempt preview, migration, atomic activation and kill-switch contract |
+| #47, #99, #44 | — | **unchanged** | External and legal gates genuinely open; verticals are a separate decision |
+
+**Scope movement.** V3.3 scope moves **208 → 218** (#43 +8, #95 +2) and done moves
+**117 → 122**, because closing #46 counts its retained 5 points as delivered. That is
+a governance closure, not engineering velocity: no code, schema, migration, route,
+contract or test changed, and **no implementation started**.
+
+**ADR-048 is required before the first schema or executable implementation** of
+`V33-DEC-028`, and was deliberately not written in the governance change that
+recorded the decision.
