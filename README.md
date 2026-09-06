@@ -104,7 +104,7 @@ overage), and Story #40 was decomposed from one 13-point item into four:
 | #58 (`#40d`) → `#58a` | 8 -> **13** | Atomic consumption at first `confirmed` and idempotent return, enforced **selectively** — active only for a seller who holds a positive grant |
 | `#58b` (#95) | 3 -> **5** | Global fail-closed enforcement activation. **Ready** since `V33-DEC-028`; it owns the legacy-exempt rollout, the non-mutating preview, the atomic activation and the audited kill switch |
 | #83 (`#41d`) -> `#41d-1` | **13** | Administrator-published versioned booking collection policy. Publication only; changes no order behaviour |
-| `#41d-2` | **8** | Seller-party assignment and the immutable order snapshot, behind an explicit dark-launch boundary. Created 2026-09-06 by `V33-DEC-029` |
+| #104 (`#41d-2`) | **8** | Seller-party assignment and the immutable order snapshot, behind an explicit dark-launch boundary. Created 2026-09-06 by `V33-DEC-029` |
 
 `#40b` was split again on 2026-09-03 (`V33-DEC-018`): #56 keeps its number and its
 8 points as the foundation, and #69 carries the 5-point seller surface, so the
@@ -156,7 +156,7 @@ transaction seam #58 hooks; #82 (`#41c`) sandbox deposit execution with the refu
 ceiling and the ledger limited to money actually collected; and #83 (`#41d`) the
 administrator-versioned policy publication, which was blocked by #46, became Ready
 on 2026-09-06 when `V33-DEC-028` closed it structurally, and was split the same day by
-`V33-DEC-029` into `#41d-1` (#83, 13) and `#41d-2` (8). That closure fixes
+`V33-DEC-029` into `#41d-1` (#83, 13) and #104 (`#41d-2`, 8). That closure fixes
 sequencing only — no deposit value, percentage base, rounding value or enabled mode was
 chosen, and #47 gates real provider collection and settlement rather than the structural
 work.
@@ -244,7 +244,7 @@ that would be false. Filling any of those with a zero, a placeholder or an inven
 identifier would have put commercial and legal values into code, which `V33-DEC-028`
 forbids. So the foundation gains a **collection-only** contract — mode, deposit rule,
 calculation base, contract version, key/version, resolution instant — `#41d-1` (#83, 13
-points) publishes versioned policy and changes no order behaviour, and `#41d-2` (8 points)
+points) publishes versioned policy and changes no order behaviour, and #104 (`#41d-2`, 8 points)
 adds seller-party assignment and the immutable order snapshot behind an explicit **dark
 launch**: an unenrolled party stays on today's named legacy path with a stated exit, and an
 enrolled one resolves or fails closed with no post-lookup fallback. Acceptance is never

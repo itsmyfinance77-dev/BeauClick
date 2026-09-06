@@ -256,7 +256,7 @@ unclaimed, so the classification cannot be forgotten.
   `V33-DEC-028` and `V33-DEC-029`: both decisions' structural halves are closed and
   #83 is Ready, so it is no longer blocked. `V33-DEC-029` then split the work —
   **publication** is `#41d-1` (#83, 13 SP) and changes no order behaviour; **selection
-  and the order snapshot** are `#41d-2` (8 SP), which also replaces this schema's
+  and the order snapshot** are #104 (`#41d-2`, 8 SP), which also replaces this schema's
   all-three `ck_ops_policy_reference` with key/version all-or-none and independently
   nullable acceptance, because `policy_accepted_at` may not be fabricated. Existing
   rows stay byte-identical. ADR-048 constrains both.)*
