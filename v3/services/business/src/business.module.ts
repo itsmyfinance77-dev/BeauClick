@@ -7,9 +7,11 @@ import { BusinessStaffEntity } from './entities/business-staff.entity';
 import { BusinessOutboxEntity } from './entities/business-outbox.entity';
 import { BusinessVerticalEntity } from './entities/business-vertical.entity';
 import { BusinessTraitEntity } from './entities/business-trait.entity';
+import { BusinessLocationEntity } from './entities/business-location.entity';
 
 import { BusinessService } from './business.service';
 import { BusinessClassificationService } from './business-classification.service';
+import { BusinessLocationService } from './business-location.service';
 import { StaffService } from './staff.service';
 import { BusinessController } from './business.controller';
 import {
@@ -29,6 +31,11 @@ export const BUSINESS_ENTITIES = [
   // cannot be reachable at runtime while being invisible to the ORM.
   BusinessVerticalEntity,
   BusinessTraitEntity,
+  // V3.3 Story #108 (`#44b`). Registered here and nowhere else, exactly as the
+  // #107 tables above: the composition root spreads this list onto the main
+  // DataSource, so a new business table cannot be reachable at runtime while
+  // being invisible to the ORM.
+  BusinessLocationEntity,
 ];
 
 @Module({
@@ -38,6 +45,12 @@ export const BUSINESS_ENTITIES = [
     BusinessSubjectDataContract,
     BusinessService,
     BusinessClassificationService,
+    // V3.3 Story #108 (`#44b`). It injects `LOCATION_CITY_CATALOGUE` and
+    // `WORKSPACE_REFERENCE_SECRET`, both bound globally by `DomainPortsModule` --
+    // `BusinessModule` declares neither, so a composition that omits the
+    // composition root fails to boot rather than silently mis-wiring the city
+    // check, the same shape `BUSINESS_OWNER_ROLE_GRANT` already uses.
+    BusinessLocationService,
     StaffService,
     BusinessMembershipResolver,
     BusinessOwnerResolver,
@@ -48,6 +61,7 @@ export const BUSINESS_ENTITIES = [
     BusinessSubjectDataContract,
     BusinessService,
     BusinessClassificationService,
+    BusinessLocationService,
     StaffService,
     BusinessMembershipResolver,
     TypeOrmModule,

@@ -516,6 +516,9 @@ export const RESETTABLE_TABLES = [
   // state a clean migration leaves: empty.
   'business.business_verticals',
   'business.business_traits',
+  // V3.3 Story #108 (`#44b`). Another child of `business.businesses` by a real
+  // same-schema FK, before it, and the migration seeds no row.
+  'business.locations',
   'business.businesses',
   'analytics.daily_metrics',
   'analytics.rollup_state',
@@ -745,6 +748,17 @@ export async function seedBusiness(dataSource: DataSource, ownerUserId: string, 
     [id, ownerUserId, displayName],
   );
   return { id, ownerUserId };
+}
+
+/** V3.3 #108 (`#44b`). A launched city row, so a location create has something valid to point at. */
+export async function seedCity(dataSource: DataSource, name: string, isLaunched = true): Promise<string> {
+  const id = uuidv7();
+  await dataSource.query(`INSERT INTO provider.locations_cities (id, name, is_launched) VALUES ($1, $2, $3)`, [
+    id,
+    name,
+    isLaunched,
+  ]);
+  return id;
 }
 
 /** A slot far enough ahead to satisfy the reschedule minimum-notice rule. */

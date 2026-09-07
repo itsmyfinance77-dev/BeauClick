@@ -18,5 +18,8 @@ module.exports = {
     // the mapping -- a runtime-global is not a substitute for a real dependency.
     '^@beauclick/audit$': '<rootDir>/../../libs/audit/src/index.ts',
     '^@beauclick/subject-data$': '<rootDir>/../../libs/subject-data/src/index.ts',
+    // V3.3 #108: the location service derives its opaque `locationRef` through
+    // the shared reference primitive.
+    '^@beauclick/workspace-reference$': '<rootDir>/../../libs/workspace-reference/src/index.ts',
   },
 };
