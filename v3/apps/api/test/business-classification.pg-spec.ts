@@ -10,6 +10,14 @@ import {
   StaffService,
 } from '@beauclick/business';
 
+import {
+  CatalogueTable,
+  SUBJECT_DATA_CONTRACTS,
+  SubjectDataContract,
+  SubjectDataCoverageService,
+  evaluateCoverage,
+} from '@beauclick/subject-data';
+
 import { createPgTestApp, requiredPgEnv, resetDatabase, seedBusiness, seedUser } from './pg-test-app.factory';
 
 /**
@@ -39,6 +47,8 @@ describeIfPg('Business classification on real PostgreSQL (#107)', () => {
   let classification: BusinessClassificationService;
   let businesses: BusinessService;
   let staff: StaffService;
+  let coverage: SubjectDataCoverageService;
+  let contracts: SubjectDataContract[];
 
   const uniquePhone = (prefix: string) => `${prefix}${String(Date.now()).slice(-6)}${Math.floor(Math.random() * 90 + 10)}`;
 
@@ -49,6 +59,8 @@ describeIfPg('Business classification on real PostgreSQL (#107)', () => {
     classification = app.get(BusinessClassificationService);
     businesses = app.get(BusinessService);
     staff = app.get(StaffService);
+    coverage = app.get(SubjectDataCoverageService);
+    contracts = app.get(SUBJECT_DATA_CONTRACTS);
   });
 
   afterAll(async () => {
@@ -859,6 +871,84 @@ describeIfPg('Business classification on real PostgreSQL (#107)', () => {
         `SELECT (SELECT count(*) FROM business.business_verticals) + (SELECT count(*) FROM business.business_traits) AS count`,
       );
       expect(Number(count)).toBe(0);
+    });
+
+    it('the ADR-027 coverage assertion sees BOTH new tables in the real catalogue and claims them exactly once', async () => {
+      const catalogue = await coverage.readCatalogue();
+      const names = catalogue.map((table) => `${table.schema}.${table.name}`);
+      expect(names).toContain('business.business_verticals');
+      expect(names).toContain('business.business_traits');
+
+      const report = await coverage.evaluate(contracts);
+      expect(report.violations).toEqual([]);
+      expect(report.tablesClaimed).toBe(report.tablesInDatabase);
+    });
+
+    it.each([
+      // Every violation kind the coverage engine can raise, planted against the
+      // REAL catalogue and the REAL contract list -- so each is a control over
+      // the assertion above rather than over a toy fixture. Without these, a
+      // passing coverage report is indistinguishable from an engine that stopped
+      // detecting anything.
+      [
+        'an unclaimed new table',
+        'unclaimed',
+        (catalogue: CatalogueTable[], contracts: SubjectDataContract[]) => ({
+          catalogue: [...catalogue, { schema: 'business', name: 'zz_never_a_real_classification_table', columns: ['business_id'] }],
+          contracts,
+        }),
+      ],
+      [
+        'a stale claim for a table that no longer exists',
+        'claimed_but_absent',
+        (catalogue: CatalogueTable[], contracts: SubjectDataContract[]) => ({
+          catalogue: catalogue.filter((table) => `${table.schema}.${table.name}` !== 'business.business_traits'),
+          contracts,
+        }),
+      ],
+      [
+        'the same table claimed by two modules',
+        'claimed_twice',
+        (catalogue: CatalogueTable[], contracts: SubjectDataContract[]) => ({
+          catalogue,
+          contracts: [
+            ...contracts,
+            {
+              moduleKey: 'planted_second_owner',
+              tables: [{ table: 'business.business_verticals', disposition: 'retained' as const, reason: 'planted duplicate' }],
+              exportSubjectData: async () => [],
+              eraseSubjectData: async () => ({ moduleKey: 'planted_second_owner', anonymized: 0, deleted: 0, retained: [] }),
+            } as unknown as SubjectDataContract,
+          ],
+        }),
+      ],
+      [
+        'a dishonest `no_subject_data` claim on a table carrying an identity column',
+        'wrongly_declared_empty',
+        (catalogue: CatalogueTable[], contracts: SubjectDataContract[]) => ({
+          catalogue: [...catalogue, { schema: 'business', name: 'zz_planted_identity_table', columns: ['id', 'user_id'] }],
+          contracts: [
+            ...contracts,
+            {
+              moduleKey: 'planted_dishonest',
+              tables: [
+                { table: 'business.zz_planted_identity_table', disposition: 'no_subject_data' as const, reason: 'planted dishonest claim' },
+              ],
+              exportSubjectData: async () => [],
+              eraseSubjectData: async () => ({ moduleKey: 'planted_dishonest', anonymized: 0, deleted: 0, retained: [] }),
+            } as unknown as SubjectDataContract,
+          ],
+        }),
+      ],
+    ])('the coverage engine still detects %s', async (_name, kind, mutate) => {
+      const catalogue = await coverage.readCatalogue();
+      const mutated = (mutate as (c: CatalogueTable[], k: SubjectDataContract[]) => { catalogue: CatalogueTable[]; contracts: SubjectDataContract[] })(
+        [...catalogue],
+        [...contracts],
+      );
+
+      const report = evaluateCoverage(mutated.catalogue, mutated.contracts);
+      expect(report.violations.map((violation) => violation.kind)).toContain(kind);
     });
 
     it('classification survives erasure of the owner and is reported as retained', async () => {
