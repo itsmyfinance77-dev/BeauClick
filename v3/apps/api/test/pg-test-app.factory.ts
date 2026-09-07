@@ -510,6 +510,12 @@ export const RESETTABLE_TABLES = [
   'waitlist.entries',
   'business.outbox_events',
   'business.business_staff',
+  // V3.3 Story #107 (`#44a`). Children BEFORE `business.businesses`, matching
+  // this list's own convention -- both reference it by a real same-schema FK,
+  // and the migration seeds neither, so a reset returns them to exactly the
+  // state a clean migration leaves: empty.
+  'business.business_verticals',
+  'business.business_traits',
   'business.businesses',
   'analytics.daily_metrics',
   'analytics.rollup_state',

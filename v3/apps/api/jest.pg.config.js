@@ -43,6 +43,9 @@ module.exports = {
     '^@beauclick/search$': '<rootDir>/../../services/search/src/index.ts',
     '^@beauclick/media$': '<rootDir>/../../libs/media/src/index.ts',
     '^@beauclick/audit$': '<rootDir>/../../libs/audit/src/index.ts',
+    // V3.3 #107. The classification suite drives the business module's own
+    // services and its subject-data contract directly, not only through HTTP.
+    '^@beauclick/business$': '<rootDir>/../../services/business/src/index.ts',
   },
   testTimeout: 30000,
   // Real DB tests share one server; run serially so TRUNCATE between cases

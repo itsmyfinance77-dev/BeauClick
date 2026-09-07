@@ -718,6 +718,9 @@ importers:
 
   services/business:
     dependencies:
+      '@beauclick/audit':
+        specifier: workspace:*
+        version: link:../../libs/audit
       '@beauclick/auth':
         specifier: workspace:*
         version: link:../../libs/auth

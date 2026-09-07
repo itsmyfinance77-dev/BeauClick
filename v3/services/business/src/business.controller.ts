@@ -1,14 +1,16 @@
-import { Body, Controller, Get, Param, Post, Patch } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Patch, Put } from '@nestjs/common';
 import { AuthenticatedUser, CurrentUser } from '@beauclick/http';
 import { NotFoundOrNotYoursException, ResolveOwner } from '@beauclick/ownership';
 
 import { BusinessService } from './business.service';
+import { BusinessClassification, BusinessClassificationService } from './business-classification.service';
 import { StaffService } from './staff.service';
 import { BusinessEntity } from './entities/business.entity';
 import { BusinessStaffEntity } from './entities/business-staff.entity';
 import { CreateBusinessDto } from './dto/create-business.dto';
 import { UpdateBusinessDto } from './dto/update-business.dto';
 import { InviteStaffDto } from './dto/staff.dto';
+import { ReplaceBusinessClassificationDto } from './dto/business-classification.dto';
 import {
   BusinessManagerResolver,
   BusinessMembershipResolver,
@@ -27,6 +29,18 @@ function toBusinessShape(business: BusinessEntity) {
     verificationStatus: business.verificationStatus,
     createdAt: business.createdAt.toISOString(),
   };
+}
+
+/**
+ * The classification response shape.
+ *
+ * Neutral and complete: an unclassified business answers `vertical: null` and
+ * an empty trait array rather than a `404`, because "not yet answered" is a
+ * legal state (`V33-DEC-032` R3) and a missing resource is not what it means.
+ * Traits are already sorted by the service, so the whole body is deterministic.
+ */
+function toClassificationShape(classification: BusinessClassification) {
+  return { vertical: classification.vertical, traits: [...classification.traits] };
 }
 
 function toStaffShape(row: BusinessStaffEntity) {
@@ -48,6 +62,7 @@ export class BusinessController {
   constructor(
     private readonly businesses: BusinessService,
     private readonly staff: StaffService,
+    private readonly classification: BusinessClassificationService,
   ) {}
 
   @Post('businesses')
@@ -75,6 +90,45 @@ export class BusinessController {
   async update(@Param('id') id: string, @Body() dto: UpdateBusinessDto) {
     const business = await this.businesses.update(id, dto);
     return toBusinessShape(business);
+  }
+
+  // -----------------------------------------------------------------------
+  // Classification and operating traits -- V3.3 Story #107 (`#44a`).
+  //
+  // Two routes, on the two DIFFERENT authorization boundaries the story
+  // ratified: any live member may READ what the business is, only the live
+  // OWNER may change it. `@ResolveOwner` is declared on each HANDLER and never
+  // on the class -- `OwnershipGuard` reflects handler metadata only, so a
+  // class-level decorator would be silently ignored and every route on this
+  // controller would lose its check while the decorator read as protection
+  // (ADR-049 section 2.5).
+  //
+  // `GET /v1/me/business` and the existing business projection are deliberately
+  // untouched: widening a shipped response to carry classification would change
+  // a contract this story is not authorized to change.
+  // -----------------------------------------------------------------------
+
+  @ResolveOwner(BusinessMembershipResolver)
+  @Get('businesses/:id/classification')
+  async getClassification(@Param('id') id: string) {
+    return toClassificationShape(await this.classification.read(id));
+  }
+
+  /**
+   * Full replacement. Owner-only: an ACTIVE manager or staff member resolves to
+   * `null` here and receives the same refusal a stranger does.
+   *
+   * The actor comes from the session and the business from the path -- neither
+   * is ever a body field, and the DTO structurally cannot carry one.
+   */
+  @ResolveOwner(BusinessOwnerResolver)
+  @Put('businesses/:id/classification')
+  async replaceClassification(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: ReplaceBusinessClassificationDto,
+  ) {
+    return toClassificationShape(await this.classification.replace(id, user.userId, dto));
   }
 
   @ResolveOwner(BusinessMembershipResolver)
