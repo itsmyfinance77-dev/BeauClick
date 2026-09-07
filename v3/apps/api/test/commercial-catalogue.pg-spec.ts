@@ -1110,11 +1110,14 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
       // `booking_credit_consumptions` and `booking_credit_returns`; ten since
       // Story #57 (`#40c-1`) added `credit_purchases`; twelve since Story #83
       // (`#41d-1`) added `booking_collection_policies` and
-      // `booking_collection_policy_versions`. The count is asserted exactly,
-      // rather than loosened to a minimum, because an exact number is what
-      // makes a table added without a subject-data claim fail HERE with a
-      // readable message instead of at application boot.
-      expect(rows).toHaveLength(12);
+      // `booking_collection_policy_versions`; thirteen since Story #104
+      // (`#41d-2a`) added `seller_collection_policy_assignments`. The count is
+      // asserted exactly, rather than loosened to a minimum, because an exact
+      // number is what makes a table added without a subject-data claim fail
+      // HERE with a readable message instead of at application boot -- so it is
+      // raised deliberately, with the new table's own claim shipped alongside,
+      // and never relaxed to `toBeGreaterThan`.
+      expect(rows).toHaveLength(13);
 
       const contracts = app.get<SubjectDataContract[]>(SUBJECT_DATA_CONTRACTS);
       const report = evaluateCoverage(rows, contracts);
@@ -1133,6 +1136,11 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
       // `commercial` schema rather than this story's five tables, so a later
       // story adding an undetectable identity column fails HERE.
       expect(names).toEqual([
+        // V3.3 Story #104 (`#41d-2a`): who chose a collection policy, and who
+        // replaced it. Both carry the detectable suffix, which is what makes
+        // the table's `retained` claim checkable -- a `no_subject_data` claim
+        // on it would be REJECTED at boot rather than merely being wrong.
+        'assigned_by_user_id',
         'cancelled_by_user_id',
         'created_by_user_id',
         'published_by_user_id',
@@ -1142,6 +1150,7 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
         // told about it.
         'requested_by_user_id',
         'retired_by_user_id',
+        'superseded_by_user_id',
       ]);
       // Non-vacuity: the platform's own detector agrees these are subject
       // columns, which is what makes a `no_subject_data` claim on these tables
@@ -1223,6 +1232,11 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
         'commercial/20260906900001_create_credit_purchases.sql',
         // V3.3 Story #83 (`#41d-1`). The collection-policy publication plane.
         'commercial/20260906950001_create_booking_collection_policies.sql',
+        // V3.3 Story #104 (`#41d-2a`). The seller assignment plane. Its
+        // companion identity migration is not listed because this query
+        // deliberately names only `add_commercial_plan_capability` from
+        // `identity/`; #104's capability migration is asserted in its own suite.
+        'commercial/20260907800001_create_seller_collection_policy_assignments.sql',
         'identity/20260902800002_add_commercial_plan_capability.sql',
       ]);
     });
@@ -1282,6 +1296,9 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
         'tg_price_schedule_versions_lifecycle',
         'tg_price_schedules_immutable',
         'tg_price_tiers_parent_is_draft',
+        // V3.3 Story #104 (`#41d-2a`): supersession is the only permitted
+        // update, it happens once, and there is no DELETE path at all.
+        'tg_scpa_immutable',
         'tg_seller_subscriptions_immutable',
       ]);
     });

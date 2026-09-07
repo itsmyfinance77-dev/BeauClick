@@ -24,6 +24,7 @@ import {
   CommercialCatalogueModule,
   CommercialPolicyModule,
   SellerSubscriptionModule,
+  CollectionPolicyAssignmentModule,
   SellerSubscriptionSurfaceModule,
 } from '@beauclick/commercial-policy';
 import { CHAT_OUTBOX_SOURCES } from './chat-tokens';
@@ -166,7 +167,8 @@ import {
     // `OWNED_SUBSCRIBER_PARTY_RESOLVER`, already bound globally in
     // `DomainPortsModule` — so it is composed directly rather than through a
     // `*-composition.module.ts`, exactly as the catalogue above is.
-    SellerSubscriptionSurfaceModule,
+    CollectionPolicyAssignmentModule,
+  SellerSubscriptionSurfaceModule,
   ],
   controllers: [
     CheckoutController,
@@ -302,7 +304,8 @@ import {
     ReferralCompositionModule,
     CommercialCatalogueModule,
     SellerSubscriptionModule,
-    SellerSubscriptionSurfaceModule,
+    CollectionPolicyAssignmentModule,
+  SellerSubscriptionSurfaceModule,
     FINANCIAL_OUTBOX_RELAY,
     PrivacyModule,
     // V3.1 Phase F. Re-exported so the root injector can resolve

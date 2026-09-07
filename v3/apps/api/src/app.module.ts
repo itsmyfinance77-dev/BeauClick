@@ -39,6 +39,7 @@ import { WISHLIST_ENTITIES } from '@beauclick/wishlist';
 import { REFERRAL_ENTITIES } from '@beauclick/referral';
 import {
   BOOKING_COLLECTION_POLICY_ENTITIES,
+  COLLECTION_POLICY_ASSIGNMENT_ENTITIES,
   COMMERCIAL_ENTITIES,
   SUBSCRIPTION_ENTITIES,
 } from '@beauclick/commercial-policy';
@@ -152,6 +153,7 @@ import { MetricsController } from './observability/metrics.controller';
           // looks like a query bug while the app boots cleanly.
           ...COMMERCIAL_ENTITIES,
           ...BOOKING_COLLECTION_POLICY_ENTITIES,
+          ...COLLECTION_POLICY_ASSIGNMENT_ENTITIES,
           ...SUBSCRIPTION_ENTITIES,
         ],
         // V3_DATABASE_BLUEPRINT.md §2 mandates lower_snake_case columns;
