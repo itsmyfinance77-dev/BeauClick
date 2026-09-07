@@ -26,11 +26,14 @@
 --     nothing; a key without a version cannot be resolved back to terms, and
 --     `V33-DEC-029` Ruling 6 binds an order to an exact version rather than to
 --     whatever the key means later.
---   * `policy_version` stays positive when present — unchanged, and still
---     enforced separately by `ck_ops_policy_version_positive`, which this
---     migration does not touch. The predicate is repeated inside the new CHECK
---     so the constraint is self-contained and a future edit to either one
---     cannot silently widen the pair.
+--   * `policy_version` stays positive when present, enforced — as it already
+--     was — by `ck_ops_policy_version_positive`, which this migration does not
+--     touch. The predicate is deliberately NOT repeated here: duplicating it
+--     would make two constraints able to refuse the same row, and PostgreSQL
+--     names only the one it happens to evaluate first. `order-payment-schedule.pg-spec`
+--     asserts which constraint owns which rule, and it is right to -- an error
+--     message that cannot say what was violated is worth less than a
+--     self-contained predicate is worth.
 --   * `policy_accepted_at` becomes INDEPENDENTLY NULLABLE. It is no longer
 --     mentioned by this constraint at all.
 --
@@ -66,11 +69,11 @@ ALTER TABLE commerce.order_payment_schedules
 ALTER TABLE commerce.order_payment_schedules
     ADD CONSTRAINT ck_ops_policy_reference CHECK (
         (policy_key IS NULL AND policy_version IS NULL)
-        OR (policy_key IS NOT NULL AND policy_version IS NOT NULL AND policy_version >= 1)
+        OR (policy_key IS NOT NULL AND policy_version IS NOT NULL)
     );
 
 COMMENT ON CONSTRAINT ck_ops_policy_reference ON commerce.order_payment_schedules IS
-    'Key and version are all-or-none and the version is positive when present (V3.3 #115). policy_accepted_at is independently nullable: #115 snapshots which policy priced the booking, and #42 records customer acceptance later, after Legal.';
+    'Key and version are all-or-none (V3.3 #115); positivity stays with ck_ops_policy_version_positive. policy_accepted_at is independently nullable: #115 snapshots which policy priced the booking, and #42 records customer acceptance later, after Legal.';
 
 COMMENT ON COLUMN commerce.order_payment_schedules.policy_accepted_at IS
     'Customer acceptance of the policy. Deliberately NULL for every row: neither #104 (assignment) nor #115 (order resolution) records acceptance. #42 owns it, after Legal.';
