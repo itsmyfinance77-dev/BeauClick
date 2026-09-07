@@ -144,15 +144,34 @@ describePg('booking collection policy — publication, lifecycle and constraints
   // =========================================================================
 
   describe('§1 schema and the zero-row foundation', () => {
-    it('creates exactly the two new tables, and no assignment table', async () => {
+    it('creates the two tables Story #83 owns, and assigns nobody', async () => {
+      /*
+       * This case used to assert that `seller_collection_policy_assignments`
+       * did NOT EXIST. That was true only until Story #104 (`#41d-2a`) landed,
+       * so it was a statement about the calendar rather than an invariant --
+       * the kind of assertion that must be replaced when it comes due, never
+       * deleted quietly.
+       *
+       * What is permanent is the boundary it was standing in for: #83 ships
+       * PUBLICATION, and creates no assignment. Its two halves now live where
+       * each can stay true forever -- that #83's own migrations do not create
+       * the table is proved by scanning their SQL in
+       * `story-83-boundary.spec.ts`, and that #104 enrols nobody is proved
+       * here, at runtime, against the real catalogue.
+       */
       const tables = await dataSource.query(
         `SELECT tablename FROM pg_tables WHERE schemaname = 'commercial' ORDER BY tablename`,
       );
       const names = tables.map((t: { tablename: string }) => t.tablename);
       expect(names).toContain('booking_collection_policies');
       expect(names).toContain('booking_collection_policy_versions');
-      // #104's table must not exist in any form.
-      expect(names).not.toContain('seller_collection_policy_assignments');
+
+      // Publication changes no seller's behaviour: the assignment table exists
+      // and is EMPTY, so every party is unenrolled and on the legacy path.
+      const [{ assignments }] = await dataSource.query(
+        `SELECT count(*)::int AS assignments FROM commercial.seller_collection_policy_assignments`,
+      );
+      expect(assignments).toBe(0);
     });
 
     it('carries every named invariant ADR-048 requires', async () => {
@@ -757,9 +776,34 @@ describePg('booking collection policy — publication, lifecycle and constraints
       expect(row.definition).toContain('policy_accepted_at IS NOT NULL');
     });
 
-    it('adds no capability to the platform', async () => {
-      const rows = await dataSource.query(`SELECT slug FROM identity.capabilities WHERE slug LIKE '%collection%'`);
-      expect(rows).toEqual([]);
+    it('adds no capability of its own, and does not widen the one #104 added', async () => {
+      /*
+       * Also formerly temporal: it asserted that NO `%collection%` capability
+       * existed anywhere, which Story #104 legitimately ended by adding
+       * `bc_manage_own_collection_policy`.
+       *
+       * The permanent claim is that publication stays on the PRIVILEGED
+       * administrator capability and grants nothing to a seller. So the set is
+       * still exact -- there is exactly one, it belongs to #104, it is
+       * non-privileged, and it reaches only the two seller roles. A #83
+       * migration that quietly granted itself a capability would still fail
+       * here, which is what the original case was for.
+       */
+      const rows: Array<{ slug: string }> = await dataSource.query(
+        `SELECT slug FROM identity.capabilities WHERE slug LIKE '%collection%' ORDER BY slug`,
+      );
+      expect(rows.map((row) => row.slug)).toEqual(['bc_manage_own_collection_policy']);
+
+      const [capability] = await dataSource.query(
+        `SELECT is_privileged FROM identity.capabilities WHERE slug = 'bc_manage_own_collection_policy'`,
+      );
+      expect(capability.is_privileged).toBe(false);
+
+      const grants: Array<{ role_slug: string }> = await dataSource.query(
+        `SELECT role_slug FROM identity.role_capabilities
+          WHERE capability_slug = 'bc_manage_own_collection_policy' ORDER BY role_slug`,
+      );
+      expect(grants.map((row) => row.role_slug)).toEqual(['business', 'professional']);
     });
   });
 
@@ -783,10 +827,13 @@ describePg('booking collection policy — publication, lifecycle and constraints
           WHERE t.schemaname = 'commercial'
           GROUP BY t.schemaname, t.tablename`,
       );
-      // Twelve since Story #83 added the two collection-policy tables to the
-      // ten that were there. Asserted exactly, so a table added without a claim
-      // fails HERE with a readable message rather than at application boot.
-      expect(rows).toHaveLength(12);
+      // Thirteen: the ten that predate #83, the two collection-policy tables
+      // #83 added, and the one assignment table Story #104 added with its own
+      // claim. Asserted exactly, so a table added without a claim fails HERE
+      // with a readable message rather than at application boot -- which is
+      // what this number is for, and why it is bumped deliberately rather than
+      // loosened to a lower bound.
+      expect(rows).toHaveLength(13);
 
       const report = evaluateCoverage(rows, contracts);
       expect(report.violations.filter((v) => v.table.startsWith('commercial.'))).toEqual([]);
