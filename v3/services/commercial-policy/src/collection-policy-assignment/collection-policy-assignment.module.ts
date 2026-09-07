@@ -8,7 +8,7 @@ import {
   CollectionPolicyAssignmentController,
   SellerCollectionPoliciesController,
 } from './collection-policy-assignment.controller';
-import { WorkspaceReferenceService } from './workspace-reference';
+import { WorkspaceReferenceService } from '../seller-surface/workspace-reference';
 
 /**
  * The seller collection-policy assignment surface — V3.3 Story #104

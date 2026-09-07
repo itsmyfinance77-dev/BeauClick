@@ -45,6 +45,20 @@ export const CAPABILITIES_BY_ROLE: Record<Role, string[]> = {
     // follow staff affiliation — so a capability check that passed would still
     // find no owned party to act on.
     'bc_manage_own_subscription',
+    // V3.3 Story #104 (`#41d-2a`). Choosing which PUBLISHED booking collection
+    // policy this owner's own bookings are governed by (ADR-048 R2).
+    //
+    // Non-privileged for the reason `bc_manage_own_subscription` above records,
+    // and the consequence is the same one, stated rather than glossed: a
+    // revoked grant takes effect at the next token issue, up to the
+    // access-token TTL later. It confers authority over the holder's own
+    // workspace and over nobody else's.
+    //
+    // Necessary and never sufficient. WHICH workspace it may act on is decided
+    // per request by the ownership resolver, which does not follow staff
+    // affiliation -- so an affiliated manager holding it still finds no owned
+    // party to act on.
+    'bc_manage_own_collection_policy',
   ],
   business: [
     'bc_manage_own_profile',
@@ -72,6 +86,11 @@ export const CAPABILITIES_BY_ROLE: Record<Role, string[]> = {
     // explicitly by its own `workspaceRef` — never on both at once, and never
     // on one chosen for them.
     'bc_manage_own_subscription',
+    // V3.3 Story #104 (`#41d-2a`). The same capability the professional role
+    // above carries, for the same reason `bc_manage_own_subscription` records:
+    // each owned PARTY has its own workspace, and a business owner chooses
+    // theirs exactly as a professional owner chooses theirs.
+    'bc_manage_own_collection_policy',
   ],
   // `bc_moderate_media` (V3.1 Phase C) sits with the other content-moderation
   // capabilities and deliberately NOT with platform_operator's -- the roles

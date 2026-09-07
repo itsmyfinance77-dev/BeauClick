@@ -48,9 +48,9 @@ export * from './catalogue/booking-collection-policy.service';
 // V3.3 Story #104 (`#41d-2a`). The seller collection-policy assignment surface
 // (ADR-048 R2). Assignment only: it changes no order, schedule, amount, mode or
 // customer-facing response, and populates no acceptance.
-export * from './seller-surface/collection-policy-assignment.entities';
-export * from './seller-surface/collection-policy-assignment.exceptions';
-export * from './seller-surface/collection-policy-assignment.service';
-export * from './seller-surface/collection-policy-assignment.controller';
-export * from './seller-surface/collection-policy-assignment-subject-data.contract';
-export * from './seller-surface/collection-policy-assignment.module';
+export * from './collection-policy-assignment/collection-policy-assignment.entities';
+export * from './collection-policy-assignment/collection-policy-assignment.exceptions';
+export * from './collection-policy-assignment/collection-policy-assignment.service';
+export * from './collection-policy-assignment/collection-policy-assignment.controller';
+export * from './collection-policy-assignment/collection-policy-assignment-subject-data.contract';
+export * from './collection-policy-assignment/collection-policy-assignment.module';

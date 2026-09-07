@@ -24,8 +24,9 @@ import { ChatModule, ChatSubjectDataContract } from '@beauclick/chat';
 import { WishlistModule, WishlistSubjectDataContract } from '@beauclick/wishlist';
 import { ReferralModule, ReferralSubjectDataContract } from '@beauclick/referral';
 import {
-  CommercialCatalogueModule,
+  CollectionPolicyAssignmentModule,
   CollectionPolicyAssignmentSubjectDataContract,
+  CommercialCatalogueModule,
   CommercialSubjectDataContract,
   SellerSubscriptionModule,
   SubscriptionSubjectDataContract,
@@ -152,6 +153,12 @@ export class PrivacyErasureCompleter {
     // The coverage check is what made them make it.
     CommercialCatalogueModule,
     SellerSubscriptionModule,
+    // V3.3 Story #104 (`#41d-2a`). Imported for its contract only. One table,
+    // claimed `retained` -- an assignment records which owner routed their own
+    // bookings' money through which published policy, and an erasure able to
+    // blank that attribution would leave a governed commercial commitment with
+    // nobody attached to it.
+    CollectionPolicyAssignmentModule,
   ],
   providers: [
     PrivacyErasureCompleter,
@@ -188,9 +195,9 @@ export class PrivacyErasureCompleter {
         ChatSubjectDataContract,
         WishlistSubjectDataContract,
         ReferralSubjectDataContract,
-        CollectionPolicyAssignmentSubjectDataContract,
-  CommercialSubjectDataContract,
+        CommercialSubjectDataContract,
         SubscriptionSubjectDataContract,
+        CollectionPolicyAssignmentSubjectDataContract,
       ],
       useFactory: (...contracts: SubjectDataContract[]): SubjectDataContract[] => contracts,
     },

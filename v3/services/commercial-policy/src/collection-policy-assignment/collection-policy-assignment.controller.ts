@@ -11,7 +11,7 @@ import {
   CollectionPolicyAssignmentViewV1,
 } from '@beauclick/commercial-policy-contract';
 
-import { EmptyQueryDto } from './seller-subscription-surface.dto';
+import { EmptyQueryDto } from '../seller-surface/seller-subscription-surface.dto';
 import { CollectionPolicyAssignmentService } from './collection-policy-assignment.service';
 
 /** The capability this surface adds. Non-privileged: it never substitutes for live ownership. */

@@ -14,9 +14,8 @@ import {
   OwnedSubscriberParty,
   OwnedSubscriberPartyResolver,
 } from '../subscription/owned-subscriber-party.port';
-import { WorkspaceReferenceService } from './workspace-reference';
+import { WorkspaceReferenceService } from '../seller-surface/workspace-reference';
 import { CollectionPolicyAssignmentUnavailableException } from './collection-policy-assignment.exceptions';
-import { SellerCollectionPolicyAssignmentEntity } from './collection-policy-assignment.entities';
 
 const PG_UNIQUE_VIOLATION = '23505';
 const PG_EXCLUSION_VIOLATION = '23P01';
@@ -151,8 +150,10 @@ export class CollectionPolicyAssignmentService {
    *
    *  1. resolve ownership **inside** the transaction, so a party sold or
    *     deleted mid-request stops resolving;
-   *  2. read and `FOR SHARE`-lock the current assignment (ADR-048 R5), so a
-   *     concurrent supersession waits rather than interleaving;
+   *  2. read the current assignment WITHOUT a row lock — the compare-and-swap
+   *     in (5) and the partial unique index are what decide a concurrent
+   *     supersession (ADR-048 R5), and a share lock here would deadlock two
+   *     requests that both need to upgrade it;
    *  3. **if the same key is already current, return it as a successful
    *     idempotent replay** — no new row, no audit row. This is checked BEFORE
    *     the key is required to still be assignable, so retrying a command that
@@ -173,15 +174,27 @@ export class CollectionPolicyAssignmentService {
     return this.dataSource.transaction(async (manager) => {
       const party = await this.requireOwnedWorkspace(manager, userId, input.workspaceRef);
 
-      // (2) The current row, locked. `FOR SHARE` and not `FOR UPDATE`: this
-      // request may supersede it, but a concurrent reader must not be blocked
-      // from seeing it, and the compare-and-swap below is what actually decides
-      // the write.
+      // (2) The current row, read WITHOUT a row lock.
+      //
+      // An earlier draft took `FOR SHARE` here, reasoning that a concurrent
+      // supersession should wait. That was wrong, and provably so: both
+      // requests would hold a share lock on the same row and both would then
+      // need to upgrade it for the compare-and-swap below, which is a textbook
+      // deadlock. PostgreSQL would abort one with `40P01` -- an untranslated
+      // error, so a seller double-clicking would get a 500 instead of a
+      // refusal.
+      //
+      // ADR-048 R5 names `FOR SHARE` for the ORDER-CREATION reader (#115),
+      // which never upgrades, and names the compare-and-swap plus **the partial
+      // unique index** as the mechanism for supersession racing supersession.
+      // That is what this does. The read below decides only the idempotent
+      // replay; every actual write outcome is decided by the CAS predicate and
+      // by `uq_scpa_one_current_per_party`, neither of which a stale read can
+      // defeat.
       const currentRows: Array<{ id: string; policy_key: string; assigned_at: Date }> = await manager.query(
         `SELECT id, policy_key, assigned_at
            FROM commercial.seller_collection_policy_assignments
-          WHERE seller_party_type = $1 AND seller_party_id = $2 AND superseded_at IS NULL
-          FOR SHARE`,
+          WHERE seller_party_type = $1 AND seller_party_id = $2 AND superseded_at IS NULL`,
         [party.partyType, party.partyId],
       );
       const current = currentRows[0];
