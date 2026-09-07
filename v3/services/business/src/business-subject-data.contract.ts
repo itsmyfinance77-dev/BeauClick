@@ -43,6 +43,30 @@ export class BusinessSubjectDataContract implements SubjectDataContract {
     },
     { table: 'business.business_staff', disposition: 'subject_data' },
     { table: 'business.outbox_events', disposition: 'retained', reason: 'Transactional outbox.' },
+    // V3.3 Story #107 (`#44a`), ADR-049 section 7.2. Both are RETAINED, and the
+    // reason is the same in substance for each: they describe a COMMERCIAL
+    // ENTITY, not a person. There is no `user_id`, no `*_by`, no `*_user_id`,
+    // no phone and no email on either table -- the actor who set a
+    // classification lives in `admin.admin_audit_log` and nowhere else -- so
+    // erasing an individual has nothing to erase here, and destroying the rows
+    // would delete a salon's own description of itself for no privacy gain.
+    //
+    // They are deliberately NOT in the export document either: an export tells a
+    // SUBJECT what the platform holds about THEM, and "this salon is a salon" is
+    // not that. The business rows a user owns are already exported by
+    // `owned_businesses` below.
+    {
+      table: 'business.business_verticals',
+      disposition: 'retained',
+      reason:
+        'The commercial vertical a business is classified as. A property of the organisation, naming no person and carrying no identity column, so it survives the erasure of any individual exactly as the business row itself does.',
+    },
+    {
+      table: 'business.business_traits',
+      disposition: 'retained',
+      reason:
+        'How a business operates (multi-location, mobile). A property of the organisation, naming no person and carrying no identity column, so it survives the erasure of any individual exactly as the business row itself does.',
+    },
   ];
 
   async exportSubjectData(manager: EntityManager, userId: string): Promise<SubjectExportSection[]> {
@@ -97,6 +121,14 @@ export class BusinessSubjectDataContract implements SubjectDataContract {
         {
           table: 'business.businesses',
           reason: 'a commercial entity with its own staff and bookings; ownership succession is an open product decision',
+        },
+        {
+          table: 'business.business_verticals',
+          reason: 'the commercial classification of a business, not a fact about any person',
+        },
+        {
+          table: 'business.business_traits',
+          reason: 'how a business operates, not a fact about any person',
         },
       ],
     };

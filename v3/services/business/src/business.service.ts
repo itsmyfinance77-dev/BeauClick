@@ -4,6 +4,7 @@ import { IsNull, Repository } from 'typeorm';
 import { DataSource } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
 import { emitEvent, AuditLogger } from '@beauclick/events';
+import { NotFoundOrNotYoursException } from '@beauclick/ownership';
 
 import { BusinessEntity } from './entities/business.entity';
 import { BusinessOutboxEntity } from './entities/business-outbox.entity';
@@ -83,9 +84,34 @@ export class BusinessService {
     });
   }
 
+  /**
+   * Edits a LIVE business.
+   *
+   * ## Why the `deletedAt: IsNull()` filter landed with V3.3 Story #107
+   *
+   * This read had no soft-delete filter while `findById` and `findByOwner` both
+   * did, so `PATCH /v1/businesses/:id` could edit a soft-deleted business. Like
+   * the same omission in `StaffService.roleFor`, it was invisible only because
+   * `uq_businesses_owner_id` was unconditional. #107 makes that index partial,
+   * so one owner can hold a dead row and a live row at once -- and the dead one
+   * must be unreachable to mutation, not merely unlikely to be addressed.
+   *
+   * The filter, the `roleFor` filter, the partial index and the entity-metadata
+   * correction are one change (ADR-049 section 2.3).
+   *
+   * The refusal is the platform's existing non-enumerating shape rather than
+   * `findOneOrFail`'s `EntityNotFoundError`. That error is not an
+   * `HttpException`, so the filter would render it as a `500` -- the same
+   * "uncaught database outcome escapes as a server error" class this story
+   * exists to remove from `uq_businesses_owner_id`. A deleted business, a
+   * nonexistent one and a foreign one now answer identically.
+   */
   async update(businessId: string, dto: UpdateBusinessDto): Promise<BusinessEntity> {
     return this.dataSource.transaction(async (manager) => {
-      const business = await manager.findOneOrFail(BusinessEntity, { where: { id: businessId } });
+      const business = await manager.findOne(BusinessEntity, {
+        where: { id: businessId, deletedAt: IsNull() },
+      });
+      if (!business) throw new NotFoundOrNotYoursException();
       await manager
         .createQueryBuilder()
         .update(BusinessEntity)

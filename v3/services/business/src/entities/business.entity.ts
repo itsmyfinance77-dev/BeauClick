@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, Entity, PrimaryColumn, UpdateDateColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, Index, PrimaryColumn, UpdateDateColumn } from 'typeorm';
 
 export const BUSINESS_VERIFICATION_STATUSES = ['unverified', 'pending', 'verified', 'rejected', 'suspended'] as const;
 export type BusinessVerificationStatus = (typeof BUSINESS_VERIFICATION_STATUSES)[number];
@@ -13,12 +13,28 @@ export type BusinessVerificationStatus = (typeof BUSINESS_VERIFICATION_STATUSES)
  * `BusinessStaffEntity` is what actually links delivering professionals in.
  */
 @Entity({ name: 'businesses', schema: 'business' })
+// One ACTIVE business organisation per owner -- V3.3 Story #107 (`#44a`),
+// `V33-DEC-030` D3 and ADR-049 section 2.3.
+//
+// This was `@Column({ unique: true })` on `ownerId`, which produced an
+// UNCONDITIONAL unique index. The migration's index is partial on
+// `deleted_at IS NULL`, and entity metadata that disagreed with it would give
+// pg-mem (which builds its schema from this metadata with `synchronize: true`)
+// a stricter rule than real PostgreSQL enforces -- so a soft-delete-then-
+// recreate would pass in production and fail only in the fast test layer, or
+// the reverse. The named entity-level partial form is the same shape
+// `BusinessStaffEntity` already uses for `uq_business_staff_active_professional`.
+//
+// Real PostgreSQL stays authoritative for partial-index behaviour (ADR-049
+// section 2.4); a real-PG spec compares `pg_indexes.indexdef` against this
+// declaration so the two cannot drift apart silently.
+@Index('uq_businesses_owner_id', ['ownerId'], { unique: true, where: 'deleted_at IS NULL' })
 export class BusinessEntity {
   @PrimaryColumn('uuid')
   id!: string;
 
   /** References identity.users.id. No cross-schema FK by convention (V3_DATABASE_BLUEPRINT.md §1). */
-  @Column({ type: 'uuid', unique: true })
+  @Column({ type: 'uuid' })
   ownerId!: string;
 
   @Column({ type: 'varchar', length: 120 })

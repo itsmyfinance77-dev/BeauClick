@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, Repository } from 'typeorm';
+import { DataSource, In, IsNull, Repository } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
 import { emitEvent, AuditLogger } from '@beauclick/events';
 
@@ -32,9 +32,25 @@ export class StaffService {
     private readonly dataSource: DataSource,
   ) {}
 
-  /** The session's relationship to this business, or null if it has none. */
+  /**
+   * The session's relationship to this LIVE business, or null if it has none.
+   *
+   * ## Why `deletedAt: IsNull()` is load-bearing, and why it landed with #107
+   *
+   * This read had no soft-delete filter. It was invisible while
+   * `uq_businesses_owner_id` was unconditional, because one user could then
+   * hold at most one row of any kind. V3.3 Story #107 (`#44a`) makes that index
+   * partial on `deleted_at IS NULL` -- at which point a user can own a
+   * soft-deleted row AND a live row, and `BusinessOwnerResolver`, which reads
+   * this method, would grant owner authority over BOTH. The dead business would
+   * stay fully reachable through every `@ResolveOwner`-guarded route.
+   *
+   * So the filter and the partial index are one change (ADR-049 section 2.3).
+   * Shipping the index without it would convert a latent `500` into a live
+   * authorization defect.
+   */
   async roleFor(businessId: string, userId: string): Promise<BusinessRole | null> {
-    const business = await this.businesses.findOne({ where: { id: businessId } });
+    const business = await this.businesses.findOne({ where: { id: businessId, deletedAt: IsNull() } });
     if (!business) return null;
     if (business.ownerId === userId) return 'owner';
 
