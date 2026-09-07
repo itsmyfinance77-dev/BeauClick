@@ -175,11 +175,82 @@ describe('Story #115 keeps Commerce inside its own scope', () => {
       expect(catalog).toMatch(/this\.sellerParty\.forProfessional\(manager,/);
     });
 
+    it('passes the caller manager through the resolver adapter verbatim', () => {
+      /*
+       * The resolver itself takes a manager and uses it (asserted in §3b), and
+       * a probe that moved the ADAPTER onto `manager.connection.manager` still
+       * satisfied that -- the resolver was innocent; the adapter handed it the
+       * wrong connection. Caught behaviourally by the lock-duration case, and
+       * here as well so the shape is pinned at both ends.
+       */
+      const adapters = stripComments(read('apps/api/src/composition/port-adapters.ts'));
+      const from = adapters.indexOf('class CommercialPolicyBackedCollectionResolver');
+      expect(from).toBeGreaterThan(-1);
+      // Bounded to THIS class. An unbounded slice runs to end of file and
+      // sweeps in every later adapter, several of which legitimately hold a
+      // DataSource -- the assertion would then fail on correct source.
+      const nextClass = adapters.indexOf('export class ', from + 1);
+      const resolver = adapters.slice(from, nextClass === -1 ? undefined : nextClass);
+
+      expect(resolver).toMatch(
+        /this\.resolution\.resolveForParty\(manager, sellerParty\.partyType, sellerParty\.partyId\)/,
+      );
+      expect(resolver).not.toMatch(/connection\.manager|dataSource|createQueryRunner/);
+    });
+
     it('binds the resolver exactly once, at the composition root', () => {
       const module = stripComments(read('apps/api/src/composition/domain-ports.module.ts'));
       const bindings = module.match(/provide: BOOKING_COLLECTION_POLICY_RESOLVER/g) ?? [];
       expect(bindings).toHaveLength(1);
       expect(module).toMatch(/useExisting: CommercialPolicyBackedCollectionResolver/);
+    });
+  });
+
+  // =========================================================================
+  // §3b. The resolver reads through the caller and asks PostgreSQL for the time
+  // =========================================================================
+
+  describe('the resolver stays inside the caller transaction and on the database clock', () => {
+    const resolver = (): string =>
+      stripComments(
+        read(
+          'services/commercial-policy/src/collection-policy-assignment/collection-policy-resolution.service.ts',
+        ),
+      );
+
+    it('runs every statement on the caller manager', () => {
+      const source = resolver();
+      // Two reads, both on `manager`.
+      expect((source.match(/await manager\.query\(/g) ?? []).length).toBe(2);
+      // Never a repository, a DataSource, or a second manager.
+      expect(source).not.toMatch(/InjectRepository|private readonly dataSource|this\.dataSource/);
+      expect(source).not.toMatch(/connection\.manager|\.manager\.query/);
+    });
+
+    it('locks both rows with FOR SHARE', () => {
+      const source = resolver();
+      expect((source.match(/FOR SHARE/g) ?? []).length).toBe(2);
+      expect(source).toMatch(/seller_collection_policy_assignments[\s\S]{0,300}?FOR SHARE/);
+      expect(source).toMatch(/booking_collection_policy_versions[\s\S]{0,600}?FOR SHARE/);
+    });
+
+    it('decides the activation window with the database clock only', () => {
+      const source = resolver();
+      // The window is compared against `now()`, three times: start, and both
+      // halves of the open-ended end bound.
+      expect(source).toMatch(/activation_starts_at <= now\(\)/);
+      expect(source).toMatch(/now\(\) < v\.activation_ends_at/);
+      // And the instant recorded comes from the row, never from JavaScript.
+      expect(source).toMatch(/now\(\) AS resolved_at/);
+      expect(source).toMatch(/resolvedAt: versions\[0\]\.resolved_at\.toISOString\(\)/);
+      expect(source).not.toMatch(/new Date\(\)/);
+    });
+
+    it('writes nothing at all', () => {
+      const source = resolver();
+      for (const mutation of ['INSERT', 'UPDATE', 'DELETE', 'audit', 'actorUserId', 'reason']) {
+        expect(source).not.toMatch(new RegExp(mutation));
+      }
     });
   });
 

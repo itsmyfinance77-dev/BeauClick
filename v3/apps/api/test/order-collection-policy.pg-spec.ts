@@ -762,6 +762,161 @@ describePg('order collection-policy resolution (real PostgreSQL)', () => {
       expect(await dataSource.query(`SELECT * FROM ${SCHEDULES}`)).toHaveLength(1);
     });
 
+    it('HOLDS both locks until the order commits, not just while it resolves', async () => {
+      /*
+       * The direction the two cases above cannot see.
+       *
+       * They take the competitor's lock FIRST and prove the order waits. That
+       * passes even if the resolver reads on a DIFFERENT connection, because a
+       * lock conflict is a lock conflict whichever connection asks -- a
+       * mutation probe that moved the resolver off the caller's manager left
+       * both of them green.
+       *
+       * What an out-of-transaction read actually breaks is the DURATION: its
+       * `FOR SHARE` is released the moment that separate statement returns, so
+       * the window between resolving a version and writing the schedule is
+       * unprotected. A retirement landing in that window would leave an order
+       * snapshotting a version that is no longer published.
+       *
+       * ## Proved with `lock_timeout`, not with a pending statement
+       *
+       * An earlier version raced the competitor's UPDATE against a timer and
+       * left it in flight, which wedged the connection: rolling back a runner
+       * with a blocked query hangs, the transaction was never released, and
+       * every later `resetDatabase` TRUNCATE queued behind it. `lock_timeout`
+       * turns "it is waiting" into a fast, deterministic error instead, so
+       * nothing is ever left pending.
+       */
+      const { key } = await publishedPolicy(fixedDeposit(40_000));
+      const seller = await professionalSeller(200_000);
+      await enrol(seller, key);
+      const [version] = await dataSource.query(
+        `SELECT id FROM commercial.booking_collection_policy_versions
+          WHERE policy_key = $1 AND lifecycle_state = 'published'`,
+        [key],
+      );
+      const [assignment] = await dataSource.query(
+        `SELECT id FROM ${ASSIGNMENTS} WHERE seller_party_id = $1 AND superseded_at IS NULL`,
+        [seller.partyId],
+      );
+      const customer = await seedUser(app, dataSource, nextPhone(), ['customer']);
+
+      /** Runs one statement with a short lock timeout and reports whether it was BLOCKED. */
+      async function blockedByLock(sql: string, params: unknown[]): Promise<boolean> {
+        const runner = dataSource.createQueryRunner();
+        await runner.connect();
+        try {
+          await runner.startTransaction();
+          await runner.query("SET LOCAL lock_timeout = '750ms'");
+          await runner.query(sql, params as never[]);
+          await runner.rollbackTransaction();
+          return false;
+        } catch (error) {
+          if (runner.isTransactionActive) await runner.rollbackTransaction();
+          return /lock timeout|canceling statement/i.test((error as Error).message);
+        } finally {
+          await runner.release();
+        }
+      }
+
+      const holder = dataSource.createQueryRunner();
+      await holder.connect();
+      await holder.startTransaction();
+      let versionBlocked = false;
+      let assignmentBlocked = false;
+      try {
+        // The order is created INSIDE the held transaction and not committed,
+        // so both of its `FOR SHARE` locks are still held right now.
+        await orders.createForBooking(
+          {
+            bookingId: uuidv7(),
+            customerId: customer.id,
+            professionalId: seller.professionalId,
+            serviceId: seller.serviceId,
+          },
+          holder.manager,
+        );
+
+        versionBlocked = await blockedByLock(
+          `UPDATE commercial.booking_collection_policy_versions SET lifecycle_state = 'retired' WHERE id = $1`,
+          [version.id],
+        );
+        assignmentBlocked = await blockedByLock(
+          `UPDATE ${ASSIGNMENTS} SET superseded_at = now(), superseded_by_user_id = $1,
+             superseded_by_assignment_id = $2 WHERE id = $3`,
+          [seller.ownerUser.id, uuidv7(), assignment.id],
+        );
+      } finally {
+        await holder.rollbackTransaction();
+        await holder.release();
+      }
+
+      expect(versionBlocked).toBe(true);
+      expect(assignmentBlocked).toBe(true);
+
+      // The control: with no order holding them, the same two writes succeed
+      // immediately -- so the blocking above is the order's locks and not an
+      // unrelated contention.
+      expect(
+        await blockedByLock(
+          `UPDATE commercial.booking_collection_policy_versions SET lifecycle_state = 'retired' WHERE id = $1`,
+          [version.id],
+        ),
+      ).toBe(false);
+    });
+
+    it('decides the active window by the DATABASE clock, not the application one', async () => {
+      /*
+       * PostgreSQL's `now()` is the TRANSACTION START instant; a JavaScript
+       * `new Date()` is evaluated when the statement runs. On one machine the
+       * two agree to within milliseconds, which is why a naive test cannot tell
+       * them apart -- a probe that swapped `now()` for a supplied instant left
+       * the whole suite green.
+       *
+       * The gap between them is observable, though, and this is the shape that
+       * shows it: a version published AFTER the reading transaction began is
+       * not yet active by the database clock and IS active by the wall clock.
+       *
+       * Correct behaviour refuses. An application clock resolves.
+       */
+      const key = nextKey('lateclock');
+      await policies.createPolicy(admin.id, key, `${key} display`, 'clock probe setup');
+      const seller = await professionalSeller(200_000);
+      await enrol(seller, key);
+
+      const reader = dataSource.createQueryRunner();
+      await reader.connect();
+      await reader.startTransaction();
+      try {
+        // Fix the transaction's `now()`, then let real time move on.
+        await reader.query('SELECT 1');
+        await new Promise((resolve) => setTimeout(resolve, 1_200));
+
+        // Publish on ANOTHER connection. `activation_starts_at` is the database
+        // clock at publication, which is now later than the reader's `now()`.
+        const draft = await policies.createVersionDraft(
+          admin.id,
+          { policyKey: key, terms: fixedDeposit(50_000), activationEndsAt: null },
+          'published after the reader began',
+        );
+        await policies.publishVersion(admin.id, key, draft.version, 'published after the reader began');
+
+        await expect(
+          resolution.resolveForParty(reader.manager, seller.partyType, seller.partyId),
+        ).rejects.toThrow(/unresolvable/i);
+      } finally {
+        await reader.rollbackTransaction();
+        await reader.release();
+      }
+
+      // The control: a transaction beginning AFTER publication resolves it, so
+      // the refusal above is about the clock and not about a broken fixture.
+      const snapshot = await dataSource.transaction((manager) =>
+        resolution.resolveForParty(manager, seller.partyType, seller.partyId),
+      );
+      expect(snapshot?.policyKey).toBe(key);
+    });
+
     it('leaves the booking-source unique index as the idempotency arbiter', async () => {
       const { key } = await publishedPolicy(fixedDeposit(40_000));
       const seller = await professionalSeller(200_000);
