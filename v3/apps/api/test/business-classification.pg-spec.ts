@@ -1,5 +1,5 @@
 import { INestApplication } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import request from 'supertest';
 import { uuidv7 } from 'uuidv7';
 
@@ -326,6 +326,44 @@ describeIfPg('Business classification on real PostgreSQL (#107)', () => {
   // =====================================================================
 
   describe('concurrency', () => {
+    it('a replacement WAITS for a competing lock on the business row', async () => {
+      // The two racing-request cases below are necessary but not sufficient: a
+      // service with no lock at all can still happen to serialize, and a
+      // mutation probe that deleted `FOR NO KEY UPDATE` survived them. This case
+      // asserts the lock itself.
+      //
+      // A competing transaction takes `FOR NO KEY UPDATE` on the business row
+      // and holds it. If the service takes the same lock, its replacement must
+      // block until that transaction commits. If it does not, the replacement
+      // finishes immediately -- the FK check's `FOR KEY SHARE` does not conflict
+      // with `FOR NO KEY UPDATE` -- and this fails.
+      const { business } = await seedOwnerWithBusiness();
+      const owner = (await businesses.findById(business.id))!.ownerId;
+
+      const competitor = dataSource.createQueryRunner();
+      await competitor.connect();
+      await competitor.startTransaction();
+      await competitor.query(`SELECT id FROM business.businesses WHERE id = $1 FOR NO KEY UPDATE`, [business.id]);
+
+      let settled = false;
+      const pending = classification
+        .replace(business.id, owner, { vertical: 'salon', traits: ['mobile'] })
+        .then((result) => {
+          settled = true;
+          return result;
+        });
+
+      await new Promise((resolve) => setTimeout(resolve, 750));
+      const blockedWhileHeld = settled;
+
+      await competitor.commitTransaction();
+      await competitor.release();
+
+      await expect(pending).resolves.toEqual({ vertical: 'salon', traits: ['mobile'] });
+      expect(blockedWhileHeld).toBe(false);
+      expect(settled).toBe(true);
+    });
+
     it('two genuinely parallel replacements linearize -- never a torn vertical/trait combination', async () => {
       const { owner, business } = await seedOwnerWithBusiness();
 
@@ -602,6 +640,50 @@ describeIfPg('Business classification on real PostgreSQL (#107)', () => {
       const serialized = JSON.stringify(row);
       expect(serialized).not.toContain(owner.phone);
       expect(row.reason).toBe('business classification replaced by its owner');
+    });
+
+    it("writes the audit row on the CALLER's own transaction, not a second connection", async () => {
+      // The rollback case below proves the two fail together. It does NOT, on
+      // its own, prove they share a transaction: an audit written on a second
+      // connection that also fails looks identical. A mutation probe
+      // (`AdminAuditService.record` -> `recordDetached`) survived that test,
+      // which is what this case exists to kill.
+      //
+      // The proof is visibility. While the classification transaction is still
+      // open, the manager handed to `record` must already SEE the uncommitted
+      // vertical row, and a different connection must NOT. A detached audit
+      // transaction is a different connection and would see zero.
+      const { business } = await seedOwnerWithBusiness();
+      const owner = (await businesses.findById(business.id))!.ownerId;
+
+      const audit = (classification as unknown as { audit: Record<string, unknown> }).audit;
+      const original = (audit.record as (...args: unknown[]) => Promise<void>).bind(audit);
+      let seenByAuditsManager: number | null = null;
+      let seenByAnotherConnection: number | null = null;
+
+      audit.record = async (manager: EntityManager, input: unknown) => {
+        const [inside] = await manager.query(
+          `SELECT count(*)::int AS c FROM business.business_verticals WHERE business_id = $1`,
+          [business.id],
+        );
+        seenByAuditsManager = inside.c;
+        const [outside] = await dataSource.query(
+          `SELECT count(*)::int AS c FROM business.business_verticals WHERE business_id = $1`,
+          [business.id],
+        );
+        seenByAnotherConnection = outside.c;
+        return original(manager, input);
+      };
+
+      try {
+        await classification.replace(business.id, owner, { vertical: 'salon', traits: [] });
+      } finally {
+        audit.record = original;
+      }
+
+      expect(seenByAuditsManager).toBe(1);
+      expect(seenByAnotherConnection).toBe(0);
+      expect(await auditRows(business.id)).toHaveLength(1);
     });
 
     it('the classification and its audit row ROLL BACK together when the audit write fails', async () => {
