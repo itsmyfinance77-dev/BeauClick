@@ -267,6 +267,17 @@ number as `#41d-2a` and owns assignment; #115 (`#41d-2b`) owns order resolution 
 immutable snapshot behind a dark launch. ADR-048's 2026-09-07 amendment already binds both,
 so no new ADR was written.
 
+On **2026-09-07** `V33-DEC-032` closed the one question `V33-DEC-030` had left open about
+#107 (`#44a`): **cardinality**. A business has **at most one** current vertical, keyed by
+`business_id` with no `is_primary` column and no secondary rows, and an **unclassified
+business is a legal state** represented by the absence of the row rather than by a default, a
+backfill or a sentinel vocabulary member. `POST /v1/businesses` is unchanged and existing
+businesses stay unclassified until their owner explicitly classifies them. Traits stay an
+independent additive set, classification still authorizes nothing, and `clinic` remains a
+commercial classification carrying no medical data. #107 stays unsplit at 5 points, no Story
+Point moved, and **ADR-049 is still required — alone — before any schema, contract or
+executable code** for #107 or any other `#44` child.
+
 Prices, included allowances, bounds, cutoffs, legal copy and accounting treatment stay
 **unpublished**, and real money movement stays blocked by #47. No allowance may
 exist as a code constant, default, fallback or seed; an unconfigured plan or price
