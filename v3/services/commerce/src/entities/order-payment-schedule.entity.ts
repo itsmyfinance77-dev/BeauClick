@@ -54,10 +54,25 @@ export class OrderPaymentScheduleEntity {
   /**
    * The policy this schedule was selected from, or a real absence.
    *
-   * All three are NULL together or present together — `ck_ops_policy_reference`
-   * makes "partially referenced" unrepresentable. They are NULL for every row
-   * today: `#41a` selects no policy, and the backfilled orders were placed
-   * before any policy existed to select. #83 (`#41d`) fills them in.
+   * ## Who writes these, corrected
+   *
+   * This docblock used to say #83 (`#41d`) would fill them in. That was true of
+   * the story as originally scoped and stopped being true when `V33-DEC-031`
+   * split it: **#83 publishes the catalogue and writes nothing here**, #104
+   * (`#41d-2a`) records which policy a seller chose, and **#115 (`#41d-2b`) is
+   * the writer of `policyKey` and `policyVersion`** — the exact key and version
+   * that priced one booking, snapshotted immutably at order creation.
+   *
+   * ## Key and version are all-or-none; acceptance is independent
+   *
+   * `ck_ops_policy_reference` originally required all THREE together, which
+   * made an enrolled order unwritable: #115 knows the policy and, deliberately,
+   * no acceptance. Its migration replaced the constraint so key and version
+   * remain inseparable while `policyAcceptedAt` is independently nullable.
+   *
+   * An UNENROLLED seller's order still carries all three NULL, as does every
+   * backfilled order placed before any policy existed — which is a fact about
+   * those bookings, not a gap.
    */
   @Column({ type: 'varchar', length: 64, nullable: true })
   policyKey!: string | null;
@@ -65,6 +80,14 @@ export class OrderPaymentScheduleEntity {
   @Column({ type: 'int', nullable: true })
   policyVersion!: number | null;
 
+  /**
+   * Customer acceptance of the policy. **NULL for every row.**
+   *
+   * Neither child of `#41d-2` records it: #104 assigns and #115 snapshots, and
+   * acceptance is #42's after Legal. It is nullable independently of the key
+   * and version precisely so #42 can add it beside a reference that is already
+   * there.
+   */
   @Column({ type: 'timestamptz', nullable: true })
   policyAcceptedAt!: Date | null;
 

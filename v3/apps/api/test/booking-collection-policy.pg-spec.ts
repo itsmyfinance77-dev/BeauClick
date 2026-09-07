@@ -767,13 +767,44 @@ describePg('booking collection policy — publication, lifecycle and constraints
       expect(after[0].accepted).toBe(0);
     });
 
-    it("leaves commerce's all-three policy-reference constraint exactly as #104 will find it", async () => {
-      const [row] = await dataSource.query(
+    it('writes no commerce row and owns no commerce migration', async () => {
+      /*
+       * This case used to assert that `ck_ops_policy_reference` still required
+       * all THREE columns -- "#104 replaces this; #83 must not have touched
+       * it". That was a statement about the calendar, not an invariant: V3.3
+       * #115 (`#41d-2b`) has since replaced the constraint exactly as ADR-048
+       * §2 ratifies, so key and version are now all-or-none and
+       * `policy_accepted_at` is independently nullable.
+       *
+       * The permanent claim underneath it is that PUBLICATION touches commerce
+       * at all -- no row, and no migration of its own. That stays true forever,
+       * and it is what this now asserts.
+       */
+      const [reference] = await dataSource.query(
         `SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conname = 'ck_ops_policy_reference'`,
       );
-      // #104 replaces this. Story #83 must not have touched it.
-      expect(row.definition).toContain('policy_accepted_at IS NULL');
-      expect(row.definition).toContain('policy_accepted_at IS NOT NULL');
+      // #115's shape, not #83's doing.
+      expect(reference.definition).not.toContain('policy_accepted_at');
+
+      // Publication wrote nothing into commerce.
+      const [{ schedules }] = await dataSource.query(
+        `SELECT count(*)::int AS schedules FROM commerce.order_payment_schedules`,
+      );
+      expect(schedules).toBe(0);
+
+      /*
+       * And #83 owns no commerce migration.
+       *
+       * Matched on `booking_collection_polic`, which is #83's own naming, not
+       * on a bare "collection" -- that matched
+       * `20260905900002_add_online_collection_not_required_status.sql`, which
+       * is #82's and predates this story entirely.
+       */
+      const owned = await dataSource.query(
+        `SELECT filename FROM public.schema_migrations
+          WHERE filename LIKE 'commerce/%' AND filename LIKE '%booking_collection_polic%'`,
+      );
+      expect(owned).toEqual([]);
     });
 
     it('adds no capability of its own, and does not widen the one #104 added', async () => {

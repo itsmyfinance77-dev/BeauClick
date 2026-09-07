@@ -6,9 +6,18 @@ import { DataSource } from 'typeorm';
 import { ProfessionalEntity, ProviderModule, SELLER_OWNER_ROLE_GRANT, ServiceOfferingEntity } from '@beauclick/provider';
 import { IdentityModule, UserEntity } from '@beauclick/identity';
 import { BOOKING_CANCELLATION_ENTITLEMENT_HOOK, PROFESSIONAL_DIRECTORY } from '@beauclick/booking';
-import { PRICING_RULES, SERVICE_CATALOG, BOOKING_CONFIRMATION_ENTITLEMENT_HOOK } from '@beauclick/commerce';
+import {
+  BOOKING_COLLECTION_POLICY_RESOLVER,
+  BOOKING_CONFIRMATION_ENTITLEMENT_HOOK,
+  PRICING_RULES,
+  SERVICE_CATALOG,
+} from '@beauclick/commerce';
 import { FINANCE_WORKSPACE_OWNER_RESOLVER, FINANCIAL_DATA_SOURCE, FINANCIAL_PARTY_RESOLVER } from '@beauclick/financial';
-import { OWNED_SUBSCRIBER_PARTY_RESOLVER, SellerSubscriptionModule } from '@beauclick/commercial-policy';
+import {
+  CollectionPolicyResolutionModule,
+  OWNED_SUBSCRIBER_PARTY_RESOLVER,
+  SellerSubscriptionModule,
+} from '@beauclick/commercial-policy';
 import { PROVIDER_REINDEX_SOURCE } from '@beauclick/search';
 import { RECIPIENT_RESOLVER } from '@beauclick/notification';
 import { ANALYTICS_SUBJECT_RESOLVER } from '@beauclick/analytics';
@@ -26,6 +35,7 @@ import {
   OwnershipBackedFinanceWorkspaceResolver,
   ProviderBackedProfessionalDirectory,
   ProviderBackedServiceCatalog,
+  CommercialPolicyBackedCollectionResolver,
   IdentityBackedOwnerRoleGrant,
   SellerPartyLookup,
 } from './port-adapters';
@@ -74,6 +84,13 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
      * credit does this party have" would be a second answer.
      */
     SellerSubscriptionModule,
+    /*
+     * V3.3 #115 (`#41d-2b`), ADR-048 R4. The read-only resolver module, whose
+     * one provider `CommercialPolicyBackedCollectionResolver` delegates to.
+     * Imported rather than reimplemented for the reason the credit ledger above
+     * is: a second "which policy governs this party" would be a second answer.
+     */
+    CollectionPolicyResolutionModule,
     // V3.3 #75 (`V33-DEC-021`). `IdentityBackedOwnerRoleGrant` delegates the
     // whole grant rule to `RoleService`, which lives here. Imported rather than
     // reimplemented for the same reason the finance workspace resolver
@@ -84,6 +101,7 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     SellerPartyLookup,
     ProviderBackedProfessionalDirectory,
     ProviderBackedServiceCatalog,
+    CommercialPolicyBackedCollectionResolver,
     ProviderBackedFinancialPartyResolver,
     OwnershipBackedSubscriberPartyResolver,
     { provide: PROFESSIONAL_DIRECTORY, useExisting: ProviderBackedProfessionalDirectory },
@@ -94,6 +112,12 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     // implementation answering the same question a second way.
     { provide: PROFESSIONAL_OWNER_LOOKUP, useExisting: ProviderBackedProfessionalDirectory },
     { provide: SERVICE_CATALOG, useExisting: ProviderBackedServiceCatalog },
+    /*
+     * V3.3 #115 (`#41d-2b`), ADR-048 R4. The one cross-domain binding for
+     * collection-policy resolution, and the only place Commerce and Commercial
+     * Policy meet on the order path.
+     */
+    { provide: BOOKING_COLLECTION_POLICY_RESOLVER, useExisting: CommercialPolicyBackedCollectionResolver },
     /*
      * V3.3 #81 (`#41b`, ADR-044 §6). The entitlement seam a zero-collectible
      * confirmation passes through, bound to an explicit no-op until #58.
@@ -209,6 +233,7 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     PROFESSIONAL_DIRECTORY,
     PROFESSIONAL_OWNER_LOOKUP,
     SERVICE_CATALOG,
+    BOOKING_COLLECTION_POLICY_RESOLVER,
     BOOKING_CONFIRMATION_ENTITLEMENT_HOOK,
     BOOKING_CANCELLATION_ENTITLEMENT_HOOK,
     FINANCIAL_PARTY_RESOLVER,

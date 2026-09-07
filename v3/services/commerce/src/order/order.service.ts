@@ -13,9 +13,22 @@ import { OrderPaymentScheduleEntity } from '../entities/order-payment-schedule.e
 import { CommerceOutboxEntity } from '../entities/commerce-outbox.entity';
 import { PricingService } from '../pricing/pricing.service';
 import { PricingResult } from '../pricing/pricing.types';
-import { COMMERCIAL_POLICY_CONTRACT_VERSION } from '@beauclick/commercial-policy-contract';
+import {
+  BookingCollectionMode,
+  BookingCollectionPolicySnapshotV1,
+  COMMERCIAL_POLICY_CONTRACT_VERSION,
+  bookingCollectionAmountsV1,
+  validateBookingCollectionPolicySnapshotV1,
+} from '@beauclick/commercial-policy-contract';
+import { METRICS, MetricsRegistry } from '@beauclick/observability';
 
-import { SERVICE_CATALOG, ServiceCatalog } from '../ports';
+import {
+  BOOKING_COLLECTION_POLICY_RESOLVER,
+  BookingCollectionPolicyResolver,
+  OrderSellerParty,
+  SERVICE_CATALOG,
+  ServiceCatalog,
+} from '../ports';
 
 export class OrderNotFoundException extends DomainException {
   constructor() {
@@ -175,6 +188,18 @@ export class OrderService {
     private readonly dataSource: DataSource,
     private readonly pricing: PricingService,
     @Inject(SERVICE_CATALOG) private readonly catalog: ServiceCatalog,
+    /*
+     * V3.3 #115 (`#41d-2b`), ADR-048 R4. Mandatory, never `@Optional()`.
+     *
+     * An optional resolver is a money effect that can be silently absent: every
+     * enrolled seller would quietly fall back to the legacy full-online path
+     * and nothing in the response, the logs or the tests would say so. A
+     * composition that omits this binding fails to construct at boot instead,
+     * which is the same call `BOOKING_CONFIRMATION_ENTITLEMENT_HOOK` records.
+     */
+    @Inject(BOOKING_COLLECTION_POLICY_RESOLVER)
+    private readonly collectionPolicy: BookingCollectionPolicyResolver,
+    private readonly metrics: MetricsRegistry,
   ) {}
 
   /**
@@ -217,17 +242,44 @@ export class OrderService {
   ): Promise<OrderWithDetail> {
     if (!input.serviceId) throw new UnsellableServiceException();
 
-    // The price comes from the catalogue, server-side, every time. A client
-    // never supplies, influences, or even sees a price field on the way in.
-    const offering = await this.catalog.findServiceOffering(input.serviceId);
+    /*
+     * The price comes from the catalogue, server-side, every time. A client
+     * never supplies, influences, or even sees a price field on the way in.
+     *
+     * V3.3 #115 (`#41d-2b`), ADR-048 R3: read through the CALLER's manager, so
+     * the offering and the seller party are selected inside the transaction
+     * that writes them rather than on the adapter's own connection.
+     */
+    const offering = await this.catalog.findServiceOffering(manager, input.serviceId);
     if (!offering || offering.professionalId !== input.professionalId) {
       throw new UnsellableServiceException();
     }
 
+    /*
+     * The seller of record, selected ONCE (ADR-048 R3).
+     *
+     * Everything downstream -- the order row, the outbox payload and the policy
+     * resolution below -- uses this exact value. `SellerPartyLookup` is not
+     * consulted again anywhere in this transaction, and that is the actual
+     * guarantee: not that a re-read would return the same answer, but that
+     * there is no second read to disagree with the first.
+     */
+    const sellerParty: OrderSellerParty = {
+      partyType: offering.sellerPartyType,
+      partyId: offering.sellerPartyId,
+    };
+
+    /*
+     * V3.3 #115. Resolved BEFORE anything is written, so an enrolled seller
+     * whose policy cannot be resolved refuses with no order, item, adjustment,
+     * schedule or outbox row in existence (`V33-DEC-029` Ruling 8).
+     */
+    const collection = await this.resolveCollection(manager, sellerParty);
+
     const priced: PricingResult = await this.pricing.quote({
       customerId: input.customerId,
-      sellerPartyType: offering.sellerPartyType,
-      sellerPartyId: offering.sellerPartyId,
+      sellerPartyType: sellerParty.partyType,
+      sellerPartyId: sellerParty.partyId,
       bookingId: input.bookingId,
       at: new Date(),
       lines: [
@@ -246,8 +298,8 @@ export class OrderService {
       sourceType: 'booking',
       sourceId: input.bookingId,
       customerId: input.customerId,
-      sellerPartyType: offering.sellerPartyType,
-      sellerPartyId: offering.sellerPartyId,
+      sellerPartyType: sellerParty.partyType,
+      sellerPartyId: sellerParty.partyId,
       status: 'pending',
       currency: priced.currency,
       subtotalToman: priced.subtotalToman,
@@ -302,27 +354,22 @@ export class OrderService {
      * event would have manufactured a window that does not need to exist: both
      * tables are in one cluster (ADR-018), so a real transaction is available.
      *
-     * `full_payment_online` with the whole total collectible is not a default
-     * standing in for a decision -- it is what today's flow actually does, and
-     * `V33-DEC-022` Ruling 3 forbids `#41a` from making any other mode
-     * reachable. `V33-DEC-011` decides when that changes.
+     * V3.3 #115 (`#41d-2b`) makes the values conditional on enrolment:
      *
-     * The policy reference is absent, which `ck_ops_policy_reference` permits
-     * explicitly: `#41a` selects no policy, and fabricating a key or version
-     * would put a policy on a receipt that never had one. #83 (`#41d`) fills it
-     * in.
+     *   * an UNENROLLED party keeps `#41a`'s named full-online path exactly --
+     *     whole total collectible, zero venue balance, null policy reference.
+     *     That is not a default standing in for a decision; it is what today's
+     *     flow does, byte for byte, and the #115 suite compares it against a
+     *     pre-change baseline;
+     *   * an ENROLLED party records the amounts its assigned policy produced
+     *     and the exact key and version that produced them.
+     *
+     * `policyAcceptedAt` stays null on BOTH paths. Neither #104 nor #115
+     * records customer acceptance -- that is #42's, after Legal -- and the
+     * migration shipped with this story is what makes a key and version
+     * writable without one.
      */
-    await manager.insert(OrderPaymentScheduleEntity, {
-      orderId,
-      collectionMode: 'full_payment_online',
-      serviceTotalToman: priced.totalToman,
-      platformCollectibleToman: priced.totalToman,
-      venueBalanceToman: 0,
-      policyKey: null,
-      policyVersion: null,
-      policyAcceptedAt: null,
-      contractVersion: COMMERCIAL_POLICY_CONTRACT_VERSION,
-    });
+    await manager.insert(OrderPaymentScheduleEntity, scheduleValuesFor(orderId, priced, collection));
 
     await emitEvent(manager, CommerceOutboxEntity, {
       aggregateType: 'order',
@@ -333,8 +380,8 @@ export class OrderService {
         sourceType: 'booking',
         sourceId: input.bookingId,
         customerId: input.customerId,
-        sellerPartyType: offering.sellerPartyType,
-        sellerPartyId: offering.sellerPartyId,
+        sellerPartyType: sellerParty.partyType,
+        sellerPartyId: sellerParty.partyId,
         subtotalToman: priced.subtotalToman,
         totalToman: priced.totalToman,
         currency: priced.currency,
@@ -770,8 +817,155 @@ export class OrderService {
   private runInTransaction<T>(manager: EntityManager | undefined, fn: (m: EntityManager) => Promise<T>): Promise<T> {
     return manager ? fn(manager) : this.dataSource.transaction(fn);
   }
+
+  /**
+   * Resolves the seller's collection policy, or refuses — V3.3 #115
+   * (`#41d-2b`), ADR-048 R2's fail-closed boundary.
+   *
+   * ## Why the failure becomes `UnsellableServiceException` and not a new code
+   *
+   * ADR-048 §7 binds ONE non-enumerating public refusal for every
+   * collection-policy cause. A refusal code minted for #115 would satisfy the
+   * letter of that and defeat its purpose: a caller comparing the new code
+   * against `SERVICE_UNAVAILABLE_FOR_SALE` could tell an ENROLLED seller from
+   * an unenrolled one, and enumerate the platform's rollout one booking attempt
+   * at a time. Reusing the refusal this method already raises for an
+   * unsellable offering makes the two indistinguishable, which is strictly more
+   * non-enumerating and adds no public surface.
+   *
+   * The internal cause is recorded on a bounded metric and thrown away. It is
+   * never attached to the exception, so no future author can leak it by
+   * forgetting why it was separate.
+   */
+  private async resolveCollection(
+    manager: EntityManager,
+    sellerParty: OrderSellerParty,
+  ): Promise<ResolvedCollection> {
+    let resolved;
+    try {
+      resolved = await this.collectionPolicy.resolveForSellerParty(manager, sellerParty);
+    } catch (error) {
+      this.metrics.increment(METRICS.collectionPolicyResolutionFailures, { cause: causeOf(error) });
+      throw new UnsellableServiceException();
+    }
+
+    if (resolved.outcome === 'legacy_unenrolled') {
+      this.metrics.increment(METRICS.collectionPolicyResolutions, { outcome: 'legacy_unenrolled' });
+      return { enrolled: false };
+    }
+
+    /*
+     * Validated again HERE, at the trust boundary, even though the resolver
+     * validates before returning.
+     *
+     * The port is an interface: the composition root binds one implementation
+     * today, and a future adapter, a test double or a mistaken second binding
+     * would not run the resolver's own check. An unvalidated snapshot becomes
+     * an IMMUTABLE schedule row, so the cost of checking twice is one function
+     * call and the cost of trusting once is a receipt nobody can correct.
+     */
+    if (validateBookingCollectionPolicySnapshotV1(resolved.snapshot).length > 0) {
+      this.metrics.increment(METRICS.collectionPolicyResolutionFailures, { cause: 'invalid_snapshot' });
+      throw new UnsellableServiceException();
+    }
+
+    this.metrics.increment(METRICS.collectionPolicyResolutions, { outcome: 'enrolled' });
+    return { enrolled: true, snapshot: resolved.snapshot };
+  }
 }
 
 function isUniqueViolation(err: unknown): boolean {
   return (err as { code?: string } | null)?.code === '23505';
+}
+
+/** What order creation learned about the seller's policy. Internal to this module. */
+type ResolvedCollection =
+  | { enrolled: false }
+  | { enrolled: true; snapshot: BookingCollectionPolicySnapshotV1 };
+
+/**
+ * The closed cause vocabulary, read defensively.
+ *
+ * The resolver throws `CollectionPolicyUnresolvableError` with a bounded
+ * `cause`, but this module must not import `services/commercial-policy` to name
+ * that class (ADR-011). So the shape is duck-typed and anything unrecognised
+ * collapses to `unknown_error` -- which keeps the metric's label set bounded
+ * even if a future adapter throws something else entirely. An unbounded label
+ * here would be a cardinality explosion driven by whatever an exception happened
+ * to contain.
+ */
+function causeOf(error: unknown): string {
+  const candidate = (error as { cause?: unknown } | null)?.cause;
+  return typeof candidate === 'string' && /^[a-z_]{1,40}$/.test(candidate) ? candidate : 'unknown_error';
+}
+
+/**
+ * The schedule row for one order — V3.3 #115 (`#41d-2b`), ADR-048 R1.
+ *
+ * ## The mode is DERIVED from the amounts, never copied from the terms
+ *
+ * This is R1, and it is the correction that made ADR-048 necessary.
+ * `bookingCollectionAmountsV1` legitimately returns a collectible of `0` (a
+ * percentage flooring to zero on a small booking) or of exactly the service
+ * total (a fixed amount, or a minimum, clamped up to it) while the terms still
+ * say `deposit_online_balance_at_venue`. The shipped `ck_ops_mode_consistent`
+ * admits that mode only when `0 < collectible < total` STRICTLY, so copying
+ * `terms.collectionMode` would make a policy an administrator is entitled to
+ * publish refuse a booking for particular amounts -- a failure that would
+ * appear only for some order totals, long after the policy was published.
+ *
+ * Deriving from the computed amounts cannot disagree with the constraint,
+ * because both read the same three numbers.
+ */
+function scheduleValuesFor(
+  orderId: string,
+  priced: PricingResult,
+  collection: ResolvedCollection,
+): Partial<OrderPaymentScheduleEntity> {
+  if (!collection.enrolled) {
+    // `#41a`'s path, unchanged and asserted byte-identical against a
+    // pre-#115 baseline.
+    return {
+      orderId,
+      collectionMode: 'full_payment_online',
+      serviceTotalToman: priced.totalToman,
+      platformCollectibleToman: priced.totalToman,
+      venueBalanceToman: 0,
+      policyKey: null,
+      policyVersion: null,
+      policyAcceptedAt: null,
+      contractVersion: COMMERCIAL_POLICY_CONTRACT_VERSION,
+    };
+  }
+
+  /*
+   * Both amounts are passed, never one, because the ADMINISTRATOR chose which
+   * is the percentage base. Passing only the chosen amount would move that
+   * choice to this call site, which is the gap `V33-DEC-029` Ruling 4 closes.
+   *
+   * The arithmetic -- BigInt floor division, minimum clamp, maximum clamp, then
+   * the service-total clamp last -- lives in the shipped helper and is not
+   * duplicated here.
+   */
+  const amounts = bookingCollectionAmountsV1(priced.subtotalToman, priced.totalToman, collection.snapshot.terms);
+
+  return {
+    orderId,
+    collectionMode: modeForAmounts(amounts.platformCollectibleToman, amounts.serviceTotalToman),
+    serviceTotalToman: amounts.serviceTotalToman,
+    platformCollectibleToman: amounts.platformCollectibleToman,
+    venueBalanceToman: amounts.venueBalanceToman,
+    policyKey: collection.snapshot.policyKey,
+    policyVersion: collection.snapshot.policyVersion,
+    // #42's, after Legal. Neither child of `#41d-2` records acceptance.
+    policyAcceptedAt: null,
+    contractVersion: COMMERCIAL_POLICY_CONTRACT_VERSION,
+  };
+}
+
+/** ADR-048 R1's three cases, in the order the constraint states them. */
+function modeForAmounts(platformCollectibleToman: number, serviceTotalToman: number): BookingCollectionMode {
+  if (platformCollectibleToman === 0) return 'pay_at_venue';
+  if (platformCollectibleToman === serviceTotalToman) return 'full_payment_online';
+  return 'deposit_online_balance_at_venue';
 }

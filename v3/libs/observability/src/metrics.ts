@@ -222,6 +222,16 @@ export const METRICS = {
   paymentVerifications: 'beauclick_payment_verifications_total',
   outboxDepth: 'beauclick_outbox_pending',
   errorsReported: 'beauclick_errors_reported_total',
+  /**
+   * V3.3 #115 (`#41d-2b`). How every booking order resolved its collection
+   * policy, and why an enrolled one failed.
+   *
+   * Two series, not one, because they answer different questions and only the
+   * second is ever alertable. See `registerPlatformMetrics` for the exact
+   * bounded label sets and the dark-launch exit criterion.
+   */
+  collectionPolicyResolutions: 'beauclick_collection_policy_resolutions_total',
+  collectionPolicyResolutionFailures: 'beauclick_collection_policy_resolution_failures_total',
 } as const;
 
 export function registerPlatformMetrics(registry: MetricsRegistry): void {
@@ -239,4 +249,37 @@ export function registerPlatformMetrics(registry: MetricsRegistry): void {
   registry.registerCounter(METRICS.errorsReported, 'Errors handed to the error reporter, by whether it transmits.', [
     'transmitted',
   ]);
+
+  /*
+   * V3.3 #115 (`#41d-2b`), ADR-048 R2's dark-launch boundary.
+   *
+   * ## Exactly two label values, and nothing derived from the request
+   *
+   * `outcome` is `legacy_unenrolled` or `enrolled`, and that is the entire
+   * domain. No seller party, no policy key, no version, no amount, no order id
+   * and no customer id appears here or in either series below -- a metric label
+   * is retained far longer than a log line and is joined across tenants, so an
+   * identifier here is a disclosure that outlives the request that made it.
+   * The bounded label set is asserted by test, and `MAX_SERIES_PER_METRIC`
+   * above is the second line of defence rather than the first.
+   *
+   * ## The exit criterion is qualitative, deliberately
+   *
+   * Dark launch ends when `legacy_unenrolled` stops being the overwhelming
+   * majority AND the failure counter below stays flat as enrolment grows --
+   * that is, when sellers are actually enrolled and enrolling more of them adds
+   * no failures. **No numeric threshold, percentage or duration is chosen
+   * here.** Picking one would be a rollout policy, which `V33-DEC-031` reserves
+   * and this story explicitly does not decide.
+   */
+  registry.registerCounter(
+    METRICS.collectionPolicyResolutions,
+    'Booking orders by how their collection policy resolved. `legacy_unenrolled` is the pre-enrolment path; its share falling is what dark launch progressing looks like.',
+    ['outcome'],
+  );
+  registry.registerCounter(
+    METRICS.collectionPolicyResolutionFailures,
+    'Enrolled orders REFUSED because the assigned policy could not be resolved, by closed internal cause. Every increment is a booking that did not happen: this is the series to alert on.',
+    ['cause'],
+  );
 }

@@ -334,11 +334,6 @@ describePg('order payment schedule — invariants, immutability, atomicity, back
       ['a policy key with no version', { policy_key: 'salon_deposit' }, 'ck_ops_policy_reference'],
       ['a policy version with no key', { policy_version: 1 }, 'ck_ops_policy_reference'],
       [
-        'a policy key and version with no acceptance time',
-        { policy_key: 'salon_deposit', policy_version: 1 },
-        'ck_ops_policy_reference',
-      ],
-      [
         'a policy version below one',
         { policy_key: 'salon_deposit', policy_version: 0, policy_accepted_at: new Date() },
         'ck_ops_policy_version_positive',
@@ -354,6 +349,36 @@ describePg('order payment schedule — invariants, immutability, atomicity, back
         insertSchedule({ policy_key: 'salon_deposit', policy_version: 2, policy_accepted_at: new Date() }),
       ).resolves.toBeUndefined();
       expect(await scheduleRows()).toHaveLength(1);
+    });
+
+    it('accepts a key and version WITHOUT an acceptance time, which is what #115 writes', async () => {
+      /*
+       * This case used to sit in the refusal table above, and its inversion is
+       * the whole point of V3.3 #115's migration.
+       *
+       * `ck_ops_policy_reference` originally required all THREE columns
+       * together. That was right while nothing selected a policy -- every row
+       * was NULL and "partially referenced" was unrepresentable -- and it made
+       * an enrolled seller's order unwritable the moment one did: #115 knows
+       * exactly which key and version priced the booking, and deliberately
+       * knows no acceptance, because acceptance is #42's after Legal.
+       *
+       * The old constraint would have forced either a fabricated consent
+       * instant on a receipt that never had one, or dropping the policy
+       * reference and losing the audit trail. ADR-048 §2 ratified the third
+       * option: the two facts are independent.
+       *
+       * The refusals above are therefore still about incompleteness -- of the
+       * KEY/VERSION PAIR, which remains inseparable.
+       */
+      await expect(
+        insertSchedule({ policy_key: 'salon_deposit', policy_version: 3 }),
+      ).resolves.toBeUndefined();
+
+      const [row] = await scheduleRows();
+      expect(row.policy_key).toBe('salon_deposit');
+      expect(row.policy_version).toBe(3);
+      expect(row.policy_accepted_at).toBeNull();
     });
 
     it('accepts a genuine deposit split, so the deposit refusals are about the boundaries only', async () => {

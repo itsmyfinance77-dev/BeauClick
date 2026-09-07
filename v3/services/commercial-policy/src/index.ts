@@ -54,3 +54,8 @@ export * from './collection-policy-assignment/collection-policy-assignment.servi
 export * from './collection-policy-assignment/collection-policy-assignment.controller';
 export * from './collection-policy-assignment/collection-policy-assignment-subject-data.contract';
 export * from './collection-policy-assignment/collection-policy-assignment.module';
+// V3.3 Story #115 (`#41d-2b`). The READ-ONLY runtime resolver the order path
+// binds (ADR-048 R4). Separate from both writers above: no actor, no reason, no
+// audit row, and no mutation surface at all.
+export * from './collection-policy-assignment/collection-policy-resolution.errors';
+export * from './collection-policy-assignment/collection-policy-resolution.service';

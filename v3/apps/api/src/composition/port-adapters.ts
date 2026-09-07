@@ -4,9 +4,19 @@ import { DataSource, EntityManager, IsNull, Repository } from 'typeorm';
 
 import { ProfessionalEntity, SellerOwnerRoleGrantPort, ServiceOfferingEntity } from '@beauclick/provider';
 import { ProfessionalDirectory } from '@beauclick/booking';
-import { ServiceCatalog, ServiceOfferingSnapshot } from '@beauclick/commerce';
+import {
+  BookingCollectionPolicyResolver,
+  OrderSellerParty,
+  ResolvedBookingCollectionPolicy,
+  ServiceCatalog,
+  ServiceOfferingSnapshot,
+} from '@beauclick/commerce';
 import { FinanceWorkspaceOwnerResolver, FinancialParty, FinancialPartyResolver } from '@beauclick/financial';
-import { OwnedSubscriberParty, OwnedSubscriberPartyResolver } from '@beauclick/commercial-policy';
+import {
+  CollectionPolicyResolutionService,
+  OwnedSubscriberParty,
+  OwnedSubscriberPartyResolver,
+} from '@beauclick/commercial-policy';
 import { BusinessEntity, BusinessOwnerRoleGrantPort, BusinessStaffEntity } from '@beauclick/business';
 import { RoleService } from '@beauclick/identity';
 
@@ -53,12 +63,18 @@ export class ProviderBackedProfessionalDirectory implements ProfessionalDirector
  */
 @Injectable()
 export class SellerPartyLookup {
-  constructor(
-    @InjectRepository(BusinessStaffEntity) private readonly staff: Repository<BusinessStaffEntity>,
-  ) {}
-
-  async forProfessional(professionalId: string): Promise<FinancialParty> {
-    const membership = await this.staff.findOne({
+  /**
+   * V3.3 #115 (`#41d-2b`), ADR-048 R3: the caller's `EntityManager` is
+   * MANDATORY and there is no injected-repository fallback.
+   *
+   * The repository is gone from this class entirely rather than kept as a
+   * default, because a default is exactly how an out-of-transaction read
+   * survives a refactor: every call site that forgot to pass a manager would
+   * keep compiling and keep reading on another connection, and nothing would
+   * report it. Removing the field makes that unrepresentable.
+   */
+  async forProfessional(manager: EntityManager, professionalId: string): Promise<FinancialParty> {
+    const membership = await manager.findOne(BusinessStaffEntity, {
       where: { professionalId, status: 'active' },
       select: { id: true, businessId: true },
     });
@@ -70,15 +86,21 @@ export class SellerPartyLookup {
 
 @Injectable()
 export class ProviderBackedServiceCatalog implements ServiceCatalog {
-  constructor(
-    @InjectRepository(ServiceOfferingEntity) private readonly services: Repository<ServiceOfferingEntity>,
-    private readonly sellerParty: SellerPartyLookup,
-  ) {}
+  constructor(private readonly sellerParty: SellerPartyLookup) {}
 
-  async findServiceOffering(serviceId: string): Promise<ServiceOfferingSnapshot | null> {
-    const offering = await this.services.findOne({ where: { id: serviceId, deletedAt: IsNull() } });
+  /**
+   * V3.3 #115 (`#41d-2b`), ADR-048 R3.
+   *
+   * Both reads -- the offering and the affiliation behind the seller party --
+   * now go through the CALLER's manager, so neither happens on this adapter's
+   * own connection outside the order's transaction. The injected
+   * `ServiceOfferingEntity` repository was removed rather than left unused, so
+   * there is no connection here to accidentally read from again.
+   */
+  async findServiceOffering(manager: EntityManager, serviceId: string): Promise<ServiceOfferingSnapshot | null> {
+    const offering = await manager.findOne(ServiceOfferingEntity, { where: { id: serviceId, deletedAt: IsNull() } });
     if (!offering) return null;
-    const seller = await this.sellerParty.forProfessional(offering.professionalId);
+    const seller = await this.sellerParty.forProfessional(manager, offering.professionalId);
     return {
       id: offering.id,
       professionalId: offering.professionalId,
@@ -88,6 +110,42 @@ export class ProviderBackedServiceCatalog implements ServiceCatalog {
       sellerPartyType: seller.partyType,
       sellerPartyId: seller.partyId,
     };
+  }
+}
+
+/**
+ * Commerce's collection-policy resolver, answered by commercial-policy —
+ * V3.3 #115 (`#41d-2b`), ADR-048 R4.
+ *
+ * ## The whole adapter is a delegation, and that is the design
+ *
+ * `scope:commerce` may depend only on `scope:shared`, so Commerce declares the
+ * question and cannot name who answers it. This class is the ONE place the two
+ * domains meet, exactly as `ProviderBackedServiceCatalog` above is for the
+ * catalogue -- `apps/api` is the only tier permitted to compose domains
+ * (ADR-011).
+ *
+ * It binds to `CollectionPolicyResolutionService`, which is read-only and has
+ * no actor, reason or audit contract. It deliberately does NOT bind to
+ * `BookingCollectionPolicyService` (the privileged administrator writer) or to
+ * `CollectionPolicyAssignmentService` (the seller's writer): either would put a
+ * mutation surface one autocomplete away from the code path that runs for every
+ * booking on the platform.
+ *
+ * The port's own `null` case is translated here into the closed union Commerce
+ * declared, so "unenrolled" is a value the caller must handle rather than a
+ * null it might forget to.
+ */
+@Injectable()
+export class CommercialPolicyBackedCollectionResolver implements BookingCollectionPolicyResolver {
+  constructor(private readonly resolution: CollectionPolicyResolutionService) {}
+
+  async resolveForSellerParty(
+    manager: EntityManager,
+    sellerParty: OrderSellerParty,
+  ): Promise<ResolvedBookingCollectionPolicy> {
+    const snapshot = await this.resolution.resolveForParty(manager, sellerParty.partyType, sellerParty.partyId);
+    return snapshot === null ? { outcome: 'legacy_unenrolled' } : { outcome: 'enrolled', snapshot };
   }
 }
 
@@ -129,7 +187,14 @@ export class ProviderBackedFinancialPartyResolver implements FinancialPartyResol
     // not a party, and null (never a fabricated zero-balance party) is what
     // says so.
     if (!professional) return null;
-    return this.sellerParty.forProfessional(professional.id);
+    /*
+     * V3.3 #115 made the manager mandatory on `forProfessional`. This resolver
+     * is NOT on the transactional order path -- it answers "whose earnings are
+     * these?" for a finance read -- so it passes its own repository's manager,
+     * which is the exact connection it already used. Behaviour is unchanged;
+     * only the parameter is now explicit rather than implicit.
+     */
+    return this.sellerParty.forProfessional(this.professionals.manager, professional.id);
   }
 }
 

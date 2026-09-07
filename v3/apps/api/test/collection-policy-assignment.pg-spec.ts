@@ -1596,15 +1596,28 @@ describePg('seller collection-policy assignment (real PostgreSQL)', () => {
       expect(await rowsFor(owner.partyId)).toHaveLength(2);
     });
 
-    it("leaves commerce's all-three policy-reference CHECK exactly as #115 will find it", async () => {
-      const [row] = await dataSource.query(
+    it('owns no commerce migration, whoever later changed the constraint', async () => {
+      /*
+       * Formerly temporal: it asserted the all-three CHECK was still in place,
+       * because "replacing it is #115's decision". #115 has since made that
+       * decision, so the assertion came due -- key and version are now
+       * all-or-none and `policy_accepted_at` is independently nullable.
+       *
+       * What was permanent is that ASSIGNMENT does not reach into commerce. A
+       * commerce migration authored by this story would still fail here, which
+       * is what the original case was protecting.
+       */
+      const owned = await dataSource.query(
+        `SELECT filename FROM public.schema_migrations
+          WHERE filename LIKE 'commerce/%' AND filename LIKE '%assignment%'`,
+      );
+      expect(owned).toEqual([]);
+
+      // The constraint is #115's shape now, and #104 still writes no schedule.
+      const [reference] = await dataSource.query(
         `SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conname='ck_ops_policy_reference'`,
       );
-      // Untouched: replacing it is #115's decision, and this story must not
-      // pre-empt it by loosening the constraint that keeps a partial policy
-      // reference unwritable.
-      expect(row.definition).toContain('policy_accepted_at IS NULL');
-      expect(row.definition).toContain('policy_accepted_at IS NOT NULL');
+      expect(reference.definition).not.toContain('policy_accepted_at');
     });
 
     it('populates no acceptance instant anywhere, which stays #42’s after Legal', async () => {
