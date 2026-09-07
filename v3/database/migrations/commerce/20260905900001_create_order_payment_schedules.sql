@@ -47,7 +47,18 @@ CREATE TABLE commerce.order_payment_schedules (
      * is a fact, not a gap -- `ck_ops_policy_reference` makes "partially
      * referenced" unrepresentable rather than merely discouraged.
      *
-     * `#83` (`#41d`) fills these in when publication and selection exist.
+     * CORRECTED by V3.3 #115 (`#41d-2b`). This comment said `#83` (`#41d`)
+     * would fill these in, which was true of the story as originally scoped and
+     * stopped being true when `V33-DEC-031` split it. #83 publishes the
+     * catalogue and writes nothing here; #104 (`#41d-2a`) records a seller's
+     * choice; **#115 writes `policy_key` and `policy_version`** for an enrolled
+     * seller's order.
+     *
+     * `policy_accepted_at` is still written by NEITHER, and #115's own
+     * migration replaced `ck_ops_policy_reference` so that key and version can
+     * be recorded without it. The constraint as defined below is therefore
+     * superseded -- see
+     * `20260907900001_replace_order_payment_schedule_policy_reference.sql`.
      */
     policy_key         VARCHAR(64),
     policy_version     INTEGER,
