@@ -28,7 +28,7 @@ delivering its Story Points never creates a tag and never enables production.
 | V3.2-E | B2B Quotes and Campaigns | Owner-gated; payment gate applies to settlement | Not applicable | Not enabled |
 | V3.2-F | Payout and Calendar Automation | Predominantly external-gated | Not applicable | Not enabled |
 | V3.2-G | Evidence-Gated Scale | No commitment without evidence | Not applicable | Not enabled |
-| V3.3 | Product Maturity Programme | Active foundation: #39, #40 (`#40a`), #56 (`#56a`), #69 (`#56b`), #72 and #75 complete; epic #38 in progress; Story #41 decomposed by `V33-DEC-022` into #41 (`#41a`), #81 (`#41b`), #82 (`#41c`) and #83 (`#41d`) and re-estimated 13 -> 42 (#82 raised 8 -> 13 by `V33-DEC-024`); #41 (`#41a`), #81 (`#41b`) and #82 (`#41c`) complete, #83 (`#41d`) gated; #58 split by `V33-DEC-025` into `#58a` (13, **complete**) and `#58b` (3, blocked on #46); #57 split by `V33-DEC-026` into `#40c-1` (#57, **complete** at 13 after `V33-DEC-027` re-estimated it 8 -> 13) and #99 (`#40c-2`, 5, blocked on #47); bug #97 (2) complete; commercial structure ratified and **#46 closed** 2026-09-06 by `V33-DEC-028`, which moved #83 (13) and #95 (`#58b`, 3 -> 5) to Ready and re-estimated #43 13 -> 21; #83 then split 2026-09-06 by `V33-DEC-029` into `#41d-1` (#83, 13, Ready) and #104 (`#41d-2`, 8, proposed); #104 then split 2026-09-07 by `V33-DEC-031` into `#41d-2a` (#104, 8, Ready) and #115 (`#41d-2b`, 8, proposed); **#44 decomposed 2026-09-06 by `V33-DEC-030`** into an umbrella carrying no Story Points plus five children — #107 (`#44a`, 5, Ready), #108 (`#44b`, 8), #109 (`#44c`, 13), #110 (`#44d`, 13) and #111 (`#44e`, 8) — re-estimated 13 -> 47, a net **+34** with done unchanged | No tag authorized | Real money blocked by #47; every commercial value and all legal copy remain **unpublished**, now tracked on #83, #42 (Legal), #43 and #47 rather than #46 |
+| V3.3 | Product Maturity Programme | Active foundation: #39, #40 (`#40a`), #56 (`#56a`), #69 (`#56b`), #72 and #75 complete; epic #38 in progress; Story #41 decomposed by `V33-DEC-022` into #41 (`#41a`), #81 (`#41b`), #82 (`#41c`) and #83 (`#41d`) and re-estimated 13 -> 42 (#82 raised 8 -> 13 by `V33-DEC-024`); #41 (`#41a`), #81 (`#41b`) and #82 (`#41c`) complete, #83 (`#41d`) gated; #58 split by `V33-DEC-025` into `#58a` (13, **complete**) and `#58b` (3, blocked on #46); #57 split by `V33-DEC-026` into `#40c-1` (#57, **complete** at 13 after `V33-DEC-027` re-estimated it 8 -> 13) and #99 (`#40c-2`, 5, blocked on #47); bug #97 (2) complete; commercial structure ratified and **#46 closed** 2026-09-06 by `V33-DEC-028`, which moved #83 (13) and #95 (`#58b`, 3 -> 5) to Ready and re-estimated #43 13 -> 21; #83 then split 2026-09-06 by `V33-DEC-029` into `#41d-1` (#83, 13, Ready) and #104 (`#41d-2`, 8, proposed); #104 then split 2026-09-07 by `V33-DEC-031` into `#41d-2a` (#104, 8, Ready) and #115 (`#41d-2b`, 8, proposed); **#44 decomposed 2026-09-06 by `V33-DEC-030`** into an umbrella carrying no Story Points plus five children — #107 (`#44a`, 5, Ready), #108 (`#44b`, 8), #109 (`#44c`, 13), #110 (`#44d`, 13) and #111 (`#44e`, 8) — re-estimated 13 -> 47, a net **+34** with done unchanged; #107 (`#44a`)'s classification cardinality then ratified 2026-09-07 by `V33-DEC-032` — **at most one** vertical, an unclassified business legal, #107 unsplit at 5 SP and **no Story Point moved** | No tag authorized | Real money blocked by #47; every commercial value and all legal copy remain **unpublished**, now tracked on #83, #42 (Legal), #43 and #47 rather than #46 |
 | V3.4 | Conditional Expansion Programme | Written owner decision and evidence required | Not applicable | Not enabled |
 
 V3.2-A and V3.2-B are completed historical milestones but are deliberately
@@ -436,7 +436,7 @@ started as written:
 | Item | Before | After | Outcome it owns |
 |---|---:|---:|---|
 | #44 | 13 | **0 (umbrella)** | Retained OPEN as the parent under #38, converted to `type:epic`, `sp:13` and `gate:product` removed. **Delivers no schema or code and closes only when all five children close.** |
-| #107 (`#44a`) | — | **5** | Business classification and operating traits: closed vertical and trait vocabularies, one primary vertical per business, owner-only mutation, transactional audit, ADR-027 claims, a structural proof that classification authorizes nothing, and the `uq_businesses_owner_id` partial-index correction. The **only** Ready child |
+| #107 (`#44a`) | — | **5** | Business classification and operating traits: closed vertical and trait vocabularies, one primary vertical per business *(amended 2026-09-07 by `V33-DEC-032` to **at most one** vertical, with an unclassified business legal — see the 2026-09-07 section below)*, owner-only mutation, transactional audit, ADR-027 claims, a structural proof that classification authorizes nothing, and the `uq_businesses_owner_id` partial-index correction. The **only** Ready child |
 | #108 (`#44b`) | — | **8** | Organisation locations with an `active \| suspended \| closed` lifecycle and an opaque `locationRef`. `businesses.city_id` is deprecated **as a service-delivery location**, with the column and all data preserved. No booking behaviour changes |
 | #109 (`#44c`) | — | **13** | Scoped staff roles and permissions: the grant store anchored on `business_staff.id`, a **new scoped** verifier port, owner-only grant/revoke with live re-checks, the `business_staff` status vocabulary and CHECK correction, consented non-enumerating invite-by-phone, and the chat practitioner grant |
 | #110 (`#44d`) | — | **13** | Bookable resources and `ex_booking_resource_no_overlap`, assigned in the same transaction as the slot claim. `booking.bookings` byte-identical |
@@ -508,3 +508,55 @@ its `READ COMMITTED` precision, the separate resolver, and the `FOR SHARE`/CAS
 linearization. `policy_accepted_at` remains independently nullable and is populated by
 neither child; per-service override stays deferred behind #44; and #42, #43, #47, #95 and
 #99 keep every gate they had.
+
+## V3.3 Story #107 classification cardinality ratified, 2026-09-07
+
+`V33-DEC-032` closed the one question a read-only implementation-readiness audit of #107
+refused to answer. **Product meaning and data contract only** — no commercial value, no
+Legal wording, no schema, no ADR and no implementation. **No issue was created, closed,
+re-estimated or re-pointed**, so Story Points and progress totals are unchanged.
+
+**Why.** `V33-DEC-030` D1 closed the vertical and trait **vocabularies** but never their
+**cardinality**, and #107 then required "exactly **one primary** vertical per business,
+enforced by a partial unique index". That sentence was unratified and unbuildable in two
+independent ways:
+
+- the word *primary* and its partial index are meaningful only if **secondary** verticals
+  exist, and nothing in the register, ADR-023, ADR-039 or #107's own D1 says what a secondary
+  vertical means, who may set one, whether it is exported under ADR-027, or what reads it;
+- **no unique index can require at least one row**, and `BusinessService.create` writes no
+  classification at all, so "exactly one" would have made every existing and every newly
+  created business non-conforming — inside a story that calls itself a zero-behaviour change.
+
+**What was ratified.** A business has **at most one current vertical**.
+`business.business_verticals` is keyed by `business_id` as its primary key, with **no
+`is_primary` column** and **no independent row id** whose only purpose is to imply multiple
+verticals; "primary vertical" and a partial primary-marker index are explicitly rejected
+because they silently introduce secondary verticals with no ratified meaning. An
+**unclassified business is legal**, represented by the **absence** of the row — never by a
+default, a backfill, an inference or a sentinel member of the closed vocabulary. Existing
+businesses stay unclassified until **their owner explicitly sets a classification**, and
+**`POST /v1/businesses` is unchanged**: creation neither requires nor accepts a vertical.
+Traits remain an independent additive set of zero, one or both of `multi_location | mobile`,
+keyed by `(business_id, trait)`. Classification still **authorizes nothing**, and `clinic`
+remains a commercial classification carrying no medical data and no medical authority.
+
+**Four engineering obligations were recorded as #107's own, not as new product decisions:**
+the `uq_businesses_owner_id` partial active-owner index repair; the `deleted_at IS NULL`
+filters in `StaffService.roleFor` and `BusinessService.update`, which must land **atomically
+with** that repair, because a partial index otherwise lets one user own a soft-deleted row
+and a live row with owner authority over both; **direct** tests for the transactional-audit
+criterion, because the privileged-route boot assertion does not cover this non-capability
+business surface; and entity-metadata/index alignment, so removing `@Column({ unique: true
+})` from `ownerId` cannot leave pg-mem and real PostgreSQL holding contradictory ownership
+uniqueness, with real PostgreSQL authoritative for partial-index behaviour.
+
+**Nothing moved.** #107 stays **unsplit at 5 SP**, `status:ready`, milestone V3.3, priority,
+track, parent and open state unchanged. #44, #108–#111 and #38 are untouched. `V33-DEC-030`
+is amended **only** in its `#44a` cardinality phrase; every other ruling of that card stands
+and is not reopened.
+
+**ADR-049 is still required before any child schema, contract or executable code**, must be
+committed alone as its own pull request containing exactly one new file, and must now record
+`V33-DEC-032`'s rulings verbatim. It was deliberately **not** written in this governance
+change, and no #107 implementation began with it.
