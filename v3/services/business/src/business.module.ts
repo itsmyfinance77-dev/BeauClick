@@ -14,6 +14,7 @@ import { BusinessClassificationService } from './business-classification.service
 import { BusinessLocationService } from './business-location.service';
 import { StaffService } from './staff.service';
 import { BusinessController } from './business.controller';
+import { BusinessLocationController } from './business-location.controller';
 import {
   BusinessManagerResolver,
   BusinessMembershipResolver,
@@ -40,7 +41,7 @@ export const BUSINESS_ENTITIES = [
 
 @Module({
   imports: [ConfigModule, TypeOrmModule.forFeature(BUSINESS_ENTITIES)],
-  controllers: [BusinessController],
+  controllers: [BusinessController, BusinessLocationController],
   providers: [
     BusinessSubjectDataContract,
     BusinessService,
