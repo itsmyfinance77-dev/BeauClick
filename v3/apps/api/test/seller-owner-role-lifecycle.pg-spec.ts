@@ -161,6 +161,40 @@ describePg('seller owner role lifecycle — ownership triggers, backfill, token 
     return { ...session, accessToken: res.body.data.accessToken, refreshToken: res.body.data.refreshToken };
   }
 
+  /**
+   * Invite by phone and return the membership id -- V3.3 Story #109 (`#44c`).
+   *
+   * The owner-facing contract used to be `{ userId, role, professionalId }`
+   * answering `201` with the whole membership row. #109 replaced it: the input
+   * is `{ phone, role }`, the professional link is resolved server-side from the
+   * invitee's own profile, and the answer is a byte-identical `202 {}` that
+   * discloses no membership id. So the id is read where it is now the only place
+   * it is disclosed -- the invitee's own surface, which is the person entitled
+   * to it.
+   */
+  async function inviteByPhone(
+    ownerToken: string,
+    businessId: string,
+    invitee: LiveSession,
+    role: 'manager' | 'staff',
+  ): Promise<string> {
+    await request(app.getHttpServer())
+      .post(`/api/v1/businesses/${businessId}/staff`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ phone: invitee.phone, role })
+      .expect(202);
+
+    const mine = await request(app.getHttpServer())
+      .get('/api/v1/me/business-staff')
+      .set('Authorization', `Bearer ${invitee.accessToken}`)
+      .expect(200);
+    const membership = mine.body.data.find(
+      (row: { businessId: string; status: string }) => row.businessId === businessId && row.status === 'invited',
+    );
+    if (!membership) throw new Error('the invitation was not created for this invitee');
+    return membership.id;
+  }
+
   function claimsOf(accessToken: string): { roles: string[]; capabilities: string[] } {
     return JSON.parse(Buffer.from(accessToken.split('.')[1], 'base64url').toString());
   }
@@ -496,17 +530,15 @@ describePg('seller owner role lifecycle — ownership triggers, backfill, token 
       businessId: string,
       member: LiveSession,
       role: 'manager' | 'staff',
-      professionalId: string | null,
     ): Promise<void> {
+      // The `professionalId` argument is gone with the UUID contract (#109):
+      // the link is resolved server-side from the invitee's own profile, so a
+      // caller can neither supply it nor learn it.
       const ownerToken = (await refresh(businessOwner)).accessToken;
-      const invited = await request(app.getHttpServer())
-        .post(`/api/v1/businesses/${businessId}/staff`)
-        .set('Authorization', `Bearer ${ownerToken}`)
-        .send({ userId: member.userId, role, ...(professionalId ? { professionalId } : {}) })
-        .expect(201);
+      const membershipId = await inviteByPhone(ownerToken, businessId, member, role);
 
       await request(app.getHttpServer())
-        .post(`/api/v1/me/business-staff/${invited.body.data.id}/accept`)
+        .post(`/api/v1/me/business-staff/${membershipId}/accept`)
         .set('Authorization', `Bearer ${member.accessToken}`)
         .send({})
         .expect(201);
@@ -517,7 +549,7 @@ describePg('seller owner role lifecycle — ownership triggers, backfill, token 
       const businessId = await createBusiness(bizOwner);
       const manager = await login();
 
-      await inviteAndAccept(bizOwner, businessId, manager, 'manager', null);
+      await inviteAndAccept(bizOwner, businessId, manager, 'manager');
 
       expect(await rolesOf(manager.userId)).toEqual(['customer']);
       expect(await ownerRoleAuditRows(manager.userId)).toHaveLength(0);
@@ -528,7 +560,7 @@ describePg('seller owner role lifecycle — ownership triggers, backfill, token 
       const businessId = await createBusiness(bizOwner);
       const member = await login();
 
-      await inviteAndAccept(bizOwner, businessId, member, 'staff', null);
+      await inviteAndAccept(bizOwner, businessId, member, 'staff');
 
       expect(await rolesOf(member.userId)).toEqual(['customer']);
     });
@@ -538,10 +570,13 @@ describePg('seller owner role lifecycle — ownership triggers, backfill, token 
       const businessId = await createBusiness(bizOwner);
 
       const staffPro = await login();
-      const professionalId = await createProfessional(staffPro, 'متخصص کارمند');
+      // The profile itself still matters -- it is what gives this account its
+      // `professional` role. Its id does not: #109 resolves the membership's
+      // professional link server-side, so no caller names it any more.
+      await createProfessional(staffPro, 'متخصص کارمند');
       expect(await rolesOf(staffPro.userId)).toEqual(['customer', 'professional']);
 
-      await inviteAndAccept(bizOwner, businessId, staffPro, 'staff', professionalId);
+      await inviteAndAccept(bizOwner, businessId, staffPro, 'staff');
       // Joining grants no business role and removes no professional role.
       expect(await rolesOf(staffPro.userId)).toEqual(['customer', 'professional']);
 
@@ -1033,16 +1068,14 @@ describePg('seller owner role lifecycle — ownership triggers, backfill, token 
       const ownerLive = await refresh(bizOwner);
 
       const staffPro = await login();
-      const professionalId = await createProfessional(staffPro, 'کارمند متخصص');
+      // Owning a professional is what gives this staff member
+      // `bc_manage_own_subscription`; the id is no longer named by any caller.
+      await createProfessional(staffPro, 'کارمند متخصص');
       const staffLive = await refresh(staffPro);
 
-      const invited = await request(app.getHttpServer())
-        .post(`/api/v1/businesses/${businessId}/staff`)
-        .set('Authorization', `Bearer ${ownerLive.accessToken}`)
-        .send({ userId: staffPro.userId, role: 'manager', professionalId })
-        .expect(201);
+      const membershipId = await inviteByPhone(ownerLive.accessToken, businessId, staffLive, 'manager');
       await request(app.getHttpServer())
-        .post(`/api/v1/me/business-staff/${invited.body.data.id}/accept`)
+        .post(`/api/v1/me/business-staff/${membershipId}/accept`)
         .set('Authorization', `Bearer ${staffLive.accessToken}`)
         .send({})
         .expect(201);
