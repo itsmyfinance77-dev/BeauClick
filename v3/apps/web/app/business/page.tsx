@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { formatFullJalaliDate } from '@beauclick/persian-utils';
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { formatFullJalaliDate, normalizeDigits } from '@beauclick/persian-utils';
 import { useAuth } from '@/lib/auth-context';
 import { ProtectedRoute } from '@/components/protected-route';
 import { Alert, Button, Card, ErrorState, Input, LoadingState } from '@/components/ui';
@@ -19,6 +19,7 @@ import {
   removeStaff,
   type Business,
   type BusinessStaffMember,
+  type BusinessStaffStatus,
 } from '@/lib/phase4-api';
 
 /**
@@ -65,13 +66,32 @@ const PENDING_COPY: Record<PendingAction['kind'], { title: string; confirm: stri
     body: 'عضویت شما در این کسب‌وکار پایان می‌یابد. برای بازگشت، باید دوباره دعوت شوید.',
   },
 };
-const STATUS_LABELS: Record<string, string> = { invited: 'دعوت‌شده', active: 'فعال', inactive: 'غیرفعال', declined: 'رد شده' };
+/*
+ * V3.3 Story #123. `removed` is the membership status V3.3 Story #109 (`#44c`)
+ * added to the vocabulary -- privacy erasure had always written it while neither
+ * the type system nor the database knew it. Without an entry here the badge for
+ * an erased member rendered blank, which reads as a broken row rather than as a
+ * real state.
+ *
+ * The copy is deliberately neutral and factual: the membership ended, and the
+ * screen says nothing about the person or why.
+ */
+const STATUS_LABELS: Record<BusinessStaffStatus, string> = {
+  invited: 'دعوت‌شده',
+  active: 'فعال',
+  inactive: 'غیرفعال',
+  declined: 'رد شده',
+  removed: 'حذف‌شده',
+};
 
-const STATUS_TONE: Record<string, 'neutral' | 'success' | 'warning' | 'error'> = {
+const STATUS_TONE: Record<BusinessStaffStatus, 'neutral' | 'success' | 'warning' | 'error'> = {
   invited: 'warning',
   active: 'success',
   inactive: 'neutral',
   declined: 'error',
+  // Terminal and not an error the owner can act on -- the same quiet tone
+  // `inactive` carries, for the same reason.
+  removed: 'neutral',
 };
 
 export default function BusinessPage() {
@@ -166,15 +186,42 @@ function BusinessDashboard() {
     }
   }
 
-  async function handleInvite(userId: string, role: 'manager' | 'staff') {
-    if (!owned) return;
+  /**
+   * Invite by phone -- V3.3 Story #123, migrating this screen onto the contract
+   * V3.3 Story #109 (`#44c`) shipped.
+   *
+   * ## Why this returns a result instead of setting the page error
+   *
+   * The outcome belongs to the form: a malformed phone must come back as a
+   * correctable field error with the number still in the box, which a
+   * page-level alert cannot express. `InviteForm` owns both, so the two states
+   * cannot drift apart.
+   *
+   * ## Why there is no `load()` here any more
+   *
+   * It used to refresh the roster immediately after inviting. Under the new
+   * contract that would be an enumeration oracle rebuilt in the browser: a row
+   * appearing next to the confirmation means the phone belonged to a real
+   * eligible account, and no row means it did not -- exactly the difference
+   * `V33-DEC-033` R3 removed from the response. A `202` is success either way,
+   * so the confirmation is unconditional and the roster refreshes on the next
+   * ordinary load.
+   */
+  async function handleInvite(
+    phone: string,
+    role: 'manager' | 'staff',
+  ): Promise<{ ok: true } | { ok: false; message: string }> {
+    if (!owned) return { ok: false, message: 'کسب‌وکاری برای دعوت یافت نشد.' };
     setBusy(true);
     setError(null);
     try {
-      await inviteStaff(api, owned.id, { userId, role });
-      await load();
+      await inviteStaff(api, owned.id, { phone, role });
+      return { ok: true };
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'دعوت ارسال نشد.');
+      // The server's own Persian text, never patched or re-interpreted here --
+      // and never mapped onto a semantic outcome, because the response carries
+      // none to map.
+      return { ok: false, message: err instanceof Error ? err.message : 'دعوت ارسال نشد.' };
     } finally {
       setBusy(false);
     }
@@ -373,27 +420,93 @@ function CreateBusinessForm({ onCreate, busy }: { onCreate: (displayName: string
   );
 }
 
+/**
+ * Invite a colleague by phone -- V3.3 Story #123.
+ *
+ * ## One confirmation, for every outcome
+ *
+ * `V33-DEC-033` R3 makes the server answer a byte-identical `202 {}` whether the
+ * phone belongs to a known eligible account, to nobody, to the owner
+ * themselves, to someone already invited, to someone affiliated with another
+ * business, or to a deleted account. The browser cannot tell those apart, and
+ * must not appear to: there is exactly ONE success message, it is set
+ * unconditionally, and nothing in this component branches on anything the
+ * response contains -- because it contains nothing.
+ *
+ * The copy says only that the request was received. It does not say a person
+ * exists, that a membership was created, that an SMS went out, or who was
+ * invited. Any of those would rebuild in the UI the enumeration oracle the
+ * backend removed.
+ *
+ * ## The phone rule is the server's
+ *
+ * Digits are normalised to ASCII with the platform's existing `normalizeDigits`
+ * -- the same call `/admin/users` already makes -- so a number typed with
+ * Persian digits reaches the API in the form it expects. Nothing here decides
+ * whether a string IS an Iranian mobile: `canonicalizePhone` on the server is
+ * the single authority, and a second grammar in the browser would be one more
+ * rule to drift. A malformed number therefore comes back as the ordinary
+ * syntactic `400` and is shown against the field.
+ */
 function InviteForm({
   onInvite,
   busy,
 }: {
-  onInvite: (userId: string, role: 'manager' | 'staff') => void;
+  onInvite: (phone: string, role: 'manager' | 'staff') => Promise<{ ok: true } | { ok: false; message: string }>;
   busy: boolean;
 }) {
-  const [userId, setUserId] = useState('');
+  const [phone, setPhone] = useState('');
   const [role, setRole] = useState<'manager' | 'staff'>('staff');
+  const [fieldError, setFieldError] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    // Guards a second submit from a double click or a repeated Enter while the
+    // first request is still open.
+    if (submitting || busy) return;
+    const entered = normalizeDigits(phone.trim());
+    if (!entered) return;
+
+    setSubmitting(true);
+    setFieldError(null);
+    setSent(false);
+    const result = await onInvite(entered, role);
+    setSubmitting(false);
+
+    if (result.ok) {
+      setSent(true);
+      // Cleared only on success, so a rejected number stays on screen to be
+      // corrected rather than retyped.
+      setPhone('');
+      return;
+    }
+    setFieldError(result.message);
+  }
+
+  const pending = submitting || busy;
+
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (userId.trim()) onInvite(userId.trim(), role);
-      }}
-    >
+    <form onSubmit={submit} noValidate>
+      {sent ? <Alert tone="success">درخواست دعوت دریافت شد و در حال بررسی است.</Alert> : null}
       <Input
-        label="شناسه کاربری فرد مورد نظر"
-        hint="شناسه کاربری (شناسه حساب کاربری) فردی که می‌خواهید دعوت کنید."
-        value={userId}
-        onChange={(e) => setUserId(e.target.value)}
+        label="شماره موبایل همکار"
+        name="phone"
+        type="tel"
+        inputMode="numeric"
+        autoComplete="tel"
+        placeholder="09123456789"
+        hint="دعوت به این شماره ارسال می‌شود."
+        value={phone}
+        onChange={(e) => {
+          setPhone(e.target.value);
+          // Editing after a refusal clears the stale message; the confirmation
+          // is left alone so it does not flicker away as the next number is
+          // typed.
+          if (fieldError) setFieldError(null);
+        }}
+        error={fieldError ?? undefined}
         required
       />
       {/* Two bare radios in labels with no `minHeight`, so the tappable area was
@@ -405,9 +518,9 @@ function InviteForm({
           baseline, and is what the analytics range and availability horizon
           use. */}
       <div style={{ marginBlockEnd: 16 }}>
-        <SegmentedControl label="نقش" value={role} options={ROLE_OPTIONS} onChange={setRole} disabled={busy} />
+        <SegmentedControl label="نقش" value={role} options={ROLE_OPTIONS} onChange={setRole} disabled={pending} />
       </div>
-      <Button type="submit" loading={busy}>
+      <Button type="submit" loading={pending}>
         ارسال دعوت
       </Button>
     </form>
