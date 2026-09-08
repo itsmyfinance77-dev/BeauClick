@@ -116,9 +116,24 @@ export const CHAT_ELIGIBILITY = Symbol('BEAUCLICK_CHAT_ELIGIBILITY');
  * Ordinary `staff` get nothing — including the practitioner who actually
  * delivered the service, when their role is only `staff`. `business_staff.role`
  * is `manager | staff` and nothing finer, so an any-active-staff rule would hand
- * a private customer conversation to everyone a salon has ever added. The
- * practitioner-specific grant that would fix this properly needs the V3.3-C role
- * matrix, which does not exist.
+ * a private customer conversation to everyone a salon has ever added.
+ *
+ * ## What V3.3 Story #109 (`#44c`) changed
+ *
+ * The paragraph above used to end "the practitioner-specific grant that would fix
+ * this properly needs the V3.3-C role matrix, which does not exist". It exists
+ * now. `V33-DEC-033` R1/R2 ratified a one-member scoped vocabulary,
+ * `practitioner_chat`, which is **practitioner-specific**: it reaches the
+ * conversations whose qualifying booking the grantee personally delivered, on the
+ * business the order snapshotted, and never a colleague's conversation in the
+ * same salon.
+ *
+ * That reach is carried by `grantedConversationScopes` rather than by widening
+ * `counterpartiesFor`, and `canAccessCounterparty` / `recipientsFor` now take the
+ * conversation's customer — because "may this practitioner act here" cannot be
+ * answered from the counterparty alone. Every call site already holds the
+ * conversation, so it costs nothing and makes the narrow question the only
+ * expressible one.
  */
 export interface ChatSellerAccessPort {
   /**
@@ -133,6 +148,7 @@ export interface ChatSellerAccessPort {
     userId: string,
     counterpartyType: ChatCounterpartyType,
     counterpartyId: string,
+    customerUserId: string,
   ): Promise<boolean>;
 
   /**
@@ -158,7 +174,49 @@ export interface ChatSellerAccessPort {
     manager: EntityManager,
     counterpartyType: ChatCounterpartyType,
     counterpartyId: string,
+    customerUserId: string,
   ): Promise<readonly string[]>;
+
+  /**
+   * The specific conversations a scoped grant reaches for this user -- V3.3
+   * Story #109 (`#44c`).
+   *
+   * ## Why this is a SECOND method and not a wider `counterpartiesFor`
+   *
+   * `V33-DEC-033` R2 made `practitioner_chat` **practitioner-specific**: it
+   * reaches the conversations whose qualifying booking the grantee personally
+   * delivered, on the business the order snapshotted -- not every conversation
+   * the salon holds. `counterpartiesFor` above means "counterparties whose WHOLE
+   * inbox you may see", and widening it with a grant would have handed a granted
+   * practitioner all of a salon's private customer conversations: the same "too
+   * many people can read it" failure the owner corrected once already when they
+   * narrowed engineering's any-active-staff proposal.
+   *
+   * A conversation is uniquely `(counterpartyType, counterpartyId,
+   * customerUserId)`, so this returns that triple and chat filters its own rows
+   * against it -- without chat ever learning what a grant is.
+   *
+   * Batched: the whole set in one call, because one lookup per conversation is
+   * the N+1 the story's evidence forbids by name. An empty array is the normal
+   * answer for anyone without a grant, which is almost everyone.
+   */
+  grantedConversationScopes(
+    manager: EntityManager,
+    userId: string,
+  ): Promise<readonly ChatGrantedConversationScope[]>;
+}
+
+/**
+ * One conversation a scoped grant reaches, identified without an id.
+ *
+ * `(counterpartyType, counterpartyId, customerUserId)` is a conversation's
+ * natural key, so a consumer can filter rows against a grant's reach without
+ * chat modelling the grant itself.
+ */
+export interface ChatGrantedConversationScope {
+  readonly counterpartyType: ChatCounterpartyType;
+  readonly counterpartyId: string;
+  readonly customerUserId: string;
 }
 
 export const CHAT_SELLER_ACCESS = Symbol('BEAUCLICK_CHAT_SELLER_ACCESS');

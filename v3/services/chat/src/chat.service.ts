@@ -379,6 +379,20 @@ export class ChatService {
     const pageSize = Math.min(Math.max(1, limit), CHAT_MAX_PAGE_SIZE);
     const decoded = cursor ? decodeConversationCursor(cursor) : null;
     const sellerParties = await this.access.sellerCounterparties(this.access.manager, callerUserId);
+    /*
+     * V3.3 #109 (`#44c`). Two DIFFERENT reaches, unioned but never conflated.
+     *
+     * `sellerParties` are counterparties whose WHOLE inbox the caller may see —
+     * their own professional profile, a business they own, a business they
+     * actively manage. `grantedScopes` are the individual conversations a
+     * `practitioner_chat` grant reaches: the ones the caller personally
+     * delivered, matched on the full conversation key including the customer.
+     *
+     * Merging the second into the first would have handed a granted practitioner
+     * every conversation the salon holds, which is exactly what `V33-DEC-033` R2
+     * refused.
+     */
+    const grantedScopes = await this.access.grantedConversationScopes(this.access.manager, callerUserId);
 
     const query = this.dataSource
       .getRepository(ChatConversationEntity)
@@ -387,19 +401,43 @@ export class ChatService {
       .addOrderBy('c.id', 'DESC')
       .take(pageSize + 1);
 
-    if (sellerParties.length === 0) {
-      query.where('c.customerUserId = :callerUserId', { callerUserId });
-    } else {
-      // A parameterised OR over the caller's own counterparties. Never a string
-      // the caller supplied -- `sellerParties` comes from the access port.
-      query.where(
-        `(c.customerUserId = :callerUserId OR (c.counterpartyType, c.counterpartyId) IN (:...pairs))`,
-        {
-          callerUserId,
-          pairs: sellerParties.map((p) => [p.counterpartyType, p.counterpartyId]),
-        },
+    /*
+     * Parameterised throughout. Never a string the caller supplied -- both sets
+     * come from the access port.
+     *
+     * ## Why a concatenated TEXT KEY rather than a row-value `IN`
+     *
+     * `(c.counterparty_type, c.counterparty_id) IN (:...pairs)` reads better and
+     * does not work: TypeORM expands each pair to one bind parameter, node-postgres
+     * sends a JS array as an array literal, and PostgreSQL answers
+     * `input of anonymous composite types is not implemented` -- a 500, for every
+     * caller who has any seller counterparty at all.
+     *
+     * That defect is older than this story; it survived because the only listing
+     * case in the suite listed as a CUSTOMER, whose `sellerParties` is empty and
+     * whose branch therefore never built a row value. V3.3 Story #109 (`#44c`) is
+     * what first lists as a seller, so it is what first hit it.
+     *
+     * The fix is the idiom `unreadCount` below already uses: fold each tuple into
+     * one text key and compare with `= ANY`. Both halves are uuids and closed
+     * vocabulary members this process read back from its own database, and the
+     * separator is a character neither can contain.
+     */
+    const clauses = ['c.customerUserId = :callerUserId'];
+    const parameters: Record<string, unknown> = { callerUserId };
+    if (sellerParties.length > 0) {
+      clauses.push(`(c.counterparty_type || ':' || c.counterparty_id::text) = ANY(CAST(:pairKeys AS text[]))`);
+      parameters.pairKeys = sellerParties.map((p) => `${p.counterpartyType}:${p.counterpartyId}`);
+    }
+    if (grantedScopes.length > 0) {
+      clauses.push(
+        `(c.counterparty_type || ':' || c.counterparty_id::text || ':' || c.customer_user_id::text) = ANY(CAST(:grantedKeys AS text[]))`,
+      );
+      parameters.grantedKeys = grantedScopes.map(
+        (s) => `${s.counterpartyType}:${s.counterpartyId}:${s.customerUserId}`,
       );
     }
+    query.where(`(${clauses.join(' OR ')})`, parameters);
 
     if (decoded) {
       query.andWhere(
@@ -492,6 +530,15 @@ export class ChatService {
   async unreadCount(callerUserId: string): Promise<{ total: number; conversations: number }> {
     const sellerParties = await this.access.sellerCounterparties(this.access.manager, callerUserId);
     const pairs = sellerParties.map((p) => `${p.counterpartyType}:${p.counterpartyId}`);
+    /*
+     * V3.3 #109 (`#44c`). The granted reach is keyed on the FULL conversation
+     * key -- counterparty plus customer -- so a granted practitioner's unread
+     * count covers their own conversations and never a colleague's. Same two
+     * distinct reaches as `listConversations`, and the same reason for keeping
+     * them distinct.
+     */
+    const grantedScopes = await this.access.grantedConversationScopes(this.access.manager, callerUserId);
+    const grantedTriples = grantedScopes.map((s) => `${s.counterpartyType}:${s.counterpartyId}:${s.customerUserId}`);
 
     const rows: Array<{ total: string; conversations: string }> = await this.dataSource.query(
       `WITH visible AS (
@@ -499,6 +546,7 @@ export class ChatService {
            FROM chat.conversations c
           WHERE c.customer_user_id = $1
              OR (c.counterparty_type || ':' || c.counterparty_id::text) = ANY($2::text[])
+             OR (c.counterparty_type || ':' || c.counterparty_id::text || ':' || c.customer_user_id::text) = ANY($3::text[])
        ),
        counted AS (
          SELECT v.id,
@@ -510,7 +558,7 @@ export class ChatService {
        SELECT COALESCE(SUM(GREATEST(unread, 0)), 0)::text AS total,
               COUNT(*) FILTER (WHERE unread > 0)::text AS conversations
          FROM counted`,
-      [callerUserId, pairs],
+      [callerUserId, pairs, grantedTriples],
     );
 
     return {
