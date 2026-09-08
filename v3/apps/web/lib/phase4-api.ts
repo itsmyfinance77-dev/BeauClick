@@ -9,7 +9,16 @@ import type { ApiClient } from './api-client';
 // --------------------------------------------------------------- business
 
 export type BusinessStaffRole = 'manager' | 'staff';
-export type BusinessStaffStatus = 'invited' | 'active' | 'inactive' | 'declined';
+/**
+ * The membership status vocabulary, mirroring the server's
+ * `BUSINESS_STAFF_STATUSES`.
+ *
+ * `removed` arrived with V3.3 Story #109 (`#44c`): privacy erasure had always
+ * written it while neither the type system nor the database knew it, and #109
+ * reconciled the vocabulary and closed the column with a CHECK. Omitting it here
+ * is what made an erased member render a blank label.
+ */
+export type BusinessStaffStatus = 'invited' | 'active' | 'inactive' | 'declined' | 'removed';
 
 export interface Business {
   id: string;
@@ -53,12 +62,45 @@ export function listBusinessStaff(api: ApiClient, businessId: string) {
   return api.get<BusinessStaffMember[]>(`/v1/businesses/${businessId}/staff`);
 }
 
+/**
+ * What a staff invitation returns, and the reason it is a type of its own.
+ *
+ * V3.3 Story #109 (`#44c`), `V33-DEC-033` R3/R4. The route answers `202` with an
+ * empty object for **every** well-formed outcome -- known, unknown, self,
+ * duplicate, already-affiliated-elsewhere, deleted -- so the response carries no
+ * membership id, no user id, no professional id, no phone echo and no
+ * existence, eligibility or notification state. That is the whole point: the
+ * previous contract returned the membership row on success and two distinct
+ * `409`s otherwise, which let an owner submit an identity and read back whether
+ * it existed.
+ *
+ * `Record<string, never>` is chosen over `void`, `unknown` or the old
+ * `BusinessStaffMember` deliberately. It says "an object with no properties", so
+ * a future caller that reaches for `.id` fails to compile rather than reading
+ * `undefined` at runtime and quietly reintroducing the oracle. Casting the empty
+ * body back into the row type would be the same defect with the compiler
+ * silenced.
+ */
+export type StaffInvitationAccepted = Record<string, never>;
+
+/**
+ * Invite a colleague by phone number.
+ *
+ * The input is exactly `{ phone, role }` -- `role` is the MEMBERSHIP vocabulary
+ * `manager | staff`, unrelated to #109's scoped grants. There is deliberately no
+ * `userId` and no `professionalId`: the identity and the professional link are
+ * resolved server-side from the invited account's own profile, so the inviter
+ * neither supplies nor learns them, and no parallel UUID contract survives to be
+ * enumerated (`V33-DEC-033` R4).
+ *
+ * The route path is unchanged; only its request and response changed.
+ */
 export function inviteStaff(
   api: ApiClient,
   businessId: string,
-  input: { userId: string; professionalId?: string; role: BusinessStaffRole },
+  input: { phone: string; role: BusinessStaffRole },
 ) {
-  return api.post<BusinessStaffMember>(`/v1/businesses/${businessId}/staff`, input);
+  return api.post<StaffInvitationAccepted>(`/v1/businesses/${businessId}/staff`, input);
 }
 
 export function removeStaff(api: ApiClient, businessId: string, staffId: string) {
