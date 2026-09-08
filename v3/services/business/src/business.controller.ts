@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Patch, Put } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Patch, Put } from '@nestjs/common';
 import { AuthenticatedUser, CurrentUser } from '@beauclick/http';
 import { NotFoundOrNotYoursException, ResolveOwner } from '@beauclick/ownership';
 
@@ -9,7 +9,8 @@ import { BusinessEntity } from './entities/business.entity';
 import { BusinessStaffEntity } from './entities/business-staff.entity';
 import { CreateBusinessDto } from './dto/create-business.dto';
 import { UpdateBusinessDto } from './dto/update-business.dto';
-import { InviteStaffDto } from './dto/staff.dto';
+import { InviteStaffByPhoneDto, ScopedStaffRoleDto } from './dto/staff.dto';
+import { StaffGrantService } from './staff-grant.service';
 import { ReplaceBusinessClassificationDto } from './dto/business-classification.dto';
 import {
   BusinessManagerResolver,
@@ -63,6 +64,7 @@ export class BusinessController {
     private readonly businesses: BusinessService,
     private readonly staff: StaffService,
     private readonly classification: BusinessClassificationService,
+    private readonly grants: StaffGrantService,
   ) {}
 
   @Post('businesses')
@@ -137,11 +139,73 @@ export class BusinessController {
     return (await this.staff.listForBusiness(id)).map(toStaffShape);
   }
 
+  /**
+   * Invite a colleague by phone number -- V3.3 Story #109 (`#44c`).
+   *
+   * **`202` with an empty body, for every well-formed case.** Known-eligible,
+   * unknown, self-invite, duplicate and ineligible are byte-identical here and
+   * comparable in timing (`StaffService.inviteByPhone`), so the owner learns
+   * nothing about who exists. The UUID-based contract this replaced returned the
+   * whole membership row on success and two distinct `409`s otherwise -- three
+   * separate enumeration oracles, all removed together (`V33-DEC-033` R4).
+   *
+   * `202` rather than `201` or `204` because it is the honest one: the request
+   * was accepted for processing, which is true whether or not a membership was
+   * created, and no `Location` or id may be disclosed. The invitee sees the real
+   * invitation, if any, in their own `GET /v1/me/business-staff` below.
+   */
   @ResolveOwner(BusinessOwnerResolver)
+  @HttpCode(HttpStatus.ACCEPTED)
   @Post('businesses/:id/staff')
-  async invite(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser, @Body() dto: InviteStaffDto) {
-    const row = await this.staff.invite(id, user.userId, dto);
-    return toStaffShape(row);
+  async invite(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser, @Body() dto: InviteStaffByPhoneDto) {
+    await this.staff.inviteByPhone(id, user.userId, dto);
+    return {};
+  }
+
+  // -----------------------------------------------------------------------
+  // Scoped staff authority -- V3.3 Story #109 (`#44c`).
+  //
+  // Owner-only, and `@ResolveOwner` is on each HANDLER, never the class:
+  // `OwnershipGuard` reflects handler metadata only, so a class-level decorator
+  // would be silently ignored and every route here would lose its check while
+  // reading as protection (ADR-049 section 2.5). This story avoids that hazard by
+  // convention and deliberately does NOT repair the guard.
+  //
+  // The membership is named in the path and the role in a closed one-literal DTO;
+  // no owner, user, phone, professional or business identity is accepted in a
+  // body, and the whitelist pipe rejects any extra field with a 400.
+  // -----------------------------------------------------------------------
+
+  @ResolveOwner(BusinessOwnerResolver)
+  @Get('businesses/:id/staff/:staffId/grants')
+  async listGrants(
+    @Param('id') id: string,
+    @Param('staffId') staffId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.grants.list(id, user.userId, staffId);
+  }
+
+  @ResolveOwner(BusinessOwnerResolver)
+  @Post('businesses/:id/staff/:staffId/grants')
+  async grant(
+    @Param('id') id: string,
+    @Param('staffId') staffId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: ScopedStaffRoleDto,
+  ) {
+    return this.grants.grant(id, user.userId, staffId, dto.role);
+  }
+
+  @ResolveOwner(BusinessOwnerResolver)
+  @Post('businesses/:id/staff/:staffId/grants/revoke')
+  async revokeGrant(
+    @Param('id') id: string,
+    @Param('staffId') staffId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: ScopedStaffRoleDto,
+  ) {
+    return this.grants.revoke(id, user.userId, staffId, dto.role);
   }
 
   /**

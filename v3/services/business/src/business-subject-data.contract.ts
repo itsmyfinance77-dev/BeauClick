@@ -10,6 +10,7 @@ import {
 
 import { BusinessEntity } from './entities/business.entity';
 import { BusinessStaffEntity } from './entities/business-staff.entity';
+import { returnedRows } from './sql-result';
 
 /**
  * business' subject-data contract.
@@ -89,6 +90,18 @@ export class BusinessSubjectDataContract implements SubjectDataContract {
       reason:
         'A named branch of a business organisation -- its name, opaque city reference and active|suspended|closed lifecycle. A property of the organisation, naming no person and carrying no identity column, so it survives the erasure of any individual exactly as the business row it hangs off does.',
     },
+    // V3.3 Story #109 (`#44c`), ADR-049 section 7.2: "Membership-anchored scoped
+    // grants -> `subject_data`. A grant names a person's authority." Unlike the
+    // organisation-fact tables above, this one is about a PERSON: it records what
+    // a named member of staff was allowed to do. `subject_data` needs no reason —
+    // it is the default obligation, not an exemption from one.
+    //
+    // `granted_by_user_id` and `revoked_by_user_id` end in `_user_id`, so ADR-027's
+    // coverage cross-check (`isSubjectColumn`) recognises them: a future
+    // `no_subject_data` claim on this table would be refused at boot rather than
+    // by someone noticing. `membership_id` deliberately does not match the
+    // heuristic — it is a `business` row id, not a person.
+    { table: 'business.staff_role_grants', disposition: 'subject_data' },
   ];
 
   async exportSubjectData(manager: EntityManager, userId: string): Promise<SubjectExportSection[]> {
@@ -122,22 +135,81 @@ export class BusinessSubjectDataContract implements SubjectDataContract {
           createdAt: s.createdAt,
         })),
       },
+      {
+        // V3.3 Story #109 (`#44c`), ADR-049 section 7.2: "Export must return the
+        // grantee's own grants and must NOT disclose the granting actor's
+        // identity."
+        //
+        // `granted_by_user_id` and `revoked_by_user_id` are therefore absent, for
+        // the same reason `invitedBy` is absent above: who granted you an
+        // authority is THEIR action, not your data. Revoked grants are included —
+        // "you held this and it ended" is as much the subject's own history as
+        // "you hold this".
+        key: 'staff_role_grants',
+        description: 'دسترسی‌های اختصاصی شما در کسب‌وکارها',
+        rows: await manager.query(
+          `SELECT g.role, g.business_id AS "businessId", g.granted_at AS "grantedAt", g.revoked_at AS "revokedAt"
+             FROM business.staff_role_grants g
+             JOIN business.business_staff s ON s.id = g.membership_id
+            WHERE s.user_id = $1
+            ORDER BY g.granted_at, g.id`,
+          [userId],
+        ),
+      },
     ];
   }
 
   async eraseSubjectData(manager: EntityManager, userId: string): Promise<SubjectErasureOutcome> {
+    /*
+     * V3.3 Story #109 (`#44c`), ADR-049 section 7.2: "erasure must revoke live
+     * grants in the SAME transaction as the membership change."
+     *
+     * `manager` is `PrivacyService.executeErasure`'s single transaction over the
+     * main DataSource, shared by every module's contract — so the two statements
+     * below are atomic by construction, not by a second mechanism. A failure
+     * anywhere in that transaction leaves the subject fully intact: no state
+     * exists where the authority is gone but the membership still says `active`,
+     * or the reverse.
+     *
+     * Grants are revoked BEFORE the membership is marked `removed`, which is the
+     * safe order rather than an arbitrary one: at every instant inside the
+     * transaction the visible state is at least as restrictive as the previous
+     * one, so a concurrent authorizer read can never observe a live grant on a
+     * membership that has already lost its `active` status.
+     *
+     * `revoked_by_user_id` is deliberately left NULL: erasure has no human actor,
+     * and fabricating one would put a person's name on something nobody did.
+     * `ck_staff_role_grants_revocation` permits exactly that shape.
+     */
+    const revoked = returnedRows(
+      await manager.query(
+        `UPDATE business.staff_role_grants g
+            SET revoked_at = now()
+          FROM business.business_staff s
+          WHERE s.id = g.membership_id AND s.user_id = $1 AND g.revoked_at IS NULL
+          RETURNING g.id`,
+        [userId],
+      ),
+    );
+
     // Access ends. The row survives so the business's own history of who
     // worked there stays intact -- and it now names an anonymous id.
-    const removed = await manager.query(
-      `UPDATE business.business_staff
-          SET status = 'removed', updated_at = now()
-        WHERE user_id = $1 AND status <> 'removed'`,
-      [userId],
+    const removed = returnedRows(
+      await manager.query(
+        `UPDATE business.business_staff
+            SET status = 'removed', updated_at = now()
+          WHERE user_id = $1 AND status <> 'removed'
+          RETURNING id`,
+        [userId],
+      ),
     );
 
     return {
       moduleKey: this.moduleKey,
-      anonymized: Array.isArray(removed) && typeof removed[1] === 'number' ? removed[1] : 0,
+      // Truthful counts: memberships moved to `removed` plus grants revoked.
+      // Both are anonymisations in the platform's sense -- the row survives, the
+      // subject's link to an active authority does not.
+      anonymized: removed.length + revoked.length,
       deleted: 0,
       retained: [
         {

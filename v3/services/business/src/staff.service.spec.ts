@@ -7,8 +7,10 @@ import { BusinessStaffEntity } from './entities/business-staff.entity';
 import { BusinessOutboxEntity } from './entities/business-outbox.entity';
 import { BusinessService } from './business.service';
 import { StaffService } from './staff.service';
-import { StaffInviteRejectedException, StaffMembershipNotFoundException } from './business.errors';
-import { BusinessOwnerRoleGrantPort } from './ports';
+import { StaffMembershipNotFoundException } from './business.errors';
+import { BusinessOwnerRoleGrantPort, StaffInviteIdentityResolverPort } from './ports';
+import { StaffInviteClock } from './staff-invite.clock';
+import { AdminAuditService } from '@beauclick/audit';
 
 /**
  * `StaffService`'s cases need a business to attach staff to, and nothing more.
@@ -18,6 +20,20 @@ import { BusinessOwnerRoleGrantPort } from './ports';
  */
 const noOpOwnerRoles: BusinessOwnerRoleGrantPort = { grantBusinessOwnerRole: async () => true };
 
+/**
+ * The #109 collaborators, stubbed.
+ *
+ * `inviteByPhone` itself is proved in `apps/api/test/scoped-staff-authority.pg-spec.ts`:
+ * it needs `admin.admin_audit_log` (which does not exist on this DataSource, and
+ * whose append-only guarantee is a GRANT pg-mem cannot model), a real
+ * `ON CONFLICT` and a real transaction. What this file still owns is everything
+ * around it -- `roleFor`, the consent lifecycle and deactivation -- which needs
+ * none of that.
+ */
+const noOpAudit = { record: async () => undefined } as unknown as AdminAuditService;
+const noIdentities: StaffInviteIdentityResolverPort = { resolveInvitableIdentity: async () => null };
+const instantClock: StaffInviteClock = { monotonicNowMs: () => 0, sleep: async () => undefined };
+
 describe('StaffService (integration, pg-mem)', () => {
   let dataSource: DataSource;
   let businesses: BusinessService;
@@ -26,7 +42,14 @@ describe('StaffService (integration, pg-mem)', () => {
   beforeEach(async () => {
     dataSource = await createInMemoryDataSource([BusinessEntity, BusinessStaffEntity, BusinessOutboxEntity]);
     businesses = new BusinessService(dataSource.getRepository(BusinessEntity), dataSource, noOpOwnerRoles);
-    staff = new StaffService(dataSource.getRepository(BusinessEntity), dataSource.getRepository(BusinessStaffEntity), dataSource);
+    staff = new StaffService(
+      dataSource.getRepository(BusinessEntity),
+      dataSource.getRepository(BusinessStaffEntity),
+      dataSource,
+      noOpAudit,
+      noIdentities,
+      instantClock,
+    );
   });
 
   afterEach(async () => {
@@ -37,6 +60,36 @@ describe('StaffService (integration, pg-mem)', () => {
     const ownerId = uuidv7();
     const b = await businesses.create(ownerId, { displayName: 'Salon' });
     return { ownerId, businessId: b.id };
+  }
+
+  /**
+   * A membership at `invited`, written directly.
+   *
+   * V3.3 #109 (`#44c`) replaced the invitation contract with a phone-based one
+   * that resolves identity server-side and discloses no membership id, so a spec
+   * that needs a specific membership creates it. Consent is still exercised where
+   * it matters: every case below moves `invited -> active` through `accept` from
+   * the invitee's own id, exactly as production does.
+   */
+  async function seedMembership(
+    businessId: string,
+    userId: string,
+    role: 'manager' | 'staff',
+    invitedBy: string,
+    professionalId: string | null = null,
+  ): Promise<string> {
+    const id = uuidv7();
+    await dataSource.getRepository(BusinessStaffEntity).insert({
+      id,
+      businessId,
+      userId,
+      professionalId,
+      role,
+      status: 'invited',
+      invitedBy,
+      respondedAt: null,
+    });
+    return id;
   }
 
   describe('roleFor -- the authorization primitive every resolver depends on', () => {
@@ -53,15 +106,15 @@ describe('StaffService (integration, pg-mem)', () => {
     it('resolves an invited-but-not-yet-accepted user to null -- an invite alone grants nothing', async () => {
       const { ownerId, businessId } = await business();
       const userId = uuidv7();
-      await staff.invite(businessId, ownerId, { userId, role: 'staff' });
+      await seedMembership(businessId, userId, 'staff', ownerId);
       expect(await staff.roleFor(businessId, userId)).toBeNull();
     });
 
     it('resolves an ACTIVE member to their real role', async () => {
       const { ownerId, businessId } = await business();
       const userId = uuidv7();
-      const invited = await staff.invite(businessId, ownerId, { userId, role: 'manager' });
-      await staff.accept(invited.id, userId);
+      const invitedId = await seedMembership(businessId, userId, 'manager', ownerId);
+      await staff.accept(invitedId, userId);
       expect(await staff.roleFor(businessId, userId)).toBe('manager');
     });
 
@@ -69,8 +122,8 @@ describe('StaffService (integration, pg-mem)', () => {
       const a = await business();
       const b = await business();
       const userId = uuidv7();
-      const invited = await staff.invite(a.businessId, a.ownerId, { userId, role: 'staff' });
-      await staff.accept(invited.id, userId);
+      const invitedId = await seedMembership(a.businessId, userId, 'staff', a.ownerId);
+      await staff.accept(invitedId, userId);
 
       expect(await staff.roleFor(a.businessId, userId)).toBe('staff');
       expect(await staff.roleFor(b.businessId, userId)).toBeNull();
@@ -81,39 +134,38 @@ describe('StaffService (integration, pg-mem)', () => {
     it('accept() succeeds only for the INVITED user\'s own session', async () => {
       const { ownerId, businessId } = await business();
       const userId = uuidv7();
-      const invited = await staff.invite(businessId, ownerId, { userId, role: 'staff' });
+      const invitedId = await seedMembership(businessId, userId, 'staff', ownerId);
 
       // The owner (or anyone else) cannot accept on the invitee's behalf.
-      await expect(staff.accept(invited.id, ownerId)).rejects.toBeInstanceOf(StaffMembershipNotFoundException);
-      await expect(staff.accept(invited.id, uuidv7())).rejects.toBeInstanceOf(StaffMembershipNotFoundException);
+      await expect(staff.accept(invitedId, ownerId)).rejects.toBeInstanceOf(StaffMembershipNotFoundException);
+      await expect(staff.accept(invitedId, uuidv7())).rejects.toBeInstanceOf(StaffMembershipNotFoundException);
 
       // Only the real invitee succeeds.
-      const accepted = await staff.accept(invited.id, userId);
+      const accepted = await staff.accept(invitedId, userId);
       expect(accepted.status).toBe('active');
     });
 
-    it('rejects inviting yourself', async () => {
-      const { ownerId, businessId } = await business();
-      await expect(staff.invite(businessId, ownerId, { userId: ownerId, role: 'manager' })).rejects.toBeInstanceOf(
-        StaffInviteRejectedException,
-      );
-    });
-
-    it('rejects a second invite to an already-invited/active user (uq_business_staff_membership)', async () => {
-      const { ownerId, businessId } = await business();
-      const userId = uuidv7();
-      await staff.invite(businessId, ownerId, { userId, role: 'staff' });
-      await expect(staff.invite(businessId, ownerId, { userId, role: 'manager' })).rejects.toBeInstanceOf(
-        StaffInviteRejectedException,
-      );
-    });
+    /*
+     * V3.3 #109 (`#44c`) deleted the two cases that used to sit here --
+     * "rejects inviting yourself" and "rejects a second invite" -- because the
+     * behaviour they asserted was itself the defect. Both raised a DISTINCT
+     * `409` (`StaffInviteRejectedException`, the second carrying the violated
+     * constraint name), which let an owner submit an identity and read back
+     * whether it existed and whether it was already affiliated.
+     *
+     * `V33-DEC-033` R3/R4 replaced all of it with one uniform `202 {}`: a
+     * self-invite and a duplicate now write nothing and are externally
+     * indistinguishable from a phone with no account. That is proved where it
+     * can be proved honestly -- against a real database and over HTTP -- in
+     * `apps/api/test/scoped-staff-authority.pg-spec.ts`.
+     */
 
     it('accepting twice fails the second time (invited->active CAS, not re-enterable)', async () => {
       const { ownerId, businessId } = await business();
       const userId = uuidv7();
-      const invited = await staff.invite(businessId, ownerId, { userId, role: 'staff' });
-      await staff.accept(invited.id, userId);
-      await expect(staff.accept(invited.id, userId)).rejects.toBeInstanceOf(StaffMembershipNotFoundException);
+      const invitedId = await seedMembership(businessId, userId, 'staff', ownerId);
+      await staff.accept(invitedId, userId);
+      await expect(staff.accept(invitedId, userId)).rejects.toBeInstanceOf(StaffMembershipNotFoundException);
     });
   });
 
@@ -121,19 +173,19 @@ describe('StaffService (integration, pg-mem)', () => {
     it('moves an active member to inactive, and roleFor then returns null', async () => {
       const { ownerId, businessId } = await business();
       const userId = uuidv7();
-      const invited = await staff.invite(businessId, ownerId, { userId, role: 'staff' });
-      await staff.accept(invited.id, userId);
+      const invitedId = await seedMembership(businessId, userId, 'staff', ownerId);
+      await staff.accept(invitedId, userId);
 
-      expect(await staff.deactivate(invited.id)).toBe(true);
+      expect(await staff.deactivate(invitedId)).toBe(true);
       expect(await staff.roleFor(businessId, userId)).toBeNull();
     });
 
     it('is idempotent -- deactivating an already-inactive row reports false, not an error', async () => {
       const { ownerId, businessId } = await business();
       const userId = uuidv7();
-      const invited = await staff.invite(businessId, ownerId, { userId, role: 'staff' });
-      await staff.deactivate(invited.id);
-      expect(await staff.deactivate(invited.id)).toBe(false);
+      const invitedId = await seedMembership(businessId, userId, 'staff', ownerId);
+      await staff.deactivate(invitedId);
+      expect(await staff.deactivate(invitedId)).toBe(false);
     });
   });
 
@@ -146,10 +198,10 @@ describe('StaffService (integration, pg-mem)', () => {
       const { ownerId, businessId } = await business();
       const userId = uuidv7();
       const professionalId = uuidv7();
-      const invited = await staff.invite(businessId, ownerId, { userId, professionalId, role: 'staff' });
+      const invitedId = await seedMembership(businessId, userId, 'staff', ownerId, professionalId);
 
       expect(await staff.activeBusinessForProfessional(professionalId)).toBeNull();
-      await staff.accept(invited.id, userId);
+      await staff.accept(invitedId, userId);
       expect(await staff.activeBusinessForProfessional(professionalId)).toBe(businessId);
     });
   });

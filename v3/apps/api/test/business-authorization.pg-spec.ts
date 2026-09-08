@@ -12,7 +12,15 @@ import {
   MyFinanceService,
 } from '@beauclick/financial';
 
-import { createPgTestApp, requiredPgEnv, resetDatabase, seedBusiness, seedProfessional, seedUser } from './pg-test-app.factory';
+import {
+  createPgTestApp,
+  requiredPgEnv,
+  resetDatabase,
+  seedBusiness,
+  seedMembership,
+  seedProfessional,
+  seedUser,
+} from './pg-test-app.factory';
 
 /**
  * REAL PostgreSQL: business authorization (ADR-023) and the financial-party
@@ -26,6 +34,18 @@ import { createPgTestApp, requiredPgEnv, resetDatabase, seedBusiness, seedProfes
  */
 const describeIfPg = requiredPgEnv() ? describe : describe.skip;
 
+/*
+ * Every seeded phone below is a REAL Iranian mobile shape -- `+98` followed by
+ * `9` and nine more digits -- and that became load-bearing with V3.3 Story #109
+ * (`#44c`).
+ *
+ * These literals used to be nine digits after `+98`, which `canonicalizePhone`
+ * rejects. It never showed, because the invitation contract took a `userId` and
+ * nothing in this file ever canonicalised a number. #109 replaced that contract
+ * with one that resolves a phone server-side, at which point a malformed seed
+ * resolves to nobody and the invitation correctly writes nothing -- a test-data
+ * defect that reads exactly like a broken feature.
+ */
 describeIfPg('Business authorization on real PostgreSQL', () => {
   let app: INestApplication;
   let dataSource: DataSource;
@@ -58,9 +78,9 @@ describeIfPg('Business authorization on real PostgreSQL', () => {
 
   describe('cross-business isolation', () => {
     it('a stranger gets the same 404 whether the business exists or not -- ids are non-enumerable', async () => {
-      const ownerA = await seedUser(app, dataSource, `+98922${String(Date.now()).slice(-6)}`, ['business']);
+      const ownerA = await seedUser(app, dataSource, `+989220${String(Date.now()).slice(-6)}`, ['business']);
       const businessA = await seedBusiness(dataSource, ownerA.id, 'کسب‌وکار A');
-      const strangerToken = (await seedUser(app, dataSource, `+98923${String(Date.now()).slice(-6)}`)).accessToken;
+      const strangerToken = (await seedUser(app, dataSource, `+989230${String(Date.now()).slice(-6)}`)).accessToken;
 
       const real = await request(app.getHttpServer())
         .get(`/api/v1/businesses/${businessA.id}`)
@@ -74,25 +94,28 @@ describeIfPg('Business authorization on real PostgreSQL', () => {
     });
 
     it("Business B's owner cannot invite staff into Business A", async () => {
-      const ownerA = await seedUser(app, dataSource, `+98924${String(Date.now()).slice(-6)}`, ['business']);
+      const ownerA = await seedUser(app, dataSource, `+989240${String(Date.now()).slice(-6)}`, ['business']);
       const businessA = await seedBusiness(dataSource, ownerA.id, 'A');
-      const ownerB = await seedUser(app, dataSource, `+98925${String(Date.now()).slice(-6)}`, ['business']);
+      const ownerB = await seedUser(app, dataSource, `+989250${String(Date.now()).slice(-6)}`, ['business']);
       await seedBusiness(dataSource, ownerB.id, 'B');
-      const target = await seedUser(app, dataSource, `+98926${String(Date.now()).slice(-6)}`);
+      const target = await seedUser(app, dataSource, `+989260${String(Date.now()).slice(-6)}`);
 
+      // Refused by the ownership GUARD, before the body is ever validated or the
+      // phone resolved -- so a foreign business answers identically whether or
+      // not the phone belongs to a real account.
       await request(app.getHttpServer())
         .post(`/api/v1/businesses/${businessA.id}/staff`)
         .set('Authorization', `Bearer ${ownerB.accessToken}`)
-        .send({ userId: target.id, role: 'staff' })
+        .send({ phone: target.phone, role: 'staff' })
         .expect(404);
 
       expect(await staff.roleFor(businessA.id, target.id)).toBeNull();
     });
 
     it('a plain customer with no business at all is denied every business-scoped route', async () => {
-      const ownerA = await seedUser(app, dataSource, `+98927${String(Date.now()).slice(-6)}`, ['business']);
+      const ownerA = await seedUser(app, dataSource, `+989270${String(Date.now()).slice(-6)}`, ['business']);
       const businessA = await seedBusiness(dataSource, ownerA.id, 'A');
-      const customer = await seedUser(app, dataSource, `+98928${String(Date.now()).slice(-6)}`);
+      const customer = await seedUser(app, dataSource, `+989280${String(Date.now()).slice(-6)}`);
 
       await request(app.getHttpServer())
         .get(`/api/v1/businesses/${businessA.id}`)
@@ -108,15 +131,18 @@ describeIfPg('Business authorization on real PostgreSQL', () => {
 
   describe('staff consent -- an owner cannot grant themselves access by naming an id they do not control', () => {
     it('an invited user has NO access until they accept, and only their own token can accept', async () => {
-      const owner = await seedUser(app, dataSource, `+98929${String(Date.now()).slice(-6)}`, ['business']);
+      const owner = await seedUser(app, dataSource, `+989290${String(Date.now()).slice(-6)}`, ['business']);
       const business = await seedBusiness(dataSource, owner.id, 'Salon');
-      const invitee = await seedUser(app, dataSource, `+98930${String(Date.now()).slice(-6)}`);
+      const invitee = await seedUser(app, dataSource, `+989300${String(Date.now()).slice(-6)}`);
 
-      const invited = await request(app.getHttpServer())
+      // V3.3 #109 (`#44c`). The invitation is by PHONE and answers `202 {}` --
+      // the owner is told nothing, not even a membership id.
+      const accepted = await request(app.getHttpServer())
         .post(`/api/v1/businesses/${business.id}/staff`)
         .set('Authorization', `Bearer ${owner.accessToken}`)
-        .send({ userId: invitee.id, role: 'staff' })
-        .expect(201);
+        .send({ phone: invitee.phone, role: 'staff' })
+        .expect(202);
+      expect(accepted.body.data).toEqual({});
 
       // Invited, not yet a member: the invitee cannot yet see the business.
       await request(app.getHttpServer())
@@ -124,15 +150,23 @@ describeIfPg('Business authorization on real PostgreSQL', () => {
         .set('Authorization', `Bearer ${invitee.accessToken}`)
         .expect(404);
 
+      // The membership id is discoverable ONLY through the invitee's own
+      // surface -- which is the person entitled to it, and nobody else.
+      const mine = await request(app.getHttpServer())
+        .get('/api/v1/me/business-staff')
+        .set('Authorization', `Bearer ${invitee.accessToken}`)
+        .expect(200);
+      const membershipId = mine.body.data[0].id;
+
       // The OWNER cannot accept on the invitee's behalf.
       await request(app.getHttpServer())
-        .post(`/api/v1/me/business-staff/${invited.body.data.id}/accept`)
+        .post(`/api/v1/me/business-staff/${membershipId}/accept`)
         .set('Authorization', `Bearer ${owner.accessToken}`)
         .expect(404);
 
       // Only the real invitee can.
       await request(app.getHttpServer())
-        .post(`/api/v1/me/business-staff/${invited.body.data.id}/accept`)
+        .post(`/api/v1/me/business-staff/${membershipId}/accept`)
         .set('Authorization', `Bearer ${invitee.accessToken}`)
         .expect(201);
 
@@ -143,14 +177,14 @@ describeIfPg('Business authorization on real PostgreSQL', () => {
     });
 
     it('a manager can edit the profile; plain staff cannot', async () => {
-      const owner = await seedUser(app, dataSource, `+98931${String(Date.now()).slice(-6)}`, ['business']);
+      const owner = await seedUser(app, dataSource, `+989310${String(Date.now()).slice(-6)}`, ['business']);
       const business = await seedBusiness(dataSource, owner.id, 'Salon');
-      const manager = await seedUser(app, dataSource, `+98932${String(Date.now()).slice(-6)}`);
-      const plainStaff = await seedUser(app, dataSource, `+98933${String(Date.now()).slice(-6)}`);
+      const manager = await seedUser(app, dataSource, `+989320${String(Date.now()).slice(-6)}`);
+      const plainStaff = await seedUser(app, dataSource, `+989330${String(Date.now()).slice(-6)}`);
 
       for (const [user, role] of [[manager, 'manager'], [plainStaff, 'staff']] as const) {
-        const invited = await staff.invite(business.id, owner.id, { userId: user.id, role });
-        await staff.accept(invited.id, user.id);
+        const membershipId = await seedMembership(dataSource, business.id, user.id, role, owner.id);
+        await staff.accept(membershipId, user.id);
       }
 
       await request(app.getHttpServer())
@@ -167,14 +201,14 @@ describeIfPg('Business authorization on real PostgreSQL', () => {
     });
 
     it('the owner removes a staff member; the removed member loses access immediately', async () => {
-      const owner = await seedUser(app, dataSource, `+98934${String(Date.now()).slice(-6)}`, ['business']);
+      const owner = await seedUser(app, dataSource, `+989340${String(Date.now()).slice(-6)}`, ['business']);
       const business = await seedBusiness(dataSource, owner.id, 'Salon');
-      const member = await seedUser(app, dataSource, `+98935${String(Date.now()).slice(-6)}`);
-      const invited = await staff.invite(business.id, owner.id, { userId: member.id, role: 'staff' });
-      await staff.accept(invited.id, member.id);
+      const member = await seedUser(app, dataSource, `+989350${String(Date.now()).slice(-6)}`);
+      const membershipId = await seedMembership(dataSource, business.id, member.id, 'staff', owner.id);
+      await staff.accept(membershipId, member.id);
 
       await request(app.getHttpServer())
-        .post(`/api/v1/businesses/${business.id}/staff/${invited.id}/remove`)
+        .post(`/api/v1/businesses/${business.id}/staff/${membershipId}/remove`)
         .set('Authorization', `Bearer ${owner.accessToken}`)
         .expect(201);
 
@@ -187,7 +221,7 @@ describeIfPg('Business authorization on real PostgreSQL', () => {
 
   describe('financial party resolution (ADR-023 §3) -- the point of the whole feature', () => {
     it('an independent professional (no business) is their own financial party', async () => {
-      const owner = await seedUser(app, dataSource, `+98936${String(Date.now()).slice(-6)}`, ['professional']);
+      const owner = await seedUser(app, dataSource, `+989360${String(Date.now()).slice(-6)}`, ['professional']);
       const professional = await seedProfessional(dataSource, owner.id, 'مستقل');
 
       const detail = await orders.createForBooking({
@@ -205,17 +239,20 @@ describeIfPg('Business authorization on real PostgreSQL', () => {
     });
 
     it('a professional affiliated with a business SELLS for it but may not READ its finance', async () => {
-      const businessOwner = await seedUser(app, dataSource, `+98937${String(Date.now()).slice(-6)}`, ['business']);
+      const businessOwner = await seedUser(app, dataSource, `+989370${String(Date.now()).slice(-6)}`, ['business']);
       const business = await businesses.create(businessOwner.id, { displayName: 'سالن بزرگ' });
-      const proOwner = await seedUser(app, dataSource, `+98938${String(Date.now()).slice(-6)}`, ['professional']);
+      const proOwner = await seedUser(app, dataSource, `+989380${String(Date.now()).slice(-6)}`, ['professional']);
       const professional = await seedProfessional(dataSource, proOwner.id, 'کارمند');
 
-      const invited = await staff.invite(business.id, businessOwner.id, {
-        userId: proOwner.id,
-        professionalId: professional.id,
-        role: 'staff',
-      });
-      await staff.accept(invited.id, proOwner.id);
+      const membershipId = await seedMembership(
+        dataSource,
+        business.id,
+        proOwner.id,
+        'staff',
+        businessOwner.id,
+        professional.id,
+      );
+      await staff.accept(membershipId, proOwner.id);
 
       const detail = await orders.createForBooking({
         bookingId: uuidv7(),
@@ -290,18 +327,21 @@ describeIfPg('Business authorization on real PostgreSQL', () => {
     });
 
     it('deactivating the staff membership reverts the professional to their own party for FUTURE orders', async () => {
-      const businessOwner = await seedUser(app, dataSource, `+98939${String(Date.now()).slice(-6)}`, ['business']);
+      const businessOwner = await seedUser(app, dataSource, `+989390${String(Date.now()).slice(-6)}`, ['business']);
       const business = await businesses.create(businessOwner.id, { displayName: 'سالن' });
-      const proOwner = await seedUser(app, dataSource, `+98940${String(Date.now()).slice(-6)}`, ['professional']);
+      const proOwner = await seedUser(app, dataSource, `+989400${String(Date.now()).slice(-6)}`, ['professional']);
       const professional = await seedProfessional(dataSource, proOwner.id, 'کارمند سابق');
 
-      const invited = await staff.invite(business.id, businessOwner.id, {
-        userId: proOwner.id,
-        professionalId: professional.id,
-        role: 'staff',
-      });
-      await staff.accept(invited.id, proOwner.id);
-      await staff.deactivate(invited.id);
+      const membershipId = await seedMembership(
+        dataSource,
+        business.id,
+        proOwner.id,
+        'staff',
+        businessOwner.id,
+        professional.id,
+      );
+      await staff.accept(membershipId, proOwner.id);
+      await staff.deactivate(membershipId);
 
       const detail = await orders.createForBooking({
         bookingId: uuidv7(),

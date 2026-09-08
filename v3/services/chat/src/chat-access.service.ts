@@ -12,6 +12,7 @@ import {
   CHAT_SELLER_ACCESS,
   ChatEligibilityPort,
   ChatEligibleRelationship,
+  ChatGrantedConversationScope,
   ChatSellerAccessPort,
 } from './ports/chat.ports';
 import { ChatBlockEntity, ChatConversationEntity, ChatParticipantEntity } from './entities/chat.entities';
@@ -142,6 +143,11 @@ export class ChatAccessService {
       callerUserId,
       conversation.counterpartyType,
       conversation.counterpartyId,
+      // V3.3 #109 (`#44c`). The customer is part of the question: a scoped
+      // `practitioner_chat` grant reaches the conversations its holder personally
+      // delivered, so "may this user act here" cannot be answered from the
+      // counterparty alone.
+      conversation.customerUserId,
     );
     return allowed ? 'seller' : null;
   }
@@ -208,6 +214,11 @@ export class ChatAccessService {
         manager,
         conversation.counterpartyType,
         conversation.counterpartyId,
+        // V3.3 #109 (`#44c`). Scoped to THIS conversation, so a granted
+        // practitioner is notified about their own customer and never about a
+        // colleague's -- a notification about a conversation somebody may not
+        // read would disclose that it exists.
+        conversation.customerUserId,
       );
       return [...recipients];
     }
@@ -247,12 +258,27 @@ export class ChatAccessService {
     return row;
   }
 
-  /** Every counterparty the caller may act for on the seller side. */
+  /** Every counterparty whose whole seller inbox the caller may see. */
   async sellerCounterparties(
     manager: EntityManager,
     userId: string,
   ): Promise<readonly { counterpartyType: ChatCounterpartyType; counterpartyId: string }[]> {
     return this.sellerAccess.counterpartiesFor(manager, userId);
+  }
+
+  /**
+   * The individual conversations a scoped grant reaches for the caller -- V3.3
+   * Story #109 (`#44c`).
+   *
+   * Separate from `sellerCounterparties` on purpose: a granted practitioner
+   * reaches the conversations they personally delivered, not a whole salon's
+   * inbox. One batched call feeds the listing query, never one lookup per row.
+   */
+  async grantedConversationScopes(
+    manager: EntityManager,
+    userId: string,
+  ): Promise<readonly ChatGrantedConversationScope[]> {
+    return this.sellerAccess.grantedConversationScopes(manager, userId);
   }
 
   /** Every counterparty the caller may START a conversation with. */

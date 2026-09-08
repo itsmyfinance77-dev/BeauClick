@@ -509,6 +509,14 @@ export const RESETTABLE_TABLES = [
   'waitlist.outbox_events',
   'waitlist.entries',
   'business.outbox_events',
+  // V3.3 Story #109 (`#44c`). Before `business.business_staff`, which it
+  // references by a real composite FK. TRUNCATE bypasses
+  // `tg_staff_role_grants_immutable` -- it is not an UPDATE or a DELETE, so no
+  // row trigger fires. That is what a reset needs and is NOT a hole in the
+  // immutability guarantee: the application role reaches this table only through
+  // the service, and the suite that clears it is the one proving the trigger
+  // refuses every write that goes through it.
+  'business.staff_role_grants',
   'business.business_staff',
   // V3.3 Story #107 (`#44a`). Children BEFORE `business.businesses`, matching
   // this list's own convention -- both reference it by a real same-schema FK,
@@ -748,6 +756,36 @@ export async function seedBusiness(dataSource: DataSource, ownerUserId: string, 
     [id, ownerUserId, displayName],
   );
   return { id, ownerUserId };
+}
+
+/**
+ * V3.3 #109 (`#44c`). A membership row inserted directly, at `invited`.
+ *
+ * Seeding goes through SQL rather than the invite route because #109 replaced
+ * that route's contract: it takes a phone number, resolves the identity
+ * server-side, and answers `202 {}` without disclosing the membership id. A test
+ * that needs a specific membership therefore creates one, and the specs that care
+ * about the invitation contract drive the real route instead.
+ *
+ * Consent is still exercised where it matters: callers move `invited -> active`
+ * through `StaffService.accept` from the invitee's own id, exactly as production
+ * does.
+ */
+export async function seedMembership(
+  dataSource: DataSource,
+  businessId: string,
+  userId: string,
+  role: 'manager' | 'staff',
+  invitedBy: string,
+  professionalId: string | null = null,
+): Promise<string> {
+  const id = uuidv7();
+  await dataSource.query(
+    `INSERT INTO business.business_staff (id, business_id, user_id, professional_id, role, status, invited_by)
+     VALUES ($1, $2, $3, $4, $5, 'invited', $6)`,
+    [id, businessId, userId, professionalId, role, invitedBy],
+  );
+  return id;
 }
 
 /** V3.3 #108 (`#44b`). A launched city row, so a location create has something valid to point at. */

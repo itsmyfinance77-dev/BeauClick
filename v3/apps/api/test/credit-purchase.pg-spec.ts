@@ -1196,7 +1196,13 @@ describePg('custom booking-credit purchases (real PostgreSQL)', () => {
         '/api/v1/me/subscriptions/:workspaceRef/credit-purchases',
         '/api/v1/me/subscriptions/:workspaceRef/credit-purchases/quote',
       ]);
-      expect(paths.filter((p) => /balance|grant|allowance/i.test(p))).toEqual([]);
+      // The `businesses/…/grants` exclusion is V3.3 Story #109 (`#44c`): a
+      // business-scoped STAFF authority grant is a different family entirely
+      // from a credit balance, grant or allowance. Excluding it by prefix keeps
+      // this assertion exact for the surface it guards.
+      expect(
+        paths.filter((p) => /balance|grant|allowance/i.test(p) && !p.startsWith('/api/v1/businesses/')),
+      ).toEqual([]);
     });
 
     it('resolves the price on the caller’s manager, not a fresh connection', () => {

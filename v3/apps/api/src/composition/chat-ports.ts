@@ -1,9 +1,19 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { EntityManager, IsNull } from 'typeorm';
 
-import { ChatEligibilityPort, ChatEligibleRelationship, ChatSellerAccessPort } from '@beauclick/chat';
+import {
+  ChatEligibilityPort,
+  ChatEligibleRelationship,
+  ChatGrantedConversationScope,
+  ChatSellerAccessPort,
+} from '@beauclick/chat';
 import type { ChatCounterpartyType } from '@beauclick/chat-contract';
-import { BusinessEntity, BusinessStaffEntity } from '@beauclick/business';
+import {
+  BusinessEntity,
+  BusinessStaffEntity,
+  SCOPED_STAFF_AUTHORIZER,
+  ScopedStaffAuthorizerPort,
+} from '@beauclick/business';
 import { ProfessionalEntity } from '@beauclick/provider';
 
 /**
@@ -56,6 +66,30 @@ import { ProfessionalEntity } from '@beauclick/provider';
  * something assembled across several statements rather than one thing a reviewer
  * can check. Cross-schema reads are exactly what the composition root is for.
  */
+/**
+ * What makes a booking QUALIFY, as one SQL predicate.
+ *
+ * Extracted to module scope by V3.3 Story #109 (`#44c`) so the eligibility port
+ * and the practitioner-specific seller-access rule below cannot grow two opinions
+ * about it. `V32-DEC-011`'s rule, unchanged: `confirmed`, `completed` and
+ * `no_show` qualify outright, and `cancelled` qualifies only when the append-only
+ * history proves it once reached `confirmed` -- because `pending` is the one
+ * status any authenticated user can create against any professional, so
+ * `pending -> cancelled` would otherwise be an eligibility grant anybody could
+ * mint at will.
+ */
+const QUALIFYING_BOOKING_PREDICATE = `
+        b.status IN ('confirmed', 'completed', 'no_show')
+        OR (
+             b.status = 'cancelled'
+             AND EXISTS (
+               SELECT 1 FROM booking.booking_history h
+                WHERE h.booking_id = b.id
+                  AND (h.event = 'confirmed' OR h.to_status = 'confirmed')
+             )
+           )
+`;
+
 @Injectable()
 export class BookingBackedChatEligibility implements ChatEligibilityPort {
 
@@ -76,19 +110,7 @@ export class BookingBackedChatEligibility implements ChatEligibilityPort {
       JOIN commerce.orders o
         ON o.source_type = 'booking' AND o.source_id = b.id
      WHERE b.customer_id = $1
-       AND (
-             b.status IN ('confirmed', 'completed', 'no_show')
-             OR (
-                  -- The correction. A cancelled booking qualifies only if the
-                  -- append-only history proves it once reached 'confirmed'.
-                  b.status = 'cancelled'
-                  AND EXISTS (
-                    SELECT 1 FROM booking.booking_history h
-                     WHERE h.booking_id = b.id
-                       AND (h.event = 'confirmed' OR h.to_status = 'confirmed')
-                  )
-                )
-           )
+       AND (${QUALIFYING_BOOKING_PREDICATE})
   `;
 
   async eligibleCounterpartiesFor(
@@ -159,11 +181,23 @@ export class BookingBackedChatEligibility implements ChatEligibilityPort {
  */
 @Injectable()
 export class BusinessBackedChatSellerAccess implements ChatSellerAccessPort {
+  constructor(
+    /**
+     * V3.3 #109 (`#44c`). The scoped-authority question, asked through the
+     * business-owned port bound in `DomainPortsModule`. `chat` still imports no
+     * `business` ORM entity; this adapter is the only bridge, and it passes the
+     * caller's `manager` so the read joins chat's send transaction rather than
+     * taking a second pool connection.
+     */
+    @Inject(SCOPED_STAFF_AUTHORIZER) private readonly scopedAuthority: ScopedStaffAuthorizerPort,
+  ) {}
+
   async canAccessCounterparty(
     manager: EntityManager,
     userId: string,
     counterpartyType: ChatCounterpartyType,
     counterpartyId: string,
+    customerUserId: string,
   ): Promise<boolean> {
     if (counterpartyType === 'professional') {
       const professional = await manager.getRepository(ProfessionalEntity).findOne({
@@ -179,12 +213,69 @@ export class BusinessBackedChatSellerAccess implements ChatSellerAccessPort {
     });
     if (business) return true;
 
-    // Active MANAGERS only. `role: 'staff'` is deliberately absent.
+    // Active MANAGERS. `role: 'staff'` is deliberately still absent here -- an
+    // any-active-staff rule remains refused (`V32-DEC-010`).
     const membership = await manager.getRepository(BusinessStaffEntity).findOne({
       where: { businessId: counterpartyId, userId, status: 'active', role: 'manager' },
       select: { id: true },
     });
-    return membership !== null;
+    if (membership) return true;
+
+    /*
+     * V3.3 #109 (`#44c`), `V33-DEC-033` R2 -- the booked practitioner, and only
+     * for their own conversation.
+     *
+     * Five conditions, and every one of them is required:
+     *
+     *  1. a live `practitioner_chat` grant, on an `active` membership of a live
+     *     business, with a non-null professional link -- all four re-read by the
+     *     authorizer on this request, never cached in a token;
+     *  2. the grant's business is the counterparty, which is the order's
+     *     SNAPSHOTTED seller party, so a practitioner who changed salon never
+     *     reaches the conversation they used to serve;
+     *  3. the membership's `professional_id` equals the `professional_id` of a
+     *     QUALIFYING booking between this customer and this business -- which is
+     *     what makes the authority practitioner-specific rather than salon-wide;
+     *  4. the caller is the membership's own user, which is how the authorizer is
+     *     asked in the first place;
+     *  5. the booking itself qualifies under the unchanged `V32-DEC-011` rule.
+     *
+     * A manager without a grant already returned true above; a granted
+     * practitioner reaching for a colleague's conversation finds no matching
+     * professional here and returns false, indistinguishably from a stranger.
+     */
+    const authorities = await this.scopedAuthority.liveScopedAuthorities(manager, userId, 'practitioner_chat');
+    const grantedHere = authorities.filter((authority) => authority.businessId === counterpartyId);
+    if (grantedHere.length === 0) return false;
+
+    const practitioners = await this.qualifyingPractitioners(manager, customerUserId, counterpartyId);
+    return grantedHere.some((authority) => practitioners.has(authority.professionalId));
+  }
+
+  /**
+   * The practitioners who delivered a QUALIFYING booking between this customer
+   * and this business.
+   *
+   * One indexed read against the same predicate `BookingBackedChatEligibility`
+   * uses, so "qualifying" cannot come to mean two different things.
+   */
+  private async qualifyingPractitioners(
+    manager: EntityManager,
+    customerUserId: string,
+    businessId: string,
+  ): Promise<ReadonlySet<string>> {
+    const rows: Array<{ professional_id: string }> = await manager.query(
+      `SELECT DISTINCT b.professional_id
+         FROM booking.bookings b
+         JOIN commerce.orders o
+           ON o.source_type = 'booking' AND o.source_id = b.id
+        WHERE b.customer_id = $1
+          AND o.seller_party_type = 'business'
+          AND o.seller_party_id = $2
+          AND (${QUALIFYING_BOOKING_PREDICATE})`,
+      [customerUserId, businessId],
+    );
+    return new Set(rows.map((row) => row.professional_id));
   }
 
   async counterpartiesFor(
@@ -231,6 +322,7 @@ export class BusinessBackedChatSellerAccess implements ChatSellerAccessPort {
     manager: EntityManager,
     counterpartyType: ChatCounterpartyType,
     counterpartyId: string,
+    customerUserId: string,
   ): Promise<readonly string[]> {
     if (counterpartyType === 'professional') {
       const professional = await manager.getRepository(ProfessionalEntity).findOne({
@@ -252,6 +344,67 @@ export class BusinessBackedChatSellerAccess implements ChatSellerAccessPort {
     const recipients = new Set<string>();
     if (business) recipients.add(business.ownerId);
     for (const membership of managers) recipients.add(membership.userId);
+
+    /*
+     * V3.3 #109 (`#44c`). Granted practitioners are added ONLY for the
+     * conversation they may actually read.
+     *
+     * Scoped to this customer's qualifying practitioners rather than to the
+     * business, because a notification is itself a disclosure: telling every
+     * granted practitioner that a message arrived would reveal that a
+     * conversation they may not open exists at all.
+     */
+    for (const professionalId of await this.qualifyingPractitioners(manager, customerUserId, counterpartyId)) {
+      for (const userId of await this.scopedAuthority.usersWithLiveScopedAuthority(
+        manager,
+        'practitioner_chat',
+        counterpartyId,
+        professionalId,
+      )) {
+        recipients.add(userId);
+      }
+    }
+
     return [...recipients];
+  }
+
+  /**
+   * The individual conversations a `practitioner_chat` grant reaches for this
+   * user -- V3.3 Story #109 (`#44c`).
+   *
+   * Two batched reads and no N+1: the authorizer returns every
+   * `(business, professional)` pair the user holds live, and one query turns
+   * those into the `(business, customer)` conversations whose qualifying booking
+   * that same practitioner delivered. A user with no grant costs one cheap
+   * indexed lookup and returns an empty array, which is almost everyone.
+   */
+  async grantedConversationScopes(
+    manager: EntityManager,
+    userId: string,
+  ): Promise<readonly ChatGrantedConversationScope[]> {
+    const authorities = await this.scopedAuthority.liveScopedAuthorities(manager, userId, 'practitioner_chat');
+    if (authorities.length === 0) return [];
+
+    // The pair is zipped into one text key so a single `= ANY` covers the whole
+    // set. Both halves are uuids this process just read back from its own
+    // database -- never anything a caller supplied.
+    const keys = authorities.map((authority) => `${authority.businessId}:${authority.professionalId}`);
+
+    const rows: Array<{ counterparty_id: string; customer_id: string }> = await manager.query(
+      `SELECT DISTINCT o.seller_party_id AS counterparty_id, b.customer_id
+         FROM booking.bookings b
+         JOIN commerce.orders o
+           ON o.source_type = 'booking' AND o.source_id = b.id
+        WHERE o.seller_party_type = 'business'
+          AND (o.seller_party_id::text || ':' || b.professional_id::text) = ANY($1::text[])
+          AND (${QUALIFYING_BOOKING_PREDICATE})`,
+      [keys],
+    );
+
+    return rows.map((row) => ({
+      counterpartyType: 'business' as const,
+      counterpartyId: row.counterparty_id,
+      customerUserId: row.customer_id,
+    }));
   }
 }

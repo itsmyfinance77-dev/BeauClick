@@ -1187,7 +1187,15 @@ describePg('subscription foundation — assignment, snapshots, grants (real Post
       const paths = router.stack
         .filter((layer) => layer.route)
         .map((layer) => layer.route!.path)
-        .filter((path) => /subscription|my-plan|credits|grant/i.test(path));
+        .filter((path) => /subscription|my-plan|credits|grant/i.test(path))
+      /*
+       * V3.3 Story #109 (`#44c`) added `businesses/:id/staff/:staffId/grants` --
+       * a business-scoped STAFF authority grant, which has nothing to do with a
+       * subscription credit grant and belongs to a different route family. It is
+       * excluded by path prefix rather than by relaxing the exact set below, so
+       * this guard keeps its teeth for the family it actually guards.
+       */
+        .filter((path) => !path.startsWith('/api/v1/businesses/'));
 
       /*
        * This case used to assert `[]`, with the note "the routes are #69".

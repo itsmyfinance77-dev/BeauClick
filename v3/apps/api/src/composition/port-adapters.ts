@@ -22,9 +22,11 @@ import {
   BusinessEntity,
   BusinessOwnerRoleGrantPort,
   BusinessStaffEntity,
+  InvitableIdentity,
   LocationCityCataloguePort,
+  StaffInviteIdentityResolverPort,
 } from '@beauclick/business';
-import { RoleService } from '@beauclick/identity';
+import { RoleService, UserEntity, canonicalizePhone } from '@beauclick/identity';
 
 /**
  * The composition root's implementations of the ports booking-, commerce-,
@@ -437,5 +439,68 @@ export class ProviderBackedLocationCityCatalogue implements LocationCityCatalogu
       select: { id: true, name: true },
     });
     return new Map(rows.map((row) => [row.id, { id: row.id, name: row.name }]));
+  }
+}
+
+/**
+ * Resolves a staff-invitation phone number to an eligible account — V3.3 Story
+ * #109 (`#44c`), `V33-DEC-030` D5 and ADR-049 section 4.5.
+ *
+ * ## This is the only place the two schemas meet for an invitation
+ *
+ * `scope:business` may depend only on `scope:shared`, so `business` declares
+ * `STAFF_INVITE_IDENTITY_RESOLVER` and cannot name who answers it. `apps/api` is
+ * the only tier permitted to compose domains (ADR-011), and this adapter is where
+ * `identity.users` and `provider.professionals` are read — the same construction
+ * `IdentityBackedRecipientResolver` already uses.
+ *
+ * ## Canonicalisation is not re-implemented
+ *
+ * `canonicalizePhone` is identity's own rule — local `09…`, `+98…`, `0098…`,
+ * `98…`, Persian and Arabic-Indic digits, all folded to one `+98XXXXXXXXX` form
+ * before any comparison (`V3_SECURITY_MODEL.md` section 1). Restating that
+ * grammar in `business` would be a second implementation of one rule, and two
+ * implementations of one rule are one waiting to disagree.
+ *
+ * ## Every negative cause returns the SAME null
+ *
+ * A phone that does not canonicalise, one with no account, and an account that is
+ * soft-deleted or erased are indistinguishable to the caller — `business` receives
+ * `null` and could not leak the difference if it tried. An erased subject is
+ * doubly covered: `identity` tombstones the phone to `del:…`, which no real
+ * number canonicalises to, *and* sets `deleted_at`.
+ *
+ * ## The professional link is resolved here, never asserted by the inviter
+ *
+ * `V33-DEC-033` R2/R4. It becomes the membership's `professional_id`, which is
+ * what a later `practitioner_chat` grant is checked against. An account with no
+ * professional profile yields `null`, and a membership with a null link can
+ * satisfy no such check — fail-closed by construction.
+ *
+ * ## It writes nothing
+ *
+ * This is a read. No pending-invite row, no raw phone, no phone hash, no
+ * encrypted phone, no lookup token, no outbox event and no notification —
+ * durable or transient — for any phone, and least of all one with no account
+ * (ADR-049 section 4.6 as extended by `V33-DEC-033` R3).
+ */
+@Injectable()
+export class IdentityBackedStaffInviteResolver implements StaffInviteIdentityResolverPort {
+  async resolveInvitableIdentity(manager: EntityManager, rawPhone: string): Promise<InvitableIdentity | null> {
+    const canonical = canonicalizePhone(rawPhone);
+    if (!canonical) return null;
+
+    const user = await manager.getRepository(UserEntity).findOne({
+      where: { phone: canonical, deletedAt: IsNull() },
+      select: { id: true },
+    });
+    if (!user) return null;
+
+    const professional = await manager.getRepository(ProfessionalEntity).findOne({
+      where: { ownerId: user.id, deletedAt: IsNull() },
+      select: { id: true },
+    });
+
+    return { userId: user.id, professionalId: professional?.id ?? null };
   }
 }

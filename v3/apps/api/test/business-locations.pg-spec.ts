@@ -11,7 +11,15 @@ import {
   deriveWorkspaceReference,
 } from '@beauclick/workspace-reference';
 
-import { createPgTestApp, requiredPgEnv, resetDatabase, seedBusiness, seedCity, seedUser } from './pg-test-app.factory';
+import {
+  createPgTestApp,
+  requiredPgEnv,
+  resetDatabase,
+  seedBusiness,
+  seedCity,
+  seedMembership,
+  seedUser,
+} from './pg-test-app.factory';
 
 /**
  * REAL PostgreSQL: V3.3 Story #108 (`#44b`) -- organisation locations.
@@ -471,8 +479,11 @@ describeIfPg('Business locations on real PostgreSQL (#108)', () => {
   describe('owner-only, proven adversarially', () => {
     async function activeStaff(businessId: string, role: 'manager' | 'staff', prefix: string) {
       const member = await seedUser(app, dataSource, uniquePhone(prefix));
-      const invited = await staff.invite(businessId, (await businesses.findById(businessId))!.ownerId, { userId: member.id, role });
-      await staff.accept(invited.id, member.id);
+      const ownerId = (await businesses.findById(businessId))!.ownerId;
+      // V3.3 #109 (`#44c`) replaced the invite contract with a phone-based one
+      // that discloses no membership id; consent is still exercised via `accept`.
+      const membershipId = await seedMembership(dataSource, businessId, member.id, role, ownerId);
+      await staff.accept(membershipId, member.id);
       return member;
     }
 
