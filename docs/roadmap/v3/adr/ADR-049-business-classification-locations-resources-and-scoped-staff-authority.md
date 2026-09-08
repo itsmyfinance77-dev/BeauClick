@@ -264,6 +264,21 @@ type nor the database knows. **Obligation (#109):** reconcile the vocabulary to 
 byte-identical. **No new lifecycle state, transition or actor beyond #109's issue contract is
 introduced by this correction.**
 
+> **Amendment note — 2026-09-08, `V33-DEC-033`.** Nothing in §4 above is rewritten,
+> reopened or weakened. Three points this section deliberately left to #109's own
+> contract were ratified by [`V33-DEC-033`](../../v3.3/V3.3_DECISION_REGISTER.md) and are
+> recorded here only so they are discoverable from the ADR that binds the family:
+> (1) the closed scoped-role vocabulary for #109 is **exactly one member**,
+> `practitioner_chat`; (2) that role is **practitioner-specific, not business-wide** —
+> at authorization time the qualifying booking's `professional_id` must equal the
+> grantee membership's `professional_id` and the order's snapshotted seller business
+> must equal the grant's business, with **no third generic scope form** added and the
+> membership's `professional_id` resolved server-side; and (3) §4.6's "persist nothing,
+> notify nothing" extends explicitly to **transient queued derivatives** — no phone
+> hash, encrypted phone, lookup token or queued work item may be written for an absent,
+> ineligible, duplicate, foreign or self case, so invitation resolution is fully
+> synchronous with a monotonic-clock minimum-duration floor rather than queued.
+
 ---
 
 ### 5. Scoped finance
