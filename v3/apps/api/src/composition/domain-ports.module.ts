@@ -22,7 +22,12 @@ import { PROVIDER_REINDEX_SOURCE } from '@beauclick/search';
 import { RECIPIENT_RESOLVER } from '@beauclick/notification';
 import { ANALYTICS_SUBJECT_RESOLVER } from '@beauclick/analytics';
 import { LoyaltyModule } from '@beauclick/loyalty';
-import { BUSINESS_OWNER_ROLE_GRANT, BusinessEntity, BusinessStaffEntity } from '@beauclick/business';
+import {
+  BUSINESS_OWNER_ROLE_GRANT,
+  BusinessEntity,
+  BusinessStaffEntity,
+  LOCATION_CITY_CATALOGUE,
+} from '@beauclick/business';
 import { PROFESSIONAL_OWNER_LOOKUP } from '@beauclick/waitlist';
 import {
   DEVELOPMENT_WORKSPACE_REFERENCE_SECRET,
@@ -37,6 +42,7 @@ import {
   ProviderBackedServiceCatalog,
   CommercialPolicyBackedCollectionResolver,
   IdentityBackedOwnerRoleGrant,
+  ProviderBackedLocationCityCatalogue,
   SellerPartyLookup,
 } from './port-adapters';
 import {
@@ -173,6 +179,15 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     IdentityBackedOwnerRoleGrant,
     { provide: SELLER_OWNER_ROLE_GRANT, useExisting: IdentityBackedOwnerRoleGrant },
     { provide: BUSINESS_OWNER_ROLE_GRANT, useExisting: IdentityBackedOwnerRoleGrant },
+    /*
+     * V3.3 #108 (`#44b`), ADR-049 section 3.2. `business` declares
+     * `LOCATION_CITY_CATALOGUE` and cannot import `provider`; this adapter reads
+     * `provider.locations_cities` on the caller's own manager. Mandatory -- no
+     * `@Optional()` fallback -- so a composition that omits it fails to boot
+     * rather than refusing every location create.
+     */
+    ProviderBackedLocationCityCatalogue,
+    { provide: LOCATION_CITY_CATALOGUE, useExisting: ProviderBackedLocationCityCatalogue },
     /**
      * The workspace-reference secret, read ONCE for the whole application.
      *
@@ -241,6 +256,7 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     FINANCE_WORKSPACE_OWNER_RESOLVER,
     SELLER_OWNER_ROLE_GRANT,
     BUSINESS_OWNER_ROLE_GRANT,
+    LOCATION_CITY_CATALOGUE,
     WORKSPACE_REFERENCE_SECRET,
     FINANCIAL_DATA_SOURCE,
     PROVIDER_REINDEX_SOURCE,

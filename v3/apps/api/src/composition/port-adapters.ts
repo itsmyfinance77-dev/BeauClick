@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, IsNull, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, IsNull, Repository } from 'typeorm';
 
-import { ProfessionalEntity, SellerOwnerRoleGrantPort, ServiceOfferingEntity } from '@beauclick/provider';
+import { CityEntity, ProfessionalEntity, SellerOwnerRoleGrantPort, ServiceOfferingEntity } from '@beauclick/provider';
 import { ProfessionalDirectory } from '@beauclick/booking';
 import {
   BookingCollectionPolicyResolver,
@@ -17,7 +17,13 @@ import {
   OwnedSubscriberParty,
   OwnedSubscriberPartyResolver,
 } from '@beauclick/commercial-policy';
-import { BusinessEntity, BusinessOwnerRoleGrantPort, BusinessStaffEntity } from '@beauclick/business';
+import {
+  AssignableCity,
+  BusinessEntity,
+  BusinessOwnerRoleGrantPort,
+  BusinessStaffEntity,
+  LocationCityCataloguePort,
+} from '@beauclick/business';
 import { RoleService } from '@beauclick/identity';
 
 /**
@@ -381,5 +387,55 @@ export class IdentityBackedOwnerRoleGrant implements SellerOwnerRoleGrantPort, B
 
   async grantBusinessOwnerRole(manager: EntityManager, ownerUserId: string): Promise<boolean> {
     return this.roles.assignOwnerRole(manager, ownerUserId, 'business');
+  }
+}
+
+/**
+ * Answers `business`'s city-catalogue port from `provider.locations_cities` —
+ * V3.3 Story #108 (`#44b`), ADR-049 section 3.2.
+ *
+ * ## This is the one place the two schemas meet for cities
+ *
+ * `scope:business` may depend only on `scope:shared`, so `business` declares
+ * `LOCATION_CITY_CATALOGUE` and cannot name who answers it. `apps/api` is the
+ * only tier permitted to compose domains (ADR-011), and this adapter is where
+ * `provider`'s `CityEntity` is read — `business` imports no `provider` ORM entity
+ * and issues no `provider.*` query, which a boundary spec asserts.
+ *
+ * ## Every read is on the CALLER's manager
+ *
+ * The adapter holds no repository and no DataSource of its own. The city check
+ * therefore runs inside the location-write transaction (ADR-049 section 8.2): a
+ * city that vanishes mid-request cannot be accepted, and a rolled-back write
+ * rolls back a check that had "passed". The same construction `SellerPartyLookup`
+ * uses.
+ *
+ * ## Availability is `is_launched`, and nothing else
+ *
+ * `lookupAssignableCity` filters on `is_launched = true` — the exact predicate
+ * `GET /v1/cities` (`ProviderService.listCities`) already applies. #108 invents
+ * no city policy. `describeCities` ignores `is_launched`: a city that becomes
+ * unavailable after a location was created still renders its name.
+ */
+@Injectable()
+export class ProviderBackedLocationCityCatalogue implements LocationCityCataloguePort {
+  async lookupAssignableCity(manager: EntityManager, cityId: string): Promise<AssignableCity | null> {
+    const row = await manager.getRepository(CityEntity).findOne({
+      where: { id: cityId, isLaunched: true },
+      select: { id: true, name: true },
+    });
+    return row ? { id: row.id, name: row.name } : null;
+  }
+
+  async describeCities(
+    manager: EntityManager,
+    cityIds: readonly string[],
+  ): Promise<ReadonlyMap<string, AssignableCity>> {
+    if (cityIds.length === 0) return new Map();
+    const rows = await manager.getRepository(CityEntity).find({
+      where: { id: In([...new Set(cityIds)]) },
+      select: { id: true, name: true },
+    });
+    return new Map(rows.map((row) => [row.id, { id: row.id, name: row.name }]));
   }
 }

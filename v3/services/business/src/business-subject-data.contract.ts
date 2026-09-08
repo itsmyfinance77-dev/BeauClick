@@ -67,6 +67,28 @@ export class BusinessSubjectDataContract implements SubjectDataContract {
       reason:
         'How a business operates (multi-location, mobile). A property of the organisation, naming no person and carrying no identity column, so it survives the erasure of any individual exactly as the business row itself does.',
     },
+    // V3.3 Story #108 (`#44b`), ADR-049 section 7.2. `retained`, for the same
+    // substance as the two #107 tables above: a location is a property of a
+    // COMMERCIAL ENTITY, not of a person. It carries no `user_id`, no `*_by`, no
+    // `*_user_id`, no phone and no email -- the actor who created, renamed or
+    // closed a location lives in `admin.admin_audit_log` and nowhere else -- so
+    // erasing an individual has nothing to erase here, and destroying the rows
+    // would delete a business's own description of its branches for no privacy
+    // gain. `no_subject_data` is the only other disposition ADR-049 section 7.2
+    // permits for this table; `retained` is chosen for consistency with the
+    // business rows it hangs off, all of which are `retained` while owner-erasure
+    // succession stays an open product decision (see the class note).
+    //
+    // Deliberately NOT in the export document: an export tells a SUBJECT what
+    // the platform holds about THEM, and "this organisation has a branch in
+    // Tehran" is not that. The business rows a user owns are already exported by
+    // `owned_businesses` below.
+    {
+      table: 'business.locations',
+      disposition: 'retained',
+      reason:
+        'A named branch of a business organisation -- its name, opaque city reference and active|suspended|closed lifecycle. A property of the organisation, naming no person and carrying no identity column, so it survives the erasure of any individual exactly as the business row it hangs off does.',
+    },
   ];
 
   async exportSubjectData(manager: EntityManager, userId: string): Promise<SubjectExportSection[]> {
@@ -129,6 +151,10 @@ export class BusinessSubjectDataContract implements SubjectDataContract {
         {
           table: 'business.business_traits',
           reason: 'how a business operates, not a fact about any person',
+        },
+        {
+          table: 'business.locations',
+          reason: 'named branches of a business, not a fact about any person',
         },
       ],
     };
