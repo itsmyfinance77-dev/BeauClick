@@ -18,7 +18,7 @@ import {
   evaluateCoverage,
 } from '@beauclick/subject-data';
 
-import { createPgTestApp, requiredPgEnv, resetDatabase, seedBusiness, seedUser } from './pg-test-app.factory';
+import { createPgTestApp, requiredPgEnv, resetDatabase, seedBusiness, seedMembership, seedUser } from './pg-test-app.factory';
 
 /**
  * REAL PostgreSQL: V3.3 Story #107 (`#44a`) -- business classification and
@@ -442,11 +442,12 @@ describeIfPg('Business classification on real PostgreSQL (#107)', () => {
   describe('authorization', () => {
     async function seedActiveStaff(businessId: string, role: 'manager' | 'staff', phonePrefix: string) {
       const member = await seedUser(app, dataSource, uniquePhone(phonePrefix));
-      const invited = await staff.invite(businessId, (await businesses.findById(businessId))!.ownerId, {
-        userId: member.id,
-        role,
-      });
-      await staff.accept(invited.id, member.id);
+      const ownerId = (await businesses.findById(businessId))!.ownerId;
+      // V3.3 #109 (`#44c`) replaced the invite contract with a phone-based one
+      // that discloses no membership id, so a spec that needs a specific
+      // membership seeds it and still exercises consent through `accept`.
+      const membershipId = await seedMembership(dataSource, businessId, member.id, role, ownerId);
+      await staff.accept(membershipId, member.id);
       return member;
     }
 
@@ -976,7 +977,14 @@ describeIfPg('Business classification on real PostgreSQL (#107)', () => {
       );
 
       const sections = await dataSource.transaction(async (manager) => contract.exportSubjectData(manager, owner.id));
-      expect(sections.map((section) => section.key)).toEqual(['owned_businesses', 'staff_memberships']);
+      // V3.3 Story #109 (`#44c`) added the third section. The list stays EXACT
+      // rather than being relaxed to `arrayContaining`: this assertion exists to
+      // notice a new export section, and it did.
+      expect(sections.map((section) => section.key)).toEqual([
+        'owned_businesses',
+        'staff_memberships',
+        'staff_role_grants',
+      ]);
       expect(JSON.stringify(sections)).not.toContain('retail');
 
       const [{ count }] = await dataSource.query(

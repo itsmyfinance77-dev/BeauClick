@@ -8,11 +8,15 @@ import { BusinessOutboxEntity } from './entities/business-outbox.entity';
 import { BusinessVerticalEntity } from './entities/business-vertical.entity';
 import { BusinessTraitEntity } from './entities/business-trait.entity';
 import { BusinessLocationEntity } from './entities/business-location.entity';
+import { StaffRoleGrantEntity } from './entities/staff-role-grant.entity';
 
 import { BusinessService } from './business.service';
 import { BusinessClassificationService } from './business-classification.service';
 import { BusinessLocationService } from './business-location.service';
 import { StaffService } from './staff.service';
+import { StaffGrantService } from './staff-grant.service';
+import { BusinessScopedStaffAuthorizer } from './scoped-staff-authorizer.service';
+import { STAFF_INVITE_CLOCK, SystemStaffInviteClock } from './staff-invite.clock';
 import { BusinessController } from './business.controller';
 import { BusinessLocationController } from './business-location.controller';
 import {
@@ -37,6 +41,9 @@ export const BUSINESS_ENTITIES = [
   // DataSource, so a new business table cannot be reachable at runtime while
   // being invisible to the ORM.
   BusinessLocationEntity,
+  // V3.3 Story #109 (`#44c`). Registered here and nowhere else, for the reason
+  // the #107 and #108 lines above record.
+  StaffRoleGrantEntity,
 ];
 
 @Module({
@@ -53,6 +60,30 @@ export const BUSINESS_ENTITIES = [
     // check, the same shape `BUSINESS_OWNER_ROLE_GRANT` already uses.
     BusinessLocationService,
     StaffService,
+    /*
+     * V3.3 Story #109 (`#44c`).
+     *
+     * `StaffService` now injects `STAFF_INVITE_IDENTITY_RESOLVER` — declared
+     * here, bound by `DomainPortsModule` — so a composition without the
+     * composition root fails to boot rather than silently refusing every
+     * invitation.
+     *
+     * `STAFF_INVITE_CLOCK` is bound to the real monotonic clock HERE rather than
+     * at the root, because it is not a cross-domain seam: it exists so a
+     * deterministic fake can prove the response-time floor applies to every
+     * semantic path, including the exception path.
+     *
+     * `BusinessScopedStaffAuthorizer` implements `SCOPED_STAFF_AUTHORIZER`. It is
+     * exported as a CLASS and deliberately not bound to its token here: nothing
+     * inside `business` consumes the port, and the one consumer — chat's
+     * seller-access adapter — resolves the token from the composition root, which
+     * is what lets it ask the question without importing a `business` ORM entity.
+     * The class holds no repository and no DataSource (every method takes the
+     * caller's manager), so where it is instantiated changes nothing.
+     */
+    StaffGrantService,
+    BusinessScopedStaffAuthorizer,
+    { provide: STAFF_INVITE_CLOCK, useClass: SystemStaffInviteClock },
     BusinessMembershipResolver,
     BusinessOwnerResolver,
     BusinessManagerResolver,
@@ -64,6 +95,9 @@ export const BUSINESS_ENTITIES = [
     BusinessClassificationService,
     BusinessLocationService,
     StaffService,
+    StaffGrantService,
+    BusinessScopedStaffAuthorizer,
+    STAFF_INVITE_CLOCK,
     BusinessMembershipResolver,
     TypeOrmModule,
   ],

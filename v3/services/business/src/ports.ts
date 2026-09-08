@@ -1,5 +1,7 @@
 import type { EntityManager } from 'typeorm';
 
+import type { ScopedStaffRole } from './entities/staff-role-grant.entity';
+
 /**
  * The one outbound port `business` declares — V3.3 #75, `V33-DEC-021`.
  *
@@ -133,3 +135,163 @@ export interface LocationCityCataloguePort {
 }
 
 export const LOCATION_CITY_CATALOGUE = Symbol('BEAUCLICK_BUSINESS_LOCATION_CITY_CATALOGUE');
+
+/**
+ * What a scoped-authority question looks like -- V3.3 Story #109 (`#44c`),
+ * `V33-DEC-033` R2.
+ *
+ * `professionalId` is **required**, and that is the whole point. `practitioner_chat`
+ * is practitioner-specific: it authorizes the booked practitioner's **own**
+ * customer conversation and never every conversation the business holds. A caller
+ * that could omit the practitioner would be asking a wider question than the
+ * ruling permits, so the shape makes the narrow question the only expressible one.
+ */
+export interface ScopedStaffAuthorityRequest {
+  /** The session user asking to act. Never a caller-supplied identity. */
+  readonly userId: string;
+  readonly role: ScopedStaffRole;
+  /** The business the action is about -- for chat, the order's SNAPSHOTTED seller business. */
+  readonly businessId: string;
+  /** The practitioner the action is about -- for chat, the qualifying booking's `professional_id`. */
+  readonly professionalId: string;
+}
+
+/**
+ * The scoped-authority verifier -- V3.3 Story #109 (`#44c`), ADR-049 section 4.4.
+ *
+ * ## Why this is a SECOND, separate port
+ *
+ * `libs/auth`'s `PrivilegedCapabilityVerifier` takes `(userId, capability)` and
+ * **no scope**, and its `PRIVILEGED_CAPABILITIES` list is shared with
+ * `libs/audit`'s boot assertion. Adding a scope parameter there would change the
+ * meaning of every existing privileged call site and make a scope-less call
+ * against a scoped verifier exactly the confused deputy the separation prevents.
+ * That port is **not** widened, altered or re-bound by this story.
+ *
+ * ## Everything is re-read live, on every request
+ *
+ * ADR-049 section 4.3 and `V33-DEC-033` R5. Nothing here is cached in a JWT
+ * claim, a session or a memo. A revoked grant therefore fails on the **next**
+ * request, and a stale access token carrying a valid base capability is refused.
+ * This story adds no identity role and no token capability at all.
+ *
+ * ## It takes the caller's `EntityManager`
+ *
+ * Chat re-evaluates seller-side access **inside** its send transaction. An
+ * implementation holding its own repository would take a second pool connection
+ * while that transaction already holds one -- the exhaustion `chat.ports.ts`
+ * documents from its own twenty-way concurrency case. Taking the manager makes
+ * the read part of the caller's transaction on the caller's connection.
+ *
+ * ## Nothing is provided by default, deliberately
+ *
+ * `BusinessModule` declares the token and binds nothing; the composition root
+ * binds it. A composition that forgets it fails to boot rather than silently
+ * denying -- or worse, silently allowing -- every scoped action.
+ */
+export interface ScopedStaffAuthorizerPort {
+  /**
+   * True only when **all** of these hold, each read live:
+   *
+   *  1. the business exists and is not soft-deleted;
+   *  2. the user holds an `active` membership of that business;
+   *  3. that membership's `professional_id` is non-null and equals
+   *     `request.professionalId`;
+   *  4. a grant of `request.role` for that membership and business exists with
+   *     `revoked_at IS NULL`.
+   *
+   * Any other combination is false. There is no partial answer and no reason
+   * code: the caller maps false to its own non-enumerating refusal.
+   */
+  hasLiveScopedAuthority(manager: EntityManager, request: ScopedStaffAuthorityRequest): Promise<boolean>;
+
+  /**
+   * Every `(businessId, professionalId)` pair this user currently holds `role`
+   * for, as one batched read.
+   *
+   * Drives a consumer's list surface without an N+1: the caller resolves the
+   * whole set once and filters its own rows against it, rather than asking this
+   * port per row. An empty array is the ordinary answer for someone with no
+   * grants.
+   */
+  liveScopedAuthorities(
+    manager: EntityManager,
+    userId: string,
+    role: ScopedStaffRole,
+  ): Promise<readonly { readonly businessId: string; readonly professionalId: string }[]>;
+
+  /**
+   * Every user who currently holds `role` for `(businessId, professionalId)`.
+   *
+   * The reverse direction, for a consumer that must decide **who to notify**
+   * about something already scoped to one practitioner. It is deliberately not a
+   * business-wide list: notifying every granted practitioner of a message meant
+   * for one of them would disclose that the conversation exists.
+   */
+  usersWithLiveScopedAuthority(
+    manager: EntityManager,
+    role: ScopedStaffRole,
+    businessId: string,
+    professionalId: string,
+  ): Promise<readonly string[]>;
+}
+
+export const SCOPED_STAFF_AUTHORIZER = Symbol('BEAUCLICK_SCOPED_STAFF_AUTHORIZER');
+
+/** The one identity fact a staff invitation needs, and nothing else. */
+export interface InvitableIdentity {
+  readonly userId: string;
+  /**
+   * The professional profile this account owns, or `null`.
+   *
+   * Resolved **server-side** and never supplied by the inviter (`V33-DEC-033`
+   * R2/R4). It becomes the membership's `professional_id`, which is what a
+   * `practitioner_chat` grant is later checked against; a membership whose
+   * resolved value is null can satisfy no such check and therefore authorizes
+   * nothing -- fail-closed by construction rather than by a rule to remember.
+   */
+  readonly professionalId: string | null;
+}
+
+/**
+ * Resolves an invitation phone number to an eligible account -- V3.3 Story #109
+ * (`#44c`), `V33-DEC-030` D5 and ADR-049 section 4.5.
+ *
+ * ## Why a port and not an import
+ *
+ * The phone is the platform's OTP identity and lives in `identity.users`;
+ * `canonicalizePhone` lives in `services/identity`. `business` may import neither
+ * `identity` nor `provider` (ADR-011, enforced by
+ * `@nx/enforce-module-boundaries`), so it declares the question and the
+ * composition root binds an adapter -- the same arrangement
+ * `BUSINESS_OWNER_ROLE_GRANT` and `LOCATION_CITY_CATALOGUE` already use, and the
+ * same one `IdentityBackedRecipientResolver` already uses to read
+ * `identity.users`.
+ *
+ * ## It answers for ONE phone the caller already holds, and enumerates nothing
+ *
+ * There is no list method, no count, no search and no shape that could carry a
+ * reason. It returns `null` for a phone that does not canonicalise, for one with
+ * no account, and for an account that is soft-deleted or erased -- all alike, so
+ * `business` cannot distinguish them and could not leak the difference if it
+ * wanted to. **No public user directory or search over users is authorized**
+ * (`V33-DEC-030` D5).
+ *
+ * ## Nothing about an absent account is persisted
+ *
+ * ADR-049 section 4.6 as extended by `V33-DEC-033` R3: this is a **read**. It
+ * writes no pending-invite row, no raw phone, no phone hash, no encrypted phone,
+ * no lookup token, no outbox event and no notification -- durable or transient --
+ * for any phone, and least of all for one with no account.
+ */
+export interface StaffInviteIdentityResolverPort {
+  /**
+   * The eligible account behind `rawPhone`, or `null`.
+   *
+   * Runs on `manager`'s transaction so resolution and the membership insert are
+   * one atomic unit.
+   */
+  resolveInvitableIdentity(manager: EntityManager, rawPhone: string): Promise<InvitableIdentity | null>;
+}
+
+export const STAFF_INVITE_IDENTITY_RESOLVER = Symbol('BEAUCLICK_STAFF_INVITE_IDENTITY_RESOLVER');

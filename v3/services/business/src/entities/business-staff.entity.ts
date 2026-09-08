@@ -3,7 +3,24 @@ import { Column, CreateDateColumn, Entity, Index, PrimaryColumn, UpdateDateColum
 export const BUSINESS_STAFF_ROLES = ['manager', 'staff'] as const;
 export type BusinessStaffRole = (typeof BUSINESS_STAFF_ROLES)[number];
 
-export const BUSINESS_STAFF_STATUSES = ['invited', 'active', 'inactive', 'declined'] as const;
+/**
+ * The membership status vocabulary -- reconciled by V3.3 Story #109 (`#44c`).
+ *
+ * `'removed'` was missing here while `BusinessSubjectDataContract.eraseSubjectData`
+ * had always written it, and `business_staff.status` carried no CHECK constraint
+ * at all: three sources, three answers. ADR-049 section 4.8 and `V33-DEC-033` R5
+ * bind the correction to this story -- the vocabulary gains `removed` and
+ * `ck_business_staff_status` closes the column over exactly this set, with every
+ * existing row byte-identical (adding a CHECK validates but does not rewrite).
+ *
+ * The legal transitions are unchanged and nothing beyond them is invented:
+ * a row starts `invited`; only the invitee's own session may reach `active` or
+ * `declined`; the owner or the member may reach `inactive`; privacy erasure
+ * reaches `removed`, which is **terminal**. There is no reactivation path and
+ * this story adds none. A scoped grant authorizes nothing unless the membership
+ * is `active`.
+ */
+export const BUSINESS_STAFF_STATUSES = ['invited', 'active', 'inactive', 'declined', 'removed'] as const;
 export type BusinessStaffStatus = (typeof BUSINESS_STAFF_STATUSES)[number];
 
 /**

@@ -25,8 +25,11 @@ import { LoyaltyModule } from '@beauclick/loyalty';
 import {
   BUSINESS_OWNER_ROLE_GRANT,
   BusinessEntity,
+  BusinessScopedStaffAuthorizer,
   BusinessStaffEntity,
   LOCATION_CITY_CATALOGUE,
+  SCOPED_STAFF_AUTHORIZER,
+  STAFF_INVITE_IDENTITY_RESOLVER,
 } from '@beauclick/business';
 import { PROFESSIONAL_OWNER_LOOKUP } from '@beauclick/waitlist';
 import {
@@ -42,6 +45,7 @@ import {
   ProviderBackedServiceCatalog,
   CommercialPolicyBackedCollectionResolver,
   IdentityBackedOwnerRoleGrant,
+  IdentityBackedStaffInviteResolver,
   ProviderBackedLocationCityCatalogue,
   SellerPartyLookup,
 } from './port-adapters';
@@ -188,6 +192,29 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
      */
     ProviderBackedLocationCityCatalogue,
     { provide: LOCATION_CITY_CATALOGUE, useExisting: ProviderBackedLocationCityCatalogue },
+    /*
+     * V3.3 #109 (`#44c`), ADR-049 sections 4.4-4.5.
+     *
+     * Two bindings, and the asymmetry is deliberate.
+     *
+     * `SCOPED_STAFF_AUTHORIZER` is bound `useClass` to a class `business` owns
+     * and exports. Every fact it reads is a `business` table, so there is no
+     * cross-domain read to compose — what the root supplies is the TOKEN, which
+     * is what lets chat's seller-access adapter ask "does this person hold this
+     * authority" without importing a `business` ORM entity. The class holds no
+     * repository and no DataSource (every method takes the caller's manager), so
+     * a second instance is indistinguishable from the one `BusinessModule` also
+     * provides — there is one implementation, which is the property that matters.
+     *
+     * `STAFF_INVITE_IDENTITY_RESOLVER` genuinely crosses domains: it reads
+     * `identity.users` and `provider.professionals`, neither of which `business`
+     * may import. Both are MANDATORY — no `@Optional()` fallback — so a
+     * composition that forgets one fails to boot rather than silently refusing
+     * every invitation or, worse, silently allowing a scoped action.
+     */
+    { provide: SCOPED_STAFF_AUTHORIZER, useClass: BusinessScopedStaffAuthorizer },
+    IdentityBackedStaffInviteResolver,
+    { provide: STAFF_INVITE_IDENTITY_RESOLVER, useExisting: IdentityBackedStaffInviteResolver },
     /**
      * The workspace-reference secret, read ONCE for the whole application.
      *
@@ -257,6 +284,8 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     SELLER_OWNER_ROLE_GRANT,
     BUSINESS_OWNER_ROLE_GRANT,
     LOCATION_CITY_CATALOGUE,
+    SCOPED_STAFF_AUTHORIZER,
+    STAFF_INVITE_IDENTITY_RESOLVER,
     WORKSPACE_REFERENCE_SECRET,
     FINANCIAL_DATA_SOURCE,
     PROVIDER_REINDEX_SOURCE,
