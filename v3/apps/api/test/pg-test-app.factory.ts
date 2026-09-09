@@ -518,6 +518,13 @@ export const RESETTABLE_TABLES = [
   // refuses every write that goes through it.
   'business.staff_role_grants',
   'business.business_staff',
+  // V3.3 Story #110 (`#110a`). Before `business.locations`, which it references
+  // by a real composite FK. TRUNCATE bypasses `tg_location_resources_lifecycle`
+  // -- it is not an UPDATE or a DELETE, so no row trigger fires. That is what a
+  // reset needs and is NOT a hole in the terminality guarantee: the application
+  // role reaches this table only through the service, and the suite that clears
+  // it is the one proving the trigger refuses every write that goes through it.
+  'business.location_resources',
   // V3.3 Story #107 (`#44a`). Children BEFORE `business.businesses`, matching
   // this list's own convention -- both reference it by a real same-schema FK,
   // and the migration seeds neither, so a reset returns them to exactly the
