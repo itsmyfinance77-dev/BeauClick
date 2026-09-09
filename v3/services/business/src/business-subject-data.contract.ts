@@ -102,6 +102,22 @@ export class BusinessSubjectDataContract implements SubjectDataContract {
     // by someone noticing. `membership_id` deliberately does not match the
     // heuristic — it is a `business` row id, not a person.
     { table: 'business.staff_role_grants', disposition: 'subject_data' },
+    // V3.3 Story #110 (`#110a`), `V33-DEC-034` R7 and ADR-049 section 7.2.
+    // `retained`, for exactly the reason `business.locations` above is: a room, a
+    // device or a styling station is a property of the ORGANISATION. It names no
+    // person, carries no identity column, and survives the erasure of any
+    // individual precisely as the location it hangs off does.
+    //
+    // No actor or user column was added to this table to satisfy ADR-027's
+    // heuristic -- adding one to make the check happy would invent the very
+    // subject data the claim says is absent. Actor identity for every resource
+    // mutation lives in `admin.admin_audit_log` and nowhere else.
+    {
+      table: 'business.location_resources',
+      disposition: 'retained',
+      reason:
+        "A bookable resource of a business branch -- its name, its room|device|station kind and its active|retired lifecycle. A property of the organisation's premises, naming no person and carrying no identity column, so it survives the erasure of any individual exactly as the location row it hangs off does.",
+    },
   ];
 
   async exportSubjectData(manager: EntityManager, userId: string): Promise<SubjectExportSection[]> {
@@ -227,6 +243,10 @@ export class BusinessSubjectDataContract implements SubjectDataContract {
         {
           table: 'business.locations',
           reason: 'named branches of a business, not a fact about any person',
+        },
+        {
+          table: 'business.location_resources',
+          reason: 'the rooms, devices and stations of a branch, not a fact about any person',
         },
       ],
     };

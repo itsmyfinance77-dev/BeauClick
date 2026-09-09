@@ -9,16 +9,19 @@ import { BusinessVerticalEntity } from './entities/business-vertical.entity';
 import { BusinessTraitEntity } from './entities/business-trait.entity';
 import { BusinessLocationEntity } from './entities/business-location.entity';
 import { StaffRoleGrantEntity } from './entities/staff-role-grant.entity';
+import { LocationResourceEntity } from './entities/location-resource.entity';
 
 import { BusinessService } from './business.service';
 import { BusinessClassificationService } from './business-classification.service';
 import { BusinessLocationService } from './business-location.service';
+import { LocationResourceService } from './location-resource.service';
 import { StaffService } from './staff.service';
 import { StaffGrantService } from './staff-grant.service';
 import { BusinessScopedStaffAuthorizer } from './scoped-staff-authorizer.service';
 import { STAFF_INVITE_CLOCK, SystemStaffInviteClock } from './staff-invite.clock';
 import { BusinessController } from './business.controller';
 import { BusinessLocationController } from './business-location.controller';
+import { LocationResourceController } from './location-resource.controller';
 import {
   BusinessManagerResolver,
   BusinessMembershipResolver,
@@ -44,11 +47,15 @@ export const BUSINESS_ENTITIES = [
   // V3.3 Story #109 (`#44c`). Registered here and nowhere else, for the reason
   // the #107 and #108 lines above record.
   StaffRoleGrantEntity,
+  // V3.3 Story #110 (`#110a`). Same reason as the three lines above: a new
+  // business table must not be reachable at runtime while being invisible to
+  // the ORM.
+  LocationResourceEntity,
 ];
 
 @Module({
   imports: [ConfigModule, TypeOrmModule.forFeature(BUSINESS_ENTITIES)],
-  controllers: [BusinessController, BusinessLocationController],
+  controllers: [BusinessController, BusinessLocationController, LocationResourceController],
   providers: [
     BusinessSubjectDataContract,
     BusinessService,
@@ -59,6 +66,11 @@ export const BUSINESS_ENTITIES = [
     // composition root fails to boot rather than silently mis-wiring the city
     // check, the same shape `BUSINESS_OWNER_ROLE_GRANT` already uses.
     BusinessLocationService,
+    // V3.3 Story #110 (`#110a`). Injects `WORKSPACE_REFERENCE_SECRET`, bound
+    // globally by `DomainPortsModule` and not declared here, so a composition
+    // that omits the composition root fails to boot rather than minting
+    // references under an empty secret.
+    LocationResourceService,
     StaffService,
     /*
      * V3.3 Story #109 (`#44c`).
@@ -94,6 +106,7 @@ export const BUSINESS_ENTITIES = [
     BusinessService,
     BusinessClassificationService,
     BusinessLocationService,
+    LocationResourceService,
     StaffService,
     StaffGrantService,
     BusinessScopedStaffAuthorizer,
