@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 import { getMetadataArgsStorage } from 'typeorm';
@@ -292,6 +295,62 @@ describe('location resource catalogue contract (#110a)', () => {
       for (const Dto of [CreateLocationResourceDto, RenameLocationResourceDto, EmptyLocationResourceCommandDto]) {
         expect(Object.getOwnPropertyNames(Dto.prototype)).not.toContain('reason');
       }
+    });
+  });
+
+  describe('the migration touches no existing row', () => {
+    /*
+     * The real-PostgreSQL suite proves that ADDING the uniqueness constraint
+     * does not rewrite `business.locations` -- it drops and re-adds it in a
+     * rolled-back transaction and compares `xmin`, with a control that shows a
+     * genuine rewrite IS detected.
+     *
+     * What that cannot see is the migration doing something ELSE to those rows,
+     * because the migration has already run by the time any test connects. A
+     * single stray `UPDATE business.locations SET …` in the file would rewrite
+     * every row, move every `xmin`, and no runtime assertion in this repository
+     * would notice. So the file itself is the thing asserted.
+     */
+    const migration = readFileSync(
+      join(__dirname, '..', '..', '..', 'database', 'migrations', 'business', '20260913100001_create_location_resources.sql'),
+      'utf8',
+    );
+
+    /** Comments stripped: the file legitimately NAMES the statements it must not contain. */
+    const executable = migration
+      .split(/\r?\n/)
+      .filter((line) => !line.trim().startsWith('--'))
+      .join('\n');
+
+    const WRITES_EXISTING_ROWS = /\b(UPDATE|DELETE\s+FROM|INSERT\s+INTO)\s+business\.(locations|businesses|business_staff)\b/i;
+
+    it('the scan sees the real migration', () => {
+      // Discovery: without this every refusal below could pass against an empty
+      // string or a mis-resolved path.
+      expect(executable).toContain('CREATE TABLE business.location_resources');
+      expect(executable).toContain('uq_locations_id_business');
+    });
+
+    it('contains no UPDATE, DELETE or INSERT against an existing business table', () => {
+      expect(WRITES_EXISTING_ROWS.test(executable)).toBe(false);
+    });
+
+    it('adds no cascade that could erase resource history', () => {
+      expect(executable).not.toMatch(/ON\s+DELETE\s+CASCADE/i);
+    });
+
+    it('touches no booking or provider object -- those are #110b and #110c', () => {
+      expect(executable).not.toMatch(/\bbooking\./i);
+      expect(executable).not.toMatch(/\bprovider\./i);
+    });
+
+    it('the scan is non-vacuous -- each forbidden statement is caught when planted', () => {
+      expect(WRITES_EXISTING_ROWS.test('UPDATE business.locations SET updated_at = now();')).toBe(true);
+      expect(WRITES_EXISTING_ROWS.test('DELETE FROM business.locations WHERE id = 1;')).toBe(true);
+      expect(WRITES_EXISTING_ROWS.test("INSERT INTO business.locations (id) VALUES ('x');")).toBe(true);
+      // And it does not flag the migration's own legitimate statements.
+      expect(WRITES_EXISTING_ROWS.test('CREATE TABLE business.location_resources (id UUID PRIMARY KEY);')).toBe(false);
+      expect(WRITES_EXISTING_ROWS.test('ALTER TABLE business.locations ADD CONSTRAINT uq_locations_id_business UNIQUE (id, business_id);')).toBe(false);
     });
   });
 
