@@ -383,6 +383,34 @@ reference. **Delegated receptionist mutation of another practitioner's calendar 
 cancelling, rescheduling, completing or marking a no-show on their behalf — is explicitly not
 authorized by this ADR**, remains a separately governed future decision, and has no issue.
 
+> **Amendment note — 2026-09-09, `V33-DEC-034`.** Nothing in §6 above is rewritten,
+> reopened or weakened; §6.1–§6.7 stand exactly as ratified. What changed is the
+> **delivery vehicle**, recorded here so it is discoverable from the ADR that binds the
+> family. A read-only audit of #110 established from code that this section's obligations
+> presuppose a fact the model does not contain: **there is no authoritative
+> booking→location edge**. `CreateBookingInput` carries no location, the `booking` schema
+> contains the token `location` nowhere at all, `provider.services` binds only to a
+> professional, the only professional→organisation resolver stops at a **business**, and a
+> business has **0..N** locations — while §3.5 makes a business with no location row legal
+> and `V33-DEC-033` R2 had already ratified that **"a location owns no bookings"**.
+> Automatic resource selection is therefore not implementable as a step inside #110; it
+> would reduce to first-row selection that passes on a single-branch business and silently
+> assigns wrong-branch resources on a multi-branch one.
+>
+> [`V33-DEC-034`](../../v3.3/V3.3_DECISION_REGISTER.md) accordingly splits `#44d` into
+> **three** stories — `#110a` (#110, the resource catalogue), `#110c` (#127, the delivery
+> context this section needs and does not have) and `#110b` (#128, the assignment and
+> collision core §6.3–§6.6 describe) — re-estimated **13 → 21 SP**. `#110b` **must not
+> begin** until `#110c` supplies an authoritative delivery context. The card also confirms
+> three things §6 left to #110's own contract: the closed resource-kind vocabulary is
+> exactly **`room | device | station`**; catalogue mutation is **owner-only**, adding no
+> scoped-staff role and leaving `SCOPED_STAFF_ROLES` byte-identical; and §6.6's
+> blocked-close obligation belongs to **`#110b`**, because during `#110a` no assignment
+> table exists and the test would pass for the wrong reason. `V33-DEC-034` authorizes **no
+> column or table** for `#110c`: `availability_slots.location_id`, an
+> `availability_slots.resource_id`, a slot side table and a service/location column all
+> remain unauthorized pending that story's own readiness audit.
+
 ---
 
 ### 7. Privacy, audit and failure contracts
