@@ -298,6 +298,64 @@ describe('location resource catalogue contract (#110a)', () => {
     });
   });
 
+  describe('every write runs on the caller’s EntityManager', () => {
+    /*
+     * A structural assertion, because the consequence is not observable from
+     * outside -- the same reasoning `credit-purchase.pg-spec.ts` records for
+     * `priceFor`.
+     *
+     * An audit row written on `this.dataSource.manager` commits on a SECOND
+     * pooled connection. Every runtime case still passes: the mutation succeeds
+     * and the audit row exists, and when the audit throws, both are absent. The
+     * defect only appears when the transaction rolls back AFTER a successful
+     * audit write -- a window this service does not currently have, because the
+     * audit is its last statement. Adding one statement after it would open the
+     * window silently.
+     *
+     * So the shape a mutation would have to break is asserted instead: every
+     * `audit.record` call threads the `manager` it was given, and the service
+     * never reaches for `this.dataSource.manager` at all.
+     */
+    const source = readFileSync(join(__dirname, 'location-resource.service.ts'), 'utf8');
+    const executable = source
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .split(/\r?\n/)
+      .map((line) => line.replace(/\/\/.*$/, ''))
+      .join('\n');
+
+    it('the scan sees the real service', () => {
+      expect(executable).toContain('export class LocationResourceService');
+      expect(executable).toContain('this.audit.record(');
+    });
+
+    it('every audit.record call is handed the caller’s manager', () => {
+      const calls = [...executable.matchAll(/this\.audit\.record\(\s*([A-Za-z.]+)/g)].map((m) => m[1]);
+      expect(calls.length).toBeGreaterThan(0);
+      for (const arg of calls) expect(arg).toBe('manager');
+    });
+
+    it('no MUTATION runs on the plain manager -- only the read path may', () => {
+      /*
+       * `this.dataSource.manager` appears exactly once, in `list`, and that is
+       * correct: a read never writes, so it needs no transaction and no row
+       * lock -- the same shape `BusinessLocationService.list` uses. Every
+       * mutation instead opens `this.dataSource.transaction` and threads that
+       * manager through, audit included.
+       */
+      expect(executable.match(/this\.dataSource\.manager/g) ?? []).toHaveLength(1);
+      expect(executable).toMatch(/async list\([\s\S]*?this\.dataSource\.manager/);
+      // Three mutations, three transactions.
+      expect(executable.match(/this\.dataSource\.transaction/g) ?? []).toHaveLength(3);
+    });
+
+    it('the scan is non-vacuous -- the offending shape is caught when planted', () => {
+      const planted = 'await this.audit.record(this.dataSource.manager, { actorUserId });';
+      const args = [...planted.matchAll(/this\.audit\.record\(\s*([A-Za-z.]+)/g)].map((m) => m[1]);
+      expect(args).toEqual(['this.dataSource.manager']);
+      expect(planted).toContain('this.dataSource.manager');
+    });
+  });
+
   describe('the migration touches no existing row', () => {
     /*
      * The real-PostgreSQL suite proves that ADDING the uniqueness constraint
