@@ -28,7 +28,7 @@ delivering its Story Points never creates a tag and never enables production.
 | V3.2-E | B2B Quotes and Campaigns | Owner-gated; payment gate applies to settlement | Not applicable | Not enabled |
 | V3.2-F | Payout and Calendar Automation | Predominantly external-gated | Not applicable | Not enabled |
 | V3.2-G | Evidence-Gated Scale | No commitment without evidence | Not applicable | Not enabled |
-| V3.3 | Product Maturity Programme | Active foundation: #39, #40 (`#40a`), #56 (`#56a`), #69 (`#56b`), #72 and #75 complete; epic #38 in progress; Story #41 decomposed by `V33-DEC-022` into #41 (`#41a`), #81 (`#41b`), #82 (`#41c`) and #83 (`#41d`) and re-estimated 13 -> 42 (#82 raised 8 -> 13 by `V33-DEC-024`); #41 (`#41a`), #81 (`#41b`) and #82 (`#41c`) complete, #83 (`#41d`) gated; #58 split by `V33-DEC-025` into `#58a` (13, **complete**) and `#58b` (3, blocked on #46); #57 split by `V33-DEC-026` into `#40c-1` (#57, **complete** at 13 after `V33-DEC-027` re-estimated it 8 -> 13) and #99 (`#40c-2`, 5, blocked on #47); bug #97 (2) complete; commercial structure ratified and **#46 closed** 2026-09-06 by `V33-DEC-028`, which moved #83 (13) and #95 (`#58b`, 3 -> 5) to Ready and re-estimated #43 13 -> 21; #83 then split 2026-09-06 by `V33-DEC-029` into `#41d-1` (#83, 13, Ready) and #104 (`#41d-2`, 8, proposed); #104 then split 2026-09-07 by `V33-DEC-031` into `#41d-2a` (#104, 8, Ready) and #115 (`#41d-2b`, 8, proposed); **#44 decomposed 2026-09-06 by `V33-DEC-030`** into an umbrella carrying no Story Points plus five children — #107 (`#44a`, 5, Ready), #108 (`#44b`, 8), #109 (`#44c`, 13), #110 (`#44d`, 13) and #111 (`#44e`, 8) — re-estimated 13 -> 47, a net **+34** with done unchanged; #107 (`#44a`)'s classification cardinality then ratified 2026-09-07 by `V33-DEC-032` — **at most one** vertical, an unclassified business legal, #107 unsplit at 5 SP and **no Story Point moved**; #107 (`#44a`) and #108 (`#44b`) then **complete**, and #109 (`#44c`)'s scoped-staff contract ratified 2026-09-08 by `V33-DEC-033` — a one-member `practitioner_chat` vocabulary, practitioner-specific chat authority, a fully synchronous invitation with no queued phone derivative, and the UUID invite contract replaced — moving #109 to Ready **unsplit at 13 SP** with no point completed and adding **#123** (2, the bounded web-invite frontend follow-up), a net **+2** with done unchanged | No tag authorized | Real money blocked by #47; every commercial value and all legal copy remain **unpublished**, now tracked on #83, #42 (Legal), #43 and #47 rather than #46 |
+| V3.3 | Product Maturity Programme | Active foundation: #39, #40 (`#40a`), #56 (`#56a`), #69 (`#56b`), #72 and #75 complete; epic #38 in progress; Story #41 decomposed by `V33-DEC-022` into #41 (`#41a`), #81 (`#41b`), #82 (`#41c`) and #83 (`#41d`) and re-estimated 13 -> 42 (#82 raised 8 -> 13 by `V33-DEC-024`); #41 (`#41a`), #81 (`#41b`) and #82 (`#41c`) complete, #83 (`#41d`) gated; #58 split by `V33-DEC-025` into `#58a` (13, **complete**) and `#58b` (3, blocked on #46); #57 split by `V33-DEC-026` into `#40c-1` (#57, **complete** at 13 after `V33-DEC-027` re-estimated it 8 -> 13) and #99 (`#40c-2`, 5, blocked on #47); bug #97 (2) complete; commercial structure ratified and **#46 closed** 2026-09-06 by `V33-DEC-028`, which moved #83 (13) and #95 (`#58b`, 3 -> 5) to Ready and re-estimated #43 13 -> 21; #83 then split 2026-09-06 by `V33-DEC-029` into `#41d-1` (#83, 13, Ready) and #104 (`#41d-2`, 8, proposed); #104 then split 2026-09-07 by `V33-DEC-031` into `#41d-2a` (#104, 8, Ready) and #115 (`#41d-2b`, 8, proposed); **#44 decomposed 2026-09-06 by `V33-DEC-030`** into an umbrella carrying no Story Points plus five children — #107 (`#44a`, 5, Ready), #108 (`#44b`, 8), #109 (`#44c`, 13), #110 (`#44d`, 13) and #111 (`#44e`, 8) — re-estimated 13 -> 47, a net **+34** with done unchanged; #107 (`#44a`)'s classification cardinality then ratified 2026-09-07 by `V33-DEC-032` — **at most one** vertical, an unclassified business legal, #107 unsplit at 5 SP and **no Story Point moved**; #107 (`#44a`) and #108 (`#44b`) then **complete**, and #109 (`#44c`)'s scoped-staff contract ratified 2026-09-08 by `V33-DEC-033` — a one-member `practitioner_chat` vocabulary, practitioner-specific chat authority, a fully synchronous invitation with no queued phone derivative, and the UUID invite contract replaced — moving #109 to Ready **unsplit at 13 SP** with no point completed and adding **#123** (2, the bounded web-invite frontend follow-up), a net **+2** with done unchanged; #123 then **complete** 2026-09-08; and #110 (`#44d`) **decomposed 2026-09-09 by `V33-DEC-034`** into `#110a` (#110, 5, the resource catalogue), `#110c` (#127, 8, the delivery-location context the platform does not yet have) and `#110b` (#128, 8, assignment and collision, blocked on both) — re-estimated 13 -> 21, a net **+8** with done unchanged | No tag authorized | Real money blocked by #47; every commercial value and all legal copy remain **unpublished**, now tracked on #83, #42 (Legal), #43 and #47 rather than #46 |
 | V3.4 | Conditional Expansion Programme | Written owner decision and evidence required | Not applicable | Not enabled |
 
 V3.2-A and V3.2-B are completed historical milestones but are deliberately
@@ -439,7 +439,7 @@ started as written:
 | #107 (`#44a`) | — | **5** | Business classification and operating traits: closed vertical and trait vocabularies, one primary vertical per business *(amended 2026-09-07 by `V33-DEC-032` to **at most one** vertical, with an unclassified business legal — see the 2026-09-07 section below)*, owner-only mutation, transactional audit, ADR-027 claims, a structural proof that classification authorizes nothing, and the `uq_businesses_owner_id` partial-index correction. The **only** Ready child |
 | #108 (`#44b`) | — | **8** | Organisation locations with an `active \| suspended \| closed` lifecycle and an opaque `locationRef`. `businesses.city_id` is deprecated **as a service-delivery location**, with the column and all data preserved. No booking behaviour changes |
 | #109 (`#44c`) | — | **13** | Scoped staff roles and permissions: the grant store anchored on `business_staff.id`, a **new scoped** verifier port, owner-only grant/revoke with live re-checks, the `business_staff` status vocabulary and CHECK correction, consented non-enumerating invite-by-phone, and the chat practitioner grant. *(Contract ratified 2026-09-08 by `V33-DEC-033`: vocabulary is exactly `practitioner_chat`, the role is practitioner-specific, invitation is fully synchronous with no queued phone derivative, and the UUID invite contract is replaced. Moved to Ready, unsplit at 13 SP — see the 2026-09-08 section below.)* |
-| #110 (`#44d`) | — | **13** | Bookable resources and `ex_booking_resource_no_overlap`, assigned in the same transaction as the slot claim. `booking.bookings` byte-identical |
+| #110 (`#44d`) | — | **13** | Bookable resources and `ex_booking_resource_no_overlap`, assigned in the same transaction as the slot claim. `booking.bookings` byte-identical *(decomposed 2026-09-09 by `V33-DEC-034` into `#110a` (#110, 5), `#110c` (#127, 8) and `#110b` (#128, 8), re-estimated 13 -> 21 — see the 2026-09-09 section below)* |
 | #111 (`#44e`) | — | **8** | Scoped **read-only** finance visibility for exactly one business, with every existing #72 finance-security assertion still passing unchanged |
 | **Total** | **13** | **47** | Net V3.3 scope movement **+34**. Done unchanged — this decision completes no story |
 
@@ -600,3 +600,56 @@ untouched.
 **No new ADR.** ADR-049 still gates the family; it receives only a dated cross-reference note
 in §4 so R2 and R3 are discoverable from it. No ADR-050 was created and no #109
 implementation began with this change.
+
+## V3.3 Story #110 decomposed and re-estimated, 2026-09-09
+
+`V33-DEC-034` split #110 (`#44d`) after a read-only readiness audit against
+`98b86994d4d840bd49c12835d172d71e7fad915d` found the story coherent and well bound by
+ADR-049 §6 in every respect but one. **Structure and contract only** — no commercial value,
+no Legal wording, no schema, no new ADR and no implementation.
+
+**Why.** #110's acceptance criteria require automatic server-side resource selection, and
+ADR-049 §6.2 requires resources to hang off a location — but nothing in the platform can say
+**which location a booking is delivered at**. `CreateBookingInput` carries no location; the
+token `location` appears **nowhere** in the `booking` migration directory or anywhere in
+`services/booking/src`; `provider.services` binds only to a professional; the only
+professional→organisation resolver stops at a **business**; and a business has **0..N**
+locations, with ADR-049 §3.5 making a location-less business legal and `V33-DEC-033` R2
+having already ratified that **"a location owns no bookings"**. Any implementation would
+reduce to first-row selection: green on a single-branch business, and **silently assigning
+wrong-branch resources** the day a salon opens its second location.
+
+**What was ruled.** **R1** splits `#44d` into three independently tracked stories. **R2**
+closes the resource-kind vocabulary at exactly `room | device | station`, `station` covering
+chairs, beds, nail desks and styling positions. **R3** makes catalogue mutation
+**owner-only**, adding no scoped-staff role and leaving `SCOPED_STAFF_ROLES` byte-identical.
+**R4** makes assignment **optional** and at most one per booking, with no backfill inventing
+a location or resource and no `provider.services` change. **R5** addresses resources by an
+opaque `resourceRef` on the API while the booking↔business module boundary keeps a raw opaque
+UUID through a port. **R6** authorizes **no** customer-facing resource surface of any kind.
+**R7** bounds `#110a` and **moves the blocked-close criterion to `#110b`**, because during
+`#110a` no assignment exists and the test would pass for the wrong reason. **R8** sets
+`#110c`'s direction as availability-slot-level context while authorizing **no** column or
+table, and records it `status:proposed`. **R9** bounds `#110b` and forbids it starting before
+`#110c` supplies delivery context.
+
+| Item | Before | After | Outcome it owns |
+|---|---:|---:|---|
+| #110 (`#110a`) | 13 | **5** | Location resource catalogue and lifecycle: `business.location_resources`, the required `UNIQUE (id, business_id)` target on `business.locations`, same-business composite-FK integrity, the closed `room \| device \| station` vocabulary, lifecycle, owner-only CRUD, `resourceRef`, audit and the ADR-027 `retained` disposition. **Ready** |
+| #127 (`#110c`) | — | **8** | Delivery-location and resource-selection context — the authoritative edge that must exist before automatic assignment is possible. Direction is slot-level context; **no column or table is yet authorized**. `status:proposed` pending its own readiness audit |
+| #128 (`#110b`) | — | **8** | Booking resource assignment and collision prevention: `booking.booking_resource_assignments`, `ex_booking_resource_no_overlap` with half-open `[)` semantics, same-transaction claim with deterministic lock ordering, two-way rollback, `23P01` → the existing non-enumerating refusal, blocked retirement and closure, and ADR-027 `subject_data` pinning. **Depends on both** #110 and #127 |
+| **Total** | **13** | **21** | Net V3.3 scope movement **+8**. Done unchanged — this decision completes no story |
+
+**Story Points are not double-counted.** #110 keeps a single `sp:5`; #127 and #128 carry
+`sp:8` each. The +8 is an honest scope correction, not completed work: the original 13 never
+contained the delivery-context modelling, so it was never a credible estimate for the outcome
+as written.
+
+**What moved.** #110 goes `status:proposed → status:ready` at **5 SP** as `#110a`. #127 and
+#128 are created `status:proposed`. V3.3 scope rises **270 → 278** with done unchanged at
+**179**. #107, #108, #109 and #123 remain closed; #44, #38, #111, #42, #43, #45, #47, #95 and
+#99 are untouched.
+
+**No new ADR.** ADR-049 still gates the family; §6 receives only a dated amendment note —
+28 insertions, zero deletions, committed alone per the ADR's own rule — so §6.1–§6.7 stand
+exactly as ratified. No ADR-050 was created and no #110 implementation began with this change.
