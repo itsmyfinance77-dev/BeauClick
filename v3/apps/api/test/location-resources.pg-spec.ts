@@ -974,6 +974,18 @@ describeIfPg('Location resource catalogue on real PostgreSQL (#110a)', () => {
       );
       expect(n).toBe(0);
 
+      // And NO audit row survived either. This is the half that catches an audit
+      // written on a second connection: a `record` call handed
+      // `this.dataSource.manager` instead of the caller's `manager` would commit
+      // independently and outlive the rolled-back mutation, leaving the log
+      // asserting a resource that does not exist.
+      const [{ audits }] = await dataSource.query(
+        `SELECT count(*)::int AS audits FROM admin.admin_audit_log
+          WHERE action = 'business.location_resource_created' AND actor_user_id = $1`,
+        [fixture.owner.id],
+      );
+      expect(audits).toBe(0);
+
       // The control: with the constraint gone, the same request succeeds.
       await api()
         .post(resourcesPath(fixture.businessId, fixture.locationRef))
