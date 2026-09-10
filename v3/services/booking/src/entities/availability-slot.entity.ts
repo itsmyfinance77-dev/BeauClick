@@ -41,6 +41,31 @@ export class AvailabilitySlotEntity {
   @Column({ type: 'uuid', nullable: true })
   serviceId!: string | null;
 
+  /**
+   * The branch this slot is delivered at, snapshotted when it was created --
+   * V3.3 Story #127 (`#127a`), `V33-DEC-035` R3.
+   *
+   * An **opaque** `business.locations.id`. There is no cross-schema foreign key
+   * and `booking` imports no `business` entity: the value arrives through a
+   * `booking`-declared port implemented in the composition root, exactly as
+   * `PROFESSIONAL_DIRECTORY` supplies the professional's owning user.
+   *
+   * **A snapshot, never a live lookup.** An owner rebinding a practitioner to
+   * another branch must not change where an already-published slot happens, so
+   * the branch is written once and `tg_availability_slots_delivery_location_frozen`
+   * refuses to change it once the slot leaves `open`. A rebinding therefore
+   * affects future slots only.
+   *
+   * `null` for every pre-existing row, for a standalone professional, and for an
+   * affiliated professional whose membership carries no branch -- all of which
+   * behave exactly as they did before this column existed.
+   *
+   * **Internal.** It is never accepted from a DTO and never appears in a
+   * professional or customer response shape (`V33-DEC-035` R9).
+   */
+  @Column({ type: 'uuid', nullable: true })
+  deliveryLocationId!: string | null;
+
   @Column({ type: 'timestamptz' })
   startAt!: Date;
 

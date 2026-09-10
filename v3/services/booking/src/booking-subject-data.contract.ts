@@ -45,7 +45,7 @@ export class BookingSubjectDataContract implements SubjectDataContract {
       table: 'booking.availability_slots',
       disposition: 'no_subject_data',
       reason:
-        'A professional\'s published calendar: times and a slot status. `held_by_booking_id` points at a booking, never at a person.',
+        'A professional\'s published calendar: times, a slot status, and an opaque business branch id. `held_by_booking_id` points at a booking, never at a person, and `delivery_location_id` names an organisational place, not an individual -- the same reasoning that makes business.locations a `retained` organisational fact rather than subject data.',
     },
     {
       table: 'booking.outbox_events',

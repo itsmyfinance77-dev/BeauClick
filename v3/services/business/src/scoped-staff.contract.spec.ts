@@ -194,12 +194,28 @@ describe('scoped staff authority contract (#109)', () => {
       expect(String(index?.where)).toContain('revoked_at IS NULL');
     });
 
-    it('business_staff gains no new column from this story', () => {
+    it('business_staff carries exactly the ratified column set', () => {
+      /*
+       * Updated -- not loosened -- by V3.3 Story #127 (`#127a`).
+       *
+       * This assertion was written as "gains no new column from this story",
+       * and it did its job: #127a's `locationId` failed it, which is precisely
+       * how a column arriving on the consent-bearing membership table should be
+       * noticed. `V33-DEC-035` R2 ratified that column, so the EXACT set moves by
+       * exactly one member and stays exact -- a `toContain` or a filtered
+       * comparison here would retire the guard rather than update it.
+       *
+       * What #109's rulings actually forbid is unchanged and still asserted
+       * around this case: `role` remains `manager | staff`, `status` remains the
+       * five ratified members, and `locationId` confers no authority -- it says
+       * WHERE a member works, never WHAT they may do.
+       */
       expect(columnsOf(BusinessStaffEntity)).toEqual([
         'businessId',
         'createdAt',
         'id',
         'invitedBy',
+        'locationId',
         'professionalId',
         'respondedAt',
         'role',

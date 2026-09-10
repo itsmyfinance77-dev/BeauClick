@@ -284,8 +284,18 @@ describeIfPg('Location resource catalogue on real PostgreSQL (#110a)', () => {
 
       await expect(
         dataSource.transaction(async (manager) => {
+          /*
+           * Both dependents must go first. #127a added a SECOND composite FK onto
+           * this same uniqueness target -- `business_staff.location_id` -- so
+           * dropping the target now fails with "other objects depend on it" until
+           * that one is dropped too. Recreated below inside the same
+           * rolled-back transaction, so the schema is restored either way.
+           */
           await manager.query(
             `ALTER TABLE business.location_resources DROP CONSTRAINT fk_location_resources_location_same_business`,
+          );
+          await manager.query(
+            `ALTER TABLE business.business_staff DROP CONSTRAINT fk_business_staff_location_same_business`,
           );
           await manager.query(`ALTER TABLE business.locations DROP CONSTRAINT uq_locations_id_business`);
 
@@ -304,6 +314,11 @@ describeIfPg('Location resource catalogue on real PostgreSQL (#110a)', () => {
           await manager.query(
             `ALTER TABLE business.location_resources
                ADD CONSTRAINT fk_location_resources_location_same_business
+               FOREIGN KEY (location_id, business_id) REFERENCES business.locations (id, business_id)`,
+          );
+          await manager.query(
+            `ALTER TABLE business.business_staff
+               ADD CONSTRAINT fk_business_staff_location_same_business
                FOREIGN KEY (location_id, business_id) REFERENCES business.locations (id, business_id)`,
           );
 
@@ -329,10 +344,15 @@ describeIfPg('Location resource catalogue on real PostgreSQL (#110a)', () => {
             UNION ALL
            SELECT conname FROM pg_constraint
             WHERE conrelid='business.location_resources'::regclass
-              AND conname='fk_location_resources_location_same_business'`,
+              AND conname='fk_location_resources_location_same_business'
+            UNION ALL
+           SELECT conname FROM pg_constraint
+            WHERE conrelid='business.business_staff'::regclass
+              AND conname='fk_business_staff_location_same_business'`,
         )
       ).map((r: { conname: string }) => r.conname);
       expect(constraints.sort()).toEqual([
+        'fk_business_staff_location_same_business',
         'fk_location_resources_location_same_business',
         'uq_locations_id_business',
       ]);

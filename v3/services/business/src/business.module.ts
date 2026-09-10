@@ -15,6 +15,7 @@ import { BusinessService } from './business.service';
 import { BusinessClassificationService } from './business-classification.service';
 import { BusinessLocationService } from './business-location.service';
 import { LocationResourceService } from './location-resource.service';
+import { StaffLocationService } from './staff-location.service';
 import { StaffService } from './staff.service';
 import { StaffGrantService } from './staff-grant.service';
 import { BusinessScopedStaffAuthorizer } from './scoped-staff-authorizer.service';
@@ -71,6 +72,10 @@ export const BUSINESS_ENTITIES = [
     // that omits the composition root fails to boot rather than minting
     // references under an empty secret.
     LocationResourceService,
+    // V3.3 Story #127 (`#127a`). Injects `WORKSPACE_REFERENCE_SECRET`, bound
+    // globally by `DomainPortsModule`, for the same reason the location and
+    // resource services do.
+    StaffLocationService,
     StaffService,
     /*
      * V3.3 Story #109 (`#44c`).
@@ -107,6 +112,7 @@ export const BUSINESS_ENTITIES = [
     BusinessClassificationService,
     BusinessLocationService,
     LocationResourceService,
+    StaffLocationService,
     StaffService,
     StaffGrantService,
     BusinessScopedStaffAuthorizer,

@@ -31,6 +31,7 @@ import {
   SCOPED_STAFF_AUTHORIZER,
   STAFF_INVITE_IDENTITY_RESOLVER,
 } from '@beauclick/business';
+import { DELIVERY_LOCATION_DIRECTORY } from '@beauclick/booking';
 import { PROFESSIONAL_OWNER_LOOKUP } from '@beauclick/waitlist';
 import {
   DEVELOPMENT_WORKSPACE_REFERENCE_SECRET,
@@ -45,6 +46,7 @@ import {
   ProviderBackedServiceCatalog,
   CommercialPolicyBackedCollectionResolver,
   IdentityBackedOwnerRoleGrant,
+  BusinessBackedDeliveryLocationDirectory,
   IdentityBackedStaffInviteResolver,
   ProviderBackedLocationCityCatalogue,
   SellerPartyLookup,
@@ -215,6 +217,22 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     { provide: SCOPED_STAFF_AUTHORIZER, useClass: BusinessScopedStaffAuthorizer },
     IdentityBackedStaffInviteResolver,
     { provide: STAFF_INVITE_IDENTITY_RESOLVER, useExisting: IdentityBackedStaffInviteResolver },
+    /*
+     * V3.3 #127 (`#127a`), `V33-DEC-035` R3.
+     *
+     * Where a professional currently delivers is a `business` fact, and
+     * `services/booking` may not import `services/business` (ADR-011). Booking
+     * declares the question; this adapter answers it by reading the consented
+     * membership and its branch in ONE statement, on the CALLER's manager, so the
+     * snapshot lands in the same transaction as the slot insert and linearises
+     * against a concurrent owner rebinding.
+     *
+     * MANDATORY -- no `@Optional()` fallback. A composition that forgets it must
+     * fail to boot rather than silently stamping every new slot with no context,
+     * which would look exactly like a platform where nobody has a branch.
+     */
+    BusinessBackedDeliveryLocationDirectory,
+    { provide: DELIVERY_LOCATION_DIRECTORY, useExisting: BusinessBackedDeliveryLocationDirectory },
     /**
      * The workspace-reference secret, read ONCE for the whole application.
      *
@@ -286,6 +304,7 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     LOCATION_CITY_CATALOGUE,
     SCOPED_STAFF_AUTHORIZER,
     STAFF_INVITE_IDENTITY_RESOLVER,
+    DELIVERY_LOCATION_DIRECTORY,
     WORKSPACE_REFERENCE_SECRET,
     FINANCIAL_DATA_SOURCE,
     PROVIDER_REINDEX_SOURCE,
