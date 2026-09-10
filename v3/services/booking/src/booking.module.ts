@@ -7,6 +7,7 @@ import { BookingEntity } from './entities/booking.entity';
 import { BookingHistoryEntity } from './entities/booking-history.entity';
 import { BookingIdempotencyKeyEntity } from './entities/booking-idempotency-key.entity';
 import { BookingOutboxEntity } from './entities/booking-outbox.entity';
+import { BookingResourceAssignmentEntity } from './entities/booking-resource-assignment.entity';
 
 import { BookingConfig } from './booking.config';
 import { AvailabilityService } from './availability/availability.service';
@@ -22,6 +23,11 @@ export const BOOKING_ENTITIES = [
   BookingHistoryEntity,
   BookingIdempotencyKeyEntity,
   BookingOutboxEntity,
+  // V3.3 Story #128 (`#110b`). Registered here and nowhere else: the
+  // composition root spreads this list onto the main DataSource, so a new
+  // booking table cannot be reachable at runtime while being invisible to
+  // the ORM.
+  BookingResourceAssignmentEntity,
 ];
 
 /**
