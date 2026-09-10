@@ -27,6 +27,7 @@ import {
   StaffInviteIdentityResolverPort,
 } from '@beauclick/business';
 import { RoleService, UserEntity, canonicalizePhone } from '@beauclick/identity';
+import { DeliveryLocationDirectory } from '@beauclick/booking';
 
 /**
  * The composition root's implementations of the ports booking-, commerce-,
@@ -502,5 +503,70 @@ export class IdentityBackedStaffInviteResolver implements StaffInviteIdentityRes
     });
 
     return { userId: user.id, professionalId: professional?.id ?? null };
+  }
+}
+
+/**
+ * The authoritative delivery location for a professional's new slots — V3.3
+ * Story #127 (`#127a`), `V33-DEC-035` R3.
+ *
+ * ## This is the only place `booking` and `business` meet for a slot
+ *
+ * `scope:booking` may depend only on `scope:shared`, so `booking` declares
+ * `DELIVERY_LOCATION_DIRECTORY` and cannot name who answers it. `apps/api` is the
+ * only tier permitted to compose domains (ADR-011), and this adapter is where the
+ * `business` schema is read — the same construction `SellerPartyLookup` and
+ * `IdentityBackedStaffInviteResolver` already use.
+ *
+ * ## One statement, four conditions, no ordering
+ *
+ * The join asserts every condition the binding must satisfy at once, so a caller
+ * cannot satisfy three and forget the fourth:
+ *
+ *  1. an **`active`** membership — an `invited`, `inactive`, `declined` or
+ *     `removed` one delivers nothing;
+ *  2. naming **this** professional;
+ *  3. carrying a **non-null** branch;
+ *  4. whose branch is still **`active`** and still belongs to the **same
+ *     business** as the membership, on a **live** business.
+ *
+ * There is no `ORDER BY` and no `LIMIT`, and that is deliberate rather than an
+ * omission: `uq_business_staff_active_professional` already admits at most one
+ * active membership per professional, and a membership carries at most one
+ * branch, so the result is unambiguous by construction. A `LIMIT 1` here would be
+ * exactly the first-row rule `V33-DEC-035` R4 forbids — it would silently pick
+ * one answer on the day the model gained a second, instead of failing loudly.
+ *
+ * **Business ownership is not a binding.** A user who owns a business and also
+ * owns a professional profile gets `null` unless an active membership says
+ * otherwise, because guessing a branch from ownership is the same defect wearing
+ * a different hat — and a business may have many branches.
+ *
+ * ## It runs on the caller's manager
+ *
+ * The answer is snapshotted onto the row being inserted in the same transaction,
+ * so the read joins that transaction. That is what linearises it against a
+ * concurrent owner rebinding, which holds `FOR UPDATE` on the membership row.
+ */
+@Injectable()
+export class BusinessBackedDeliveryLocationDirectory implements DeliveryLocationDirectory {
+  async deliveryLocationFor(manager: EntityManager, professionalId: string): Promise<string | null> {
+    const rows: Array<{ location_id: string }> = await manager.query(
+      `SELECT s.location_id
+         FROM business.business_staff s
+         JOIN business.businesses b ON b.id = s.business_id
+         JOIN business.locations l ON l.id = s.location_id AND l.business_id = s.business_id
+        WHERE s.professional_id = $1
+          AND s.status = 'active'
+          AND s.location_id IS NOT NULL
+          AND b.deleted_at IS NULL
+          AND l.lifecycle = 'active'`,
+      [professionalId],
+    );
+
+    // Zero rows is the ordinary answer for almost everyone. More than one is
+    // unrepresentable today; if the model ever changes underneath this, refusing
+    // to guess is safer than picking one.
+    return rows.length === 1 ? rows[0].location_id : null;
   }
 }

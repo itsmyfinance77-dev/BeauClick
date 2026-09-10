@@ -62,3 +62,50 @@ export interface BookingCancellationEntitlementHook {
 }
 
 export const BOOKING_CANCELLATION_ENTITLEMENT_HOOK = Symbol('BEAUCLICK_BOOKING_CANCELLATION_ENTITLEMENT_HOOK');
+
+/**
+ * The authoritative delivery location for a professional's new slots --
+ * V3.3 Story #127 (`#127a`), `V33-DEC-035` R3.
+ *
+ * ## Why booking declares a question it cannot answer
+ *
+ * A slot is created only by the professional whose session it is, but WHERE they
+ * deliver is a `business` fact: it lives on their consented `business_staff`
+ * membership, which only the business owner may set. ADR-011 forbids
+ * `services/booking` importing `services/business`, so the port is declared here
+ * and implemented in `apps/api` -- exactly as `PROFESSIONAL_DIRECTORY` and
+ * `BookingCancellationEntitlementHook` above already are. Booking therefore never
+ * learns what a membership, a branch or an owner is; it only asks where this
+ * professional currently delivers.
+ *
+ * ## It takes the caller's `EntityManager`, and that is load-bearing
+ *
+ * The answer is snapshotted onto the row being inserted, so the read must happen
+ * inside the same transaction as the insert. Taking the manager is what makes a
+ * concurrent owner rebinding and a concurrent slot creation linearise: the
+ * resolver sees either the complete old binding or the complete new one, never a
+ * half-applied change, because the owner's own transaction holds `FOR UPDATE` on
+ * the membership row it is rewriting.
+ *
+ * ## Fail-closed, and never a guess
+ *
+ * `null` is returned for every case that is not an unambiguous, currently-valid
+ * binding: a standalone professional, an inactive/invited/declined/removed
+ * membership, a membership with no branch, a branch that is suspended or closed,
+ * and -- deliberately -- a user who merely OWNS a business without holding an
+ * active membership in it. **No first business and no first location is ever
+ * selected**; ownership is not a binding, and a business may legitimately have
+ * many branches. `null` means "no context", which is exactly how every slot
+ * behaved before this port existed.
+ */
+export interface DeliveryLocationDirectory {
+  /**
+   * The branch this professional currently delivers at, or `null`.
+   *
+   * One query answers both the present and absent cases, so the cost and shape of
+   * the call do not depend on whether a binding exists.
+   */
+  deliveryLocationFor(manager: EntityManager, professionalId: string): Promise<string | null>;
+}
+
+export const DELIVERY_LOCATION_DIRECTORY = Symbol('BEAUCLICK_DELIVERY_LOCATION_DIRECTORY');
