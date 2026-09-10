@@ -411,6 +411,50 @@ authorized by this ADR**, remains a separately governed future decision, and has
 > `availability_slots.resource_id`, a slot side table and a service/location column all
 > remain unauthorized pending that story's own readiness audit.
 
+> **Amendment note — 2026-09-10, `V33-DEC-035`.** Nothing in §6 above is rewritten,
+> reopened or weakened; §6.1–§6.7 stand exactly as ratified, and the 2026-09-09 note
+> above stands with them. This records the model
+> [`V33-DEC-035`](../../v3.3/V3.3_DECISION_REGISTER.md) ratified for the delivery context
+> §6.4 needs and §6.2 presupposes, so it is discoverable from the ADR that binds the
+> family.
+>
+> A read-only audit of #127 established from code that the two authorities this family
+> depends on **do not currently intersect**: a slot can be created only by the
+> professional whose session it belongs to (`POST /v1/me/availability/slots`, with the
+> professional id derived from the token and no ownership resolver anywhere on the route),
+> while locations and resources are owner-only by `V33-DEC-034` R3. It further established
+> the cardinalities from constraints rather than data — a user has at most one
+> professional profile (`uq_professionals_owner_id`), a professional has at most one
+> **active** business affiliation (`uq_business_staff_active_professional`), a business has
+> **0..N** locations, and **no professional→location relation exists at all**.
+>
+> `V33-DEC-035` therefore puts the **authority on the consented membership** and an
+> **immutable snapshot on the slot**: `business.business_staff.location_id` (nullable,
+> owner-managed, composite-FK to `business.locations (id, business_id)`, audited in the
+> same transaction, never writable by a professional, a staff member or a
+> `practitioner_chat` holder) and `booking.availability_slots.delivery_location_id`
+> (nullable, an opaque UUID crossing the boundary through a booking-declared port, written
+> once at slot creation, **frozen once the slot leaves `open`**, and never dynamically
+> re-resolved). Changing the membership binding therefore affects **future slots only** —
+> the property §6.6's "block, never cascade" reasoning exists to protect, applied to time
+> rather than to lifecycle. A standalone professional, and an affiliated one whose
+> membership carries no location, keep NULL and behave exactly as today; **no backfill
+> invents a location**.
+>
+> Resource eligibility is ratified separately as `business.service_resource_requirements`
+> — business-owned, binding an **opaque** `provider` service id to exactly one required
+> kind from the closed `room | device | station` vocabulary, with **no cross-schema
+> foreign key** and no `provider` ORM import, service validation crossing through a narrow
+> composition-root port exactly as §3.2 requires for cities. Selection itself remains
+> `#110b`'s.
+>
+> Consequentially `#110c` becomes two stories — `#127a` (#127, delivery-location context,
+> 5) and `#127b` (#131, service resource requirement and eligible-resource resolution, 8)
+> — and **`#110b` (#128) depends on both**, taking its byte-identity baseline from the
+> post-`#127a` slot schema. A practitioner working at several locations of one business in
+> the same period is **not representable** and is an explicit MVP limitation with its own
+> future decision, not an accidental query-order rule.
+
 ---
 
 ### 7. Privacy, audit and failure contracts
