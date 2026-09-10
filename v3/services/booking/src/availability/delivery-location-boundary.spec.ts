@@ -157,6 +157,14 @@ describe('delivery-location context — boundaries and non-exposure (#127a)', ()
         // a new leak of it. #131 does not call this port from any existing
         // booking path; only its declaration in ports.ts names the value.
         'ports.ts',
+        // V3.3 #128 (`#110b`), ADR-049 §6.4. The consumer #127a's own docs
+        // named in advance: `createWithin` reads the claimed slot's
+        // `deliveryLocationId` to resolve a resource requirement, and
+        // `reschedule` reads the DESTINATION slot's, in the SAME transaction
+        // as the claim/move. Never accepted from a DTO, never returned in any
+        // response -- passed straight into `ELIGIBLE_RESOURCE_DIRECTORY` and
+        // nowhere else.
+        'booking/booking.service.ts',
       ]);
       const offenders = bookingSources
         .filter((file) => !allowed.has(file.path))

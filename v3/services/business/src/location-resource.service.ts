@@ -11,6 +11,7 @@ import {
   resolveResourceReference,
 } from '@beauclick/workspace-reference';
 
+import { RESOURCE_ASSIGNMENT_DIRECTORY, ResourceAssignmentDirectoryPort } from './ports';
 import {
   AUDIT_TARGET_LOCATION_RESOURCE,
   LOCATION_RESOURCE_AUDIT_ACTIONS,
@@ -93,6 +94,14 @@ export class LocationResourceService {
      * that forgets it fails to boot.
      */
     @Inject(WORKSPACE_REFERENCE_SECRET) private readonly referenceSecret: string,
+    /**
+     * V3.3 #128 (`#110b`), ADR-049 §6.6. **Mandatory**, deliberately without
+     * `@Optional()` -- the same reasoning `referenceSecret` above carries: a
+     * composition missing the binding must fail to construct rather than
+     * silently letting `retire()` succeed on a resource a customer's
+     * upcoming appointment still depends on.
+     */
+    @Inject(RESOURCE_ASSIGNMENT_DIRECTORY) private readonly resourceAssignments: ResourceAssignmentDirectoryPort,
   ) {}
 
   /**
@@ -225,6 +234,17 @@ export class LocationResourceService {
       const resource = await this.resolveOwnedResourceForUpdate(manager, businessId, ownerUserId, location.id, resourceRef);
 
       if (resource.lifecycle === 'retired') throw new NotFoundOrNotYoursException();
+
+      // ADR-049 §6.6: blocked, never cascaded. Locks `resource.id` against a
+      // concurrent assignment-creation for this exact resource (see
+      // `RESOURCE_ASSIGNMENT_DIRECTORY`'s own documentation), then checks for
+      // any still-relevant booking. The SAME non-enumerating refusal as
+      // every other cause in this method -- an owner cannot tell "a future
+      // appointment needs this" apart from "already retired" or "no such
+      // resource".
+      if (await this.resourceAssignments.hasFutureAssignment(manager, [resource.id])) {
+        throw new NotFoundOrNotYoursException();
+      }
 
       const result = await manager.query(
         `UPDATE business.location_resources SET lifecycle = 'retired', updated_at = now()

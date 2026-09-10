@@ -145,46 +145,101 @@ export const DELIVERY_LOCATION_DIRECTORY = Symbol('BEAUCLICK_DELIVERY_LOCATION_D
  * at the right location, of the right kind -- not "currently free"; this port
  * computes no occupancy and is not a busy/free oracle.
  *
- * ## The no-requirement and no-key cases both return the SAME empty result
+ * ## `null` means "nothing to resolve"; `[]` means "resolved, and refused"
  *
- * A null `serviceId` (the slot/booking accepts any service), a null
- * `deliveryLocationId` (no branch context), and a concrete service with no
- * requirement row all resolve to an empty array -- never an error, never a
- * default, never a first-row guess. This is what keeps a booking with no
- * resolvable service or location behaving exactly as it always has.
+ * This distinction is `#128`'s own contract addition -- `#131` shipped this
+ * port with no consumer and documented that a future caller would need
+ * SOME way to tell "no requirement" apart from "requirement genuinely
+ * unmet," without committing to a mechanism. `#128` is that caller, and this
+ * is the mechanism: a null `serviceId`, a null `deliveryLocationId`, or a
+ * concrete service with no requirement row all resolve to `null` -- booking
+ * proceeds with no assignment, exactly as it always has. A requirement row
+ * that DOES exist but matches no active resource at that location resolves
+ * to `[]` -- the genuine refusal case. Neither ever discloses the required
+ * kind, a candidate count, or which of the `null`-cases applied
+ * (`V33-DEC-035` R9 governs what may reach a CUSTOMER response, and neither
+ * value here ever does; the distinction is purely an internal `booking`↔
+ * `business` coordination signal).
  *
  * ## It takes the caller's `EntityManager`
  *
- * A future caller (`#128`) must read candidates inside the SAME transaction
- * that later locks and assigns one, so a resource retired between the read and
- * the lock cannot be assigned -- the same discipline `DeliveryLocationDirectory`
- * documents for the slot snapshot.
+ * `#128` reads candidates inside the SAME transaction that later locks and
+ * assigns one, so a resource retired between the read and the lock cannot be
+ * assigned -- the same discipline `DeliveryLocationDirectory` documents for
+ * the slot snapshot.
  *
  * ## Nothing is provided by default, deliberately
  *
  * `BookingModule` declares the token and binds nothing. A composition that
- * forgets it fails to boot, rather than a future `#128` silently resolving
- * against an empty adapter and refusing every resource-bearing booking.
+ * forgets it fails to boot, rather than `#128` silently resolving against an
+ * empty adapter and refusing every resource-bearing booking.
  */
 export interface EligibleResourceDirectory {
   /**
    * The eligible internal `business.location_resources.id` values for
    * `serviceId` at `deliveryLocationId`, deterministically ordered.
    *
-   * Returns `[]` when `serviceId` is `null`, when `deliveryLocationId` is
-   * `null`, when the service has no requirement row, or when a requirement
-   * exists but no active resource of the required kind exists at that
-   * location. There is no way to distinguish these cases from the return
-   * value alone, by design (`V33-DEC-035` R9) -- `#128` maps every empty
-   * result to the platform's existing generic non-enumerating booking
-   * refusal when (and only when) it determines a requirement was genuinely
-   * unmet.
+   * Returns `null` when `serviceId` is `null`, when `deliveryLocationId` is
+   * `null`, or when the service has no requirement row at all -- no
+   * assignment is needed, and the caller must not refuse. Returns `[]` when
+   * a requirement row exists but no active resource of the required kind
+   * exists at that location -- the caller must refuse. Returns a non-empty
+   * array of candidates otherwise.
    */
   eligibleResourcesFor(
     manager: EntityManager,
     serviceId: string | null,
     deliveryLocationId: string | null,
-  ): Promise<readonly string[]>;
+  ): Promise<readonly string[] | null>;
 }
 
 export const ELIGIBLE_RESOURCE_DIRECTORY = Symbol('BEAUCLICK_ELIGIBLE_RESOURCE_DIRECTORY');
+
+/**
+ * A namespace for this module's advisory locks -- V3.3 Story #128 (`#110b`).
+ *
+ * PostgreSQL's advisory-lock space is global to the database, so an
+ * unqualified key would collide with any future caller that happened to hash
+ * the same value. `business.service_resource_requirement.service.ts` claims
+ * `0x73727271` ('srrq') and `wishlist.service.ts` claims `0x77697368`
+ * ('wish'); this is a third, disjoint one -- `'bkas'` (BooKing Assignment) --
+ * claimed explicitly for the same reason.
+ */
+export const RESOURCE_ASSIGNMENT_LOCK_NAMESPACE = 0x62_6b_61_73 | 0; // 'bkas'
+
+/**
+ * Locks `resourceId` for the remainder of the caller's transaction --
+ * V3.3 Story #128 (`#110b`), ADR-049 §6.6.
+ *
+ * ## The race this closes
+ *
+ * A resource's "is it retired / does it have a future assignment" state can
+ * change between `#131`'s `ELIGIBLE_RESOURCE_DIRECTORY` read (unlocked, by
+ * design -- a read never writes and never blocks) and this transaction's own
+ * `INSERT` into `booking_resource_assignments`, if a CONCURRENT transaction
+ * retires that exact resource in between. Symmetrically, `business`'s
+ * retire/close path can race a concurrent assignment being created for the
+ * very resource it is about to retire. Neither side can see the other's
+ * table (module boundary), so neither can take an ordinary row lock on it.
+ *
+ * A transaction-scoped advisory lock, keyed on `resourceId` and taken by
+ * BOTH sides before their respective check-then-act, closes this: whichever
+ * transaction locks a given resource id first, its counterpart on the other
+ * side blocks until the first commits or rolls back, then observes the
+ * post-commit truth rather than a stale read. This is the SAME technique
+ * `wishlist.service.ts` (ADR-033 §8) and
+ * `ServiceResourceRequirementService` (`#131`) already use for the identical
+ * class of problem -- a check-then-act race over something that may not yet
+ * (or may no longer) have a row to lock.
+ *
+ * ## Exported so both sides use the IDENTICAL derivation
+ *
+ * `booking`'s own assignment-creation path (`booking.service.ts`) and
+ * `business`'s retire/close port adapter (`apps/api`, answering
+ * `RESOURCE_ASSIGNMENT_DIRECTORY`) both call this exact function. Two
+ * independent re-implementations of "hash this the same way" is exactly the
+ * kind of drift that would silently reopen the race.
+ */
+export async function lockResourceForAssignment(manager: EntityManager, resourceId: string): Promise<void> {
+  await manager.query('SELECT pg_advisory_xact_lock($1, hashtext($2))', [RESOURCE_ASSIGNMENT_LOCK_NAMESPACE, resourceId]);
+}

@@ -24,11 +24,12 @@ import {
   BusinessStaffEntity,
   InvitableIdentity,
   LocationCityCataloguePort,
+  ResourceAssignmentDirectoryPort,
   ServiceOwnershipDirectoryPort,
   StaffInviteIdentityResolverPort,
 } from '@beauclick/business';
 import { RoleService, UserEntity, canonicalizePhone } from '@beauclick/identity';
-import { DeliveryLocationDirectory, EligibleResourceDirectory } from '@beauclick/booking';
+import { DeliveryLocationDirectory, EligibleResourceDirectory, lockResourceForAssignment } from '@beauclick/booking';
 
 /**
  * The composition root's implementations of the ports booking-, commerce-,
@@ -665,32 +666,87 @@ export class BusinessBackedEligibleResourceDirectory implements EligibleResource
     manager: EntityManager,
     serviceId: string | null,
     deliveryLocationId: string | null,
-  ): Promise<readonly string[]> {
-    if (serviceId === null || deliveryLocationId === null) return [];
+  ): Promise<readonly string[] | null> {
+    if (serviceId === null || deliveryLocationId === null) return null;
 
-    // The join is on BOTH `service_id` AND `r.business_id` -- not `service_id`
-    // alone. `service_resource_requirements` is uniquely keyed on
-    // `(business_id, service_id)`, not `service_id` alone, precisely because a
-    // professional who has moved businesses can leave a STALE requirement row
-    // behind under their old business (`V33-DEC-035`'s "stale rows are
-    // harmless" reasoning: they are harmless only because nothing ever reads
-    // them without also matching the CURRENT business). Matching on
-    // `r.business_id` -- the resource's own business, which is authoritative
-    // because it is derived from `deliveryLocationId`, itself the slot's
-    // frozen snapshot -- is what keeps an old employer's requirement from ever
-    // leaking into a candidate set resolved for the new one.
+    // Two statements, not one, and deliberately so: the FIRST is what makes
+    // "no requirement" (`null`) distinguishable from "requirement unmet"
+    // (`[]`) at all -- a single query joining straight to
+    // `location_resources` would produce zero rows for both cases alike,
+    // exactly the ambiguity `#128`'s contract addition exists to remove.
+    //
+    // Scoped by `deliveryLocationId`'s OWN business (via `business.locations`),
+    // not by the requirement row's business alone -- `service_resource_requirements`
+    // is uniquely keyed on `(business_id, service_id)`, so a professional who
+    // has moved businesses can leave a STALE requirement row behind under
+    // their FORMER business (`V33-DEC-035`'s "stale rows are harmless"
+    // reasoning: harmless only because nothing ever reads them without also
+    // matching the CURRENT business). Deriving business from the slot's own
+    // frozen `deliveryLocationId` snapshot is what keeps a former employer's
+    // requirement from ever leaking into a candidate set resolved for the
+    // current one.
+    const requirementRows: Array<{ required_kind: string }> = await manager.query(
+      `SELECT q.required_kind
+         FROM business.service_resource_requirements q
+         JOIN business.locations l ON l.business_id = q.business_id
+        WHERE l.id = $1 AND q.service_id = $2`,
+      [deliveryLocationId, serviceId],
+    );
+    if (requirementRows.length === 0) return null;
+
     const rows: Array<{ id: string }> = await manager.query(
-      `SELECT r.id
-         FROM business.location_resources r
-         JOIN business.service_resource_requirements q
-           ON q.business_id = r.business_id
-          AND q.service_id = $1
-          AND q.required_kind = r.kind
-        WHERE r.location_id = $2
-          AND r.lifecycle = 'active'
-        ORDER BY r.id`,
-      [serviceId, deliveryLocationId],
+      `SELECT id
+         FROM business.location_resources
+        WHERE location_id = $1 AND kind = $2 AND lifecycle = 'active'
+        ORDER BY id`,
+      [deliveryLocationId, requirementRows[0].required_kind],
     );
     return rows.map((row) => row.id);
+  }
+}
+
+/**
+ * Answers whether ANY of a set of resources has a still-relevant booking
+ * assignment -- V3.3 Story #128 (`#110b`), ADR-049 §6.6. `business`'s
+ * retire/close blocking check.
+ *
+ * ## This is the only place `business` and `booking` meet for closure blocking
+ *
+ * `scope:business` may depend only on `scope:shared`, so `business` declares
+ * `RESOURCE_ASSIGNMENT_DIRECTORY` and cannot name who answers it. This
+ * adapter is where `booking.booking_resource_assignments` is read -- the
+ * mirror image of `BusinessBackedEligibleResourceDirectory` above.
+ *
+ * ## Locking, before the check -- not instead of it
+ *
+ * Every `resourceId`, sorted, is locked with `lockResourceForAssignment`
+ * (`@beauclick/booking`) BEFORE the existence query runs. `booking`'s own
+ * assignment-creation path takes the identical lock, keyed the identical
+ * way, before its `INSERT` -- so whichever transaction reaches a given
+ * resource id first, the other blocks until it commits or rolls back, and
+ * this query then reads genuinely current state rather than a stale
+ * pre-lock snapshot. Sorted order is what keeps a `close()` locking several
+ * resources at once from deadlocking against a second concurrent `close()`
+ * of the same location.
+ */
+@Injectable()
+export class BookingBackedResourceAssignmentDirectory implements ResourceAssignmentDirectoryPort {
+  async hasFutureAssignment(manager: EntityManager, resourceIds: readonly string[]): Promise<boolean> {
+    if (resourceIds.length === 0) return false;
+
+    for (const id of [...resourceIds].sort()) {
+      await lockResourceForAssignment(manager, id);
+    }
+
+    const rows: unknown[] = await manager.query(
+      `SELECT 1
+         FROM booking.booking_resource_assignments
+        WHERE resource_id = ANY($1)
+          AND status = 'active'
+          AND end_at > now()
+        LIMIT 1`,
+      [resourceIds],
+    );
+    return rows.length > 0;
   }
 }

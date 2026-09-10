@@ -351,3 +351,74 @@ export interface ServiceOwnershipDirectoryPort {
 }
 
 export const SERVICE_OWNERSHIP_DIRECTORY = Symbol('BEAUCLICK_SERVICE_OWNERSHIP_DIRECTORY');
+
+/**
+ * The closure/retirement blocking port -- V3.3 Story #128 (`#110b`),
+ * ADR-049 §6.6.
+ *
+ * ## Why a port and not an import
+ *
+ * Retiring a resource, and closing a location, must both be **blocked**
+ * while a future active booking assignment exists for that resource --
+ * "blocked, never cascaded," so an administrative lifecycle change can never
+ * silently orphan or double-book an appointment a customer already holds.
+ * That fact lives entirely in `booking.booking_resource_assignments`.
+ * `business` may not import `booking` (ADR-011,
+ * `@nx/enforce-module-boundaries`) and may not query its schema by raw SQL
+ * (`V3_DATABASE_BLUEPRINT.md` §1), so it declares the question and the
+ * composition root answers it -- the mirror image of `#131`'s
+ * `ELIGIBLE_RESOURCE_DIRECTORY` (declared by `booking`, answered by
+ * `business`): here `business` asks, and `booking` answers.
+ *
+ * ## It takes the caller's `EntityManager`, and locks
+ *
+ * The check and the retire/close write are one transaction: an adapter
+ * holding its own connection could not see this transaction's own row lock
+ * on `business.location_resources`, and — more importantly — could not
+ * coordinate with a CONCURRENT assignment being created for the very
+ * resource being retired. The implementation takes `lockResourceForAssignment`
+ * (`@beauclick/booking`) for every id in `resourceIds`, in sorted order,
+ * before running its existence check: the identical advisory-lock
+ * convention `booking`'s own assignment-creation path uses, so whichever
+ * side locks a resource id first, the other blocks until it commits or
+ * rolls back rather than racing a stale read (see that function's own
+ * documentation for the full reasoning).
+ *
+ * ## It answers for a SET, so `business` can check a whole location in one call
+ *
+ * Retiring one resource asks with a one-element array; closing a location
+ * asks with every resource id that location owns, in one round trip -- an
+ * N+1 (one call per resource) is exactly the pattern `describeCities` and
+ * `ELIGIBLE_RESOURCE_DIRECTORY` both avoid, and this port follows the same
+ * discipline.
+ *
+ * ## It answers ONE boolean, and nothing more
+ *
+ * `business` never learns which booking, which customer, which time, or how
+ * many assignments exist -- the port is a yes/no gate, so there is no shape
+ * through which a `booking` fact could leak into a `business` response. A
+ * `true` answer collapses into `business`'s own single non-enumerating
+ * refusal (`NotFoundOrNotYoursException`), identical in shape to a stale
+ * reference or a foreign resource.
+ *
+ * ## Nothing is provided by default, deliberately
+ *
+ * `BusinessModule` declares the token and binds nothing. A composition that
+ * forgets it fails to boot, rather than silently allowing a resource to be
+ * retired out from under a customer's upcoming appointment.
+ */
+export interface ResourceAssignmentDirectoryPort {
+  /**
+   * True when ANY of `resourceIds` has a still-relevant assignment: `status
+   * = 'active'` and `end_at > now()`. A past active assignment (already
+   * elapsed, e.g. a completed appointment never explicitly released) does
+   * NOT block -- only a genuinely future or currently-ongoing one does, so
+   * retirement and closure remain possible once a resource's commitments
+   * have actually passed.
+   *
+   * Returns `false` for an empty `resourceIds` array.
+   */
+  hasFutureAssignment(manager: EntityManager, resourceIds: readonly string[]): Promise<boolean>;
+}
+
+export const RESOURCE_ASSIGNMENT_DIRECTORY = Symbol('BEAUCLICK_RESOURCE_ASSIGNMENT_DIRECTORY');
