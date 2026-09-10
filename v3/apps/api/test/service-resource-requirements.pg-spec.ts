@@ -184,7 +184,7 @@ describeIfPg('Service resource requirement and eligible-resource resolution (#13
       expect(indexes.join('\n')).toMatch(/ix_service_resource_requirements_service_id/);
     });
 
-    it('adds NOTHING to the booking or provider schema -- #128 owns assignment, and provider is untouched', async () => {
+    it('adds no resource-assignment column to booking or provider -- #128 owns assignment itself, and provider is untouched', async () => {
       const bookingColumns: string[] = (
         await dataSource.query(`SELECT column_name FROM information_schema.columns WHERE table_schema='booking' AND table_name='availability_slots'`)
       ).map((r: { column_name: string }) => r.column_name);
@@ -192,10 +192,18 @@ describeIfPg('Service resource requirement and eligible-resource resolution (#13
         expect(bookingColumns).not.toContain(forbidden);
       }
 
+      // `booking.booking_resource_assignments` DID NOT exist when this
+      // assertion was first written (#131, 2026-09-10) -- it originally
+      // pinned the table's absence as evidence that #131 itself added no
+      // booking-schema object, deliberately anticipating that #128 (`#110b`)
+      // would add exactly that one table afterward (see
+      // `booking-resource-assignments.pg-spec.ts` for its full contract).
+      // #128 has SINCE been ratified and implemented, so its presence here
+      // is expected, not a #131 regression.
       const bookingTables: string[] = (
         await dataSource.query(`SELECT table_name FROM information_schema.tables WHERE table_schema='booking'`)
       ).map((r: { table_name: string }) => r.table_name);
-      expect(bookingTables).not.toContain('booking_resource_assignments');
+      expect(bookingTables).toContain('booking_resource_assignments');
 
       const providerColumns: string[] = (
         await dataSource.query(`SELECT column_name FROM information_schema.columns WHERE table_schema='provider' AND table_name='services'`)
@@ -556,26 +564,26 @@ describeIfPg('Service resource requirement and eligible-resource resolution (#13
       port = app.get(ELIGIBLE_RESOURCE_DIRECTORY);
     });
 
-    it('returns [] for a NULL serviceId -- the nullable-service semantics, byte-identical to the legacy path', async () => {
+    it('returns null for a NULL serviceId -- the nullable-service semantics, byte-identical to the legacy path', async () => {
       const { locationId } = await seedOwnerLocationResource('+98983');
-      await expect(dataSource.transaction((m) => port.eligibleResourcesFor(m, null, locationId))).resolves.toEqual([]);
+      await expect(dataSource.transaction((m) => port.eligibleResourcesFor(m, null, locationId))).resolves.toBeNull();
     });
 
-    it('returns [] for a NULL deliveryLocationId', async () => {
+    it('returns null for a NULL deliveryLocationId', async () => {
       const { businessId, owner } = await seedOwner('+98984');
       const { serviceId } = await seedActiveProfessionalService(businessId, owner.id, '+98985');
-      await expect(dataSource.transaction((m) => port.eligibleResourcesFor(m, serviceId, null))).resolves.toEqual([]);
+      await expect(dataSource.transaction((m) => port.eligibleResourcesFor(m, serviceId, null))).resolves.toBeNull();
     });
 
-    it('returns [] for both null -- the "no key at all" case', async () => {
-      await expect(dataSource.transaction((m) => port.eligibleResourcesFor(m, null, null))).resolves.toEqual([]);
+    it('returns null for both null -- the "no key at all" case', async () => {
+      await expect(dataSource.transaction((m) => port.eligibleResourcesFor(m, null, null))).resolves.toBeNull();
     });
 
-    it('returns [] for a concrete service with NO requirement row -- "no requirement" is not an error', async () => {
+    it('returns null for a concrete service with NO requirement row -- "no requirement" is not an error, and is distinct from "requirement unmet"', async () => {
       const { businessId, owner } = await seedOwner('+98986');
       const { serviceId } = await seedActiveProfessionalService(businessId, owner.id, '+98987');
       const { locationId } = await seedOwnerLocationResource('+98988');
-      await expect(dataSource.transaction((m) => port.eligibleResourcesFor(m, serviceId, locationId))).resolves.toEqual([]);
+      await expect(dataSource.transaction((m) => port.eligibleResourcesFor(m, serviceId, locationId))).resolves.toBeNull();
     });
 
     it('returns [] for a configured requirement with no eligible resource at that location', async () => {
@@ -629,7 +637,8 @@ describeIfPg('Service resource requirement and eligible-resource resolution (#13
       );
 
       const result = await dataSource.transaction((m) => port.eligibleResourcesFor(m, serviceId, locationId));
-      expect([...result].sort()).toEqual([...deviceIds].sort());
+      expect(result).not.toBeNull();
+      expect([...(result ?? [])].sort()).toEqual([...deviceIds].sort());
     });
 
     it('excludes resources at a DIFFERENT location, and excludes a stale requirement row left by a FORMER business', async () => {

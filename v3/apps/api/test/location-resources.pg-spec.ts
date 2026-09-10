@@ -235,19 +235,26 @@ describeIfPg('Location resource catalogue on real PostgreSQL (#110a)', () => {
       expect(uniques.filter((def) => /UNIQUE/i.test(def) && /name/i.test(def))).toEqual([]);
     });
 
-    it('adds NOTHING to the booking schema -- #110b owns that', async () => {
+    it('added NOTHING to the booking schema itself -- #110b (#128) owns the one table that landed there since', async () => {
       const bookingTables: string[] = (
         await dataSource.query(`SELECT tablename FROM pg_tables WHERE schemaname='booking' ORDER BY tablename`)
       ).map((r: { tablename: string }) => r.tablename);
 
+      // `booking.booking_resource_assignments` DID NOT exist when this suite
+      // was first written (#110a, 2026-09-08) -- this test originally
+      // asserted its absence as evidence that #110a authorized no booking-
+      // schema object. #128 (`#110b`) has SINCE been ratified and
+      // implemented as its own story, adding exactly that one table (see
+      // `booking-resource-assignments.pg-spec.ts` for its full contract).
+      // Its presence here is therefore expected, not a #110a regression.
       expect(bookingTables).toEqual([
         'availability_slots',
         'booking_history',
+        'booking_resource_assignments',
         'bookings',
         'idempotency_keys',
         'outbox_events',
       ]);
-      expect(bookingTables).not.toContain('booking_resource_assignments');
     });
   });
 
