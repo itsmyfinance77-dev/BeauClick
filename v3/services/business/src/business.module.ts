@@ -10,11 +10,13 @@ import { BusinessTraitEntity } from './entities/business-trait.entity';
 import { BusinessLocationEntity } from './entities/business-location.entity';
 import { StaffRoleGrantEntity } from './entities/staff-role-grant.entity';
 import { LocationResourceEntity } from './entities/location-resource.entity';
+import { ServiceResourceRequirementEntity } from './entities/service-resource-requirement.entity';
 
 import { BusinessService } from './business.service';
 import { BusinessClassificationService } from './business-classification.service';
 import { BusinessLocationService } from './business-location.service';
 import { LocationResourceService } from './location-resource.service';
+import { ServiceResourceRequirementService } from './service-resource-requirement.service';
 import { StaffLocationService } from './staff-location.service';
 import { StaffService } from './staff.service';
 import { StaffGrantService } from './staff-grant.service';
@@ -23,6 +25,7 @@ import { STAFF_INVITE_CLOCK, SystemStaffInviteClock } from './staff-invite.clock
 import { BusinessController } from './business.controller';
 import { BusinessLocationController } from './business-location.controller';
 import { LocationResourceController } from './location-resource.controller';
+import { ServiceResourceRequirementController } from './service-resource-requirement.controller';
 import {
   BusinessManagerResolver,
   BusinessMembershipResolver,
@@ -52,11 +55,15 @@ export const BUSINESS_ENTITIES = [
   // business table must not be reachable at runtime while being invisible to
   // the ORM.
   LocationResourceEntity,
+  // V3.3 Story #131 (`#127b`). Same reason as the four lines above: a new
+  // business table must not be reachable at runtime while being invisible to
+  // the ORM.
+  ServiceResourceRequirementEntity,
 ];
 
 @Module({
   imports: [ConfigModule, TypeOrmModule.forFeature(BUSINESS_ENTITIES)],
-  controllers: [BusinessController, BusinessLocationController, LocationResourceController],
+  controllers: [BusinessController, BusinessLocationController, LocationResourceController, ServiceResourceRequirementController],
   providers: [
     BusinessSubjectDataContract,
     BusinessService,
@@ -72,6 +79,11 @@ export const BUSINESS_ENTITIES = [
     // that omits the composition root fails to boot rather than minting
     // references under an empty secret.
     LocationResourceService,
+    // V3.3 Story #131 (`#127b`). Injects `SERVICE_OWNERSHIP_DIRECTORY`, bound
+    // globally by `DomainPortsModule` -- a composition that omits the
+    // composition root fails to boot rather than silently accepting a
+    // requirement for a service nobody proved belongs to the caller.
+    ServiceResourceRequirementService,
     // V3.3 Story #127 (`#127a`). Injects `WORKSPACE_REFERENCE_SECRET`, bound
     // globally by `DomainPortsModule`, for the same reason the location and
     // resource services do.
@@ -112,6 +124,7 @@ export const BUSINESS_ENTITIES = [
     BusinessClassificationService,
     BusinessLocationService,
     LocationResourceService,
+    ServiceResourceRequirementService,
     StaffLocationService,
     StaffService,
     StaffGrantService,

@@ -191,16 +191,30 @@ describeIfPg('Delivery-location context on real PostgreSQL (#127a)', () => {
       }
     });
 
-    it('adds no resource or assignment object -- those are #131 and #128', async () => {
+    it('adds no resource or assignment object -- the collision/assignment table is #128 alone', async () => {
       const bookingTables: string[] = (
         await dataSource.query(`SELECT tablename FROM pg_tables WHERE schemaname='booking' ORDER BY tablename`)
       ).map((r: { tablename: string }) => r.tablename);
       expect(bookingTables).toEqual(['availability_slots', 'booking_history', 'bookings', 'idempotency_keys', 'outbox_events']);
 
+      /*
+       * `business.service_resource_requirements` DID NOT exist when this
+       * suite was first written (#127a, 2026-09-10) -- this test originally
+       * asserted its absence as evidence that #127a authorized no resource
+       * table. #131 (`#127b`) has SINCE been ratified and implemented as its
+       * own story, adding exactly that one table (see
+       * `service-resource-requirements.pg-spec.ts` for its full contract).
+       * Its presence here is therefore expected, not a #127a regression --
+       * the assertion that matters, and still holds, is that #128's
+       * `booking_resource_assignments` / collision-constraint table is
+       * NOWHERE in either schema.
+       */
       const businessTables: string[] = (
         await dataSource.query(`SELECT tablename FROM pg_tables WHERE schemaname='business' ORDER BY tablename`)
       ).map((r: { tablename: string }) => r.tablename);
-      expect(businessTables).not.toContain('service_resource_requirements');
+      expect(businessTables).toContain('service_resource_requirements');
+      expect(businessTables).not.toContain('booking_resource_assignments');
+      expect(bookingTables).not.toContain('booking_resource_assignments');
     });
   });
 

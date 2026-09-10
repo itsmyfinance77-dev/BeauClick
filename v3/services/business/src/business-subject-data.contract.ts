@@ -118,6 +118,30 @@ export class BusinessSubjectDataContract implements SubjectDataContract {
       reason:
         "A bookable resource of a business branch -- its name, its room|device|station kind and its active|retired lifecycle. A property of the organisation's premises, naming no person and carrying no identity column, so it survives the erasure of any individual exactly as the location row it hangs off does.",
     },
+    // V3.3 Story #131 (`#127b`), `V33-DEC-035` R5 and ADR-049 section 7.2.
+    // `retained`, for exactly the reason `business.location_resources` above is:
+    // a resource requirement describes what a SERVICE needs, not what a PERSON
+    // did. It carries `business_id`, an opaque `service_id` and a
+    // `required_kind` -- no `user_id`, no `*_by`, no `*_user_id`, no phone and
+    // no email -- so erasing an individual has nothing to erase here.
+    //
+    // No owner or actor column was added to satisfy ADR-027's heuristic --
+    // adding one would invent the very subject data the claim says is absent.
+    // Actor identity for every mutation lives in `admin.admin_audit_log` and
+    // nowhere else. The heuristic cannot detect a dishonest claim on this
+    // table either (none of `business_id`, `service_id` or `required_kind`
+    // matches `isSubjectColumn`), so the disposition is additionally pinned by
+    // an explicit test, exactly as `#110a` and `#127a` both are.
+    //
+    // Deliberately NOT in the export document: an export tells a SUBJECT what
+    // the platform holds about THEM, and "this service needs a device" is not
+    // that.
+    {
+      table: 'business.service_resource_requirements',
+      disposition: 'retained',
+      reason:
+        "The resource kind a business's service requires -- an opaque provider service id and a room|device|station kind. A property of the organisation's service catalogue, naming no person and carrying no identity column, so it survives the erasure of any individual exactly as business.location_resources does.",
+    },
   ];
 
   async exportSubjectData(manager: EntityManager, userId: string): Promise<SubjectExportSection[]> {
@@ -247,6 +271,10 @@ export class BusinessSubjectDataContract implements SubjectDataContract {
         {
           table: 'business.location_resources',
           reason: 'the rooms, devices and stations of a branch, not a fact about any person',
+        },
+        {
+          table: 'business.service_resource_requirements',
+          reason: 'the resource kind a service requires, not a fact about any person',
         },
       ],
     };

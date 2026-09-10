@@ -295,3 +295,59 @@ export interface StaffInviteIdentityResolverPort {
 }
 
 export const STAFF_INVITE_IDENTITY_RESOLVER = Symbol('BEAUCLICK_STAFF_INVITE_IDENTITY_RESOLVER');
+
+/**
+ * The service-validation port -- V3.3 Story #131 (`#127b`), `V33-DEC-035` R5.
+ *
+ * ## Why a port and not an import
+ *
+ * A resource requirement is keyed on an OPAQUE `provider.services.id`
+ * (`ServiceResourceRequirementEntity`), and before a business owner may set one,
+ * the service must genuinely belong to a professional currently affiliated with
+ * THIS business. That fact lives entirely in `provider` (`provider.services`,
+ * `provider.professionals`) joined against `business.business_staff`. `business`
+ * may import neither `provider` (ADR-011, `@nx/enforce-module-boundaries`) nor
+ * read across the schema boundary by raw query (`V3_DATABASE_BLUEPRINT.md` §1),
+ * so it declares the question and the composition root binds the adapter --
+ * exactly as `LOCATION_CITY_CATALOGUE` and `STAFF_INVITE_IDENTITY_RESOLVER`
+ * above already do.
+ *
+ * ## The signature takes the caller's `EntityManager`
+ *
+ * The validation and the requirement write must be one transaction: an adapter
+ * holding its own repository would run on a different connection, so a service
+ * that was reassigned to another business mid-request could still be accepted,
+ * and a rolled-back requirement write would not roll back a check that already
+ * "passed" -- the same reasoning `LocationCityCataloguePort.lookupAssignableCity`
+ * documents.
+ *
+ * ## It answers ONE boolean, and nothing more
+ *
+ * `business` never learns the service's name, its professional, its price or
+ * any other `provider` fact -- the port is a yes/no gate, not a lookup, so there
+ * is no shape through which a `provider` concept could leak into a `business`
+ * response. A `false` answer collapses into `business`'s own single
+ * non-enumerating refusal; the port carries no distinguishing cause.
+ *
+ * ## Nothing is provided by default, deliberately
+ *
+ * `BusinessModule` declares the token and binds nothing. A composition that
+ * forgets it fails to boot, rather than quietly accepting a requirement for a
+ * service nobody proved belongs to the caller's business.
+ */
+export interface ServiceOwnershipDirectoryPort {
+  /**
+   * True only when `serviceId` names a **live** `provider.services` row
+   * (`deleted_at IS NULL`) whose owning professional (`provider.professionals`,
+   * also live) holds an **active** `business.business_staff` membership of
+   * `businessId`. Any other combination -- no such service, a deleted service, a
+   * professional with no membership, an `invited`/`inactive`/`declined`/`removed`
+   * membership, or a membership of a DIFFERENT business -- is `false`.
+   *
+   * Runs on `manager`'s transaction, so the check and the requirement write
+   * commit or roll back together.
+   */
+  verifyServiceBelongsToBusiness(manager: EntityManager, businessId: string, serviceId: string): Promise<boolean>;
+}
+
+export const SERVICE_OWNERSHIP_DIRECTORY = Symbol('BEAUCLICK_SERVICE_OWNERSHIP_DIRECTORY');

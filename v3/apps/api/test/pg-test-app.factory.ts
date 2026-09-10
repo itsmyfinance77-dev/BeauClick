@@ -525,6 +525,11 @@ export const RESETTABLE_TABLES = [
   // role reaches this table only through the service, and the suite that clears
   // it is the one proving the trigger refuses every write that goes through it.
   'business.location_resources',
+  // V3.3 Story #131 (`#127b`). Before `business.businesses`, which it
+  // references by a real same-schema FK, matching `business.location_resources`
+  // immediately above. Unlike that table, this one has no lifecycle trigger to
+  // bypass -- TRUNCATE is an ordinary reset here.
+  'business.service_resource_requirements',
   // V3.3 Story #107 (`#44a`). Children BEFORE `business.businesses`, matching
   // this list's own convention -- both reference it by a real same-schema FK,
   // and the migration seeds neither, so a reset returns them to exactly the
