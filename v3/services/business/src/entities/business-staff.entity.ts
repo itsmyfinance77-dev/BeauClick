@@ -67,6 +67,29 @@ export class BusinessStaffEntity {
   @Column({ type: 'uuid', nullable: true })
   professionalId!: string | null;
 
+  /**
+   * The `business.locations` branch this membership works at, or `null` --
+   * V3.3 Story #127 (`#127a`), `V33-DEC-035` R2.
+   *
+   * **Owner-managed only.** The professional, an ordinary staff member and a
+   * `practitioner_chat` holder can none of them read or write it; the binding is
+   * set through one owner-guarded route and audited transactionally.
+   * `fk_business_staff_location_same_business` makes a cross-business binding
+   * **unwritable in PostgreSQL** rather than merely refused by code.
+   *
+   * **It confers no authority.** A location says WHERE someone works, never WHAT
+   * they may do: no role, no capability, no grant, and `SCOPED_STAFF_ROLES` is
+   * untouched.
+   *
+   * At most one branch per membership. A practitioner working at several
+   * locations of one business in the same period is **not representable** and is
+   * a named future decision (`V33-DEC-035` R4) -- deliberately a single column
+   * rather than an ordering-dependent collection, so nothing can quietly become a
+   * first-row rule.
+   */
+  @Column({ type: 'uuid', nullable: true })
+  locationId!: string | null;
+
   @Column({ type: 'varchar', length: 20 })
   role!: BusinessStaffRole;
 
