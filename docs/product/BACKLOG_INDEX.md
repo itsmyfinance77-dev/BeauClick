@@ -28,7 +28,7 @@ delivering its Story Points never creates a tag and never enables production.
 | V3.2-E | B2B Quotes and Campaigns | Owner-gated; payment gate applies to settlement | Not applicable | Not enabled |
 | V3.2-F | Payout and Calendar Automation | Predominantly external-gated | Not applicable | Not enabled |
 | V3.2-G | Evidence-Gated Scale | No commitment without evidence | Not applicable | Not enabled |
-| V3.3 | Product Maturity Programme | Active foundation: #39, #40 (`#40a`), #56 (`#56a`), #69 (`#56b`), #72 and #75 complete; epic #38 in progress; Story #41 decomposed by `V33-DEC-022` into #41 (`#41a`), #81 (`#41b`), #82 (`#41c`) and #83 (`#41d`) and re-estimated 13 -> 42 (#82 raised 8 -> 13 by `V33-DEC-024`); #41 (`#41a`), #81 (`#41b`) and #82 (`#41c`) complete, #83 (`#41d`) gated; #58 split by `V33-DEC-025` into `#58a` (13, **complete**) and `#58b` (3, blocked on #46); #57 split by `V33-DEC-026` into `#40c-1` (#57, **complete** at 13 after `V33-DEC-027` re-estimated it 8 -> 13) and #99 (`#40c-2`, 5, blocked on #47); bug #97 (2) complete; commercial structure ratified and **#46 closed** 2026-09-06 by `V33-DEC-028`, which moved #83 (13) and #95 (`#58b`, 3 -> 5) to Ready and re-estimated #43 13 -> 21; #83 then split 2026-09-06 by `V33-DEC-029` into `#41d-1` (#83, 13, Ready) and #104 (`#41d-2`, 8, proposed); #104 then split 2026-09-07 by `V33-DEC-031` into `#41d-2a` (#104, 8, Ready) and #115 (`#41d-2b`, 8, proposed); **#44 decomposed 2026-09-06 by `V33-DEC-030`** into an umbrella carrying no Story Points plus five children — #107 (`#44a`, 5, Ready), #108 (`#44b`, 8), #109 (`#44c`, 13), #110 (`#44d`, 13) and #111 (`#44e`, 8) — re-estimated 13 -> 47, a net **+34** with done unchanged; #107 (`#44a`)'s classification cardinality then ratified 2026-09-07 by `V33-DEC-032` — **at most one** vertical, an unclassified business legal, #107 unsplit at 5 SP and **no Story Point moved**; #107 (`#44a`) and #108 (`#44b`) then **complete**, and #109 (`#44c`)'s scoped-staff contract ratified 2026-09-08 by `V33-DEC-033` — a one-member `practitioner_chat` vocabulary, practitioner-specific chat authority, a fully synchronous invitation with no queued phone derivative, and the UUID invite contract replaced — moving #109 to Ready **unsplit at 13 SP** with no point completed and adding **#123** (2, the bounded web-invite frontend follow-up), a net **+2** with done unchanged; #123 then **complete** 2026-09-08; and #110 (`#44d`) **decomposed 2026-09-09 by `V33-DEC-034`** into `#110a` (#110, 5, the resource catalogue), `#110c` (#127, 8, the delivery-location context the platform does not yet have) and `#110b` (#128, 8, assignment and collision, blocked on both) — re-estimated 13 -> 21, a net **+8** with done unchanged; `#110a` (#110) then **complete** 2026-09-09; and `#110c` (#127) itself **split 2026-09-10 by `V33-DEC-035`** into `#127a` (#127, 5, the delivery-location context) and `#127b` (#131, 8, the service resource requirement), with #128 now blocked on **both** — re-estimated 8 -> 13, a net **+5** with done unchanged; `#127a` (#127) and `#127b` (#131) then both **complete** 2026-09-10, done rising 184 -> 197, with #128 (`#110b`) still `status:proposed` pending its own readiness work | No tag authorized | Real money blocked by #47; every commercial value and all legal copy remain **unpublished**, now tracked on #83, #42 (Legal), #43 and #47 rather than #46 |
+| V3.3 | Product Maturity Programme | Active foundation: #39, #40 (`#40a`), #56 (`#56a`), #69 (`#56b`), #72 and #75 complete; epic #38 in progress; Story #41 decomposed by `V33-DEC-022` into #41 (`#41a`), #81 (`#41b`), #82 (`#41c`) and #83 (`#41d`) and re-estimated 13 -> 42 (#82 raised 8 -> 13 by `V33-DEC-024`); #41 (`#41a`), #81 (`#41b`) and #82 (`#41c`) complete, #83 (`#41d`) gated; #58 split by `V33-DEC-025` into `#58a` (13, **complete**) and `#58b` (3, blocked on #46); #57 split by `V33-DEC-026` into `#40c-1` (#57, **complete** at 13 after `V33-DEC-027` re-estimated it 8 -> 13) and #99 (`#40c-2`, 5, blocked on #47); bug #97 (2) complete; commercial structure ratified and **#46 closed** 2026-09-06 by `V33-DEC-028`, which moved #83 (13) and #95 (`#58b`, 3 -> 5) to Ready and re-estimated #43 13 -> 21; #83 then split 2026-09-06 by `V33-DEC-029` into `#41d-1` (#83, 13, Ready) and #104 (`#41d-2`, 8, proposed); #104 then split 2026-09-07 by `V33-DEC-031` into `#41d-2a` (#104, 8, Ready) and #115 (`#41d-2b`, 8, proposed); **#44 decomposed 2026-09-06 by `V33-DEC-030`** into an umbrella carrying no Story Points plus five children — #107 (`#44a`, 5, Ready), #108 (`#44b`, 8), #109 (`#44c`, 13), #110 (`#44d`, 13) and #111 (`#44e`, 8) — re-estimated 13 -> 47, a net **+34** with done unchanged; #107 (`#44a`)'s classification cardinality then ratified 2026-09-07 by `V33-DEC-032` — **at most one** vertical, an unclassified business legal, #107 unsplit at 5 SP and **no Story Point moved**; #107 (`#44a`) and #108 (`#44b`) then **complete**, and #109 (`#44c`)'s scoped-staff contract ratified 2026-09-08 by `V33-DEC-033` — a one-member `practitioner_chat` vocabulary, practitioner-specific chat authority, a fully synchronous invitation with no queued phone derivative, and the UUID invite contract replaced — moving #109 to Ready **unsplit at 13 SP** with no point completed and adding **#123** (2, the bounded web-invite frontend follow-up), a net **+2** with done unchanged; #123 then **complete** 2026-09-08; and #110 (`#44d`) **decomposed 2026-09-09 by `V33-DEC-034`** into `#110a` (#110, 5, the resource catalogue), `#110c` (#127, 8, the delivery-location context the platform does not yet have) and `#110b` (#128, 8, assignment and collision, blocked on both) — re-estimated 13 -> 21, a net **+8** with done unchanged; `#110a` (#110) then **complete** 2026-09-09; and `#110c` (#127) itself **split 2026-09-10 by `V33-DEC-035`** into `#127a` (#127, 5, the delivery-location context) and `#127b` (#131, 8, the service resource requirement), with #128 now blocked on **both** — re-estimated 8 -> 13, a net **+5** with done unchanged; `#127a` (#127) and `#127b` (#131) then both **complete** 2026-09-10, done rising 184 -> 197; and #128 (`#110b`) itself **complete** 2026-09-10, done rising 197 -> 205, closing the `V33-DEC-034`/`V33-DEC-035` resource-assignment lineage in full | No tag authorized | Real money blocked by #47; every commercial value and all legal copy remain **unpublished**, now tracked on #83, #42 (Legal), #43 and #47 rather than #46 |
 | V3.4 | Conditional Expansion Programme | Written owner decision and evidence required | Not applicable | Not enabled |
 
 V3.2-A and V3.2-B are completed historical milestones but are deliberately
@@ -755,3 +755,61 @@ the 2026-09-10 split left it pending its own fresh preflight and readiness work.
 amendment notes already recorded at the 2026-09-09 and 2026-09-10 splits, and neither required
 a product decision — R5–R9 of `V33-DEC-035` already settled every product-shaped question for
 #131, and #127a's contract was already ratified in full by the same card.
+
+## V3.3 Story #128 (`#110b`) delivered, 2026-09-10
+
+The last child of the `V33-DEC-034`/`V33-DEC-035` resource-assignment lineage has shipped,
+after its own fresh preflight against the then-current `master` (post-`#127a`/`#131`, commit
+`b1f0eef`). This closes the lineage started by `V33-DEC-034` in full: `#110a` (#110), `#127a`
+(#127), `#127b` (#131) and now `#110b` (#128) are all complete.
+
+**#128 (`#110b`), 8 Story Points.** Booking resource assignment and collision prevention. One
+new table, `booking.booking_resource_assignments` — one row per booking (mutated in place
+across reschedule, the same pattern `booking.bookings` itself already follows), an opaque
+`resource_id` with no cross-schema FK, and a partial GiST exclusion constraint over
+`(resource_id, [start_at, end_at))` for `status = 'active'` rows that PostgreSQL itself
+enforces. Assignment is wired into the existing booking-creation, cancellation and reschedule
+transactions, never a separate write: creation locks and re-verifies each eligible candidate
+in a fixed ascending-id order, one at a time, attempting the write under its own `SAVEPOINT`
+so a collision moves on to the next candidate instead of aborting the surrounding transaction;
+exhausting every candidate refuses with the platform's existing generic
+`SlotUnavailableException`, never a 500. A `NULL` service, a service with no configured
+requirement, or a `NULL` delivery location all book exactly as they did before #128, with no
+assignment attempted. Cancellation releases the assignment atomically; reschedule re-resolves
+the destination from scratch and never carries the old resource forward, leaving the original
+booking and assignment completely untouched if the destination can't be served.
+
+`business`'s resource retirement and location closure now refuse (generically) while a future
+active assignment exists, through a new `ResourceAssignmentDirectoryPort` — the mirror image
+of `#131`'s own `ELIGIBLE_RESOURCE_DIRECTORY` — so neither module ever reads the other's
+tables directly; both sides of that race close through one shared advisory lock keyed by
+resource id, the same convention `#131` established for the opposite direction.
+`ELIGIBLE_RESOURCE_DIRECTORY.eligibleResourcesFor` gained the `null`-vs-`[]` distinction
+`#131`'s own documentation had already flagged as needed — `null` for "no resolvable
+requirement, proceed without assignment," `[]` for "a requirement exists but nothing is
+eligible, refuse" — a contract refinement, not a behaviour change, for every `#131` caller.
+The new table is `subject_data` by explicit owner direction (pinned by a dedicated test, since
+the repository's own coverage heuristic cannot infer it from the column names), exported
+scoped to the subject's own bookings with the resource id withheld, and retained — never
+deleted — on erasure, matching `booking.bookings` itself. `booking.availability_slots` keeps
+its ratified `no_subject_data` disposition unchanged. Merged to `master` as commit `b7b29e6`
+(PR #137), closing #128.
+
+| Item | Before | After | Outcome it owns |
+|---|---:|---:|---|
+| #128 (`#110b`) | `status:proposed`, 8 | **Closed, 8** | Delivered as described above |
+
+**What moved.** #128 closes with `sp:8` preserved and no status label. V3.3 done rises
+**197 → 205**; V3.3 scope stays **283** — the point was already counted at the 2026-09-09
+split. This closes the entire `V33-DEC-034`/`V33-DEC-035` lineage: #110 (`#110a`), #127
+(`#127a`), #131 (`#127b`) and #128 (`#110b`) are now all closed. Epic #44 stays **open** —
+#111 (`#44e`, 8 SP) remains `status:proposed` and un-decomposed, so #44 cannot close
+structurally. #42, #43, #45, #47, #95 and #99 remain untouched.
+
+**No new ADR and no new decision card.** #128's own fresh preflight found every engineering
+question already delegated to ADR-049 (§6 and its amendment notes) or resolvable by existing
+repository convention — the `null`-vs-`[]` port refinement, the SAVEPOINT-per-candidate retry,
+and the `subject_data` claim (matching `booking.bookings`'s own retained-on-erasure pattern
+despite ADR-049 §7.2's literal `retained` label for this row, which describes the same
+behavioural outcome under a different disposition name) — with no genuine unresolved
+product, legal or security choice requiring a new decision card.
