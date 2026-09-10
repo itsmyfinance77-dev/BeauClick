@@ -11,6 +11,8 @@ import { CreateBusinessDto } from './dto/create-business.dto';
 import { UpdateBusinessDto } from './dto/update-business.dto';
 import { InviteStaffByPhoneDto, ScopedStaffRoleDto } from './dto/staff.dto';
 import { StaffGrantService } from './staff-grant.service';
+import { StaffLocationService } from './staff-location.service';
+import { SetStaffLocationDto } from './dto/staff-location.dto';
 import { ReplaceBusinessClassificationDto } from './dto/business-classification.dto';
 import {
   BusinessManagerResolver,
@@ -65,6 +67,7 @@ export class BusinessController {
     private readonly staff: StaffService,
     private readonly classification: BusinessClassificationService,
     private readonly grants: StaffGrantService,
+    private readonly staffLocations: StaffLocationService,
   ) {}
 
   @Post('businesses')
@@ -175,6 +178,46 @@ export class BusinessController {
   // no owner, user, phone, professional or business identity is accepted in a
   // body, and the whitelist pipe rejects any extra field with a 400.
   // -----------------------------------------------------------------------
+
+  /**
+   * The branch a consented membership works at -- V3.3 Story #127 (`#127a`),
+   * `V33-DEC-035` R2.
+   *
+   * Owner-only, and `@ResolveOwner` is on each HANDLER for the reason the grant
+   * block above records. The membership is named in the path and the branch by an
+   * opaque `locationRef` in a one-field body; no owner, user, professional,
+   * business or raw location id is accepted, and the whitelist pipe rejects any
+   * extra field with a `400`.
+   *
+   * **Deliberately a route of its own, not a field on the staff list.** Widening
+   * `GET /businesses/:id/staff` would put a branch on every roster row, and
+   * widening `GET /v1/me/business-staff` would hand it to the professional --
+   * neither is authorized (`V33-DEC-035` R2/R9), and the binding is owner-facing
+   * configuration rather than roster data.
+   *
+   * `null` is a real value here: it clears the binding. A missing `locationRef`
+   * is a malformed request.
+   */
+  @ResolveOwner(BusinessOwnerResolver)
+  @Get('businesses/:id/staff/:staffId/location')
+  async readStaffLocation(
+    @Param('id') id: string,
+    @Param('staffId') staffId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.staffLocations.read(id, user.userId, staffId);
+  }
+
+  @ResolveOwner(BusinessOwnerResolver)
+  @Put('businesses/:id/staff/:staffId/location')
+  async setStaffLocation(
+    @Param('id') id: string,
+    @Param('staffId') staffId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: SetStaffLocationDto,
+  ) {
+    return this.staffLocations.set(id, user.userId, staffId, dto);
+  }
 
   @ResolveOwner(BusinessOwnerResolver)
   @Get('businesses/:id/staff/:staffId/grants')
