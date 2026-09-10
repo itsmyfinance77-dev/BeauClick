@@ -109,3 +109,82 @@ export interface DeliveryLocationDirectory {
 }
 
 export const DELIVERY_LOCATION_DIRECTORY = Symbol('BEAUCLICK_DELIVERY_LOCATION_DIRECTORY');
+
+/**
+ * The eligible-candidate resolution port -- V3.3 Story #131 (`#127b`),
+ * `V33-DEC-035` R5/R7.
+ *
+ * ## Why booking declares a question it cannot answer
+ *
+ * Which resources are eligible for a service is a `business` fact: it depends
+ * on `business.service_resource_requirements` (what kind is required) and
+ * `business.location_resources` (which resources of that kind exist at a
+ * location). ADR-011 forbids `services/booking` importing `services/business`,
+ * so the port is declared here and implemented in `apps/api` -- exactly as
+ * `DeliveryLocationDirectory` above already is. Booking therefore never learns
+ * what a requirement or a resource catalogue is; it only asks which internal
+ * ids are eligible for a service at a location.
+ *
+ * ## This story does not call it
+ *
+ * `#131` builds and tests this port and its adapter; it does not wire the port
+ * into any existing booking read or write path. `#128` (`#110b`) is the
+ * consumer that will call it at booking time, lock a candidate under a
+ * PostgreSQL exclusion constraint, and write
+ * `booking.booking_resource_assignments`. Nothing in `#131` selects a
+ * resource, creates an assignment, or otherwise changes booking's observable
+ * behaviour -- a nullable `serviceId` or `deliveryLocationId` continues to
+ * behave byte-identically to the pre-#131 path on every existing route.
+ *
+ * ## It returns ELIGIBLE resources, never a winner
+ *
+ * `V33-DEC-035` R7. The result is the complete candidate set in a
+ * deterministic order, never a single selection: there is no `ORDER BY ...
+ * LIMIT 1` inside the implementation, because picking one is `#128`'s job
+ * under its own locking discipline, not this port's. "Eligible" means active,
+ * at the right location, of the right kind -- not "currently free"; this port
+ * computes no occupancy and is not a busy/free oracle.
+ *
+ * ## The no-requirement and no-key cases both return the SAME empty result
+ *
+ * A null `serviceId` (the slot/booking accepts any service), a null
+ * `deliveryLocationId` (no branch context), and a concrete service with no
+ * requirement row all resolve to an empty array -- never an error, never a
+ * default, never a first-row guess. This is what keeps a booking with no
+ * resolvable service or location behaving exactly as it always has.
+ *
+ * ## It takes the caller's `EntityManager`
+ *
+ * A future caller (`#128`) must read candidates inside the SAME transaction
+ * that later locks and assigns one, so a resource retired between the read and
+ * the lock cannot be assigned -- the same discipline `DeliveryLocationDirectory`
+ * documents for the slot snapshot.
+ *
+ * ## Nothing is provided by default, deliberately
+ *
+ * `BookingModule` declares the token and binds nothing. A composition that
+ * forgets it fails to boot, rather than a future `#128` silently resolving
+ * against an empty adapter and refusing every resource-bearing booking.
+ */
+export interface EligibleResourceDirectory {
+  /**
+   * The eligible internal `business.location_resources.id` values for
+   * `serviceId` at `deliveryLocationId`, deterministically ordered.
+   *
+   * Returns `[]` when `serviceId` is `null`, when `deliveryLocationId` is
+   * `null`, when the service has no requirement row, or when a requirement
+   * exists but no active resource of the required kind exists at that
+   * location. There is no way to distinguish these cases from the return
+   * value alone, by design (`V33-DEC-035` R9) -- `#128` maps every empty
+   * result to the platform's existing generic non-enumerating booking
+   * refusal when (and only when) it determines a requirement was genuinely
+   * unmet.
+   */
+  eligibleResourcesFor(
+    manager: EntityManager,
+    serviceId: string | null,
+    deliveryLocationId: string | null,
+  ): Promise<readonly string[]>;
+}
+
+export const ELIGIBLE_RESOURCE_DIRECTORY = Symbol('BEAUCLICK_ELIGIBLE_RESOURCE_DIRECTORY');

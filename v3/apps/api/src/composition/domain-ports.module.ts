@@ -29,9 +29,10 @@ import {
   BusinessStaffEntity,
   LOCATION_CITY_CATALOGUE,
   SCOPED_STAFF_AUTHORIZER,
+  SERVICE_OWNERSHIP_DIRECTORY,
   STAFF_INVITE_IDENTITY_RESOLVER,
 } from '@beauclick/business';
-import { DELIVERY_LOCATION_DIRECTORY } from '@beauclick/booking';
+import { DELIVERY_LOCATION_DIRECTORY, ELIGIBLE_RESOURCE_DIRECTORY } from '@beauclick/booking';
 import { PROFESSIONAL_OWNER_LOOKUP } from '@beauclick/waitlist';
 import {
   DEVELOPMENT_WORKSPACE_REFERENCE_SECRET,
@@ -49,6 +50,8 @@ import {
   BusinessBackedDeliveryLocationDirectory,
   IdentityBackedStaffInviteResolver,
   ProviderBackedLocationCityCatalogue,
+  ProviderBackedServiceOwnershipDirectory,
+  BusinessBackedEligibleResourceDirectory,
   SellerPartyLookup,
 } from './port-adapters';
 import {
@@ -233,6 +236,38 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
      */
     BusinessBackedDeliveryLocationDirectory,
     { provide: DELIVERY_LOCATION_DIRECTORY, useExisting: BusinessBackedDeliveryLocationDirectory },
+    /*
+     * V3.3 #131 (`#127b`), `V33-DEC-035` R5.
+     *
+     * `business` may not import `provider` (ADR-011). This adapter proves a
+     * `provider.services` id belongs to a professional with an active
+     * membership of the calling business, reading `provider.services`,
+     * `provider.professionals` and `business.business_staff` together on the
+     * CALLER's manager, so the check and the requirement write commit as one
+     * transaction.
+     *
+     * MANDATORY -- no `@Optional()` fallback. A composition that forgets it
+     * must fail to boot rather than silently accepting a requirement for a
+     * service nobody proved belongs to the caller.
+     */
+    ProviderBackedServiceOwnershipDirectory,
+    { provide: SERVICE_OWNERSHIP_DIRECTORY, useExisting: ProviderBackedServiceOwnershipDirectory },
+    /*
+     * V3.3 #131 (`#127b`), `V33-DEC-035` R5/R7.
+     *
+     * `booking` may not import `business` (ADR-011). This adapter answers
+     * "which internal resource ids are eligible for this service at this
+     * location" by reading `business.service_resource_requirements` and
+     * `business.location_resources` together. `#131` binds it but does not
+     * call it from any existing booking path -- `#128` is the consumer.
+     *
+     * MANDATORY -- no `@Optional()` fallback, for the same reason
+     * `DELIVERY_LOCATION_DIRECTORY` above is: a composition that forgets it
+     * must fail to boot rather than #128 later resolving against an empty
+     * adapter and refusing every resource-bearing booking.
+     */
+    BusinessBackedEligibleResourceDirectory,
+    { provide: ELIGIBLE_RESOURCE_DIRECTORY, useExisting: BusinessBackedEligibleResourceDirectory },
     /**
      * The workspace-reference secret, read ONCE for the whole application.
      *
@@ -305,6 +340,8 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     SCOPED_STAFF_AUTHORIZER,
     STAFF_INVITE_IDENTITY_RESOLVER,
     DELIVERY_LOCATION_DIRECTORY,
+    SERVICE_OWNERSHIP_DIRECTORY,
+    ELIGIBLE_RESOURCE_DIRECTORY,
     WORKSPACE_REFERENCE_SECRET,
     FINANCIAL_DATA_SOURCE,
     PROVIDER_REINDEX_SOURCE,

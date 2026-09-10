@@ -147,7 +147,17 @@ describe('delivery-location context — boundaries and non-exposure (#127a)', ()
     });
 
     it('no booking source outside the entity and service names the snapshot at all', () => {
-      const allowed = new Set(['entities/availability-slot.entity.ts', 'availability/availability.service.ts', 'booking-subject-data.contract.ts']);
+      const allowed = new Set([
+        'entities/availability-slot.entity.ts',
+        'availability/availability.service.ts',
+        'booking-subject-data.contract.ts',
+        // V3.3 #131 (`#127b`), `V33-DEC-035` R5/R7. `ELIGIBLE_RESOURCE_DIRECTORY`
+        // takes the slot's snapshotted delivery-location id as one of its two
+        // arguments -- it is the consumer #127a's snapshot exists to serve, not
+        // a new leak of it. #131 does not call this port from any existing
+        // booking path; only its declaration in ports.ts names the value.
+        'ports.ts',
+      ]);
       const offenders = bookingSources
         .filter((file) => !allowed.has(file.path))
         .filter((file) => file.code.includes('deliveryLocationId') || file.code.includes('delivery_location_id'))

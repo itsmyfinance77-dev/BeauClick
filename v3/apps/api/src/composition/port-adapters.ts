@@ -24,10 +24,11 @@ import {
   BusinessStaffEntity,
   InvitableIdentity,
   LocationCityCataloguePort,
+  ServiceOwnershipDirectoryPort,
   StaffInviteIdentityResolverPort,
 } from '@beauclick/business';
 import { RoleService, UserEntity, canonicalizePhone } from '@beauclick/identity';
-import { DeliveryLocationDirectory } from '@beauclick/booking';
+import { DeliveryLocationDirectory, EligibleResourceDirectory } from '@beauclick/booking';
 
 /**
  * The composition root's implementations of the ports booking-, commerce-,
@@ -568,5 +569,128 @@ export class BusinessBackedDeliveryLocationDirectory implements DeliveryLocation
     // unrepresentable today; if the model ever changes underneath this, refusing
     // to guess is safer than picking one.
     return rows.length === 1 ? rows[0].location_id : null;
+  }
+}
+
+/**
+ * Proves a `provider.services` id belongs to a business -- V3.3 Story #131
+ * (`#127b`), `V33-DEC-035` R5.
+ *
+ * ## This is the only place `business` and `provider` meet for a requirement
+ *
+ * `scope:business` may depend only on `scope:shared`, so `business` declares
+ * `SERVICE_OWNERSHIP_DIRECTORY` and cannot name who answers it. `apps/api` is
+ * the only tier permitted to compose domains (ADR-011), and this adapter is
+ * where `provider.services`, `provider.professionals` and
+ * `business.business_staff` are read together -- the same construction
+ * `BusinessBackedDeliveryLocationDirectory` above already uses in the
+ * opposite direction.
+ *
+ * ## One statement, three conditions, no ordering
+ *
+ * The join asserts every condition at once: the service is **live**
+ * (`deleted_at IS NULL`); its owning professional is **live**; and that
+ * professional holds an **active** `business.business_staff` membership of
+ * THIS business. A service belonging to a professional with no membership, an
+ * `invited`/`inactive`/`declined`/`removed` one, or a membership of a
+ * DIFFERENT business, all answer `false` identically -- there is no
+ * distinguishing cause for `business` to leak.
+ *
+ * `uq_business_staff_active_professional` already admits at most one active
+ * membership per professional, so there is no first-row ambiguity here to
+ * refuse: the answer is unambiguous by construction, exactly as
+ * `deliveryLocationFor` above documents for the same invariant.
+ *
+ * ## It runs on the caller's manager
+ *
+ * The check and the requirement write are one transaction (ADR-049 §8.2): a
+ * service reassigned to another business mid-request cannot be accepted, and a
+ * rolled-back requirement write rolls back a check that already "passed".
+ */
+@Injectable()
+export class ProviderBackedServiceOwnershipDirectory implements ServiceOwnershipDirectoryPort {
+  async verifyServiceBelongsToBusiness(manager: EntityManager, businessId: string, serviceId: string): Promise<boolean> {
+    const rows: unknown[] = await manager.query(
+      `SELECT 1
+         FROM provider.services s
+         JOIN provider.professionals p ON p.id = s.professional_id
+         JOIN business.business_staff m ON m.professional_id = p.id
+        WHERE s.id = $1
+          AND s.deleted_at IS NULL
+          AND p.deleted_at IS NULL
+          AND m.business_id = $2
+          AND m.status = 'active'`,
+      [serviceId, businessId],
+    );
+    return rows.length > 0;
+  }
+}
+
+/**
+ * Resolves the eligible resource candidates for a service at a delivery
+ * location -- V3.3 Story #131 (`#127b`), `V33-DEC-035` R5/R7.
+ *
+ * ## This is the only place `booking` and `business` meet for eligibility
+ *
+ * `scope:booking` may depend only on `scope:shared`, so `booking` declares
+ * `ELIGIBLE_RESOURCE_DIRECTORY` and cannot name who answers it. `apps/api` is
+ * the only tier permitted to compose domains, and this adapter reads
+ * `business.service_resource_requirements` and `business.location_resources`
+ * together -- the same construction every other cross-domain adapter in this
+ * file uses.
+ *
+ * ## The null cases short-circuit before any query runs
+ *
+ * A `null` `serviceId` (the slot/booking accepts any service) and a `null`
+ * `deliveryLocationId` (no branch context) both mean "nothing to resolve" --
+ * `V33-DEC-035`'s nullable-service semantics, restated at the one place that
+ * would otherwise have to dereference a missing key. Neither reaches the
+ * database: the empty result is returned directly, so a booking with no
+ * concrete service or no branch behaves byte-identically to the pre-#131
+ * path with zero added queries.
+ *
+ * ## One statement for the candidate set, never a winner
+ *
+ * When a requirement row exists, one query returns every ACTIVE resource at
+ * the location whose kind matches -- set-based, no N+1, no `LIMIT`. When no
+ * requirement row exists, the LEFT JOIN makes that fact visible without a
+ * second round trip, and the method returns `[]` rather than treating "no
+ * requirement" as an error (`V33-DEC-035` R6/R7). Picking one candidate is
+ * `#128`'s job under its own locking discipline; this adapter never orders
+ * toward a single answer.
+ */
+@Injectable()
+export class BusinessBackedEligibleResourceDirectory implements EligibleResourceDirectory {
+  async eligibleResourcesFor(
+    manager: EntityManager,
+    serviceId: string | null,
+    deliveryLocationId: string | null,
+  ): Promise<readonly string[]> {
+    if (serviceId === null || deliveryLocationId === null) return [];
+
+    // The join is on BOTH `service_id` AND `r.business_id` -- not `service_id`
+    // alone. `service_resource_requirements` is uniquely keyed on
+    // `(business_id, service_id)`, not `service_id` alone, precisely because a
+    // professional who has moved businesses can leave a STALE requirement row
+    // behind under their old business (`V33-DEC-035`'s "stale rows are
+    // harmless" reasoning: they are harmless only because nothing ever reads
+    // them without also matching the CURRENT business). Matching on
+    // `r.business_id` -- the resource's own business, which is authoritative
+    // because it is derived from `deliveryLocationId`, itself the slot's
+    // frozen snapshot -- is what keeps an old employer's requirement from ever
+    // leaking into a candidate set resolved for the new one.
+    const rows: Array<{ id: string }> = await manager.query(
+      `SELECT r.id
+         FROM business.location_resources r
+         JOIN business.service_resource_requirements q
+           ON q.business_id = r.business_id
+          AND q.service_id = $1
+          AND q.required_kind = r.kind
+        WHERE r.location_id = $2
+          AND r.lifecycle = 'active'
+        ORDER BY r.id`,
+      [serviceId, deliveryLocationId],
+    );
+    return rows.map((row) => row.id);
   }
 }
