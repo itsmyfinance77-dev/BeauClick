@@ -28,6 +28,7 @@ import {
   BusinessScopedStaffAuthorizer,
   BusinessStaffEntity,
   LOCATION_CITY_CATALOGUE,
+  RESOURCE_ASSIGNMENT_DIRECTORY,
   SCOPED_STAFF_AUTHORIZER,
   SERVICE_OWNERSHIP_DIRECTORY,
   STAFF_INVITE_IDENTITY_RESOLVER,
@@ -52,6 +53,7 @@ import {
   ProviderBackedLocationCityCatalogue,
   ProviderBackedServiceOwnershipDirectory,
   BusinessBackedEligibleResourceDirectory,
+  BookingBackedResourceAssignmentDirectory,
   SellerPartyLookup,
 } from './port-adapters';
 import {
@@ -268,6 +270,23 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
      */
     BusinessBackedEligibleResourceDirectory,
     { provide: ELIGIBLE_RESOURCE_DIRECTORY, useExisting: BusinessBackedEligibleResourceDirectory },
+    /*
+     * V3.3 #128 (`#110b`), ADR-049 §6.6.
+     *
+     * `business` may not import `booking` (ADR-011). This adapter answers
+     * "does any of these resources have a still-relevant booking
+     * assignment," reading `booking.booking_resource_assignments` behind the
+     * same advisory-lock convention `booking`'s own assignment-creation path
+     * uses, so retire/close and assignment-creation linearise against each
+     * other even though neither module can see the other's table.
+     *
+     * MANDATORY -- no `@Optional()` fallback. A composition that forgets it
+     * must fail to boot rather than silently letting a resource be retired,
+     * or a location closed, out from under a customer's upcoming
+     * appointment.
+     */
+    BookingBackedResourceAssignmentDirectory,
+    { provide: RESOURCE_ASSIGNMENT_DIRECTORY, useExisting: BookingBackedResourceAssignmentDirectory },
     /**
      * The workspace-reference secret, read ONCE for the whole application.
      *
@@ -342,6 +361,7 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     DELIVERY_LOCATION_DIRECTORY,
     SERVICE_OWNERSHIP_DIRECTORY,
     ELIGIBLE_RESOURCE_DIRECTORY,
+    RESOURCE_ASSIGNMENT_DIRECTORY,
     WORKSPACE_REFERENCE_SECRET,
     FINANCIAL_DATA_SOURCE,
     PROVIDER_REINDEX_SOURCE,

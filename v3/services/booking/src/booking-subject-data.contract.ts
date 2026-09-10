@@ -52,6 +52,17 @@ export class BookingSubjectDataContract implements SubjectDataContract {
       disposition: 'retained',
       reason: 'Transactional outbox. Contract-validated payloads carry ids and timestamps.',
     },
+    // V3.3 Story #128 (`#110b`), ADR-049 §6. `subject_data`, by explicit
+    // owner direction: an assignment describes something that happened as
+    // part of ONE person's appointment, not an organisational fact
+    // independent of any customer (unlike `business.location_resources`,
+    // which describes a resource that exists regardless of who ever booked
+    // it). The heuristic (`coverage.ts`'s `isSubjectColumn`) recognises none
+    // of this table's columns (`booking_id`, `resource_id`, `start_at`,
+    // `end_at`, `status`) -- `booking_id` is a `booking` row id, not a
+    // person, and `resource_id` is an opaque `business` id -- so the
+    // disposition is pinned by an explicit test, exactly as `#131`'s is.
+    { table: 'booking.booking_resource_assignments', disposition: 'subject_data' },
   ];
 
   async exportSubjectData(manager: EntityManager, userId: string): Promise<SubjectExportSection[]> {
@@ -70,6 +81,21 @@ export class BookingSubjectDataContract implements SubjectDataContract {
          JOIN booking.bookings b ON b.id = h.booking_id
         WHERE b.customer_id = $1 AND h.actor_id = $1
         ORDER BY h.created_at DESC`,
+      [userId],
+    );
+
+    // V3.3 Story #128 (`#110b`), `V33-DEC-034` R6/R9. Scoped to the subject's
+    // OWN bookings, exactly as `history` above is. `resource_id` is
+    // DELIBERATELY excluded -- an export tells a subject what the platform
+    // holds about a resource-bearing appointment they made, not which
+    // physical resource served it, matching the same non-enumeration
+    // discipline every customer-facing surface in this family follows.
+    const resourceAssignments = await manager.query(
+      `SELECT a.booking_id, a.status, a.created_at, a.updated_at
+         FROM booking.booking_resource_assignments a
+         JOIN booking.bookings b ON b.id = a.booking_id
+        WHERE b.customer_id = $1
+        ORDER BY a.created_at DESC`,
       [userId],
     );
 
@@ -95,6 +121,11 @@ export class BookingSubjectDataContract implements SubjectDataContract {
         key: 'booking_history',
         description: 'تغییراتی که خودتان روی رزروهایتان انجام داده‌اید',
         rows: history as Array<Record<string, unknown>>,
+      },
+      {
+        key: 'booking_resource_assignments',
+        description: 'وضعیت تخصیص منبع برای رزروهایتان',
+        rows: resourceAssignments as Array<Record<string, unknown>>,
       },
     ];
   }
@@ -137,6 +168,11 @@ export class BookingSubjectDataContract implements SubjectDataContract {
           table: 'booking.bookings',
           reason:
             "the other party's business record and the ledger's referential ground; anonymous once the identity behind customer_id is destroyed",
+        },
+        {
+          table: 'booking.booking_resource_assignments',
+          reason:
+            "which resource served an appointment is the other party's operational record, not the subject's free text; there is nothing here to anonymize, and destroying it would corrupt that record for no privacy gain",
         },
       ],
     };

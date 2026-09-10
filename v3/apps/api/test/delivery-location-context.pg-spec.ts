@@ -195,26 +195,34 @@ describeIfPg('Delivery-location context on real PostgreSQL (#127a)', () => {
       const bookingTables: string[] = (
         await dataSource.query(`SELECT tablename FROM pg_tables WHERE schemaname='booking' ORDER BY tablename`)
       ).map((r: { tablename: string }) => r.tablename);
-      expect(bookingTables).toEqual(['availability_slots', 'booking_history', 'bookings', 'idempotency_keys', 'outbox_events']);
 
       /*
-       * `business.service_resource_requirements` DID NOT exist when this
-       * suite was first written (#127a, 2026-09-10) -- this test originally
-       * asserted its absence as evidence that #127a authorized no resource
-       * table. #131 (`#127b`) has SINCE been ratified and implemented as its
-       * own story, adding exactly that one table (see
-       * `service-resource-requirements.pg-spec.ts` for its full contract).
-       * Its presence here is therefore expected, not a #127a regression --
-       * the assertion that matters, and still holds, is that #128's
-       * `booking_resource_assignments` / collision-constraint table is
-       * NOWHERE in either schema.
+       * `business.service_resource_requirements` and
+       * `booking.booking_resource_assignments` DID NOT exist when this suite
+       * was first written (#127a, 2026-09-10) -- this test originally
+       * asserted their absence as evidence that #127a authorized no resource
+       * or assignment table. #131 (`#127b`) and #128 (`#110b`) have SINCE
+       * been ratified and implemented as their own stories, each adding
+       * exactly the one table it owns (see `service-resource-requirements
+       * .pg-spec.ts` and `booking-resource-assignments.pg-spec.ts` for their
+       * full contracts). Their presence here is therefore expected, not a
+       * #127a regression -- the assertion that matters, and still holds, is
+       * that #127a itself introduced neither.
        */
+      expect(bookingTables).toEqual([
+        'availability_slots',
+        'booking_history',
+        'booking_resource_assignments',
+        'bookings',
+        'idempotency_keys',
+        'outbox_events',
+      ]);
+
       const businessTables: string[] = (
         await dataSource.query(`SELECT tablename FROM pg_tables WHERE schemaname='business' ORDER BY tablename`)
       ).map((r: { tablename: string }) => r.tablename);
       expect(businessTables).toContain('service_resource_requirements');
       expect(businessTables).not.toContain('booking_resource_assignments');
-      expect(bookingTables).not.toContain('booking_resource_assignments');
     });
   });
 

@@ -5,6 +5,9 @@ import { uuidv7 } from 'uuidv7';
 import {
   BOOKING_CANCELLATION_ENTITLEMENT_HOOK,
   BookingCancellationEntitlementHook,
+  ELIGIBLE_RESOURCE_DIRECTORY,
+  EligibleResourceDirectory,
+  lockResourceForAssignment,
 } from '../ports';
 import { emitEvent, AuditLogger } from '@beauclick/events';
 
@@ -19,6 +22,7 @@ import {
 import { BookingHistoryEntity, BookingHistoryEvent, BookingHistoryMetadata } from '../entities/booking-history.entity';
 import { BookingIdempotencyKeyEntity } from '../entities/booking-idempotency-key.entity';
 import { BookingOutboxEntity } from '../entities/booking-outbox.entity';
+import { BookingResourceAssignmentEntity } from '../entities/booking-resource-assignment.entity';
 import { BookingConfig } from '../booking.config';
 import {
   InvalidBookingTransitionException,
@@ -80,6 +84,15 @@ export class BookingService {
      */
     @Inject(BOOKING_CANCELLATION_ENTITLEMENT_HOOK)
     private readonly cancellationEntitlement: BookingCancellationEntitlementHook,
+    /**
+     * V3.3 #128 (`#110b`). **Mandatory**, deliberately without `@Optional()`
+     * -- the same reasoning `cancellationEntitlement` above already carries:
+     * a composition missing the binding must fail to construct rather than
+     * silently booking every resource-requiring service with no assignment
+     * at all.
+     */
+    @Inject(ELIGIBLE_RESOURCE_DIRECTORY)
+    private readonly eligibleResources: EligibleResourceDirectory,
   ) {}
 
   // ---------------------------------------------------------------------
@@ -194,6 +207,13 @@ export class BookingService {
       cancelledAt: null,
     });
     await manager.insert(BookingEntity, booking);
+
+    // V3.3 #128 (`#110b`), ADR-049 §6.4. Inside the SAME transaction as the
+    // slot claim and the booking insert, so there is no window in which the
+    // booking exists without its resource or vice versa. Resolves to no
+    // assignment for a null service, a null delivery location, or a service
+    // with no requirement (`V33-DEC-034` R4) -- see `syncResourceAssignment`.
+    await this.syncResourceAssignment(manager, bookingId, booking.serviceId, slot.deliveryLocationId, slot.startAt, slot.endAt);
 
     if (idempotencyKey) {
       // Inserted in the SAME transaction as the booking, with the result id
@@ -391,6 +411,12 @@ export class BookingService {
 
       await this.releaseSlot(m, before.slotId, bookingId);
 
+      // V3.3 #128 (`#110b`). Same transaction as the cancellation, so a
+      // rollback of either rolls back both. Idempotent: a booking with no
+      // assignment, or one already `released`, matches zero rows and is a
+      // silent no-op.
+      await this.releaseResourceAssignment(m, bookingId);
+
       await emitEvent(m, BookingOutboxEntity, {
         aggregateType: 'booking',
         aggregateId: bookingId,
@@ -513,6 +539,17 @@ export class BookingService {
         holdExpiresAt ?? new Date(now.getTime() + this.config.holdMinutes * 60_000),
         now,
       );
+
+      // Step 1.5 -- resolve the resource for the DESTINATION slot, re-
+      // evaluating delivery location and required kind from scratch rather
+      // than carrying the old resource forward (`V33-DEC-034` R4/R7): the
+      // destination may need no resource at all, the same kind, or (if the
+      // professional's branch context differs) a different one entirely.
+      // `syncResourceAssignment` mutates the SAME assignment row this
+      // booking has always had, if any -- see that method's own docs. A
+      // throw here rolls back Step 1's slot claim too, leaving the
+      // ORIGINAL booking, slot and assignment completely untouched.
+      await this.syncResourceAssignment(m, bookingId, booking.serviceId, claimed.deliveryLocationId, claimed.startAt, claimed.endAt);
 
       // Step 2 -- move the booking, compare-and-swapping on the status we
       // validated above, so a concurrent cancel/confirm that landed in
@@ -803,6 +840,153 @@ export class BookingService {
       .execute();
   }
 
+  // ---------------------------------------------------------------------
+  // Resource assignment -- V3.3 #128 (`#110b`)
+  // ---------------------------------------------------------------------
+
+  /**
+   * Resolves and writes this booking's resource assignment for the given
+   * `(serviceId, deliveryLocationId, startAt, endAt)`, inside the caller's
+   * transaction. Called from BOTH `createWithin` (first assignment) and
+   * `reschedule` (reassignment to a new destination) -- there is at most
+   * ONE assignment row per booking, ever (`UNIQUE(booking_id)`,
+   * `BookingResourceAssignmentEntity`'s own docs), so this method always
+   * decides INSERT vs UPDATE from whether a row already exists for
+   * `bookingId`, never appends a second one.
+   *
+   * ## The three outcomes, and which is which
+   *
+   * `#131`'s `eligibleResourcesFor` distinguishes "no requirement to
+   * resolve" (`null`) from "a requirement exists and is unmet" (`[]`) --
+   * see that port's own contract. `null` means this booking needs no
+   * assignment: any EXISTING row is released (the destination no longer
+   * needs a resource), never deleted. `[]` throws the platform's existing
+   * generic non-enumerating refusal, `SlotUnavailableException` --
+   * `ADR-049` §6.5's precedent, reused rather than a second shape invented.
+   * A non-empty array is the candidate set to select from.
+   *
+   * ## Lock-then-verify, one candidate at a time, in a fixed order
+   *
+   * The FIRST read is unlocked (a read never blocks) and only decides the
+   * ORDER candidates are tried in -- ascending id, the same fixed order
+   * every caller sorts to, so two transactions racing over an overlapping
+   * pool always attempt locks in the same sequence and can never deadlock
+   * against each other. Only the candidate actually being tried is locked,
+   * via `lockResourceForAssignment` -- the same convention `business`'s
+   * retire/close path uses on the other side of this exact race (see that
+   * function's own documentation for why a lock is needed at all: a
+   * resource can be retired, or gain/lose a requirement match, between an
+   * unlocked read and this transaction's write). Once a candidate is
+   * locked, this re-reads eligibility authoritatively before touching it:
+   * if it retired in the gap, nothing that could still retire it can
+   * proceed concurrently while we hold its lock, so the re-read is
+   * conclusive. Candidates never reached by this loop are never locked --
+   * the cost of a successful assignment is the cost of the ONE candidate
+   * that worked, not the size of the eligible pool.
+   *
+   * ## Selection: try candidates in order, never guess, never abort early
+   *
+   * The GiST exclusion constraint -- not this method's ordering -- is what
+   * actually prevents two bookings from occupying one resource at
+   * overlapping times; ordering only decides WHICH free resource is offered
+   * first when several qualify. An `INSERT`/`UPDATE` that collides raises
+   * PostgreSQL `23P01` (or, defensively, `23505`) -- but ANY failed
+   * statement marks the whole transaction aborted until a `ROLLBACK TO
+   * SAVEPOINT`, so each attempt runs inside its own savepoint: a collision
+   * rolls back only that attempt and leaves the surrounding transaction (the
+   * booking row already inserted by the caller, included) perfectly usable
+   * for the next candidate. Never surfaced as a 500. Only when every
+   * candidate has been tried and none succeeded does this throw the generic
+   * refusal, and by then nothing has been written.
+   */
+  private async syncResourceAssignment(
+    manager: EntityManager,
+    bookingId: string,
+    serviceId: string | null,
+    deliveryLocationId: string | null,
+    startAt: Date,
+    endAt: Date,
+  ): Promise<void> {
+    const existing = await manager.findOne(BookingResourceAssignmentEntity, { where: { bookingId } });
+
+    const initialCandidates = await this.eligibleResources.eligibleResourcesFor(manager, serviceId, deliveryLocationId);
+
+    if (initialCandidates === null) {
+      if (existing && existing.status === 'active') {
+        await manager.update(BookingResourceAssignmentEntity, { id: existing.id }, { status: 'released' });
+        this.auditLog.log({ action: 'booking.resource_released', bookingId });
+      }
+      return;
+    }
+
+    if (initialCandidates.length === 0) {
+      throw new SlotUnavailableException();
+    }
+
+    const sortedCandidateIds = [...initialCandidates].sort();
+    for (const resourceId of sortedCandidateIds) {
+      await lockResourceForAssignment(manager, resourceId);
+
+      const authoritative = await this.eligibleResources.eligibleResourcesFor(manager, serviceId, deliveryLocationId);
+      if (!authoritative || !authoritative.includes(resourceId)) {
+        // Retired (or otherwise made ineligible) in the gap between the
+        // unlocked read and this lock -- try the next candidate.
+        continue;
+      }
+
+      await manager.query('SAVEPOINT sp_resource_assignment');
+      try {
+        if (existing) {
+          await manager
+            .createQueryBuilder()
+            .update(BookingResourceAssignmentEntity)
+            .set({ resourceId, startAt, endAt, status: 'active' })
+            .where('id = :id', { id: existing.id })
+            .execute();
+        } else {
+          await manager.insert(BookingResourceAssignmentEntity, {
+            id: uuidv7(),
+            bookingId,
+            resourceId,
+            startAt,
+            endAt,
+            status: 'active',
+          });
+        }
+        await manager.query('RELEASE SAVEPOINT sp_resource_assignment');
+        this.auditLog.log({
+          action: existing ? 'booking.resource_reassigned' : 'booking.resource_assigned',
+          bookingId,
+        });
+        return;
+      } catch (err) {
+        await manager.query('ROLLBACK TO SAVEPOINT sp_resource_assignment');
+        if (!isResourceCollision(err)) throw err;
+        // This candidate collided -- try the next one. Nothing was written.
+      }
+    }
+
+    throw new SlotUnavailableException();
+  }
+
+  /**
+   * Releases this booking's resource assignment, if it has one. Idempotent:
+   * a booking with no assignment, or one already `released`, matches zero
+   * rows and is a silent no-op -- the row is never deleted, so cancellation
+   * history is never falsified.
+   */
+  private async releaseResourceAssignment(manager: EntityManager, bookingId: string): Promise<void> {
+    const result = await manager
+      .createQueryBuilder()
+      .update(BookingResourceAssignmentEntity)
+      .set({ status: 'released' })
+      .where('booking_id = :bookingId AND status = :status', { bookingId, status: 'active' })
+      .execute();
+    if ((result.affected ?? 0) > 0) {
+      this.auditLog.log({ action: 'booking.resource_released', bookingId });
+    }
+  }
+
   private async recordHistory(
     manager: EntityManager,
     input: {
@@ -838,4 +1022,20 @@ export { BOOKING_STATUSES, LEGAL_TRANSITIONS };
 
 function isUniqueViolation(err: unknown): boolean {
   return (err as { code?: string } | null)?.code === '23505';
+}
+
+/**
+ * Postgres `23P01` = exclusion_violation (the `ex_booking_resource_no_overlap`
+ * GiST constraint), `23505` = unique_violation (defensively -- `#128`'s own
+ * `UNIQUE(booking_id)` should never fire here, since `syncResourceAssignment`
+ * always resolves INSERT vs UPDATE from an existing row, but a second cause
+ * for "the database rejected this candidate" is treated identically to the
+ * exclusion violation rather than escaping as a 500). The exact precedent
+ * `availability.service.ts`'s `isOverlapViolation` already establishes for
+ * the slot-overlap case (ADR-049 §6.5) -- not re-exported from there because
+ * that module's function is private to a different exception mapping.
+ */
+function isResourceCollision(err: unknown): boolean {
+  const code = (err as { code?: string } | null)?.code;
+  return code === '23P01' || code === '23505';
 }

@@ -575,6 +575,9 @@ export const RESETTABLE_TABLES = [
   'booking.outbox_events',
   'booking.idempotency_keys',
   'booking.booking_history',
+  // V3.3 Story #128 (`#110b`). Before `booking.bookings`, which it
+  // references by a real same-schema FK.
+  'booking.booking_resource_assignments',
   'booking.bookings',
   'booking.availability_slots',
   'provider.professional_specialties',
@@ -746,12 +749,15 @@ export async function seedSlot(
   serviceId: string | null,
   startAt: Date,
   durationMinutes = 60,
+  // V3.3 Story #128 (`#110b`). Optional and trailing, so every existing
+  // caller (which never touches delivery location) is unaffected.
+  deliveryLocationId: string | null = null,
 ): Promise<string> {
   const id = uuidv7();
   await dataSource.query(
-    `INSERT INTO booking.availability_slots (id, professional_id, service_id, start_at, end_at, status)
-     VALUES ($1, $2, $3, $4, $5, 'open')`,
-    [id, professionalId, serviceId, startAt, new Date(startAt.getTime() + durationMinutes * 60_000)],
+    `INSERT INTO booking.availability_slots (id, professional_id, service_id, start_at, end_at, status, delivery_location_id)
+     VALUES ($1, $2, $3, $4, $5, 'open', $6)`,
+    [id, professionalId, serviceId, startAt, new Date(startAt.getTime() + durationMinutes * 60_000), deliveryLocationId],
   );
   return id;
 }

@@ -18,7 +18,13 @@ import {
 } from './business-location.audit';
 import { BusinessLocationLifecycle } from './entities/business-location.entity';
 import { CreateLocationDto, RenameLocationDto } from './dto/location.dto';
-import { AssignableCity, LOCATION_CITY_CATALOGUE, LocationCityCataloguePort } from './ports';
+import {
+  AssignableCity,
+  LOCATION_CITY_CATALOGUE,
+  LocationCityCataloguePort,
+  RESOURCE_ASSIGNMENT_DIRECTORY,
+  ResourceAssignmentDirectoryPort,
+} from './ports';
 
 /**
  * One location, as a caller sees it -- V3.3 Story #108 (`#44b`), ADR-049
@@ -94,6 +100,11 @@ export class BusinessLocationService {
      * `@Optional()`, so a composition that forgets it fails to boot.
      */
     @Inject(WORKSPACE_REFERENCE_SECRET) private readonly referenceSecret: string,
+    /**
+     * V3.3 #128 (`#110b`), ADR-049 §6.6. **Mandatory**, deliberately without
+     * `@Optional()` -- the same reasoning `referenceSecret` above carries.
+     */
+    @Inject(RESOURCE_ASSIGNMENT_DIRECTORY) private readonly resourceAssignments: ResourceAssignmentDirectoryPort,
   ) {}
 
   /**
@@ -207,6 +218,25 @@ export class BusinessLocationService {
       // `closed`): the same refusal as a stale ref.
       if (!TRANSITION_SOURCES[kind].includes(location.lifecycle)) {
         throw new NotFoundOrNotYoursException();
+      }
+
+      // ADR-049 §6.6: closing is blocked, never cascaded, while ANY of this
+      // location's resources has a future assignment -- suspend/reactivate
+      // are reversible and carry no such block. Only ACTIVE resources are
+      // checked: a retired one necessarily has none already, since
+      // `LocationResourceService.retire` enforces the identical block before
+      // a resource may ever become retired.
+      if (kind === 'close') {
+        const activeResourceIds: Array<{ id: string }> = await manager.query(
+          `SELECT id FROM business.location_resources WHERE location_id = $1 AND lifecycle = 'active'`,
+          [location.id],
+        );
+        if (
+          activeResourceIds.length > 0 &&
+          (await this.resourceAssignments.hasFutureAssignment(manager, activeResourceIds.map((r) => r.id)))
+        ) {
+          throw new NotFoundOrNotYoursException();
+        }
       }
 
       const result = await manager.query(
