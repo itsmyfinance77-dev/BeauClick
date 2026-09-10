@@ -4,7 +4,7 @@ import { uuidv7 } from 'uuidv7';
 import request from 'supertest';
 
 import { AdminAuditService } from '@beauclick/audit';
-import { AvailabilityService } from '@beauclick/booking';
+import { AvailabilityService, BookingService } from '@beauclick/booking';
 import { BusinessSubjectDataContract } from '@beauclick/business';
 import { SUBJECT_DATA_CONTRACTS, SubjectDataContract, SubjectDataCoverageService, CatalogueTable, evaluateCoverage } from '@beauclick/subject-data';
 import { WORKSPACE_REFERENCE_SECRET, deriveLocationReference } from '@beauclick/workspace-reference';
@@ -811,6 +811,59 @@ describeIfPg('Delivery-location context on real PostgreSQL (#127a)', () => {
       // Either the complete old binding or the complete new one -- never a
       // half-applied change and never NULL.
       expect([branchA, branchB]).toContain(await snapshotOf(slot.id));
+    });
+  });
+
+  // =========================================================================
+  // §9b Reschedule
+  // =========================================================================
+
+  describe('§9b a reschedule takes the destination slot’s branch, never the old one', () => {
+    it('points the booking at the new slot, whose snapshot is the new branch', async () => {
+      const owner = await seedUser(app, dataSource, uniquePhone('+98894'), ['business']);
+      const business = await seedBusiness(dataSource, owner.id, 'سالن');
+      const cityId = await seedCity(dataSource, `شهر ${Math.random().toString(36).slice(2, 8)}`);
+      const branchA = uuidv7();
+      const branchB = uuidv7();
+      for (const id of [branchA, branchB]) {
+        await dataSource.query(
+          `INSERT INTO business.locations (id, business_id, name, city_id, lifecycle) VALUES ($1, $2, 'شعبه', $3, 'active')`,
+          [id, business.id, cityId],
+        );
+      }
+      const { professional, membershipId } = await seedActiveProfessionalMembership(business.id, owner.id, '+98895', branchA);
+
+      // One slot published while bound to A, a second after rebinding to B.
+      const slotA = await availability.createSlot(professional.id, { ...futureSlot(64), serviceId: null });
+      await api()
+        .put(bindingPath(business.id, membershipId))
+        .set(auth(owner))
+        .send({ locationRef: deriveLocationReference(referenceSecret, owner.id, business.id, branchB) })
+        .expect(200);
+      const slotB = await availability.createSlot(professional.id, { ...futureSlot(65), serviceId: null });
+
+      expect(await snapshotOf(slotA.id)).toBe(branchA);
+      expect(await snapshotOf(slotB.id)).toBe(branchB);
+
+      // A booking on A, rescheduled onto B.
+      const customer = await seedUser(app, dataSource, uniquePhone('+98896'));
+      const booking = await app
+        .get(BookingService)
+        .create({ customerId: customer.id, professionalId: professional.id, slotId: slotA.id, serviceId: null });
+      await app.get(BookingService).reschedule(booking.id, slotB.id, { type: 'customer', id: customer.id });
+
+      const [moved] = await dataSource.query(`SELECT slot_id::text FROM booking.bookings WHERE id = $1`, [booking.id]);
+      expect(moved.slot_id).toBe(slotB.id);
+
+      /*
+       * The delivery context of a booking IS its slot's snapshot -- there is no
+       * copy on the booking row to go stale. So a reschedule moves the context
+       * simply by moving the slot, and the old slot keeps its own branch for
+       * whoever books it next. #128 reads the CURRENT slot and therefore never
+       * sees the old branch.
+       */
+      expect(await snapshotOf(slotB.id)).toBe(branchB);
+      expect(await snapshotOf(slotA.id)).toBe(branchA);
     });
   });
 
