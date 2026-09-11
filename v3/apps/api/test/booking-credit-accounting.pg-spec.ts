@@ -1053,15 +1053,33 @@ describePg('booking-credit accounting (real PostgreSQL)', () => {
        * case makes is unchanged and still exact: #58a's own surface —
        * consumption, return, balance, allowance, entitlement — is still
        * empty, and a route from any of those families fails here.
+       *
+       * Amended again by V3.3 Story #95 (`#58b-1`, ADR-050 §5, `V33-DEC-036`
+       * R7), which added the PRIVILEGED ADMINISTRATOR sub-resource for the
+       * enforcement control plane -- preview, explicit governance transition
+       * and exemption, and the emergency kill switch -- under
+       * `v1/admin/commercial`. Named exactly, and the claim is still exact:
+       * no seller- or customer-facing credit route, no balance surface, no
+       * consumption or return route exists, and no activation route (#141)
+       * exists yet. A seventh enforcement route, or any route under `v1/me`
+       * naming credits beyond #57's three, fails here.
        */
       expect(paths.filter((p) => /credit|consumption|entitlement|balance|allowance/i.test(p)).sort()).toEqual(
         [
           '/api/v1/me/subscriptions/:workspaceRef/credit-purchases/quote',
           '/api/v1/me/subscriptions/:workspaceRef/credit-purchases',
           '/api/v1/me/subscriptions/:workspaceRef/credit-purchases',
+          '/api/v1/admin/commercial/booking-credit-enforcement',
+          '/api/v1/admin/commercial/booking-credit-enforcement/preview',
+          '/api/v1/admin/commercial/booking-credit-enforcement/transitions',
+          '/api/v1/admin/commercial/booking-credit-enforcement/exemptions',
+          '/api/v1/admin/commercial/booking-credit-enforcement/kill-switch/engage',
+          '/api/v1/admin/commercial/booking-credit-enforcement/kill-switch/release',
         ].sort(),
       );
       expect(paths.filter((p) => /consumption|entitlement|balance|allowance/i.test(p))).toEqual([]);
+      expect(paths.filter((p) => /credit/i.test(p) && /\/me\//.test(p) && !/credit-purchases/.test(p))).toEqual([]);
+      expect(paths.filter((p) => /activation/i.test(p))).toEqual([]);
     });
 
     it('emits no event: the commercial domain still has no outbox at all', async () => {
