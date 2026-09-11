@@ -1,6 +1,7 @@
 import { Column, CreateDateColumn, Entity, PrimaryColumn } from 'typeorm';
 
 import { CreditPurchaseEntity } from './credit-purchase.entity';
+import { ENFORCEMENT_ENTITIES } from '../enforcement/booking-credit-enforcement.entities';
 
 import type {
   BookingCreditGrantSource,
@@ -272,6 +273,10 @@ export const SUBSCRIPTION_ENTITIES = [
   // module that spreads this list see it at boot, rather than at the first
   // request against a route that then 500s.
   CreditPurchaseEntity,
+  // V3.3 #95 (`#58b-1`). The two control-plane tables (ADR-050 §2), registered
+  // here for the same reason: every composition that knows the ledger knows
+  // the controls that gate it.
+  ...ENFORCEMENT_ENTITIES,
 ];
 
 /** Re-exported so ledger entities in this package can name the same type. */

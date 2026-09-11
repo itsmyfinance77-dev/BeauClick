@@ -604,6 +604,10 @@ describePg('ai assistant — lifecycle, retention, and privacy (real PostgreSQL)
       // Non-vacuity: this must have FOUND the two locks that exist, not zero.
       expect(declarations.has('AI_CONVERSATION_LOCK_NAMESPACE')).toBe(true);
       expect(declarations.has('WISHLIST_LOCK_NAMESPACE')).toBe(true);
+      // V3.3 #95 (`#58b-1`), ADR-050 §7.2: the coordination namespace joins the
+      // walk, so a later story that copies it fails here rather than in production.
+      expect(declarations.has('BOOKING_ENFORCEMENT_COORDINATION_LOCK_NAMESPACE')).toBe(true);
+      expect(declarations.get('BOOKING_ENFORCEMENT_COORDINATION_LOCK_NAMESPACE')).toBe(0x62_63_67_76 | 0);
       expect(declarations.get('AI_CONVERSATION_LOCK_NAMESPACE')).toBe(AI_CONVERSATION_LOCK_NAMESPACE);
 
       const values = [...declarations.values()];

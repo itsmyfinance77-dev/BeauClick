@@ -14,6 +14,7 @@ import {
 } from '@beauclick/commerce';
 import { FINANCE_WORKSPACE_OWNER_RESOLVER, FINANCIAL_DATA_SOURCE, FINANCIAL_PARTY_RESOLVER } from '@beauclick/financial';
 import {
+  BookingCreditEnforcementModule,
   CollectionPolicyResolutionModule,
   OWNED_SUBSCRIBER_PARTY_RESOLVER,
   SellerSubscriptionModule,
@@ -101,6 +102,13 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
      * credit does this party have" would be a second answer.
      */
     SellerSubscriptionModule,
+    /*
+     * V3.3 #95 (`#58b-1`), ADR-050 §4. The persistent control planes the
+     * entitlement adapter consults before the ledger. Imported rather than
+     * reimplemented for the same reason the ledger above is: a second "is the
+     * kill switch engaged" would be a second answer.
+     */
+    BookingCreditEnforcementModule,
     /*
      * V3.3 #115 (`#41d-2b`), ADR-048 R4. The read-only resolver module, whose
      * one provider `CommercialPolicyBackedCollectionResolver` delegates to.

@@ -425,6 +425,12 @@ export const RESETTABLE_TABLES = [
   // immutability guarantee: the application role reaches these tables only
   // through the service, and the suites that clear them are the ones proving
   // the triggers refuse every write that goes through it.
+  //
+  // V3.3 #95 (`#58b-1`). The per-party governance fact references a grant
+  // (`proof_grant_id`), so it goes BEFORE the grants. The singleton control row
+  // is deliberately NOT here: it must always exist, and `resetDatabase` puts
+  // it back into its initial safe state instead (see below).
+  'commercial.booking_credit_party_governance',
   'commercial.booking_credit_grants',
   'commercial.seller_subscriptions',
   // V3.3-A Story #40 (`#40a`). The plan and price catalogue, children first:
@@ -627,6 +633,26 @@ export const RESETTABLE_TABLES = [
 
 export async function resetDatabase(dataSource: DataSource): Promise<void> {
   await dataSource.query(`TRUNCATE ${RESETTABLE_TABLES.join(', ')} CASCADE`);
+  await resetEnforcementControl(dataSource);
+}
+
+/**
+ * Returns the V3.3 #95 (`#58b-1`) control singleton to the state the migration
+ * seeded: kill switch released.
+ *
+ * Only the kill-switch columns are touched, because they are the only ones an
+ * ordinary transaction may move in both directions. `rollout_state` is left
+ * alone on purpose: no #95 code writes `active`, no suite may, and a suite
+ * that finds it `active` here has found a real defect rather than stale
+ * fixture state. The trigger refuses `active -> inactive`, so this helper
+ * could not undo it even if it tried -- which is the point.
+ */
+export async function resetEnforcementControl(dataSource: DataSource): Promise<void> {
+  await dataSource.query(
+    `UPDATE commercial.booking_credit_enforcement_control
+        SET kill_switch_state = 'released', kill_switch_changed_at = NULL, kill_switch_audit_id = NULL, updated_at = now()
+      WHERE id = 1 AND (kill_switch_state <> 'released' OR kill_switch_changed_at IS NOT NULL)`,
+  );
 }
 
 /**

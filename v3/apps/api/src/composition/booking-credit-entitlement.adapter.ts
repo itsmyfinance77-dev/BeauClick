@@ -5,6 +5,7 @@ import { OrderEntity } from '@beauclick/commerce';
 import type { BookingConfirmationEntitlementHook, BookingConfirmationEntitlement } from '@beauclick/commerce';
 import {
   BookingCreditAccountingService,
+  BookingCreditEnforcementControlService,
   BookingCreditReturnCause,
 } from '@beauclick/commercial-policy';
 
@@ -27,10 +28,31 @@ import {
  * Live `business_staff` affiliation is never consulted. `V33-DEC-020`
  * established the rule for finance reads and `V33-DEC-025` Ruling 7 restates it
  * for credits: current affiliation must not decide historical money.
+ *
+ * ## The four-plane decision runs HERE, upstream of the ledger -- V3.3 #95
+ *
+ * ADR-050 §4.1: this adapter is the one place that already sees the order's
+ * snapshotted party, the confirmation transaction and both domains, so it is
+ * where the kill-switch and rollout planes are consulted -- BEFORE
+ * `consumeForConfirmation`, which is byte-identical to #58a
+ * (`V33-DEC-036` R13). The control row is read `FOR SHARE` on the caller's
+ * manager, so an engagement (which takes it `FOR UPDATE`) and this
+ * confirmation are linearized by PostgreSQL. It is read AFTER the order
+ * lookup so that `no_order` stays byte-identical whatever the switch says,
+ * and BEFORE the ledger's own per-party advisory lock -- the fixed order
+ * ADR-050 §7.2 documents.
+ *
+ * With the rollout inactive -- the only state this release can produce -- the
+ * decision is exactly "refuse if the kill switch is engaged, otherwise #58a
+ * as before": governance is not consulted on the confirmation path until
+ * #141 (`#58b-2`) gives an active rollout its outcomes.
  */
 @Injectable()
 export class BookingCreditEntitlementAdapter implements BookingConfirmationEntitlementHook {
-  constructor(private readonly credits: BookingCreditAccountingService) {}
+  constructor(
+    private readonly credits: BookingCreditAccountingService,
+    private readonly enforcement: BookingCreditEnforcementControlService,
+  ) {}
 
   async onBookingConfirmation(
     manager: EntityManager,
@@ -46,6 +68,18 @@ export class BookingCreditEntitlementAdapter implements BookingConfirmationEntit
       where: { sourceType: 'booking', sourceId: bookingId },
     });
     if (!order) return { outcome: 'ineligible', reason: 'no_order' };
+
+    /*
+     * V3.3 #95 (`#58b-1`). The pre-ledger planes. An engaged kill switch
+     * refuses every new first confirmation on both checkout paths, for
+     * governed, legacy-exempt and unresolved sellers alike (`V33-DEC-036`
+     * R8) -- and it refuses BEFORE anything is consumed, so nothing has to be
+     * given back. A released switch under an inactive rollout is the legacy
+     * path, byte-for-byte.
+     */
+    const control = await this.enforcement.readForConfirmation(manager);
+    const preLedger = this.enforcement.decideBeforeLedger(control);
+    if (preLedger.kind === 'refuse') return { outcome: 'control_refused', reason: preLedger.reason };
 
     const result = await this.credits.consumeForConfirmation(manager, bookingId, {
       partyType: order.sellerPartyType,

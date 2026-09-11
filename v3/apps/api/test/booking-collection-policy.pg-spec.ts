@@ -858,13 +858,14 @@ describePg('booking collection policy — publication, lifecycle and constraints
           WHERE t.schemaname = 'commercial'
           GROUP BY t.schemaname, t.tablename`,
       );
-      // Thirteen: the ten that predate #83, the two collection-policy tables
-      // #83 added, and the one assignment table Story #104 added with its own
-      // claim. Asserted exactly, so a table added without a claim fails HERE
-      // with a readable message rather than at application boot -- which is
-      // what this number is for, and why it is bumped deliberately rather than
-      // loosened to a lower bound.
-      expect(rows).toHaveLength(13);
+      // Fifteen: the ten that predate #83, the two collection-policy tables
+      // #83 added, the one assignment table Story #104 added with its own
+      // claim, and the two control-plane tables Story #95 (`#58b-1`) added
+      // with their own contract (ADR-050 §8). Asserted exactly, so a table
+      // added without a claim fails HERE with a readable message rather than
+      // at application boot -- which is what this number is for, and why it
+      // is bumped deliberately rather than loosened to a lower bound.
+      expect(rows).toHaveLength(15);
 
       const report = evaluateCoverage(rows, contracts);
       expect(report.violations.filter((v) => v.table.startsWith('commercial.'))).toEqual([]);
