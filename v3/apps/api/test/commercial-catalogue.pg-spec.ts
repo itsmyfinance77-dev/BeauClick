@@ -1111,13 +1111,15 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
       // Story #57 (`#40c-1`) added `credit_purchases`; twelve since Story #83
       // (`#41d-1`) added `booking_collection_policies` and
       // `booking_collection_policy_versions`; thirteen since Story #104
-      // (`#41d-2a`) added `seller_collection_policy_assignments`. The count is
+      // (`#41d-2a`) added `seller_collection_policy_assignments`; fifteen since
+      // Story #95 (`#58b-1`) added `booking_credit_enforcement_control` and
+      // `booking_credit_party_governance` (ADR-050 §2). The count is
       // asserted exactly, rather than loosened to a minimum, because an exact
       // number is what makes a table added without a subject-data claim fail
       // HERE with a readable message instead of at application boot -- so it is
       // raised deliberately, with the new table's own claim shipped alongside,
       // and never relaxed to `toBeGreaterThan`.
-      expect(rows).toHaveLength(13);
+      expect(rows).toHaveLength(15);
 
       const contracts = app.get<SubjectDataContract[]>(SUBJECT_DATA_CONTRACTS);
       const report = evaluateCoverage(rows, contracts);
@@ -1144,6 +1146,11 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
         'cancelled_by_user_id',
         'created_by_user_id',
         'published_by_user_id',
+        // V3.3 Story #95 (`#58b-1`): the administrator who recorded a party's
+        // governance state (ADR-050 §2.2). The detectable suffix is what lets
+        // the coverage check refuse a dishonest `no_subject_data` claim on
+        // `booking_credit_party_governance` at boot.
+        'recorded_by_user_id',
         // V3.3 Story #57 (`#40c-1`): which of a workspace's owners made the
         // request. Named with the detectable suffix on purpose, so the
         // ADR-027 coverage check SEES the identity rather than having to be
@@ -1237,6 +1244,10 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
         // deliberately names only `add_commercial_plan_capability` from
         // `identity/`; #104's capability migration is asserted in its own suite.
         'commercial/20260907800001_create_seller_collection_policy_assignments.sql',
+        // V3.3 Story #95 (`#58b-1`). The booking-credit enforcement control
+        // plane: the singleton control row and the per-party governance fact
+        // (ADR-050 §2). Seeds one control row and no governance row.
+        'commercial/20260917100001_create_booking_credit_enforcement_controls.sql',
         'identity/20260902800002_add_commercial_plan_capability.sql',
       ]);
     });
@@ -1283,6 +1294,11 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
       // set is the only shape that catches a removal.
       expect(triggers.map((t) => t.tgname)).toEqual([
         'tg_bcc_immutable',
+        // V3.3 Story #95 (`#58b-1`), ADR-050 §2: the control singleton's
+        // one-way rollout and permanence, and the governance fact's
+        // monotonic `legacy_exempt -> governed` transition with no DELETE.
+        'tg_bcec_protect',
+        'tg_bcpg_protect',
         // V3.3 Story #83 (`#41d-1`): the collection-policy lifecycle and the
         // key's permanence.
         'tg_bcpv_lifecycle',

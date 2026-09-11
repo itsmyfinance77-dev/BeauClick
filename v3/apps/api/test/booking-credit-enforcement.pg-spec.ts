@@ -8,7 +8,6 @@ import { join } from 'node:path';
 
 import request from 'supertest';
 
-import { AdminAuditService } from '@beauclick/audit';
 import { PRIVILEGED_CAPABILITIES } from '@beauclick/auth';
 import { BookingService } from '@beauclick/booking';
 import {
