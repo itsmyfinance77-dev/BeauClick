@@ -115,6 +115,37 @@ export class SubscriptionSubjectDataContract implements SubjectDataContract {
       reason:
         'The reversal side of the seller balance (#58a). At most one per consumption, immutable, and carrying a closed server-authored cause rather than any cancellation prose. Deleting it would re-spend a credit that was already given back.',
     },
+    /*
+     * V3.3 #95 (`#58b-1`), ADR-050 §8.
+     *
+     * The singleton control row carries NO actor column -- who activated the
+     * rollout or moved the kill switch lives in `admin.admin_audit_log`,
+     * pointed at by two opaque audit ids -- so `no_subject_data` is honest.
+     * Its columns contain no `_by` or `_user_id` suffix, which means the
+     * coverage detector would NOT catch a dishonest claim on it; the
+     * disposition is therefore pinned by an explicit test, exactly as
+     * `booking_credit_grants`' is above.
+     *
+     * The per-party governance table names a seller party AND the
+     * administrator who recorded its state (`recorded_by_user_id`), so it is
+     * `retained`: an operational and legal obligation record. Deleting a row
+     * would silently return a seller to legacy exemption, which is the one
+     * thing `V33-DEC-036` R3 and R12 forbid. The `_user_id` suffix makes a
+     * dishonest `no_subject_data` claim on it detectable -- at BOOT, by the
+     * coverage assertion, before any request is served.
+     */
+    {
+      table: 'commercial.booking_credit_enforcement_control',
+      disposition: 'no_subject_data',
+      reason:
+        'The one-row platform control for booking-credit enforcement: rollout state, activation generation and kill-switch state, plus two opaque audit-row ids. No person is named; administrator identity for its mutations stays in admin.admin_audit_log (ADR-050 §8).',
+    },
+    {
+      table: 'commercial.booking_credit_party_governance',
+      disposition: 'retained',
+      reason:
+        'One explicit governance fact per seller party (governed or legacy_exempt) with the administrator who recorded it. An operational and legal obligation record: deleting it would silently return a seller to legacy exemption, and the party id it holds points at a row provider or business has already anonymized in place (ADR-050 §8).',
+    },
   ];
 
   async exportSubjectData(manager: EntityManager, userId: string): Promise<SubjectExportSection[]> {

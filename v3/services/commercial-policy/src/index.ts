@@ -59,3 +59,10 @@ export * from './collection-policy-assignment/collection-policy-assignment.modul
 // audit row, and no mutation surface at all.
 export * from './collection-policy-assignment/collection-policy-resolution.errors';
 export * from './collection-policy-assignment/collection-policy-resolution.service';
+// V3.3 Story #95 (`#58b-1`). The booking-credit enforcement control plane
+// (ADR-050): the persistent singleton control row and per-party governance
+// fact, the four-plane reader the confirmation seam consults, and the
+// privileged administrator sub-resource. A sixth, additive surface: with the
+// rollout inactive it changes no confirmation outcome except through the
+// kill switch, and it ships NO activation route -- that is #141 (`#58b-2`).
+export * from './enforcement/booking-credit-enforcement.entities';
