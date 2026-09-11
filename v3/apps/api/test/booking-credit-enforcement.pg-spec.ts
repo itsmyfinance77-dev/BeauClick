@@ -20,7 +20,7 @@ import {
   EnforcementControlMalformedError,
   SellerSubscriptionService,
   SubscriberPartyType,
-  SubscriptionSubjectDataContract,
+  BookingCreditEnforcementSubjectDataContract,
 } from '@beauclick/commercial-policy';
 import { SandboxPaymentProvider } from '@beauclick/payment';
 import { SUBJECT_DATA_CONTRACTS, SubjectDataContract, evaluateCoverage, SubjectDataCoverageService } from '@beauclick/subject-data';
@@ -384,6 +384,13 @@ describePg('booking-credit enforcement control foundation (#95 / #58b-1, real Po
         'commercial.booking_credit_party_governance:retained',
       ]);
       for (const claim of claims) expect((claim.reason ?? '').length).toBeGreaterThan(40);
+      // Claimed by the control plane's OWN contract, so the subscription
+      // contract's "every claim is retained" invariant stays exactly as #56a
+      // pinned it (ADR-050 §8).
+      const owner = contracts.find((c) => c.tables.some((t) => t.table === CONTROL))!;
+      expect(owner.moduleKey).toBe('commercial-enforcement');
+      expect(owner.tables.map((t) => t.table).sort()).toEqual([CONTROL, GOVERNANCE]);
+      expect(contracts.find((c) => c.moduleKey === 'commercial-subscription')!.tables.every((t) => t.disposition === 'retained')).toBe(true);
     });
 
     it('the live catalogue is fully claimed, both new tables included', async () => {
@@ -1416,9 +1423,9 @@ describePg('booking-credit enforcement control foundation (#95 / #58b-1, real Po
   // =========================================================================
 
   describe('§I export, erasure and the absence of any process cache (ADR-050 §8; case 27)', () => {
-    let contract: SubscriptionSubjectDataContract;
+    let contract: BookingCreditEnforcementSubjectDataContract;
     beforeAll(() => {
-      contract = app.get(SubscriptionSubjectDataContract);
+      contract = app.get(BookingCreditEnforcementSubjectDataContract);
     });
 
     it('an OWNER receives state, cause, recordedAt and governedAt for each owned party -- and never the actor, audit id or proof grant', async () => {

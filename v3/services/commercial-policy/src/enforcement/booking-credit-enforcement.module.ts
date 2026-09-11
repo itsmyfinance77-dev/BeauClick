@@ -5,6 +5,7 @@ import { CommercialPolicyControlGate } from '../commercial-policy-control.gate';
 import { BookingCreditEnforcementControlService } from './booking-credit-enforcement-control.service';
 import { BookingCreditEnforcementGovernanceService } from './booking-credit-enforcement-governance.service';
 import { BookingCreditEnforcementController } from './booking-credit-enforcement.controller';
+import { BookingCreditEnforcementSubjectDataContract } from './booking-credit-enforcement-subject-data.contract';
 import { ENFORCEMENT_ENTITIES } from './booking-credit-enforcement.entities';
 
 /**
@@ -40,7 +41,12 @@ import { ENFORCEMENT_ENTITIES } from './booking-credit-enforcement.entities';
   // ONE controller, and it is the administrator sub-resource (ADR-050 §5).
   // It declares NO activation route: that is #141's, and a fast test pins it.
   controllers: [BookingCreditEnforcementController],
-  providers: [CommercialPolicyControlGate, BookingCreditEnforcementControlService, BookingCreditEnforcementGovernanceService],
-  exports: [BookingCreditEnforcementControlService, BookingCreditEnforcementGovernanceService],
+  providers: [
+    CommercialPolicyControlGate,
+    BookingCreditEnforcementControlService,
+    BookingCreditEnforcementGovernanceService,
+    BookingCreditEnforcementSubjectDataContract,
+  ],
+  exports: [BookingCreditEnforcementControlService, BookingCreditEnforcementGovernanceService, BookingCreditEnforcementSubjectDataContract],
 })
 export class BookingCreditEnforcementModule {}

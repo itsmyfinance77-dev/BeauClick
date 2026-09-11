@@ -70,4 +70,5 @@ export * from './enforcement/booking-credit-enforcement.constants';
 export * from './enforcement/booking-credit-enforcement-control.service';
 export * from './enforcement/booking-credit-enforcement-governance.service';
 export * from './enforcement/booking-credit-enforcement.controller';
+export * from './enforcement/booking-credit-enforcement-subject-data.contract';
 export * from './enforcement/booking-credit-enforcement.module';

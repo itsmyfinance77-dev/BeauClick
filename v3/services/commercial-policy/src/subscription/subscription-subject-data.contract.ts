@@ -9,7 +9,6 @@ import {
 } from '@beauclick/subject-data';
 
 import { CreditPurchaseEntity } from './credit-purchase.entity';
-import { BookingCreditPartyGovernanceEntity } from '../enforcement/booking-credit-enforcement.entities';
 import {
   BookingCreditConsumptionEntity,
   BookingCreditGrantEntity,
@@ -116,37 +115,6 @@ export class SubscriptionSubjectDataContract implements SubjectDataContract {
       reason:
         'The reversal side of the seller balance (#58a). At most one per consumption, immutable, and carrying a closed server-authored cause rather than any cancellation prose. Deleting it would re-spend a credit that was already given back.',
     },
-    /*
-     * V3.3 #95 (`#58b-1`), ADR-050 §8.
-     *
-     * The singleton control row carries NO actor column -- who activated the
-     * rollout or moved the kill switch lives in `admin.admin_audit_log`,
-     * pointed at by two opaque audit ids -- so `no_subject_data` is honest.
-     * Its columns contain no `_by` or `_user_id` suffix, which means the
-     * coverage detector would NOT catch a dishonest claim on it; the
-     * disposition is therefore pinned by an explicit test, exactly as
-     * `booking_credit_grants`' is above.
-     *
-     * The per-party governance table names a seller party AND the
-     * administrator who recorded its state (`recorded_by_user_id`), so it is
-     * `retained`: an operational and legal obligation record. Deleting a row
-     * would silently return a seller to legacy exemption, which is the one
-     * thing `V33-DEC-036` R3 and R12 forbid. The `_user_id` suffix makes a
-     * dishonest `no_subject_data` claim on it detectable -- at BOOT, by the
-     * coverage assertion, before any request is served.
-     */
-    {
-      table: 'commercial.booking_credit_enforcement_control',
-      disposition: 'no_subject_data',
-      reason:
-        'The one-row platform control for booking-credit enforcement: rollout state, activation generation and kill-switch state, plus two opaque audit-row ids. No person is named; administrator identity for its mutations stays in admin.admin_audit_log (ADR-050 §8).',
-    },
-    {
-      table: 'commercial.booking_credit_party_governance',
-      disposition: 'retained',
-      reason:
-        'One explicit governance fact per seller party (governed or legacy_exempt) with the administrator who recorded it. An operational and legal obligation record: deleting it would silently return a seller to legacy exemption, and the party id it holds points at a row provider or business has already anonymized in place (ADR-050 §8).',
-    },
   ];
 
   async exportSubjectData(manager: EntityManager, userId: string): Promise<SubjectExportSection[]> {
@@ -196,25 +164,6 @@ export class SubscriptionSubjectDataContract implements SubjectDataContract {
             .where('p.subscription_id IN (:...ids)', { ids: subscriptions.map((s) => s.id) })
             .orderBy('p.created_at', 'DESC')
             .getMany();
-
-    /*
-     * V3.3 #95 (`#58b-1`), ADR-050 §8. The seller's own governance facts:
-     * whether their party is governed or legacy-exempt, why (the closed
-     * cause), and when. NOT who recorded it (`recorded_by_*` is
-     * administrator identity, an audit fact), NOT the audit row id, and NOT
-     * the proving grant id (a ledger internal the grants section above
-     * already describes in its own terms). A customer owns no party, so a
-     * customer's export never reaches this query.
-     */
-    const governance = await manager
-      .getRepository(BookingCreditPartyGovernanceEntity)
-      .createQueryBuilder('v')
-      .where(
-        parties.map((_party, index) => `(v.party_type = :type${index} AND v.party_id = :id${index})`).join(' OR '),
-        this.partyParameters(parties),
-      )
-      .orderBy('v.recorded_at', 'DESC')
-      .getMany();
 
     const sections: SubjectExportSection[] = [];
 
@@ -287,20 +236,6 @@ export class SubscriptionSubjectDataContract implements SubjectDataContract {
           // `scheduleKey`, `priceScheduleVersionId` or `priceTierId`: catalogue
           // internals a seller is not shown, here for the same reason the quote
           // route omits them.
-        })),
-      });
-    }
-
-    if (governance.length > 0) {
-      sections.push({
-        key: 'commercial.booking_credit_party_governance',
-        description: 'وضعیت کسب‌وکار شما در نظام اعمال اعتبار نوبت‌دهی',
-        rows: governance.map((g) => ({
-          subscriberPartyType: g.partyType,
-          state: g.state,
-          cause: g.cause,
-          recordedAt: g.recordedAt.toISOString(),
-          governedAt: g.governedAt ? g.governedAt.toISOString() : null,
         })),
       });
     }

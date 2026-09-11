@@ -24,6 +24,8 @@ import { ChatModule, ChatSubjectDataContract } from '@beauclick/chat';
 import { WishlistModule, WishlistSubjectDataContract } from '@beauclick/wishlist';
 import { ReferralModule, ReferralSubjectDataContract } from '@beauclick/referral';
 import {
+  BookingCreditEnforcementModule,
+  BookingCreditEnforcementSubjectDataContract,
   CollectionPolicyAssignmentModule,
   CollectionPolicyAssignmentSubjectDataContract,
   CommercialCatalogueModule,
@@ -159,6 +161,11 @@ export class PrivacyErasureCompleter {
     // blank that attribution would leave a governed commercial commitment with
     // nobody attached to it.
     CollectionPolicyAssignmentModule,
+    // V3.3 Story #95 (`#58b-1`). Imported for its contract only: the control
+    // singleton (`no_subject_data`, pinned by test because the heuristic cannot
+    // see it) and the per-party governance fact (`retained`, so erasure can
+    // never silently return a seller to legacy exemption). ADR-050 §8.
+    BookingCreditEnforcementModule,
   ],
   providers: [
     PrivacyErasureCompleter,
@@ -198,6 +205,9 @@ export class PrivacyErasureCompleter {
         CommercialSubjectDataContract,
         SubscriptionSubjectDataContract,
         CollectionPolicyAssignmentSubjectDataContract,
+        // V3.3 #95 (`#58b-1`), ADR-050 §8: the control singleton (no_subject_data)
+        // and the per-party governance fact (retained).
+        BookingCreditEnforcementSubjectDataContract,
       ],
       useFactory: (...contracts: SubjectDataContract[]): SubjectDataContract[] => contracts,
     },
