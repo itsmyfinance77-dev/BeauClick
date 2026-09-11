@@ -3,11 +3,14 @@ import { EntityManager } from 'typeorm';
 
 import { OrderEntity } from '@beauclick/commerce';
 import type { BookingConfirmationEntitlementHook, BookingConfirmationEntitlement } from '@beauclick/commerce';
+import type { BusinessGovernanceInitializationPort } from '@beauclick/business';
 import {
   BookingCreditAccountingService,
   BookingCreditEnforcementControlService,
+  BookingCreditEnforcementGovernanceService,
   BookingCreditReturnCause,
 } from '@beauclick/commercial-policy';
+import type { SellerGovernanceInitializationPort } from '@beauclick/provider';
 
 /**
  * The entitlement seam's real binding — V3.3 #58 (`#58a`), ADR-046 §3 and §7.
@@ -42,10 +45,30 @@ import {
  * and BEFORE the ledger's own per-party advisory lock -- the fixed order
  * ADR-050 §7.2 documents.
  *
- * With the rollout inactive -- the only state this release can produce -- the
- * decision is exactly "refuse if the kill switch is engaged, otherwise #58a
- * as before": governance is not consulted on the confirmation path until
- * #141 (`#58b-2`) gives an active rollout its outcomes.
+ * With the rollout inactive the decision is exactly "refuse if the kill
+ * switch is engaged, otherwise #58a as before", and governance is NOT read.
+ *
+ * ## Under an ACTIVE rollout -- V3.3 #141 (`#58b-2`), ADR-050 §4.3
+ *
+ * The order's snapshotted party is resolved through its governance row,
+ * read UNDER the same `bcre` party lock the ledger takes a moment later
+ * (re-entrant; ADR-050 §4.1 "after the party lock"), and:
+ *
+ *   * unresolved or malformed  -> refused, `business_policy_disabled`, and
+ *                                 the ledger is NEVER called -- nothing can
+ *                                 be consumed for a party nobody classified;
+ *   * `legacy_exempt`          -> the #58a selective path, byte-identical;
+ *   * `governed`               -> the ledger decides, and then the four-plane
+ *                                 gate is asked with every plane genuinely
+ *                                 evaluated: `consumed`/`already_consumed`
+ *                                 permit; `not_configured` and
+ *                                 `insufficient_credit` refuse as
+ *                                 `entitlement_missing`. Zero never means
+ *                                 unlimited (`V33-DEC-036` R2).
+ *
+ * The party is selected ONCE from the order and passed to both the
+ * governance read and the ledger; live `business_staff` affiliation and the
+ * owner are never consulted here.
  */
 @Injectable()
 export class BookingCreditEntitlementAdapter implements BookingConfirmationEntitlementHook {
@@ -81,10 +104,28 @@ export class BookingCreditEntitlementAdapter implements BookingConfirmationEntit
     const preLedger = this.enforcement.decideBeforeLedger(control);
     if (preLedger.kind === 'refuse') return { outcome: 'control_refused', reason: preLedger.reason };
 
-    const result = await this.credits.consumeForConfirmation(manager, bookingId, {
-      partyType: order.sellerPartyType,
-      partyId: order.sellerPartyId,
-    });
+    const party = { partyType: order.sellerPartyType, partyId: order.sellerPartyId };
+
+    /*
+     * V3.3 #141 (`#58b-2`). The business-policy plane, under the party lock,
+     * BEFORE the ledger -- so an unresolved party is refused with nothing
+     * consumed, and a governed party is known to be governed before its
+     * balance is decided.
+     */
+    let governed = false;
+    if (preLedger.kind === 'active') {
+      const governance = await this.enforcement.readGovernanceForConfirmation(manager, party);
+      const policy = this.enforcement.decideGovernance(control, governance);
+      if (policy.kind === 'refuse') return { outcome: 'control_refused', reason: policy.reason };
+      governed = policy.kind === 'governed';
+    }
+
+    const result = await this.credits.consumeForConfirmation(manager, bookingId, party);
+
+    if (governed && result.outcome !== 'ineligible') {
+      const verdict = this.enforcement.decideGovernedLedger(result.outcome);
+      if (verdict.kind === 'refuse') return { outcome: 'control_refused', reason: verdict.reason };
+    }
 
     switch (result.outcome) {
       case 'consumed':
@@ -143,3 +184,37 @@ const CAUSE_BY_ACTOR: Record<string, BookingCreditReturnCause | undefined> = {
   professional: 'seller_cancelled',
   system: 'platform_cancelled',
 };
+
+/**
+ * Governance initialisation at seller creation -- V3.3 #141 (`#58b-2`),
+ * ADR-050 §3.4, `V33-DEC-036` R5.
+ *
+ * ONE adapter, bound under BOTH domain tokens (`SELLER_GOVERNANCE_INITIALIZATION`
+ * and `BUSINESS_GOVERNANCE_INITIALIZATION`), the arrangement
+ * `IdentityBackedOwnerRoleGrant` established: `provider` and `business` each
+ * declare a port because neither may import `commercial-policy` (ADR-011),
+ * and two implementations of "govern a party created under an active
+ * rollout" would be two answers to a question that must have exactly one.
+ *
+ * The party TYPE comes from which method was called -- the caller is the only
+ * thing that knows whether it created a professional or a business; it is
+ * never inferred from the id. Ownership is the trigger (the creating
+ * transaction IS the ownership fact being established); staff affiliation
+ * never reaches either method because no staff path calls either port.
+ *
+ * Holds no repository and no DataSource: the caller's manager is passed
+ * straight through, so "runs on another connection" is impossible rather
+ * than discouraged.
+ */
+@Injectable()
+export class EnforcementBackedGovernanceInitialization implements SellerGovernanceInitializationPort, BusinessGovernanceInitializationPort {
+  constructor(private readonly governance: BookingCreditEnforcementGovernanceService) {}
+
+  async initializeProfessionalGovernance(manager: EntityManager, professionalId: string): Promise<void> {
+    await this.governance.initializeCreatedParty(manager, { partyType: 'professional', partyId: professionalId });
+  }
+
+  async initializeBusinessGovernance(manager: EntityManager, businessId: string): Promise<void> {
+    await this.governance.initializeCreatedParty(manager, { partyType: 'business', partyId: businessId });
+  }
+}
