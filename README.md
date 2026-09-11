@@ -106,7 +106,8 @@ overage), and Story #40 was decomposed from one 13-point item into four:
 | #57 (`#40c`) -> `#40c-1` | 5 -> 8 -> **13** | Custom booking-credit purchase **record** and immutable price snapshot. Writes no grant. **Complete** |
 | #99 (`#40c-2`) | **5** | Paid activation of a custom purchase. Blocked on #47 |
 | #58 (`#40d`) → `#58a` | 8 -> **13** | Atomic consumption at first `confirmed` and idempotent return, enforced **selectively** — active only for a seller who holds a positive grant |
-| `#58b` (#95) | 3 -> **5** | Global fail-closed enforcement activation. **Ready** since `V33-DEC-028`; it owns the legacy-exempt rollout, the non-mutating preview, the atomic activation and the audited kill switch |
+| `#58b` (#95) -> `#58b-1` | 3 -> 5 -> **5** | Booking-credit enforcement **control foundation**. **Ready** since `V33-DEC-028`; split 2026-09-11 by `V33-DEC-036` and bound by ADR-050: it owns the persistent singleton control row and per-party governance fact, the aggregate-only preview, explicit seller transition, the platform-wide kill switch and the privileged admin sub-resource — and changes no confirmation outcome |
+| #141 (`#58b-2`) | **5** | Global booking-credit **activation and enforcement**: the atomic, non-reversible activation command, the seller-creation race closure and the fail-closed confirmation path for governed sellers. Split out 2026-09-11 by `V33-DEC-036`; depends on #95 |
 | #83 (`#41d`) -> `#41d-1` | **13** | Administrator-published versioned booking collection policy. Publication only; changes no order behaviour |
 | #104 (`#41d-2a`) | **8** | Seller collection-policy assignment: immutable history, one current row per party, the seller-readable assignable-policy catalogue and the new non-privileged capability. Changes no order behaviour |
 | #115 (`#41d-2b`) | **8** | Order collection-policy resolution and the immutable schedule snapshot, behind an explicit dark-launch boundary. Split out 2026-09-07 by `V33-DEC-031` |
@@ -204,7 +205,11 @@ holds a positive grant, dormant for one that has never held any — and `#58b` (
 is the later explicit switch to global enforcement. *(Corrected 2026-09-06 by
 `V33-DEC-028`: a positive source is already reachable through an administrator-published
 zero-price plan version carrying a positive allowance, so what `#58b` was really waiting
-for was the rollout treatment — see below.)* The same ratification corrected three stale
+for was the rollout treatment — see below.)* *(Split 2026-09-11 by `V33-DEC-036`, after a
+readiness audit found the four control planes designed but unpersisted, uncallable and
+unreachable under the story's own "no new HTTP surface" non-goal: #95 keeps its number as
+`#58b-1`, the 5-point control foundation, and #141 is `#58b-2`, the 5-point activation
+child; ADR-050 binds both.)* The same ratification corrected three stale
 claims: #57 is not a prerequisite, the
 entitlement seam must cover **both** confirmation paths rather than only the
 zero-collectible one, and the `business` and `administrator` cancellation returns the

@@ -15,6 +15,18 @@ assignment, and #115 `#41d-2b`, order resolution and the immutable snapshot. Eve
 technical rule below is unchanged and now binds whichever child owns it: R1 and R3–R5's
 order-path rules bind #115, and R2's assignment rules bind #104.)*
 
+**Amended 2026-09-11 (`V33-DEC-036`) — scope clarification, no rule changed.**
+`V33-DEC-028`'s "Next ADR" section, and ADR-039's 2026-09-06 note, assigned "the
+persistence and composition of the four control planes in Ruling 11" to this ADR. This ADR
+never took that assignment: it specifies collection-policy publication, seller assignment and
+the order snapshot, and contains no control-state table, no rollout or kill-switch
+persistence, no per-seller governance fact and no plane composition — #95 appears below only
+as a non-goal. That obligation is now recorded in
+[ADR-050](ADR-050-booking-credit-enforcement-control-plane.md), which reuses two of this ADR's
+own patterns — presence-as-fact (R2) and `FOR SHARE` linearization (R5) — and which does not
+touch collection policy. Every rule of this ADR, and the `#58a` accounting model it leaves
+alone, is unchanged.
+
 **Amended 2026-09-07 (Story #104 readiness audit) — order resolution.** The
 `#41d-2` readiness recheck against the shipped `#41d-1` code found two
 load-bearing engineering defects and one internal inconsistency in this ADR, all

@@ -20,6 +20,22 @@ production caller before global enforcement, and that ordinary administrator
 publication use a database-authoritative activation instant at or after publication —
 both of which are **ADR-048's** to specify before any schema or code.
 
+**Amended 2026-09-11 (`V33-DEC-036`) — who owns four-plane persistence.** The sentence
+immediately above is preserved as written and corrected here: ADR-048 delivered the
+**database-authoritative activation instant** and the collection-policy families it was
+written for, and **did not** specify the persistence and composition of the four control
+planes in §2 — it contains no control-state table, no kill-switch or rollout persistence, no
+per-seller governance fact and no plane composition, and mentions #95 only as a non-goal.
+That obligation is now owned by
+[ADR-050](ADR-050-booking-credit-enforcement-control-plane.md), which gives §2's four
+controls a persistent singleton control row, a monotonic per-party governance fact, a
+platform-wide emergency kill switch, a privileged administrator surface and a first
+production caller for `CommercialPolicyControlGate`, and which splits #95 into a control
+foundation (`#58b-1`, #95) and an activation child (`#58b-2`, #141). **No decision of this
+ADR changes**: §2's rule that no control implies another, that a UI flag is never
+authorization, that an entitlement is never a policy value and that a policy cannot bypass
+a kill switch is exactly what ADR-050 makes persistent.
+
 **Amended 2026-09-05 (`V33-DEC-022`):** the owner closed the STRUCTURE and
 DELIVERY CONTRACT for Story #41, which this ADR's §3 and §4 anticipated. Three
 things are recorded in place below: #41 is decomposed into four children

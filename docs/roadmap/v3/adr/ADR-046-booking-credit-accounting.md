@@ -91,6 +91,18 @@ The blocker was never the grant source — an administrator may publish a zero-p
 plan version carrying a positive `included_booking_credits` today — but the rollout
 treatment for sellers holding the seeded zero grant, which #95 now owns.)*
 
+*(Amended 2026-09-11, `V33-DEC-036`: #95's control-plane contract is now
+[ADR-050](ADR-050-booking-credit-enforcement-control-plane.md), and #95 was split into a
+control foundation (`#58b-1`, #95) and an activation child (`#58b-2`, #141). **Nothing in
+this ADR changes.** The table above, the two-question rule, the allocation order in §4, the
+per-party advisory lock and lock order in §4–§5, the commit semantics in §6, the snapshotted
+party in §7 and the return boundary in §8 are byte-for-byte the rules ADR-050 §4.1 builds on
+top of: the four-plane decision runs **upstream** of `consumeForConfirmation`, and the only
+change to this ADR's seam is one **additive** internal outcome, `control_refused`, on
+`BookingConfirmationEntitlement`. What ADR-050 adds is that, once global enforcement is
+activated by #141, a party recorded as **governed** treats `not_configured` as a refusal —
+the dormant row of the table above then applies only to parties recorded as legacy-exempt.)*
+
 ### 3. One confirmation-wide port
 
 `ZeroCollectibleConfirmationHook` is replaced by
@@ -241,7 +253,7 @@ at zero balance; only a genuinely new first confirmation can be refused.
 
 ## What was deliberately not built
 
-- Global fail-closed enforcement — **#95 (`#58b`)**, blocked on #46. *(Amended 2026-09-06, `V33-DEC-028`: unblocked and Ready; still not built here.)*
+- Global fail-closed enforcement — **#95 (`#58b`)**, blocked on #46. *(Amended 2026-09-06, `V33-DEC-028`: unblocked and Ready; still not built here.)* *(Amended 2026-09-11, `V33-DEC-036`: bound by ADR-050 and split — the persistent controls, preview, governance transition and kill switch are #95 (`#58b-1`); atomic activation and the fail-closed confirmation path are #141 (`#58b-2`). Still not built here.)*
 - Any positive quantity, grace, expiry, overage, cutoff, retention rule, no-show penalty or notification threshold — **#46**. *(Amended 2026-09-06, `V33-DEC-028`: all still unpublished; the quantity is an administrator-published plan value, and the cutoff, retention and no-show rules moved to **#42** with Legal.)*
 - `custom_purchase` grants; `ck_booking_credit_grants_source` is **not** widened — **#99 (`#40c-2`)**.
   *(Amended 2026-09-06, `V33-DEC-026`: attributed to #57 when written; the split moved
