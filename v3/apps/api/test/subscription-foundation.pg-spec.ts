@@ -189,8 +189,13 @@ describePg('subscription foundation — assignment, snapshots, grants (real Post
       [party.partyType, party.partyId],
     );
 
+  // `created_at` is the transaction's `now()`, so two rows written in ONE
+  // transaction (assignment, then its grant) share it exactly and their order
+  // under `ORDER BY created_at` alone is whatever the heap returns. The
+  // uuidv7 `id` is generated in insertion order within a process, so it is the
+  // deterministic tie-break. Surfaced by the #95 full-battery run.
   const auditRows = (targetId: string) =>
-    dataSource.query(`SELECT * FROM admin.admin_audit_log WHERE target_id = $1 ORDER BY created_at`, [targetId]);
+    dataSource.query(`SELECT * FROM admin.admin_audit_log WHERE target_id = $1 ORDER BY created_at, id`, [targetId]);
 
   // =========================================================================
   // §1. Automatic assignment — the base workspace is a row, never a fallback

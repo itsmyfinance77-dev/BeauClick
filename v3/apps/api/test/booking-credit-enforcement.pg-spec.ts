@@ -895,7 +895,7 @@ describePg('booking-credit enforcement control foundation (#95 / #58b-1, real Po
     dataSource.query(
       `SELECT action, actor_user_id, reason, after_state FROM admin.admin_audit_log
         WHERE target_type = 'commercial.booking_credit_enforcement' AND created_at > $1
-        ORDER BY created_at`,
+        ORDER BY created_at, id`,
       [auditWatermark],
     );
 
