@@ -21,6 +21,7 @@ import {
   EnforcementControlMalformedError,
   SellerSubscriptionService,
   SubscriberPartyType,
+  SubscriptionSubjectDataContract,
 } from '@beauclick/commercial-policy';
 import { SandboxPaymentProvider } from '@beauclick/payment';
 import { SUBJECT_DATA_CONTRACTS, SubjectDataContract, evaluateCoverage, SubjectDataCoverageService } from '@beauclick/subject-data';
@@ -1410,5 +1411,134 @@ describePg('booking-credit enforcement control foundation (#95 / #58b-1, real Po
       expect((await post('/kill-switch/engage')).status).toBe(201);
       expect(await auditRows()).toHaveLength(1);
     });
+  });
+  // =========================================================================
+  // §I  Privacy: export, erasure, no process cache, restart (ADR-050 §8; cases 7, 27)
+  // =========================================================================
+
+  describe('§I export, erasure and the absence of any process cache (ADR-050 §8; case 27)', () => {
+    let contract: SubscriptionSubjectDataContract;
+    beforeAll(() => {
+      contract = app.get(SubscriptionSubjectDataContract);
+    });
+
+    it('an OWNER receives state, cause, recordedAt and governedAt for each owned party -- and never the actor, audit id or proof grant', async () => {
+      const admin = await seedAdmin();
+      const dual = await seedUser(app, dataSource, nextPhone(), ['customer', 'professional', 'business']);
+      const professional = await seedProfessional(dataSource, dual.id, 'دوگانه', 0);
+      const business = await seedBusiness(dataSource, dual.id, 'کسب‌وکار دوگانه');
+      const proofGrant = await grantCredits({ partyType: 'professional', partyId: professional.id }, 1);
+      await request(app.getHttpServer()).post(`${BASE}/transitions`).set('Authorization', `Bearer ${admin.accessToken}`).send(REASON).expect(201);
+      await request(app.getHttpServer()).post(`${BASE}/exemptions`).set('Authorization', `Bearer ${admin.accessToken}`).send(REASON).expect(201);
+      const rows = await dataSource.query(`SELECT audit_id FROM ${GOVERNANCE}`);
+      expect(rows).toHaveLength(2);
+
+      const sections = await dataSource.transaction((m) => contract.exportSubjectData(m, dual.id));
+      const section = sections.find((s) => s.key === 'commercial.booking_credit_party_governance');
+      expect(section).toBeDefined();
+      expect(section!.rows).toHaveLength(2);
+      for (const row of section!.rows) {
+        expect(Object.keys(row).sort()).toEqual(['cause', 'governedAt', 'recordedAt', 'state', 'subscriberPartyType']);
+      }
+      expect(section!.rows.map((r) => `${r.subscriberPartyType}:${r.state}:${r.cause}`).sort()).toEqual([
+        'business:legacy_exempt:explicit_exemption',
+        'professional:governed:explicit_transition',
+      ]);
+      const serialized = JSON.stringify(sections);
+      expect(serialized).not.toContain(admin.id);
+      expect(serialized).not.toContain(proofGrant);
+      for (const { audit_id } of rows) expect(serialized).not.toContain(audit_id);
+      expect(serialized).not.toMatch(/recorded_by|recordedBy|audit|proof/i);
+      void business;
+    });
+
+    it('a CUSTOMER and a STAFF member receive none of it', async () => {
+      const seller = await newSeller();
+      await governAs(seller, 'governed');
+      const owner = await seedUser(app, dataSource, nextPhone(), ['customer', 'business']);
+      const business = await seedBusiness(dataSource, owner.id, 'سالن');
+      await governAs({ partyType: 'business', partyId: business.id }, 'legacy_exempt');
+      const customer = await seedUser(app, dataSource, nextPhone(), ['customer']);
+      const staff = await seedUser(app, dataSource, nextPhone(), ['customer', 'professional']);
+      const membershipId = await seedMembership(dataSource, business.id, staff.id, 'manager', owner.id, null);
+      await dataSource.query(`UPDATE business.business_staff SET status = 'active', responded_at = now() WHERE id = $1`, [membershipId]);
+
+      const forCustomer = await dataSource.transaction((m) => contract.exportSubjectData(m, customer.id));
+      expect(forCustomer).toEqual([]);
+      const forStaff = await dataSource.transaction((m) => contract.exportSubjectData(m, staff.id));
+      expect(forStaff.find((s) => s.key === 'commercial.booking_credit_party_governance')).toBeUndefined();
+      expect(JSON.stringify(forStaff)).not.toContain(business.id);
+    });
+
+    it('erasure retains both tables completely and says so', async () => {
+      const seller = await newSeller();
+      await governAs(seller, 'governed');
+      await setKillSwitch('engaged');
+      const before = [await dataSource.query(`SELECT * FROM ${GOVERNANCE} ORDER BY id`), await controlRow()];
+
+      const outcome = await contract.eraseSubjectData();
+      expect(outcome.anonymized).toBe(0);
+      expect(outcome.deleted).toBe(0);
+      expect(outcome.retained.map((r) => r.table)).toEqual(expect.arrayContaining([CONTROL, GOVERNANCE]));
+
+      expect([await dataSource.query(`SELECT * FROM ${GOVERNANCE} ORDER BY id`), await controlRow()]).toEqual(before);
+    });
+
+    it('the reads (GET and preview) write no audit row', async () => {
+      const admin = await seedAdmin();
+      await request(app.getHttpServer()).get(BASE).set('Authorization', `Bearer ${admin.accessToken}`).expect(200);
+      await request(app.getHttpServer()).get(`${BASE}/preview`).set('Authorization', `Bearer ${admin.accessToken}`).expect(200);
+      expect(await auditRows()).toEqual([]);
+      expect(await dataSource.query(`SELECT count(*)::int AS n FROM admin.admin_audit_log WHERE created_at > $1`, [auditWatermark])).toEqual([{ n: 0 }]);
+    });
+
+    it('holds no control data in process memory: a row changed underneath the running app is seen by the very next read', async () => {
+      const governance = app.get(BookingCreditEnforcementGovernanceService);
+      expect((await governance.status()).killSwitchState).toBe('released');
+      await setKillSwitch('engaged'); // by direct SQL, not through the service
+      expect((await governance.status()).killSwitchState).toBe('engaged');
+      const seller = await newSeller();
+      expect((await tryBookZeroCollectible(seller)).refusal?.reason).toBe('control_refused');
+      await setKillSwitch('released');
+      expect((await governance.status()).killSwitchState).toBe('released');
+    });
+  });
+
+  // =========================================================================
+  // §J  Restart survival (ADR-050 §10 case 7) -- LAST, because it replaces the app
+  // =========================================================================
+
+  describe('§J control and governance state survive app.close() and a fresh boot (case 7)', () => {
+    it('an engaged switch and a governed party are exactly as they were after a fresh createPgTestApp against the same database', async () => {
+      const admin = await seedAdmin();
+      const seller = await newSeller();
+      await grantCredits(seller, 1);
+      await request(app.getHttpServer()).post(`${BASE}/transitions`).set('Authorization', `Bearer ${admin.accessToken}`).send(REASON).expect(201);
+      await request(app.getHttpServer()).post(`${BASE}/kill-switch/engage`).set('Authorization', `Bearer ${admin.accessToken}`).send(REASON).expect(201);
+      const controlBefore = await controlRow();
+      const governanceBefore = await dataSource.query(`SELECT * FROM ${GOVERNANCE} ORDER BY id`);
+
+      await app.close();
+      ctx = await createPgTestApp();
+      app = ctx.app;
+      dataSource = ctx.dataSource;
+      checkout = app.get(CheckoutService);
+      bookings = app.get(BookingService);
+      credits = app.get(BookingCreditAccountingService);
+      subscriptions = app.get(SellerSubscriptionService);
+      sandbox = app.get(SandboxPaymentProvider);
+      enforcement = app.get(BookingCreditEnforcementControlService);
+
+      expect(await controlRow()).toEqual(controlBefore);
+      expect(await dataSource.query(`SELECT * FROM ${GOVERNANCE} ORDER BY id`)).toEqual(governanceBefore);
+      const status = await request(app.getHttpServer()).get(BASE).set('Authorization', `Bearer ${admin.accessToken}`);
+      expect(status.body.data).toMatchObject({ killSwitchState: 'engaged', rolloutState: 'inactive', activationGeneration: 0 });
+      // And the fresh process enforces the persisted switch immediately.
+      const other = await newSeller();
+      await grantCredits(other, 1);
+      expect((await tryBookZeroCollectible(other)).refusal?.reason).toBe('control_refused');
+      const preview = await request(app.getHttpServer()).get(`${BASE}/preview`).set('Authorization', `Bearer ${admin.accessToken}`);
+      expect(preview.body.data).toMatchObject({ governed: 1, unresolved: 1, killSwitchState: 'engaged' });
+    }, 60_000);
   });
 });

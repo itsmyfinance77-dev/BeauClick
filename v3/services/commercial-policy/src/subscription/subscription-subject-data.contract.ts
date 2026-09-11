@@ -9,6 +9,7 @@ import {
 } from '@beauclick/subject-data';
 
 import { CreditPurchaseEntity } from './credit-purchase.entity';
+import { BookingCreditPartyGovernanceEntity } from '../enforcement/booking-credit-enforcement.entities';
 import {
   BookingCreditConsumptionEntity,
   BookingCreditGrantEntity,
@@ -196,6 +197,25 @@ export class SubscriptionSubjectDataContract implements SubjectDataContract {
             .orderBy('p.created_at', 'DESC')
             .getMany();
 
+    /*
+     * V3.3 #95 (`#58b-1`), ADR-050 §8. The seller's own governance facts:
+     * whether their party is governed or legacy-exempt, why (the closed
+     * cause), and when. NOT who recorded it (`recorded_by_*` is
+     * administrator identity, an audit fact), NOT the audit row id, and NOT
+     * the proving grant id (a ledger internal the grants section above
+     * already describes in its own terms). A customer owns no party, so a
+     * customer's export never reaches this query.
+     */
+    const governance = await manager
+      .getRepository(BookingCreditPartyGovernanceEntity)
+      .createQueryBuilder('v')
+      .where(
+        parties.map((_party, index) => `(v.party_type = :type${index} AND v.party_id = :id${index})`).join(' OR '),
+        this.partyParameters(parties),
+      )
+      .orderBy('v.recorded_at', 'DESC')
+      .getMany();
+
     const sections: SubjectExportSection[] = [];
 
     if (subscriptions.length > 0) {
@@ -267,6 +287,20 @@ export class SubscriptionSubjectDataContract implements SubjectDataContract {
           // `scheduleKey`, `priceScheduleVersionId` or `priceTierId`: catalogue
           // internals a seller is not shown, here for the same reason the quote
           // route omits them.
+        })),
+      });
+    }
+
+    if (governance.length > 0) {
+      sections.push({
+        key: 'commercial.booking_credit_party_governance',
+        description: 'وضعیت کسب‌وکار شما در نظام اعمال اعتبار نوبت‌دهی',
+        rows: governance.map((g) => ({
+          subscriberPartyType: g.partyType,
+          state: g.state,
+          cause: g.cause,
+          recordedAt: g.recordedAt.toISOString(),
+          governedAt: g.governedAt ? g.governedAt.toISOString() : null,
         })),
       });
     }
