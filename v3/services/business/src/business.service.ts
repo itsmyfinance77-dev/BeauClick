@@ -11,7 +11,7 @@ import { BusinessOutboxEntity } from './entities/business-outbox.entity';
 import { CreateBusinessDto } from './dto/create-business.dto';
 import { UpdateBusinessDto } from './dto/update-business.dto';
 import { BusinessAlreadyExistsException } from './business.errors';
-import { BUSINESS_OWNER_ROLE_GRANT, BusinessOwnerRoleGrantPort } from './ports';
+import { BUSINESS_GOVERNANCE_INITIALIZATION, BUSINESS_OWNER_ROLE_GRANT, BusinessGovernanceInitializationPort, BusinessOwnerRoleGrantPort } from './ports';
 
 /**
  * Profile CRUD, deliberately mirroring `ProviderService`'s professional-
@@ -37,6 +37,7 @@ export class BusinessService {
      * capability-gated route.
      */
     @Inject(BUSINESS_OWNER_ROLE_GRANT) private readonly ownerRoles: BusinessOwnerRoleGrantPort,
+    @Inject(BUSINESS_GOVERNANCE_INITIALIZATION) private readonly governance: BusinessGovernanceInitializationPort,
   ) {}
 
   async create(ownerId: string, dto: CreateBusinessDto): Promise<BusinessEntity> {
@@ -71,6 +72,16 @@ export class BusinessService {
        * column nothing ever writes would deny the role to every business.
        */
       await this.ownerRoles.grantBusinessOwnerRole(manager, ownerId);
+
+      /*
+       * V3.3 #141 (`#58b-2`, ADR-050 §3.4). Governance for the new business
+       * party, on this manager, right after the role -- written only under an
+       * active global rollout, never with a grant, and never optional: if it
+       * cannot complete, the business is not created. Keyed by the business
+       * id; a re-created business after a soft delete is a NEW party and gets
+       * its own row here. Staff paths never reach this.
+       */
+      await this.governance.initializeBusinessGovernance(manager, id);
 
       await emitEvent(manager, BusinessOutboxEntity, {
         aggregateType: 'business',

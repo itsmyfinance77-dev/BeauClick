@@ -13,15 +13,16 @@
  * repository (`aicn`, `bkas`, `srrq`, `bcre`, `wish`), and asserted distinct by
  * the repository-wide uniqueness test. ONE fixed key (`0`) lives in it:
  *
- *   * SHARED  -- explicit transition and exemption (this story), and #141's
- *                seller-creation hook: many may run at once;
- *   * EXCLUSIVE -- #141's activation, which must wait for every shared holder
- *                and exclude new ones while it verifies "no unresolved
- *                seller" at its commit instant.
+ *   * SHARED  -- explicit transition and exemption (#95), and the
+ *                seller-creation hook (#141): many may run at once;
+ *   * EXCLUSIVE -- activation (#141), which waits for every shared holder
+ *                and excludes new ones while it verifies "no unresolved
+ *                seller" at its commit instant. PostgreSQL queues later
+ *                shared requests behind a waiting exclusive one, so
+ *                activation cannot be starved by a stream of creations.
  *
- * Nothing in #95 takes the exclusive form. It is named here, and the shared
- * form is taken here, so that activation later locks against the commands
- * that already exist rather than against a convention.
+ * Exactly ONE site takes the exclusive form (`activate`); the contract spec
+ * counts it.
  */
 export const BOOKING_ENFORCEMENT_COORDINATION_LOCK_NAMESPACE = 0x62_63_67_76 | 0;
 export const BOOKING_ENFORCEMENT_COORDINATION_LOCK_KEY = 0;
@@ -29,13 +30,22 @@ export const BOOKING_ENFORCEMENT_COORDINATION_LOCK_KEY = 0;
 /** The audit `target_type` every enforcement action reports against. */
 export const AUDIT_TARGET_ENFORCEMENT = 'commercial.booking_credit_enforcement';
 
-/** The closed audit vocabulary (ADR-050 §8). Server-authored; nothing caller-supplied. */
+/**
+ * The closed audit vocabulary (ADR-050 §8). Server-authored; nothing
+ * caller-supplied. Six actions: four from #95, and from #141 (`#58b-2`) the
+ * activation itself and the system-actor governance written when a seller is
+ * created under an active rollout (ADR-050 §3.4 -- the action the ADR left
+ * unnamed; recorded in its dated #141 consistency note).
+ */
 export const ENFORCEMENT_AUDIT_ACTIONS = {
   partiesGoverned: 'commercial.enforcement_parties_governed',
   partiesExempted: 'commercial.enforcement_parties_exempted',
   killSwitchEngaged: 'commercial.enforcement_kill_switch_engaged',
   killSwitchReleased: 'commercial.enforcement_kill_switch_released',
+  activated: 'commercial.enforcement_activated',
+  partyGovernedAtCreation: 'commercial.enforcement_party_governed_at_creation',
 } as const;
+export type EnforcementAuditAction = (typeof ENFORCEMENT_AUDIT_ACTIONS)[keyof typeof ENFORCEMENT_AUDIT_ACTIONS];
 
 /**
  * THE eligibility predicate -- ADR-050 §3.1, expressed exactly once.
@@ -44,9 +54,10 @@ export const ENFORCEMENT_AUDIT_ACTIONS = {
  * business. Nothing else: `verification_status` is not consulted (no
  * confirmation path consults it either), `business_staff` affiliation grants
  * nothing, a user owning both is two parties, and the subscription state is
- * irrelevant. Preview, transition, exemption and -- later -- #141's activation
- * all embed this one fragment; a second copy is the drift `V33-DEC-036` R6
- * and R9 forbid, and the contract spec counts the definition sites.
+ * irrelevant. Preview, transition, exemption and activation (#141, through
+ * the one `partition` function) all embed this one fragment; a second copy is
+ * the drift `V33-DEC-036` R6 and R9 forbid, and the contract spec counts the
+ * definition sites.
  */
 export const ELIGIBLE_PARTIES_SQL = `
   SELECT 'professional'::text AS party_type, p.id AS party_id

@@ -12,7 +12,7 @@ import { UpdateProfessionalDto } from './dto/update-professional.dto';
 import { ListProvidersDto } from './dto/list-providers.dto';
 import { ProviderEventsService } from './provider-events.service';
 import { AuditLogger } from '@beauclick/events';
-import { SELLER_OWNER_ROLE_GRANT, SellerOwnerRoleGrantPort } from './ports';
+import { SELLER_GOVERNANCE_INITIALIZATION, SELLER_OWNER_ROLE_GRANT, SellerGovernanceInitializationPort, SellerOwnerRoleGrantPort } from './ports';
 
 export class ProviderAlreadyExistsException extends DomainException {
   constructor() {
@@ -50,6 +50,7 @@ export class ProviderService {
      * capability reachable, with nothing failing anywhere.
      */
     @Inject(SELLER_OWNER_ROLE_GRANT) private readonly ownerRoles: SellerOwnerRoleGrantPort,
+    @Inject(SELLER_GOVERNANCE_INITIALIZATION) private readonly governance: SellerGovernanceInitializationPort,
   ) {}
 
   /** ownerId is ALWAYS the session-derived caller -- never accepted from the request body (V3_DOMAIN_BOUNDARIES.md provider section: "No client supplied owner IDs"). */
@@ -97,6 +98,18 @@ export class ProviderService {
        * a seller without commercial terms.
        */
       await this.ownerRoles.grantProfessionalOwnerRole(manager, ownerId);
+
+      /*
+       * V3.3 #141 (`#58b-2`, ADR-050 §3.4). The booking-credit governance
+       * fact, on the SAME manager, immediately after the role: under an
+       * active global rollout the new professional is governed in this very
+       * transaction, with no grant; under an inactive one nothing is written.
+       * Mandatory and un-optional: a failure here takes the profile with it,
+       * because a seller who exists ungoverned under active enforcement is
+       * the race `V33-DEC-036` R5 closes. Keyed by the PARTY (the profile id),
+       * never by the owner.
+       */
+      await this.governance.initializeProfessionalGovernance(manager, saved.id);
 
       await this.events.emitProfessionalUpdated(manager, saved.id);
       this.auditLog.log({ action: 'provider.created', ownerId, professionalId: saved.id });

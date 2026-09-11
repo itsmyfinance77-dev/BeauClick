@@ -1,12 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 
+import type { SubscriberPartyType } from '@beauclick/commercial-policy-contract';
+
 import { CommercialPolicyControlGate, CommercialPolicyControlRefusal } from '../commercial-policy-control.gate';
+import { lockBookingEntitlementParty } from './booking-entitlement-party-lock';
 import {
   BookingCreditEnforcementControlEntity,
+  BookingCreditPartyGovernanceEntity,
   ENFORCEMENT_CONTROL_SINGLETON_ID,
   ENFORCEMENT_ROLLOUT_STATES,
   KILL_SWITCH_STATES,
+  PARTY_GOVERNANCE_STATES,
 } from './booking-credit-enforcement.entities';
 
 /**
@@ -33,16 +38,44 @@ export class EnforcementControlMalformedError extends Error {
  *               refuses, on both checkout paths.
  *   legacy   -- global enforcement is not active, so `#58a`'s selective path
  *               stands byte-for-byte: dormant proceeds, exhausted refuses.
- *
- * There is deliberately NO third member for an active rollout. #95 ships no
- * code that writes `rollout_state = 'active'`, and the fail-closed outcomes of
- * a governed or unresolved party under active enforcement belong to #141
- * (`#58b-2`). Until that story lands, an active row is a state this release
- * does not know how to honour and refuses loudly (see `decideBeforeLedger`).
+ *               Governance is NOT consulted.
+ *   active   -- global enforcement is active (V3.3 #141, `#58b-2`): the
+ *               order's party must now be resolved through its governance
+ *               row before the ledger is asked anything (`decideGovernance`).
  */
 export type PreLedgerDecision =
   | Readonly<{ kind: 'refuse'; reason: Extract<CommercialPolicyControlRefusal, 'kill_switch_active'> }>
-  | Readonly<{ kind: 'legacy' }>;
+  | Readonly<{ kind: 'legacy' }>
+  | Readonly<{ kind: 'active' }>;
+
+/**
+ * What the business-policy plane decided for one party under an ACTIVE
+ * rollout -- V3.3 #141 (`#58b-2`), ADR-050 §3.2 and §4.3.
+ *
+ *   refuse    -- the party is unresolved (no governance row) or its row is
+ *                malformed. Activation exists to make this unreachable; if it
+ *                is reached, the ledger is NOT consulted and nothing is
+ *                consumed. Internal reason `business_policy_disabled`.
+ *   legacy    -- an administrator recorded `legacy_exempt` with a reason: the
+ *                `#58a` selective path applies exactly as before activation.
+ *   governed  -- the party is inside the regime: the ledger decides, and
+ *                `not_configured` is no longer a permit (`decideGovernedLedger`).
+ */
+export type GovernanceDecision =
+  | Readonly<{ kind: 'refuse'; reason: Extract<CommercialPolicyControlRefusal, 'business_policy_disabled'> }>
+  | Readonly<{ kind: 'legacy' }>
+  | Readonly<{ kind: 'governed' }>;
+
+/** The `#58a` outcomes a governed party's ledger decision is made from. */
+export type GovernedLedgerOutcome = 'consumed' | 'already_consumed' | 'not_configured' | 'insufficient_credit';
+
+/**
+ * The four-plane verdict for a governed party once the ledger has answered
+ * -- the one call where every plane is genuinely evaluated.
+ */
+export type GovernedLedgerDecision =
+  | Readonly<{ kind: 'permit' }>
+  | Readonly<{ kind: 'refuse'; reason: Extract<CommercialPolicyControlRefusal, 'entitlement_missing'> }>;
 
 /**
  * The persistent side of the four control planes -- V3.3 #95 (`#58b-1`),
@@ -97,12 +130,13 @@ export class BookingCreditEnforcementControlService {
   /**
    * The kill-switch and rollout planes, decided before the ledger is touched.
    *
-   * With `rollout_state = 'active'` this release has nothing correct to do:
-   * the governed and unresolved outcomes are #141's, and honouring the legacy
-   * path under an active rollout would be exactly the silent fallback
-   * `V33-DEC-036` R8 forbids. The row cannot reach that state through any #95
-   * code, so reaching it here means the database was moved by hand ahead of
-   * the code that understands it -- a malformed state, refused loudly.
+   * The two unevaluated planes are passed as NOT granted -- the gate's own
+   * fail-closed posture -- so the gate can answer only `kill_switch_active`,
+   * `rollout_disabled`, or (both first planes clear) `entitlement_missing`.
+   * The last is not a refusal here: it is the statement that the rollout is
+   * active and the remaining planes are still to be evaluated, which is
+   * `active` (V3.3 #141). A gate that PERMITS with no entitlement evaluated
+   * has stopped being the gate this service was written against.
    */
   decideBeforeLedger(control: BookingCreditEnforcementControlEntity): PreLedgerDecision {
     const decision = this.gate.decide({
@@ -113,8 +147,6 @@ export class BookingCreditEnforcementControlService {
     });
 
     if (decision.allowed) {
-      // Unreachable while both unevaluated planes are passed as not granted;
-      // kept as a refusal because "unreachable" is a claim about the gate.
       throw new EnforcementControlMalformedError('the control gate permitted a confirmation with no entitlement evaluated');
     }
     switch (decision.reason) {
@@ -122,11 +154,75 @@ export class BookingCreditEnforcementControlService {
         return { kind: 'refuse', reason: 'kill_switch_active' };
       case 'rollout_disabled':
         return { kind: 'legacy' };
+      case 'entitlement_missing':
+        return { kind: 'active' };
       default:
-        throw new EnforcementControlMalformedError(
-          `rollout_state is '${control.rolloutState}' but this release implements no active-rollout confirmation outcome (#141)`,
-        );
+        throw new EnforcementControlMalformedError(`the control gate answered '${decision.reason}' before any plane beyond rollout was evaluated`);
     }
+  }
+
+  /**
+   * The party's governance row, read UNDER the `bcre` party lock on the
+   * caller's manager -- V3.3 #141, ADR-050 §4.1 ("after the party lock").
+   *
+   * The lock is the same transaction-scoped advisory lock
+   * `consumeForConfirmation` and the transition command take, keyed the same
+   * way; the ledger's own acquisition a moment later is re-entrant. Holding
+   * it here means a transition of THIS party (which locks `bcre` before it
+   * writes) either committed before this read or waits until this
+   * confirmation commits -- never lands between the read and the ledger.
+   */
+  async readGovernanceForConfirmation(
+    manager: EntityManager,
+    party: { readonly partyType: SubscriberPartyType; readonly partyId: string },
+  ): Promise<BookingCreditPartyGovernanceEntity | null> {
+    await lockBookingEntitlementParty(manager, party);
+    return manager.getRepository(BookingCreditPartyGovernanceEntity).findOne({
+      where: { partyType: party.partyType, partyId: party.partyId },
+    });
+  }
+
+  /**
+   * The business-policy plane for one party under an ACTIVE rollout --
+   * ADR-050 §4.3, rows 4-8.
+   *
+   * Decided HERE and not through `CommercialPolicyControlGate.decide`: the
+   * gate evaluates entitlement before business policy, so with the ledger
+   * honestly unevaluated it can only ever answer `entitlement_missing`. An
+   * unresolved party is refused for the reason that is true of it -- nobody
+   * decided its policy -- and the ledger is never asked, so nothing is
+   * consumed. The gate's ordering is not changed to force the vocabulary.
+   */
+  decideGovernance(control: BookingCreditEnforcementControlEntity, governance: BookingCreditPartyGovernanceEntity | null): GovernanceDecision {
+    if (control.rolloutState !== 'active') {
+      throw new EnforcementControlMalformedError('governance was consulted while the rollout is not active');
+    }
+    if (!governance) return { kind: 'refuse', reason: 'business_policy_disabled' };
+    if (!(PARTY_GOVERNANCE_STATES as readonly string[]).includes(governance.state)) {
+      return { kind: 'refuse', reason: 'business_policy_disabled' };
+    }
+    return governance.state === 'governed' ? { kind: 'governed' } : { kind: 'legacy' };
+  }
+
+  /**
+   * The full four-plane verdict for a GOVERNED party, once `#58a`'s ledger
+   * has answered -- ADR-050 §4.3 rows 4-5. This is the one place every input
+   * to the gate is genuinely evaluated: the switch is released and the
+   * rollout active (or we would not be here), the party's policy is enabled
+   * (it is governed), and entitlement is exactly what the ledger said.
+   * `not_configured` is NOT a permit for a governed party (`V33-DEC-036` R2:
+   * zero never means unlimited), and neither is exhaustion.
+   */
+  decideGovernedLedger(ledger: GovernedLedgerOutcome): GovernedLedgerDecision {
+    const decision = this.gate.decide({
+      killSwitchActive: false,
+      rolloutEnabled: true,
+      entitlementGranted: ledger === 'consumed' || ledger === 'already_consumed',
+      businessPolicyEnabled: true,
+    });
+    if (decision.allowed) return { kind: 'permit' };
+    if (decision.reason === 'entitlement_missing') return { kind: 'refuse', reason: 'entitlement_missing' };
+    throw new EnforcementControlMalformedError(`the control gate answered '${decision.reason}' for a governed party under an active rollout`);
   }
 
   private requireWellFormed(rows: BookingCreditEnforcementControlEntity[]): BookingCreditEnforcementControlEntity {

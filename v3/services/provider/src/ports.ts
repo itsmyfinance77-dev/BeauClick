@@ -109,3 +109,37 @@ export interface SellerOwnerRoleGrantPort {
 }
 
 export const SELLER_OWNER_ROLE_GRANT = Symbol('BEAUCLICK_PROVIDER_SELLER_OWNER_ROLE_GRANT');
+
+/**
+ * The third outbound port `provider` declares -- V3.3 #141 (`#58b-2`),
+ * ADR-050 §3.4, `V33-DEC-036` R5.
+ *
+ * ## The same shape as the owner-role grant, for the same reason
+ *
+ * Once global booking-credit enforcement is active, a professional created
+ * afterwards must never exist unresolved: the governance fact is written on
+ * the CREATING transaction's own manager, immediately after the owner role,
+ * so the profile and its governance commit together or not at all. Under an
+ * inactive rollout the port writes nothing. If it fails, creation fails.
+ *
+ * `provider` may not import `commercial-policy` (ADR-011), so the port is
+ * declared here and bound in `apps/api`. The method names the party type --
+ * a professional -- because the caller is the only thing that knows it and a
+ * raw UUID does not; the business domain declares its own, differently named,
+ * method. Nothing here accepts an owner, a user or a quantity.
+ *
+ * ## Nothing is provided by default, deliberately
+ *
+ * `ProviderModule` binds nothing. A composition that forgets it fails to
+ * boot rather than quietly creating sellers who are unresolved under an
+ * active rollout -- exactly the state activation exists to make unreachable.
+ */
+export interface SellerGovernanceInitializationPort {
+  /**
+   * Initialises the booking-credit governance fact for a professional that
+   * was created inside `manager`'s transaction. Writes no credit, ever.
+   */
+  initializeProfessionalGovernance(manager: EntityManager, professionalId: string): Promise<void>;
+}
+
+export const SELLER_GOVERNANCE_INITIALIZATION = Symbol('BEAUCLICK_PROVIDER_SELLER_GOVERNANCE_INITIALIZATION');

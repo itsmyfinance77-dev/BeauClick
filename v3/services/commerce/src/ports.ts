@@ -208,13 +208,21 @@ export type BookingConfirmationEntitlement =
   | { outcome: 'ineligible'; reason: 'no_order' | 'no_subscription' }
   /*
    * V3.3 #95 (`#58b-1`), ADR-050 §4.3 -- ADDITIVE. The control plane refused
-   * the confirmation before the ledger was consulted: the emergency kill
-   * switch is engaged. Nothing was consumed. Every member above is
+   * the confirmation. Nothing was consumed. Every member above is
    * byte-identical to #58a's, and a caller treats this exactly as it treats
    * `insufficient_credit`: the zero-collectible path rolls back, the
    * verified-capture path keeps the capture and refunds. The reason is an
-   * internal vocabulary that never reaches a client (ADR-050 §9).
+   * internal vocabulary that never reaches a client (ADR-050 §9):
+   *
+   *   `kill_switch_active`       -- #95: the emergency switch is engaged;
+   *                                 refused before the ledger was consulted.
+   *   `business_policy_disabled` -- #141 (`#58b-2`): the rollout is active
+   *                                 and the order's party has no governance
+   *                                 decision; refused before the ledger.
+   *   `entitlement_missing`      -- #141: the party is governed under an
+   *                                 active rollout and the ledger answered
+   *                                 `not_configured` or `insufficient_credit`.
    */
-  | { outcome: 'control_refused'; reason: 'kill_switch_active' };
+  | { outcome: 'control_refused'; reason: 'kill_switch_active' | 'business_policy_disabled' | 'entitlement_missing' };
 
 export const BOOKING_CONFIRMATION_ENTITLEMENT_HOOK = Symbol('BEAUCLICK_BOOKING_CONFIRMATION_ENTITLEMENT_HOOK');

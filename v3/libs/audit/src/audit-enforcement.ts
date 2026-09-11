@@ -101,7 +101,16 @@ export class AuditEnforcementService {
         // reads it, so this cannot drift from the real guard. There is no
         // second inventory of admin routes to keep in sync -- which would be
         // the original bug one level up.
-        const capability: string | undefined = Reflect.getMetadata(CAPABILITY_KEY, handler);
+        //
+        // Handler first, then the CLASS -- the same precedence the guard's
+        // `getAllAndOverride([handler, class])` applies. V3.3 #141 found this
+        // scanner reading the handler only, so every mutation on a controller
+        // gated at class level (`CommercialCatalogueController`, the
+        // enforcement sub-resource, chat moderation) was invisible to it: the
+        // guard enforced the capability, and this assertion enforced nothing.
+        // A mutation probe that dropped `@AuditAction` from a class-gated
+        // route booted cleanly. Now it does not.
+        const capability: string | undefined = Reflect.getMetadata(CAPABILITY_KEY, handler) ?? Reflect.getMetadata(CAPABILITY_KEY, metatype);
         if (!capability || !PRIVILEGED_CAPABILITIES.includes(capability)) continue;
 
         const declared: AuditActionMetadata | undefined = Reflect.getMetadata(AUDIT_ACTION_KEY, handler);

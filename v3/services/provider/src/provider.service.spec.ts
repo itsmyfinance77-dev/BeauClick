@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { DataSource, EntityManager } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
 import { createInMemoryDataSource } from '@beauclick/testing';
@@ -8,7 +11,7 @@ import { CityEntity } from './entities/city.entity';
 import { ProviderOutboxEntity } from './entities/provider-outbox.entity';
 import { ProviderEventsService } from './provider-events.service';
 import { createEventContractRegistry } from '@beauclick/event-contracts';
-import { SellerOwnerRoleGrantPort } from './ports';
+import { SellerGovernanceInitializationPort, SellerOwnerRoleGrantPort } from './ports';
 
 /**
  * The #75 owner-role port, recorded rather than executed.
@@ -23,10 +26,31 @@ class RecordingOwnerRoleGrant implements SellerOwnerRoleGrantPort {
   readonly calls: Array<{ ownerUserId: string; hasManager: boolean }> = [];
   shouldFail = false;
 
+  constructor(private readonly order: string[] = []) {}
+
   async grantProfessionalOwnerRole(manager: EntityManager, ownerUserId: string): Promise<boolean> {
+    this.order.push('role');
     this.calls.push({ ownerUserId, hasManager: Boolean(manager) });
     if (this.shouldFail) throw new Error('owner role grant failed');
     return true;
+  }
+}
+
+/**
+ * V3.3 #141 (`#58b-2`, ADR-050 §3.4). The governance-initialisation port,
+ * recorded the same way: which PARTY id it was called with (never the owner),
+ * on which manager, and in which order relative to the role grant.
+ */
+class RecordingGovernanceInitialization implements SellerGovernanceInitializationPort {
+  readonly calls: Array<{ professionalId: string; hasManager: boolean }> = [];
+  shouldFail = false;
+
+  constructor(private readonly order: string[]) {}
+
+  async initializeProfessionalGovernance(manager: EntityManager, professionalId: string): Promise<void> {
+    this.order.push('governance');
+    this.calls.push({ professionalId, hasManager: Boolean(manager) });
+    if (this.shouldFail) throw new Error('governance initialisation failed');
   }
 }
 
@@ -34,6 +58,8 @@ describe('ProviderService (integration, pg-mem)', () => {
   let dataSource: DataSource;
   let service: ProviderService;
   let ownerRoles: RecordingOwnerRoleGrant;
+  let governance: RecordingGovernanceInitialization;
+  let callOrder: string[];
 
   beforeEach(async () => {
     dataSource = await createInMemoryDataSource([ProfessionalEntity, SpecialtyEntity, CityEntity, ProviderOutboxEntity]);
@@ -47,7 +73,8 @@ describe('ProviderService (integration, pg-mem)', () => {
       dataSource.getRepository(SpecialtyEntity),
       dataSource.getRepository(CityEntity),
       events,
-      (ownerRoles = new RecordingOwnerRoleGrant()),
+      (ownerRoles = new RecordingOwnerRoleGrant(callOrder = [])),
+      (governance = new RecordingGovernanceInitialization(callOrder)),
     );
   });
 
@@ -104,6 +131,40 @@ describe('ProviderService (integration, pg-mem)', () => {
 
       expect(ownerRoles.calls).toEqual([{ ownerUserId: sessionOwner, hasManager: true }]);
       expect(ownerRoles.calls.map((c) => c.ownerUserId)).not.toContain(someoneElse);
+    });
+
+    /**
+     * V3.3 #141 (`#58b-2`, ADR-050 §3.4, `V33-DEC-036` R5).
+     *
+     * The governance port is called with the PARTY id (the new profile's id,
+     * never the owner's), on the transaction's own manager, immediately after
+     * the owner-role grant. Whether it writes -- it does only under an active
+     * rollout -- and whether a failure rolls the profile back belong to the
+     * real-PostgreSQL enforcement suite.
+     */
+    it('initialises governance through the port with the new PARTY id, on the transaction manager, after the role grant', async () => {
+      const ownerId = uuidv7();
+      const created = await service.create(ownerId, { displayName: 'Sara Beauty' });
+
+      expect(governance.calls).toEqual([{ professionalId: created.id, hasManager: true }]);
+      expect(governance.calls.map((c) => c.professionalId)).not.toContain(ownerId);
+      expect(callOrder).toEqual(['role', 'governance']);
+    });
+
+    it('the governance port is injected WITHOUT @Optional() and called WITHOUT ?. -- an absent binding is a boot failure, never an ungoverned seller', () => {
+      const source = readFileSync(join(__dirname, 'provider.service.ts'), 'utf8');
+      expect(source).toMatch(/@Inject\(SELLER_GOVERNANCE_INITIALIZATION\) private readonly governance: SellerGovernanceInitializationPort,/);
+      expect(source).not.toMatch(/@Optional\(\)\s*@Inject\(SELLER_GOVERNANCE_INITIALIZATION\)/);
+      expect(source).toContain('await this.governance.initializeProfessionalGovernance(manager, saved.id);');
+      expect(source).not.toContain('this.governance?.');
+    });
+
+    it('propagates a governance-initialisation failure instead of creating an ungoverned seller', async () => {
+      const ownerId = uuidv7();
+      governance.shouldFail = true;
+
+      await expect(service.create(ownerId, { displayName: 'Sara Beauty' })).rejects.toThrow('governance initialisation failed');
+      expect(governance.calls).toHaveLength(1);
     });
 
     it('rejects a second profile for the same owner (one profile per identity)', async () => {

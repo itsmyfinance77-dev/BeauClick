@@ -3,7 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 
-import { ProfessionalEntity, ProviderModule, SELLER_OWNER_ROLE_GRANT, ServiceOfferingEntity } from '@beauclick/provider';
+import { ProfessionalEntity, ProviderModule, SELLER_GOVERNANCE_INITIALIZATION, SELLER_OWNER_ROLE_GRANT, ServiceOfferingEntity } from '@beauclick/provider';
 import { IdentityModule, UserEntity } from '@beauclick/identity';
 import { BOOKING_CANCELLATION_ENTITLEMENT_HOOK, PROFESSIONAL_DIRECTORY } from '@beauclick/booking';
 import {
@@ -24,6 +24,7 @@ import { RECIPIENT_RESOLVER } from '@beauclick/notification';
 import { ANALYTICS_SUBJECT_RESOLVER } from '@beauclick/analytics';
 import { LoyaltyModule } from '@beauclick/loyalty';
 import {
+  BUSINESS_GOVERNANCE_INITIALIZATION,
   BUSINESS_OWNER_ROLE_GRANT,
   BusinessEntity,
   BusinessScopedStaffAuthorizer,
@@ -65,6 +66,7 @@ import {
 import {
   BookingCreditCancellationAdapter,
   BookingCreditEntitlementAdapter,
+  EnforcementBackedGovernanceInitialization,
 } from './booking-credit-entitlement.adapter';
 import { MembershipDiscountRule } from '../pricing/membership-discount.rule';
 import { financialDataSourceProvider } from './financial-datasource.provider';
@@ -198,6 +200,17 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     IdentityBackedOwnerRoleGrant,
     { provide: SELLER_OWNER_ROLE_GRANT, useExisting: IdentityBackedOwnerRoleGrant },
     { provide: BUSINESS_OWNER_ROLE_GRANT, useExisting: IdentityBackedOwnerRoleGrant },
+    /*
+     * V3.3 #141 (`#58b-2`, ADR-050 §3.4). The governance fact at seller
+     * creation, bound under both domain tokens by ONE adapter for the same
+     * reason as the owner-role grant just above. Both bindings are MANDATORY:
+     * neither domain declares an `@Optional()` fallback, so a composition that
+     * forgot one would fail to boot rather than creating sellers who are
+     * unresolved under an active rollout.
+     */
+    EnforcementBackedGovernanceInitialization,
+    { provide: SELLER_GOVERNANCE_INITIALIZATION, useExisting: EnforcementBackedGovernanceInitialization },
+    { provide: BUSINESS_GOVERNANCE_INITIALIZATION, useExisting: EnforcementBackedGovernanceInitialization },
     /*
      * V3.3 #108 (`#44b`), ADR-049 section 3.2. `business` declares
      * `LOCATION_CITY_CATALOGUE` and cannot import `provider`; this adapter reads
@@ -363,6 +376,8 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     FINANCE_WORKSPACE_OWNER_RESOLVER,
     SELLER_OWNER_ROLE_GRANT,
     BUSINESS_OWNER_ROLE_GRANT,
+    SELLER_GOVERNANCE_INITIALIZATION,
+    BUSINESS_GOVERNANCE_INITIALIZATION,
     LOCATION_CITY_CATALOGUE,
     SCOPED_STAFF_AUTHORIZER,
     STAFF_INVITE_IDENTITY_RESOLVER,

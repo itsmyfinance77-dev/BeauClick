@@ -5,9 +5,9 @@ import { uuidv7 } from 'uuidv7';
 import { AdminAuditService } from '@beauclick/audit';
 import type { SubscriberPartyType } from '@beauclick/commercial-policy-contract';
 
-import { CommercialReasonRequiredException } from '../catalogue/commercial-catalogue.exceptions';
-import { BOOKING_ENTITLEMENT_LOCK_NAMESPACE } from '../subscription/booking-credit-accounting.service';
+import { CommercialEnforcementActivationRefusedException, CommercialReasonRequiredException } from '../catalogue/commercial-catalogue.exceptions';
 import { BookingCreditEnforcementControlService, EnforcementControlMalformedError } from './booking-credit-enforcement-control.service';
+import { lockBookingEntitlementParty } from './booking-entitlement-party-lock';
 import {
   AUDIT_TARGET_ENFORCEMENT,
   BOOKING_ENFORCEMENT_COORDINATION_LOCK_KEY,
@@ -72,6 +72,9 @@ interface PartitionRow {
 const REASON_MIN = 3;
 const REASON_MAX = 500;
 
+/** The server-authored actor label of a governance row nobody typed (ADR-050 §3.4). */
+const SYSTEM_ACTOR_LABEL = 'system';
+
 /**
  * Governance of seller parties and the emergency kill switch -- V3.3 #95
  * (`#58b-1`), ADR-050 §3, §5, §6 and §7.
@@ -90,6 +93,10 @@ const REASON_MAX = 500;
  *   transition / exemption: bcgv SHARED -> control row FOR SHARE ->
  *                           bcre(party) in (party_type, party_id) order ->
  *                           governance write
+ *   creation hook (#141):   bcgv SHARED -> control row FOR SHARE ->
+ *                           governance insert
+ *   activation (#141):      bcgv EXCLUSIVE -> control row FOR UPDATE ->
+ *                           partition read (no row locks) -> control update
  *   kill switch:            control row FOR UPDATE -> control update
  *   preview:                no lock of any kind
  *
@@ -367,6 +374,136 @@ export class BookingCreditEnforcementGovernanceService {
   }
 
   // =========================================================================
+  // Global activation (ADR-050 §7) -- V3.3 #141 (`#58b-2`)
+  // =========================================================================
+
+  /**
+   * Activates global booking-credit enforcement: ONE transaction, atomic,
+   * idempotent, not reversible by any route.
+   *
+   *  1. `bcgv` EXCLUSIVE -- waits for every in-flight creation hook and
+   *     explicit transition/exemption, and excludes new ones until commit;
+   *  2. the singleton `FOR UPDATE` -- serialised against the kill switch and
+   *     against every confirmation holding it `FOR SHARE`, so a confirmation
+   *     sees either the world before activation or the world after it, never
+   *     a mixture (`V33-DEC-036` R9, R10);
+   *  3. already `active` -> nothing is written, not even an audit row, and
+   *     the current state is returned (a replay is a no-op);
+   *  4. the partition -- the SAME function preview uses, on this manager --
+   *     and if one eligible seller is unresolved the command REFUSES with the
+   *     counts and nothing else, writing nothing;
+   *  5. one audit row, then one UPDATE of exactly the activation columns:
+   *     `active`, generation + 1, `now()`, the audit id. The kill-switch
+   *     columns are untouched; `tg_bcec_protect` independently refuses any
+   *     other shape.
+   *
+   * It writes no governance row, no grant, no subscription, no balance and
+   * no notification: every seller was resolved BEFORE this ran, by an
+   * administrator's explicit command, and every seller created AFTER it is
+   * governed by the creation hook. The kill switch is not a precondition --
+   * activation never bypasses it (`V33-DEC-036` R2); an engaged switch keeps
+   * refusing after activation until it is released.
+   */
+  async activate(actorUserId: string, reason: string): Promise<EnforcementStatus> {
+    const statedReason = this.requireReason(reason);
+
+    return this.dataSource.transaction(async (manager) => {
+      await this.takeCoordinationExclusive(manager);
+
+      const [current] = await manager.query(
+        `SELECT rollout_state, activation_generation FROM commercial.booking_credit_enforcement_control WHERE id = $1 FOR UPDATE`,
+        [ENFORCEMENT_CONTROL_SINGLETON_ID],
+      );
+      if (!current) throw new EnforcementControlMalformedError('the singleton row is missing');
+      if (current.rollout_state === 'active') return this.statusWithin(manager);
+      if (current.rollout_state !== 'inactive') {
+        throw new EnforcementControlMalformedError(`rollout_state '${current.rollout_state}' is outside the vocabulary`);
+      }
+
+      const partition = await this.partition(manager);
+      if (partition.unresolved > 0) {
+        const control = await this.control.read(manager);
+        throw new CommercialEnforcementActivationRefusedException({
+          rolloutState: control.rolloutState,
+          killSwitchState: control.killSwitchState,
+          activationGeneration: control.activationGeneration,
+          ...partition,
+        });
+      }
+
+      const generation = Number(current.activation_generation);
+      const auditId = await this.audit.record(manager, {
+        actorUserId,
+        action: ENFORCEMENT_AUDIT_ACTIONS.activated,
+        targetType: AUDIT_TARGET_ENFORCEMENT,
+        targetId: 'booking_credit_enforcement_control',
+        reason: statedReason,
+        before: { rolloutState: 'inactive', activationGeneration: generation },
+        after: { rolloutState: 'active', activationGeneration: generation + 1, ...partition },
+      });
+
+      await manager.query(
+        `UPDATE commercial.booking_credit_enforcement_control
+            SET rollout_state = 'active',
+                activation_generation = activation_generation + 1,
+                activated_at = now(),
+                activation_audit_id = $2,
+                updated_at = now()
+          WHERE id = $1`,
+        [ENFORCEMENT_CONTROL_SINGLETON_ID, auditId],
+      );
+      return this.statusWithin(manager);
+    });
+  }
+
+  // =========================================================================
+  // Seller creation under an active rollout (ADR-050 §3.4) -- V3.3 #141
+  // =========================================================================
+
+  /**
+   * Called on the CREATING transaction's own manager, immediately after the
+   * owner-role grant, by the composition adapter both seller domains bind.
+   *
+   *   bcgv SHARED -> control row FOR SHARE -> (inactive: nothing) |
+   *                  (active: system audit row -> governed row, no grant)
+   *
+   * Holding `bcgv` shared for the rest of the creating transaction is what
+   * makes activation's "no unresolved seller" true at its COMMIT instant: a
+   * seller mid-creation under an inactive rollout keeps activation waiting
+   * until it commits, at which point activation counts it and refuses; a
+   * creation that starts while activation holds the lock waits, reads
+   * `active`, and governs itself. Any failure here propagates and the seller
+   * is not created -- a seller who exists ungoverned under active enforcement
+   * is the defect `V33-DEC-036` R5 exists to prevent.
+   */
+  async initializeCreatedParty(manager: EntityManager, party: { readonly partyType: SubscriberPartyType; readonly partyId: string }): Promise<void> {
+    await this.takeCoordinationShared(manager);
+    const control = await this.control.readForConfirmation(manager);
+    if (control.rolloutState !== 'active') return;
+
+    const auditId = await this.audit.recordSystem(manager, {
+      actorLabel: SYSTEM_ACTOR_LABEL,
+      action: ENFORCEMENT_AUDIT_ACTIONS.partyGovernedAtCreation,
+      targetType: AUDIT_TARGET_ENFORCEMENT,
+      targetId: 'booking_credit_party_governance',
+      after: { partyType: party.partyType, state: 'governed', cause: 'created_under_enforcement' },
+    });
+
+    await manager.insert(BookingCreditPartyGovernanceEntity, {
+      id: uuidv7(),
+      partyType: party.partyType,
+      partyId: party.partyId,
+      state: 'governed',
+      cause: 'created_under_enforcement',
+      proofGrantId: null,
+      governedAt: new Date(),
+      recordedByUserId: null,
+      recordedByLabel: SYSTEM_ACTOR_LABEL,
+      auditId,
+    });
+  }
+
+  // =========================================================================
   // Kill switch (ADR-050 §6)
   // =========================================================================
 
@@ -438,16 +575,22 @@ export class BookingCreditEnforcementGovernanceService {
     ]);
   }
 
+  /** The ONE exclusive taker of `bcgv` -- activation, and nothing else (ADR-050 §7.2). */
+  private async takeCoordinationExclusive(manager: EntityManager): Promise<void> {
+    await manager.query('SELECT pg_advisory_xact_lock($1, $2)', [
+      BOOKING_ENFORCEMENT_COORDINATION_LOCK_NAMESPACE,
+      BOOKING_ENFORCEMENT_COORDINATION_LOCK_KEY,
+    ]);
+  }
+
   /**
    * The SAME per-party lock `consumeForConfirmation` takes, keyed the same
    * way, so a transition and a confirmation for one party are serialised on
-   * one mechanism rather than two that might drift.
+   * one mechanism rather than two that might drift. Spelled once, in
+   * `booking-entitlement-party-lock.ts`, since #141 gave it a third caller.
    */
   private async lockParty(manager: EntityManager, party: PartyRow): Promise<void> {
-    await manager.query('SELECT pg_advisory_xact_lock($1, hashtext($2))', [
-      BOOKING_ENTITLEMENT_LOCK_NAMESPACE,
-      `${party.party_type}:${party.party_id}`,
-    ]);
+    await lockBookingEntitlementParty(manager, { partyType: party.party_type, partyId: party.party_id });
   }
 
   private requireReason(reason: string): string {

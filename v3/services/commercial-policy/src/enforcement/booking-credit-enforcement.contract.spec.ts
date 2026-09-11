@@ -22,16 +22,19 @@ import {
 const BOOKING_ENTITLEMENT_LOCK_NAMESPACE = 0x62_63_72_65 | 0;
 
 /**
- * V3.3 Story #95 (`#58b-1`) -- the closed contract, pinned (ADR-050 §10
- * cases 24, 29, 30 and the story boundary).
+ * V3.3 Stories #95 (`#58b-1`) and #141 (`#58b-2`) -- the closed contract,
+ * pinned (ADR-050 §10 cases 24, 29, 30 and the story boundaries).
  *
  * The constraint, trigger, lock and transactional behaviour lives in
- * `apps/api/test/booking-credit-enforcement.pg-spec.ts` -- it needs a real
- * server. This file checks the shapes a real server cannot: the vocabularies,
- * the entity columns, that the migration confers nothing, and -- the story
- * boundary -- that no #95 source writes `rollout_state = 'active'`, writes the
- * #141-reserved cause, or declares an activation route or a seller-creation
- * governance port.
+ * `apps/api/test/booking-credit-enforcement.pg-spec.ts` and
+ * `booking-credit-activation.pg-spec.ts` -- it needs a real server. This file
+ * checks the shapes a real server cannot: the vocabularies, the entity
+ * columns, that the migration confers nothing, and the STRUCTURAL facts #141
+ * turned from absences into exactly-once presences: ONE site assigns
+ * `rollout_state = 'active'` (activation), ONE site writes
+ * `created_under_enforcement` (the creation hook), ONE site takes `bcgv`
+ * exclusively (activation), ONE activation route, and no environment read
+ * anywhere.
  */
 const WORKSPACE_ROOT = resolve(__dirname, '../../../..');
 const ENFORCEMENT_DIR = __dirname;
@@ -194,42 +197,101 @@ describe('booking-credit enforcement control contract (#95 / #58b-1)', () => {
     });
   });
 
-  describe('the story boundary: #95 ships no #141 responsibility', () => {
+  describe('the story boundary: what #141 (`#58b-2`) owns, exactly once each', () => {
     const sources = enforcementSources();
+    const governance = () => sources.find((s) => s.file === 'booking-credit-enforcement-governance.service.ts')!.source;
 
     it('has enforcement sources to assert against', () => {
       expect(sources.length).toBeGreaterThanOrEqual(1);
     });
 
-    it('no #95 source writes rollout_state = active', () => {
+    it("EXACTLY ONE statement assigns rollout_state = 'active' -- activation's UPDATE, in the governance service", () => {
+      const sites: string[] = [];
       for (const { file, source } of sources) {
-        // Type unions and vocabulary arrays may NAME the value; no statement may ASSIGN it.
-        const assignments = source.match(/rolloutState\s*[:=]\s*'active'|rollout_state\s*=\s*'active'/g) ?? [];
-        expect({ file, assignments }).toEqual({ file, assignments: [] });
+        // Comparisons (`=== 'active'`) and audit snapshots (`after: { rolloutState: 'active' }`)
+        // are not writes; a SQL `SET rollout_state = 'active'` or a query-builder `.set({ rolloutState` is.
+        for (const m of source.matchAll(/SET rollout_state = 'active'|\.set\(\{[^}]*rolloutState/g)) sites.push(`${file}:${m[0]}`);
+        expect({ file, hit: /update\(BookingCreditEnforcementControlEntity\)/.test(source) }).toEqual({ file, hit: false });
       }
+      expect(sites).toEqual(["booking-credit-enforcement-governance.service.ts:SET rollout_state = 'active'"]);
+      // And the UPDATE that carries it moves every activation fact together.
+      expect(governance()).toMatch(/SET rollout_state = 'active',\s*activation_generation = activation_generation \+ 1,\s*activated_at = now\(\),\s*activation_audit_id = \$2/);
     });
 
-    it('no #95 source writes the #141-reserved cause', () => {
+    it("EXACTLY ONE statement writes cause 'created_under_enforcement' -- the creation hook", () => {
+      const sites: string[] = [];
       for (const { file, source } of sources) {
-        const writes = source.match(/cause\s*[:=]\s*'created_under_enforcement'/g) ?? [];
-        expect({ file, writes }).toEqual({ file, writes: [] });
+        // Row writes only: an INSERT of the governance entity, or a query-builder UPDATE `.set({ ... })`.
+        for (const m of source.matchAll(/insert\(BookingCreditPartyGovernanceEntity, \{[^}]*\}|\.set\(\{[^}]*\}/g)) {
+          if (m[0].includes("cause: 'created_under_enforcement'")) sites.push(`${file}:${m[0].slice(0, 44)}`);
+        }
       }
+      expect(sites).toEqual(['booking-credit-enforcement-governance.service.ts:insert(BookingCreditPartyGovernanceEntity, {']);
+      // With no grant, no proof, and the system label -- never a user id.
+      expect(governance()).toMatch(/cause: 'created_under_enforcement',\s*proofGrantId: null,\s*governedAt: new Date\(\),\s*recordedByUserId: null,\s*recordedByLabel: SYSTEM_ACTOR_LABEL/);
     });
 
-    it('declares no activation route and no seller-creation governance port', () => {
-      for (const { file, source } of sources) {
-        expect({ file, hit: /@Post\(\s*['"]activation['"]\s*\)/.test(source) }).toEqual({ file, hit: false });
-        expect({ file, hit: /SELLER_GOVERNANCE_INITIALIZATION|BUSINESS_GOVERNANCE_INITIALIZATION|initializeGovernanceFor/.test(source) }).toEqual({
-          file,
-          hit: false,
-        });
-      }
+    it('activation writes no governance row, no grant, no subscription: it touches the singleton and the audit log only', () => {
+      const src = governance();
+      const activate = src.slice(src.indexOf('async activate('), src.indexOf('async initializeCreatedParty('));
+      expect(activate).toContain('takeCoordinationExclusive(manager)');
+      expect(activate).toContain('FOR UPDATE');
+      // The partition is taken from the shared function AS IS -- not spread, wrapped, filtered or recomputed.
+      expect(activate).toContain('const partition = await this.partition(manager);');
+      expect(activate).not.toMatch(/partition\s*=\s*\{/);
+      expect(activate).toContain('CommercialEnforcementActivationRefusedException');
+      expect(activate).toMatch(/UPDATE commercial\.booking_credit_enforcement_control/);
+      expect(activate).not.toMatch(/INSERT|BookingCreditPartyGovernanceEntity|booking_credit_grants|seller_subscriptions|kill_switch/);
+    });
+
+    it('the creation hook takes bcgv SHARED, reads the control row FOR SHARE, and writes nothing under an inactive rollout', () => {
+      const src = governance();
+      const hook = src.slice(src.indexOf('async initializeCreatedParty('), src.indexOf('// Kill switch (ADR-050'));
+      expect(hook.indexOf('takeCoordinationShared')).toBeGreaterThan(-1);
+      expect(hook.indexOf('readForConfirmation')).toBeGreaterThan(hook.indexOf('takeCoordinationShared'));
+      expect(hook).toMatch(/if \(control\.rolloutState !== 'active'\) return;/);
+      expect(hook.indexOf('recordSystem')).toBeGreaterThan(hook.indexOf("!== 'active') return;"));
+      expect(hook.indexOf('manager.insert(BookingCreditPartyGovernanceEntity')).toBeGreaterThan(hook.indexOf('recordSystem'));
+      expect(hook).not.toMatch(/booking_credit_grants|BookingCreditGrantEntity|quantity/);
     });
 
     it('reads no environment variable: the planes are rows, never flags', () => {
       for (const { file, source } of sources) {
         expect({ file, hit: /process\.env|ConfigService/.test(source) }).toEqual({ file, hit: false });
       }
+    });
+
+    it('the four-plane seam under an active rollout is decided in the control service, not by reordering the pure gate', () => {
+      const control = sources.find((s) => s.file === 'booking-credit-enforcement-control.service.ts')!.source;
+      expect(control).toContain('decideGovernance(');
+      expect(control).toContain('decideGovernedLedger(');
+      expect(control).toContain('readGovernanceForConfirmation(');
+      // The unresolved refusal is NOT produced by the gate (which would say entitlement_missing).
+      const decideGovernance = control.slice(control.indexOf('decideGovernance('), control.indexOf('decideGovernedLedger('));
+      expect(decideGovernance).not.toContain('this.gate.decide');
+      expect(decideGovernance).toContain("reason: 'business_policy_disabled'");
+      // The governed verdict IS the gate, with every plane evaluated.
+      const governed = control.slice(control.indexOf('decideGovernedLedger('));
+      expect(governed).toMatch(/killSwitchActive: false,\s*rolloutEnabled: true,\s*entitlementGranted: ledger === 'consumed' \|\| ledger === 'already_consumed',\s*businessPolicyEnabled: true/);
+      // The gate itself is byte-for-byte the #39 evaluator: kill -> rollout -> entitlement -> business policy.
+      const gate = stripComments(readFileSync(join(ENFORCEMENT_DIR, '..', 'commercial-policy-control.gate.ts'), 'utf8'));
+      const order = ['killSwitchActive', 'rolloutEnabled', 'entitlementGranted', 'businessPolicyEnabled'].map((k) => gate.indexOf(`controls.${k}`));
+      expect([...order].sort((a, b) => a - b)).toEqual(order);
+    });
+
+    it('the governance read takes the SAME bcre party lock the ledger takes, spelled once', () => {
+      const lock = sources.find((s) => s.file === 'booking-entitlement-party-lock.ts')!.source;
+      expect(lock).toContain("SELECT pg_advisory_xact_lock($1, hashtext($2))");
+      expect(lock).toContain('BOOKING_ENTITLEMENT_LOCK_NAMESPACE');
+      expect(lock).toContain('`${party.partyType}:${party.partyId}`');
+      // Nobody else in this directory spells the per-party lock.
+      for (const { file, source } of sources) {
+        if (file === 'booking-entitlement-party-lock.ts') continue;
+        expect({ file, hit: /hashtext/.test(source) }).toEqual({ file, hit: false });
+      }
+      const control = sources.find((s) => s.file === 'booking-credit-enforcement-control.service.ts')!.source;
+      const read = control.slice(control.indexOf('async readGovernanceForConfirmation('), control.indexOf('decideGovernance('));
+      expect(read.indexOf('lockBookingEntitlementParty(manager, party)')).toBeLessThan(read.indexOf('findOne'));
     });
   });
 
@@ -273,10 +335,18 @@ describe('booking-credit enforcement control contract (#95 / #58b-1)', () => {
       }
     });
 
-    it('is taken SHARED by this story and never exclusively', () => {
+    it('is taken SHARED by transition, exemption and the creation hook, and EXCLUSIVELY at exactly one site: activation', () => {
       const governance = enforcementSources().find((s) => s.file === 'booking-credit-enforcement-governance.service.ts')!.source;
-      expect(governance).toContain('pg_advisory_xact_lock_shared($1, $2)');
-      expect(governance).not.toMatch(/pg_advisory_xact_lock\(\$1, \$2\)/);
+      expect(governance.match(/pg_advisory_xact_lock_shared\(\$1, \$2\)/g)).toHaveLength(1);
+      expect(governance.match(/pg_advisory_xact_lock\(\$1, \$2\)/g)).toHaveLength(1);
+      expect(governance.match(/takeCoordinationExclusive\(manager\)/g)).toHaveLength(1);
+      const activate = governance.slice(governance.indexOf('async activate('), governance.indexOf('async initializeCreatedParty('));
+      expect(activate).toContain('takeCoordinationExclusive(manager)');
+      expect(activate).not.toContain('takeCoordinationShared');
+      for (const { file, source } of enforcementSources()) {
+        if (file === 'booking-credit-enforcement-governance.service.ts') continue;
+        expect({ file, hit: /pg_advisory_xact_lock(_shared)?\(\$1, \$2\)/.test(source) }).toEqual({ file, hit: false });
+      }
     });
   });
 
@@ -289,23 +359,47 @@ describe('booking-credit enforcement control contract (#95 / #58b-1)', () => {
       expect(controller.indexOf('@RequireCapability')).toBeLessThan(controller.indexOf('export class'));
     });
 
-    it('declares exactly the six #95 routes and NO activation route', () => {
+    it('declares exactly the six #95 routes plus #141\'s activation -- and no activation/preview, no deactivation', () => {
       const routes = [...controller.matchAll(/@(Get|Post)\((?:'([^']*)')?\)/g)].map((m) => `${m[1]} ${m[2] ?? ''}`.trim());
-      expect(routes).toEqual(['Get', 'Get preview', 'Post transitions', 'Post exemptions', 'Post kill-switch/engage', 'Post kill-switch/release']);
-      expect(controller).not.toMatch(/activation/i);
+      expect(routes).toEqual([
+        'Get',
+        'Get preview',
+        'Post transitions',
+        'Post exemptions',
+        'Post kill-switch/engage',
+        'Post kill-switch/release',
+        'Post activation',
+      ]);
+      expect(controller).not.toMatch(/activation\/preview|deactivat|@Delete|@Patch|@Put/i);
     });
 
     it('every mutation carries an audit action from the closed vocabulary and takes exactly a ReasonDto', () => {
       const posts = controller.match(/@Post\([^)]*\)\s*@AuditAction\(ENFORCEMENT_AUDIT_ACTIONS\.[a-zA-Z]+\)/g) ?? [];
-      expect(posts).toHaveLength(4);
-      expect(controller.match(/@Body\(\) dto: ReasonDto/g) ?? []).toHaveLength(4);
+      expect(posts).toHaveLength(5);
+      expect(controller).toMatch(/@Post\('activation'\)\s*@AuditAction\(ENFORCEMENT_AUDIT_ACTIONS\.activated\)/);
+      expect(controller.match(/@Body\(\) dto: ReasonDto/g) ?? []).toHaveLength(5);
       expect(controller).not.toMatch(/@Body\(\) dto: (?!ReasonDto)/);
+      // The only query parameter any handler declares is the EMPTY one, which refuses every parameter.
+      expect(controller.match(/@Query\(\)[^,)]*/g)).toEqual(['@Query() _query: EmptyQueryDto']);
       expect(Object.values(ENFORCEMENT_AUDIT_ACTIONS).sort()).toEqual([
+        'commercial.enforcement_activated',
         'commercial.enforcement_kill_switch_engaged',
         'commercial.enforcement_kill_switch_released',
         'commercial.enforcement_parties_exempted',
         'commercial.enforcement_parties_governed',
+        'commercial.enforcement_party_governed_at_creation',
       ]);
+    });
+
+    it('the closed vocabulary is the ONLY source of an audit action: no string literal is passed to record()/recordSystem()', () => {
+      const governance = enforcementSources().find((s) => s.file === 'booking-credit-enforcement-governance.service.ts')!.source;
+      const values = [...governance.matchAll(/\baction:\s*([^,\n)]+)/g)].map((m) => m[1].trim());
+      expect(values.length).toBeGreaterThanOrEqual(5);
+      for (const value of values) {
+        // A constant from the closed vocabulary, the kill switch's pass-through parameter, or that parameter's type.
+        expect(value).toMatch(/^(ENFORCEMENT_AUDIT_ACTIONS\.[a-zA-Z]+|action|string)$/);
+      }
+      expect(governance).not.toMatch(/action:\s*['"`]/);
     });
   });
 });

@@ -78,6 +78,45 @@ class UngatedController {
   }
 }
 
+/**
+ * V3.3 #141. The capability declared on the CLASS, the shape every
+ * administrator sub-resource under `v1/admin/commercial` uses. The guard
+ * reads it through `getAllAndOverride([handler, class])`; the scanner must
+ * see exactly what the guard enforces.
+ */
+@Controller('t/class-gated-declared')
+@RequireCapability('bc_manage_platform')
+class ClassGatedDeclaredController {
+  @AuditAction('test.class.declared')
+  @Post()
+  mutate() {
+    return null;
+  }
+
+  @Get()
+  read() {
+    return null;
+  }
+}
+
+@Controller('t/class-gated-undeclared')
+@RequireCapability('bc_manage_platform')
+class ClassGatedUndeclaredController {
+  @Post()
+  mutate() {
+    return null;
+  }
+}
+
+@Controller('t/class-gated-ordinary')
+@RequireCapability('bc_book_service')
+class ClassGatedOrdinaryController {
+  @Post()
+  mutate() {
+    return null;
+  }
+}
+
 async function appWith(controllers: unknown[]) {
   @Module({ imports: [DiscoveryModule], controllers: controllers as never[], providers: [AuditEnforcementService] })
   class TestModule {}
@@ -112,6 +151,37 @@ describe('structural audit enforcement', () => {
       // The message must be actionable, not just a failure: whoever hits this
       // at boot needs to know what to do about it.
       expect(() => assertPrivilegedMutationsAreAudited(app)).toThrow(/@AuditAction/);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('SEES a mutation whose privileged capability is declared on the CLASS, and ignores the class-gated read', async () => {
+    const app = await appWith([ClassGatedDeclaredController]);
+    try {
+      const found = app.get(AuditEnforcementService).privilegedMutations();
+      expect(found.map((r) => r.handler)).toEqual(['ClassGatedDeclaredController.mutate']);
+      expect(found[0].capability).toBe('bc_manage_platform');
+      expect(found[0].auditAction).toBe('test.class.declared');
+      expect(() => assertPrivilegedMutationsAreAudited(app)).not.toThrow();
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('THROWS for an undeclared mutation on a class-gated controller -- the guard enforces the class capability, so this must too', async () => {
+    const app = await appWith([ClassGatedUndeclaredController]);
+    try {
+      expect(() => assertPrivilegedMutationsAreAudited(app)).toThrow(/ClassGatedUndeclaredController\.mutate/);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('ignores a mutation on a controller class-gated on a NON-privileged capability', async () => {
+    const app = await appWith([ClassGatedOrdinaryController]);
+    try {
+      expect(app.get(AuditEnforcementService).privilegedMutations()).toEqual([]);
     } finally {
       await app.close();
     }

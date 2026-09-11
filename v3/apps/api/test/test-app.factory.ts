@@ -10,7 +10,8 @@ import { BeauClickExceptionFilter, ResponseEnvelopeInterceptor, ValidationExcept
 import { JwtAuthGuard, CapabilityGuard } from '@beauclick/auth';
 import { OwnershipGuard } from '@beauclick/ownership';
 import { IdentityModule, IDENTITY_ENTITIES, OTP_DEBUG_OBSERVER, OtpDebugObserver } from '@beauclick/identity';
-import { ProviderModule, PROVIDER_ENTITIES, SELLER_OWNER_ROLE_GRANT } from '@beauclick/provider';
+import { ProviderModule, PROVIDER_ENTITIES, SELLER_GOVERNANCE_INITIALIZATION, SELLER_OWNER_ROLE_GRANT } from '@beauclick/provider';
+import type { SellerGovernanceInitializationPort } from '@beauclick/provider';
 import { CAPABILITIES_BY_ROLE, ROLES } from '@beauclick/identity';
 import { PRIVILEGED_CAPABILITIES } from '@beauclick/auth';
 import { IdentityBackedOwnerRoleGrant } from '../src/composition/port-adapters';
@@ -121,14 +122,39 @@ function applyHermeticTestEnv(): void {
  * about the wiring — the failure Story #8 shipped and the reason the wishlist
  * ports above are real too.
  */
+/**
+ * V3.3 #141 (`#58b-2`). The seller-creation governance port, which
+ * `ProviderService` now injects WITHOUT `@Optional()` -- so this pg-mem layer
+ * failed to compile the moment #141 landed, which is the property working.
+ *
+ * This layer has NO commercial-policy module, no control singleton and no
+ * governance table (pg-mem honours none of the advisory locks, row locks or
+ * triggers the control plane is made of), so there is nothing here for the
+ * real adapter to read. What this stub asserts is exactly what the real one
+ * does under an INACTIVE rollout -- nothing -- and it records every call so a
+ * test could still see that creation reached the port. The wiring of the
+ * REAL `EnforcementBackedGovernanceInitialization`, and every outcome under
+ * an active rollout, is proven against real PostgreSQL in
+ * `booking-credit-activation.pg-spec.ts`.
+ */
+class DormantGovernanceInitialization implements SellerGovernanceInitializationPort {
+  readonly calls: string[] = [];
+
+  async initializeProfessionalGovernance(_manager: unknown, professionalId: string): Promise<void> {
+    this.calls.push(professionalId);
+  }
+}
+
 @Global()
 @Module({
   imports: [IdentityModule],
   providers: [
     IdentityBackedOwnerRoleGrant,
     { provide: SELLER_OWNER_ROLE_GRANT, useExisting: IdentityBackedOwnerRoleGrant },
+    DormantGovernanceInitialization,
+    { provide: SELLER_GOVERNANCE_INITIALIZATION, useExisting: DormantGovernanceInitialization },
   ],
-  exports: [SELLER_OWNER_ROLE_GRANT],
+  exports: [SELLER_OWNER_ROLE_GRANT, SELLER_GOVERNANCE_INITIALIZATION],
 })
 class OwnerRoleTestPortsModule {}
 
