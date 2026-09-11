@@ -660,8 +660,14 @@ describePg('booking-credit accounting (real PostgreSQL)', () => {
     it('both ledger tables are claimed by the privacy contract as retained', async () => {
       const contracts = app.get<SubjectDataContract[]>(SUBJECT_DATA_CONTRACTS);
       const contract = contracts.find((c) => c.moduleKey === 'commercial-subscription');
+      // The three LEDGER tables, by name. V3.3 #95 (`#58b-1`) added two
+      // control-plane tables under the same `booking_credit_` prefix
+      // (ADR-050 §2) with their own dispositions, pinned by their own suite;
+      // a prefix filter here would assert their absence, which was never this
+      // test's claim.
+      const LEDGER_TABLES = ['commercial.booking_credit_grants', 'commercial.booking_credit_consumptions', 'commercial.booking_credit_returns'];
       const claimed = (contract?.tables ?? [])
-        .filter((c) => c.table.startsWith('commercial.booking_credit_'))
+        .filter((c) => LEDGER_TABLES.includes(c.table))
         .map((c) => `${c.table}:${c.disposition}`)
         .sort();
       expect(claimed).toEqual([

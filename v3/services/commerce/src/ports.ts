@@ -205,6 +205,16 @@ export interface BookingConfirmationEntitlementHook {
 export type BookingConfirmationEntitlement =
   | { outcome: 'permitted'; detail: 'consumed' | 'already_consumed' | 'not_configured' }
   | { outcome: 'insufficient_credit' }
-  | { outcome: 'ineligible'; reason: 'no_order' | 'no_subscription' };
+  | { outcome: 'ineligible'; reason: 'no_order' | 'no_subscription' }
+  /*
+   * V3.3 #95 (`#58b-1`), ADR-050 §4.3 -- ADDITIVE. The control plane refused
+   * the confirmation before the ledger was consulted: the emergency kill
+   * switch is engaged. Nothing was consumed. Every member above is
+   * byte-identical to #58a's, and a caller treats this exactly as it treats
+   * `insufficient_credit`: the zero-collectible path rolls back, the
+   * verified-capture path keeps the capture and refunds. The reason is an
+   * internal vocabulary that never reaches a client (ADR-050 §9).
+   */
+  | { outcome: 'control_refused'; reason: 'kill_switch_active' };
 
 export const BOOKING_CONFIRMATION_ENTITLEMENT_HOOK = Symbol('BEAUCLICK_BOOKING_CONFIRMATION_ENTITLEMENT_HOOK');

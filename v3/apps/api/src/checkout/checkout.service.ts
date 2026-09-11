@@ -71,7 +71,13 @@ export class ZeroCollectibleConfirmationRefusedException extends DomainException
       // V3.3 #58a: the seller has no booking credit left. The customer sees the
       // same generic refusal -- a balance must never be inferable from a
       // checkout response (ADR-046 §9).
-      | 'insufficient_credit',
+      | 'insufficient_credit'
+      // V3.3 #95 (`#58b-1`): the booking-credit enforcement control plane
+      // refused before the ledger was consulted -- the emergency kill switch
+      // is engaged. Same generic refusal, same status, same sentence: an
+      // incident must never be inferable from a checkout response
+      // (ADR-050 §9).
+      | 'control_refused',
   ) {
     super(
       'BOOKING_NOT_CONFIRMABLE',
@@ -344,7 +350,11 @@ export class CheckoutService {
       if (entitlement.outcome !== 'permitted') {
         throw new ZeroCollectibleConfirmationRefusedException(
           orderId,
-          entitlement.outcome === 'insufficient_credit' ? 'insufficient_credit' : 'not_transitionable',
+          entitlement.outcome === 'insufficient_credit'
+            ? 'insufficient_credit'
+            : entitlement.outcome === 'control_refused'
+              ? 'control_refused'
+              : 'not_transitionable',
         );
       }
 

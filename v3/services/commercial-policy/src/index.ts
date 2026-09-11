@@ -66,3 +66,5 @@ export * from './collection-policy-assignment/collection-policy-resolution.servi
 // rollout inactive it changes no confirmation outcome except through the
 // kill switch, and it ships NO activation route -- that is #141 (`#58b-2`).
 export * from './enforcement/booking-credit-enforcement.entities';
+export * from './enforcement/booking-credit-enforcement-control.service';
+export * from './enforcement/booking-credit-enforcement.module';
