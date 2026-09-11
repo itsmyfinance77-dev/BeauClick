@@ -61,6 +61,24 @@ export interface BusinessOwnerRoleGrantPort {
 export const BUSINESS_OWNER_ROLE_GRANT = Symbol('BEAUCLICK_BUSINESS_OWNER_ROLE_GRANT');
 
 /**
+ * Governance initialisation at business creation -- V3.3 #141 (`#58b-2`),
+ * ADR-050 §3.4, `V33-DEC-036` R5. The business counterpart of `provider`'s
+ * `SellerGovernanceInitializationPort`: called on the creating transaction's
+ * own manager immediately after the owner-role grant; writes a `governed`
+ * fact only under an active rollout, and never a credit; a failure fails the
+ * creation. Staff invitation, acceptance and role grants call it NEVER --
+ * staff affiliation is not ownership and triggers no governance
+ * (`V33-DEC-036` R5). The method names the party type -- a business --
+ * because only this caller knows it. Mandatory: `BusinessModule` binds
+ * nothing, so an absent binding is a boot failure, not an ungoverned seller.
+ */
+export interface BusinessGovernanceInitializationPort {
+  initializeBusinessGovernance(manager: EntityManager, businessId: string): Promise<void>;
+}
+
+export const BUSINESS_GOVERNANCE_INITIALIZATION = Symbol('BEAUCLICK_BUSINESS_GOVERNANCE_INITIALIZATION');
+
+/**
  * The city representation a location surface may return -- V3.3 #108 (`#44b`).
  *
  * Exactly the two fields the platform's own public city catalogue exposes

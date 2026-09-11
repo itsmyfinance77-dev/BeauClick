@@ -126,13 +126,21 @@ export class AdminAuditService {
    * The label is server-generated in every case. `ck_admin_audit_actor` already
    * enforces that exactly one of `actor_user_id` and `actor_label` is present,
    * so a row written here can never be mistaken for a session's own action.
+   *
+   * Resolves to the persisted row's id -- the SAME additive shape `record`
+   * took for V3.3 #95. #141 (`#58b-2`)'s seller-creation hook writes a
+   * governance row whose `audit_id` must point at the system audit row
+   * written in the same transaction, and a pointer at anything but the row
+   * actually inserted would be provenance in name only. Every earlier caller
+   * ignores the value.
    */
   async recordSystem(
     manager: EntityManager,
     input: Omit<AdminAuditInput, 'actorUserId'> & { actorLabel: string },
-  ): Promise<void> {
+  ): Promise<string> {
+    const id = uuidv7();
     await manager.getRepository(AdminAuditLogEntity).insert({
-      id: uuidv7(),
+      id,
       actorUserId: null,
       actorLabel: input.actorLabel,
       action: input.action,
@@ -143,6 +151,7 @@ export class AdminAuditService {
       reason: input.reason ?? null,
       correlationId: currentCorrelationId() ?? null,
     });
+    return id;
   }
 
   /** Read-only, newest first. There is no update or delete counterpart, by design. */

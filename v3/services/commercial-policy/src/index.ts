@@ -64,10 +64,12 @@ export * from './collection-policy-assignment/collection-policy-resolution.servi
 // fact, the four-plane reader the confirmation seam consults, and the
 // privileged administrator sub-resource. A sixth, additive surface: with the
 // rollout inactive it changes no confirmation outcome except through the
-// kill switch, and it ships NO activation route -- that is #141 (`#58b-2`).
+// kill switch. V3.3 #141 (`#58b-2`) added the activation command, the
+// seller-creation governance initialisation and the active-rollout outcomes.
 export * from './enforcement/booking-credit-enforcement.entities';
 export * from './enforcement/booking-credit-enforcement.constants';
 export * from './enforcement/booking-credit-enforcement-control.service';
+export * from './enforcement/booking-entitlement-party-lock';
 export * from './enforcement/booking-credit-enforcement-governance.service';
 export * from './enforcement/booking-credit-enforcement.controller';
 export * from './enforcement/booking-credit-enforcement-subject-data.contract';

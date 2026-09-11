@@ -38,8 +38,8 @@ import { ENFORCEMENT_ENTITIES } from './booking-credit-enforcement.entities';
  */
 @Module({
   imports: [TypeOrmModule.forFeature([...ENFORCEMENT_ENTITIES])],
-  // ONE controller, and it is the administrator sub-resource (ADR-050 §5).
-  // It declares NO activation route: that is #141's, and a fast test pins it.
+  // ONE controller, and it is the administrator sub-resource (ADR-050 §5):
+  // seven routes since #141 added activation; a fast test pins the exact set.
   controllers: [BookingCreditEnforcementController],
   providers: [
     CommercialPolicyControlGate,

@@ -107,3 +107,24 @@ export class CommercialReasonRequiredException extends DomainException {
     super('COMMERCIAL_REASON_REQUIRED', 'ثبت دلیل برای این عملیات الزامی است.', HttpStatus.BAD_REQUEST);
   }
 }
+
+/**
+ * Global booking-credit enforcement could not be activated because at least
+ * one eligible seller is still unresolved -- V3.3 #141 (`#58b-2`), ADR-050
+ * §7.1 step 3 and §9; `V33-DEC-036` R9.
+ *
+ * Administrator-facing only. `details` is EXACTLY the preview object -- the
+ * aggregate counts and control state -- so the operator learns HOW MANY are
+ * unresolved and never WHO. Thrown inside the activation transaction, so
+ * nothing is written: no control change, no audit row.
+ */
+export class CommercialEnforcementActivationRefusedException extends DomainException {
+  constructor(details: Record<string, string | number>) {
+    super(
+      'COMMERCIAL_ENFORCEMENT_ACTIVATION_REFUSED',
+      'فعال‌سازی سراسری ممکن نیست: وضعیت برخی فروشندگان هنوز تعیین نشده است.',
+      HttpStatus.CONFLICT,
+      details,
+    );
+  }
+}
