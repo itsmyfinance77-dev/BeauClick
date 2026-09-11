@@ -246,10 +246,16 @@ describe('booking-credit enforcement control contract (#95 / #58b-1)', () => {
     it('is defined at exactly ONE site and embedded wherever eligibility is read -- never re-spelled', () => {
       const definitions = sources.filter(({ source }) => /export const ELIGIBLE_PARTIES_SQL\s*=/.test(source));
       expect(definitions.map((d) => d.file)).toEqual(['booking-credit-enforcement.constants.ts']);
-      // No second spelling of the predicate anywhere in the module.
+      // No second spelling of the ELIGIBILITY predicate anywhere in the module:
+      // a scan of either party table by `deleted_at IS NULL`. (The subject-data
+      // contract's OWNERSHIP query -- "which parties does this user own", by
+      // `owner_id` -- answers a different question and is the precedent every
+      // contract in this service follows; it is not a re-spelling.)
       for (const { file, source } of sources) {
         const respelled = source.split('export const ELIGIBLE_PARTIES_SQL')[1] ?? source;
-        const hits = (respelled.match(/FROM provider\.professionals/g) ?? []).length + (respelled.match(/FROM business\.businesses/g) ?? []).length;
+        const hits =
+          (respelled.match(/FROM provider\.professionals[^;`]*?deleted_at IS NULL/g) ?? []).length +
+          (respelled.match(/FROM business\.businesses[^;`]*?deleted_at IS NULL/g) ?? []).length;
         expect({ file, hits }).toEqual({ file, hits: file === 'booking-credit-enforcement.constants.ts' ? 2 : 0 });
       }
       // Every place that needs eligibility embeds the constant.
