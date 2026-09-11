@@ -28,7 +28,7 @@ delivering its Story Points never creates a tag and never enables production.
 | V3.2-E | B2B Quotes and Campaigns | Owner-gated; payment gate applies to settlement | Not applicable | Not enabled |
 | V3.2-F | Payout and Calendar Automation | Predominantly external-gated | Not applicable | Not enabled |
 | V3.2-G | Evidence-Gated Scale | No commitment without evidence | Not applicable | Not enabled |
-| V3.3 | Product Maturity Programme | Active foundation: #39, #40 (`#40a`), #56 (`#56a`), #69 (`#56b`), #72 and #75 complete; epic #38 in progress; Story #41 decomposed by `V33-DEC-022` into #41 (`#41a`), #81 (`#41b`), #82 (`#41c`) and #83 (`#41d`) and re-estimated 13 -> 42 (#82 raised 8 -> 13 by `V33-DEC-024`); #41 (`#41a`), #81 (`#41b`) and #82 (`#41c`) complete, #83 (`#41d`) gated; #58 split by `V33-DEC-025` into `#58a` (13, **complete**) and `#58b` (3, blocked on #46); #57 split by `V33-DEC-026` into `#40c-1` (#57, **complete** at 13 after `V33-DEC-027` re-estimated it 8 -> 13) and #99 (`#40c-2`, 5, blocked on #47); bug #97 (2) complete; commercial structure ratified and **#46 closed** 2026-09-06 by `V33-DEC-028`, which moved #83 (13) and #95 (`#58b`, 3 -> 5) to Ready and re-estimated #43 13 -> 21; #83 then split 2026-09-06 by `V33-DEC-029` into `#41d-1` (#83, 13, Ready) and #104 (`#41d-2`, 8, proposed); #104 then split 2026-09-07 by `V33-DEC-031` into `#41d-2a` (#104, 8, Ready) and #115 (`#41d-2b`, 8, proposed); **#44 decomposed 2026-09-06 by `V33-DEC-030`** into an umbrella carrying no Story Points plus five children — #107 (`#44a`, 5, Ready), #108 (`#44b`, 8), #109 (`#44c`, 13), #110 (`#44d`, 13) and #111 (`#44e`, 8) — re-estimated 13 -> 47, a net **+34** with done unchanged; #107 (`#44a`)'s classification cardinality then ratified 2026-09-07 by `V33-DEC-032` — **at most one** vertical, an unclassified business legal, #107 unsplit at 5 SP and **no Story Point moved**; #107 (`#44a`) and #108 (`#44b`) then **complete**, and #109 (`#44c`)'s scoped-staff contract ratified 2026-09-08 by `V33-DEC-033` — a one-member `practitioner_chat` vocabulary, practitioner-specific chat authority, a fully synchronous invitation with no queued phone derivative, and the UUID invite contract replaced — moving #109 to Ready **unsplit at 13 SP** with no point completed and adding **#123** (2, the bounded web-invite frontend follow-up), a net **+2** with done unchanged; #123 then **complete** 2026-09-08; and #110 (`#44d`) **decomposed 2026-09-09 by `V33-DEC-034`** into `#110a` (#110, 5, the resource catalogue), `#110c` (#127, 8, the delivery-location context the platform does not yet have) and `#110b` (#128, 8, assignment and collision, blocked on both) — re-estimated 13 -> 21, a net **+8** with done unchanged; `#110a` (#110) then **complete** 2026-09-09; and `#110c` (#127) itself **split 2026-09-10 by `V33-DEC-035`** into `#127a` (#127, 5, the delivery-location context) and `#127b` (#131, 8, the service resource requirement), with #128 now blocked on **both** — re-estimated 8 -> 13, a net **+5** with done unchanged; `#127a` (#127) and `#127b` (#131) then both **complete** 2026-09-10, done rising 184 -> 197; and #128 (`#110b`) itself **complete** 2026-09-10, done rising 197 -> 205, closing the `V33-DEC-034`/`V33-DEC-035` resource-assignment lineage in full | No tag authorized | Real money blocked by #47; every commercial value and all legal copy remain **unpublished**, now tracked on #83, #42 (Legal), #43 and #47 rather than #46 |
+| V3.3 | Product Maturity Programme | Active foundation: #39, #40 (`#40a`), #56 (`#56a`), #69 (`#56b`), #72 and #75 complete; epic #38 in progress; Story #41 decomposed by `V33-DEC-022` into #41 (`#41a`), #81 (`#41b`), #82 (`#41c`) and #83 (`#41d`) and re-estimated 13 -> 42 (#82 raised 8 -> 13 by `V33-DEC-024`); #41 (`#41a`), #81 (`#41b`) and #82 (`#41c`) complete, #83 (`#41d`) gated; #58 split by `V33-DEC-025` into `#58a` (13, **complete**) and `#58b` (3, blocked on #46); #57 split by `V33-DEC-026` into `#40c-1` (#57, **complete** at 13 after `V33-DEC-027` re-estimated it 8 -> 13) and #99 (`#40c-2`, 5, blocked on #47); bug #97 (2) complete; commercial structure ratified and **#46 closed** 2026-09-06 by `V33-DEC-028`, which moved #83 (13) and #95 (`#58b`, 3 -> 5) to Ready and re-estimated #43 13 -> 21; #83 then split 2026-09-06 by `V33-DEC-029` into `#41d-1` (#83, 13, Ready) and #104 (`#41d-2`, 8, proposed); #104 then split 2026-09-07 by `V33-DEC-031` into `#41d-2a` (#104, 8, Ready) and #115 (`#41d-2b`, 8, proposed); **#44 decomposed 2026-09-06 by `V33-DEC-030`** into an umbrella carrying no Story Points plus five children — #107 (`#44a`, 5, Ready), #108 (`#44b`, 8), #109 (`#44c`, 13), #110 (`#44d`, 13) and #111 (`#44e`, 8) — re-estimated 13 -> 47, a net **+34** with done unchanged; #107 (`#44a`)'s classification cardinality then ratified 2026-09-07 by `V33-DEC-032` — **at most one** vertical, an unclassified business legal, #107 unsplit at 5 SP and **no Story Point moved**; #107 (`#44a`) and #108 (`#44b`) then **complete**, and #109 (`#44c`)'s scoped-staff contract ratified 2026-09-08 by `V33-DEC-033` — a one-member `practitioner_chat` vocabulary, practitioner-specific chat authority, a fully synchronous invitation with no queued phone derivative, and the UUID invite contract replaced — moving #109 to Ready **unsplit at 13 SP** with no point completed and adding **#123** (2, the bounded web-invite frontend follow-up), a net **+2** with done unchanged; #123 then **complete** 2026-09-08; and #110 (`#44d`) **decomposed 2026-09-09 by `V33-DEC-034`** into `#110a` (#110, 5, the resource catalogue), `#110c` (#127, 8, the delivery-location context the platform does not yet have) and `#110b` (#128, 8, assignment and collision, blocked on both) — re-estimated 13 -> 21, a net **+8** with done unchanged; `#110a` (#110) then **complete** 2026-09-09; and `#110c` (#127) itself **split 2026-09-10 by `V33-DEC-035`** into `#127a` (#127, 5, the delivery-location context) and `#127b` (#131, 8, the service resource requirement), with #128 now blocked on **both** — re-estimated 8 -> 13, a net **+5** with done unchanged; `#127a` (#127) and `#127b` (#131) then both **complete** 2026-09-10, done rising 184 -> 197; and #128 (`#110b`) itself **complete** 2026-09-10, done rising 197 -> 205, closing the `V33-DEC-034`/`V33-DEC-035` resource-assignment lineage in full; the test-only bug #139 (1) found by #128's post-merge verification then **complete** 2026-09-11 and given its milestone, done rising 205 -> 206; and **#95 (`#58b`) split 2026-09-11 by `V33-DEC-036`** into `#58b-1` (#95, 5, the control foundation, Ready) and `#58b-2` (#141, 5, global activation and enforcement, proposed, depends on #95) — re-estimated 5 -> 10, a net **+5** with done unchanged, ADR-050 committed alone as the family's pre-code gate | No tag authorized | Real money blocked by #47; every commercial value and all legal copy remain **unpublished**, now tracked on #83, #42 (Legal), #43 and #47 rather than #46 |
 | V3.4 | Conditional Expansion Programme | Written owner decision and evidence required | Not applicable | Not enabled |
 
 V3.2-A and V3.2-B are completed historical milestones but are deliberately
@@ -813,3 +813,69 @@ and the `subject_data` claim (matching `booking.bookings`'s own retained-on-eras
 despite ADR-049 §7.2's literal `retained` label for this row, which describes the same
 behavioural outcome under a different disposition name) — with no genuine unresolved
 product, legal or security choice requiring a new decision card.
+
+## V3.3 Story #95 (`#58b`) control-plane contract ratified and split, 2026-09-11
+
+`V33-DEC-036` split #95 after a read-only readiness audit against
+`2cf217098fdc93e0d1f084f5837b42222c716c63` found it `status:ready` but not executable as
+written. **Structure, contract and security only** — no commercial value, no Legal wording, no
+schema, no implementation. **ADR-050 was written and committed alone** as the family's pre-code
+gate before the card was recorded.
+
+**Why.** `CommercialPolicyControlGate` implements the four independent fail-closed planes
+`V33-DEC-007` named and has **no production caller and no persistence** for any of its flags.
+No command, route, CLI or service can preview eligible, governed and exempt sellers, transition
+a seller, activate global enforcement, or engage or release a kill switch. The story's own
+non-goal — *"No new HTTP surface, commercial event or `ServiceName`"* — therefore made every
+operation its own acceptance criteria require **unreachable**. `V33-DEC-028`'s "Next ADR"
+instruction had assigned four-plane persistence to ADR-048, which was written for #83 and never
+took it; ADR-039's 2026-09-06 note repeated that assignment. And a single 5-SP estimate covered
+persistence, preview, transition, kill switch, activation, concurrency, audit, privacy and
+production gates.
+
+**What was ruled.** **R1** splits the family. **R2** keeps four independent planes — rollout, the
+unchanged `#58a` ledger, an explicit **monotonic** per-party governance fact, and a kill switch —
+and rejects a constant `true` for any of them. **R3** fixes one PostgreSQL-enforced singleton
+control row and one per-party governance table, reusing `admin.admin_audit_log`. **R4** leaves
+existing sellers legacy-exempt until explicitly transitioned, with no backfill of any kind.
+**R5** closes the seller-creation race by a mandatory transaction-scoped hook. **R6** gives the
+foundation an aggregate-only non-mutating preview. **R7** corrects the non-goal to *"no new
+customer- or seller-facing HTTP surface"* and authorizes a narrow privileged sub-resource under
+`v1/admin/commercial`. **R8** makes the kill switch platform-wide. **R9** makes activation atomic
+and not reversible through ordinary administration. **R10** chooses PostgreSQL-authoritative
+locking with a new `bcgv` namespace. **R11** starts eligibility from the ownership-only party and
+declines to record a suspended/revoked rule the real lifecycle does not support. **R12** fixes
+ADR-027 treatment. **R13** leaves `#58a` unredesigned. **R14** records the estimate.
+
+| Item | Before | After | Outcome it owns |
+|---|---:|---:|---|
+| #95 (`#58b` -> `#58b-1`) | 5 | **5** | Booking-credit enforcement control foundation: the singleton control row and per-party governance table, the four-plane seam upstream of `consumeForConfirmation` reading an `inactive` rollout, the aggregate-only preview, the set-based explicit transition and exemption commands, the platform-wide kill switch, the privileged admin contract, audit and privacy. Changes no confirmation outcome except through the kill switch. **Ready** |
+| #141 (`#58b-2`) | — | **5** | Global booking-credit activation and enforcement: the atomic, idempotent, non-reversible activation command, the seller-creation race closure, and the `active`-rollout confirmation outcomes under which a governed party is fail-closed. `status:proposed`, depends on #95 |
+| **Total** | **5** | **10** | Net V3.3 scope movement **+5**. Done unchanged by the split — it completes no story |
+
+**Story Points are not double-counted.** #95 keeps a single `sp:5`; #141 carries `sp:5`. The +5 is
+an honest scope correction, not completed work: the original 5 silently contained persistence,
+an operational surface and an activation with a different blast radius from the controls it
+needs.
+
+**One reconciliation, recorded rather than hidden.** #139 — the closed, 1-SP test-only bug the
+#128 post-merge mutation-probe verification filed and fixed on 2026-09-11 — had no milestone, and
+the live dashboard reported exactly one data-quality warning for it. It received milestone V3.3,
+its truthful delivery context. That moves V3.3 **done 205 → 206** and adds **+1** to scope,
+independent of the split.
+
+**What moved.** #95 goes from "Global booking-credit enforcement activation (`#58b`)" to
+"Booking-credit enforcement control foundation (`#58b-1`)" at **5 SP**, staying `status:ready`,
+with its body replaced by the foundation-only outcome and its HTTP non-goal corrected. #141 is
+created `status:proposed`. V3.3 scope rises **283 → 289** (+5 the split, +1 #139) with done
+**205 → 206** (#139). The live dashboard and an independent recomputation from raw labels agree:
+**206 / 289, zero data-quality warnings**. #58 (`#58a`), #42, #43, #44, #45, #47, #99 and #111
+remain untouched.
+
+**ADR-050 exists, committed alone.** It records R1–R14 as engineering rules, explains why ADR-048
+did not fulfil `V33-DEC-028` Ruling 11's obligation, specifies both tables and their constraints
+without creating a migration, defines the plane composition, the admin routes at contract level,
+the lock order with its deadlock analysis, privacy and audit dispositions, the failure contract,
+the implementation order and a thirty-row verification and mutation matrix. ADR-039, ADR-046 and
+ADR-048 received dated amendment notes only. **No production code or schema exists yet**, and
+implementation of #95 must begin with its own fresh preflight against the then-current `master`.
