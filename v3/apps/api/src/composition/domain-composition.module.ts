@@ -21,6 +21,7 @@ import { ChatCompositionModule } from './chat-composition.module';
 import { WishlistCompositionModule } from './wishlist-composition.module';
 import { ReferralCompositionModule } from './referral-composition.module';
 import {
+  BookingCreditEnforcementModule,
   CommercialCatalogueModule,
   CommercialPolicyModule,
   SellerSubscriptionModule,
@@ -169,6 +170,11 @@ import {
     // `*-composition.module.ts`, exactly as the catalogue above is.
     CollectionPolicyAssignmentModule,
   SellerSubscriptionSurfaceModule,
+    // V3.3 #95 (`#58b-1`), ADR-050 §5. The enforcement control plane and its
+    // privileged administrator sub-resource. Composed directly, like the
+    // catalogue: its one port-shaped dependency (the ledger's lock namespace)
+    // is a constant, and its entitlement seam is bound in `DomainPortsModule`.
+    BookingCreditEnforcementModule,
   ],
   controllers: [
     CheckoutController,
@@ -306,6 +312,7 @@ import {
     SellerSubscriptionModule,
     CollectionPolicyAssignmentModule,
   SellerSubscriptionSurfaceModule,
+    BookingCreditEnforcementModule,
     FINANCIAL_OUTBOX_RELAY,
     PrivacyModule,
     // V3.1 Phase F. Re-exported so the root injector can resolve

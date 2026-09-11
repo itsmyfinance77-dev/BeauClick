@@ -3,6 +3,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { CommercialPolicyControlGate } from '../commercial-policy-control.gate';
 import { BookingCreditEnforcementControlService } from './booking-credit-enforcement-control.service';
+import { BookingCreditEnforcementGovernanceService } from './booking-credit-enforcement-governance.service';
+import { BookingCreditEnforcementController } from './booking-credit-enforcement.controller';
 import { ENFORCEMENT_ENTITIES } from './booking-credit-enforcement.entities';
 
 /**
@@ -35,7 +37,10 @@ import { ENFORCEMENT_ENTITIES } from './booking-credit-enforcement.entities';
  */
 @Module({
   imports: [TypeOrmModule.forFeature([...ENFORCEMENT_ENTITIES])],
-  providers: [CommercialPolicyControlGate, BookingCreditEnforcementControlService],
-  exports: [BookingCreditEnforcementControlService],
+  // ONE controller, and it is the administrator sub-resource (ADR-050 §5).
+  // It declares NO activation route: that is #141's, and a fast test pins it.
+  controllers: [BookingCreditEnforcementController],
+  providers: [CommercialPolicyControlGate, BookingCreditEnforcementControlService, BookingCreditEnforcementGovernanceService],
+  exports: [BookingCreditEnforcementControlService, BookingCreditEnforcementGovernanceService],
 })
 export class BookingCreditEnforcementModule {}

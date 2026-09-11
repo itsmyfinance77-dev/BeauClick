@@ -6,10 +6,18 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import request from 'supertest';
+
+import { AdminAuditService } from '@beauclick/audit';
+import { PRIVILEGED_CAPABILITIES } from '@beauclick/auth';
 import { BookingService } from '@beauclick/booking';
 import {
+  BOOKING_ENFORCEMENT_COORDINATION_LOCK_KEY,
+  BOOKING_ENFORCEMENT_COORDINATION_LOCK_NAMESPACE,
+  BOOKING_ENTITLEMENT_LOCK_NAMESPACE,
   BookingCreditAccountingService,
   BookingCreditEnforcementControlService,
+  BookingCreditEnforcementGovernanceService,
   EnforcementControlMalformedError,
   SellerSubscriptionService,
   SubscriberPartyType,
@@ -26,6 +34,8 @@ import {
   futureSlotTime,
   requiredPgEnv,
   resetDatabase,
+  seedBusiness,
+  seedMembership,
   seedProfessional,
   seedSlot,
   seedUser,
@@ -73,8 +83,18 @@ describePg('booking-credit enforcement control foundation (#95 / #58b-1, real Po
     await app.close();
   });
 
+  /**
+   * `admin.admin_audit_log` is append-only and outside `resetDatabase`'s
+   * reach -- the application role cannot TRUNCATE it, by design -- so every
+   * audit assertion below is scoped to rows written after this test began,
+   * by the DATABASE clock (`now()` is the insert's transaction start, and a
+   * transaction that begins after this read cannot predate it).
+   */
+  let auditWatermark: string;
+
   beforeEach(async () => {
     await resetDatabase(dataSource);
+    auditWatermark = (await dataSource.query('SELECT clock_timestamp() AS t'))[0].t;
   });
 
   const CONTROL = 'commercial.booking_credit_enforcement_control';
@@ -843,6 +863,552 @@ describePg('booking-credit enforcement control foundation (#95 / #58b-1, real Po
       const orderAt = adapter.indexOf("reason: 'no_order'");
       expect(readAt).toBeGreaterThan(orderAt);
       expect(consumeAt).toBeGreaterThan(readAt);
+    });
+  });
+  // =========================================================================
+  // §E  The administrator surface: authorization (ADR-050 §5; cases 17, 18)
+  // =========================================================================
+
+  const BASE = '/api/v1/admin/commercial/booking-credit-enforcement';
+  const ROUTES: Array<['get' | 'post', string]> = [
+    ['get', BASE],
+    ['get', `${BASE}/preview`],
+    ['post', `${BASE}/transitions`],
+    ['post', `${BASE}/exemptions`],
+    ['post', `${BASE}/kill-switch/engage`],
+    ['post', `${BASE}/kill-switch/release`],
+  ];
+  const REASON = { reason: 'operator action recorded by the enforcement suite' };
+
+  async function seedAdmin(): Promise<SeededUser> {
+    return seedUser(app, dataSource, nextPhone(), ['administrator']);
+  }
+
+  const auditRows = async () =>
+    dataSource.query(
+      `SELECT action, actor_user_id, reason, after_state FROM admin.admin_audit_log
+        WHERE target_type = 'commercial.booking_credit_enforcement' AND created_at > $1
+        ORDER BY created_at`,
+      [auditWatermark],
+    );
+
+  describe('§E authorization over the real route table (ADR-050 §5.2; cases 17, 18)', () => {
+    it('the capability is PRIVILEGED, which confers the live re-check and the boot assertion', () => {
+      expect(PRIVILEGED_CAPABILITIES).toContain('bc_manage_commercial_plans');
+    });
+
+    it('every one of the six routes refuses an unauthenticated caller with 401, and a sibling nonexistent route is 404', async () => {
+      for (const [method, path] of ROUTES) {
+        const server = app.getHttpServer();
+        const response = await (method === 'get' ? request(server).get(path) : request(server).post(path).send(REASON));
+        expect({ path, status: response.status }).toEqual({ path, status: 401 });
+      }
+      // The activation route does NOT exist on this release: 404, not 401.
+      const missing = await request(app.getHttpServer()).post(`${BASE}/activation`).send(REASON);
+      expect(missing.status).toBe(404);
+    });
+
+    it('refuses a CUSTOMER and a PLATFORM_OPERATOR on every route', async () => {
+      const customer = await seedUser(app, dataSource, nextPhone(), ['customer']);
+      const operator = await seedUser(app, dataSource, nextPhone(), ['platform_operator']);
+      for (const caller of [customer, operator]) {
+        for (const [method, path] of ROUTES) {
+          const server = app.getHttpServer();
+          const response = await (method === 'get'
+            ? request(server).get(path).set('Authorization', `Bearer ${caller.accessToken}`)
+            : request(server).post(path).set('Authorization', `Bearer ${caller.accessToken}`).send(REASON));
+          expect({ path, status: response.status }).toEqual({ path, status: 403 });
+        }
+      }
+      expect(await auditRows()).toEqual([]);
+    });
+
+    it('admits an ADMINISTRATOR on both reads', async () => {
+      const admin = await seedAdmin();
+      const status = await request(app.getHttpServer()).get(BASE).set('Authorization', `Bearer ${admin.accessToken}`);
+      expect(status.status).toBe(200);
+      expect(status.body.data).toEqual({ rolloutState: 'inactive', killSwitchState: 'released', activationGeneration: 0, activatedAt: null, killSwitchChangedAt: null });
+      const preview = await request(app.getHttpServer()).get(`${BASE}/preview`).set('Authorization', `Bearer ${admin.accessToken}`);
+      expect(preview.status).toBe(200);
+    });
+
+    it('refuses on the next request after the role is revoked, with the SAME token, on reads and mutations (case 17)', async () => {
+      const admin = await seedAdmin();
+      expect((await request(app.getHttpServer()).get(BASE).set('Authorization', `Bearer ${admin.accessToken}`)).status).toBe(200);
+
+      await dataSource.query(`DELETE FROM identity.user_roles WHERE user_id = $1`, [admin.id]);
+
+      for (const [method, path] of ROUTES) {
+        const server = app.getHttpServer();
+        const response = await (method === 'get'
+          ? request(server).get(path).set('Authorization', `Bearer ${admin.accessToken}`)
+          : request(server).post(path).set('Authorization', `Bearer ${admin.accessToken}`).send(REASON));
+        expect({ path, status: response.status }).toEqual({ path, status: 403 });
+      }
+      expect((await controlRow()).kill_switch_state).toBe('released');
+      expect(await auditRows()).toEqual([]);
+    });
+
+    it('a business_staff member holding every non-privileged capability reaches no route, and accepting a membership writes no governance row (case 18)', async () => {
+      const owner = await seedUser(app, dataSource, nextPhone(), ['customer', 'business']);
+      const business = await seedBusiness(dataSource, owner.id, 'سالن');
+      const staffUser = await seedUser(app, dataSource, nextPhone(), ['customer', 'professional']);
+      const staffProfessional = await seedProfessional(dataSource, staffUser.id, 'کارمند', 0);
+      const membershipId = await seedMembership(dataSource, business.id, staffUser.id, 'manager', owner.id, staffProfessional.id);
+      await dataSource.query(`UPDATE business.business_staff SET status = 'active', responded_at = now() WHERE id = $1`, [membershipId]);
+
+      for (const [method, path] of ROUTES) {
+        const server = app.getHttpServer();
+        const response = await (method === 'get'
+          ? request(server).get(path).set('Authorization', `Bearer ${staffUser.accessToken}`)
+          : request(server).post(path).set('Authorization', `Bearer ${staffUser.accessToken}`).send(REASON));
+        expect({ path, status: response.status }).toEqual({ path, status: 403 });
+      }
+      // The OWNER of the business is a seller, not an administrator: also refused.
+      expect((await request(app.getHttpServer()).get(BASE).set('Authorization', `Bearer ${owner.accessToken}`)).status).toBe(403);
+      // Affiliation triggers nothing: no governance row for the staff member's own party or the business.
+      expect(await dataSource.query(`SELECT count(*)::int AS n FROM ${GOVERNANCE}`)).toEqual([{ n: 0 }]);
+    });
+
+    it('rejects an unknown body field, a missing reason and a whitespace reason before anything is written', async () => {
+      const admin = await seedAdmin();
+      const server = app.getHttpServer();
+      const auth = (r: request.Test) => r.set('Authorization', `Bearer ${admin.accessToken}`);
+
+      expect((await auth(request(server).post(`${BASE}/kill-switch/engage`)).send({ ...REASON, partyId: uuidv7() })).status).toBe(400);
+      expect((await auth(request(server).post(`${BASE}/transitions`)).send({ ...REASON, ownerUserId: uuidv7() })).status).toBe(400);
+      expect((await auth(request(server).post(`${BASE}/exemptions`)).send({ ...REASON, businessId: uuidv7() })).status).toBe(400);
+      expect((await auth(request(server).post(`${BASE}/kill-switch/engage`)).send({})).status).toBe(400);
+      expect((await auth(request(server).post(`${BASE}/kill-switch/engage`)).send({ reason: 'x' })).status).toBe(400);
+      const whitespace = await auth(request(server).post(`${BASE}/kill-switch/engage`)).send({ reason: '     ' });
+      expect(whitespace.status).toBeGreaterThanOrEqual(400);
+      expect(whitespace.status).toBeLessThan(500);
+
+      expect((await controlRow()).kill_switch_state).toBe('released');
+      expect(await auditRows()).toEqual([]);
+    });
+
+    it('no read or response carries an actor, audit, owner, party or seller identifier', async () => {
+      const admin = await seedAdmin();
+      const seller = await newSeller();
+      await grantCredits(seller, 1);
+      const auth = (r: request.Test) => r.set('Authorization', `Bearer ${admin.accessToken}`);
+
+      const bodies = [
+        (await auth(request(app.getHttpServer()).post(`${BASE}/kill-switch/engage`)).send(REASON)).body.data,
+        (await auth(request(app.getHttpServer()).post(`${BASE}/kill-switch/release`)).send(REASON)).body.data,
+        (await auth(request(app.getHttpServer()).post(`${BASE}/transitions`)).send(REASON)).body.data,
+        (await auth(request(app.getHttpServer()).post(`${BASE}/exemptions`)).send(REASON)).body.data,
+        (await auth(request(app.getHttpServer()).get(BASE))).body.data,
+        (await auth(request(app.getHttpServer()).get(`${BASE}/preview`))).body.data,
+      ];
+      const serialized = JSON.stringify(bodies);
+      expect(serialized).not.toContain(admin.id);
+      expect(serialized).not.toContain(seller.partyId);
+      expect(serialized).not.toContain(seller.ownerId);
+      expect(serialized).not.toMatch(/audit|actor|user_id|userId|partyId|party_id|ownerId|phone/i);
+      expect(bodies[2]).toEqual({ affected: 1, skipped: 0 });
+      expect(bodies[3]).toEqual({ affected: 0, skipped: 0 });
+    });
+  });
+
+  // =========================================================================
+  // §F  Preview (ADR-050 §5.4; cases 1, 2, 22)
+  // =========================================================================
+
+  describe('§F preview (ADR-050 §5.4; cases 1, 2, 22)', () => {
+    let admin: SeededUser;
+    beforeEach(async () => {
+      admin = await seedAdmin();
+    });
+    const previewAs = async () => {
+      const response = await request(app.getHttpServer()).get(`${BASE}/preview`).set('Authorization', `Bearer ${admin.accessToken}`);
+      expect(response.status).toBe(200);
+      return response.body.data as Record<string, unknown>;
+    };
+
+    it('returns exactly the §5.4 contract, and a fresh database counts zero everywhere', async () => {
+      expect(await previewAs()).toEqual({
+        rolloutState: 'inactive',
+        killSwitchState: 'released',
+        activationGeneration: 0,
+        eligible: 0,
+        governed: 0,
+        legacyExempt: 0,
+        unresolved: 0,
+        wouldBeRefused: 0,
+      });
+    });
+
+    it('counts exactly the ADR-050 §3.1 eligible parties: non-deleted professionals and businesses, dual owners twice, staff never, deleted never, subscription irrelevant (case 2)', async () => {
+      // 1. a plain professional (no subscription row at all)
+      await newSeller();
+      // 2. a business owner
+      const bizOwner = await seedUser(app, dataSource, nextPhone(), ['customer', 'business']);
+      await seedBusiness(dataSource, bizOwner.id, 'کسب‌وکار');
+      // 3+4. a DUAL owner: one user, two parties
+      const dual = await seedUser(app, dataSource, nextPhone(), ['customer', 'professional', 'business']);
+      await seedProfessional(dataSource, dual.id, 'دوگانه', 0);
+      await seedBusiness(dataSource, dual.id, 'کسب‌وکار دوگانه');
+      // a deleted professional and a deleted business: ineligible
+      const gone = await seedUser(app, dataSource, nextPhone(), ['customer', 'professional', 'business']);
+      const goneP = await seedProfessional(dataSource, gone.id, 'حذف‌شده', 0);
+      const goneB = await seedBusiness(dataSource, gone.id, 'حذف‌شده');
+      await dataSource.query(`UPDATE provider.professionals SET deleted_at = now() WHERE id = $1`, [goneP.id]);
+      await dataSource.query(`UPDATE business.businesses SET deleted_at = now() WHERE id = $1`, [goneB.id]);
+      // a staff member of the business: eligible ONLY as their own professional party, never as the employer
+      const staffUser = await seedUser(app, dataSource, nextPhone(), ['customer', 'professional']);
+      const staffP = await seedProfessional(dataSource, staffUser.id, 'کارمند', 0);
+      const business = (await dataSource.query(`SELECT id FROM business.businesses WHERE owner_id = $1`, [bizOwner.id]))[0].id;
+      const membershipId = await seedMembership(dataSource, business, staffUser.id, 'staff', bizOwner.id, staffP.id);
+      await dataSource.query(`UPDATE business.business_staff SET status = 'active', responded_at = now() WHERE id = $1`, [membershipId]);
+      // a suspended-by-hand professional stays eligible: verification is orthogonal (ADR-050 Context)
+      const susp = await newSeller();
+      await dataSource.query(`UPDATE provider.professionals SET verification_status = 'suspended' WHERE id = $1`, [susp.professionalId]);
+
+      const preview = await previewAs();
+      // professional(1) + business(2) + dual-professional(3) + dual-business(4) + staff-professional(5) + suspended(6)
+      expect(preview).toMatchObject({ eligible: 6, governed: 0, legacyExempt: 0, unresolved: 6, wouldBeRefused: 0 });
+    });
+
+    it('partitions governed / legacy_exempt / unresolved, and wouldBeRefused uses grants minus active consumptions INCLUDING a governed party with no positive grant', async () => {
+      const govNoGrant = await newSeller();
+      await governAs(govNoGrant, 'governed'); // governed, never granted -> would be refused
+      const govFunded = await newSeller();
+      await governAs(govFunded, 'governed');
+      await grantCredits(govFunded, 2); // balance 2 -> not refused
+      const govSpent = await newSeller();
+      await governAs(govSpent, 'governed');
+      await grantCredits(govSpent, 1);
+      await exhaust(govSpent); // balance 0 -> would be refused
+      const govReturned = await newSeller();
+      await governAs(govReturned, 'governed');
+      await grantCredits(govReturned, 1);
+      const a = await bookZeroCollectible(govReturned); // consumes the one credit
+      await bookings.cancel(a.bookingId, { type: 'professional', id: govReturned.ownerId }, 'بازگشت'); // returned -> balance 1 -> not refused
+      const exempt = await newSeller();
+      await governAs(exempt, 'legacy_exempt');
+      await newSeller(); // unresolved
+
+      expect(await previewAs()).toMatchObject({ eligible: 6, governed: 4, legacyExempt: 1, unresolved: 1, wouldBeRefused: 2 });
+    });
+
+    it('is non-mutating: no governance row, no audit row, no control change, and it holds NO row lock and NO advisory lock (case 1)', async () => {
+      await newSeller();
+      const before = [await dataSource.query(`SELECT * FROM ${GOVERNANCE}`), await auditRows(), await controlRow()];
+
+      // Hold the control row FOR UPDATE and the coordination lock EXCLUSIVELY in another
+      // transaction; a preview that took either lock would block here.
+      let release!: () => void;
+      const held = new Promise<void>((r) => (release = r));
+      let ready!: () => void;
+      const isReady = new Promise<void>((r) => (ready = r));
+      const holder = dataSource.transaction(async (m) => {
+        await m.query(`SELECT id FROM ${CONTROL} WHERE id = 1 FOR UPDATE`);
+        await m.query('SELECT pg_advisory_xact_lock($1, $2)', [BOOKING_ENFORCEMENT_COORDINATION_LOCK_NAMESPACE, BOOKING_ENFORCEMENT_COORDINATION_LOCK_KEY]);
+        ready();
+        await held;
+      });
+      await isReady;
+
+      const timed = await Promise.race([previewAs().then(() => 'completed'), new Promise<string>((r) => setTimeout(() => r('blocked'), 2_500))]);
+      release();
+      await holder;
+      expect(timed).toBe('completed');
+
+      const after = [await dataSource.query(`SELECT * FROM ${GOVERNANCE}`), await auditRows(), await controlRow()];
+      expect(after).toEqual(before);
+    });
+
+    it('issues the same number of statements for one seller as for fifty (case 22)', async () => {
+      const governance = app.get(BookingCreditEnforcementGovernanceService);
+      const countStatements = async () => {
+        let queries = 0;
+        const original = dataSource.logger;
+        dataSource.logger = {
+          logQuery: () => {
+            queries += 1;
+          },
+          logQueryError: () => undefined,
+          logQuerySlow: () => undefined,
+          logSchemaBuild: () => undefined,
+          logMigration: () => undefined,
+          log: () => undefined,
+        };
+        try {
+          await governance.preview();
+        } finally {
+          dataSource.logger = original;
+        }
+        return queries;
+      };
+      await newSeller();
+      const withOne = await countStatements();
+      for (let i = 0; i < 49; i += 1) await newSeller();
+      await governAs(await newSeller(), 'governed');
+      const withFifty = await countStatements();
+      expect(withOne).toBeGreaterThan(0);
+      expect(withFifty).toBe(withOne);
+      expect((await previewAs()).eligible).toBe(51);
+    });
+
+    it('reads one consistent snapshot: a seller created while the preview transaction is open is not counted by it', async () => {
+      // The REPEATABLE READ snapshot is asserted through the service, which
+      // exposes the transaction boundary; the route is the same call.
+      await newSeller();
+      const governance = app.get(BookingCreditEnforcementGovernanceService);
+      const snapshot = await dataSource.transaction('REPEATABLE READ', async (m) => {
+        const first = await governance.partition(m);
+        await newSeller(); // committed on another connection while this snapshot is open
+        const second = await governance.partition(m);
+        return { first, second };
+      });
+      expect(snapshot.second).toEqual(snapshot.first);
+      expect((await previewAs()).eligible).toBe(2);
+    });
+  });
+
+  // =========================================================================
+  // §G  Transition, exemption and the kill switch (ADR-050 §3.3, §6; cases 11-13, 19, 20)
+  // =========================================================================
+
+  describe('§G explicit transition and exemption (ADR-050 §3.3; cases 11, 12, 13, 19)', () => {
+    let admin: SeededUser;
+    let governance: BookingCreditEnforcementGovernanceService;
+    beforeAll(() => {
+      governance = app.get(BookingCreditEnforcementGovernanceService);
+    });
+    beforeEach(async () => {
+      admin = await seedAdmin();
+    });
+    const post = (path: string, body: Record<string, unknown> = REASON) =>
+      request(app.getHttpServer()).post(`${BASE}${path}`).set('Authorization', `Bearer ${admin.accessToken}`).send(body);
+    const governanceRows = async () => dataSource.query(`SELECT party_type, party_id, state, cause, proof_grant_id, recorded_by_user_id, recorded_by_label, audit_id, governed_at FROM ${GOVERNANCE} ORDER BY party_type, party_id`);
+
+    it('governs every entitled party with the OLDEST positive grant as proof, skips the unentitled, writes no grant, and leaves the skipped party unresolved (case 11)', async () => {
+      const entitled = await newSeller();
+      const older = await grantCredits(entitled, 1);
+      const newer = await grantCredits(entitled, 3);
+      const zeroOnly = await newSeller();
+      await ensureBasePlan();
+      await subscriptions.ensureBaseSubscription(zeroOnly); // the seeded-shape zero grant: NOT a positive entitlement
+      const nothing = await newSeller();
+      const grantsBefore = await dataSource.query('SELECT * FROM commercial.booking_credit_grants ORDER BY id');
+
+      const response = await post('/transitions');
+      expect(response.status).toBe(201);
+      expect(response.body.data).toEqual({ affected: 1, skipped: 2 });
+
+      const rows = await governanceRows();
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ party_type: 'professional', party_id: entitled.partyId, state: 'governed', cause: 'explicit_transition', proof_grant_id: older, recorded_by_user_id: admin.id, recorded_by_label: null });
+      expect(rows[0].proof_grant_id).not.toBe(newer);
+      expect(rows[0].governed_at).not.toBeNull();
+      void nothing;
+      void zeroOnly;
+
+      // No grant, subscription, consumption, return or balance was written (case 12).
+      expect(await dataSource.query('SELECT * FROM commercial.booking_credit_grants ORDER BY id')).toEqual(grantsBefore);
+      expect(await dataSource.query('SELECT count(*)::int AS n FROM commercial.booking_credit_consumptions')).toEqual([{ n: 0 }]);
+      expect(await credits.balanceFor(dataSource.manager, entitled)).toBe(4);
+
+      // One audit row, attributed to the session actor, carrying only counts.
+      const audit = await auditRows();
+      expect(audit).toHaveLength(1);
+      expect(audit[0]).toMatchObject({ action: 'commercial.enforcement_parties_governed', actor_user_id: admin.id, reason: REASON.reason, after_state: { affected: 1, skipped: 2 } });
+      expect(JSON.stringify(audit[0].after_state)).not.toContain(entitled.partyId);
+      expect(rows[0].audit_id).toBeDefined();
+      const [auditRow] = await dataSource.query('SELECT id FROM admin.admin_audit_log WHERE id = $1', [rows[0].audit_id]);
+      expect(auditRow).toBeDefined();
+    });
+
+    it('is idempotent under replay: a second run affects nothing and writes no audit row (case 13)', async () => {
+      const entitled = await newSeller();
+      await grantCredits(entitled, 1);
+      expect((await post('/transitions')).body.data).toEqual({ affected: 1, skipped: 0 });
+      const rowsAfterFirst = await governanceRows();
+      const auditAfterFirst = await auditRows();
+
+      expect((await post('/transitions')).body.data).toEqual({ affected: 0, skipped: 0 });
+      expect(await governanceRows()).toEqual(rowsAfterFirst);
+      expect(await auditRows()).toEqual(auditAfterFirst);
+    });
+
+    it('moves a legacy_exempt party to governed once it holds a positive grant -- the one permitted update, and never the reverse', async () => {
+      const seller = await newSeller();
+      expect((await post('/exemptions')).body.data).toEqual({ affected: 1, skipped: 0 });
+      const [exempt] = await governanceRows();
+      expect(exempt).toMatchObject({ state: 'legacy_exempt', cause: 'explicit_exemption', proof_grant_id: null });
+
+      await grantCredits(seller, 1);
+      expect((await post('/transitions')).body.data).toEqual({ affected: 1, skipped: 0 });
+      const [governed] = await governanceRows();
+      expect(governed).toMatchObject({ party_id: seller.partyId, state: 'governed', cause: 'explicit_transition' });
+      expect(governed.proof_grant_id).not.toBeNull();
+
+      // Exemption never touches a resolved party: the governed row stays governed.
+      expect((await post('/exemptions')).body.data).toEqual({ affected: 0, skipped: 0 });
+      expect((await governanceRows())[0].state).toBe('governed');
+    });
+
+    it('exempts only UNRESOLVED parties without a positive grant, and counts the entitled ones as skipped', async () => {
+      const entitled = await newSeller();
+      await grantCredits(entitled, 1);
+      const plain = await newSeller();
+      const alreadyExempt = await newSeller();
+      await governAs(alreadyExempt, 'legacy_exempt');
+
+      expect((await post('/exemptions')).body.data).toEqual({ affected: 1, skipped: 1 });
+      const rows = await governanceRows();
+      expect(rows.map((r: { party_id: string; state: string }) => `${r.party_id}:${r.state}`).sort()).toEqual(
+        [`${plain.partyId}:legacy_exempt`, `${alreadyExempt.partyId}:legacy_exempt`].sort(),
+      );
+      expect(rows.find((r: { party_id: string }) => r.party_id === plain.partyId)).toMatchObject({ cause: 'explicit_exemption', recorded_by_user_id: admin.id });
+      // Together the two commands resolve every seller: nothing remains unresolved.
+      // The two legacy_exempt parties stay transition CANDIDATES (a later positive
+      // grant would move them), so the transition truthfully reports them skipped.
+      expect((await post('/transitions')).body.data).toEqual({ affected: 1, skipped: 2 });
+      const preview = await request(app.getHttpServer()).get(`${BASE}/preview`).set('Authorization', `Bearer ${admin.accessToken}`);
+      expect(preview.body.data).toMatchObject({ eligible: 3, governed: 1, legacyExempt: 2, unresolved: 0 });
+    });
+
+    it('two CONCURRENT batches produce one row per party and one audit row each at most, never a duplicate (case 13)', async () => {
+      const sellers = await Promise.all([newSeller(), newSeller(), newSeller()]);
+      for (const seller of sellers) await grantCredits(seller, 1);
+
+      const results = await Promise.allSettled([
+        governance.transitionEntitledParties(admin.id, 'batch one'),
+        governance.transitionEntitledParties(admin.id, 'batch two'),
+      ]);
+      expect(results.every((r) => r.status === 'fulfilled')).toBe(true);
+      const affected = results.map((r) => (r as PromiseFulfilledResult<{ affected: number }>).value.affected);
+      expect(affected.reduce((a, b) => a + b, 0)).toBe(3);
+
+      const rows = await governanceRows();
+      expect(rows).toHaveLength(3);
+      expect(new Set(rows.map((r: { party_id: string }) => r.party_id)).size).toBe(3);
+      const audit = await auditRows();
+      expect(audit.length).toBe(affected.filter((n) => n > 0).length);
+    });
+
+    it('a dual owner is two independent parties, transitioned independently (case 19)', async () => {
+      const dual = await seedUser(app, dataSource, nextPhone(), ['customer', 'professional', 'business']);
+      const professional = await seedProfessional(dataSource, dual.id, 'دوگانه', 0);
+      const business = await seedBusiness(dataSource, dual.id, 'کسب‌وکار دوگانه');
+      await grantCredits({ partyType: 'professional', partyId: professional.id }, 1);
+
+      expect((await post('/transitions')).body.data).toEqual({ affected: 1, skipped: 1 });
+      let rows = await governanceRows();
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ party_type: 'professional', party_id: professional.id, state: 'governed' });
+
+      await grantCredits({ partyType: 'business', partyId: business.id }, 1);
+      expect((await post('/transitions')).body.data).toEqual({ affected: 1, skipped: 0 });
+      rows = await governanceRows();
+      expect(rows.map((r: { party_type: string; party_id: string }) => `${r.party_type}:${r.party_id}`).sort()).toEqual(
+        [`business:${business.id}`, `professional:${professional.id}`].sort(),
+      );
+    });
+
+    it('a transition and a confirmation for the SAME party serialise on the bcre party lock', async () => {
+      const seller = await newSeller();
+      await grantCredits(seller, 1);
+      let releaseHolder!: () => void;
+      const holderDone = new Promise<void>((r) => (releaseHolder = r));
+      let signalReady!: () => void;
+      const holderReady = new Promise<void>((r) => (signalReady = r));
+      // A confirmation-shaped holder of the party lock.
+      const holder = dataSource.transaction(async (m) => {
+        await m.query('SELECT pg_advisory_xact_lock($1, hashtext($2))', [BOOKING_ENTITLEMENT_LOCK_NAMESPACE, `${seller.partyType}:${seller.partyId}`]);
+        signalReady();
+        await holderDone;
+      });
+      await holderReady;
+
+      let done = false;
+      const transition = governance.transitionEntitledParties(admin.id, 'racing a confirmation').then(() => {
+        done = true;
+      });
+      await new Promise((r) => setTimeout(r, 750));
+      expect(done).toBe(false);
+      releaseHolder();
+      await holder;
+      await transition;
+      expect(done).toBe(true);
+      expect((await governanceRows())[0]).toMatchObject({ party_id: seller.partyId, state: 'governed' });
+    }, 20_000);
+  });
+
+  describe('§G the kill switch through the administrator surface (ADR-050 §6; case 20)', () => {
+    let admin: SeededUser;
+    beforeEach(async () => {
+      admin = await seedAdmin();
+    });
+    const post = (path: string, body: Record<string, unknown> = REASON) =>
+      request(app.getHttpServer()).post(`${BASE}${path}`).set('Authorization', `Bearer ${admin.accessToken}`).send(body);
+
+    it('engages and releases, each once, audited once, idempotent on replay, and never touches rollout, generation or governance', async () => {
+      const seller = await newSeller();
+      await governAs(seller, 'legacy_exempt');
+      const governanceBefore = await dataSource.query(`SELECT * FROM ${GOVERNANCE}`);
+
+      const engaged = await post('/kill-switch/engage');
+      expect(engaged.status).toBe(201);
+      expect(engaged.body.data).toMatchObject({ rolloutState: 'inactive', killSwitchState: 'engaged', activationGeneration: 0, activatedAt: null });
+      expect(engaged.body.data.killSwitchChangedAt).not.toBeNull();
+      const row = await controlRow();
+      expect(row).toMatchObject({ rollout_state: 'inactive', activation_generation: 0, kill_switch_state: 'engaged' });
+      expect(row.kill_switch_audit_id).not.toBeNull();
+      const [auditRow] = await dataSource.query('SELECT action, actor_user_id, reason, before_state, after_state FROM admin.admin_audit_log WHERE id = $1', [row.kill_switch_audit_id]);
+      expect(auditRow).toEqual({ action: 'commercial.enforcement_kill_switch_engaged', actor_user_id: admin.id, reason: REASON.reason, before_state: { killSwitchState: 'released' }, after_state: { killSwitchState: 'engaged' } });
+
+      // Replay: no new audit row, same audit pointer, same instant.
+      const replay = await post('/kill-switch/engage', { reason: 'engaging again by mistake' });
+      expect(replay.status).toBe(201);
+      expect(replay.body.data.killSwitchChangedAt).toBe(engaged.body.data.killSwitchChangedAt);
+      expect((await controlRow()).kill_switch_audit_id).toBe(row.kill_switch_audit_id);
+      expect(await auditRows()).toHaveLength(1);
+
+      // A confirmation is refused while engaged, through the real route-driven state.
+      const blocked = await newSeller();
+      await grantCredits(blocked, 1);
+      expect((await tryBookZeroCollectible(blocked)).refusal?.reason).toBe('control_refused');
+
+      const released = await post('/kill-switch/release');
+      expect(released.body.data.killSwitchState).toBe('released');
+      expect(await auditRows()).toHaveLength(2);
+      expect((await auditRows())[1].action).toBe('commercial.enforcement_kill_switch_released');
+      expect((await post('/kill-switch/release')).status).toBe(201);
+      expect(await auditRows()).toHaveLength(2);
+
+      expect(await dataSource.query(`SELECT * FROM ${GOVERNANCE}`)).toEqual(governanceBefore);
+      expect((await controlRow())).toMatchObject({ rollout_state: 'inactive', activation_generation: 0, activated_at: null, activation_audit_id: null });
+      const a = await bookZeroCollectible(blocked);
+      expect((await bookingRow(a.bookingId)).status).toBe('confirmed');
+    });
+
+    it('a failure at the control UPDATE -- after the audit insert -- rolls back BOTH: the audit row must not survive (case 20)', async () => {
+      // The audit row is written FIRST and the control update follows. A planted
+      // PostgreSQL trigger refuses that update, so the transaction fails at the
+      // point where an audit written in its OWN transaction would already have
+      // committed. The rollback must take the audit row with it.
+      await dataSource.query(`
+        CREATE OR REPLACE FUNCTION commercial.planted_refuse_kill_switch() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN RAISE EXCEPTION 'planted failure at the control update' USING ERRCODE = 'raise_exception'; END $$;
+        CREATE TRIGGER tg_planted_refuse_kill_switch BEFORE UPDATE OF kill_switch_state ON ${CONTROL}
+          FOR EACH ROW EXECUTE FUNCTION commercial.planted_refuse_kill_switch();`);
+      try {
+        const response = await post('/kill-switch/engage');
+        expect(response.status).toBe(500);
+        expect((await controlRow()).kill_switch_state).toBe('released');
+        expect((await controlRow()).kill_switch_audit_id).toBeNull();
+        expect(await auditRows()).toEqual([]);
+      } finally {
+        await dataSource.query(`DROP TRIGGER IF EXISTS tg_planted_refuse_kill_switch ON ${CONTROL}; DROP FUNCTION IF EXISTS commercial.planted_refuse_kill_switch();`);
+      }
+      // Non-vacuity: the same call succeeds once nothing is planted.
+      expect((await post('/kill-switch/engage')).status).toBe(201);
+      expect(await auditRows()).toHaveLength(1);
     });
   });
 });

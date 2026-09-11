@@ -64,10 +64,17 @@ export class AdminAuditService {
    * If the insert fails, the caller's transaction fails with it. That is the
    * intended behaviour and not a hazard to route around: an administrative
    * mutation that cannot be recorded must not happen.
+   *
+   * Resolves to the new row's id. V3.3 #95 (`#58b-1`, ADR-050 §2) stores that
+   * id on the domain row the action produced (`audit_id`,
+   * `kill_switch_audit_id`) as opaque provenance -- the domain never reads
+   * `admin.*`, but it can point at the record of who moved it. Every earlier
+   * caller ignores the value; the signature change is additive.
    */
-  async record(manager: EntityManager, input: AdminAuditInput): Promise<void> {
+  async record(manager: EntityManager, input: AdminAuditInput): Promise<string> {
+    const id = uuidv7();
     await manager.getRepository(AdminAuditLogEntity).insert({
-      id: uuidv7(),
+      id,
       actorUserId: input.actorUserId,
       actorLabel: null,
       action: input.action,
@@ -81,6 +88,7 @@ export class AdminAuditService {
       // one you can follow.
       correlationId: currentCorrelationId() ?? null,
     });
+    return id;
   }
 
   /**

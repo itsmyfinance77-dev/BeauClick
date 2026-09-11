@@ -12,6 +12,14 @@ import {
   PARTY_GOVERNANCE_CAUSES,
   PARTY_GOVERNANCE_STATES,
 } from './booking-credit-enforcement.entities';
+import {
+  BOOKING_ENFORCEMENT_COORDINATION_LOCK_NAMESPACE,
+  ELIGIBLE_PARTIES_SQL,
+  ENFORCEMENT_AUDIT_ACTIONS,
+} from './booking-credit-enforcement.constants';
+
+/** `bcre`, spelled here rather than imported: the ledger service pulls in the events lib the fast config does not map. */
+const BOOKING_ENTITLEMENT_LOCK_NAMESPACE = 0x62_63_72_65 | 0;
 
 /**
  * V3.3 Story #95 (`#58b-1`) -- the closed contract, pinned (ADR-050 §10
@@ -32,10 +40,15 @@ const MIGRATION = join(
   'database/migrations/commercial/20260917100001_create_booking_credit_enforcement_controls.sql',
 );
 
+/** Comments stripped: the boundary scans below are about STATEMENTS, and the docblocks legitimately name what the story does not do. */
+function stripComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+}
+
 function enforcementSources(): Array<{ file: string; source: string }> {
   return readdirSync(ENFORCEMENT_DIR)
     .filter((name) => name.endsWith('.ts') && !name.endsWith('.spec.ts'))
-    .map((name) => ({ file: name, source: readFileSync(join(ENFORCEMENT_DIR, name), 'utf8') }));
+    .map((name) => ({ file: name, source: stripComments(readFileSync(join(ENFORCEMENT_DIR, name), 'utf8')) }));
 }
 
 describe('booking-credit enforcement control contract (#95 / #58b-1)', () => {
@@ -217,6 +230,76 @@ describe('booking-credit enforcement control contract (#95 / #58b-1)', () => {
       for (const { file, source } of sources) {
         expect({ file, hit: /process\.env|ConfigService/.test(source) }).toEqual({ file, hit: false });
       }
+    });
+  });
+
+  describe('the ONE eligibility predicate (ADR-050 §3.1, case 2)', () => {
+    const sources = enforcementSources();
+
+    it('is non-deleted professionals UNION ALL non-deleted businesses, and consults nothing else', () => {
+      expect(ELIGIBLE_PARTIES_SQL).toMatch(/FROM provider\.professionals p\s+WHERE p\.deleted_at IS NULL/);
+      expect(ELIGIBLE_PARTIES_SQL).toMatch(/FROM business\.businesses b\s+WHERE b\.deleted_at IS NULL/);
+      expect(ELIGIBLE_PARTIES_SQL).toContain('UNION ALL');
+      expect(ELIGIBLE_PARTIES_SQL).not.toMatch(/verification|business_staff|seller_subscriptions|owner_id/);
+    });
+
+    it('is defined at exactly ONE site and embedded wherever eligibility is read -- never re-spelled', () => {
+      const definitions = sources.filter(({ source }) => /export const ELIGIBLE_PARTIES_SQL\s*=/.test(source));
+      expect(definitions.map((d) => d.file)).toEqual(['booking-credit-enforcement.constants.ts']);
+      // No second spelling of the predicate anywhere in the module.
+      for (const { file, source } of sources) {
+        const respelled = source.split('export const ELIGIBLE_PARTIES_SQL')[1] ?? source;
+        const hits = (respelled.match(/FROM provider\.professionals/g) ?? []).length + (respelled.match(/FROM business\.businesses/g) ?? []).length;
+        expect({ file, hits }).toEqual({ file, hits: file === 'booking-credit-enforcement.constants.ts' ? 2 : 0 });
+      }
+      // Every place that needs eligibility embeds the constant.
+      const governance = sources.find((s) => s.file === 'booking-credit-enforcement-governance.service.ts')!.source;
+      expect((governance.match(/\$\{ELIGIBLE_PARTIES_SQL\}/g) ?? []).length).toBeGreaterThanOrEqual(3);
+    });
+  });
+
+  describe('the coordination lock namespace (ADR-050 §7.2, case 29)', () => {
+    it("is 'bcgv', a distinct signed 32-bit namespace, never bcre", () => {
+      expect(BOOKING_ENFORCEMENT_COORDINATION_LOCK_NAMESPACE).toBe(0x62_63_67_76 | 0);
+      expect(BOOKING_ENFORCEMENT_COORDINATION_LOCK_NAMESPACE).not.toBe(BOOKING_ENTITLEMENT_LOCK_NAMESPACE);
+      for (const other of [0x61_69_63_6e | 0, 0x62_6b_61_73 | 0, 0x73_72_72_71 | 0, 0x77_69_73_68 | 0]) {
+        expect(BOOKING_ENFORCEMENT_COORDINATION_LOCK_NAMESPACE).not.toBe(other);
+      }
+    });
+
+    it('is taken SHARED by this story and never exclusively', () => {
+      const governance = enforcementSources().find((s) => s.file === 'booking-credit-enforcement-governance.service.ts')!.source;
+      expect(governance).toContain('pg_advisory_xact_lock_shared($1, $2)');
+      expect(governance).not.toMatch(/pg_advisory_xact_lock\(\$1, \$2\)/);
+    });
+  });
+
+  describe('the administrator surface (ADR-050 §5.2)', () => {
+    const controller = stripComments(readFileSync(join(ENFORCEMENT_DIR, 'booking-credit-enforcement.controller.ts'), 'utf8'));
+
+    it('is mounted under the existing commercial admin namespace and class-gated on the privileged capability', () => {
+      expect(controller).toContain("@Controller('v1/admin/commercial/booking-credit-enforcement')");
+      expect(controller).toContain("@RequireCapability('bc_manage_commercial_plans')");
+      expect(controller.indexOf('@RequireCapability')).toBeLessThan(controller.indexOf('export class'));
+    });
+
+    it('declares exactly the six #95 routes and NO activation route', () => {
+      const routes = [...controller.matchAll(/@(Get|Post)\((?:'([^']*)')?\)/g)].map((m) => `${m[1]} ${m[2] ?? ''}`.trim());
+      expect(routes).toEqual(['Get', 'Get preview', 'Post transitions', 'Post exemptions', 'Post kill-switch/engage', 'Post kill-switch/release']);
+      expect(controller).not.toMatch(/activation/i);
+    });
+
+    it('every mutation carries an audit action from the closed vocabulary and takes exactly a ReasonDto', () => {
+      const posts = controller.match(/@Post\([^)]*\)\s*@AuditAction\(ENFORCEMENT_AUDIT_ACTIONS\.[a-zA-Z]+\)/g) ?? [];
+      expect(posts).toHaveLength(4);
+      expect(controller.match(/@Body\(\) dto: ReasonDto/g) ?? []).toHaveLength(4);
+      expect(controller).not.toMatch(/@Body\(\) dto: (?!ReasonDto)/);
+      expect(Object.values(ENFORCEMENT_AUDIT_ACTIONS).sort()).toEqual([
+        'commercial.enforcement_kill_switch_engaged',
+        'commercial.enforcement_kill_switch_released',
+        'commercial.enforcement_parties_exempted',
+        'commercial.enforcement_parties_governed',
+      ]);
     });
   });
 });
