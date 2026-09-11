@@ -428,8 +428,9 @@ export const RESETTABLE_TABLES = [
   //
   // V3.3 #95 (`#58b-1`). The per-party governance fact references a grant
   // (`proof_grant_id`), so it goes BEFORE the grants. The singleton control row
-  // is deliberately NOT here: it must always exist, and `resetDatabase` puts
-  // it back into its initial safe state instead (see below).
+  // is deliberately NOT here: it must always exist, and `resetDatabase`
+  // re-seeds it in its initial safe state instead (`resetEnforcementControl`
+  // below -- TRUNCATE + reseed since #141, because activation is one-way).
   'commercial.booking_credit_party_governance',
   'commercial.booking_credit_grants',
   'commercial.seller_subscriptions',
@@ -637,21 +638,37 @@ export async function resetDatabase(dataSource: DataSource): Promise<void> {
 }
 
 /**
- * Returns the V3.3 #95 (`#58b-1`) control singleton to the state the migration
- * seeded: kill switch released.
+ * Returns the booking-credit enforcement control singleton to the state the
+ * migration seeded: `inactive`, generation 0, kill switch released -- V3.3 #95
+ * (`#58b-1`) and #141 (`#58b-2`), ADR-050 §2.1.
  *
- * Only the kill-switch columns are touched, because they are the only ones an
- * ordinary transaction may move in both directions. `rollout_state` is left
- * alone on purpose: no #95 code writes `active`, no suite may, and a suite
- * that finds it `active` here has found a real defect rather than stale
- * fixture state. The trigger refuses `active -> inactive`, so this helper
- * could not undo it even if it tried -- which is the point.
+ * ## TRUNCATE + deterministic reseed, not UPDATE
+ *
+ * #141 gives the platform a real activation, so a suite that activates the
+ * rollout leaves the row `active` -- and `tg_bcec_protect` refuses
+ * `active -> inactive` for every UPDATE, from any role, on purpose
+ * (`V33-DEC-036` R9). That trigger is production monotonicity and it is NOT
+ * weakened here: TRUNCATE is neither an UPDATE nor a DELETE, so no row trigger
+ * fires, exactly the property this factory already relies on for the
+ * immutable ledger and subscription tables above. The row is then re-inserted
+ * in the migration's own seeded shape, so every suite -- whatever ran before
+ * it -- starts from the dormant, released, generation-0 state.
+ *
+ * ## Test-only, by construction
+ *
+ * This file lives under `apps/api/test/`, is excluded from the production
+ * `tsconfig` build and is imported by no `src/` module (a structural test in
+ * the enforcement suite pins both). The application role's TRUNCATE privilege
+ * on this table is the same one `resetDatabase` already exercises on every
+ * table in `RESETTABLE_TABLES`; nothing here grants a privilege production
+ * code could reach.
  */
 export async function resetEnforcementControl(dataSource: DataSource): Promise<void> {
+  await dataSource.query('TRUNCATE commercial.booking_credit_enforcement_control');
   await dataSource.query(
-    `UPDATE commercial.booking_credit_enforcement_control
-        SET kill_switch_state = 'released', kill_switch_changed_at = NULL, kill_switch_audit_id = NULL, updated_at = now()
-      WHERE id = 1 AND (kill_switch_state <> 'released' OR kill_switch_changed_at IS NOT NULL)`,
+    `INSERT INTO commercial.booking_credit_enforcement_control
+       (id, rollout_state, activation_generation, kill_switch_state)
+     VALUES (1, 'inactive', 0, 'released')`,
   );
 }
 

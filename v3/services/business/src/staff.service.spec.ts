@@ -8,7 +8,7 @@ import { BusinessOutboxEntity } from './entities/business-outbox.entity';
 import { BusinessService } from './business.service';
 import { StaffService } from './staff.service';
 import { StaffMembershipNotFoundException } from './business.errors';
-import { BusinessOwnerRoleGrantPort, StaffInviteIdentityResolverPort } from './ports';
+import { BusinessGovernanceInitializationPort, BusinessOwnerRoleGrantPort, StaffInviteIdentityResolverPort } from './ports';
 import { StaffInviteClock } from './staff-invite.clock';
 import { AdminAuditService } from '@beauclick/audit';
 
@@ -19,6 +19,17 @@ import { AdminAuditService } from '@beauclick/audit';
  * grant would be testing the wrong thing.
  */
 const noOpOwnerRoles: BusinessOwnerRoleGrantPort = { grantBusinessOwnerRole: async () => true };
+/**
+ * V3.3 #141 (`#58b-2`). A RECORDING stub rather than a silent one: the staff
+ * cases below assert it is reached exactly once per business CREATION and
+ * never by an invitation, acceptance or role change (`V33-DEC-036` R5).
+ */
+const governanceCalls: string[] = [];
+const recordingGovernance: BusinessGovernanceInitializationPort = {
+  initializeBusinessGovernance: async (_manager, businessId) => {
+    governanceCalls.push(businessId);
+  },
+};
 
 /**
  * The #109 collaborators, stubbed.
@@ -41,7 +52,8 @@ describe('StaffService (integration, pg-mem)', () => {
 
   beforeEach(async () => {
     dataSource = await createInMemoryDataSource([BusinessEntity, BusinessStaffEntity, BusinessOutboxEntity]);
-    businesses = new BusinessService(dataSource.getRepository(BusinessEntity), dataSource, noOpOwnerRoles);
+    governanceCalls.length = 0;
+    businesses = new BusinessService(dataSource.getRepository(BusinessEntity), dataSource, noOpOwnerRoles, recordingGovernance);
     staff = new StaffService(
       dataSource.getRepository(BusinessEntity),
       dataSource.getRepository(BusinessStaffEntity),
@@ -143,6 +155,12 @@ describe('StaffService (integration, pg-mem)', () => {
       // Only the real invitee succeeds.
       const accepted = await staff.accept(invitedId, userId);
       expect(accepted.status).toBe('active');
+
+      // V3.3 #141 (`V33-DEC-036` R5): the governance port was reached exactly
+      // once -- by the business CREATION -- and never by the invitation or
+      // the acceptance. Staff affiliation is not ownership and triggers no
+      // governance fact.
+      expect(governanceCalls).toEqual([businessId]);
     });
 
     /*

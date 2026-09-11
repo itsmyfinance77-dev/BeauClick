@@ -754,14 +754,20 @@ describePg('booking-credit enforcement control foundation (#95 / #58b-1, real Po
       expect(await controlRow()).toMatchObject({ id: 1, rollout_state: 'inactive' });
     });
 
-    it('an ACTIVE rollout is a state this release refuses to honour -- neither the legacy path nor a guess (story boundary)', async () => {
-      await expect(
-        dataSource.transaction(async (m) => {
-          await m.query(`UPDATE ${CONTROL} SET rollout_state = 'active', activation_generation = 1, activated_at = now(), activation_audit_id = $1 WHERE id = 1`, [uuidv7()]);
-          const control = await enforcement.readForConfirmation(m);
-          enforcement.decideBeforeLedger(control);
-        }),
-      ).rejects.toThrow(/no active-rollout confirmation outcome/);
+    it("an ACTIVE rollout is the pre-ledger decision 'active' -- never the legacy path, never a guess (V3.3 #141 gave it its outcomes)", async () => {
+      const decision = await dataSource.transaction(async (m) => {
+        await m.query(`UPDATE ${CONTROL} SET rollout_state = 'active', activation_generation = 1, activated_at = now(), activation_audit_id = $1 WHERE id = 1`, [uuidv7()]);
+        const control = await enforcement.readForConfirmation(m);
+        const pre = enforcement.decideBeforeLedger(control);
+        // Governance may only be consulted under an active rollout; the reverse is a malformed call.
+        expect(() => enforcement.decideGovernance({ ...control, rolloutState: 'inactive' }, null)).toThrow(EnforcementControlMalformedError);
+        return pre;
+      });
+      expect(decision).toEqual({ kind: 'active' });
+      // The active rollout outcomes themselves are booking-credit-activation.pg-spec.ts's subject;
+      // this suite's fixture reset (TRUNCATE + reseed) returns the row to inactive for the next case.
+      expect((await controlRow()).rollout_state).toBe('active');
+      await resetDatabase(dataSource);
       expect((await controlRow()).rollout_state).toBe('inactive');
     });
 
@@ -852,13 +858,15 @@ describePg('booking-credit enforcement control foundation (#95 / #58b-1, real Po
       ]);
     });
 
-    it('the seam is additive: every pre-#95 member of BookingConfirmationEntitlement is present verbatim, and the new one names only the kill switch (case 30)', () => {
+    it('the seam is additive: every pre-#95 member of BookingConfirmationEntitlement is present verbatim, and the control-plane member names exactly the three control refusals (case 30)', () => {
       const ports = readFileSync(join(__dirname, '..', '..', '..', 'services', 'commerce', 'src', 'ports.ts'), 'utf8');
       expect(ports).toContain("| { outcome: 'permitted'; detail: 'consumed' | 'already_consumed' | 'not_configured' }");
       expect(ports).toContain("| { outcome: 'insufficient_credit' }");
       expect(ports).toContain("| { outcome: 'ineligible'; reason: 'no_order' | 'no_subscription' }");
-      expect(ports).toContain("| { outcome: 'control_refused'; reason: 'kill_switch_active' }");
-      expect(ports).not.toMatch(/control_refused'; reason: '(?!kill_switch_active')/);
+      // #95 named the kill switch; #141 (`#58b-2`) widened the SAME member by exactly the two active-rollout refusals.
+      expect(ports).toContain("| { outcome: 'control_refused'; reason: 'kill_switch_active' | 'business_policy_disabled' | 'entitlement_missing' };");
+      // `rollout_disabled` is never a refusal at the seam: an inactive rollout IS the legacy path.
+      expect(ports).not.toMatch(/control_refused'[^;]*rollout_disabled/);
     });
 
     it('both production confirmation paths still call the one entitlement port, and the adapter reads the control row BEFORE the ledger', () => {
@@ -904,15 +912,17 @@ describePg('booking-credit enforcement control foundation (#95 / #58b-1, real Po
       expect(PRIVILEGED_CAPABILITIES).toContain('bc_manage_commercial_plans');
     });
 
-    it('every one of the six routes refuses an unauthenticated caller with 401, and a sibling nonexistent route is 404', async () => {
-      for (const [method, path] of ROUTES) {
+    it('every one of the seven routes refuses an unauthenticated caller with 401, and a sibling nonexistent route is 404', async () => {
+      for (const [method, path] of [...ROUTES, ['post', `${BASE}/activation`] as const]) {
         const server = app.getHttpServer();
         const response = await (method === 'get' ? request(server).get(path) : request(server).post(path).send(REASON));
         expect({ path, status: response.status }).toEqual({ path, status: 401 });
       }
-      // The activation route does NOT exist on this release: 404, not 401.
-      const missing = await request(app.getHttpServer()).post(`${BASE}/activation`).send(REASON);
-      expect(missing.status).toBe(404);
+      // There is no activation/preview and no deactivation: 404, not 401 (ADR-050 §5.2, `V33-DEC-036` R9).
+      for (const path of [`${BASE}/activation/preview`, `${BASE}/deactivation`]) {
+        const missing = await request(app.getHttpServer()).post(path).send(REASON);
+        expect({ path, status: missing.status }).toEqual({ path, status: 404 });
+      }
     });
 
     it('refuses a CUSTOMER and a PLATFORM_OPERATOR on every route', async () => {

@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { DataSource, EntityManager } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
 import { createInMemoryDataSource } from '@beauclick/testing';
@@ -7,7 +10,7 @@ import { BusinessStaffEntity } from './entities/business-staff.entity';
 import { BusinessOutboxEntity } from './entities/business-outbox.entity';
 import { BusinessService } from './business.service';
 import { BusinessAlreadyExistsException } from './business.errors';
-import { BusinessOwnerRoleGrantPort } from './ports';
+import { BusinessGovernanceInitializationPort, BusinessOwnerRoleGrantPort } from './ports';
 
 
 /**
@@ -19,6 +22,20 @@ import { BusinessOwnerRoleGrantPort } from './ports';
  * the session-derived owner, on the transaction's own manager -- so the double
  * records exactly that, and the cases assert it.
  */
+/**
+ * V3.3 #141 (`#58b-2`, ADR-050 §3.4). Records which PARTY id (the business,
+ * never the owner) the governance port was called with, and on which manager.
+ */
+class RecordingGovernanceInitialization implements BusinessGovernanceInitializationPort {
+  readonly calls: Array<{ businessId: string; hasManager: boolean }> = [];
+  shouldFail = false;
+
+  async initializeBusinessGovernance(manager: EntityManager, businessId: string): Promise<void> {
+    this.calls.push({ businessId, hasManager: Boolean(manager) });
+    if (this.shouldFail) throw new Error('governance initialisation failed');
+  }
+}
+
 class RecordingOwnerRoleGrant implements BusinessOwnerRoleGrantPort {
   readonly calls: Array<{ ownerUserId: string; hasManager: boolean }> = [];
   shouldFail = false;
@@ -34,11 +51,13 @@ describe('BusinessService (integration, pg-mem)', () => {
   let dataSource: DataSource;
   let service: BusinessService;
   let ownerRoles: RecordingOwnerRoleGrant;
+  let governance: RecordingGovernanceInitialization;
 
   beforeEach(async () => {
     dataSource = await createInMemoryDataSource([BusinessEntity, BusinessStaffEntity, BusinessOutboxEntity]);
     ownerRoles = new RecordingOwnerRoleGrant();
-    service = new BusinessService(dataSource.getRepository(BusinessEntity), dataSource, ownerRoles);
+    governance = new RecordingGovernanceInitialization();
+    service = new BusinessService(dataSource.getRepository(BusinessEntity), dataSource, ownerRoles, governance);
   });
 
   afterEach(async () => {
@@ -73,6 +92,31 @@ describe('BusinessService (integration, pg-mem)', () => {
 
       await expect(service.create(ownerId, { displayName: 'Salon Sara' })).rejects.toThrow('owner role grant failed');
       expect(ownerRoles.calls).toHaveLength(1);
+    });
+
+    /** V3.3 #141 (`#58b-2`, ADR-050 §3.4, `V33-DEC-036` R5). */
+    it('initialises governance through the port with the new BUSINESS id, on the transaction manager', async () => {
+      const ownerId = uuidv7();
+      const business = await service.create(ownerId, { displayName: 'Salon Sara' });
+
+      expect(governance.calls).toEqual([{ businessId: business.id, hasManager: true }]);
+      expect(governance.calls.map((c) => c.businessId)).not.toContain(ownerId);
+    });
+
+    it('the governance port is injected WITHOUT @Optional() and called WITHOUT ?. -- an absent binding is a boot failure, never an ungoverned business', () => {
+      const source = readFileSync(join(__dirname, 'business.service.ts'), 'utf8');
+      expect(source).toMatch(/@Inject\(BUSINESS_GOVERNANCE_INITIALIZATION\) private readonly governance: BusinessGovernanceInitializationPort,/);
+      expect(source).not.toMatch(/@Optional\(\)\s*@Inject\(BUSINESS_GOVERNANCE_INITIALIZATION\)/);
+      expect(source).toContain('await this.governance.initializeBusinessGovernance(manager, id);');
+      expect(source).not.toContain('this.governance?.');
+    });
+
+    it('propagates a governance-initialisation failure instead of creating an ungoverned business', async () => {
+      const ownerId = uuidv7();
+      governance.shouldFail = true;
+
+      await expect(service.create(ownerId, { displayName: 'Salon Sara' })).rejects.toThrow('governance initialisation failed');
+      expect(governance.calls).toHaveLength(1);
     });
 
     it('consults no staff affiliation when granting: the port receives the owner and nothing else', async () => {
