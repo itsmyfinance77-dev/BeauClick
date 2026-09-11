@@ -183,10 +183,16 @@ jobs:
           echo "::add-mask::$CI_MINIO_PASSWORD"
           echo "CI_MINIO_USER=$CI_MINIO_USER" >> "$GITHUB_ENV"
           echo "CI_MINIO_PASSWORD=$CI_MINIO_PASSWORD" >> "$GITHUB_ENV"
+          # Pulled from Quay, MinIO's own registry. On 2026-09-11 Docker Hub
+          # stopped serving `minio/minio` ("pull access denied ... repository
+          # does not exist"; the Hub API answers "object not found"), which
+          # failed this step on a branch whose identical step had passed on
+          # master four hours earlier. `quay.io/minio/minio` is the same
+          # image, published by the same project; nothing else here changes.
           docker run -d --name bc-ci-minio -p 9000:9000 \
             -e MINIO_ROOT_USER="$CI_MINIO_USER" \
             -e MINIO_ROOT_PASSWORD="$CI_MINIO_PASSWORD" \
-            minio/minio:latest server /data
+            quay.io/minio/minio:latest server /data
           for i in $(seq 1 30); do
             if curl -sf http://localhost:9000/minio/health/live > /dev/null; then
               echo "MinIO is live"
