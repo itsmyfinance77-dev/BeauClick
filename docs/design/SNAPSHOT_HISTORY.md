@@ -14,6 +14,7 @@ rewrite their history.
 | V3.2-C wishlist | `c36b5d32ca3ecf24bfdde488e08aec38ed08e5e0` | 2026-08-31 | Historical; use commit |
 | V3.2-C referral | `201a7f453adbc58b4ed17f514bf1de8659174317` | 2026-09-02 | Historical; use commit |
 | V3.3-A commercial catalogue | `d2f51c34739f35ea5435f363f484dff0e23d7dbb` | 2026-09-03 | Canonical current workspace |
+| V3.3 frontend handoff closure | `f887bb4c90beef90efc3490a9dca1e72ce16685e` | 2026-09-12 | Canonical current workspace; implementation baseline `6695234eded1` |
 
 Examples:
 
