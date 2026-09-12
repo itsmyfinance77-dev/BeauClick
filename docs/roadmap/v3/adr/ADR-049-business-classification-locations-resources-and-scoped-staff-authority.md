@@ -229,6 +229,14 @@ phone number; resolution happens server-side; **the phone number and any resolve
 never echoed back**; and **no public user directory or search over users is created or
 authorized**.
 
+*(Clarified 2026-09-12 by `V33-DEC-038` R4–R5, R12. The echo this section forbids is the
+invitation response. A separate **owner-only** management read may carry, for a membership row the
+roster already lists, the professional's existing public display name or — when no professional
+is linked — exactly the final four digits of the verified phone the owner supplied, as the minimum
+identification the invitation relationship justifies. It never carries the full phone, an email, an
+account or professional UUID or a lookup status, is never readable by a manager or staff member, and
+creates no directory: a phone with no account still produces no row anywhere.)*
+
 **4.6 A phone number with no account: persist nothing, notify nothing.** This is the question
 ADR-023 left open and `V33-DEC-030` D5 required this ADR to answer before code. **The rule is
 the privacy-minimal one:**
