@@ -14,3 +14,4 @@ export * from './finance.exceptions';
 export * from './dto/finance-workspace.dto';
 export * from './financial.controller';
 export * from './financial-subject-data.contract';
+export * from './finance-no-store.middleware';

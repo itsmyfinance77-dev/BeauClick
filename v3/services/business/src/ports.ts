@@ -478,3 +478,63 @@ export interface ResourceAssignmentDirectoryPort {
 }
 
 export const RESOURCE_ASSIGNMENT_DIRECTORY = Symbol('BEAUCLICK_RESOURCE_ASSIGNMENT_DIRECTORY');
+
+/**
+ * Safe, owner-visible identification of the members on a roster -- V3.3
+ * #154, `V33-DEC-038` R2-R6.
+ *
+ * ## Why a port and not an import
+ *
+ * The two sources a member can be named from live in other domains: the
+ * verified phone in `identity.users` and the public display name in
+ * `provider.professionals`. `business` may import neither (ADR-011, and the
+ * Nx boundary restricts `scope:business` to `scope:shared`), so it declares
+ * what it needs and the composition root binds an adapter, exactly as
+ * `LOCATION_CITY_CATALOGUE` and `STAFF_INVITE_IDENTITY_RESOLVER` are bound.
+ *
+ * ## The full phone never crosses this boundary
+ *
+ * The adapter masks. What `business` receives is `phoneHint`, already reduced
+ * to the final four digits, so no code in this domain can accidentally
+ * project, log or audit a phone number: the shape has no field that could
+ * carry one (`V33-DEC-038` R4, R12). Likewise no email, no identity display
+ * name and no lookup status exist on the answer.
+ *
+ * ## It answers for a SET, in a constant number of statements
+ *
+ * One call names every membership on the roster; the adapter resolves all of
+ * them with a fixed number of queries whatever the roster size, so the
+ * management read cannot grow an N+1 path (`V33-DEC-038` R6). It never
+ * enumerates: it answers only for the user ids the caller already holds.
+ *
+ * ## Absence is a live-row question, never a reason
+ *
+ * A user id with no live identity row is simply absent from the map; a
+ * professional id with no live profile yields `professionalDisplayName: null`.
+ * Neither carries a cause.
+ *
+ * ## Nothing is provided by default, deliberately
+ *
+ * `BusinessModule` declares the token and binds nothing, so a composition that
+ * forgets it fails to boot rather than serving a roster nobody can be named on.
+ */
+export interface StaffIdentityLookup {
+  readonly userId: string;
+  readonly professionalId: string | null;
+}
+
+export interface StaffDisplayIdentity {
+  /** Exactly the final four digits of the verified phone; never more. */
+  readonly phoneHint: string;
+  /** The linked professional's public display name, or null when none is live. */
+  readonly professionalDisplayName: string | null;
+}
+
+export interface StaffDisplayIdentityPort {
+  describeMembers(
+    manager: EntityManager,
+    members: readonly StaffIdentityLookup[],
+  ): Promise<ReadonlyMap<string, StaffDisplayIdentity>>;
+}
+
+export const STAFF_DISPLAY_IDENTITY = Symbol('BEAUCLICK_STAFF_DISPLAY_IDENTITY');

@@ -505,8 +505,10 @@ describePg('scoped read-only business finance authority (real PostgreSQL, #111)'
       const s = await salon();
       const entries = await listWorkspaces(s.owner);
       expect(entries).toHaveLength(1);
-      expect(Object.keys(entries[0]).sort()).toEqual(['accessMode', 'workspaceRef', 'workspaceType']);
-      expect(entries[0]).toMatchObject({ workspaceType: 'business', accessMode: 'owner' });
+      // Exactly four keys: #111's `accessMode` and #154's `displayLabel` (`V33-DEC-038` R7) are
+      // the two additive fields; a fifth would be a contract change nobody decided.
+      expect(Object.keys(entries[0]).sort()).toEqual(['accessMode', 'displayLabel', 'workspaceRef', 'workspaceType']);
+      expect(entries[0]).toMatchObject({ workspaceType: 'business', accessMode: 'owner', displayLabel: 'سالن' });
       expect(entries[0].workspaceRef).toMatch(/^[A-Za-z0-9_-]{43}$/);
     });
 

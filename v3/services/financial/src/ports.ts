@@ -106,5 +106,49 @@ export interface AddressableFinancialParty extends FinancialParty {
 
 export const FINANCE_WORKSPACE_OWNER_RESOLVER = Symbol('BEAUCLICK_FINANCE_WORKSPACE_OWNER_RESOLVER');
 
+/**
+ * The public display name of each finance workspace — V3.3 #154,
+ * `V33-DEC-038` R7, R9.
+ *
+ * ## Presentation only, resolved after addressability
+ *
+ * `FinanceWorkspaceEntry.displayLabel` lets a client tell two real businesses
+ * apart. It is metadata: it is not part of the `workspaceRef` input, it is
+ * never consulted when a reference is resolved, and `FinanceWorkspaceService`
+ * asks for it only for parties `addressableWorkspacesFor` has already
+ * returned — so no label of a party the session cannot reach is ever computed,
+ * let alone returned (R8).
+ *
+ * ## Why a port
+ *
+ * The names live in `business.businesses.display_name` and
+ * `provider.professionals.display_name`, and `financial` may import neither
+ * domain (ADR-011; `scope:financial` depends on `scope:shared` only). The
+ * composition root binds an adapter, exactly as `FINANCE_WORKSPACE_OWNER_RESOLVER`
+ * is bound.
+ *
+ * ## It answers for a SET, in a constant number of statements
+ *
+ * One call names every party in the collection; the adapter answers all of
+ * them with a fixed number of statements whatever the collection size, so the
+ * enumeration keeps the constant query count #111 already asserts (R9).
+ *
+ * ## Absence carries no cause
+ *
+ * A party whose live source row is gone is simply absent from the map and the
+ * service omits its entry — the already-ratified "not live, not addressable"
+ * rule — never a distinguishable error.
+ */
+export interface FinanceWorkspaceLabelResolver {
+  labelsFor(parties: readonly FinancialParty[]): Promise<ReadonlyMap<string, string>>;
+}
+
+/** The map key `labelsFor` answers under: `${partyType}:${partyId}`. */
+export function financePartyKey(party: FinancialParty): string {
+  return `${party.partyType}:${party.partyId}`;
+}
+
+export const FINANCE_WORKSPACE_LABEL_RESOLVER = Symbol('BEAUCLICK_FINANCE_WORKSPACE_LABEL_RESOLVER');
+
 /** The dedicated, INSERT-only DataSource financial-service uses. See ADR-017. */
 export const FINANCIAL_DATA_SOURCE = Symbol('BEAUCLICK_FINANCIAL_DATA_SOURCE');

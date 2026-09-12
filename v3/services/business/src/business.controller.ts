@@ -12,6 +12,7 @@ import { UpdateBusinessDto } from './dto/update-business.dto';
 import { InviteStaffByPhoneDto, ScopedStaffRoleDto } from './dto/staff.dto';
 import { StaffGrantService } from './staff-grant.service';
 import { StaffLocationService } from './staff-location.service';
+import { StaffManagementService } from './staff-management.service';
 import { SetStaffLocationDto } from './dto/staff-location.dto';
 import { ReplaceBusinessClassificationDto } from './dto/business-classification.dto';
 import {
@@ -67,6 +68,7 @@ export class BusinessController {
     private readonly staff: StaffService,
     private readonly classification: BusinessClassificationService,
     private readonly grants: StaffGrantService,
+    private readonly management: StaffManagementService,
     private readonly staffLocations: StaffLocationService,
   ) {}
 
@@ -140,6 +142,27 @@ export class BusinessController {
   @Get('businesses/:id/staff')
   async listStaff(@Param('id') id: string) {
     return (await this.staff.listForBusiness(id)).map(toStaffShape);
+  }
+
+  /**
+   * The owner-only staff-management read -- V3.3 #154, `V33-DEC-038` R5.
+   *
+   * Same memberships as the roster above, same order, but the OWNER alone may
+   * read it, because each row carries the minimal identification that makes a
+   * consented member safely nameable: the linked professional's public name,
+   * or the final four digits of the verified phone the owner supplied at
+   * invitation. The roster keeps its membership-level authorization and its
+   * projection byte-for-byte; nothing was moved off it.
+   *
+   * `@ResolveOwner` is on the HANDLER, never the class (ADR-049 section 2.5).
+   * A manager, a staff member, a foreign owner and a stranger all receive the
+   * single non-enumerating refusal. The path is a sibling of `staff` rather
+   * than a child of it so it can never be shadowed by a `staff/:staffId` route.
+   */
+  @ResolveOwner(BusinessOwnerResolver)
+  @Get('businesses/:id/staff-management')
+  async staffManagement(@Param('id') id: string) {
+    return { items: await this.management.listForOwner(id) };
   }
 
   /**
