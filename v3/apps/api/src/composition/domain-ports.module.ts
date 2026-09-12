@@ -12,7 +12,12 @@ import {
   PRICING_RULES,
   SERVICE_CATALOG,
 } from '@beauclick/commerce';
-import { FINANCE_WORKSPACE_OWNER_RESOLVER, FINANCIAL_DATA_SOURCE, FINANCIAL_PARTY_RESOLVER } from '@beauclick/financial';
+import {
+  FINANCE_WORKSPACE_LABEL_RESOLVER,
+  FINANCE_WORKSPACE_OWNER_RESOLVER,
+  FINANCIAL_DATA_SOURCE,
+  FINANCIAL_PARTY_RESOLVER,
+} from '@beauclick/financial';
 import {
   BookingCreditEnforcementModule,
   CollectionPolicyResolutionModule,
@@ -33,6 +38,7 @@ import {
   RESOURCE_ASSIGNMENT_DIRECTORY,
   SCOPED_STAFF_AUTHORIZER,
   SERVICE_OWNERSHIP_DIRECTORY,
+  STAFF_DISPLAY_IDENTITY,
   STAFF_INVITE_IDENTITY_RESOLVER,
 } from '@beauclick/business';
 import { DELIVERY_LOCATION_DIRECTORY, ELIGIBLE_RESOURCE_DIRECTORY } from '@beauclick/booking';
@@ -56,6 +62,8 @@ import {
   ProviderBackedServiceOwnershipDirectory,
   BusinessBackedEligibleResourceDirectory,
   BookingBackedResourceAssignmentDirectory,
+  PublicNameBackedFinanceWorkspaceLabels,
+  IdentityAndProviderBackedStaffDisplayIdentity,
   SellerPartyLookup,
 } from './port-adapters';
 import {
@@ -183,6 +191,15 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     OwnershipBackedFinanceWorkspaceResolver,
     { provide: FINANCE_WORKSPACE_OWNER_RESOLVER, useExisting: OwnershipBackedFinanceWorkspaceResolver },
     /*
+     * The public name of each addressable workspace -- V3.3 #154,
+     * `V33-DEC-038` R7/R9. Presentation only: `financial` asks for it after
+     * addressability is proved and never consults it when resolving a
+     * reference. Bound here because the names live in `provider` and
+     * `business`, which `financial` may not import.
+     */
+    PublicNameBackedFinanceWorkspaceLabels,
+    { provide: FINANCE_WORKSPACE_LABEL_RESOLVER, useExisting: PublicNameBackedFinanceWorkspaceLabels },
+    /*
      * V3.3 #75 (`V33-DEC-021`). ONE adapter, bound under BOTH domain tokens.
      *
      * `provider` and `business` each declare their own token because neither
@@ -243,6 +260,15 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     { provide: SCOPED_STAFF_AUTHORIZER, useClass: BusinessScopedStaffAuthorizer },
     IdentityBackedStaffInviteResolver,
     { provide: STAFF_INVITE_IDENTITY_RESOLVER, useExisting: IdentityBackedStaffInviteResolver },
+    /*
+     * Safe, owner-only identification of roster members -- V3.3 #154,
+     * `V33-DEC-038` R3-R6. Reads `identity.users` (masking the phone to its
+     * final four digits before it crosses the boundary) and
+     * `provider.professionals` (the public display name), in two statements
+     * for the whole roster. `business` may import neither domain.
+     */
+    IdentityAndProviderBackedStaffDisplayIdentity,
+    { provide: STAFF_DISPLAY_IDENTITY, useExisting: IdentityAndProviderBackedStaffDisplayIdentity },
     /*
      * V3.3 #127 (`#127a`), `V33-DEC-035` R3.
      *
@@ -374,6 +400,7 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     FINANCIAL_PARTY_RESOLVER,
     OWNED_SUBSCRIBER_PARTY_RESOLVER,
     FINANCE_WORKSPACE_OWNER_RESOLVER,
+    FINANCE_WORKSPACE_LABEL_RESOLVER,
     SELLER_OWNER_ROLE_GRANT,
     BUSINESS_OWNER_ROLE_GRANT,
     SELLER_GOVERNANCE_INITIALIZATION,
@@ -381,6 +408,7 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     LOCATION_CITY_CATALOGUE,
     SCOPED_STAFF_AUTHORIZER,
     STAFF_INVITE_IDENTITY_RESOLVER,
+    STAFF_DISPLAY_IDENTITY,
     DELIVERY_LOCATION_DIRECTORY,
     SERVICE_OWNERSHIP_DIRECTORY,
     ELIGIBLE_RESOURCE_DIRECTORY,

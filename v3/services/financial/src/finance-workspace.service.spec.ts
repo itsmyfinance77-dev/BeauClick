@@ -9,7 +9,7 @@ import {
   encodeWorkspaceCursor,
 } from './finance-workspace.service';
 import { FinanceWorkspaceSelectionRequiredException } from './finance.exceptions';
-import { AddressableFinancialParty, FinancialParty } from './ports';
+import { AddressableFinancialParty, FinancialParty, financePartyKey } from './ports';
 
 /**
  * The workspace-aware finance surface's pure logic — V3.3 #72, `V33-DEC-020`.
@@ -38,13 +38,29 @@ const BUSINESS: FinancialParty = { partyType: 'business', partyId: '018f4b1a-000
 const GRANTED: FinancialParty = { partyType: 'business', partyId: '018f4b1a-0000-7000-8000-0000000000cc' };
 
 /**
+ * The public names the label port answers with -- #154, `V33-DEC-038` R7.
+ * Distinct, and unlike any id or reference, so a label appearing where an id
+ * should be (or the reverse) is visible as a wrong string.
+ */
+const LABELS: Record<string, string> = {
+  [financePartyKey(PROFESSIONAL)]: 'سارا رضایی',
+  [financePartyKey(BUSINESS)]: 'سالن نور',
+  [financePartyKey(GRANTED)]: 'کلینیک آفتاب',
+};
+
+/**
  * A port double that answers BOTH questions the way the real adapter does:
  * `ownedWorkspacesFor` is ownership only; `addressableWorkspacesFor` is the
  * owned set as `owner` plus each granted business as `finance_read`, with no
  * de-duplication -- that is the service's job, and one test hands it a
  * duplicate on purpose.
  */
-function serviceFor(owned: FinancialParty[], granted: FinancialParty[] = [], addressable?: AddressableFinancialParty[]) {
+function serviceFor(
+  owned: FinancialParty[],
+  granted: FinancialParty[] = [],
+  addressable?: AddressableFinancialParty[],
+  labelSource: Record<string, string> = LABELS,
+) {
   const ledger = { entriesForOrderAndParty: jest.fn() };
   const settlements = {
     partySummary: jest.fn(),
@@ -61,13 +77,27 @@ function serviceFor(owned: FinancialParty[], granted: FinancialParty[] = [], add
     ),
   };
 
+  // The label port answers from a fixed public-name table, in one call, for
+  // exactly the parties it is handed -- a party with no entry is simply absent.
+  const labels = {
+    labelsFor: jest.fn(async (parties: readonly FinancialParty[]) => {
+      const map = new Map<string, string>();
+      for (const party of parties) {
+        const label = labelSource[financePartyKey(party)];
+        if (label !== undefined) map.set(financePartyKey(party), label);
+      }
+      return map;
+    }),
+  };
+
   const service = new FinanceWorkspaceService(
     ledger as never,
     settlements as never,
     owners as never,
     SECRET,
+    labels as never,
   );
-  return { service, ledger, settlements, owners };
+  return { service, ledger, settlements, owners, labels };
 }
 
 describe('owned workspaces', () => {
@@ -85,19 +115,23 @@ describe('owned workspaces', () => {
     expect(await service.workspacesFor(OWNER)).toEqual([]);
   });
 
-  it('exposes a reference, a type and an access mode, and no identity', async () => {
+  it('exposes a reference, a type, an access mode and a display label, and no identity', async () => {
     const { service } = serviceFor([PROFESSIONAL, BUSINESS]);
 
     const entries = await service.workspacesFor(OWNER);
     const body = JSON.stringify(entries);
 
-    // Exactly three keys. `accessMode` is #111's one additive field; a fourth
-    // key would be a contract change nobody decided.
+    // Exactly four keys (#154 added `displayLabel` additively); pinned so a
+    // fifth cannot appear unproved.
     expect(entries.map((e) => Object.keys(e).sort())).toEqual([
-      ['accessMode', 'workspaceRef', 'workspaceType'],
-      ['accessMode', 'workspaceRef', 'workspaceType'],
+      ['accessMode', 'displayLabel', 'workspaceRef', 'workspaceType'],
+      ['accessMode', 'displayLabel', 'workspaceRef', 'workspaceType'],
     ]);
     expect(entries.map((e) => e.accessMode)).toEqual(['owner', 'owner']);
+    expect(entries.map((e) => [e.workspaceType, e.displayLabel])).toEqual([
+      ['business', 'سالن نور'],
+      ['professional', 'سارا رضایی'],
+    ]);
     for (const identifier of [OWNER, PROFESSIONAL.partyId, BUSINESS.partyId]) {
       expect(body).not.toContain(identifier);
     }
@@ -114,6 +148,68 @@ describe('owned workspaces', () => {
     expect(owners.addressableWorkspacesFor).toHaveBeenCalledWith(OWNER);
     expect(owners.addressableWorkspacesFor).toHaveBeenCalledTimes(1);
     expect(owners.ownedWorkspacesFor).not.toHaveBeenCalled();
+  });
+});
+
+describe('workspace display labels (#154, V33-DEC-038 R7-R9)', () => {
+  it('asks the label port ONCE, for exactly the addressable parties, after addressability', async () => {
+    const { service, labels } = serviceFor([PROFESSIONAL], [GRANTED]);
+
+    await service.workspacesFor(OWNER);
+
+    expect(labels.labelsFor).toHaveBeenCalledTimes(1);
+    const asked = (labels.labelsFor.mock.calls[0][0] as FinancialParty[]).map(financePartyKey).sort();
+    expect(asked).toEqual([financePartyKey(GRANTED), financePartyKey(PROFESSIONAL)].sort());
+  });
+
+  it('labels a grantee\'s workspace with the granting business\'s public name, still as finance_read', async () => {
+    const { service } = serviceFor([], [GRANTED]);
+
+    expect(await service.workspacesFor(OWNER)).toMatchObject([
+      { workspaceType: 'business', accessMode: 'finance_read', displayLabel: 'کلینیک آفتاب' },
+    ]);
+  });
+
+  it('a dual owner gets two DISTINCT real labels, not an ordinal', async () => {
+    const { service } = serviceFor([PROFESSIONAL, BUSINESS]);
+
+    const labelsSeen = (await service.workspacesFor(OWNER)).map((e) => e.displayLabel);
+    expect(new Set(labelsSeen).size).toBe(2);
+    for (const label of labelsSeen) expect(label).not.toMatch(/فضای مالی|^\d+$|^[0-9a-f-]{36}$/);
+  });
+
+  it('omits a party whose public name is gone by label time, with no error and no unnamed entry', async () => {
+    const { service } = serviceFor([PROFESSIONAL, BUSINESS], [], undefined, {
+      [financePartyKey(PROFESSIONAL)]: LABELS[financePartyKey(PROFESSIONAL)],
+    });
+
+    const entries = await service.workspacesFor(OWNER);
+    expect(entries.map((e) => e.workspaceType)).toEqual(['professional']);
+    expect(JSON.stringify(entries)).not.toContain('"displayLabel":""');
+  });
+
+  it('the label is NOT part of the reference: the same party keeps the same workspaceRef under any label', async () => {
+    const { service: named } = serviceFor([BUSINESS]);
+    const { service: renamed } = serviceFor([BUSINESS], [], undefined, { [financePartyKey(BUSINESS)]: 'نام جدید' });
+
+    const [before] = await named.workspacesFor(OWNER);
+    const [after] = await renamed.workspacesFor(OWNER);
+    expect(before.workspaceRef).toBe(after.workspaceRef);
+    expect(before.workspaceRef).toBe(deriveWorkspaceReference(SECRET, OWNER, BUSINESS));
+    expect(before.displayLabel).not.toBe(after.displayLabel);
+  });
+
+  it('never consults the label port when a reference is RESOLVED -- labels are not authorization', async () => {
+    const { service, labels } = serviceFor([PROFESSIONAL, BUSINESS]);
+    const ref = deriveWorkspaceReference(SECRET, OWNER, BUSINESS);
+
+    await service.resolveAddressableWorkspace(OWNER, ref);
+    await service.resolveOwnedWorkspace(OWNER, ref);
+    await expect(service.resolveAddressableWorkspace(OWNER, 'x'.repeat(43))).rejects.toBeInstanceOf(
+      NotFoundOrNotYoursException,
+    );
+
+    expect(labels.labelsFor).not.toHaveBeenCalled();
   });
 });
 

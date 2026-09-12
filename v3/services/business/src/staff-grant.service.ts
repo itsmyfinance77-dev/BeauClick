@@ -225,6 +225,39 @@ export class StaffGrantService {
     return { id: rows[0].id, businessId: rows[0].business_id };
   }
 
+  /**
+   * The live scoped roles of EVERY listed membership of one business, in one
+   * statement -- V3.3 #154, `V33-DEC-038` R5-R6.
+   *
+   * The owner-only management read needs each row's roles; asking
+   * `liveRoles` per row would be the N+1 that read must not have. This is
+   * read-only, runs on the plain manager, and answers only for the
+   * membership ids the caller already holds: a membership with no live grant
+   * is simply absent from the map, and `business_id` is pinned so a grant
+   * from another business can never be reported here. It does NOT check
+   * ownership -- the route's `@ResolveOwner` does -- and it is not a
+   * substitute for `findGrantableMembership` on the mutating paths.
+   */
+  async liveRolesForMemberships(
+    manager: EntityManager,
+    businessId: string,
+    membershipIds: readonly string[],
+  ): Promise<ReadonlyMap<string, readonly ScopedStaffRole[]>> {
+    const rows: Array<{ membership_id: string; role: ScopedStaffRole }> = await manager.query(
+      `SELECT membership_id, role FROM business.staff_role_grants
+        WHERE business_id = $1 AND membership_id = ANY($2::uuid[]) AND revoked_at IS NULL
+        ORDER BY membership_id, role`,
+      [businessId, [...membershipIds]],
+    );
+    const byMembership = new Map<string, ScopedStaffRole[]>();
+    for (const row of rows) {
+      const roles = byMembership.get(row.membership_id) ?? [];
+      roles.push(row.role);
+      byMembership.set(row.membership_id, roles);
+    }
+    return byMembership;
+  }
+
   /** The membership's live roles, deterministically ordered. No actor identity, no ids, no timestamps. */
   private async liveRoles(manager: EntityManager, membership: GrantableMembership): Promise<ScopedStaffRole[]> {
     const rows: Array<{ role: ScopedStaffRole }> = await manager.query(

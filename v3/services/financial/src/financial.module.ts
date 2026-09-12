@@ -1,4 +1,5 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { ApplicationConfig, HttpAdapterHost } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 
 import { LedgerEntryEntity } from './entities/ledger-entry.entity';
@@ -12,6 +13,7 @@ import { MyFinanceService } from './my-finance.service';
 import { FinanceWorkspaceService } from './finance-workspace.service';
 import { FinancialAdminController, MyFinanceController } from './financial.controller';
 import { FinancialSubjectDataContract } from './financial-subject-data.contract';
+import { FinanceNoStoreMiddleware, financeSurfaceMountPath } from './finance-no-store.middleware';
 
 export const FINANCIAL_ENTITIES = [
   LedgerEntryEntity,
@@ -53,6 +55,7 @@ export const FINANCIAL_ENTITIES = [
     SettlementService,
     FinanceWorkspaceService,
     MyFinanceService,
+    FinanceNoStoreMiddleware,
   ],
   exports: [
     FinancialSubjectDataContract,
@@ -63,4 +66,43 @@ export const FINANCIAL_ENTITIES = [
     FinancialConfig,
   ],
 })
-export class FinancialModule {}
+export class FinancialModule implements NestModule {
+  constructor(
+    private readonly adapterHost: HttpAdapterHost,
+    private readonly applicationConfig: ApplicationConfig,
+    private readonly noStore: FinanceNoStoreMiddleware,
+  ) {}
+
+  /**
+   * `Cache-Control: private, no-store` on the seller finance surface -- V3.3
+   * #154, `V33-DEC-038` R10.
+   *
+   * Mounted as a plain Express prefix middleware (`use(path, fn)`) on the
+   * controller's own path under the global prefix, from the module that owns
+   * the controller, so every consumer of `FinancialModule` -- the real
+   * bootstrap and the test harness alike -- gets it identically. Not through
+   * `MiddlewareConsumer`: Nest binds that as one Express ROUTE layer per path
+   * (`app.get`/`app.all`), which the #72/#111 proofs that the finance route
+   * table is exactly nine routes would count as new routes; a `use` layer is
+   * not a route. Registered at module init, which precedes route
+   * registration, so it runs before every guard: the `401` an unauthenticated
+   * caller gets, the `404` a foreign reference gets and the `409` a dual owner
+   * gets carry the header exactly as a `200` does. A prefix mount stops at a
+   * path segment, so `v1/admin/finance` and every other route are untouched.
+   *
+   * Done in `configure` rather than `onModuleInit`: Nest collects middleware
+   * configuration BEFORE it registers routes and runs init hooks AFTER, and an
+   * Express `use` layer only runs ahead of a route if it was mounted first.
+   * The consumer itself is deliberately not used -- see above.
+   */
+  configure(_consumer: MiddlewareConsumer): void {
+    const mount = financeSurfaceMountPath(this.applicationConfig.getGlobalPrefix());
+    this.adapterHost.httpAdapter.getInstance().use(mount, (request: unknown, response: HeaderWritableResponse, next: () => void) =>
+      this.noStore.use(request, response, next),
+    );
+  }
+}
+
+interface HeaderWritableResponse {
+  setHeader(name: string, value: string): unknown;
+}

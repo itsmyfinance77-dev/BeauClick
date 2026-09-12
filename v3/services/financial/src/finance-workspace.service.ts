@@ -15,10 +15,13 @@ import { FinanceWorkspaceSelectionRequiredException } from './finance.exceptions
 import { LedgerService } from './ledger.service';
 import {
   AddressableFinancialParty,
+  FINANCE_WORKSPACE_LABEL_RESOLVER,
   FINANCE_WORKSPACE_OWNER_RESOLVER,
   FinanceAccessMode,
+  FinanceWorkspaceLabelResolver,
   FinanceWorkspaceOwnerResolver,
   FinancialParty,
+  financePartyKey,
 } from './ports';
 import { OutstandingOrder, PartySummary, SettlementService } from './settlement.service';
 
@@ -87,6 +90,7 @@ export class FinanceWorkspaceService {
     private readonly settlements: SettlementService,
     @Inject(FINANCE_WORKSPACE_OWNER_RESOLVER) private readonly owners: FinanceWorkspaceOwnerResolver,
     @Inject(WORKSPACE_REFERENCE_SECRET) private readonly secret: string,
+    @Inject(FINANCE_WORKSPACE_LABEL_RESOLVER) private readonly labels: FinanceWorkspaceLabelResolver,
   ) {}
 
   // ======================================================================
@@ -137,16 +141,31 @@ export class FinanceWorkspaceService {
   }
 
   /**
-   * The browser contract for `GET /me/finance/workspaces`: a reference, a type
-   * and an access mode — never an id.
+   * The browser contract for `GET /me/finance/workspaces`: a reference, a type,
+   * an access mode and a display label — never an id.
+   *
+   * The label (V3.3 #154, `V33-DEC-038` R7–R9) is asked for AFTER the
+   * addressable set is known and only for that set, in one bulk call, so a
+   * party this session cannot reach never has its name computed. A party whose
+   * public source row is gone by then is omitted — it is no longer live, and
+   * "not live" has always meant "not addressable" here — rather than rendered
+   * unnamed or explained.
    */
   async workspacesFor(sessionUserId: string): Promise<FinanceWorkspaceEntry[]> {
     const parties = await this.addressableWorkspaces(sessionUserId);
-    return parties.map((party) => ({
-      workspaceRef: this.referenceFor(sessionUserId, party),
-      workspaceType: party.partyType,
-      accessMode: party.accessMode,
-    }));
+    const labels = await this.labels.labelsFor(parties);
+    const entries: FinanceWorkspaceEntry[] = [];
+    for (const party of parties) {
+      const displayLabel = labels.get(financePartyKey(party));
+      if (displayLabel === undefined) continue;
+      entries.push({
+        workspaceRef: this.referenceFor(sessionUserId, party),
+        workspaceType: party.partyType,
+        accessMode: party.accessMode,
+        displayLabel,
+      });
+    }
+    return entries;
   }
 
   referenceFor(sessionUserId: string, party: FinancialParty): string {
@@ -319,6 +338,12 @@ export interface FinanceWorkspaceEntry {
   workspaceRef: string;
   workspaceType: 'professional' | 'business';
   accessMode: FinanceAccessMode;
+  /**
+   * The public display name of the business or professional (#154,
+   * `V33-DEC-038` R7). Presentation metadata: never part of the reference,
+   * never an authorization input.
+   */
+  displayLabel: string;
 }
 
 /** Default page size, and the ceiling a caller may ask for. Mirrors `PageQueryDto`. */

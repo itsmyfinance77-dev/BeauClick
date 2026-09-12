@@ -13,9 +13,11 @@ import {
 } from '@beauclick/commerce';
 import {
   AddressableFinancialParty,
+  FinanceWorkspaceLabelResolver,
   FinanceWorkspaceOwnerResolver,
   FinancialParty,
   FinancialPartyResolver,
+  financePartyKey,
 } from '@beauclick/financial';
 import {
   CollectionPolicyResolutionService,
@@ -33,6 +35,9 @@ import {
   SCOPED_STAFF_AUTHORIZER,
   ScopedStaffAuthorizerPort,
   ServiceOwnershipDirectoryPort,
+  StaffDisplayIdentity,
+  StaffDisplayIdentityPort,
+  StaffIdentityLookup,
   StaffInviteIdentityResolverPort,
 } from '@beauclick/business';
 import { RoleService, UserEntity, canonicalizePhone } from '@beauclick/identity';
@@ -805,5 +810,126 @@ export class BookingBackedResourceAssignmentDirectory implements ResourceAssignm
       [resourceIds],
     );
     return rows.length > 0;
+  }
+}
+
+/**
+ * The public display name of each addressable finance workspace -- V3.3 #154,
+ * `V33-DEC-038` R7, R9.
+ *
+ * ## Exactly two statements, whatever the collection holds
+ *
+ * Both reads run on every call, even when one of the id sets is empty, so the
+ * cost of `GET /me/finance/workspaces` is the same for one workspace and for
+ * several -- the constant-count property #111 asserts and this adapter must
+ * not disturb. `= ANY` over an id array rather than one lookup per party.
+ *
+ * ## Live rows only, and absence carries no cause
+ *
+ * A soft-deleted business or professional yields no entry; the service omits
+ * the workspace, which is what "not live" has always meant on this surface.
+ * Nothing here can distinguish "deleted" from "never existed" for the caller.
+ *
+ * ## Names are what the public already sees
+ *
+ * `provider.professionals.display_name` and `business.businesses.display_name`
+ * are the names on the public profile and the public listing; no second name
+ * source is created and the identity `display_name` is never consulted (R3).
+ * The label is asked for only for parties the session has already been shown
+ * to address -- this adapter never sees a party the owner resolver refused.
+ */
+@Injectable()
+export class PublicNameBackedFinanceWorkspaceLabels implements FinanceWorkspaceLabelResolver {
+  constructor(private readonly dataSource: DataSource) {}
+
+  async labelsFor(parties: readonly FinancialParty[]): Promise<ReadonlyMap<string, string>> {
+    const manager = this.dataSource.manager;
+    const professionalIds = parties.filter((party) => party.partyType === 'professional').map((party) => party.partyId);
+    const businessIds = parties.filter((party) => party.partyType === 'business').map((party) => party.partyId);
+
+    const [professionals, businesses]: [NamedRow[], NamedRow[]] = await Promise.all([
+      manager.query(
+        `SELECT id, display_name FROM provider.professionals WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL`,
+        [professionalIds],
+      ),
+      manager.query(
+        `SELECT id, display_name FROM business.businesses WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL`,
+        [businessIds],
+      ),
+    ]);
+
+    const labels = new Map<string, string>();
+    for (const row of professionals) {
+      labels.set(financePartyKey({ partyType: 'professional', partyId: row.id }), row.display_name);
+    }
+    for (const row of businesses) {
+      labels.set(financePartyKey({ partyType: 'business', partyId: row.id }), row.display_name);
+    }
+    return labels;
+  }
+}
+
+interface NamedRow {
+  id: string;
+  display_name: string;
+}
+
+/**
+ * Safe identification of roster members for the OWNER -- V3.3 #154,
+ * `V33-DEC-038` R3-R6, R12.
+ *
+ * ## The phone is masked HERE, before it crosses into `business`
+ *
+ * `identity.users.phone` is read and reduced to its final four digits inside
+ * this adapter. The port's answer has no field that could carry a full phone,
+ * an email, an identity display name or a lookup status, so the business
+ * domain -- and therefore its projection, its audit and its logging -- is
+ * structurally unable to expose one (R4, R12).
+ *
+ * ## Exactly two statements, whatever the roster size
+ *
+ * Users by id set and professionals by id set, both always run, both live
+ * rows only (`deleted_at IS NULL`), so the management read costs the same for
+ * one member and for many (R6). It answers only for ids the caller already
+ * holds and enumerates nothing.
+ *
+ * ## Absence is a live-row fact
+ *
+ * A user id with no live row is absent from the map and the service omits the
+ * membership. A professional id with no live profile yields a `null` name and
+ * the service falls back to the phone label. Neither carries a cause.
+ */
+@Injectable()
+export class IdentityAndProviderBackedStaffDisplayIdentity implements StaffDisplayIdentityPort {
+  async describeMembers(
+    manager: EntityManager,
+    members: readonly StaffIdentityLookup[],
+  ): Promise<ReadonlyMap<string, StaffDisplayIdentity>> {
+    const userIds = [...new Set(members.map((member) => member.userId))];
+    const professionalIds = [
+      ...new Set(members.map((member) => member.professionalId).filter((id): id is string => id !== null)),
+    ];
+
+    const [users, professionals]: [Array<{ id: string; phone: string }>, NamedRow[]] = await Promise.all([
+      manager.query(`SELECT id, phone FROM identity.users WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL`, [userIds]),
+      manager.query(
+        `SELECT id, display_name FROM provider.professionals WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL`,
+        [professionalIds],
+      ),
+    ]);
+
+    const nameByProfessional = new Map(professionals.map((row) => [row.id, row.display_name]));
+    const phoneHintByUser = new Map(users.map((row) => [row.id, row.phone.slice(-4)]));
+
+    const described = new Map<string, StaffDisplayIdentity>();
+    for (const member of members) {
+      const phoneHint = phoneHintByUser.get(member.userId);
+      if (phoneHint === undefined) continue;
+      described.set(member.userId, {
+        phoneHint,
+        professionalDisplayName: member.professionalId ? (nameByProfessional.get(member.professionalId) ?? null) : null,
+      });
+    }
+    return described;
   }
 }

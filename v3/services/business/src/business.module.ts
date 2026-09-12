@@ -19,6 +19,7 @@ import { LocationResourceService } from './location-resource.service';
 import { ServiceResourceRequirementService } from './service-resource-requirement.service';
 import { StaffLocationService } from './staff-location.service';
 import { StaffService } from './staff.service';
+import { StaffManagementService } from './staff-management.service';
 import { StaffGrantService } from './staff-grant.service';
 import { BusinessScopedStaffAuthorizer } from './scoped-staff-authorizer.service';
 import { STAFF_INVITE_CLOCK, SystemStaffInviteClock } from './staff-invite.clock';
@@ -89,6 +90,7 @@ export const BUSINESS_ENTITIES = [
     // resource services do.
     StaffLocationService,
     StaffService,
+    StaffManagementService,
     /*
      * V3.3 Story #109 (`#44c`).
      *
@@ -127,6 +129,7 @@ export const BUSINESS_ENTITIES = [
     ServiceResourceRequirementService,
     StaffLocationService,
     StaffService,
+    StaffManagementService,
     StaffGrantService,
     BusinessScopedStaffAuthorizer,
     STAFF_INVITE_CLOCK,

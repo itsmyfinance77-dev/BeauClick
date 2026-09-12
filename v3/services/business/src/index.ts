@@ -28,6 +28,7 @@ export * from './dto/service-resource-requirement.dto';
 export * from './dto/staff-location.dto';
 export * from './dto/staff.dto';
 export * from './staff.service';
+export * from './staff-management.service';
 export * from './staff-grant.service';
 export * from './scoped-staff-authorizer.service';
 export * from './business-membership.resolver';
