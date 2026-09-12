@@ -879,3 +879,54 @@ the lock order with its deadlock analysis, privacy and audit dispositions, the f
 the implementation order and a thirty-row verification and mutation matrix. ADR-039, ADR-046 and
 ADR-048 received dated amendment notes only. **No production code or schema exists yet**, and
 implementation of #95 must begin with its own fresh preflight against the then-current `master`.
+
+## V3.3 Story #111 (`#44e`) delivered, and the `#44` family closed out, 2026-09-12
+
+The fifth and last child of umbrella #44 has shipped, after its own read-only readiness audit
+and fresh preflight against the then-current `master` (`b227ef8`). No new ADR and no new
+decision card were needed: `V33-DEC-030` D4 and ADR-049 §5 already ratified an explicit,
+business-scoped, read-only finance grant delivered through #109's grant store, and
+`V33-DEC-033` handed finance to `#44e` by name. The issue body was corrected before
+implementation — the role literal (`finance_read`, which no decision had fixed and which #109's
+shipped tests refused as `finance`), role-aware grantability (a bookkeeper has no professional
+profile, and #109's grant path required one for every role), the singular routes staying
+ownership-only (`V33-DEC-020` Ruling 7), and the already-satisfied ADR-049 gate — without
+changing its 8 SP or splitting it.
+
+**#111 (`#44e`), 8 Story Points.** Scoped read-only business finance authority. One CHECK-only
+`business` migration extends `ck_staff_role_grants_role` to `('practitioner_chat',
+'finance_read')` — no table, column, index, seed, backfill or row rewrite, every other grant
+constraint untouched. `StaffGrantService` requires the membership's professional link only for
+practitioner-specific roles, so a consented membership with `professional_id IS NULL` is
+grantable `finance_read` and still not `practitioner_chat`; `ScopedStaffAuthorizerPort` gains
+one business-scoped read (`liveBusinessScopedGrants`) typed to `BusinessScopedRole`, with the
+three practitioner methods narrowed to `PractitionerScopedRole` so `practitioner_chat` can never
+be asked business-wide. `financial`'s five workspace-aware routes now resolve against
+*owned ∪ live-scoped-read* (ADR-049 §5.4) — joined in exactly one place, the composition-root
+finance adapter, from the untouched `ownedPartiesFor` and `business`'s new read — with
+`GET /me/finance/workspaces` items carrying one additive `accessMode: 'owner' | 'finance_read'`;
+the `workspaceRef` primitive, the nine-route finance table, every finance response projection,
+the four singular routes and every commercial-policy write boundary are byte-identical. Access
+is live-rechecked on every request; revocation, membership deactivation, erasure and business
+soft-deletion withdraw it on the next request under an unchanged token; every failure cause
+collapses to the existing `404 NOT_FOUND_OR_NOT_YOURS`; reads write nothing; no ADR-027
+disposition changes. Proved by a new 43-case real-PostgreSQL suite with the #72 suite passing
+**unchanged** as the regression gate, plus eighteen restored mutation probes each with a passing
+control. Merged to `master` as commit `9b7350a` (PR #148), closing #111.
+
+| Item | Before | After | Outcome it owns |
+|---|---:|---:|---|
+| #111 (`#44e`) | `status:proposed`, 8 | **Closed, 8** | Delivered as described above |
+| #149 | — | **Created `status:proposed`, 5, `track:design`** | The one bounded frontend follow-up #111's body reserved: owner grant/revoke UI for `finance_read`, explicit business-workspace selection, a read-only treatment with no finance write control, the non-owner persona, and the responsive/accessibility criteria of the canonical `design/claude-design` V3.3 handoff |
+
+**What moved, including the deliveries this index had not yet recorded.** Since the
+2026-09-11 entry above (206 / 289): #95 (`#58b-1`, 5) and #141 (`#58b-2`, 5) both **complete**
+2026-09-11, done rising 206 → 216; the infrastructure bug #146 (1) **complete** 2026-09-12 and
+given its milestone, done and scope each +1 (217 / 290); #111 (`#44e`, 8) **complete**
+2026-09-12, done rising 217 → 225; and #149 (5) created, scope rising 290 → 295. The live
+dashboard (issue #2) and an independent recomputation from raw labels agree: **225 / 295, zero
+data-quality warnings**. #111 closes with `sp:8` preserved and no status label. Every child of
+umbrella #44 — #107 (`#44a`), #108 (`#44b`), #109 (`#44c`), #110/#127/#131/#128 (`#44d`) and now
+#111 (`#44e`) — is closed; whether #44 itself closes is the owner's structural call and is
+**not** made here. #42, #43, #45, #47 and #99 remain untouched; no commercial value, payment
+provider, deployment, tag or Release was introduced.
