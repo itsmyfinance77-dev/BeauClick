@@ -1,4 +1,39 @@
-# BeauClick Design — V3.3-A Story #40 (`#40a`) Admin Commercial Catalogue Sync
+# BeauClick Design — V3.3 Closure Sync (frontend-handoff ready)
+
+Exported: 2026-09-12 · Baseline `itsmyfinance77-dev/BeauClick@master` → **`6695234eded1`**
+Verdict: **READY WITH DOCUMENTED LIMITATIONS**
+
+## Latest pass — closure sync, story-status correction
+
+Story status was re-verified from merged code rather than from the previous design report. **#115, #95 and #141 are implemented and closed** — and #115 was already merged when the previous pass recorded it as proposed, so that finding was wrong when written and is corrected with a before/after table (handoff §34, audit §0-a). The admin commercial namespace carries **34 routes** (27 catalogue + 7 enforcement), the enforcement commands are **set-based** with no per-seller selector, and global activation now shows its real 409 refusal carrying preview counts.
+
+Also: `docs/design/V3.3_RESPONSIVE_AND_A11Y_HANDOFF.md` (mobile/tablet/desktop rules + the untested-at-implementation accessibility list); every V3.3 container made fluid; the open-option panel moved inside an explicit design-review annotation frame; `REPORT.md` retitled **Historical V3.1 Design Report** with its 71% figure labelled historical; the DOCX claim narrowed from "line-for-line agreement" to "no conflict found".
+
+**C-5 remains open** at this baseline: the live 1500 bp commission constant still contradicts `V33-DEC-028`. No commission figure appears in any screen.
+
+## Previous pass — V3.3 Commercial, Payment and Legal Flexibility Update
+
+> **Historical record.** The implementation-status statements in this section describe the
+> 2026-09-11 pass and are superseded by “Latest pass” above. They are retained only as an audit
+> trail and must not be used as the current frontend-handoff status.
+
+Exported: 2026-09-11
+Repository: `itsmyfinance77-dev/BeauClick`, `v3/` scope. Audited against `master` → `4c7506347030` — **50 commits / 279 files ahead** of the previous design sync at `12c92f974529`, adding ADR-042…ADR-050.
+No repository code changed; no commit, issue, branch, tag, Release or deployment touched; no payment provider activated.
+
+## This pass — V3.3 commercial, payment, deposit, cancellation, dispute, settlement and booking-credit design update
+
+Phase 1 was delivered as a **read-only contradiction report before any artifact was modified**: `docs/design/V3.3_BASELINE_AUDIT.md`, eight contradictions. The three that changed what could honestly be built: the live `DEFAULT_COMMISSION_RATE_BP = 1500` constant contradicts `V33-DEC-028` Ruling 2 (reported, assigned to #43, and **no commission figure appears in any screen**); six of the eleven requested personas hold no authority in the merged RBAC (`SCOPED_STAFF_ROLES` is exactly `['practitioner_chat']`, and locations/resources are owner-only); and cancellation, retention, no-show, dispute and policy acceptance are legally blocked with `policy_accepted_at` NULL by construction. Also corrected our own stale record: the admin commercial surface has **27** routes, not 18.
+
+The product owner's decision DOCX was uploaded and read in full — 15 binding decisions, 25 remaining questions (10 partially closed, 15 open). **It agrees with the repository register line-for-line**; no item over-claimed a value.
+
+- **New prototype:** `Prototype - Admin Control Plane.dc.html` — collection-policy publication (the 9 new routes), the 8-state legend separating stored from derived from externally-gated states, a version form with no defaults and a required percentage base, the irreversible publish dialog with affected-scope counts, and the four independent enforcement planes (ratified 2026-09-11, zero implementation) with aggregate-only preview, explicit per-party transition, fail-closed global activation and a platform-wide kill switch.
+- **New specs:** `V3.3_BASELINE_AUDIT.md`, `V3.3_REQUIREMENT_MATRIX.md` (persona, requirement-to-screen, component/state, decision-status incl. all 25 open questions, backend-support, frontend stories, unresolved decisions, accessibility and console verification), `screens/41_CUSTOMER_COLLECTION_AND_POLICY.md`, `screens/42_SELLER_COMMERCIAL_AND_OPERATIONS.md`, `screens/44_ADMIN_CONTROL_PLANE.md`.
+- **Customer prototype §21–§23:** three collection modes, the ten-row pre-confirmation disclosure with six rows explicitly unpublished and the acceptance control disabled with its reason, twelve payment/refund states, seven cancellation and no-show outcomes with blank values, the open-option panels with recorded recommendations marked, and the full five-step dispute flow that has no contract.
+- **Pro/Admin prototype §20–§24:** subscription as a collection with workspace selection, D-7's four real zeros, credit balance/ledger/purchase with the honest safely-unavailable state, collection-policy assignment that governs no booking until #115, salon classification/locations/terminal resource retirement/service requirements/staff grants with the unauthorized-persona panel, and six fund families as states with no commission figure.
+- Preserved exactly: **no open value chosen anywhere.** The five recorded proposed values appear only inside Customer §23's option panel, labelled as proposals.
+
+## Previous pass — V3.3-A Story #40 (`#40a`) Admin Commercial Catalogue Sync
 
 Exported: 2026-09-02
 Repository: `itsmyfinance77-dev/BeauClick`, `v3/` scope. Audited against `master` resolved to `12c92f974529...` — identical to the baseline commit named in this pass's sync brief; `origin/master` had not advanced past it.

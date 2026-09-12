@@ -6,6 +6,16 @@
 
 **Not read (no tool access in this workspace):** the GitHub Issue #40 thread itself and PR #66's review conversation. Everything the issue is reported to require was cross-checked instead against the merged code, the ADR that restates the issue's asks line-by-line, and `docs/roadmap/v3.2/V3.2_PLUS_CAPABILITY_CATALOG.md`'s "Delivered 2026-09-02" entry, all three of which agree.
 
+## CORRECTION 2026-09-11 — this surface now has 27 routes, not 18
+
+Story #83 (`#41d-1`) added the booking-collection-policy family to the SAME
+`CommercialCatalogueController` class, under the same class-level privileged capability
+(ADR-048 §5): `GET/POST collection-policies` plus the seven-route version family
+(`GET` list, `GET` one, `POST` draft, `PUT` replace-draft, `POST` publish, `POST` retire,
+`DELETE` discard) = **9 further routes**. The 18 documented below remain correct and
+unchanged; they are now 18 of 27. The nine new routes are specified in
+`44_ADMIN_CONTROL_PLANE.md` and prototyped in `Prototype - Admin Control Plane.dc.html` §01.
+
 ## Contradiction found — route count
 
 The sync brief states "16 administrator routes." The merged `CommercialCatalogueController` declares **18**: 2 catalogue-key routes (`GET/POST plans`, `GET/POST price-schedules` = 4, not 2 — see table below), 7 price-schedule-version routes, 7 plan-version routes. See the full table in §1. Design proceeds against the real 18, not the stated 16; nothing was silently forced to match the brief's number.

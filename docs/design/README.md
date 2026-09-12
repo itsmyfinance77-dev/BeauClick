@@ -5,10 +5,13 @@ This branch preserves design evidence separately from production frontend code.
 ## Canonical current workspace
 
 [`v3.3-a-commercial-catalogue-workspace-snapshot/`](v3.3-a-commercial-catalogue-workspace-snapshot/)
-is the single current full workspace snapshot. It includes the corrected V3.2
-AI, chat, wishlist and referral material plus the V3.3-A administrator
-commercial-catalogue specification and Pro/Admin prototype §19. Its manifest
-identifies the implementation commit each pass audited.
+is the single current full workspace snapshot. Despite its historical directory
+name, it now contains the complete V3.3 closure sync: the corrected V3.2 AI,
+chat, wishlist and referral material; the V3.3 commercial catalogue, collection,
+seller-operations and enforcement-control designs; and the responsive and
+accessibility implementation handoff. Its current manifest is audited against
+implementation commit `6695234eded1` and records later corrections without
+rewriting the earlier pass history.
 
 `MANIFEST.md` is the authoritative pass-by-pass sync record inside the snapshot.
 The nested `docs/design/REPORT.md` is the preserved initial V3 design report; it

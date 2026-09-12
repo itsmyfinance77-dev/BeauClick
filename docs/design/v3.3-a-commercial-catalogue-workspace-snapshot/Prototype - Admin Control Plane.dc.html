@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas" />
+<style>
+  @font-face { font-family: 'Vazirmatn'; src: url('fonts/Vazir-Light.ttf') format('truetype'); font-weight: 300; font-display: swap; }
+  @font-face { font-family: 'Vazirmatn'; src: url('fonts/Vazir-Regular.ttf') format('truetype'); font-weight: 400; font-display: swap; }
+  @font-face { font-family: 'Vazirmatn'; src: url('fonts/Vazir-Medium.ttf') format('truetype'); font-weight: 500; font-display: swap; }
+  @font-face { font-family: 'Vazirmatn'; src: url('fonts/Vazir-Bold.ttf') format('truetype'); font-weight: 600 700; font-display: swap; }
+  @font-face { font-family: 'Vazirmatn'; src: url('fonts/Vazir-Black.ttf') format('truetype'); font-weight: 800 900; font-display: swap; }
+  @font-face { font-family: 'Anjoman'; src: url('fonts/Anjoman-SemiBold.ttf') format('truetype'); font-weight: 600; font-display: swap; }
+  @font-face { font-family: 'Anjoman'; src: url('fonts/Anjoman-Bold.ttf') format('truetype'); font-weight: 700; font-display: swap; }
+  @font-face { font-family: 'Anjoman'; src: url('fonts/Anjoman-ExtraBold.ttf') format('truetype'); font-weight: 800; font-display: swap; }
+  @font-face { font-family: 'Peyda'; src: url('fonts/Peyda-SemiBold.ttf') format('truetype'); font-weight: 600; font-display: swap; }
+  @font-face { font-family: 'Peyda'; src: url('fonts/Peyda-Bold.ttf') format('truetype'); font-weight: 700 900; font-display: swap; }
+  body { margin: 0; background: oklch(0.94 0.005 60); font-family: 'Vazirmatn', system-ui, sans-serif; }
+  a { color: oklch(0.53 0.115 70); text-decoration: none; }
+  a:hover { color: oklch(0.44 0.1 70); }
+  code { font-family: ui-monospace, Menlo, monospace; font-size: 0.85em; direction: ltr; unicode-bidi: isolate; }
+</style>
+</helmet>
+
+<div dir="rtl" style="padding: 40px; display: flex; flex-direction: column; gap: 56px;">
+
+  <div style="max-width: 900px; display: flex; flex-direction: column; gap: 10px;">
+    <div style="font-size: 13px; font-weight: 700; letter-spacing: 0.04em; color: oklch(0.58 0.015 330);">BEAUCLICK V3.3 — مرکزِ کنترلِ تجاری، سطحِ مدیریت</div>
+    <h1 style="margin: 0; font-family: 'Peyda', sans-serif; font-size: 44px; font-weight: 800; line-height: 1.4; color: oklch(0.22 0.02 330);">سطحِ کنترلِ سیاستِ تجاری</h1>
+    <p style="margin: 0; font-size: 16px; line-height: 1.85; color: oklch(0.46 0.02 330); text-wrap: pretty;">این فایل جدا از نمونهٔ «متخصص و مدیریت» است چون موضوعش جداست: سطحی که سیاست‌های تجاری را <strong>منتشر</strong> می‌کند و اجرای آن‌ها را <strong>مرحله‌به‌مرحله روشن</strong> می‌کند. هر دو بخش — انتشارِ سیاستِ دریافت و کنترلِ اجرا — در سرور <strong>پیاده شده‌اند</strong>؛ آنچه هنوز ساخته نشده <strong>رابطِ اپراتور</strong> است. فضای نامِ تجاریِ مدیریت امروز <strong>۳۴ مسیر</strong> دارد: ۲۷ مسیرِ کاتالوگ و ۷ مسیرِ اجرا. هیچ قیمت، سهمیه، درصد، مهلت، نرخِ کمیسیون، تأخیرِ تسویه یا متنِ حقوقی در این صفحه انتخاب نشده.</p>
+  </div>
+
+  <section data-screen-label="01" style="display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.53 0.115 70); color: #fff;">۰۱</span>
+      <h2 style="margin: 0; font-family: 'Peyda', sans-serif; font-size: 24px; font-weight: 800; color: oklch(0.22 0.02 330);">انتشارِ سیاستِ دریافتِ پول</h2>
+      <sc-if value="{{ showRouteCodes }}" hint-placeholder-val="{{ true }}"><code style="color: oklch(0.58 0.015 330);">/admin/commercial/collection-policies — ۹ مسیر از ۲۷ مسیرِ این کنترلر</code></sc-if>
+    </div>
+    <p style="margin: 0; max-width: 980px; font-size: 15px; line-height: 1.85; color: oklch(0.46 0.02 330); text-wrap: pretty;">داستان ‎#83‎ پیاده شده. کنترلرِ تجاری امروز <strong>۲۷ مسیر</strong> دارد: ۱۸ مسیرِ طرح و جدولِ قیمت، به‌علاوهٔ ۹ مسیرِ همین خانوادهٔ سیاستِ دریافت. همه روی یک قابلیتِ ویژهٔ کلاس‌سطح، با بازبینیِ زندهٔ لغوِ دسترسی در هر درخواست، و با حسابرسیِ اجباری در همان تراکنشِ تغییر.</p>
+
+    <div style="width: min(1280px, 100%); background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; overflow: hidden;">
+      <table style="width: 100%; border-collapse: collapse;">
+        <thead>
+          <tr style="border-bottom: 1px solid oklch(0.9 0.008 60);">
+            <th style="text-align: start; padding: 12px 18px; font-size: 12px; font-weight: 700; color: oklch(0.58 0.015 330);">کلیدِ سیاست</th>
+            <th style="text-align: start; padding: 12px 10px; font-size: 12px; font-weight: 700; color: oklch(0.58 0.015 330);">نامِ نمایشی</th>
+            <th style="text-align: start; padding: 12px 10px; font-size: 12px; font-weight: 700; color: oklch(0.58 0.015 330);">نسخه‌ها</th>
+            <th style="text-align: start; padding: 12px 10px; font-size: 12px; font-weight: 700; color: oklch(0.58 0.015 330);">وضعیتِ مؤثرِ امروز</th>
+            <th style="text-align: start; padding: 12px 18px; font-size: 12px; font-weight: 700; color: oklch(0.58 0.015 330);"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom: 1px solid oklch(0.96 0.005 60);">
+            <td style="padding: 13px 18px; font-size: 14px; font-weight: 700;" dir="ltr">sample-policy <span style="font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px; background: oklch(0.94 0.006 60); color: oklch(0.58 0.015 330);">نمونه</span></td>
+            <td style="padding: 13px 10px; font-size: 13px;">سیاستِ نمونهٔ دریافت</td>
+            <td style="padding: 13px 10px; font-size: 13px; font-variant-numeric: tabular-nums;">۱</td>
+            <td style="padding: 13px 10px;"><span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 3px 10px 3px 8px; border-radius: 999px; background: oklch(0.985 0.004 75); color: oklch(0.46 0.02 330); border: 1px dashed oklch(0.8 0.01 60);"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 999px; border: 1.5px dashed oklch(0.5 0.02 330);"></span>پیش‌نویس</span></td>
+            <td style="padding: 13px 18px; text-align: end;"><a href="#" style="font-size: 13px; font-weight: 600;">نسخه‌ها</a></td>
+          </tr>
+          <tr>
+            <td colspan="5" style="padding: 16px 18px; font-size: 12.5px; color: oklch(0.58 0.015 330); line-height: 1.8;">حالتِ واقعیِ امروز: <strong>هیچ سیاستِ دریافتی منتشر نشده</strong>، پس هیچ فروشنده‌ای چیزی برای انتخاب ندارد و هر رزرو روی مسیرِ نام‌گذاری‌شدهٔ «پرداختِ کاملِ آنلاین، بدونِ ارجاعِ سیاست» می‌ماند.</td>
+          </tr>
+        </tbody>
+      </table>
+      <div style="padding: 16px 18px; border-top: 1px solid oklch(0.94 0.006 60); display: flex; justify-content: flex-end;">
+        <button type="button" style="font: inherit; min-height: 44px; padding: 0 16px; border: none; border-radius: 9px; background: oklch(0.53 0.115 70); color: #fff; font-size: 14px; font-weight: 700; cursor: pointer;">+ کلیدِ سیاستِ جدید</button>
+      </div>
+    </div>
+
+    <h3 style="margin: 8px 0 0; font-size: 15px; font-weight: 700; color: oklch(0.3 0.02 330);">فرهنگِ وضعیت‌ها — و تفکیکی که پنهان نمی‌شود</h3>
+    <div style="width: min(1280px, 100%); display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 7px;">
+        <span style="display: inline-flex; align-self: flex-start; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 3px 10px 3px 8px; border-radius: 999px; background: oklch(0.985 0.004 75); color: oklch(0.46 0.02 330); border: 1px dashed oklch(0.8 0.01 60);"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 999px; border: 1.5px dashed oklch(0.5 0.02 330);"></span>پیش‌نویس</span>
+        <p style="margin: 0; font-size: 12px; line-height: 1.75; color: oklch(0.58 0.015 330);">مقدارِ واقعیِ چرخهٔ عمر در پایگاه‌داده. قابلِ ویرایش و قابلِ دورانداختن.</p>
+      </div>
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 7px;">
+        <span style="display: inline-flex; align-self: flex-start; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 3px 10px 3px 8px; border-radius: 999px; background: oklch(0.945 0.036 155); color: oklch(0.4 0.1 155);"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 999px; background: oklch(0.4 0.1 155);"></span>منتشرشده</span>
+        <p style="margin: 0; font-size: 12px; line-height: 1.75; color: oklch(0.58 0.015 330);">مقدارِ واقعیِ چرخهٔ عمر. یک‌طرفه و غیرقابلِ ویرایش.</p>
+      </div>
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 7px;">
+        <span style="display: inline-flex; align-self: flex-start; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 3px 10px 3px 8px; border-radius: 999px; background: oklch(0.94 0.006 60); color: oklch(0.46 0.02 330);"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 2px; background: oklch(0.46 0.02 330);"></span>بازنشسته</span>
+        <p style="margin: 0; font-size: 12px; line-height: 1.75; color: oklch(0.58 0.015 330);">مقدارِ واقعیِ چرخهٔ عمر و پایانِ مسیر. سفارش‌های قبلی بازتفسیر نمی‌شوند.</p>
+      </div>
+      <div style="background: oklch(0.985 0.02 70); border: 1px solid oklch(0.9 0.05 70); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 7px;">
+        <span style="display: inline-flex; align-self: flex-start; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 3px 10px 3px 8px; border-radius: 999px; background: oklch(0.9 0.05 70); color: oklch(0.42 0.09 70);"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 3px; background: oklch(0.42 0.09 70);"></span>فعال — مشتق‌شده</span>
+        <p style="margin: 0; font-size: 12px; line-height: 1.75; color: oklch(0.42 0.09 70);">«فعال» ستونِ پایگاه‌داده نیست: یعنی نسخهٔ منتشرشده‌ای که لحظهٔ ساعتِ پایگاه‌داده داخلِ بازهٔ فعال‌سازیِ آن است.</p>
+      </div>
+      <div style="background: oklch(0.985 0.02 70); border: 1px solid oklch(0.9 0.05 70); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 7px;">
+        <span style="display: inline-flex; align-self: flex-start; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 3px 10px 3px 8px; border-radius: 999px; background: oklch(0.9 0.05 70); color: oklch(0.42 0.09 70);"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 999px; border: 2px solid oklch(0.42 0.09 70);"></span>جانشین‌شده — مشتق‌شده</span>
+        <p style="margin: 0; font-size: 12px; line-height: 1.75; color: oklch(0.42 0.09 70);">نسخهٔ منتشرشده‌ای که بازه‌اش بسته شده چون نسخهٔ تازه‌تری فعال است. بازه‌ها هم‌پوشانی ندارند.</p>
+      </div>
+      <div style="background: oklch(0.98 0.02 25); border: 1px solid oklch(0.9 0.03 25); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 7px;">
+        <span style="display: inline-flex; align-self: flex-start; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 3px 10px 3px 8px; border-radius: 999px; background: oklch(0.9 0.03 25); color: oklch(0.5 0.16 25);"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 2px; background: oklch(0.5 0.16 25);"></span>مسدودِ حقوقی</span>
+        <p style="margin: 0; font-size: 12px; line-height: 1.75; color: oklch(0.45 0.1 25);">وضعیتِ چرخهٔ عمر <strong>نیست</strong>: یک دروازهٔ بیرونی است. نگهداریِ بیعانه و متنِ مشتری‌رو زیرِ آن‌اند.</p>
+      </div>
+      <div style="background: oklch(0.98 0.02 25); border: 1px solid oklch(0.9 0.03 25); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 7px;">
+        <span style="display: inline-flex; align-self: flex-start; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 3px 10px 3px 8px; border-radius: 999px; background: oklch(0.9 0.03 25); color: oklch(0.5 0.16 25);"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 3px; background: oklch(0.5 0.16 25);"></span>مسدودِ شرکتِ پرداخت</span>
+        <p style="margin: 0; font-size: 12px; line-height: 1.75; color: oklch(0.45 0.1 25);">دروازهٔ بیرونیِ دیگر. دریافتِ واقعی، تسویه و فعال‌سازیِ ارائه‌دهنده زیرِ آن‌اند — و هیچ آداپتورِ درگاهی در مخزن وجود ندارد.</p>
+      </div>
+      <div style="background: oklch(0.98 0.02 25); border: 1px solid oklch(0.9 0.03 25); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 7px;">
+        <span style="display: inline-flex; align-self: flex-start; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 3px 10px 3px 8px; border-radius: 999px; background: oklch(0.9 0.03 25); color: oklch(0.5 0.16 25);"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 999px; background: oklch(0.5 0.16 25);"></span>توقفِ اضطراری</span>
+        <p style="margin: 0; font-size: 12px; line-height: 1.75; color: oklch(0.45 0.1 25);">حالتِ کلیدِ توقف در سطحِ پلتفرم، نه حالتِ یک نسخه. بخشِ ‎§۰۲‎.</p>
+      </div>
+    </div>
+    <p style="margin: 0; max-width: min(1280px, 100%); font-size: 13px; line-height: 1.85; color: oklch(0.46 0.02 330);">این تفکیک عمدی است: سه وضعیتِ اول واقعاً در ستونِ چرخهٔ عمر ذخیره می‌شوند، دو وضعیتِ بعدی از بازهٔ فعال‌سازی مشتق می‌شوند، و سه وضعیتِ آخر دروازه‌های بیرونی و عملیاتی‌اند که به یک نسخه تعلق ندارند. یکی‌کردنِ این هشت مقدار در یک ستون، وضعیتی می‌ساخت که پایگاه‌داده نمی‌شناسد.</p>
+
+    <h3 style="margin: 8px 0 0; font-size: 15px; font-weight: 700; color: oklch(0.3 0.02 330);">نویسِ نسخهٔ سیاستِ دریافت <span style="font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: oklch(0.94 0.006 60); color: oklch(0.58 0.015 330);">فرم — هیچ مقدارِ پیش‌فرضی ندارد</span></h3>
+    <div style="max-width: 820px; background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; padding: 24px 26px; display: flex; flex-direction: column; gap: 16px;">
+      <div style="padding: 10px 14px; border-radius: 9px; background: oklch(0.98 0.02 25); border: 1px solid oklch(0.9 0.03 25); font-size: 12px; color: oklch(0.5 0.16 25); line-height: 1.75;">هیچ فیلدِ این فرم مقدارِ پیش‌فرض، صفرِ جانشین یا مقدارِ نمونهٔ ازپیش‌پرشده ندارد. مبنای درصد عمداً بدونِ انتخابِ اولیه است؛ انتخابش تصمیمِ مالکِ محصول و دروازهٔ حقوقی است.</div>
+
+      <fieldset style="border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 16px; margin: 0; display: flex; flex-direction: column; gap: 10px;">
+        <legend style="padding: 0 6px; font-size: 13px; font-weight: 800;">روشِ دریافت — دقیقاً سه مقدار</legend>
+        <label style="display: flex; align-items: flex-start; gap: 10px; font-size: 13px; line-height: 1.8;"><input type="radio" name="mode" style="width: 18px; height: 18px; margin-top: 3px;" /><span><strong>پرداخت در محل</strong> — پلتفرم هیچ پولی از خدمت دریافت نمی‌کند.</span></label>
+        <label style="display: flex; align-items: flex-start; gap: 10px; font-size: 13px; line-height: 1.8;"><input type="radio" name="mode" style="width: 18px; height: 18px; margin-top: 3px;" /><span><strong>بیعانهٔ آنلاین و ماندهٔ در محل</strong> — نیازمندِ یک قاعدهٔ بیعانه است؛ نبودش ردِ اعتبارسنجی می‌گیرد.</span></label>
+        <label style="display: flex; align-items: flex-start; gap: 10px; font-size: 13px; line-height: 1.8;"><input type="radio" name="mode" style="width: 18px; height: 18px; margin-top: 3px;" /><span><strong>پرداختِ کاملِ آنلاین</strong> — قاعدهٔ بیعانه در این روش مجاز نیست.</span></label>
+        <p style="margin: 0; font-size: 12px; line-height: 1.8; color: oklch(0.58 0.015 330);">بیعانه روشِ چهارم نیست، یک قاعدهٔ محاسبه است. روشِ ثبت‌شدهٔ هر سفارش از <strong>مبالغِ محاسبه‌شده</strong> استخراج می‌شود، نه از این انتخاب — چون یک درصدِ گردشده به صفر یا یک مبلغِ ثابتِ محدودشده به کلِ خدمت، عملاً روشِ دیگری می‌سازد.</p>
+      </fieldset>
+
+      <fieldset style="border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 16px; margin: 0; display: flex; flex-direction: column; gap: 12px;">
+        <legend style="padding: 0 6px; font-size: 13px; font-weight: 800;">قاعدهٔ بیعانه</legend>
+        <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 13px;"><input type="radio" name="dep" style="width: 18px; height: 18px;" /> بدونِ بیعانه</label>
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 13px;"><input type="radio" name="dep" style="width: 18px; height: 18px;" /> مبلغِ ثابت</label>
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 13px;"><input type="radio" name="dep" style="width: 18px; height: 18px;" /> درصدی</label>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px;">
+          <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 700; color: oklch(0.3 0.02 330);">مبلغِ ثابت (تومان)
+            <input type="number" step="1" min="1" placeholder="بدونِ مقدارِ پیشنهادی" style="font: inherit; min-height: 44px; border: 1px solid oklch(0.9 0.008 60); border-radius: 9px; padding: 0 14px; box-sizing: border-box;" />
+          </label>
+          <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 700; color: oklch(0.3 0.02 330);">درصد (پایهٔ ده‌هزارم)
+            <input type="number" step="1" min="1" max="10000" placeholder="۱ تا ۱۰۰۰۰ — بدونِ مقدارِ پیشنهادی" style="font: inherit; min-height: 44px; border: 1px solid oklch(0.9 0.008 60); border-radius: 9px; padding: 0 14px; box-sizing: border-box;" />
+          </label>
+        </div>
+        <fieldset style="border: 1px dashed oklch(0.9 0.03 25); border-radius: 10px; padding: 14px; margin: 0; display: flex; flex-direction: column; gap: 9px; background: oklch(0.99 0.008 25);">
+          <legend style="padding: 0 6px; font-size: 12.5px; font-weight: 800; color: oklch(0.5 0.16 25);">مبنای محاسبهٔ درصد — اجباری و بدونِ پیش‌فرض</legend>
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 13px;"><input type="radio" name="base" style="width: 18px; height: 18px;" /> جمعِ خدمت</label>
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 13px;"><input type="radio" name="base" style="width: 18px; height: 18px;" /> مبلغِ کلِ خدمت</label>
+          <p style="margin: 0; font-size: 12px; line-height: 1.8; color: oklch(0.45 0.1 25);">دقیقاً همین دو، چون فقط همین دو در لحظهٔ ساختِ سفارش به‌طورِ معتبر وجود دارند. این پرسش در هیچ تصمیمی پاسخ نگرفته بود و تا پاسخ‌گرفتن، روشِ بیعانه‌ایِ درصدی قابلِ انتشار نیست.</p>
+        </fieldset>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px;">
+          <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 700; color: oklch(0.3 0.02 330);">کفِ مبلغ (تومان)
+            <input type="number" step="1" min="0" placeholder="بدونِ مقدارِ پیشنهادی" style="font: inherit; min-height: 44px; border: 1px solid oklch(0.9 0.008 60); border-radius: 9px; padding: 0 14px; box-sizing: border-box;" />
+          </label>
+          <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 700; color: oklch(0.3 0.02 330);">سقفِ مبلغ (اختیاری)
+            <input type="number" step="1" min="0" placeholder="خالی = بدونِ سقف" style="font: inherit; min-height: 44px; border: 1px solid oklch(0.9 0.008 60); border-radius: 9px; padding: 0 14px; box-sizing: border-box;" />
+          </label>
+        </div>
+      </fieldset>
+
+      <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 700; color: oklch(0.3 0.02 330);">پایانِ فعال‌سازی (اختیاری)
+        <input type="datetime-local" style="font: inherit; min-height: 44px; border: 1px solid oklch(0.9 0.008 60); border-radius: 9px; padding: 0 14px; box-sizing: border-box;" />
+      </label>
+      <p style="margin: 0; font-size: 12px; line-height: 1.8; color: oklch(0.58 0.015 330);">شروعِ فعال‌سازی در فرم نیست: لحظهٔ انتشار را پایگاه‌داده تعیین می‌کند و هرگز پیش از انتشار نیست. انتشارِ عادی <strong>عطف‌به‌ماسبق نمی‌شود</strong>؛ واردکردنِ یک واقعیتِ تاریخیِ راستین مسیر و ردِ حسابرسیِ جداگانهٔ خودش را لازم دارد.</p>
+
+      <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 700; color: oklch(0.3 0.02 330);">دلیلِ اجباری
+        <textarea rows="2" placeholder="در همان تراکنشِ تغییر ثبت می‌شود؛ نبودش ردِ درخواست است." style="font: inherit; border: 1px solid oklch(0.9 0.008 60); border-radius: 9px; padding: 10px 14px; box-sizing: border-box; resize: vertical;"></textarea>
+      </label>
+
+      <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <button type="button" style="font: inherit; min-height: 44px; padding: 0 18px; border: none; border-radius: 10px; background: oklch(0.53 0.115 70); color: #fff; font-size: 14px; font-weight: 700; cursor: pointer;">ذخیرهٔ پیش‌نویس</button>
+        <button type="button" style="font: inherit; min-height: 44px; padding: 0 18px; border: 1px solid oklch(0.86 0.01 60); border-radius: 10px; background: oklch(1 0 0); font-size: 14px; font-weight: 700; cursor: pointer;">دورانداختنِ پیش‌نویس</button>
+      </div>
+    </div>
+
+    <h3 style="margin: 8px 0 0; font-size: 15px; font-weight: 700; color: oklch(0.3 0.02 330);">تأییدِ انتشار — دامنهٔ اثر صریح گفته می‌شود</h3>
+    <div role="dialog" aria-modal="true" aria-labelledby="pub-t" style="max-width: 680px; background: oklch(1 0 0); border: 1px solid oklch(0.86 0.01 60); border-radius: 16px; padding: 22px 24px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 18px 40px -24px oklch(0.3 0.03 330 / 0.35);">
+      <h4 id="pub-t" style="margin: 0; font-family: 'Peyda', sans-serif; font-size: 19px; font-weight: 800;">انتشارِ نسخهٔ سیاستِ دریافت</h4>
+      <div style="padding: 12px 14px; border-radius: 10px; background: oklch(0.98 0.02 25); border: 1px solid oklch(0.9 0.03 25); font-size: 13px; line-height: 1.85; color: oklch(0.5 0.16 25);">انتشار <strong>برگشت‌ناپذیر</strong> است. این نسخه پس از انتشار هرگز ویرایش نمی‌شود؛ اصلاح یعنی انتشارِ نسخهٔ تازه. بازگشت از یک تصمیم هم انتشارِ نسخهٔ تازه است، نه ویرایشِ تاریخچه.</div>
+      <dl style="margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; font-size: 13px;">
+        <dt style="color: oklch(0.58 0.015 330);">فعال از</dt><dd style="margin: 0; font-weight: 700;">لحظهٔ ساعتِ پایگاه‌داده در زمانِ انتشار</dd>
+        <dt style="color: oklch(0.58 0.015 330);">فروشندگانِ ثبت‌نام‌شده روی این کلید</dt><dd style="margin: 0; font-weight: 700; font-variant-numeric: tabular-nums;">۰</dd>
+        <dt style="color: oklch(0.58 0.015 330);">رزروهای آیندهٔ متأثر</dt><dd style="margin: 0; font-weight: 700;">فقط سفارش‌هایی که بعد از این لحظه ساخته شوند</dd>
+        <dt style="color: oklch(0.58 0.015 330);">رزروهای موجود</dt><dd style="margin: 0; font-weight: 700; color: oklch(0.4 0.1 155);">هیچ‌کدام — سیاستِ جدید تاریخچه را تغییر نمی‌دهد</dd>
+      </dl>
+      <p style="margin: 0; font-size: 12.5px; line-height: 1.85; color: oklch(0.46 0.02 330);">نسخهٔ فعالِ قبلیِ همین کلید در همان لحظه بسته می‌شود، پس دو نسخه هم‌زمان فعال نمی‌شوند. هر سفارشِ آینده نسخهٔ فعالِ لحظهٔ خودش را حل و ثبتِ ثابت می‌کند و انتشارِ بعدی آن را بازتفسیر نمی‌کند.</p>
+      <div style="display: flex; gap: 10px; justify-content: flex-end;">
+        <button type="button" style="font: inherit; min-height: 44px; padding: 0 18px; border: 1px solid oklch(0.86 0.01 60); border-radius: 10px; background: oklch(1 0 0); font-size: 14px; font-weight: 700; cursor: pointer;">انصراف</button>
+        <button type="button" style="font: inherit; min-height: 44px; padding: 0 18px; border: none; border-radius: 10px; background: oklch(0.53 0.115 70); color: #fff; font-size: 14px; font-weight: 700; cursor: pointer;">انتشار — برگشت‌ناپذیر</button>
+      </div>
+    </div>
+  </section>
+
+  <section data-screen-label="02" style="display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.53 0.115 70); color: #fff;">۰۲</span>
+      <h2 style="margin: 0; font-family: 'Peyda', sans-serif; font-size: 24px; font-weight: 800; color: oklch(0.22 0.02 330);">کنترلِ اجرا — چهار سطحِ مستقل</h2>
+      <sc-if value="{{ showRouteCodes }}" hint-placeholder-val="{{ true }}"><code style="color: oklch(0.58 0.015 330);">/admin/commercial/booking-credit-enforcement — ۷ مسیر</code></sc-if>
+    </div>
+    <sc-if value="{{ showUnimplementedNotices }}" hint-placeholder-val="{{ true }}">
+      <div style="max-width: 980px; padding: 16px 20px; border-radius: 12px; background: oklch(0.965 0.05 155); border: 1px solid oklch(0.85 0.07 155); display: flex; flex-direction: column; gap: 9px;">
+        <div style="display: flex; align-items: center; gap: 9px;"><span aria-hidden="true" style="width: 10px; height: 10px; border-radius: 999px; background: oklch(0.4 0.1 155);"></span><div style="font-size: 15px; font-weight: 800; color: oklch(0.35 0.09 155);">سرور پیاده شده است — رابطِ اپراتور هنوز ساخته نشده</div></div>
+        <p style="margin: 0; font-size: 13px; line-height: 1.85; color: oklch(0.35 0.09 155);">هر چهار سطح و هر هفت مسیر ادغام شده‌اند: کنترلرِ اجرا، سرویسِ کنترل، سرویسِ حکمرانی، جدول‌ها، مهاجرتِ پایگاه‌داده و آزمون‌های واقعیِ پایگاه‌داده. این صفحه دیگر طراحیِ یک قرارداد غایب نیست — <strong>طراحیِ رابطی است که قرارداد آمادهٔ آن است</strong>. آنچه هنوز وجود ندارد فقط صفحهٔ اپراتور است.</p>
+        <p style="margin: 0; font-size: 12.5px; line-height: 1.8; color: oklch(0.35 0.09 155);">کنترلرِ اجرا کلاسی جداست و زیرِ همان فضای نامِ تجاریِ مدیریت سوار می‌شود، با همان قابلیتِ ویژه در سطحِ کلاس. پس فضای نامِ تجاریِ مدیریت امروز <strong>۳۴ مسیر</strong> دارد: ۲۷ مسیرِ کاتالوگ و ۷ مسیرِ اجرا.</p>
+      </div>
+
+      <div style="width: min(1280px, 100%); background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; overflow: hidden;">
+        <table style="width: 100%; border-collapse: collapse;">
+          <caption style="caption-side: top; text-align: start; padding: 14px 18px; font-size: 12.5px; color: oklch(0.58 0.015 330); line-height: 1.75;">هفت مسیرِ سطحِ کنترلِ اجرا. بدنهٔ هر تغییر <strong>دقیقاً یک دلیل</strong> است و هیچ فیلدِ دیگری پذیرفته نمی‌شود — پس هیچ کانالی برای نام‌بردنِ یک مالک، کاربر، متخصص، کسب‌وکار، طرف، اشتراک، اعطا، تعداد، نسل یا وضعیت وجود ندارد.</caption>
+          <thead>
+            <tr style="border-bottom: 1px solid oklch(0.9 0.008 60);">
+              <th style="text-align: start; padding: 11px 18px; font-size: 12px; font-weight: 700; color: oklch(0.58 0.015 330);">مسیر</th>
+              <th style="text-align: start; padding: 11px 10px; font-size: 12px; font-weight: 700; color: oklch(0.58 0.015 330);">کار</th>
+              <th style="text-align: start; padding: 11px 18px; font-size: 12px; font-weight: 700; color: oklch(0.58 0.015 330);">نکته</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom: 1px solid oklch(0.96 0.005 60);"><td style="padding: 11px 18px; font-size: 13px;" dir="ltr">GET /</td><td style="padding: 11px 10px; font-size: 13px;">خواندنِ وضعیتِ کنترل</td><td style="padding: 11px 18px; font-size: 12.5px; color: oklch(0.58 0.015 330);">چیزی نمی‌نویسد</td></tr>
+            <tr style="border-bottom: 1px solid oklch(0.96 0.005 60);"><td style="padding: 11px 18px; font-size: 13px;" dir="ltr">GET /preview</td><td style="padding: 11px 10px; font-size: 13px;">پیش‌نمایشِ تجمیعی</td><td style="padding: 11px 18px; font-size: 12.5px; color: oklch(0.58 0.015 330);">بدونِ تغییر و بدونِ دادهٔ شناساییِ فروشنده</td></tr>
+            <tr style="border-bottom: 1px solid oklch(0.96 0.005 60);"><td style="padding: 11px 18px; font-size: 13px;" dir="ltr">POST /transitions</td><td style="padding: 11px 10px; font-size: 13px;">بردنِ طرف‌های دارای استحقاق به حکمرانی</td><td style="padding: 11px 18px; font-size: 12.5px; color: oklch(0.58 0.015 330);"><strong>مجموعه‌ای</strong> — انتخابگرِ تک‌فروشنده ندارد</td></tr>
+            <tr style="border-bottom: 1px solid oklch(0.96 0.005 60);"><td style="padding: 11px 18px; font-size: 13px;" dir="ltr">POST /exemptions</td><td style="padding: 11px 10px; font-size: 13px;">معاف‌کردنِ طرف‌های بدونِ استحقاق</td><td style="padding: 11px 18px; font-size: 12.5px; color: oklch(0.58 0.015 330);">مجموعه‌ای</td></tr>
+            <tr style="border-bottom: 1px solid oklch(0.96 0.005 60);"><td style="padding: 11px 18px; font-size: 13px;" dir="ltr">POST /kill-switch/engage</td><td style="padding: 11px 10px; font-size: 13px;">کشیدنِ کلیدِ توقف</td><td style="padding: 11px 18px; font-size: 12.5px; color: oklch(0.58 0.015 330);">سطحِ پلتفرم</td></tr>
+            <tr style="border-bottom: 1px solid oklch(0.96 0.005 60);"><td style="padding: 11px 18px; font-size: 13px;" dir="ltr">POST /kill-switch/release</td><td style="padding: 11px 10px; font-size: 13px;">برگرداندنِ کلیدِ توقف</td><td style="padding: 11px 18px; font-size: 12.5px; color: oklch(0.58 0.015 330);">سطحِ پلتفرم</td></tr>
+            <tr><td style="padding: 11px 18px; font-size: 13px;" dir="ltr">POST /activation</td><td style="padding: 11px 10px; font-size: 13px;">فعال‌سازیِ سراسری</td><td style="padding: 11px 18px; font-size: 12.5px; color: oklch(0.58 0.015 330);">یک‌بار و اتمی؛ ردِ آن پاسخِ ۴۰۹ با شمارشِ پیش‌نمایش است</td></tr>
+          </tbody>
+        </table>
+        <div style="padding: 14px 18px; border-top: 1px solid oklch(0.94 0.006 60); font-size: 12.5px; color: oklch(0.58 0.015 330); line-height: 1.8;">مسیرِ «پیش‌نمایشِ فعال‌سازی» و مسیرِ «غیرفعال‌سازی» وجود ندارند و نبودشان عمدی است: پیش‌نمایش همان مسیرِ مشترک است، و برگشت از فعال‌سازی یک گذارِ عادی نیست.</div>
+      </div>
+    </sc-if>
+
+    <div style="width: min(1280px, 100%); display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px;">
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 10px;">
+        <div style="font-size: 14px; font-weight: 800;">۱ — سطحِ راه‌اندازی</div>
+        <span style="align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 3px 10px 3px 8px; border-radius: 999px; background: oklch(0.94 0.006 60); color: oklch(0.46 0.02 330);"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 2px; background: oklch(0.46 0.02 330);"></span>خاموش</span>
+        <p style="margin: 0; font-size: 12.5px; line-height: 1.8; color: oklch(0.58 0.015 330);">یک ردیفِ کنترلِ یکتا در پایگاه‌داده نگه می‌داردش. هیچ عددِ تجاری‌ای در آن ردیف نیست.</p>
+      </div>
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 10px;">
+        <div style="font-size: 14px; font-weight: 800;">۲ — دفترِ استحقاق</div>
+        <span style="align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 3px 10px 3px 8px; border-radius: 999px; background: oklch(0.945 0.036 155); color: oklch(0.4 0.1 155);"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 999px; background: oklch(0.4 0.1 155);"></span>پیاده‌شده — بی‌تغییر</span>
+        <p style="margin: 0; font-size: 12.5px; line-height: 1.8; color: oklch(0.58 0.015 330);">همان حسابداریِ اعتبارِ موجود. صفرِ اعتبار هرگز به معنیِ نامحدود نیست.</p>
+      </div>
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 10px;">
+        <div style="font-size: 14px; font-weight: 800;">۳ — واقعیتِ حکمرانیِ هر طرف</div>
+        <span style="align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 3px 10px 3px 8px; border-radius: 999px; background: oklch(0.945 0.036 155); color: oklch(0.4 0.1 155);"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 999px; background: oklch(0.4 0.1 155);"></span>پیاده‌شده</span>
+        <p style="margin: 0; font-size: 12.5px; line-height: 1.8; color: oklch(0.58 0.015 330);">یک‌جهته: «معافِ قدیمی» یا «تحتِ حکمرانی»، یک ردیف برای هر طرف، با علتِ بسته و کنشگرِ ثبت‌شده. مقدارِ همیشه‌درستِ ساختگی برای این سطح <strong>رد شده است</strong>.</p>
+      </div>
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 10px;">
+        <div style="font-size: 14px; font-weight: 800;">۴ — کلیدِ توقفِ اضطراری</div>
+        <span style="align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 3px 10px 3px 8px; border-radius: 999px; background: oklch(0.945 0.036 155); color: oklch(0.4 0.1 155);"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 999px; background: oklch(0.4 0.1 155);"></span>پیاده‌شده — کشیدن و برگرداندن</span>
+        <p style="margin: 0; font-size: 12.5px; line-height: 1.8; color: oklch(0.58 0.015 330);">در سطحِ پلتفرم، پایدار و حسابرسی‌شده. هیچ‌کدام از این چهار سطح جانشینِ دیگری نمی‌شود.</p>
+      </div>
+    </div>
+
+    <h3 style="margin: 8px 0 0; font-size: 15px; font-weight: 700; color: oklch(0.3 0.02 330);">پیش‌نمایشِ راه‌اندازی — فقط تجمیعی، بدونِ هیچ شناسهٔ فروشنده</h3>
+    <div style="width: min(1280px, 100%); background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; padding: 22px 24px; display: flex; flex-direction: column; gap: 16px;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px;">
+        <div style="border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 16px;">
+          <div style="font-size: 12.5px; color: oklch(0.58 0.015 330); margin-bottom: 4px;">فروشندهٔ واجدِ شرایط</div>
+          <div style="font-family: 'Peyda', sans-serif; font-size: 30px; font-weight: 800; font-variant-numeric: tabular-nums;">—</div>
+        </div>
+        <div style="border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 16px;">
+          <div style="font-size: 12.5px; color: oklch(0.58 0.015 330); margin-bottom: 4px;">تحتِ حکمرانی</div>
+          <div style="font-family: 'Peyda', sans-serif; font-size: 30px; font-weight: 800; font-variant-numeric: tabular-nums;">—</div>
+        </div>
+        <div style="border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 16px;">
+          <div style="font-size: 12.5px; color: oklch(0.58 0.015 330); margin-bottom: 4px;">معافِ قدیمی</div>
+          <div style="font-family: 'Peyda', sans-serif; font-size: 30px; font-weight: 800; font-variant-numeric: tabular-nums;">—</div>
+        </div>
+      </div>
+      <div style="padding: 14px 16px; border-radius: 10px; background: oklch(0.985 0.004 75); border: 1px solid oklch(0.9 0.008 60); font-size: 12.5px; line-height: 1.85; color: oklch(0.46 0.02 330);">پیش‌نمایش <strong>هیچ‌چیز را تغییر نمی‌دهد</strong>، یک عکسِ لحظه‌ای است و هیچ داده‌ای که فروشنده را شناسایی کند برنمی‌گرداند — نه نام، نه شمارهٔ تماس، نه شناسه، نه سیاههٔ «کدام فروشندگان». ارجاعِ هر فروشنده برای اپراتور <strong>مجاز نشده است</strong>، پس این صفحه فهرستِ قابلِ پیمایشِ فروشندگان ندارد و نبودش عیب نیست.</div>
+      <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <button type="button" style="font: inherit; min-height: 44px; padding: 0 18px; border: 1px solid oklch(0.86 0.01 60); border-radius: 10px; background: oklch(1 0 0); font-size: 14px; font-weight: 700; cursor: pointer;">گرفتنِ پیش‌نمایشِ تازه</button>
+      </div>
+    </div>
+
+    <div style="width: min(1280px, 100%); display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; align-items: start;">
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; padding: 22px 24px; display: flex; flex-direction: column; gap: 14px;">
+        <h3 style="margin: 0; font-size: 15px; font-weight: 700; color: oklch(0.3 0.02 330);">دو فرمانِ مجموعه‌ای — گذار و معافیت</h3>
+        <p style="margin: 0; font-size: 12.5px; line-height: 1.85; color: oklch(0.46 0.02 330);">هیچ مهاجرت، دانهٔ اولیه، پُرکردنِ پس‌زمینه یا استنتاجی کسی را تحتِ حکمرانی نمی‌برد. فروشندهٔ موجود معاف می‌ماند تا صریحاً منتقل شود، و پس از آن — با تمام‌شدنِ اعتبار، بازنشستگیِ طرح، جانشین‌شدنِ نسخه یا راه‌اندازیِ دوبارهٔ سامانه — تحتِ حکمرانی می‌ماند.</p>
+        <div style="padding: 12px 14px; border-radius: 10px; background: oklch(0.985 0.004 75); border: 1px solid oklch(0.9 0.008 60); font-size: 12.5px; line-height: 1.8; color: oklch(0.46 0.02 330);">هر دو فرمان <strong>مجموعه‌ای</strong> هستند و نه تک‌فروشنده‌ای: «همهٔ طرف‌های دارای استحقاق» یا «همهٔ طرف‌های بدونِ استحقاق». به همین دلیل این صفحه انتخابگرِ فروشنده ندارد — نبودش همان مرزی است که سرور می‌گذارد، نه یک کمبود.</div>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 700; color: oklch(0.3 0.02 330);">دلیلِ اجباری — ۳ تا ۵۰۰ نویسه
+            <textarea rows="2" placeholder="تنها فیلدی که بدنهٔ درخواست می‌پذیرد؛ هر فیلدِ دیگری ردِ ۴۰۰ می‌گیرد." style="font: inherit; border: 1px solid oklch(0.9 0.008 60); border-radius: 9px; padding: 10px 14px; box-sizing: border-box; resize: vertical;"></textarea>
+          </label>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <button type="button" style="font: inherit; min-height: 44px; padding: 0 18px; border: none; border-radius: 10px; background: oklch(0.53 0.115 70); color: #fff; font-size: 14px; font-weight: 700; cursor: pointer;">بردنِ دارای‌استحقاق‌ها به حکمرانی</button>
+            <button type="button" style="font: inherit; min-height: 44px; padding: 0 18px; border: 1px solid oklch(0.86 0.01 60); border-radius: 10px; background: oklch(1 0 0); font-size: 14px; font-weight: 700; cursor: pointer;">معاف‌کردنِ بدونِ‌استحقاق‌ها</button>
+          </div>
+        </div>
+        <div style="padding: 12px 14px; border-radius: 10px; background: oklch(0.955 0.028 70); border: 1px solid oklch(0.9 0.05 70); font-size: 12.5px; line-height: 1.8; color: oklch(0.42 0.09 70);">اگر اجرای سراسری فعال باشد، ساختِ فروشندهٔ تازه واقعیتِ حکمرانی را در همان تراکنش می‌نویسد، هیچ اعتباری نمی‌نویسد، و اگر نتواند کامل شود <strong>ساختِ فروشنده شکست می‌خورد</strong> — نه اینکه بی‌سروصدا معاف بماند.</div>
+      </div>
+
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; padding: 22px 24px; display: flex; flex-direction: column; gap: 14px;">
+        <h3 style="margin: 0; font-size: 15px; font-weight: 700; color: oklch(0.3 0.02 330);">فعال‌سازیِ سراسری — با توقفِ ایمن</h3>
+        <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 700; color: oklch(0.3 0.02 330);">دلیلِ اجباری
+          <textarea rows="2" placeholder="۳ تا ۵۰۰ نویسه — تنها فیلدِ بدنه" style="font: inherit; border: 1px solid oklch(0.9 0.008 60); border-radius: 9px; padding: 10px 14px; box-sizing: border-box; resize: vertical;"></textarea>
+        </label>
+        <button type="button" style="font: inherit; min-height: 44px; border: none; border-radius: 10px; background: oklch(0.53 0.115 70); color: #fff; font-size: 14px; font-weight: 700; cursor: pointer;">فعال‌سازیِ سراسریِ اجرا</button>
+        <div role="alert" style="padding: 14px 16px; border-radius: 10px; background: oklch(0.98 0.02 25); border: 1px solid oklch(0.9 0.03 25); display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px;"><span aria-hidden="true" style="width: 9px; height: 9px; border-radius: 2px; background: oklch(0.5 0.16 25);"></span><div style="font-size: 13px; font-weight: 800; color: oklch(0.5 0.16 25);">حالتِ ردِ فعال‌سازی — پاسخِ ۴۰۹</div></div>
+          <p style="margin: 0; font-size: 12.5px; line-height: 1.8; color: oklch(0.45 0.1 25);">تا وقتی طرفی بلاتکلیف مانده باشد، فعال‌سازی <strong>عمداً رد می‌شود</strong> و پاسخ فقط شمارشِ پیش‌نمایش را برمی‌گرداند و نه چیزِ دیگری. توقفِ ایمن، نه فعال‌سازیِ نیمه‌کاره.</p>
+          <dl style="margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-size: 12.5px; color: oklch(0.45 0.1 25);">
+            <dt>واجدِ شرایط</dt><dd style="margin: 0; font-variant-numeric: tabular-nums;">—</dd>
+            <dt>تحتِ حکمرانی</dt><dd style="margin: 0; font-variant-numeric: tabular-nums;">—</dd>
+            <dt>معافِ قدیمی</dt><dd style="margin: 0; font-variant-numeric: tabular-nums;">—</dd>
+          </dl>
+        </div>
+        <p style="margin: 0; font-size: 12px; line-height: 1.8; color: oklch(0.58 0.015 330);">فعال‌سازی یک‌بار و اتمی است و شمارندهٔ نسلِ فعال‌سازی را جلو می‌برد، پس «کدام فعال‌سازی» همیشه قابلِ تشخیص است. مسیرِ غیرفعال‌سازی وجود ندارد — برگشت از فعال‌سازی یک گذارِ عادی نیست.</p>
+        <hr style="border: none; border-top: 1px solid oklch(0.94 0.006 60); margin: 2px 0;" />
+        <h3 style="margin: 0; font-size: 15px; font-weight: 700; color: oklch(0.5 0.16 25);">کلیدِ توقفِ اضطراری</h3>
+        <p style="margin: 0; font-size: 12.5px; line-height: 1.85; color: oklch(0.46 0.02 330);">در سطحِ کلِ پلتفرم، نه یک فروشنده و نه یک سیاست. پایدار می‌ماند — با راه‌اندازیِ دوبارهٔ سامانه پاک نمی‌شود — و کشیدن و برگرداندنش هر دو حسابرسی می‌شوند. توقف، دفترِ استحقاق را پاک نمی‌کند و واقعیتِ حکمرانیِ کسی را برنمی‌گرداند.</p>
+        <button type="button" style="font: inherit; min-height: 48px; border: 2px solid oklch(0.5 0.16 25); border-radius: 10px; background: oklch(0.98 0.02 25); color: oklch(0.5 0.16 25); font-size: 15px; font-weight: 800; cursor: pointer;">توقفِ اضطراریِ اجرای اعتبار</button>
+      </div>
+    </div>
+
+    <div style="width: min(1280px, 100%); padding: 16px 20px; border-radius: 12px; background: oklch(0.985 0.004 75); border: 1px solid oklch(0.9 0.008 60); font-size: 13px; line-height: 1.85; color: oklch(0.46 0.02 330);">
+      سطحِ عملیاتیِ این کنترل‌ها فقط همین زیرمنبعِ ویژه است. دستورِ مستقیمِ پایگاه‌داده، متغیرِ محیطی، پرچمِ زمانِ راه‌اندازی و متدِ داخلیِ غیرقابلِ فراخوانی همه به‌عنوان سطحِ اپراتور <strong>رد شده‌اند</strong> — چون هیچ‌کدام حسابرسی، دلیل و بازبینیِ زندهٔ دسترسی ندارند. هیچ سطحِ تازه‌ای برای مشتری یا فروشنده ساخته نمی‌شود.
+    </div>
+  </section>
+
+  <section data-screen-label="03" style="display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.53 0.115 70); color: #fff;">۰۳</span>
+      <h2 style="margin: 0; font-family: 'Peyda', sans-serif; font-size: 24px; font-weight: 800; color: oklch(0.22 0.02 330);">حسابرسی، بازگشت و مرزهای بیرونی</h2>
+    </div>
+
+    <div style="width: min(1280px, 100%); display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; align-items: start;">
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; overflow: hidden;">
+        <div style="padding: 16px 20px; border-bottom: 1px solid oklch(0.94 0.006 60);"><div style="font-size: 15px; font-weight: 800;">تاریخچهٔ حسابرسی</div><p style="margin: 4px 0 0; font-size: 12.5px; color: oklch(0.58 0.015 330); line-height: 1.8;">همان دفترِ حسابرسیِ مدیریتِ موجود استفاده می‌شود، نه یک دفترِ دومِ موازی.</p></div>
+        <ol style="margin: 0; padding: 0; list-style: none;">
+          <li style="padding: 14px 20px; border-bottom: 1px solid oklch(0.96 0.005 60); display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;">
+            <div><div style="font-size: 13.5px; font-weight: 700;">ساختِ کلیدِ سیاستِ دریافت</div><div style="font-size: 12px; color: oklch(0.58 0.015 330);">کنشگر، دلیل و هدف در همان تراکنش</div></div>
+            <span style="font-size: 12px; color: oklch(0.58 0.015 330); white-space: nowrap;">—</span>
+          </li>
+          <li style="padding: 14px 20px; border-bottom: 1px solid oklch(0.96 0.005 60); display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;">
+            <div><div style="font-size: 13.5px; font-weight: 700;">انتشارِ نسخه</div><div style="font-size: 12px; color: oklch(0.58 0.015 330);">با ثبتِ لحظهٔ فعال‌سازیِ تعیین‌شدهٔ پایگاه‌داده</div></div>
+            <span style="font-size: 12px; color: oklch(0.58 0.015 330); white-space: nowrap;">—</span>
+          </li>
+          <li style="padding: 14px 20px; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;">
+            <div><div style="font-size: 13.5px; font-weight: 700;">بازنشستگیِ نسخه</div><div style="font-size: 12px; color: oklch(0.58 0.015 330);">فقط انتخابِ آینده را می‌بندد؛ سفارش‌های گذشته دست‌نخورده</div></div>
+            <span style="font-size: 12px; color: oklch(0.58 0.015 330); white-space: nowrap;">—</span>
+          </li>
+        </ol>
+        <div style="padding: 16px 20px; border-top: 1px solid oklch(0.94 0.006 60); font-size: 12.5px; line-height: 1.85; color: oklch(0.46 0.02 330);"><strong>بازگشت، انتشارِ نسخهٔ تازه است.</strong> هیچ مسیری در این طراحی تاریخچه را ویرایش یا حذف نمی‌کند، چون سرور هم ندارد. شناسهٔ ادمینِ منتشرکننده در فهرست‌های کاتالوگ نیست و فقط در همین دفترِ حسابرسی می‌ماند.</div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 14px;">
+        <div style="background: oklch(0.98 0.02 25); border: 1px solid oklch(0.9 0.03 25); border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 9px;">
+          <div style="font-size: 14px; font-weight: 800; color: oklch(0.5 0.16 25);">ناهمخوانیِ ثبت‌شده — نرخِ کمیسیونِ ثابت در کد</div>
+          <p style="margin: 0; font-size: 12.5px; line-height: 1.85; color: oklch(0.45 0.1 25);">تصمیمِ تصویب‌شده می‌گوید هیچ عددِ تجاری‌ای نباید به‌عنوان ثابتِ کد، بازگشتِ پیش‌فرض، دانهٔ اولیه یا متغیرِ محیطی باقی بماند و نوشتنِ دفترِ کمیسیون تا انتشارِ سیاستِ نسخه‌دار باید <strong>امن‌توقف</strong> کند. پیکربندیِ مالیِ فعلی هنوز یک نرخِ ثابت و یک متغیرِ محیطی دارد و در هر نوشتنِ کمیسیون از آن استفاده می‌کند. این ناهمخوانی به داستانِ کمیسیون و تسویه سپرده شده و <strong>در این طراحی دور زده نشده</strong>: هیچ نرخ، درصد یا مبلغِ کمیسیونی در هیچ صفحه‌ای نمایش داده نمی‌شود.</p>
+        </div>
+        <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 9px;">
+          <div style="font-size: 14px; font-weight: 800;">قابلیتِ پیکربندی، اختیارِ حقوقی نمی‌دهد</div>
+          <p style="margin: 0; font-size: 12.5px; line-height: 1.85; color: oklch(0.46 0.02 330);">انتشارِ یک سیاست تغییر می‌دهد که پلتفرم چه چیزی <strong>ثبت</strong> می‌کند، نه اینکه بانک، شرکتِ پرداخت یا قانون چه اجازه‌ای می‌دهد. نگهداریِ بیعانه پیش از تأییدِ حقوقی و متنِ فارسیِ تأییدشده فعال نمی‌شود، و دریافتِ واقعی و تسویه زیرِ دروازهٔ بیرونی می‌مانند.</p>
+        </div>
+        <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 9px;">
+          <div style="font-size: 14px; font-weight: 800;">تأییدِ چهارچشمی</div>
+          <p style="margin: 0; font-size: 12.5px; line-height: 1.85; color: oklch(0.46 0.02 330);">تأییدِ دومِ اختیاری برای انتشار، یک <strong>تصمیمِ آیندهٔ نام‌گذاری‌شده</strong> است که عمداً اتخاذ نشده. پس در این طراحی نه جریانِ تأییدِ دوم ساخته شده و نه دکمهٔ غیرفعالی که وجودش را وعده بدهد.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 1400, &quot;height&quot;: 900}, &quot;showUnimplementedNotices&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;نمایش&quot;}, &quot;showRouteCodes&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;نمایش&quot;}}"></script>
+</body>
+</html>

@@ -8,10 +8,37 @@ This connection now resolves `marabi766/BeauClick` (the owner recorded by every 
 
 ## Last sync
 
-date: 2026-09-02T20:41:00Z
-commit: `itsmyfinance77-dev/BeauClick@master` resolved to `12c92f974529...`, identical to the baseline commit named in this pass's sync brief. `origin/master` had not advanced past it.
+date: 2026-09-12T04:05:00Z
+commit: `itsmyfinance77-dev/BeauClick@master` resolved to `6695234eded1` (tree hash as resolved by the tree read; no commit sha is claimed). `github_compare(4c7506347030...master, v3/)`: 3 commits, 38 files.
 
-### V3.3-A Story #40 (`#40a`) — admin commercial plan and price catalogue sync (this pass, design workspace only — no repo write)
+### V3.3 closure sync — story-status correction and frontend-handoff preparation (this pass, design workspace only — no repo write)
+
+- Story status re-verified **from merged code, not from the previous design report**. **#115 implemented and closed** — `services/commerce/src/order/order.service.ts` resolves the collection policy through `BookingCollectionPolicyResolver` and snapshots `policyKey`/`policyVersion` on the order schedule (unenrolled → all NULL; enrolled → resolve at the database clock instant inside the order transaction or fail closed). This was **already true at the previous baseline**, so the earlier "proposed / governs no booking" finding was wrong when written; corrected with a before/after table rather than edited away.
+- **#95 and #141 implemented and closed** — merged in this window: `services/commercial-policy/src/enforcement/{booking-credit-enforcement.controller.ts, -control.service.ts, -governance.service.ts, .entities.ts, .constants.ts, -subject-data.contract.ts, booking-entitlement-party-lock.ts}`, migration `20260917100001_create_booking_credit_enforcement_controls.sql`, and the `booking-credit-activation` / `booking-credit-enforcement` PG suites. Seven routes under `v1/admin/commercial/booking-credit-enforcement` on the class-level privileged `bc_manage_commercial_plans`: `GET /`, `GET /preview`, `POST /transitions`, `POST /exemptions`, `POST /kill-switch/engage`, `POST /kill-switch/release`, `POST /activation`. Every mutation body is exactly a reason; the governance commands are **set-based**; there is no `activation/preview` and no deactivation route.
+- **Admin commercial namespace is now 34 routes** — 27 catalogue + 7 enforcement (a separate controller class, same namespace, same class gate).
+- **C-5 re-checked and still open:** `financial.config.ts` still declares `DEFAULT_COMMISSION_RATE_BP = 1500`, still reads `FINANCIAL_COMMISSION_RATE_BP`, and `ledger.service.ts` still stamps it on every commission and reversal write, against `V33-DEC-028` Rulings 1–2. Reported, not designed around.
+- **DOCX claim narrowed:** from "agree line-for-line" to what was actually verified — no conflict found between the 15 binding decisions and the corresponding register cards, and no DOCX item presented an open value as settled.
+- Updated: `Prototype - Admin Control Plane.dc.html` §02 (real seven-route table, both set-based commands, real activation button + 409 refusal state, two planes reclassified implemented), `Prototype - Customer.dc.html` §21 + §23 (post-#115 wording, design-review annotation frame around the open-option panel), `Prototype - Pro and Admin.dc.html` §22 (assignment now governs subsequent orders; fail-closed statement), `docs/design/V3.3_BASELINE_AUDIT.md` §0-a, `V3.3_REQUIREMENT_MATRIX.md` (§10 final capability status matrix, §11 untested-at-implementation list), `screens/{41,42,44}`, `REPORT.md` (retitled Historical V3.1), handoff §34, `MANIFEST.md`.
+- New: `docs/design/V3.3_RESPONSIVE_AND_A11Y_HANDOFF.md`. All V3.3 containers made fluid (`width: min(Npx, 100%)`, `repeat(auto-fit, minmax(…))`); pre-V3.3 artboards deliberately unchanged.
+- Verdict: **READY WITH DOCUMENTED LIMITATIONS**.
+- No production repository code, schema, migration, issue, label, tag, Release, deployment or provider changed; no commit made.
+
+#### Previous baseline (historical)
+
+date: 2026-09-11T18:05:00Z
+commit: `itsmyfinance77-dev/BeauClick@master` resolved to `4c7506347030` (tree hash as resolved by the tree read; no commit sha is claimed). `github_compare(12c92f974529...master)`: **50 commits, 279 files**.
+
+### V3.3 — commercial, payment and legal flexibility design update (previous pass, design workspace only — no repo write)
+
+- Read before designing: `docs/roadmap/v3.3/V3.3_COMMERCIAL_DECISION_PACKET.md`, the relevant `V3.3_DECISION_REGISTER.md` cards, `ADR-041`–`ADR-050`, and the real merged code — `services/commercial-policy/src/catalogue/commercial-catalogue.controller.ts`, `seller-surface/seller-subscription-surface.controller.ts`, `collection-policy-assignment/collection-policy-assignment.controller.ts`, `packages/commercial-policy-contract/src/booking-collection-policy-contract.ts`, `services/commerce/src/entities/order-payment-schedule.entity.ts`, `services/business/src/{business.controller.ts, business-location.controller.ts, location-resource.controller.ts, service-resource-requirement.controller.ts, entities/staff-role-grant.entity.ts}`, `services/financial/src/{financial.controller.ts, financial.config.ts, ledger.service.ts, dto/finance-workspace.dto.ts}`, `services/identity/src/rbac/capabilities.ts`. The product owner's decision DOCX was uploaded by the user and read in full.
+- **Eight contradictions found and reported read-only BEFORE any artifact was modified** (`docs/design/V3.3_BASELINE_AUDIT.md`). Load-bearing: **C-5** — `FinancialConfig.DEFAULT_COMMISSION_RATE_BP = 1500` + `FINANCIAL_COMMISSION_RATE_BP` are still live and `ledger.service.ts` still stamps every commission write from them, contradicting `V33-DEC-028` Rulings 1–2 (fail closed, no commercial constant); reported and **not designed around** — no commission figure in any screen. **C-2** — six of the brief's eleven personas hold no authority (`ROLES` is six values, `SCOPED_STAFF_ROLES` is exactly `['practitioner_chat']`, location/resource/service-requirement routes are owner-only). **C-3/C-4** — cancellation, retention, no-show, dispute and acceptance are legally blocked (#42) and the dispute domain has no contract at all; `policy_accepted_at` is NULL for every row by construction. **C-6** — collection-policy publication and assignment are merged but order resolution (#115) is not, so an assignment governs no booking. **C-7** — the enforcement control plane (#95/`V33-DEC-036`/ADR-050) was ratified the same day and has zero implementation. **C-1** — our own docs recorded 18 admin commercial routes; the merged controller declares **27** (corrected in `40_ADMIN_COMMERCIAL_CATALOGUE.md`).
+- **The uploaded DOCX agrees with the register** — all 15 binding items map to `V33-DEC-009/010/023/024/028/036`; no item presented an open value as settled.
+- New: `Prototype - Admin Control Plane.dc.html` (§01 collection-policy publication + 8-state legend + no-default version form + publish dialog; §02 four independent planes, aggregate-only preview with no seller-identifying data, per-party transition, fail-closed global activation, platform-wide kill switch; §03 audit, rollback-by-publication, recorded C-5 contradiction), `docs/design/V3.3_BASELINE_AUDIT.md`, `docs/design/V3.3_REQUIREMENT_MATRIX.md`, `docs/design/screens/{41_CUSTOMER_COLLECTION_AND_POLICY.md, 42_SELLER_COMMERCIAL_AND_OPERATIONS.md, 44_ADMIN_CONTROL_PLANE.md}`.
+- Extended: `Prototype - Customer.dc.html` §21–§23; `Prototype - Pro and Admin.dc.html` §20–§24.
+- Preserved exactly: **no open value chosen** — no price, allowance, seat, location, capability bundle, billing term, quantity bound, tier, preset, expiry, grace, threshold, deposit amount, percentage, calculation base, cutoff, retention, dispute window, commission rate, settlement delay, reserve, tax treatment or legal copy. The five recorded proposed values (24h, 15min, 72h, weekly, zero commission) appear only in Customer §23's open-option panel, labelled as recorded proposals. D-7's real seeded zeros are the only non-sample commercial figures.
+- No production repository code, schema, migration, issue, decision status, tag, Release or deployment changed; no payment provider activated; no commit made.
+
+### V3.3-A Story #40 (`#40a`) — admin commercial plan and price catalogue sync (previous pass, design workspace only — no repo write)
 
 - Read the real merged implementation: `docs/roadmap/v3/adr/ADR-041-commercial-plan-and-price-catalogue.md`, `v3/packages/commercial-policy-contract/src/{commercial-catalogue-contract.ts, commercial-policy-contract.ts}`, `v3/services/commercial-policy/src/catalogue/{commercial-catalogue.controller.ts, .service.ts, .dto.ts, .entities.ts, .exceptions.ts, commercial-subject-data.contract.ts, base-workspace-is-not-a-code-path.spec.ts}`, `v3/services/commercial-policy/src/commercial-policy-control.gate.ts`, `v3/database/migrations/commercial/20260902800001_create_commercial_catalogue.sql`, `v3/database/migrations/identity/20260902800002_add_commercial_plan_capability.sql`, `v3/libs/auth/src/{capability.guard.ts, privileged-capability.port.ts}`.
 - **Contradiction found and reported, not silently corrected:** the sync brief states "16 administrator routes"; the merged controller declares 18. Designed against the real 18 — full table in `40_ADMIN_COMMERCIAL_CATALOGUE.md` §1.
@@ -153,6 +180,8 @@ commit at that time: d2e11ea0f0f760c850997182f900748923e7418b (V3.2-B chat imple
 
 ## Sync history
 
+- 2026-09-12T04:05:00Z — V3.3 closure sync: #115/#95/#141 verified implemented and closed (one prior finding corrected as wrong-when-written), admin commercial namespace 27 → 34 routes, control-plane prototype rebuilt against the real seven routes, responsive + accessibility handoff added, REPORT.md retitled historical, DOCX claim narrowed. Verdict READY WITH DOCUMENTED LIMITATIONS. @`6695234eded1`
+- 2026-09-11T18:05:00Z — V3.3 commercial/payment/legal flexibility design update (read-only audit + eight contradictions reported before editing; admin route count corrected 18 → 27; new `Prototype - Admin Control Plane.dc.html`; Customer §21–§23; Pro/Admin §20–§24; `V3.3_BASELINE_AUDIT.md`, `V3.3_REQUIREMENT_MATRIX.md`, screens 41/42/44) @`4c7506347030`, 50 commits / 279 files ahead of the prior sync.
 - 2026-09-02T20:41:00Z — V3.3-A Story #40 (`#40a`) admin commercial plan and price catalogue sync (route-to-screen matrix for the real 18 admin routes — brief said 16, corrected; plan/schedule catalogue, D-7 base-workspace card, create-draft form, publish/retire dialogs, tier editor; `40_ADMIN_COMMERCIAL_CATALOGUE.md`, Pro/Admin §19) @12c92f974529... (baseline unchanged from brief).
 - 2026-09-02T04:20:00Z — V3.2-C Story #14 Referral design synchronisation (own-code/share + claim box + one-time attributed reveal + collapsed refusal/throttle + distinct 400 + real notification templates; `39_REFERRAL.md`, Customer §20; central finding: no persistent status-read route exists for pending/expired/capped; qualified/reversed reach the customer once via real, implemented notification copy) @1e5f519177b4491662cb1a4c57eb2e9035934b69 (Story #13/PR #54 baseline).
 - 2026-09-01T12:00:00Z — Logo exploration, 10 concepts (pure design-workspace brand exploration; new `BeauClick Logo Explorations — 10 Concepts.dc.html` + 10 SVG sources; both prior logo assets confirmed untouched). No repo read/write.
@@ -274,3 +303,17 @@ New since the app tree was last walked — none of these have a recreation, prot
 - `app/admin/phone-conflicts/page.tsx`
 
 These line up with the backlog's "missing prototypes" list — worth prioritizing next.
+
+
+## Screen map (V3.3 commercial, payment and legal flexibility)
+
+| Project screen | Repo files |
+| --- | --- |
+| docs/design/V3.3_BASELINE_AUDIT.md | docs/roadmap/v3.3/V3.3_COMMERCIAL_DECISION_PACKET.md, V3.3_DECISION_REGISTER.md, docs/roadmap/v3/adr/ADR-041…ADR-050, v3/services/identity/src/rbac/capabilities.ts, v3/services/financial/src/{financial.config.ts, ledger.service.ts} |
+| docs/design/V3.3_REQUIREMENT_MATRIX.md | all files below, plus the decision packet and register |
+| docs/design/screens/41_CUSTOMER_COLLECTION_AND_POLICY.md | v3/packages/commercial-policy-contract/src/booking-collection-policy-contract.ts, v3/services/commerce/src/entities/order-payment-schedule.entity.ts, v3/apps/api/src/checkout/checkout.service.ts, v3/apps/web/app/checkout/result/page.tsx, v3/apps/web/lib/booking-api.ts, ADR-043, ADR-044, ADR-045, ADR-048 |
+| Prototype - Customer.dc.html §21–§23 | same as 41_CUSTOMER_COLLECTION_AND_POLICY.md |
+| docs/design/screens/42_SELLER_COMMERCIAL_AND_OPERATIONS.md | v3/services/commercial-policy/src/seller-surface/*, subscription/*, collection-policy-assignment/*, v3/packages/commercial-policy-contract/src/{seller-subscription-contract.ts, credit-purchase-contract.ts, collection-policy-assignment-contract.ts}, v3/services/business/src/*, v3/services/financial/src/{financial.controller.ts, finance-workspace.service.ts}, ADR-042, ADR-046, ADR-047, ADR-049 |
+| Prototype - Pro and Admin.dc.html §20–§24 | same as 42_SELLER_COMMERCIAL_AND_OPERATIONS.md |
+| docs/design/screens/44_ADMIN_CONTROL_PLANE.md | v3/services/commercial-policy/src/catalogue/{commercial-catalogue.controller.ts, booking-collection-policy.{dto,entities,service}.ts}, v3/services/commercial-policy/src/commercial-policy-control.gate.ts, ADR-048, ADR-050 |
+| Prototype - Admin Control Plane.dc.html §01–§03 | same as 44_ADMIN_CONTROL_PLANE.md |

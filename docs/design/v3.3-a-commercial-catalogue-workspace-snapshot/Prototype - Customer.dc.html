@@ -2889,6 +2889,307 @@
   </section>
 
 </div>
+
+  <section data-screen-label="21" style="display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.42 0.13 340); color: #fff;">21</span>
+      <h2 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 24px; font-weight: 800; color: oklch(0.22 0.02 330);">پرداخت در رزرو — سه روشِ دریافت و افشای پیش از تأیید</h2>
+      <code style="color: oklch(0.58 0.015 330);">/providers/[id] → /checkout — v1/orders/:id.paymentSchedule</code>
+    </div>
+    <p style="margin: 0; max-width: 980px; font-size: 15px; line-height: 1.85; color: oklch(0.46 0.02 330);">سه روشِ دریافت در قرارداد، پایگاه‌داده، سطحِ انتشارِ ادمین، سطحِ انتسابِ فروشنده و — از داستان ‎#115‎ — در خودِ ساختِ سفارش وجود دارند: سیاست در همان تراکنشِ سفارش و در لحظهٔ ساعتِ پایگاه‌داده حل و ثبتِ ثابت می‌شود. <strong>پشتیبانیِ سرور کامل است؛ آنچه ساخته نشده رابطِ مشتریِ این صفحه است.</strong> مشتری هیچ‌وقت روش را انتخاب نمی‌کند: روش از سیاستی می‌آید که فروشنده پذیرفته و سرور در لحظهٔ ساختِ سفارش حل می‌کند. مشتری فقط نتیجه را می‌بیند و می‌پذیرد. رزروِ BeauClick هزینهٔ جداگانه‌ای برای مشتری ندارد — «صفر بودنِ مبلغِ آنلاین» به معنیِ صفر بودنِ قیمتِ خدمت نیست.</p>
+
+    <div style="display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start;">
+      <div style="width: min(390px, 100%); background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 12px;">
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <span aria-hidden="true" style="width: 9px; height: 9px; border-radius: 2px; background: oklch(0.42 0.09 70);"></span>
+          <div style="font-size: 14px; font-weight: 800;">پرداخت در محل</div>
+          <span style="font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px; background: oklch(0.945 0.036 155); color: oklch(0.4 0.1 155);">سرور پیاده‌شده — رابط ساخته نشده</span>
+        </div>
+        <dl style="margin: 0; display: grid; grid-template-columns: 1fr auto; gap: 9px 12px; font-size: 14px;">
+          <dt style="color: oklch(0.46 0.02 330);">قیمتِ کاملِ خدمت</dt><dd style="margin: 0; font-weight: 700; font-variant-numeric: tabular-nums;">۴۵۰٬۰۰۰ تومان <span style="font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px; background: oklch(0.94 0.006 60); color: oklch(0.58 0.015 330);">نمونه</span></dd>
+          <dt style="color: oklch(0.46 0.02 330);">پرداختِ آنلاین الان</dt><dd style="margin: 0; font-weight: 800; font-variant-numeric: tabular-nums;">۰ تومان</dd>
+          <dt style="color: oklch(0.46 0.02 330);">پرداخت در محل</dt><dd style="margin: 0; font-weight: 700; font-variant-numeric: tabular-nums;">۴۵۰٬۰۰۰ تومان</dd>
+        </dl>
+        <div style="padding: 10px 12px; border-radius: 9px; background: oklch(0.985 0.004 75); border: 1px solid oklch(0.9 0.008 60); font-size: 12.5px; line-height: 1.8; color: oklch(0.46 0.02 330);">هیچ پولی آنلاین دریافت نمی‌شود، پس هیچ رویدادِ پرداخت، طلب، بازپرداخت یا تسویه‌ای ساخته نمی‌شود. سفارش وضعیتِ صریحِ «دریافتِ آنلاین لازم نیست» می‌گیرد — نه «پرداخت‌شده»، نه «رایگان»، نه «تسویه‌شده».</div>
+        <button type="button" style="font: inherit; min-height: 48px; border: none; border-radius: 12px; background: oklch(0.42 0.13 340); color: #fff; font-size: 15px; font-weight: 700; cursor: pointer;">تأیید رزرو</button>
+      </div>
+
+      <div style="width: min(390px, 100%); background: oklch(1 0 0); border: 2px solid oklch(0.42 0.13 340); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 12px;">
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <span aria-hidden="true" style="width: 9px; height: 9px; border-radius: 999px; background: oklch(0.42 0.13 340);"></span>
+          <div style="font-size: 14px; font-weight: 800;">بیعانهٔ آنلاین و ماندهٔ در محل</div>
+        </div>
+        <dl style="margin: 0; display: grid; grid-template-columns: 1fr auto; gap: 9px 12px; font-size: 14px;">
+          <dt style="color: oklch(0.46 0.02 330);">قیمتِ کاملِ خدمت</dt><dd style="margin: 0; font-weight: 700; font-variant-numeric: tabular-nums;">۴۵۰٬۰۰۰ تومان <span style="font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px; background: oklch(0.94 0.006 60); color: oklch(0.58 0.015 330);">نمونه</span></dd>
+          <dt style="color: oklch(0.46 0.02 330);">پرداختِ آنلاین الان</dt><dd style="margin: 0; font-weight: 800; font-variant-numeric: tabular-nums;">— تومان</dd>
+          <dt style="color: oklch(0.46 0.02 330);">ماندهٔ پرداختی در محل</dt><dd style="margin: 0; font-weight: 700; font-variant-numeric: tabular-nums;">— تومان</dd>
+        </dl>
+        <div style="padding: 10px 12px; border-radius: 9px; background: oklch(0.985 0.004 75); border: 1px dashed oklch(0.86 0.01 60); font-size: 12.5px; line-height: 1.8; color: oklch(0.46 0.02 330);">مبلغِ بیعانه خالی است چون هیچ درصد، مبلغِ ثابت، کف، سقف و مبنای محاسبه‌ای تصویب نشده. مبنای درصد دقیقاً یکی از «جمعِ خدمت» یا «مبلغِ کلِ خدمت» است و ادمین آن را در هر نسخه انتخاب می‌کند؛ پیش‌فرضی وجود ندارد و در این طراحی هم انتخاب نشده.</div>
+        <div style="padding: 10px 12px; border-radius: 9px; background: oklch(0.94 0.006 60); font-size: 12px; line-height: 1.8; color: oklch(0.46 0.02 330);">قاعدهٔ گردکردن تصویب‌شده است و ساختاریِ آن قطعی: تقسیمِ صحیح به سمتِ پایین، سپس کف، سپس سقف، و در پایان همیشه محدود به مبلغِ کلِ خدمت — تا پلتفرم هرگز بیشتر از قیمتِ افشا‌شده دریافت نکند.</div>
+        <button type="button" style="font: inherit; min-height: 48px; border: none; border-radius: 12px; background: oklch(0.42 0.13 340); color: #fff; font-size: 15px; font-weight: 700; cursor: pointer;">پرداختِ بیعانه و تأیید</button>
+      </div>
+
+      <div style="width: min(390px, 100%); background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 12px;">
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <span aria-hidden="true" style="width: 9px; height: 9px; border-radius: 3px; background: oklch(0.4 0.1 155);"></span>
+          <div style="font-size: 14px; font-weight: 800;">پرداختِ کاملِ آنلاین</div>
+          <span style="display: inline-flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 999px; background: oklch(0.945 0.036 155); color: oklch(0.4 0.1 155);">مسیرِ فروشندهٔ ثبت‌نام‌نشده</span>
+        </div>
+        <dl style="margin: 0; display: grid; grid-template-columns: 1fr auto; gap: 9px 12px; font-size: 14px;">
+          <dt style="color: oklch(0.46 0.02 330);">قیمتِ کاملِ خدمت</dt><dd style="margin: 0; font-weight: 700; font-variant-numeric: tabular-nums;">۴۵۰٬۰۰۰ تومان <span style="font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px; background: oklch(0.94 0.006 60); color: oklch(0.58 0.015 330);">نمونه</span></dd>
+          <dt style="color: oklch(0.46 0.02 330);">پرداختِ آنلاین الان</dt><dd style="margin: 0; font-weight: 800; font-variant-numeric: tabular-nums;">۴۵۰٬۰۰۰ تومان</dd>
+          <dt style="color: oklch(0.46 0.02 330);">ماندهٔ پرداختی در محل</dt><dd style="margin: 0; font-weight: 700; font-variant-numeric: tabular-nums;">۰ تومان</dd>
+        </dl>
+        <div style="padding: 10px 12px; border-radius: 9px; background: oklch(0.985 0.004 75); border: 1px solid oklch(0.9 0.008 60); font-size: 12.5px; line-height: 1.8; color: oklch(0.46 0.02 330);">سفارشِ فروشنده‌ای که هیچ سیاستی به او منتسب نشده همین شکل است: مبلغِ آنلاین برابرِ قیمتِ کاملِ خدمت، ماندهٔ محل صفر و ارجاعِ سیاست تهی. سه مبلغ هم‌اکنون در رسیدِ پرداخت نمایش داده می‌شوند.</div>
+        <button type="button" style="font: inherit; min-height: 48px; border: none; border-radius: 12px; background: oklch(0.42 0.13 340); color: #fff; font-size: 15px; font-weight: 700; cursor: pointer;">پرداخت و تأیید</button>
+      </div>
+    </div>
+
+    <h3 style="margin: 8px 0 0; font-size: 15px; font-weight: 700; color: oklch(0.3 0.02 330);">بلوکِ افشای پیش از تأیید — همهٔ سطرهای لازم، با وضعیتِ صریحِ هر سطر</h3>
+    <div style="width: min(700px, 100%); max-width: 100%; background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; overflow: hidden;">
+      <div style="padding: 16px 20px; border-bottom: 1px solid oklch(0.94 0.006 60);">
+        <div style="font-size: 15px; font-weight: 800;">پیش از تأیید، این‌ها را می‌پذیرید</div>
+        <p style="margin: 4px 0 0; font-size: 12.5px; line-height: 1.8; color: oklch(0.58 0.015 330);">هر سطر یا مقدارِ واقعی دارد، یا صریحاً می‌گوید چرا ندارد. هیچ سطری با عددِ اختراعی، صفرِ جانشین یا شناسهٔ نسخهٔ ساختگی پر نشده.</p>
+      </div>
+      <dl style="margin: 0;">
+        <div style="padding: 13px 20px; border-bottom: 1px solid oklch(0.96 0.005 60); display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+          <dt style="font-size: 13.5px; font-weight: 600;">هویتِ فروشندهٔ قانونی</dt>
+          <dd style="margin: 0; display: flex; align-items: center; gap: 8px; font-size: 13px;"><span style="font-weight: 700;">کسب‌وکار یا متخصصِ مستقل</span><span style="display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: oklch(0.945 0.036 155); color: oklch(0.4 0.1 155);"><span aria-hidden="true" style="width: 6px; height: 6px; border-radius: 999px; background: oklch(0.4 0.1 155);"></span>سمتِ سرور</span></dd>
+        </div>
+        <div style="padding: 13px 20px; border-bottom: 1px solid oklch(0.96 0.005 60); display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+          <dt style="font-size: 13.5px; font-weight: 600;">قیمتِ کاملِ خدمت</dt>
+          <dd style="margin: 0; display: flex; align-items: center; gap: 8px; font-size: 13px;"><span style="font-weight: 700; font-variant-numeric: tabular-nums;">۴۵۰٬۰۰۰ تومان</span><span style="display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: oklch(0.945 0.036 155); color: oklch(0.4 0.1 155);"><span aria-hidden="true" style="width: 6px; height: 6px; border-radius: 999px; background: oklch(0.4 0.1 155);"></span>پیاده‌شده</span></dd>
+        </div>
+        <div style="padding: 13px 20px; border-bottom: 1px solid oklch(0.96 0.005 60); display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+          <dt style="font-size: 13.5px; font-weight: 600;">مبلغِ دریافتیِ آنلاین</dt>
+          <dd style="margin: 0; display: flex; align-items: center; gap: 8px; font-size: 13px;"><span style="font-weight: 700; font-variant-numeric: tabular-nums;">۴۵۰٬۰۰۰ تومان</span><span style="display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: oklch(0.945 0.036 155); color: oklch(0.4 0.1 155);"><span aria-hidden="true" style="width: 6px; height: 6px; border-radius: 999px; background: oklch(0.4 0.1 155);"></span>پیاده‌شده</span></dd>
+        </div>
+        <div style="padding: 13px 20px; border-bottom: 1px solid oklch(0.96 0.005 60); display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+          <dt style="font-size: 13.5px; font-weight: 600;">ماندهٔ پرداختی در محل</dt>
+          <dd style="margin: 0; display: flex; align-items: center; gap: 8px; font-size: 13px;"><span style="font-weight: 700; font-variant-numeric: tabular-nums;">۰ تومان</span><span style="display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: oklch(0.945 0.036 155); color: oklch(0.4 0.1 155);"><span aria-hidden="true" style="width: 6px; height: 6px; border-radius: 999px; background: oklch(0.4 0.1 155);"></span>پیاده‌شده</span></dd>
+        </div>
+        <div style="padding: 13px 20px; border-bottom: 1px solid oklch(0.96 0.005 60); display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+          <dt style="font-size: 13.5px; font-weight: 600;">مهلتِ لغوِ رایگان</dt>
+          <dd style="margin: 0; display: flex; align-items: center; gap: 8px; font-size: 13px;"><span style="color: oklch(0.58 0.015 330);">—</span><span style="display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: oklch(0.98 0.02 25); color: oklch(0.5 0.16 25); border: 1px solid oklch(0.9 0.03 25);"><span aria-hidden="true" style="width: 6px; height: 6px; border-radius: 2px; background: oklch(0.5 0.16 25);"></span>منتشرنشده — در انتظارِ تأیید حقوقی</span></dd>
+        </div>
+        <div style="padding: 13px 20px; border-bottom: 1px solid oklch(0.96 0.005 60); display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+          <dt style="font-size: 13.5px; font-weight: 600;">مبلغی که ممکن است نگهداری شود</dt>
+          <dd style="margin: 0; display: flex; align-items: center; gap: 8px; font-size: 13px;"><span style="color: oklch(0.58 0.015 330);">—</span><span style="display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: oklch(0.98 0.02 25); color: oklch(0.5 0.16 25); border: 1px solid oklch(0.9 0.03 25);"><span aria-hidden="true" style="width: 6px; height: 6px; border-radius: 2px; background: oklch(0.5 0.16 25);"></span>منتشرنشده — در انتظارِ تأیید حقوقی</span></dd>
+        </div>
+        <div style="padding: 13px 20px; border-bottom: 1px solid oklch(0.96 0.005 60); display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+          <dt style="font-size: 13.5px; font-weight: 600;">دورهٔ ارفاقِ عدم مراجعه</dt>
+          <dd style="margin: 0; display: flex; align-items: center; gap: 8px; font-size: 13px;"><span style="color: oklch(0.58 0.015 330);">—</span><span style="display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: oklch(0.98 0.02 25); color: oklch(0.5 0.16 25); border: 1px solid oklch(0.9 0.03 25);"><span aria-hidden="true" style="width: 6px; height: 6px; border-radius: 2px; background: oklch(0.5 0.16 25);"></span>منتشرنشده — در انتظارِ تأیید حقوقی</span></dd>
+        </div>
+        <div style="padding: 13px 20px; border-bottom: 1px solid oklch(0.96 0.005 60); display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+          <dt style="font-size: 13.5px; font-weight: 600;">شرایطِ تغییرِ نوبت</dt>
+          <dd style="margin: 0; display: flex; align-items: center; gap: 8px; font-size: 13px;"><span style="color: oklch(0.58 0.015 330);">—</span><span style="display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: oklch(0.98 0.02 25); color: oklch(0.5 0.16 25); border: 1px solid oklch(0.9 0.03 25);"><span aria-hidden="true" style="width: 6px; height: 6px; border-radius: 2px; background: oklch(0.5 0.16 25);"></span>منتشرنشده — در انتظارِ تأیید حقوقی</span></dd>
+        </div>
+        <div style="padding: 13px 20px; border-bottom: 1px solid oklch(0.96 0.005 60); display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+          <dt style="font-size: 13.5px; font-weight: 600;">مهلتِ اعتراض</dt>
+          <dd style="margin: 0; display: flex; align-items: center; gap: 8px; font-size: 13px;"><span style="color: oklch(0.58 0.015 330);">—</span><span style="display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: oklch(0.98 0.02 25); color: oklch(0.5 0.16 25); border: 1px solid oklch(0.9 0.03 25);"><span aria-hidden="true" style="width: 6px; height: 6px; border-radius: 2px; background: oklch(0.5 0.16 25);"></span>منتشرنشده — در انتظارِ تأیید حقوقی</span></dd>
+        </div>
+        <div style="padding: 13px 20px; border-bottom: 1px solid oklch(0.96 0.005 60); display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+          <dt style="font-size: 13.5px; font-weight: 600;">مسیرِ پشتیبانی</dt>
+          <dd style="margin: 0; display: flex; align-items: center; gap: 8px; font-size: 13px;"><span style="font-weight: 700;">گفتگوی داخلی — ‎§۱۸‎</span><span style="display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: oklch(0.945 0.036 155); color: oklch(0.4 0.1 155);"><span aria-hidden="true" style="width: 6px; height: 6px; border-radius: 999px; background: oklch(0.4 0.1 155);"></span>پیاده‌شده</span></dd>
+        </div>
+      </dl>
+      <div style="padding: 18px 20px; background: oklch(0.985 0.004 75); display: flex; flex-direction: column; gap: 12px;">
+        <div style="font-size: 13.5px; font-weight: 800;">نسخهٔ متنِ سیاست و پذیرشِ صریح</div>
+        <label style="display: flex; align-items: flex-start; gap: 11px; font-size: 13px; line-height: 1.85; color: oklch(0.5 0.02 330);">
+          <input type="checkbox" disabled aria-describedby="policy-accept-why" style="width: 20px; height: 20px; margin-top: 2px; flex: none;" />
+          <span>شرایطِ نسخهٔ <span style="color: oklch(0.58 0.015 330);">—</span> را خوانده‌ام و می‌پذیرم.</span>
+        </label>
+        <p id="policy-accept-why" style="margin: 0; font-size: 12.5px; line-height: 1.85; color: oklch(0.45 0.1 25);">این کنترل عمداً غیرفعال است و متنِ جانشین ندارد. هیچ متنِ فارسیِ تأییدشده‌ای در مخزن وجود ندارد و ستونِ «زمانِ پذیرشِ مشتری» امروز در همهٔ سفارش‌ها تهی است — با طرحی که هیچ‌کدام از داستان‌های جاری آن را پر نمی‌کنند. ساختنِ یک شناسهٔ نسخهٔ ساختگی یا یک متنِ نمونه، دادهٔ حقوقی جعل می‌کرد.</p>
+        <div style="padding: 11px 13px; border-radius: 9px; background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); font-size: 12.5px; line-height: 1.85; color: oklch(0.46 0.02 330);">واژه‌ها در این طراحی از هم جدا نگه داشته شده‌اند و مترادف نیستند: <strong>بیعانه</strong> (پیش‌پرداختِ بخشی از قیمتِ خدمت)، <strong>مبلغِ نگهداری‌شده</strong>، <strong>بازپرداخت</strong>، <strong>کمیسیون</strong>، <strong>اعتبارِ نوبت</strong> و <strong>تسویه</strong>. هیچ‌جا کلمهٔ «غیرقابلِ استرداد» یا «جریمه» به‌کار نرفته، چون ماهیتِ حقوقیِ این مبلغ هنوز تأیید نشده.</div>
+      </div>
+    </div>
+  </section>
+
+  <section data-screen-label="22" style="display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.42 0.13 340); color: #fff;">22</span>
+      <h2 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 24px; font-weight: 800; color: oklch(0.22 0.02 330);">حالت‌های پرداخت و بازپرداخت — ده وضعیت</h2>
+      <code style="color: oklch(0.58 0.015 330);">/checkout/result — v1/orders/:id</code>
+    </div>
+    <p style="margin: 0; max-width: 980px; font-size: 15px; line-height: 1.85; color: oklch(0.46 0.02 330);">وضعیتِ سفارش هیچ‌وقت از پارامترِ آدرس خوانده نمی‌شود؛ حقیقت از خودِ سفارشِ احرازهویت‌شده می‌آید. سقفِ بازپرداخت، پولِ <strong>وصول‌شده</strong> است نه قیمتِ کاملِ خدمت، و پایگاه‌داده زنجیرهٔ «بازپرداخت‌شده ≤ وصول‌شده ≤ کل» را تضمین می‌کند. ماندهٔ پرداختی در محل هرگز قابلِ بازپرداخت نیست، چون هرگز دریافت نشده.</p>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 14px; max-width: 1400px;">
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 9px;">
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"><span aria-hidden="true" style="width: 9px; height: 9px; border-radius: 2px; background: oklch(0.46 0.02 330);"></span><div style="font-size: 14px; font-weight: 800;">پرداختِ آنلاین لازم نیست</div><span style="font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px; background: oklch(0.945 0.036 155); color: oklch(0.4 0.1 155);">پیاده‌شده</span></div>
+        <p style="margin: 0; font-size: 13px; line-height: 1.85; color: oklch(0.46 0.02 330);">رزروِ شما تأیید شد و مبلغِ خدمت در محل پرداخت می‌شود. این وضعیت نه «پرداخت‌شده» است، نه «رایگان»، نه «تسویه‌شده».</p>
+      </div>
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 9px;">
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"><span aria-hidden="true" style="width: 9px; height: 9px; border-radius: 999px; border: 2px solid oklch(0.42 0.09 70);"></span><div style="font-size: 14px; font-weight: 800;">پرداخت در جریان</div><span style="font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px; background: oklch(0.945 0.036 155); color: oklch(0.4 0.1 155);">پیاده‌شده</span></div>
+        <p style="margin: 0; font-size: 13px; line-height: 1.85; color: oklch(0.46 0.02 330);">در انتظارِ تأییدِ درگاه. صفحه را نبندید و پرداخت را دوباره شروع نکنید.</p>
+      </div>
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 9px;">
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"><span aria-hidden="true" style="width: 9px; height: 9px; border-radius: 999px; background: oklch(0.4 0.1 155);"></span><div style="font-size: 14px; font-weight: 800;">پرداخت موفق</div><span style="font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px; background: oklch(0.945 0.036 155); color: oklch(0.4 0.1 155);">پیاده‌شده</span></div>
+        <p style="margin: 0; font-size: 13px; line-height: 1.85; color: oklch(0.46 0.02 330);">رسید هر سه مبلغ را نشان می‌دهد: قیمتِ کامل، مبلغِ دریافتیِ آنلاین و ماندهٔ محل.</p>
+      </div>
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 9px;">
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"><span aria-hidden="true" style="width: 9px; height: 9px; border-radius: 2px; background: oklch(0.42 0.09 70);"></span><div style="font-size: 14px; font-weight: 800;">دریافتِ آنلاین کامل شد — بخشی</div><span style="font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px; background: oklch(0.945 0.036 155); color: oklch(0.4 0.1 155);">پیاده‌شده — جعبهٔ شنی</span></div>
+        <p style="margin: 0; font-size: 13px; line-height: 1.85; color: oklch(0.46 0.02 330);">دریافتِ کمتر از کلِ خدمت واقعیتِ خودش را دارد و با «پرداختِ کاملِ سفارش» یکی گرفته نمی‌شود. مبلغِ وصول‌شده یک‌بار از مقدارِ تأییدشدهٔ درگاه نوشته می‌شود و بعد تغییر نمی‌کند.</p>
+      </div>
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.03 25); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 9px;">
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"><span aria-hidden="true" style="width: 9px; height: 9px; border-radius: 2px; background: oklch(0.5 0.16 25);"></span><div style="font-size: 14px; font-weight: 800; color: oklch(0.5 0.16 25);">پرداخت ناموفق</div><span style="font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px; background: oklch(0.945 0.036 155); color: oklch(0.4 0.1 155);">پیاده‌شده</span></div>
+        <p style="margin: 0; font-size: 13px; line-height: 1.85; color: oklch(0.45 0.1 25);">هشت علتِ شکست، هر یک با تصمیمِ صریحِ «تلاشِ دوباره» یا «تلاش نکنید». مسیرِ تلاشِ دوباره در سطحِ سفارش و ایمن در برابرِ کلیکِ دوباره است.</p>
+      </div>
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 9px;">
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"><span aria-hidden="true" style="width: 9px; height: 9px; border-radius: 3px; background: oklch(0.42 0.09 70);"></span><div style="font-size: 14px; font-weight: 800;">نتیجه نامشخص — بازخوانیِ درگاه</div><span style="font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px; background: oklch(0.945 0.036 155); color: oklch(0.4 0.1 155);">پیاده‌شده</span></div>
+        <p style="margin: 0; font-size: 13px; line-height: 1.85; color: oklch(0.46 0.02 330);">نتیجهٔ این پرداخت روشن نیست. دوباره تلاش نکنید؛ رزروهایتان را ببینید و اگر پولی کم شد ولی رزروی تأیید نشد، با پشتیبانی تماس بگیرید. این صفحه <strong>وعدهٔ تعیینِ تکلیفِ خودکار نمی‌دهد</strong>، چون هیچ سازوکارِ تطبیقِ خودکاری وجود ندارد.</p>
+      </div>
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 9px;">
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"><span aria-hidden="true" style="width: 9px; height: 9px; border-radius: 999px; border: 2px solid oklch(0.46 0.02 330);"></span><div style="font-size: 14px; font-weight: 800;">بازپرداخت در جریان</div><span style="font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px; background: oklch(0.98 0.02 25); color: oklch(0.5 0.16 25); border: 1px solid oklch(0.9 0.03 25);">قرارداد ناقص</span></div>
+        <p style="margin: 0; font-size: 13px; line-height: 1.85; color: oklch(0.46 0.02 330);">هیچ مسیری وضعیتِ «در جریان» بودنِ بازپرداخت را نمی‌خواند و هیچ زمانِ تقریبی‌ای وعده داده نمی‌شود. متن فقط می‌گوید بازپرداخت ثبت شده است.</p>
+      </div>
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 9px;">
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"><span aria-hidden="true" style="width: 9px; height: 9px; border-radius: 999px; background: oklch(0.46 0.02 330);"></span><div style="font-size: 14px; font-weight: 800;">بازپرداختِ کامل</div><span style="font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px; background: oklch(0.945 0.036 155); color: oklch(0.4 0.1 155);">پیاده‌شده</span></div>
+        <p style="margin: 0; font-size: 13px; line-height: 1.85; color: oklch(0.46 0.02 330);">لحنِ این حالت «هشدار» است نه «خطا»: مشتری مقصر نبوده. تا وقتی سیاستِ نگهداری منتشر نشده، لغو، کلِ مبلغِ باقی‌ماندهٔ وصول‌شده را برمی‌گرداند.</p>
+      </div>
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 9px;">
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"><span aria-hidden="true" style="width: 9px; height: 9px; border-radius: 2px; border: 2px solid oklch(0.46 0.02 330);"></span><div style="font-size: 14px; font-weight: 800;">بازپرداختِ بخشی</div><span style="font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px; background: oklch(0.98 0.02 25); color: oklch(0.5 0.16 25); border: 1px solid oklch(0.9 0.03 25);">ساختار آماده — سیاست منتشرنشده</span></div>
+        <p style="margin: 0; font-size: 13px; line-height: 1.85; color: oklch(0.46 0.02 330);">بازپرداختِ بخشی ساختاراً ممکن است، ولی امروز هیچ سیاستی مبلغی را برای نگهداری تعیین نمی‌کند — پس هیچ بازپرداختِ بخشیِ خودکاری رخ نمی‌دهد. مبلغِ نگهداری‌شده هرگز از پولِ واقعاً وصول‌شده بیشتر نمی‌شود و هرگز ماندهٔ محل را مطالبه نمی‌کند.</p>
+      </div>
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.03 25); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 9px;">
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"><span aria-hidden="true" style="width: 9px; height: 9px; border-radius: 2px; background: oklch(0.5 0.16 25);"></span><div style="font-size: 14px; font-weight: 800; color: oklch(0.5 0.16 25);">پرداختِ آنلاین در دسترس نیست</div></div>
+        <p style="margin: 0; font-size: 13px; line-height: 1.85; color: oklch(0.45 0.1 25);">دریافتِ آنلاین در این لحظه ممکن نیست. بازگشتِ خودکار به روشِ دیگر انجام <strong>نمی‌شود</strong> مگر فروشنده آن روش را صریحاً فعال کرده باشد، و هیچ رزروِ پذیرفته‌شده‌ای بی‌صدا تغییر نمی‌کند.</p>
+      </div>
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.03 25); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 9px;">
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"><span aria-hidden="true" style="width: 9px; height: 9px; border-radius: 3px; background: oklch(0.5 0.16 25);"></span><div style="font-size: 14px; font-weight: 800; color: oklch(0.5 0.16 25);">اختلالِ شرکتِ پرداخت</div></div>
+        <p style="margin: 0; font-size: 13px; line-height: 1.85; color: oklch(0.45 0.1 25);">یک حالتِ عمومی و بدونِ نامِ ارائه‌دهنده. هیچ زمانِ رفعِ اختلالی وعده داده نمی‌شود.</p>
+      </div>
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.03 25); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 9px;">
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"><span aria-hidden="true" style="width: 9px; height: 9px; border-radius: 999px; background: oklch(0.5 0.16 25);"></span><div style="font-size: 14px; font-weight: 800; color: oklch(0.5 0.16 25);">سیاست در دسترس نیست — توقفِ ایمن</div></div>
+        <p style="margin: 0; font-size: 13px; line-height: 1.85; color: oklch(0.45 0.1 25);">اگر فروشنده ثبت‌نام‌شده باشد و سیاستِ فعالی پیدا نشود، رزرو <strong>انجام نمی‌شود</strong> و مسیرِ جانشینِ بی‌صدا وجود ندارد. نبودِ پیکربندی برای هر حرکتِ پول، جریمه، انقضا و کمیسیون به توقفِ ایمن می‌انجامد، نه به یک پیش‌فرض.</p>
+      </div>
+    </div>
+  </section>
+
+  <section data-screen-label="23" style="display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.42 0.13 340); color: #fff;">23</span>
+      <h2 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 24px; font-weight: 800; color: oklch(0.22 0.02 330);">لغو، تغییرِ نوبت، عدم مراجعه و اعتراض</h2>
+      <code style="color: oklch(0.58 0.015 330);">/bookings/[id] — سیاست از رزرو خوانده می‌شود، نه از امروز</code>
+    </div>
+    <div style="max-width: 980px; padding: 16px 20px; border-radius: 12px; background: oklch(0.98 0.02 25); border: 1px solid oklch(0.9 0.03 25); display: flex; flex-direction: column; gap: 9px;">
+      <div style="display: flex; align-items: center; gap: 9px;"><span aria-hidden="true" style="width: 10px; height: 10px; border-radius: 2px; background: oklch(0.5 0.16 25);"></span><div style="font-size: 15px; font-weight: 800; color: oklch(0.5 0.16 25);">وضعیتِ واقعیِ این سطح: هیچ سیاستِ نتیجه‌ای منتشر نشده</div></div>
+      <p style="margin: 0; font-size: 13px; line-height: 1.85; color: oklch(0.45 0.1 25);">مهلتِ لغو، مبلغِ نگهداری‌شده در لغوِ دیرهنگام، نتیجهٔ عدم مراجعه، رفتارِ تغییرِ نوبت و مهلتِ اعتراض همه در انتظارِ <strong>تأییدِ حقوقی</strong> هستند و هیچ متنِ فارسیِ تأییدشده‌ای وجود ندارد. دامنهٔ اختلاف هم هیچ قابلیت، جدول، سرویس یا مسیری در مخزن ندارد. پس این بخش ساختار و همهٔ حالت‌ها را طراحی می‌کند و <strong>هیچ مقداری را انتخاب نمی‌کند</strong>. رفتارِ امنِ امروز پابرجاست: بدونِ نگهداری، با بازپرداختِ کلِ مبلغِ باقی‌ماندهٔ وصول‌شده.</p>
+    </div>
+
+    <h3 style="margin: 8px 0 0; font-size: 15px; font-weight: 700; color: oklch(0.3 0.02 330);">هفت واقعیت و نتیجهٔ هرکدام</h3>
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 14px; max-width: 1400px;">
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px;"><span aria-hidden="true" style="width: 9px; height: 9px; border-radius: 999px; background: oklch(0.4 0.1 155);"></span><div style="font-size: 14px; font-weight: 800;">لغوِ رایگانِ مشتری</div></div>
+        <div style="font-size: 12.5px; color: oklch(0.58 0.015 330);">پیش از مهلت — مهلت: <span style="color: oklch(0.5 0.16 25); font-weight: 700;">منتشرنشده</span></div>
+        <p style="margin: 0; font-size: 13px; line-height: 1.85; color: oklch(0.46 0.02 330);">کلِ مبلغِ آنلاینِ وصول‌شده بازگردانده می‌شود. ماندهٔ محل چیزی برای بازگرداندن ندارد چون دریافت نشده.</p>
+      </div>
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px;"><span aria-hidden="true" style="width: 9px; height: 9px; border-radius: 2px; background: oklch(0.42 0.09 70);"></span><div style="font-size: 14px; font-weight: 800;">لغوِ دیرهنگامِ مشتری</div></div>
+        <div style="font-size: 12.5px; color: oklch(0.58 0.015 330);">مبلغِ نگهداری‌شده: <span style="color: oklch(0.5 0.16 25); font-weight: 700;">منتشرنشده</span></div>
+        <p style="margin: 0; font-size: 13px; line-height: 1.85; color: oklch(0.46 0.02 330);">امروز چیزی نگهداری نمی‌شود. هر مبلغِ آیندهٔ نگهداری، سه سقف دارد: سیاستِ پذیرفته‌شدهٔ همان رزرو، سقفِ قانونی، و پولِ واقعاً وصول‌شده. ماندهٔ پرداخت‌نشده هرگز به بدهی تبدیل نمی‌شود.</p>
+      </div>
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px;"><span aria-hidden="true" style="width: 9px; height: 9px; border-radius: 3px; background: oklch(0.42 0.09 70);"></span><div style="font-size: 14px; font-weight: 800;">عدم مراجعهٔ مشتری</div></div>
+        <div style="font-size: 12.5px; color: oklch(0.58 0.015 330);">دورهٔ ارفاق: <span style="color: oklch(0.5 0.16 25); font-weight: 700;">منتشرنشده</span></div>
+        <p style="margin: 0; font-size: 13px; line-height: 1.85; color: oklch(0.46 0.02 330);">تنها <strong>پس از پایانِ بازهٔ نوبت</strong> قابلِ ثبت است. اعلامِ یک‌طرفهٔ فروشنده برای انتقالِ قطعیِ پول کافی نیست و فرصتِ اعتراضِ مشتری بخشی از همین مسیر است.</p>
+      </div>
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px;"><span aria-hidden="true" style="width: 9px; height: 9px; border-radius: 999px; background: oklch(0.4 0.1 155);"></span><div style="font-size: 14px; font-weight: 800;">لغو توسط خدمت‌دهنده</div></div>
+        <p style="margin: 0; font-size: 13px; line-height: 1.85; color: oklch(0.46 0.02 330);">بازپرداختِ ۱۰۰٪ پولِ وصول‌شده. یک اعتبارِ نوبتِ فروشنده هم دقیقاً یک‌بار برگشت می‌خورد. مشتری عاملِ لغو نبوده، پس لحنِ پیام «هشدار» است نه «خطا».</p>
+      </div>
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px;"><span aria-hidden="true" style="width: 9px; height: 9px; border-radius: 999px; background: oklch(0.4 0.1 155);"></span><div style="font-size: 14px; font-weight: 800;">لغو توسط پلتفرم یا شرکتِ پرداخت</div></div>
+        <p style="margin: 0; font-size: 13px; line-height: 1.85; color: oklch(0.46 0.02 330);">بازپرداختِ ۱۰۰٪ پولِ وصول‌شده، بدونِ نامِ ارائه‌دهنده و بدونِ انتقالِ هزینهٔ خطا به مشتری.</p>
+      </div>
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px;"><span aria-hidden="true" style="width: 9px; height: 9px; border-radius: 2px; background: oklch(0.46 0.02 330);"></span><div style="font-size: 14px; font-weight: 800;">تغییرِ نوبت</div></div>
+        <div style="font-size: 12.5px; color: oklch(0.58 0.015 330);">تعدادِ تغییرِ شامل: <span style="color: oklch(0.5 0.16 25); font-weight: 700;">منتشرنشده</span></div>
+        <p style="margin: 0; font-size: 13px; line-height: 1.85; color: oklch(0.46 0.02 330);">اعتبارِ فروشنده منتقل می‌شود و واحدِ دوم مصرف نمی‌کند — این قطعی است. اینکه بیعانه منتقل شود یا سیاستِ لغو اعمال شود، در انتظارِ تصویب است.</p>
+      </div>
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px;"><span aria-hidden="true" style="width: 9px; height: 9px; border-radius: 3px; border: 2px solid oklch(0.46 0.02 330);"></span><div style="font-size: 14px; font-weight: 800;">فورس‌ماژور</div></div>
+        <p style="margin: 0; font-size: 13px; line-height: 1.85; color: oklch(0.46 0.02 330);">درخواستی که انسان بررسی می‌کند. نه مسیرِ ثبتِ آن وجود دارد و نه نقشِ بررسی‌کننده‌ای در مدلِ مجوزها — هر دو باز هستند.</p>
+      </div>
+    </div>
+
+    <div role="note" aria-labelledby="dr-open-options" style="max-width: 1000px; border: 2px dashed oklch(0.7 0.02 330); border-radius: 18px; padding: 18px; background: repeating-linear-gradient(135deg, oklch(0.97 0.004 330) 0 10px, oklch(0.955 0.006 330) 10px 20px); display: flex; flex-direction: column; gap: 14px;">
+      <div style="display: flex; align-items: center; gap: 9px; flex-wrap: wrap;">
+        <span style="font-size: 11px; font-weight: 800; letter-spacing: 0.04em; padding: 4px 11px; border-radius: 999px; background: oklch(0.3 0.02 330); color: #fff;">بازبینیِ طراحی — بخشی از محصول نیست</span>
+        <h3 id="dr-open-options" style="margin: 0; font-size: 15px; font-weight: 700; color: oklch(0.3 0.02 330);">گزینه‌های بازِ این سطح</h3>
+      </div>
+      <p style="margin: 0; font-size: 12.5px; line-height: 1.8; color: oklch(0.46 0.02 330);">آنچه در این قاب است <strong>کنترلِ محصول نیست</strong> و در رابطِ نهایی دیده نمی‌شود. اینجا فقط برای تصمیم‌گیری نشان داده می‌شود: همهٔ گزینه‌های ممکن، پیشنهادِ ثبت‌شده، و اینکه زیرِ هر گزینه کدام جزءِ رابط عوض می‌شود.</p>
+    <div style="max-width: 1000px; background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; overflow: hidden;">
+      <div style="padding: 14px 20px; border-bottom: 1px solid oklch(0.94 0.006 60); font-size: 12.5px; line-height: 1.8; color: oklch(0.58 0.015 330);">گزینهٔ نشان‌دار، <strong>پیشنهادِ ثبت‌شده</strong> در فهرستِ تصمیم‌هاست و تصمیمِ تصویب‌شده نیست. مقادیرِ عددی هم پیشنهادِ اولیه‌اند و تصویب نشده‌اند. هر گزینه، تفاوتش در رابط را هم اعلام می‌کند تا انتخابِ نهایی نیازِ بازطراحی نداشته باشد.</div>
+      <div style="padding: 18px 20px; display: flex; flex-direction: column; gap: 18px;">
+        <div style="display: flex; flex-direction: column; gap: 9px;">
+          <div style="font-size: 14px; font-weight: 800;">لغوِ خدمت‌دهنده یا پلتفرم: مشتری چه چیزی می‌گیرد؟</div>
+          <div style="display: flex; flex-direction: column; gap: 7px; font-size: 13px;">
+            <div style="padding: 9px 12px; border-radius: 9px; background: oklch(0.985 0.004 75); border: 1px solid oklch(0.9 0.008 60);">فقط تغییرِ نوبت — رابط: بدونِ دکمهٔ بازپرداخت</div>
+            <div style="padding: 9px 12px; border-radius: 9px; background: oklch(0.985 0.004 75); border: 1px solid oklch(0.9 0.008 60);">فقط بازپرداختِ کامل — رابط: بدونِ انتخابِ مشتری</div>
+            <div style="padding: 9px 12px; border-radius: 9px; background: oklch(0.965 0.05 155); border: 1px solid oklch(0.85 0.07 155); font-weight: 700;">انتخابِ مشتری میان بازپرداختِ کامل و تغییرِ رایگان <span style="font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: oklch(0.4 0.1 155); color: #fff;">پیشنهادِ ثبت‌شده</span> — رابط: یک صفحهٔ دوگزینه‌ای با انتخابِ صریح</div>
+            <div style="padding: 9px 12px; border-radius: 9px; background: oklch(0.985 0.004 75); border: 1px solid oklch(0.9 0.008 60);">اعتبارِ داخلیِ اجباری — رابط: کیفِ اعتبارِ مشتری، که امروز وجود ندارد</div>
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 9px;">
+          <div style="font-size: 14px; font-weight: 800;">مهلتِ اعتراض چند ساعت باشد؟</div>
+          <div style="display: flex; flex-wrap: wrap; gap: 7px; font-size: 13px;">
+            <span style="padding: 8px 14px; border-radius: 999px; background: oklch(0.985 0.004 75); border: 1px solid oklch(0.9 0.008 60);">۲۴ ساعت</span>
+            <span style="padding: 8px 14px; border-radius: 999px; background: oklch(0.985 0.004 75); border: 1px solid oklch(0.9 0.008 60);">۴۸ ساعت</span>
+            <span style="padding: 8px 14px; border-radius: 999px; background: oklch(0.965 0.05 155); border: 1px solid oklch(0.85 0.07 155); font-weight: 700;">۷۲ ساعت — پیشنهادِ ثبت‌شده</span>
+            <span style="padding: 8px 14px; border-radius: 999px; background: oklch(0.985 0.004 75); border: 1px solid oklch(0.9 0.008 60);">۷ روز</span>
+            <span style="padding: 8px 14px; border-radius: 999px; background: oklch(0.985 0.004 75); border: 1px solid oklch(0.9 0.008 60);">وابسته به نوعِ خدمت — رابط: مهلتِ متفاوت روی هر رزرو</span>
+          </div>
+          <p style="margin: 0; font-size: 12px; line-height: 1.8; color: oklch(0.58 0.015 330);">در همهٔ گزینه‌ها، رابط یک شمارشِ معکوس روی رزروِ دارای نتیجه نشان می‌دهد و مقدارش از سیاستِ ثبتِ ثابتِ همان رزرو می‌آید — پس هیچ‌کدام از این گزینه‌ها بازطراحی لازم ندارد.</p>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 9px;">
+          <div style="font-size: 14px; font-weight: 800;">هنگامِ اختلاف چه مقدار پول مسدود شود؟</div>
+          <div style="display: flex; flex-direction: column; gap: 7px; font-size: 13px;">
+            <div style="padding: 9px 12px; border-radius: 9px; background: oklch(0.985 0.004 75); border: 1px solid oklch(0.9 0.008 60);">کلِ پول — رابط: کلِ رسید در حالتِ مسدود</div>
+            <div style="padding: 9px 12px; border-radius: 9px; background: oklch(0.965 0.05 155); border: 1px solid oklch(0.85 0.07 155); font-weight: 700;">فقط مبلغِ موردِ اختلاف <span style="font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: oklch(0.4 0.1 155); color: #fff;">پیشنهادِ ثبت‌شده</span> — رابط: تفکیکِ «مسدود» از «بی‌اختلاف» در همان رسید</div>
+            <div style="padding: 9px 12px; border-radius: 9px; background: oklch(0.985 0.004 75); border: 1px solid oklch(0.9 0.008 60);">تسویه و بازپس‌گیریِ بعدی — رابط: حالتِ بدهیِ فروشنده، که امروز وجود ندارد</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    </div>
+
+    <h3 style="margin: 8px 0 0; font-size: 15px; font-weight: 700; color: oklch(0.3 0.02 330);">مسیرِ اعتراض — طراحیِ کاملِ حالت‌ها، بدونِ هیچ قراردادِ سرور</h3>
+    <div style="display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start;">
+      <div style="width: min(420px, 100%); background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px;">
+        <div style="font-size: 14px; font-weight: 800;">۱ — ثبتِ اعتراض</div>
+        <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 700; color: oklch(0.3 0.02 330);">موضوعِ اعتراض
+          <div style="min-height: 44px; border: 1px solid oklch(0.9 0.008 60); border-radius: 9px; padding: 0 14px; display: flex; align-items: center; font-size: 13px; color: oklch(0.58 0.015 330);">از فهرستِ بستهٔ دلایل انتخاب می‌شود</div>
+        </label>
+        <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 700; color: oklch(0.3 0.02 330);">توضیحِ شما
+          <textarea rows="3" placeholder="شرحِ کوتاه" style="font: inherit; border: 1px solid oklch(0.9 0.008 60); border-radius: 9px; padding: 10px 14px; box-sizing: border-box; resize: vertical;"></textarea>
+        </label>
+        <div style="padding: 12px 14px; border-radius: 10px; background: oklch(0.955 0.028 70); border: 1px solid oklch(0.9 0.05 70); display: flex; gap: 9px; align-items: flex-start;">
+          <span aria-hidden="true" style="margin-top: 4px; width: 9px; height: 9px; border-radius: 2px; background: oklch(0.42 0.09 70); flex: none;"></span>
+          <p style="margin: 0; font-size: 12.5px; line-height: 1.8; color: oklch(0.42 0.09 70);">پیش از بارگذاریِ فایل بخوانید: دادهٔ موجود در سامانه و اظهاراتِ طرفین مبنای بررسی است و فایلِ حساس فقط در صورتِ ضرورت. <strong>تصویرِ بدن، موقعیتِ مکانی و اطلاعاتِ پزشکی</strong> پیش‌فرضِ این مسیر نیستند و پروندهٔ درمانی از دامنه بیرون است. دسته‌بندی، مدتِ نگهداری و حقِ دسترسی نیازمندِ تأییدِ حقوقی و حریمِ خصوصی است و در این طراحی تعیین نشده.</p>
+        </div>
+        <button type="button" disabled aria-disabled="true" style="font: inherit; min-height: 44px; border: 1px solid oklch(0.88 0.01 60); border-radius: 10px; background: oklch(0.96 0.005 60); color: oklch(0.62 0.015 330); font-size: 14px; font-weight: 700; cursor: not-allowed;">ثبت — بدونِ قراردادِ سرور</button>
+      </div>
+      <div style="width: min(420px, 100%); display: flex; flex-direction: column; gap: 14px;">
+        <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 7px;">
+          <div style="display: flex; align-items: center; gap: 8px;"><span aria-hidden="true" style="width: 9px; height: 9px; border-radius: 2px; background: oklch(0.42 0.09 70);"></span><div style="font-size: 13.5px; font-weight: 800;">۲ — مبلغِ موردِ اختلاف مسدود شد</div></div>
+          <p style="margin: 0; font-size: 12.5px; line-height: 1.8; color: oklch(0.46 0.02 330);">فقط همان مبلغ از «در انتظار» به «در اختلاف» می‌رود. تاریخچهٔ رزرو تغییر نمی‌کند و ماندهٔ پرداخت‌نشده مطالبه نمی‌شود.</p>
+        </div>
+        <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 7px;">
+          <div style="display: flex; align-items: center; gap: 8px;"><span aria-hidden="true" style="width: 9px; height: 9px; border-radius: 999px; border: 2px solid oklch(0.42 0.09 70);"></span><div style="font-size: 13.5px; font-weight: 800;">۳ — در حالِ بررسی</div></div>
+          <p style="margin: 0; font-size: 12.5px; line-height: 1.8; color: oklch(0.46 0.02 330);">هیچ زمانِ تقریبیِ نتیجه وعده داده نمی‌شود، چون هیچ تعهدِ زمانی‌ای تصویب نشده.</p>
+        </div>
+        <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 7px;">
+          <div style="display: flex; align-items: center; gap: 8px;"><span aria-hidden="true" style="width: 9px; height: 9px; border-radius: 3px; background: oklch(0.46 0.02 330);"></span><div style="font-size: 13.5px; font-weight: 800;">۴ — تصمیم، و یک مرحله تجدیدنظر</div></div>
+          <p style="margin: 0; font-size: 12.5px; line-height: 1.8; color: oklch(0.46 0.02 330);">سه نتیجهٔ ممکن: بازپرداختِ مشتری، نگهداریِ فروشنده، یا درخواستِ مدرکِ بیشتر. تجدیدنظر توسط <strong>شخصی متفاوت</strong>، یک مرحله — این هم پیشنهادِ ثبت‌شده است نه تصمیمِ تصویب‌شده. هیچ بررسی‌کننده‌ای حقِ ویرایشِ تاریخچهٔ پرداخت، رزرو یا پیام را ندارد.</p>
+        </div>
+        <div style="background: oklch(0.98 0.02 25); border: 1px solid oklch(0.9 0.03 25); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 7px;">
+          <div style="font-size: 13.5px; font-weight: 800; color: oklch(0.5 0.16 25);">۵ — نگهداری و حذفِ مدارک</div>
+          <p style="margin: 0; font-size: 12.5px; line-height: 1.8; color: oklch(0.45 0.1 25);">متنِ «مدارکِ شما تا چه زمانی نگهداری و چه زمانی حذف می‌شوند» عمداً نوشته نشده. نوشتنش بدونِ تأییدِ حقوقی و حریمِ خصوصی، یک تعهدِ نگهداریِ داده اختراع می‌کرد.</p>
+        </div>
+      </div>
+    </div>
+  </section>
 </x-dc>
 <script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 1400, &quot;height&quot;: 900}}"></script>
 </body>
