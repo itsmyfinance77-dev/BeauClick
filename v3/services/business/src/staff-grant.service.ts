@@ -5,7 +5,7 @@ import { uuidv7 } from 'uuidv7';
 import { AdminAuditService } from '@beauclick/audit';
 import { NotFoundOrNotYoursException } from '@beauclick/ownership';
 
-import { ScopedStaffRole } from './entities/staff-role-grant.entity';
+import { ScopedStaffRole, requiresProfessionalLink } from './entities/staff-role-grant.entity';
 import { returnedRows } from './sql-result';
 import {
   AUDIT_TARGET_STAFF_ROLE_GRANT,
@@ -36,21 +36,35 @@ interface GrantableMembership {
  * already use. A manager, a staff member, the grantee themselves and a stranger
  * all fail the guard and, were they to reach this service, fail here too.
  *
- * ## The target must be a CONSENTED, professional-linked, active membership
+ * ## The target must be a CONSENTED, active membership -- and, per role, linked
  *
  * ADR-049 section 4.2: anchoring on `business_staff.id` is what keeps consent
  * structural. A membership that is `invited`, `inactive`, `declined` or `removed`
- * cannot be granted, and one whose `professional_id` is null cannot either --
- * because `practitioner_chat` is checked against that link, so a grant without it
- * could never authorize anything and would be an authority-shaped row that means
- * nothing.
+ * cannot be granted, for any role.
+ *
+ * Whether the membership must ALSO carry a professional link depends on the
+ * role's axis (V3.3 #111, `requiresProfessionalLink`):
+ *
+ *  * `practitioner_chat` requires `professional_id IS NOT NULL`, because it is
+ *    checked against that link -- a grant without it could never authorize
+ *    anything and would be an authority-shaped row that means nothing.
+ *  * `finance_read` does NOT: it is business-scoped and read-only, its holder
+ *    is typically a bookkeeper with no professional profile, and inventing a
+ *    fake profile to satisfy a check that has nothing to do with the authority
+ *    would be worse than the check. The invitation path already admits such a
+ *    membership with a NULL link; this is the path that makes it grantable.
+ *
+ * Listing and revoking never require the link: both only narrow or describe
+ * what already exists, and a `practitioner_chat` grant cannot exist on an
+ * unlinked membership in the first place.
  *
  * ## One refusal shape
  *
- * A missing, foreign or soft-deleted business; a missing, foreign, non-active or
- * professional-less membership; a role outside the vocabulary already refused by
- * the DTO -- every non-syntactic cause raises the platform's single
- * `NotFoundOrNotYoursException`. The owner learns nothing about which it was.
+ * A missing, foreign or soft-deleted business; a missing, foreign or non-active
+ * membership; a professional-less membership asked for a practitioner role; a
+ * role outside the vocabulary already refused by the DTO -- every non-syntactic
+ * cause raises the platform's single `NotFoundOrNotYoursException`. The owner
+ * learns nothing about which it was.
  */
 @Injectable()
 export class StaffGrantService {
@@ -89,7 +103,10 @@ export class StaffGrantService {
     role: ScopedStaffRole,
   ): Promise<MembershipGrantView> {
     return this.dataSource.transaction(async (manager) => {
-      const membership = await this.findGrantableMembership(manager, businessId, ownerUserId, membershipId, true);
+      const membership = await this.findGrantableMembership(manager, businessId, ownerUserId, membershipId, {
+        lock: true,
+        requireProfessionalLink: requiresProfessionalLink(role),
+      });
 
       const id = uuidv7();
       // `RETURNING id` is load-bearing, not decoration: an INSERT hands back a
@@ -140,7 +157,9 @@ export class StaffGrantService {
     role: ScopedStaffRole,
   ): Promise<MembershipGrantView> {
     return this.dataSource.transaction(async (manager) => {
-      const membership = await this.findGrantableMembership(manager, businessId, ownerUserId, membershipId, true);
+      const membership = await this.findGrantableMembership(manager, businessId, ownerUserId, membershipId, {
+        lock: true,
+      });
 
       const revoked = returnedRows<{ id: string }>(
         await manager.query(
@@ -174,18 +193,21 @@ export class StaffGrantService {
    * The membership an owner may act on, or the one refusal.
    *
    * Live business owned by this session, `active` membership of THAT business,
-   * and a non-null professional link -- all in one statement, so no caller can
-   * satisfy two of the three. `lock` takes `FOR NO KEY UPDATE` on the business
-   * row for the mutating paths (not `FOR UPDATE`, which would conflict with the
-   * `FOR KEY SHARE` PostgreSQL takes on the parent when a child grant row is
-   * inserted).
+   * and -- when the role being granted is practitioner-specific -- a non-null
+   * professional link, all in one statement, so no caller can satisfy some of
+   * the conditions and forget the rest. The link requirement is a bound
+   * parameter rather than two statements: one predicate, one shape of work,
+   * whichever role is asked for. `lock` takes `FOR NO KEY UPDATE` on the
+   * business row for the mutating paths (not `FOR UPDATE`, which would conflict
+   * with the `FOR KEY SHARE` PostgreSQL takes on the parent when a child grant
+   * row is inserted).
    */
   private async findGrantableMembership(
     manager: EntityManager,
     businessId: string,
     ownerUserId: string,
     membershipId: string,
-    lock = false,
+    options: { lock?: boolean; requireProfessionalLink?: boolean } = {},
   ): Promise<GrantableMembership> {
     const rows: Array<{ id: string; business_id: string }> = await manager.query(
       `SELECT s.id, s.business_id
@@ -194,10 +216,10 @@ export class StaffGrantService {
         WHERE s.id = $1
           AND s.business_id = $2
           AND s.status = 'active'
-          AND s.professional_id IS NOT NULL
+          AND (s.professional_id IS NOT NULL OR $4::boolean = false)
           AND b.owner_id = $3
-          AND b.deleted_at IS NULL${lock ? '\n        FOR NO KEY UPDATE OF b' : ''}`,
-      [membershipId, businessId, ownerUserId],
+          AND b.deleted_at IS NULL${options.lock ? '\n        FOR NO KEY UPDATE OF b' : ''}`,
+      [membershipId, businessId, ownerUserId, options.requireProfessionalLink === true],
     );
     if (rows.length === 0) throw new NotFoundOrNotYoursException();
     return { id: rows[0].id, businessId: rows[0].business_id };

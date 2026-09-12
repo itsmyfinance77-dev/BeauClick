@@ -1,6 +1,6 @@
 import type { EntityManager } from 'typeorm';
 
-import type { ScopedStaffRole } from './entities/staff-role-grant.entity';
+import type { BusinessScopedRole, PractitionerScopedRole } from './entities/staff-role-grant.entity';
 
 /**
  * The one outbound port `business` declares — V3.3 #75, `V33-DEC-021`.
@@ -167,7 +167,7 @@ export const LOCATION_CITY_CATALOGUE = Symbol('BEAUCLICK_BUSINESS_LOCATION_CITY_
 export interface ScopedStaffAuthorityRequest {
   /** The session user asking to act. Never a caller-supplied identity. */
   readonly userId: string;
-  readonly role: ScopedStaffRole;
+  readonly role: PractitionerScopedRole;
   /** The business the action is about -- for chat, the order's SNAPSHOTTED seller business. */
   readonly businessId: string;
   /** The practitioner the action is about -- for chat, the qualifying booking's `professional_id`. */
@@ -235,7 +235,7 @@ export interface ScopedStaffAuthorizerPort {
   liveScopedAuthorities(
     manager: EntityManager,
     userId: string,
-    role: ScopedStaffRole,
+    role: PractitionerScopedRole,
   ): Promise<readonly { readonly businessId: string; readonly professionalId: string }[]>;
 
   /**
@@ -248,10 +248,48 @@ export interface ScopedStaffAuthorizerPort {
    */
   usersWithLiveScopedAuthority(
     manager: EntityManager,
-    role: ScopedStaffRole,
+    role: PractitionerScopedRole,
     businessId: string,
     professionalId: string,
   ): Promise<readonly string[]>;
+
+  /**
+   * Every business this user currently holds the BUSINESS-SCOPED `role` for, as
+   * one batched read -- V3.3 Story #111 (`#44e`), ADR-049 section 5.4.
+   *
+   * ## The second axis, typed so it cannot be confused with the first
+   *
+   * The three methods above answer the PRACTITIONER question and take
+   * `PractitionerScopedRole`; this one answers the BUSINESS question and takes
+   * `BusinessScopedRole`. `practitioner_chat` is therefore not an argument this
+   * method accepts, so nobody can ask "which businesses may this practitioner
+   * chat for" and get the business-wide answer `V33-DEC-033` R2 forbids. The
+   * type system is the guard; there is no runtime branch to forget.
+   *
+   * ## What is live here
+   *
+   * Live business (`deleted_at IS NULL`), `active` membership, unrevoked grant,
+   * and the membership and grant naming the same business. **No professional
+   * link is required** -- a `finance_read` holder is typically a bookkeeper with
+   * no professional profile, and the authority has nothing to do with who
+   * delivered a service.
+   *
+   * ## Who consumes it
+   *
+   * The composition root's finance workspace adapter, which unions this with
+   * live ownership so `financial` can enumerate `owned ∪ live-scoped-read`
+   * without importing a `business` entity. It is a read on the caller's
+   * manager, never cached, and re-run on every request -- which is what makes
+   * revocation effective on the next request rather than at token expiry.
+   *
+   * Deterministically ordered by `businessId`, and empty for someone with no
+   * such grant -- never a fabricated business, never one they merely work for.
+   */
+  liveBusinessScopedGrants(
+    manager: EntityManager,
+    userId: string,
+    role: BusinessScopedRole,
+  ): Promise<readonly { readonly businessId: string }[]>;
 }
 
 export const SCOPED_STAFF_AUTHORIZER = Symbol('BEAUCLICK_SCOPED_STAFF_AUTHORIZER');

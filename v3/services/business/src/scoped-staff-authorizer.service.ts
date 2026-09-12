@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 
-import { ScopedStaffRole } from './entities/staff-role-grant.entity';
+import { BusinessScopedRole, PractitionerScopedRole } from './entities/staff-role-grant.entity';
 import { ScopedStaffAuthorityRequest, ScopedStaffAuthorizerPort } from './ports';
 
 /**
@@ -17,7 +17,7 @@ import { ScopedStaffAuthorityRequest, ScopedStaffAuthorizerPort } from './ports'
  * hold this authority" would be two answers to a question that must have exactly
  * one.
  *
- * ## Four conditions, one statement, every time
+ * ## Four conditions, one statement, every time -- on each of two axes
  *
  * ADR-049 section 4.3 and `V33-DEC-033` R2/R5. The join is deliberately a single
  * query rather than four reads: a caller cannot satisfy three conditions and
@@ -25,6 +25,14 @@ import { ScopedStaffAuthorityRequest, ScopedStaffAuthorizerPort } from './ports'
  * Nothing here is memoised, and nothing is ever written into a token claim -- so
  * a revoked grant, a deactivated membership, a soft-deleted business or a broken
  * practitioner link all deny on the **next** request rather than at token expiry.
+ *
+ * V3.3 #111 added the BUSINESS-SCOPED axis (`finance_read`), which shares the
+ * first three conditions -- live business, `active` membership, unrevoked grant
+ * of the named role, same business on both rows -- and deliberately omits the
+ * fourth: a bookkeeper has no professional link and the authority does not
+ * depend on one. The two predicates are two constants below rather than one
+ * with a branch, so the practitioner one is byte-identical to what #109
+ * shipped and neither can silently acquire the other's condition.
  *
  * `s.business_id = g.business_id` is asserted in the join even though
  * `fk_staff_role_grants_membership_same_business` already guarantees it. The
@@ -42,7 +50,8 @@ import { ScopedStaffAuthorityRequest, ScopedStaffAuthorizerPort } from './ports'
 @Injectable()
 export class BusinessScopedStaffAuthorizer implements ScopedStaffAuthorizerPort {
   /**
-   * The one predicate, shared by all three reads so they cannot drift apart.
+   * The PRACTITIONER predicate, shared by the three practitioner reads so they
+   * cannot drift apart. Byte-identical to #109.
    *
    * Live business, `active` membership, non-null practitioner link, unrevoked
    * grant, and the membership and grant naming the same business.
@@ -75,7 +84,7 @@ export class BusinessScopedStaffAuthorizer implements ScopedStaffAuthorizerPort 
   async liveScopedAuthorities(
     manager: EntityManager,
     userId: string,
-    role: ScopedStaffRole,
+    role: PractitionerScopedRole,
   ): Promise<readonly { readonly businessId: string; readonly professionalId: string }[]> {
     const rows: Array<{ business_id: string; professional_id: string }> = await manager.query(
       `SELECT g.business_id, s.professional_id ${this.liveAuthoritySql}
@@ -88,7 +97,7 @@ export class BusinessScopedStaffAuthorizer implements ScopedStaffAuthorizerPort 
 
   async usersWithLiveScopedAuthority(
     manager: EntityManager,
-    role: ScopedStaffRole,
+    role: PractitionerScopedRole,
     businessId: string,
     professionalId: string,
   ): Promise<readonly string[]> {
@@ -99,5 +108,39 @@ export class BusinessScopedStaffAuthorizer implements ScopedStaffAuthorizerPort 
       [role, businessId, professionalId],
     );
     return rows.map((row) => row.user_id);
+  }
+
+  /**
+   * The BUSINESS-SCOPED predicate -- V3.3 #111 (`#44e`), ADR-049 section 5.4.
+   *
+   * Live business, `active` membership, unrevoked grant of the named role, and
+   * the membership and grant naming the same business. **No professional link**:
+   * see the class note. `s.business_id = g.business_id` is asserted here too,
+   * for the same second-lock reason as above.
+   */
+  private readonly liveBusinessScopedSql = `
+      FROM business.staff_role_grants g
+      JOIN business.business_staff s
+        ON s.id = g.membership_id AND s.business_id = g.business_id
+      JOIN business.businesses b
+        ON b.id = g.business_id
+     WHERE g.revoked_at IS NULL
+       AND g.role = $1
+       AND s.status = 'active'
+       AND b.deleted_at IS NULL
+  `;
+
+  async liveBusinessScopedGrants(
+    manager: EntityManager,
+    userId: string,
+    role: BusinessScopedRole,
+  ): Promise<readonly { readonly businessId: string }[]> {
+    const rows: Array<{ business_id: string }> = await manager.query(
+      `SELECT DISTINCT g.business_id ${this.liveBusinessScopedSql}
+         AND s.user_id = $2
+       ORDER BY g.business_id`,
+      [role, userId],
+    );
+    return rows.map((row) => ({ businessId: row.business_id }));
   }
 }
