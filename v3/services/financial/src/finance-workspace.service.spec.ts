@@ -9,7 +9,7 @@ import {
   encodeWorkspaceCursor,
 } from './finance-workspace.service';
 import { FinanceWorkspaceSelectionRequiredException } from './finance.exceptions';
-import { FinancialParty } from './ports';
+import { AddressableFinancialParty, FinancialParty } from './ports';
 
 /**
  * The workspace-aware finance surface's pure logic — V3.3 #72, `V33-DEC-020`.
@@ -34,15 +34,32 @@ const SECRET = 'finance-unit-test-workspace-secret';
 const OWNER = '018f4b1a-0000-7000-8000-000000000001';
 const PROFESSIONAL: FinancialParty = { partyType: 'professional', partyId: '018f4b1a-0000-7000-8000-0000000000aa' };
 const BUSINESS: FinancialParty = { partyType: 'business', partyId: '018f4b1a-0000-7000-8000-0000000000bb' };
+/** Somebody else's business, reachable only through a `finance_read` grant (#111). */
+const GRANTED: FinancialParty = { partyType: 'business', partyId: '018f4b1a-0000-7000-8000-0000000000cc' };
 
-function serviceFor(owned: FinancialParty[]) {
+/**
+ * A port double that answers BOTH questions the way the real adapter does:
+ * `ownedWorkspacesFor` is ownership only; `addressableWorkspacesFor` is the
+ * owned set as `owner` plus each granted business as `finance_read`, with no
+ * de-duplication -- that is the service's job, and one test hands it a
+ * duplicate on purpose.
+ */
+function serviceFor(owned: FinancialParty[], granted: FinancialParty[] = [], addressable?: AddressableFinancialParty[]) {
   const ledger = { entriesForOrderAndParty: jest.fn() };
   const settlements = {
     partySummary: jest.fn(),
     outstandingOrdersForParty: jest.fn(),
     settlementPageForParty: jest.fn().mockResolvedValue([]),
   };
-  const owners = { ownedWorkspacesFor: jest.fn().mockResolvedValue(owned) };
+  const owners = {
+    ownedWorkspacesFor: jest.fn().mockResolvedValue(owned),
+    addressableWorkspacesFor: jest.fn().mockResolvedValue(
+      addressable ?? [
+        ...owned.map((party) => ({ ...party, accessMode: 'owner' as const })),
+        ...granted.map((party) => ({ ...party, accessMode: 'finance_read' as const })),
+      ],
+    ),
+  };
 
   const service = new FinanceWorkspaceService(
     ledger as never,
@@ -68,29 +85,149 @@ describe('owned workspaces', () => {
     expect(await service.workspacesFor(OWNER)).toEqual([]);
   });
 
-  it('exposes a reference and a type, and no identity', async () => {
+  it('exposes a reference, a type and an access mode, and no identity', async () => {
     const { service } = serviceFor([PROFESSIONAL, BUSINESS]);
 
     const entries = await service.workspacesFor(OWNER);
     const body = JSON.stringify(entries);
 
+    // Exactly three keys. `accessMode` is #111's one additive field; a fourth
+    // key would be a contract change nobody decided.
     expect(entries.map((e) => Object.keys(e).sort())).toEqual([
-      ['workspaceRef', 'workspaceType'],
-      ['workspaceRef', 'workspaceType'],
+      ['accessMode', 'workspaceRef', 'workspaceType'],
+      ['accessMode', 'workspaceRef', 'workspaceType'],
     ]);
+    expect(entries.map((e) => e.accessMode)).toEqual(['owner', 'owner']);
     for (const identifier of [OWNER, PROFESSIONAL.partyId, BUSINESS.partyId]) {
       expect(body).not.toContain(identifier);
     }
   });
 
-  it('asks the OWNERSHIP port and nothing else', async () => {
+  it('asks the workspace port and nothing else', async () => {
     // The whole fix in one assertion: the service has no other source of
-    // parties, so it cannot fall back to a beneficiary answer.
+    // parties, so it cannot fall back to a beneficiary answer. The collection
+    // asks the ADDRESSABLE question (owned ∪ live-scoped-read, #111); the
+    // singular routes ask the OWNED one, below.
     const { service, owners } = serviceFor([PROFESSIONAL]);
 
     await service.workspacesFor(OWNER);
-    expect(owners.ownedWorkspacesFor).toHaveBeenCalledWith(OWNER);
-    expect(owners.ownedWorkspacesFor).toHaveBeenCalledTimes(1);
+    expect(owners.addressableWorkspacesFor).toHaveBeenCalledWith(OWNER);
+    expect(owners.addressableWorkspacesFor).toHaveBeenCalledTimes(1);
+    expect(owners.ownedWorkspacesFor).not.toHaveBeenCalled();
+  });
+});
+
+describe('addressable workspaces — owned ∪ live-scoped-read (#111)', () => {
+  it('an owner with no grant sees exactly what they saw before, as `owner`', async () => {
+    const { service } = serviceFor([PROFESSIONAL, BUSINESS]);
+
+    const entries = await service.addressableWorkspaces(OWNER);
+    expect(entries).toEqual([
+      { ...BUSINESS, accessMode: 'owner' },
+      { ...PROFESSIONAL, accessMode: 'owner' },
+    ]);
+  });
+
+  it('a live grant adds exactly ONE business workspace, as `finance_read`', async () => {
+    const { service } = serviceFor([], [GRANTED]);
+
+    const entries = await service.addressableWorkspaces(OWNER);
+    expect(entries).toEqual([{ ...GRANTED, accessMode: 'finance_read' }]);
+    expect((await service.workspacesFor(OWNER)).map((e) => [e.workspaceType, e.accessMode])).toEqual([
+      ['business', 'finance_read'],
+    ]);
+  });
+
+  it('a professional owner who is also a grantee sees both, separately, in the usual order', async () => {
+    const { service } = serviceFor([PROFESSIONAL], [GRANTED]);
+
+    const entries = await service.addressableWorkspaces(OWNER);
+    expect(entries.map((e) => [e.partyType, e.accessMode])).toEqual([
+      ['business', 'finance_read'],
+      ['professional', 'owner'],
+    ]);
+  });
+
+  it('returns a workspace reachable both ways ONCE, and ownership wins', async () => {
+    // The port is handed a duplicate on purpose, in the order that would let a
+    // naive "last one wins" downgrade the owner to a grantee.
+    const { service } = serviceFor([BUSINESS], [], [
+      { ...BUSINESS, accessMode: 'finance_read' },
+      { ...BUSINESS, accessMode: 'owner' },
+      { ...BUSINESS, accessMode: 'finance_read' },
+    ]);
+
+    const entries = await service.addressableWorkspaces(OWNER);
+    expect(entries).toEqual([{ ...BUSINESS, accessMode: 'owner' }]);
+    expect(await service.workspacesFor(OWNER)).toHaveLength(1);
+  });
+
+  it('a grantee resolves the granted workspace by their OWN reference, and the read carries the mode', async () => {
+    const { service, settlements } = serviceFor([], [GRANTED]);
+    settlements.partySummary.mockResolvedValue({ partyType: 'business', partyId: GRANTED.partyId });
+    const ref = service.referenceFor(OWNER, GRANTED);
+
+    await expect(service.resolveAddressableWorkspace(OWNER, ref)).resolves.toEqual({
+      ...GRANTED,
+      accessMode: 'finance_read',
+    });
+    await service.summaryFor(OWNER, ref);
+    expect(settlements.partySummary).toHaveBeenCalledWith('business', GRANTED.partyId);
+  });
+
+  it("a grantee's reference is VIEWER-SPECIFIC: the owner's reference to the same business is a different value", () => {
+    const { service } = serviceFor([], [GRANTED]);
+    const grantee = service.referenceFor(OWNER, GRANTED);
+    const owner = service.referenceFor('018f4b1a-0000-7000-8000-000000000002', GRANTED);
+
+    expect(grantee).not.toBe(owner);
+    expect(grantee).toHaveLength(43);
+    expect(owner).toHaveLength(43);
+  });
+
+  it('the OWNED resolver never accepts a grant, so a write-shaped caller cannot reach a granted party', async () => {
+    const { service } = serviceFor([PROFESSIONAL], [GRANTED]);
+    const ref = service.referenceFor(OWNER, GRANTED);
+
+    await expect(service.resolveAddressableWorkspace(OWNER, ref)).resolves.toMatchObject(GRANTED);
+    await expect(service.resolveOwnedWorkspace(OWNER, ref)).rejects.toThrow(NotFoundOrNotYoursException);
+  });
+
+  it('a revoked grant stops resolving on the next call without anything expiring', async () => {
+    const { service } = serviceFor([], [GRANTED]);
+    const ref = service.referenceFor(OWNER, GRANTED);
+    await expect(service.resolveAddressableWorkspace(OWNER, ref)).resolves.toMatchObject(GRANTED);
+
+    const { service: afterRevoke } = serviceFor([], []);
+    await expect(afterRevoke.resolveAddressableWorkspace(OWNER, ref)).rejects.toThrow(NotFoundOrNotYoursException);
+    expect(await afterRevoke.workspacesFor(OWNER)).toEqual([]);
+  });
+
+  it('ownership failures and grant failures are the SAME exception instance shape', async () => {
+    const { service } = serviceFor([PROFESSIONAL], [GRANTED]);
+    const foreignOwned = deriveWorkspaceReference(SECRET, '018f4b1a-0000-7000-8000-000000000002', PROFESSIONAL);
+    const foreignGranted = deriveWorkspaceReference(SECRET, '018f4b1a-0000-7000-8000-000000000002', GRANTED);
+
+    const errors: unknown[] = [];
+    for (const supplied of [foreignOwned, foreignGranted, 'A'.repeat(43), 'nope']) {
+      await service.resolveAddressableWorkspace(OWNER, supplied).catch((error) => errors.push(error));
+    }
+    expect(errors).toHaveLength(4);
+    for (const error of errors) {
+      expect(error).toBeInstanceOf(NotFoundOrNotYoursException);
+      expect(JSON.stringify(error)).toBe(JSON.stringify(errors[0]));
+    }
+  });
+
+  it('the singular routes ask the OWNED question only — a grant is invisible to them', async () => {
+    // A grantee who owns nothing keeps the refusal any non-seller gets; an owner
+    // of one workspace who also holds a grant is NOT turned into a dual owner.
+    const { service: grantee, owners: granteePort } = serviceFor([], [GRANTED]);
+    await expect(grantee.singularWorkspace(OWNER)).resolves.toBeNull();
+    expect(granteePort.addressableWorkspacesFor).not.toHaveBeenCalled();
+
+    const { service: ownerAndGrantee } = serviceFor([PROFESSIONAL], [GRANTED]);
+    await expect(ownerAndGrantee.singularWorkspace(OWNER)).resolves.toEqual(PROFESSIONAL);
   });
 });
 
