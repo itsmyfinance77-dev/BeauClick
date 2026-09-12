@@ -59,8 +59,18 @@ services:
   # implementation and is NOT the vendor this platform will deploy against --
   # that is undecided and downstream of `HOSTING`. `GAP-C-01` records the
   # distinction rather than letting a working local bucket imply it is closed.
+  #
+  # Pulled from Quay, MinIO's own registry, pinned to an immutable release
+  # tag. Docker Hub stopped serving `minio/minio` on 2026-09-11 (`pull access
+  # denied ... repository does not exist`), which broke every FRESH machine
+  # while machines holding the cached image kept working -- exactly the
+  # failure that hides. CI pulls `quay.io/minio/minio:latest` (#145); this
+  # tag is the release that `latest` resolved to when CI proved it green
+  # (digest sha256:14cea493d9a3..., run 34657365674), so local and CI run
+  # the same bytes today. One centrally defined MinIO version shared by CI
+  # and Compose is a later deduplication, not this file's job (#146).
   objectstorage:
-    image: minio/minio:latest
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
     container_name: bc-v3-minio
     command: server /data
     environment:
