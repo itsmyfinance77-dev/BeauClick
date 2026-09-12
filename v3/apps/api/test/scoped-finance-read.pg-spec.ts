@@ -699,7 +699,18 @@ describePg('scoped read-only business finance authority (real PostgreSQL, #111)'
       }
       const financial = statements.filter((sql) => /(ledger_entries|settlement_batches|settlement_items)/i.test(sql));
       expect(financial.length).toBeGreaterThanOrEqual(5);
-      expect(financial.filter((sql) => !/party_type/i.test(sql) || !/party_id/i.test(sql))).toEqual([]);
+      // The predicate must be in the WHERE clause, not merely somewhere in the
+      // statement: a query-builder SELECT lists `party_type` and `party_id` as
+      // COLUMNS whether or not it filters on them, so "the token appears" would
+      // pass a statement that loads every party's rows and filters in memory
+      // -- exactly the #72 defect shape. Only the text after WHERE counts.
+      const afterWhere = (sql: string) => sql.slice(sql.search(/\bWHERE\b/i));
+      const unscoped = financial.filter((sql) => {
+        if (!/\bWHERE\b/i.test(sql)) return true;
+        const predicate = afterWhere(sql);
+        return !/party_type/i.test(predicate) || !/party_id/i.test(predicate);
+      });
+      expect(unscoped).toEqual([]);
     });
 
     it('costs the same number of queries for one accessible workspace and for several', async () => {
