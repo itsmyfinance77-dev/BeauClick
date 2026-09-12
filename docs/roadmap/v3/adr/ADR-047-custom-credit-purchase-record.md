@@ -280,3 +280,10 @@ here, so it re-resolves no schedule, version, tier or price.
   revenue recognition — #46, configured through the administrator catalogue.
 - Whether credit pricing should vary by plan at all — #46. The structure
   permits it; this ADR does not decide it.
+
+*(Amended 2026-09-12, `V33-DEC-041` R5–R7: a booking credit is an internal, non-cash,
+non-withdrawable, non-transferable entitlement; a purchased credit **never expires** and its
+**unused part is refundable** at the snapshotted unit price of that purchase, executed only
+through the refund rail #47 as a named future story created at #99's readiness audit; gift
+credit is a future source. "refund and clawback, expiry" above are therefore product-decided
+and remain externally gated, not open under #46. Nothing in this ADR's structure changes.)*

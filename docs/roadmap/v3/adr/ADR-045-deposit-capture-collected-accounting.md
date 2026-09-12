@@ -218,6 +218,9 @@ longer `pending`.
 
 ## Open gates
 
+*(Annotated 2026-09-12, `V33-DEC-039`–`V33-DEC-042`: the owner approved every recommended option of the final 25-question decision document, so the **product policy** behind the cancellation, no-show, dispute, retention and commission-basis items below (`V33-DEC-039` R4–R12, `V33-DEC-040` R1) is ratified; the values stay administrator-published and Legal, accounting, tax and payment-provider evidence stays external. Nothing here is rewritten.)*
+
+
 - Which collection modes may be enabled — `V33-DEC-011`, open under #46.
 - Deposit bounds, rounding values and the percentage calculation base — `V33-DEC-012`, #46.
 - Cancellation retention, no-show and dispute outcomes — `V33-DEC-013`, #83, #46.

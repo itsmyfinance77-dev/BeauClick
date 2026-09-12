@@ -277,8 +277,8 @@ at zero balance; only a genuinely new first confirmation can be refused.
   activation must fail closed while any eligible active seller remains unintentionally
   legacy-exempt, offer a non-mutating preview and count, and retain a persistent audited
   kill switch.)*
-- Customer-cancellation return, no-show retention and cutoffs — `V33-DEC-013`, now on **#42** with Legal. *(Amended 2026-09-06, `V33-DEC-028`.)*
-- Credit expiry, if it is ever approved — would version the allocation rule in §4.
+- Customer-cancellation return, no-show retention and cutoffs — `V33-DEC-013`, now on **#42** with Legal. *(Amended 2026-09-06, `V33-DEC-028`.)* *(Amended 2026-09-12, `V33-DEC-039`: the product policy is ratified — seller-selected cutoff inside an administrator range, `min(policy, legalCap, collected)` retention, no-show declared at or after `slotStart + grace` — while values stay administrator-published and Legal evidence stays external. Whether a customer cancellation returns the seller's credit remains a versioned policy value, undecided by the 25 questions.)*
+- Credit expiry, if it is ever approved — would version the allocation rule in §4. *(Amended 2026-09-12, `V33-DEC-041` R6: **purchased** (`custom_purchase`) credit never expires as owner policy and its unused part is refundable through the refund rail; only a future gift/promotional source may expire, under a later decision that versions this rule visibly. `ck_booking_credit_grants_no_expiry` is unchanged.)*
 - Paid purchase of credits — **#99 (`#40c-2`)**, itself gated by #47. *(Amended 2026-09-06,
   `V33-DEC-026`.)* The purchase RECORD and its immutable price snapshot are `#40c-1`
   (#57) and are not gated: that child writes no grant, so nothing it produces enters
