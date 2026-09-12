@@ -1002,3 +1002,40 @@ finance read sends `Cache-Control`.
 dashboard (issue #2) and an independent recomputation from raw labels agree: **225 / 303, zero
 data-quality warnings**. #109, #111, #123 and #44 are unchanged and closed; no commercial value,
 payment provider, deployment, tag or Release was introduced.
+
+## V3.3 Story #154 delivered, 2026-09-12
+
+The backend prerequisite `V33-DEC-038` ratified has shipped, after a fresh preflight against
+`master` `b54bb84` and the governance PR that recorded the decision (`2c68d39`). No table, column,
+migration, snapshot or audit write was added; ADR-027 coverage is unchanged (the production
+image boots with `SubjectDataCoverage: 115 tables, all claimed`).
+
+**#154, 5 Story Points.** A new owner-only `GET /v1/businesses/:id/staff-management` read names
+each roster member safely — the linked professional's public `display_name`, or the final four
+digits of the verified phone the owner supplied at invitation — with the membership's live scoped
+roles and no `userId`, `professionalId`, `invitedBy`, full phone or email; the roster
+`GET …/staff` and its membership-level authorization are byte-for-byte unchanged, and a manager
+or staff member receives the single non-enumerating refusal on the new read. Identity and
+professional names resolve in bulk through a `business` port bound in the composition root, which
+masks the phone before it crosses the boundary. `FinanceWorkspaceEntry` gained `displayLabel` —
+the public business or professional name — resolved after addressability through a `financial`
+port in two statements for any collection size, with `workspaceRef` derivation, domain, encoding,
+golden vectors and constant-time matching untouched. Every response of the nine
+`MyFinanceController` routes now carries `Cache-Control: private, no-store`, mounted by
+`FinancialModule` as an Express prefix middleware on the controller's own path so `401`, `404` and
+`409` carry it as a `200` does and no route layer is added. Proved by a new 20-case
+real-PostgreSQL suite, 14 new fast cases, the unchanged #109/#72/business suites, one
+strengthened exact-key assertion in the #111 suite, twenty behavioural mutation probes each
+killed and restored, and a production-image boot with 44 runtime route/header/leak checks.
+Merged to `master` as commit `03069c5` (PR #156), closing #154.
+
+| Item | Before | After | Outcome it owns |
+|---|---:|---:|---|
+| #154 | `status:proposed`, 5 | **Closed, 5** | Delivered as described above |
+| #149 (`#149a`), #152 (`#149b`) | `status:proposed`, 3 and 5 | **unchanged** | Their backend prerequisite is met; they wait only on the narrow Claude Design correction (`V33-DEC-038` R13) |
+
+**What moved.** #154 (5) **complete** 2026-09-12: V3.3 done 225 → **230**, scope unchanged at
+**303**. The live dashboard (issue #2) and an independent recomputation from raw labels agree:
+**230 / 303, zero data-quality warnings**. #154 closes with `sp:5` preserved and no status label.
+No frontend implementation began; no commercial value, payment provider, deployment, tag or
+Release was introduced.
