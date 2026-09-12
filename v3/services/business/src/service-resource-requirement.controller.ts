@@ -23,9 +23,10 @@ import { ReadServiceResourceRequirementQueryDto, SetServiceResourceRequirementDt
  * foreign owner and a `practitioner_chat` grant holder all get the same
  * `NOT_FOUND_OR_NOT_YOURS` a nonexistent business does.
  *
- * **No scoped-staff role authorizes this surface.** `SCOPED_STAFF_ROLES`
- * stays exactly `['practitioner_chat']`, byte-identical, and no capability or
- * scoped-role guard appears on either handler below.
+ * **No scoped-staff role authorizes this surface.** No member of
+ * `SCOPED_STAFF_ROLES` (`practitioner_chat`, or #111's read-only `finance_read`)
+ * reaches it, and no capability or scoped-role guard appears on either handler
+ * below.
  *
  * ## `:serviceId` is a raw uuid, deliberately -- not an opaque reference
  *

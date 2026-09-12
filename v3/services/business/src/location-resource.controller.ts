@@ -28,8 +28,9 @@ import {
  * nonexistent business does.
  *
  * **No scoped-staff role authorizes this surface and none was added.**
- * `SCOPED_STAFF_ROLES` stays exactly `['practitioner_chat']`, byte-identical, and
- * no capability or scoped-role guard appears on any handler below.
+ * No member of `SCOPED_STAFF_ROLES` (`practitioner_chat`, or #111's read-only
+ * `finance_read`) reaches it, and no capability or scoped-role guard appears on
+ * any handler below.
  *
  * ## The opaque references are the only handles
  *

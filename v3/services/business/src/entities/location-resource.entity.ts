@@ -65,9 +65,9 @@ export type LocationResourceLifecycle = (typeof LOCATION_RESOURCE_LIFECYCLES)[nu
  * be edited or raced. Actor identity for every mutation lives in
  * `admin.admin_audit_log` and nowhere else.
  *
- * **No scoped-staff role authorizes this surface.** `SCOPED_STAFF_ROLES` stays
- * exactly `['practitioner_chat']`, byte-identical, and a `practitioner_chat`
- * holder is refused here identically to a stranger.
+ * **No scoped-staff role authorizes this surface.** No member of
+ * `SCOPED_STAFF_ROLES` (`practitioner_chat`, or #111's read-only `finance_read`)
+ * reaches it, and a holder of either is refused here identically to a stranger.
  *
  * ## No speculative column
  *

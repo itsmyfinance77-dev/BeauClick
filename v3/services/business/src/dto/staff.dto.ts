@@ -60,6 +60,10 @@ export class ChangeStaffRoleDto {
 /**
  * The scoped-role command body -- one closed literal and nothing else.
  *
+ * The literal is one of `SCOPED_STAFF_ROLES`: `practitioner_chat` (#109) or
+ * `finance_read` (#111). Widening the vocabulary is a register decision, never
+ * a DTO edit, which is why `@IsIn` reads the constant rather than repeating it.
+ *
  * The membership is named in the path, the business is named in the path and
  * ownership-guarded, and the actor comes from the session. There is deliberately
  * no owner, user, phone, professional or business id here: the whitelist pipe

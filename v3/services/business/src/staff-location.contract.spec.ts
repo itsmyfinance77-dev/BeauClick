@@ -72,9 +72,11 @@ describe('staff delivery-location contract (#127a)', () => {
       }
     });
 
-    it('the binding confers no authority -- SCOPED_STAFF_ROLES is byte-identical', () => {
-      // A location says WHERE someone works, never WHAT they may do.
-      expect([...SCOPED_STAFF_ROLES]).toEqual(['practitioner_chat']);
+    it('the binding confers no authority -- SCOPED_STAFF_ROLES carries no location role', () => {
+      // A location says WHERE someone works, never WHAT they may do. The
+      // vocabulary is exactly #109's and #111's members; neither is a location
+      // role, and a location binding never adds one.
+      expect([...SCOPED_STAFF_ROLES]).toEqual(['practitioner_chat', 'finance_read']);
     });
   });
 
