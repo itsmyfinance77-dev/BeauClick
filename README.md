@@ -41,6 +41,18 @@ milestones have landed on `master`; V3.3-A is the current work after an explicit
 owner reprioritisation. V3.2-D through V3.2-G remain roadmap scope and have not been
 silently counted as delivered.
 
+On **2026-09-12** the product owner approved every recommended option of the final
+25-question commercial decision document, recorded as `V33-DEC-039`–`V33-DEC-042` and in the
+owner-facing Persian matrix
+[`V3.3_OWNER_POLICY_RATIFICATION_2026-09-12.md`](docs/roadmap/v3.3/V3.3_OWNER_POLICY_RATIFICATION_2026-09-12.md).
+Every product policy behind cancellation, no-show, dispute, retention, acceptance,
+commission, fee allocation, revenue recognition, settlement release, reserve, the
+payment-holding model and the nature of booking credits is now ratified; **no item awaits
+an owner decision**. Values stay administrator-published and unpublished, real money stays
+blocked by #47, and Legal, accounting, tax and provider review remain external evidence,
+not owner questions. This is documentation and backlog only: no backend, frontend, schema,
+provider or release was implemented by it, and none of V3.2-D through V3.2-G was started.
+
 | Programme | Delivered | Status |
 |---|---|---|
 | **V3.0** (Phases 0–5) | The WordPress exit: 16 ADRs, the Nx/pnpm workspace, and the identity, provider, booking, commerce, payment, financial, search, loyalty, journey, notification, analytics, admin and privacy domains on PostgreSQL | Released — `v3.0.0`, `v3.0.1` |
@@ -651,14 +663,14 @@ evidence.
 | Area | State |
 |---|---|
 | Hosting | Undecided (`HOSTING`). The CD deploy job fails closed; the real restore drill and the role-grant verification against a real host remain open. |
-| Payment gateway | No real Iranian gateway adapter and no merchant credentials. Only the sandbox provider exists, and it requires both `PAYMENT_ENVIRONMENT=sandbox` **and** a non-production `NODE_ENV` — there is deliberately no override that re-enables it in production. |
+| Payment gateway | No real Iranian gateway adapter and no merchant credentials. Only the sandbox provider exists, and it requires both `PAYMENT_ENVIRONMENT=sandbox` **and** a non-production `NODE_ENV` — there is deliberately no override that re-enables it in production. The owner's production posture is decided (`V33-DEC-041`, 2026-09-12): a licensed provider holds prepaid money and releases it by outcome, split at collection only as a recorded fallback, and collection into BeauClick's own account is not the production model; #47 now names the seven exact external facts still missing. |
 | SMS | No vendor selected. The port and configuration contract exist; missing credentials leave SMS unavailable rather than falling back. |
 | AI provider | No vendor, SDK, credential or external call. The `ai` domain runs a deterministic assistant that states what it is. |
 | Object storage vendor | MinIO proves the S3 API locally and in CI; the production vendor is undecided and downstream of hosting. |
 | Error tracking | Generic JSON collector only; no backend selected. |
-| Commercial values | Plan prices, allowances, deposit bounds, cancellation cutoffs, dispute windows, settlement policy, tax and revenue recognition are **unpublished**. #46 closed structurally on 2026-09-06 (`V33-DEC-028`) without publishing any of them; they are now administrator-published values tracked on #83, #42, #43 and #47. |
+| Commercial values | Plan prices, allowances, deposit bounds, cancellation cutoffs, dispute windows, settlement policy, tax and revenue recognition are **unpublished**. #46 closed structurally on 2026-09-06 (`V33-DEC-028`) without publishing any of them; they are now administrator-published values tracked on #83, #42, #43 and #47. On 2026-09-12 the owner ratified the **product policy** behind each of them (`V33-DEC-039`–`V33-DEC-042`) with owner-endorsed initial publication values — 24 h cutoff, 15 min no-show grace, 72 h dispute window, weekly settlement, zero booking commission — none of which is a code constant. |
 | Real money movement | Blocked by #47. Structural and deterministic sandbox work may proceed; paid collection and settlement may not. |
-| Legal copy | Approved Persian policy text and terminology are open under **#42 and Legal** (`V33-DEC-017`). `V33-DEC-028` was a product-owner structural approval and is not Legal approval. |
+| Legal copy | Approved Persian policy text and terminology are open under **#42 and Legal** (`V33-DEC-017`). `V33-DEC-028` was a product-owner structural approval and is not Legal approval. `V33-DEC-039` R13 and `V33-DEC-042` (2026-09-12) fixed the **product content** of that copy — versioned, dated, immutable, explicitly accepted; intermediary role, snapshotted legal seller, responsibility split — but no sentence is approved legal text and Legal review of the published version remains the external gate. |
 
 ---
 

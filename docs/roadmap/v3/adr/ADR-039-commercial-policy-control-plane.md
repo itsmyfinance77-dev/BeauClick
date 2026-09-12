@@ -5,6 +5,20 @@
 **Backlog:** #38, #39  
 **Depends on:** ADR-018 (same-cluster consistency), ADR-023 (business seller party), ADR-025 (financial outbox), ADR-028 (honest readiness)
 
+**Amended 2026-09-12 (`V33-DEC-039`–`V33-DEC-042`) — owner policy ratified, no rule changed.**
+The product owner approved every recommended option of the final 25-question decision
+document. The cancellation, no-show, reschedule, dispute, retention and acceptance policy
+(`V33-DEC-039`), the commission engine with `zero` as the first published value, fee
+allocation by cause, revenue recognition by type, the release predicate and the
+reserve/receivable order (`V33-DEC-040`), the provider-held-released-by-outcome money model
+with split only as a fallback and the booking-credit nature/expiry/refund rules
+(`V33-DEC-041`), and BeauClick's intermediary role, the snapshotted legal seller and the
+responsibility split (`V33-DEC-042`) are now **owner product policy**. This ADR's control
+plane is unchanged: every value still travels as an administrator-published immutable
+version, still fails closed when absent, and real money still waits on #47. The next ADRs
+(indicatively ADR-051 for #42's policy families and ADR-052 for #43's pending-funds and
+commission model) must precede any code and are not written here.
+
 **Amended 2026-09-06 (`V33-DEC-028`):** the owner closed #46 as a **structural**
 product decision with every launch value explicitly `OPEN / UNPUBLISHED`. Two
 normative sentences below are therefore superseded in place, and nothing else in this
