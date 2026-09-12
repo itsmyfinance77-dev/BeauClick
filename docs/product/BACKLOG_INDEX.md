@@ -930,3 +930,22 @@ umbrella #44 — #107 (`#44a`), #108 (`#44b`), #109 (`#44c`), #110/#127/#131/#12
 #111 (`#44e`) — is closed; whether #44 itself closes is the owner's structural call and is
 **not** made here. #42, #43, #45, #47 and #99 remain untouched; no commercial value, payment
 provider, deployment, tag or Release was introduced.
+
+## V3.3 Epic #44 closed, 2026-09-12
+
+The structural call the entry above left to the owner has been made: umbrella #44 is **closed
+as completed**. Verified against `master` at `5fbf92d` before closing — every child is closed
+with a merged implementation on `master`: #107 (`#44a`, `e32a414`), #108 (`#44b`, `2306d22`),
+#109 (`#44c`, `22e6b2a`), #110 (`#110a`, `0bfdbe3`), #127 (`#127a`, `4f7cc98`), #131
+(`#127b`, `b7056b0`), #128 (`#110b`, `b7b29e6`) and #111 (`#44e`, `9b7350a`) — **60 SP**
+delivered on the children (47 by `V33-DEC-030`, +8 by `V33-DEC-034`, +5 by `V33-DEC-035`),
+none of it on the umbrella. The closure comment on #44 records the per-child evidence and
+where each parent-level criterion lives on `master`. #44 keeps `type:epic`, `priority:p2`, its
+V3.3 milestone and its body unchanged, carries no Story Points and no longer carries a status
+label. #123 (closed) and #149 (open, `status:proposed`, 5, `track:design`) are separate UI
+stories and were never conditions of the umbrella, which bound itself only to its five
+backend/domain children. Closing a zero-point epic moves nothing: the live dashboard (issue #2)
+was recomputed and an independent recomputation from raw labels agrees at **225 / 295, zero
+data-quality warnings**, exactly the figures above. #38 stays open; #42, #43, #45, #47, #99 and
+#149 are untouched; no commercial value, payment provider, deployment, tag or Release was
+introduced.
