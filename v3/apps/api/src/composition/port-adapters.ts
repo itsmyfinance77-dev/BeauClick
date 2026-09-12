@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, IsNull, Repository } from 'typeorm';
 
@@ -11,7 +11,12 @@ import {
   ServiceCatalog,
   ServiceOfferingSnapshot,
 } from '@beauclick/commerce';
-import { FinanceWorkspaceOwnerResolver, FinancialParty, FinancialPartyResolver } from '@beauclick/financial';
+import {
+  AddressableFinancialParty,
+  FinanceWorkspaceOwnerResolver,
+  FinancialParty,
+  FinancialPartyResolver,
+} from '@beauclick/financial';
 import {
   CollectionPolicyResolutionService,
   OwnedSubscriberParty,
@@ -25,6 +30,8 @@ import {
   InvitableIdentity,
   LocationCityCataloguePort,
   ResourceAssignmentDirectoryPort,
+  SCOPED_STAFF_AUTHORIZER,
+  ScopedStaffAuthorizerPort,
   ServiceOwnershipDirectoryPort,
   StaffInviteIdentityResolverPort,
 } from '@beauclick/business';
@@ -321,16 +328,34 @@ export class OwnershipBackedSubscriberPartyResolver implements OwnedSubscriberPa
  * adapter supplies that manager so finance never has to know which database
  * ownership lives in.
  *
+ * ## The scoped half lives HERE, and only here (V3.3 #111, ADR-049 §5.4)
+ *
+ * `addressableWorkspacesFor` is `owned ∪ live-scoped-read`. The owned half is
+ * the same `ownedPartiesFor` call as above, untouched; the scoped half is
+ * `business`'s own `SCOPED_STAFF_AUTHORIZER.liveBusinessScopedGrants`, the one
+ * predicate for "which businesses does this user hold a live business-scoped
+ * grant for", answered by the module that owns the grant table. This adapter
+ * is the only place the two are joined, which is what keeps the join out of
+ * `OwnershipBackedSubscriberPartyResolver`: that resolver feeds every
+ * commercial-policy WRITE route — subscription selection and cancellation,
+ * credit purchase, collection-policy assignment — through the very same
+ * `workspaceRef` value, so a scoped branch there would hand a read grant a
+ * write surface one call later. It has none, and the #111 suite proves each of
+ * those routes refuses a grantee's reference.
+ *
  * ## What it must never become
  *
  * A place that consults `SellerPartyLookup`. That lookup answers "whose money
  * is this?", follows an active affiliation, and using it here would reinstate
- * the #72 disclosure exactly.
+ * the #72 disclosure exactly. Nor a place that reads `business_staff.role`: a
+ * `manager` or `staff` row is affiliation, and affiliation grants nothing here
+ * (`V33-DEC-020` Ruling 1).
  */
 @Injectable()
 export class OwnershipBackedFinanceWorkspaceResolver implements FinanceWorkspaceOwnerResolver {
   constructor(
     private readonly owned: OwnershipBackedSubscriberPartyResolver,
+    @Inject(SCOPED_STAFF_AUTHORIZER) private readonly scoped: ScopedStaffAuthorizerPort,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -340,6 +365,38 @@ export class OwnershipBackedFinanceWorkspaceResolver implements FinanceWorkspace
     // the same reason. Mapped explicitly rather than cast, so a future field on
     // either side is a compile error here instead of a silent pass-through.
     return parties.map((party) => ({ partyType: party.partyType, partyId: party.partyId }));
+  }
+
+  /**
+   * Three constant statements on the application DataSource — professional
+   * ownership, business ownership, live `finance_read` grants — whatever the
+   * caller holds, so the cost never grows with the number of workspaces. Each
+   * is a point-in-time read, exactly as the two ownership reads always were;
+   * nothing is cached between calls.
+   *
+   * Deduplicated here on `(partyType, partyId)` with `owner` winning. The
+   * schema makes the overlap nearly unrepresentable (`uq_businesses_owner_id`,
+   * and an owner cannot invite themselves), but "nearly" is a rule a reviewer
+   * has to remember and this is a map they do not.
+   */
+  async addressableWorkspacesFor(userId: string): Promise<AddressableFinancialParty[]> {
+    const manager = this.dataSource.manager;
+    const owned = await this.owned.ownedPartiesFor(manager, userId);
+    const granted = await this.scoped.liveBusinessScopedGrants(manager, userId, 'finance_read');
+
+    const byParty = new Map<string, AddressableFinancialParty>();
+    for (const party of owned) {
+      byParty.set(`${party.partyType}:${party.partyId}`, {
+        partyType: party.partyType,
+        partyId: party.partyId,
+        accessMode: 'owner',
+      });
+    }
+    for (const grant of granted) {
+      const key = `business:${grant.businessId}`;
+      if (!byParty.has(key)) byParty.set(key, { partyType: 'business', partyId: grant.businessId, accessMode: 'finance_read' });
+    }
+    return [...byParty.values()];
   }
 }
 

@@ -44,10 +44,15 @@ function toLedgerEntry(entry: LedgerEntryEntity) {
  *
  * ## Nine routes, in two families
  *
- * The five WORKSPACE-AWARE routes name one owned workspace by an opaque,
+ * The five WORKSPACE-AWARE routes name one addressable workspace by an opaque,
  * server-issued `workspaceRef`. They are what a dual owner uses to reach each of
  * their workspaces separately, and what makes "which workspace?" an explicit
- * question instead of a silent server-side choice.
+ * question instead of a silent server-side choice. Since V3.3 #111 (`#44e`,
+ * ADR-049 §5) "addressable" means owned OR reachable through a live, explicit,
+ * business-scoped `finance_read` grant: a bookkeeper reads the granting
+ * business's workspace through these same five routes, with the same
+ * projection, and nothing else. The route table is unchanged; `/workspaces`
+ * gained one additive field, `accessMode`.
  *
  * The four SINGULAR routes are kept, unchanged in shape, so existing clients
  * keep working. What changed inside them is which question decides the party:
@@ -55,7 +60,11 @@ function toLedgerEntry(entry: LedgerEntryEntity) {
  * byte-for-byte what they saw before; one who owns none gets the same
  * non-enumerating refusal; one who owns two is refused with
  * `finance_workspace_selection_required` rather than being shown half their
- * position with nothing saying so.
+ * position with nothing saying so. They are OWNERSHIP-ONLY and #111 left them
+ * so: a `finance_read` grant is invisible here, so an owner who later receives
+ * one on somebody else's business keeps exactly the singular-route behaviour
+ * they had, and a grantee who owns nothing gets the refusal any non-seller
+ * gets. No new `409` was introduced for a grant holder.
  *
  * ## No route accepts a party
  *
@@ -88,8 +97,12 @@ function toLedgerEntry(entry: LedgerEntryEntity) {
  * enforcing it would refuse legitimate sellers. Issue #75 owns that lifecycle.
  *
  * The security boundary on this controller is exactly three things: an
- * authenticated caller, live ownership, and workspace-scoped SQL predicates.
- * Nothing here claims capability enforcement or live revocation.
+ * authenticated caller, live authority (ownership, or on the workspace-aware
+ * routes a live `finance_read` grant), and workspace-scoped SQL predicates.
+ * Nothing here claims capability enforcement, and nothing claims live
+ * revocation OF A CAPABILITY; a grant is not a capability. It is re-read on
+ * every request, so its revocation is effective on the next one — the same
+ * property live ownership has always had here.
  */
 @Controller('v1/me/finance')
 export class MyFinanceController {
@@ -104,15 +117,19 @@ export class MyFinanceController {
 
   /**
    * `GET /api/v1/me/finance/workspaces` -- every finance workspace the caller
-   * currently OWNS.
+   * may currently ADDRESS: the ones they own (`accessMode: owner`) and, since
+   * #111, the ones a live `finance_read` grant reaches (`accessMode:
+   * finance_read`), each once.
    *
-   * An empty array, never a `404`, for a caller who owns none: owning no seller
-   * workspace is a legitimate state for an authenticated customer, and a `404`
-   * would make "you are not a seller" indistinguishable from "no such route".
+   * An empty array, never a `404`, for a caller who reaches none: owning no
+   * seller workspace is a legitimate state for an authenticated customer, and a
+   * `404` would make "you are not a seller" indistinguishable from "no such
+   * route".
    *
-   * An affiliated staff member gets their own professional workspace and nothing
-   * else. Their employer's workspace never appears here, which is what actually
-   * stops them reading it.
+   * An affiliated staff member -- `staff` or `manager` -- with no grant gets
+   * their own professional workspace, if any, and nothing else. Their
+   * employer's workspace never appears here, which is what actually stops them
+   * reading it.
    */
   @Get('workspaces')
   async workspaceList(

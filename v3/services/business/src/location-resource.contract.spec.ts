@@ -93,10 +93,13 @@ describe('location resource catalogue contract (#110a)', () => {
   });
 
   describe('this story adds no scoped-staff role', () => {
-    it('SCOPED_STAFF_ROLES is byte-identical to #109’s one member', () => {
+    it('SCOPED_STAFF_ROLES carries no resource role -- exactly the #109 and #111 members', () => {
       // `V33-DEC-034` R3. Resource authority is owner-only; `practitioner_chat`
-      // is not widened and no second member is introduced.
-      expect([...SCOPED_STAFF_ROLES]).toEqual(['practitioner_chat']);
+      // is not widened and no RESOURCE member is introduced. The second member
+      // here, `finance_read`, is #111's (`V33-DEC-030` D4, ADR-049 section 5)
+      // and authorizes nothing on this surface -- the pg suite proves a holder
+      // is refused identically to a stranger.
+      expect([...SCOPED_STAFF_ROLES]).toEqual(['practitioner_chat', 'finance_read']);
     });
 
     it('no resource-shaped role was smuggled into the scoped vocabulary', () => {

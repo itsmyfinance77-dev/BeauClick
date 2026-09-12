@@ -13,7 +13,13 @@ import { LedgerEntryEntity } from './entities/ledger-entry.entity';
 import { SettlementBatchEntity } from './entities/settlement.entity';
 import { FinanceWorkspaceSelectionRequiredException } from './finance.exceptions';
 import { LedgerService } from './ledger.service';
-import { FINANCE_WORKSPACE_OWNER_RESOLVER, FinanceWorkspaceOwnerResolver, FinancialParty } from './ports';
+import {
+  AddressableFinancialParty,
+  FINANCE_WORKSPACE_OWNER_RESOLVER,
+  FinanceAccessMode,
+  FinanceWorkspaceOwnerResolver,
+  FinancialParty,
+} from './ports';
 import { OutstandingOrder, PartySummary, SettlementService } from './settlement.service';
 
 /**
@@ -37,6 +43,24 @@ import { OutstandingOrder, PartySummary, SettlementService } from './settlement.
  * `FINANCE_WORKSPACE_OWNER_RESOLVER` returns the parties the caller OWNS, and
  * ownership never follows affiliation. Both defects disappear together, because
  * they were one.
+ *
+ * ## Two enumerations, because two families of routes ask two questions (#111)
+ *
+ * V3.3 #111 (`#44e`, ADR-049 §5.4) lets an explicit, live, business-scoped
+ * `finance_read` grant reach a business's finance workspace READ-ONLY. That
+ * widens exactly one thing: what the five WORKSPACE-AWARE routes may address,
+ * which is `addressableWorkspaces` — `owned ∪ live-scoped-read`, each entry
+ * carrying its access mode. The four SINGULAR routes still resolve by
+ * ownership alone through `ownedWorkspaces` / `singularWorkspace`
+ * (`V33-DEC-020` Ruling 7): a grant never makes an owner's legacy route answer
+ * differently, and a grantee who owns nothing gets the same non-enumerating
+ * refusal there that any non-seller gets. Affiliation on its own — `staff`,
+ * `manager` — still contributes nothing to either enumeration.
+ *
+ * The reference primitive is untouched: a grantee's reference to business B is
+ * `HMAC(secret, granteeUserId, B)`, a different value from the owner's, useless
+ * in any other session, and it stops matching the moment the grant stops being
+ * enumerated. Revocation therefore needs no mechanism here either.
  *
  * ## Ordering is decided HERE and decides nothing else
  *
@@ -85,12 +109,43 @@ export class FinanceWorkspaceService {
     );
   }
 
-  /** The browser contract for `GET /me/finance/workspaces`: a reference and a type, never an id. */
+  /**
+   * Every finance workspace this user may ADDRESS on the workspace-aware
+   * routes, in the surface's own order — V3.3 #111.
+   *
+   * `owned ∪ live-scoped-read`. The port already returns each workspace once
+   * with `owner` winning; that invariant is re-asserted here rather than
+   * trusted, because a duplicate would mint two references for one party and a
+   * `finance_read` entry for an owned party would understate the caller's own
+   * authority. Sorted by `(partyType, partyId)` exactly as `ownedWorkspaces`,
+   * so an owner's entries sit where they always did and a grantee's are stable.
+   */
+  async addressableWorkspaces(sessionUserId: string): Promise<AddressableFinancialParty[]> {
+    if (!sessionUserId) return [];
+    const parties = await this.owners.addressableWorkspacesFor(sessionUserId);
+
+    const byParty = new Map<string, AddressableFinancialParty>();
+    for (const party of parties) {
+      const key = `${party.partyType}:${party.partyId}`;
+      const existing = byParty.get(key);
+      if (!existing || (existing.accessMode !== 'owner' && party.accessMode === 'owner')) byParty.set(key, party);
+    }
+
+    return [...byParty.values()].sort(
+      (left, right) => left.partyType.localeCompare(right.partyType) || left.partyId.localeCompare(right.partyId),
+    );
+  }
+
+  /**
+   * The browser contract for `GET /me/finance/workspaces`: a reference, a type
+   * and an access mode — never an id.
+   */
   async workspacesFor(sessionUserId: string): Promise<FinanceWorkspaceEntry[]> {
-    const parties = await this.ownedWorkspaces(sessionUserId);
+    const parties = await this.addressableWorkspaces(sessionUserId);
     return parties.map((party) => ({
       workspaceRef: this.referenceFor(sessionUserId, party),
       workspaceType: party.partyType,
+      accessMode: party.accessMode,
     }));
   }
 
@@ -110,13 +165,39 @@ export class FinanceWorkspaceService {
   }
 
   /**
-   * The one owned workspace a reference names, right now.
+   * The one ADDRESSABLE workspace a reference names, right now, and how.
    *
    * Throws `NotFoundOrNotYoursException` for EVERY failure — malformed,
-   * wrong-length, random, foreign, stale, no-longer-owned and correctly-shaped-
-   * but-unmatched alike. One status, one code, one message, one body, so
-   * nothing here can be used to learn whether a party exists, whether somebody
-   * else owns it, or whether a reference was correctly signed.
+   * wrong-length, random, foreign, stale, no-longer-owned, never-granted,
+   * revoked, and correctly-shaped-but-unmatched alike. One status, one code,
+   * one message, one body, so nothing here can be used to learn whether a party
+   * exists, whether somebody else owns it, whether a grant ever existed, or
+   * whether a reference was correctly signed. Ownership failures and grant
+   * failures are the SAME failure — a reference either matches one of the
+   * live candidates or it does not — which is what makes them byte-identical
+   * by construction rather than by a second `if` (#111).
+   */
+  async resolveAddressableWorkspace(sessionUserId: string, workspaceRef: string): Promise<AddressableFinancialParty> {
+    const parties = await this.addressableWorkspaces(sessionUserId);
+    const matched = resolveWorkspaceReference(
+      this.secret,
+      sessionUserId,
+      parties as readonly (WorkspaceParty & { accessMode: FinanceAccessMode })[],
+      workspaceRef,
+      (candidate, supplied) => this.matchesReference(candidate, supplied),
+    );
+
+    if (!matched) throw new NotFoundOrNotYoursException();
+    return matched as AddressableFinancialParty;
+  }
+
+  /**
+   * The one OWNED workspace a reference names, right now.
+   *
+   * Kept for callers that must never accept a grant — there are none on the
+   * read surface today, and that is the point: a future write-shaped finance
+   * route that resolves through this method cannot be reached by a
+   * `finance_read` holder, whatever else it forgets.
    */
   async resolveOwnedWorkspace(sessionUserId: string, workspaceRef: string): Promise<FinancialParty> {
     const parties = await this.ownedWorkspaces(sessionUserId);
@@ -155,16 +236,16 @@ export class FinanceWorkspaceService {
   }
 
   // ======================================================================
-  // Reads — every one scoped to ONE owned party
+  // Reads — every one scoped to ONE addressable party (owned, or finance_read)
   // ======================================================================
 
   async summaryFor(sessionUserId: string, workspaceRef: string): Promise<PartySummary> {
-    const party = await this.resolveOwnedWorkspace(sessionUserId, workspaceRef);
+    const party = await this.resolveAddressableWorkspace(sessionUserId, workspaceRef);
     return this.settlements.partySummary(party.partyType, party.partyId);
   }
 
   async outstandingOrdersFor(sessionUserId: string, workspaceRef: string): Promise<OutstandingOrder[]> {
-    const party = await this.resolveOwnedWorkspace(sessionUserId, workspaceRef);
+    const party = await this.resolveAddressableWorkspace(sessionUserId, workspaceRef);
     return this.settlements.outstandingOrdersForParty(party.partyType, party.partyId);
   }
 
@@ -180,7 +261,7 @@ export class FinanceWorkspaceService {
     workspaceRef: string,
     options: { cursor?: string; limit?: number } = {},
   ): Promise<{ items: SettlementBatchEntity[]; nextCursor: string | null }> {
-    const party = await this.resolveOwnedWorkspace(sessionUserId, workspaceRef);
+    const party = await this.resolveAddressableWorkspace(sessionUserId, workspaceRef);
 
     // BEFORE any row is read. A cursor is bound to the workspace that issued
     // it, so one lifted from another workspace's response is refused rather
@@ -212,7 +293,7 @@ export class FinanceWorkspaceService {
    * order id learns nothing from asking.
    */
   async ledgerFor(sessionUserId: string, workspaceRef: string, orderId: string): Promise<LedgerEntryEntity[]> {
-    const party = await this.resolveOwnedWorkspace(sessionUserId, workspaceRef);
+    const party = await this.resolveAddressableWorkspace(sessionUserId, workspaceRef);
     return this.ledger.entriesForOrderAndParty(orderId, party.partyType, party.partyId);
   }
 }
@@ -222,17 +303,22 @@ export class FinanceWorkspaceService {
 // ---------------------------------------------------------------------------
 
 /**
- * One owned finance workspace.
+ * One addressable finance workspace.
  *
  * `workspaceRef` is OPAQUE and server-issued. It is not an authorization token:
- * live ownership is re-verified on every request, so it stops working when the
- * party stops being owned or the secret is rotated. `workspaceType` is a
- * two-valued classification a seller already knows about their own business,
- * carrying no identity.
+ * live ownership — or, since #111, a live `finance_read` grant — is re-verified
+ * on every request, so it stops working when the party stops being owned, the
+ * grant is revoked, the membership stops being `active`, the business is
+ * deleted or the secret is rotated. `workspaceType` is a two-valued
+ * classification a seller already knows about their own business, carrying no
+ * identity. `accessMode` (#111, additive) says HOW this session reaches the
+ * workspace — `owner` or `finance_read` — which the caller also already knows,
+ * and which lets a client render the right surface without a second call.
  */
 export interface FinanceWorkspaceEntry {
   workspaceRef: string;
   workspaceType: 'professional' | 'business';
+  accessMode: FinanceAccessMode;
 }
 
 /** Default page size, and the ceiling a caller may ask for. Mirrors `PageQueryDto`. */

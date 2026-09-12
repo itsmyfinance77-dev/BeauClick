@@ -3,7 +3,13 @@ import { plainToInstance } from 'class-transformer';
 import { getMetadataArgsStorage } from 'typeorm';
 
 import { BUSINESS_STAFF_ROLES, BUSINESS_STAFF_STATUSES, BusinessStaffEntity } from './entities/business-staff.entity';
-import { SCOPED_STAFF_ROLES, StaffRoleGrantEntity } from './entities/staff-role-grant.entity';
+import {
+  BUSINESS_SCOPED_ROLES,
+  PRACTITIONER_SCOPED_ROLES,
+  SCOPED_STAFF_ROLES,
+  StaffRoleGrantEntity,
+  requiresProfessionalLink,
+} from './entities/staff-role-grant.entity';
 import { InviteStaffByPhoneDto, ScopedStaffRoleDto } from './dto/staff.dto';
 import {
   AUDIT_TARGET_STAFF_MEMBERSHIP,
@@ -13,10 +19,13 @@ import {
 } from './staff-authority.audit';
 
 /**
- * V3.3 Story #109 (`#44c`) -- the closed contract, pinned.
+ * V3.3 Story #109 (`#44c`) -- the closed contract, pinned. Extended by Story
+ * #111 (`#44e`), which added the ONE further member `V33-DEC-030` D4 and
+ * ADR-049 section 5 ratified: `finance_read`.
  *
- * Everything here is a shape `V33-DEC-033` ratified and code must not widen on
- * its own: a second scoped role, `owner` as a grantable role, a wider
+ * Everything here is a shape `V33-DEC-033` (and, for `finance_read`, D4)
+ * ratified and code must not widen on its own: a third scoped role, `owner` as
+ * a grantable role, a wider
  * `business_staff.role`, a missing `removed`, a caller-supplied identity in an
  * invitation body, a free-text audit reason. Each would be a silent security
  * change, so each has an assertion rather than a reviewer.
@@ -27,19 +36,38 @@ import {
  */
 describe('scoped staff authority contract (#109)', () => {
   describe('the closed scoped-role vocabulary', () => {
-    it('is EXACTLY one member: practitioner_chat', () => {
-      // `V33-DEC-033` R1. A second member is a register decision tied to a real
-      // consumer; this assertion is what makes that true in practice.
-      expect([...SCOPED_STAFF_ROLES]).toEqual(['practitioner_chat']);
+    it('is EXACTLY two members: practitioner_chat and finance_read', () => {
+      // `V33-DEC-033` R1 closed #109 at one member and said a further member is
+      // a decision tied to a real consumer. `finance_read` is that member:
+      // decided by `V33-DEC-030` D4 and ADR-049 section 5, consumed by the
+      // workspace-aware finance reads (#111). A THIRD member is still a
+      // decision, and this assertion is what makes that true in practice.
+      expect([...SCOPED_STAFF_ROLES]).toEqual(['practitioner_chat', 'finance_read']);
     });
 
-    it('does NOT contain `owner`, nor any deferred or dormant role', () => {
+    it('keeps the two axes disjoint and complete', () => {
+      // Practitioner-specific roles need a professional link; business-scoped
+      // roles do not. Every member is on exactly one axis, and the grant path
+      // asks `requiresProfessionalLink` rather than re-deriving the answer.
+      expect([...PRACTITIONER_SCOPED_ROLES]).toEqual(['practitioner_chat']);
+      expect([...BUSINESS_SCOPED_ROLES]).toEqual(['finance_read']);
+      for (const role of SCOPED_STAFF_ROLES) {
+        const practitioner = (PRACTITIONER_SCOPED_ROLES as readonly string[]).includes(role);
+        const business = (BUSINESS_SCOPED_ROLES as readonly string[]).includes(role);
+        expect(practitioner !== business).toBe(true);
+        expect(requiresProfessionalLink(role)).toBe(practitioner);
+      }
+    });
+
+    it('does NOT contain `owner`, nor any deferred, dormant or WRITE role', () => {
       for (const forbidden of [
         'owner',
         'location_viewer',
         'location_manager',
         'finance',
-        'finance_read',
+        'finance_write',
+        'finance_admin',
+        'settlement',
         'reception',
         'receptionist',
         'inventory',
@@ -110,9 +138,20 @@ describe('scoped staff authority contract (#109)', () => {
   describe('ScopedStaffRoleDto is one closed literal', () => {
     const build = (payload: unknown) => plainToInstance(ScopedStaffRoleDto, payload);
 
-    it('accepts the one vocabulary member and refuses everything else', async () => {
+    it('accepts the two vocabulary members and refuses everything else', async () => {
       expect(await validate(build({ role: 'practitioner_chat' }))).toHaveLength(0);
-      for (const rejected of ['owner', 'manager', 'staff', 'location_manager', '', 'practitioner_chat ']) {
+      expect(await validate(build({ role: 'finance_read' }))).toHaveLength(0);
+      for (const rejected of [
+        'owner',
+        'manager',
+        'staff',
+        'location_manager',
+        'finance',
+        'finance_write',
+        '',
+        'practitioner_chat ',
+        'finance_read ',
+      ]) {
         expect((await validate(build({ role: rejected }))).map((e) => e.property)).toContain('role');
       }
     });
