@@ -53,6 +53,13 @@ blocked by #47, and Legal, accounting, tax and provider review remain external e
 not owner questions. This is documentation and backlog only: no backend, frontend, schema,
 provider or release was implemented by it, and none of V3.2-D through V3.2-G was started.
 
+On **2026-09-13** Story #42 was decomposed by `V33-DEC-043` after a read-only readiness audit:
+`#42a` (#42, 13, Ready, `gate:legal`), `#42b` (#159, 13), `#42c` (#160, 13, `gate:legal`),
+`#42d` (#161, 8) and `#42e` (#162, 13, `gate:legal`) — 21 → 60 SP, net +39 — with
+[ADR-051](docs/roadmap/v3/adr/ADR-051-versioned-booking-outcome-policy-and-dispute-model.md)
+committed alone as the family's engineering record. Every child ships disabled by absence;
+no product policy changed and implementation has not started.
+
 | Programme | Delivered | Status |
 |---|---|---|
 | **V3.0** (Phases 0–5) | The WordPress exit: 16 ADRs, the Nx/pnpm workspace, and the identity, provider, booking, commerce, payment, financial, search, loyalty, journey, notification, analytics, admin and privacy domains on PostgreSQL | Released — `v3.0.0`, `v3.0.1` |
@@ -678,7 +685,7 @@ evidence.
 
 | Path | What it holds |
 |---|---|
-| [`docs/roadmap/v3/adr/`](docs/roadmap/v3/adr/) | **ADR-001 … ADR-040** — architecture decisions and their dated status. ADR-040 reconciles the implemented deployment topology. |
+| [`docs/roadmap/v3/adr/`](docs/roadmap/v3/adr/) | **ADR-001 … ADR-051** — architecture decisions and their dated status. ADR-040 reconciles the implemented deployment topology; ADR-041–ADR-050 record the V3.3 commercial, collection, credit, business-operations and control-plane designs; ADR-051 records the booking-outcome policy, snapshot/acceptance, evaluator, no-show, remedy-choice and dispute model behind `#42a`–`#42e`. |
 | [`docs/roadmap/v3/`](docs/roadmap/v3/) | The V3 blueprint corpus: domain boundaries, database and API blueprints, event architecture and catalog, security model, infrastructure plan, migration matrix, release audits |
 | [`docs/roadmap/v3.1/`](docs/roadmap/v3.1/) | V3.1 roadmap, phase reports, release strategy, and the external-enablement execution policy |
 | [`docs/roadmap/v3.2/`](docs/roadmap/v3.2/) | V3.2 roadmap, capability catalog, decision register, external-dependency ledger, phase reports |
