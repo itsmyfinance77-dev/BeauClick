@@ -8,10 +8,11 @@ This branch preserves design evidence separately from production frontend code.
 is the single current full workspace snapshot. Despite its historical directory
 name, it now contains the complete V3.3 closure sync: the corrected V3.2 AI,
 chat, wishlist and referral material; the V3.3 commercial catalogue, collection,
-seller-operations and enforcement-control designs; and the responsive and
-accessibility implementation handoff. Its current manifest is audited against
-implementation commit `6695234eded1` and records later corrections without
-rewriting the earlier pass history.
+seller-operations and enforcement-control designs; the owner finance-access and
+persona-neutral finance-workspace designs; and the responsive and accessibility
+implementation handoff. Its current manifest is audited against implementation
+commit `5d4b3de5d7b386d14dc72c5bbd03f17fead64b38` and records later corrections
+without rewriting the earlier pass history.
 
 `MANIFEST.md` is the authoritative pass-by-pass sync record inside the snapshot.
 The nested `docs/design/REPORT.md` is the preserved initial V3 design report; it

@@ -8,6 +8,53 @@ This connection now resolves `marabi766/BeauClick` (the owner recorded by every 
 
 ## Last sync
 
+date: 2026-09-12T20:40:00Z
+commit: `itsmyfinance77-dev/BeauClick@master` → **`5d4b3de5d7b386d14dc72c5bbd03f17fead64b38`** — the baseline named in the brief and the one actually inspected; the repository did not advance during the pass. (The earlier entry below recorded the same state as a short tree hash; corrected here to the commit sha.)
+design snapshot: V3.3-FIN-149-R2 — second correction pass, canonical design workspace updated in place; no repo write, no commit.
+
+### V3.3 #149a — grant-confirmation removal and label-wording correction (this pass, design workspace only — no repo write)
+
+- **Grant has no confirmation dialog.** Per the binding #149 contract, granting `finance_read` is reversible: the member-identifying button submits immediately, disables itself and sets `aria-busy` while in flight (duplicate submission unrepresentable), announces start/success/failure through a polite live region naming the member, redraws roles from the server response, and on failure preserves the previous row state and exposes a retry control tied to the error by `aria-describedby`. No sheet, popover, warning or second click replaced the dialog. The capability explanation moved to standing informational copy above the roster.
+- **Revoke keeps its dialog** and now documents pending/success/failure/retry and focus return explicitly.
+- **Label wording corrected:** workspace labels are server-supplied, never client-ordered or session-numbered, and **may change when the underlying public business or professional name changes**. The "stable across sessions" claim is removed. The identical-label/type/access-mode residual stays documented; no ordinal, suffix or reference fragment invented.
+- Updated: `Prototype - Pro and Admin.dc.html` §25, `Prototype - Finance Workspace.dc.html`, `screens/45_OWNER_FINANCE_ACCESS.md` (new §3-a), `screens/46_FINANCE_WORKSPACE.md`, `V3.3_149_TRACEABILITY.md`, `V3.3_REQUIREMENT_MATRIX.md`, `V3.3_RESPONSIVE_AND_A11Y_HANDOFF.md`, `MANIFEST.md`, this file.
+- Verdict: **READY FOR CANONICAL IMPORT**.
+- No production code, schema, migration, issue, decision register, ADR, branch, tag, Release, deployment, provider or commercial value changed; #149a and #152 remain `status:proposed`.
+
+## Previous sync
+
+date: 2026-09-12T19:45:00Z
+commit: `itsmyfinance77-dev/BeauClick@master` resolved by the tree read to **`5d4b3de5d7b3`** (a tree hash, not a commit sha). The brief named master as `03069c5`; this connection exposes no commit sha, so that value could not be confirmed or refuted. The #154 contracts the brief describes are present and were read directly.
+design snapshot: V3.3-FIN-149-R1 — correction pass, canonical design workspace updated in place; no new snapshot directory, no repo write, no commit.
+
+### V3.3 #149a/#152 design correction against merged #154 (this pass, design workspace only — no repo write)
+
+- **Read at this baseline:** `services/business/src/{staff-management.service.ts, staff-management.contract.spec.ts, business.controller.ts, dto/staff.dto.ts}`, `services/financial/src/{finance-workspace.service.ts, financial.controller.ts, finance-no-store.middleware.ts, dto/finance-workspace.dto.ts}`, `apps/api/src/composition/port-adapters.ts` (`IdentityAndProviderBackedStaffDisplayIdentity`, `PublicNameBackedFinanceWorkspaceLabels`), `apps/api/test/finance-identification-cache-safety.pg-spec.ts`, `apps/api/test/scoped-finance-read.pg-spec.ts`, `V3.3_DECISION_REGISTER.md` (`V33-DEC-037`, `V33-DEC-038` incl. R7/R10/R12), ADR-049 §2.5 and its 2026-09-12 clarification.
+- **Confirmed merged:** owner-only `GET /v1/businesses/:id/staff-management` → `{id, role, status, displayLabel, labelSource, identificationHint, roles}` on `@ResolveOwner(BusinessOwnerResolver)`, with `GET …/staff` byte-for-byte unchanged; `FinanceWorkspaceEntry` now four keys including `displayLabel`; `FinanceNoStoreMiddleware` setting `Cache-Control: private, no-store` on the `MyFinanceController` prefix before every guard.
+- **Contradictions reported, not designed around:** (1) the brief's `03069c5` is unverifiable through this connection; (2) the brief says `identificationHint` is present "only when provided" — the merged contract makes it non-nullable on every row, and for a phone-labelled row `displayLabel === identificationHint` (four bare digits, not a pre-masked string), so the masking presentation is the UI's job and is recorded as an explicit design rule; (3) `labelSource` is exactly `professional | phone`; (4) revoked-grant history still has no read route; (5) C-5 (`DEFAULT_COMMISSION_RATE_BP = 1500`) remains open and unrelated.
+- Updated: `Prototype - Pro and Admin.dc.html` §25 (server-label rows incl. the duplicate-name pair, the phone-framed bookkeeper and an `invited` row with no control; field→UI mapping table; both dialogs now name the exact member; twenty states), `Prototype - Finance Workspace.dc.html` (§F0–F5: `displayLabel` selector, long-label truncation, `409` selection-required, retry, single delegated workspace, implemented `no-store`), `screens/45_OWNER_FINANCE_ACCESS.md`, `screens/46_FINANCE_WORKSPACE.md`, `V3.3_149_TRACEABILITY.md`, `V3.3_REQUIREMENT_MATRIX.md`, `V3.3_RESPONSIVE_AND_A11Y_HANDOFF.md` §6, `V3.1.0_FINAL_DESIGN_HANDOFF.md` §35, `MANIFEST.md`.
+- Verdict: **READY WITH NON-BLOCKING DOCUMENTED LIMITATIONS**.
+- No production code, schema, migration, issue, label, tag, Release, deployment or provider changed; no commit; #149a and #152 left `status:proposed` and unimplemented.
+
+## Previous sync
+
+date: 2026-09-12T13:50:00Z
+commit: `itsmyfinance77-dev/BeauClick@master` resolved to **`b54bb846af09`** (implementation baseline for this pass).
+design snapshot: V3.3-FIN-149 — canonical design workspace updated in place; no new snapshot directory, no repo write, no commit.
+
+### V3.3 finance-read closure pass for #149a and #152 (this pass, design workspace only — no repo write)
+
+- Story status verified from code and the live route table, not from earlier design reports: **#44, #109, #111, #123 closed**; **#149 (`#149a`, sp:3)** and **#152 (`#149b`, sp:5)** open, `status:proposed`, `track:design`.
+- **#149a contracts read:** `GET/POST /v1/businesses/:id/staff/:staffId/grants` and `POST .../grants/revoke`, all `@ResolveOwner(BusinessOwnerResolver)`; body is exactly one literal from the closed two-member vocabulary (`practitioner_chat`, `finance_read`); `finance_read` is business-scoped, read-only and does **not** require a professional link (`requiresProfessionalLink` returns false for it); grant and revoke are idempotent; every non-syntactic failure raises the single `NotFoundOrNotYoursException`.
+- **#152 contracts read:** the five workspace-aware finance routes under `v1/me/finance`; `FinanceWorkspaceEntry` is `{workspaceRef, workspaceType, accessMode}`; page size default 20 / max 100; the cursor is opaque and workspace-bound and is checked before a row is read; the four singular routes stay ownership-only and answer `409 finance_workspace_selection_required` to a multi-workspace owner.
+- **Four bounded backend follow-ups surfaced and designed honestly, not invented around:** (1) no workspace/business display name exists in the finance contract; (2) `GET /businesses/:id/staff` returns raw `userId`/`professionalId` UUIDs and no name or phone — and the finance-only bookkeeper persona has a NULL professional link, so no profile name resolves either; (3) the grant response carries **live roles only**, so revoked-grant history has no read route; (4) `Cache-Control: no-store` is absent from the finance routes. None is presented as implemented.
+- New: `Prototype - Finance Workspace.dc.html` (§F0–F5, persona-neutral `/finance`), `docs/design/screens/45_OWNER_FINANCE_ACCESS.md`, `docs/design/screens/46_FINANCE_WORKSPACE.md`, `docs/design/V3.3_149_TRACEABILITY.md`.
+- Updated: `Prototype - Pro and Admin.dc.html` §25 (owner grant/revoke, seventeen states, both dialogs, the never-shown control list), `V3.3_REQUIREMENT_MATRIX.md`, `V3.3_RESPONSIVE_AND_A11Y_HANDOFF.md` §6, `V3.1.0_FINAL_DESIGN_HANDOFF.md` §35, `MANIFEST.md`.
+- `Prototype - Customer.dc.html` deliberately untouched — both stories are seller/operator-side.
+- Verdict: **READY WITH DOCUMENTED PREREQUISITES**.
+- No production repository code, schema, migration, issue, label, tag, Release, deployment or external provider changed; no commit made; no existing git change belonging to another process touched.
+
+### V3.3 closure sync — story-status correction and frontend-handoff preparation (previous pass
 date: 2026-09-12T04:05:00Z
 commit: `itsmyfinance77-dev/BeauClick@master` resolved to `6695234eded1` (tree hash as resolved by the tree read; no commit sha is claimed). `github_compare(4c7506347030...master, v3/)`: 3 commits, 38 files.
 
@@ -180,6 +227,9 @@ commit at that time: d2e11ea0f0f760c850997182f900748923e7418b (V3.2-B chat imple
 
 ## Sync history
 
+- 2026-09-12T20:40:00Z — #149a grant-confirmation removal (grant is reversible → immediate submit, live region, retry; revoke dialog kept), workspace-label wording corrected, baseline recorded as a commit sha. Verdict READY FOR CANONICAL IMPORT. @`5d4b3de5d7b386d14dc72c5bbd03f17fead64b38`
+- 2026-09-12T19:45:00Z — #149a/#152 design correction against merged #154: staff-management projection and `FinanceWorkspaceEntry.displayLabel` consumed, all anonymous/session-local labels removed, `private, no-store` reclassified as implemented. Verdict READY WITH NON-BLOCKING DOCUMENTED LIMITATIONS. @tree `5d4b3de5d7b3`
+- 2026-09-12T13:50:00Z — #149a/#152 finance-read closure: #44/#109/#111/#123 verified closed, owner grant/revoke UI (Pro §25) and persona-neutral `/finance` prototype designed against the real contracts, specs 45 and 46 and a 29-row traceability matrix added, four bounded backend follow-ups recorded. Verdict READY WITH DOCUMENTED PREREQUISITES. @`b54bb846af09`
 - 2026-09-12T04:05:00Z — V3.3 closure sync: #115/#95/#141 verified implemented and closed (one prior finding corrected as wrong-when-written), admin commercial namespace 27 → 34 routes, control-plane prototype rebuilt against the real seven routes, responsive + accessibility handoff added, REPORT.md retitled historical, DOCX claim narrowed. Verdict READY WITH DOCUMENTED LIMITATIONS. @`6695234eded1`
 - 2026-09-11T18:05:00Z — V3.3 commercial/payment/legal flexibility design update (read-only audit + eight contradictions reported before editing; admin route count corrected 18 → 27; new `Prototype - Admin Control Plane.dc.html`; Customer §21–§23; Pro/Admin §20–§24; `V3.3_BASELINE_AUDIT.md`, `V3.3_REQUIREMENT_MATRIX.md`, screens 41/42/44) @`4c7506347030`, 50 commits / 279 files ahead of the prior sync.
 - 2026-09-02T20:41:00Z — V3.3-A Story #40 (`#40a`) admin commercial plan and price catalogue sync (route-to-screen matrix for the real 18 admin routes — brief said 16, corrected; plan/schedule catalogue, D-7 base-workspace card, create-draft form, publish/retire dialogs, tier editor; `40_ADMIN_COMMERCIAL_CATALOGUE.md`, Pro/Admin §19) @12c92f974529... (baseline unchanged from brief).
@@ -198,6 +248,11 @@ commit at that time: d2e11ea0f0f760c850997182f900748923e7418b (V3.2-B chat imple
 - 2026-08-28T10:05:00Z — initial build (design language, 13 recreations, 10 prototypes, 4 docs).
 
 ## Screen map
+
+| Design artifact | Built from (repo files) |
+|---|---|
+| `Prototype - Pro and Admin.dc.html` §25 | `services/business/src/staff-management.service.ts`, `staff-management.contract.spec.ts`, `business.controller.ts`, `staff-grant.service.ts`, `dto/staff.dto.ts`, `apps/api/src/composition/port-adapters.ts` |
+| `Prototype - Finance Workspace.dc.html` | `services/financial/src/financial.controller.ts`, `finance-workspace.service.ts`, `finance-no-store.middleware.ts`, `dto/finance-workspace.dto.ts`, `finance.exceptions.ts`, `apps/api/src/composition/port-adapters.ts` |
 
 | Project screen | Repo files |
 | --- | --- |
@@ -258,14 +313,24 @@ commit at that time: d2e11ea0f0f760c850997182f900748923e7418b (V3.2-B chat imple
 
 Shared chrome for every screen: v3/apps/web/components/app-shell.tsx, kit.tsx (NavLink, ContextBand, PageHeader, StatCard, StatGrid, Badge, EmptyState, SegmentedControl), ui.tsx (Button, Input, Card, Alert), app/globals.css, packages/design-tokens/src/tokens.css.
 
-## Screen map (addition)
+## Screen map
+
+| Design artifact | Built from (repo files) |
+|---|---|
+| `Prototype - Pro and Admin.dc.html` §25 | `services/business/src/business.controller.ts`, `staff-grant.service.ts`, `entities/staff-role-grant.entity.ts`, `dto/staff.dto.ts` |
+| `Prototype - Finance Workspace.dc.html` | `services/financial/src/financial.controller.ts`, `finance-workspace.service.ts`, `dto/finance-workspace.dto.ts`, `finance.exceptions.ts`, `apps/api/src/composition/port-adapters.ts` | (addition)
 
 | Project screen | Repo files |
 | --- | --- |
 | docs/design/screens/35_AI_ASSISTANT.md | v3/services/ai/src/ai.controller.ts, ai.exceptions.ts, ai-consent.service.ts, ai-conversation.service.ts, ai-quota.service.ts, providers/*, safety/ai-input-safety.ts, v3/packages/ai-contract/src/ai-assistant-contract.ts, docs/roadmap/v3/adr/ADR-029, ADR-030 |
 | Prototype - Customer.dc.html §17 دستیار هوشمند | same as above |
 
-## Screen map (logo exploration, no repo files — pure design-workspace brand work)
+## Screen map
+
+| Design artifact | Built from (repo files) |
+|---|---|
+| `Prototype - Pro and Admin.dc.html` §25 | `services/business/src/business.controller.ts`, `staff-grant.service.ts`, `entities/staff-role-grant.entity.ts`, `dto/staff.dto.ts` |
+| `Prototype - Finance Workspace.dc.html` | `services/financial/src/financial.controller.ts`, `finance-workspace.service.ts`, `dto/finance-workspace.dto.ts`, `finance.exceptions.ts`, `apps/api/src/composition/port-adapters.ts` | (logo exploration, no repo files — pure design-workspace brand work)
 
 | Project screen | Repo files |
 | --- | --- |
@@ -305,7 +370,12 @@ New since the app tree was last walked — none of these have a recreation, prot
 These line up with the backlog's "missing prototypes" list — worth prioritizing next.
 
 
-## Screen map (V3.3 commercial, payment and legal flexibility)
+## Screen map
+
+| Design artifact | Built from (repo files) |
+|---|---|
+| `Prototype - Pro and Admin.dc.html` §25 | `services/business/src/business.controller.ts`, `staff-grant.service.ts`, `entities/staff-role-grant.entity.ts`, `dto/staff.dto.ts` |
+| `Prototype - Finance Workspace.dc.html` | `services/financial/src/financial.controller.ts`, `finance-workspace.service.ts`, `dto/finance-workspace.dto.ts`, `finance.exceptions.ts`, `apps/api/src/composition/port-adapters.ts` | (V3.3 commercial, payment and legal flexibility)
 
 | Project screen | Repo files |
 | --- | --- |

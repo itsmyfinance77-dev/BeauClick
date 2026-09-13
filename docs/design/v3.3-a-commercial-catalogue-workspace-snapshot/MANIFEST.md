@@ -1,4 +1,46 @@
-# BeauClick Design — V3.3 Closure Sync (frontend-handoff ready)
+# BeauClick Design — V3.3 Finance-Read Closure (#149a / #149b)
+
+Exported: 2026-09-12 · Implementation baseline `itsmyfinance77-dev/BeauClick@master` → commit **`5d4b3de5d7b386d14dc72c5bbd03f17fead64b38`**
+Design snapshot: **V3.3-FIN-149-R2** (second correction pass) · Verdict: **READY FOR CANONICAL IMPORT**
+
+## Latest pass — grant confirmation removed, revoke confirmation kept
+
+The owner-side grant of `finance_read` no longer opens a confirmation dialog: the story contract
+makes granting reversible, so the button — which already names the member through `displayLabel` and
+the masked four-digit hint — submits immediately, disables itself while in flight, announces start,
+success and failure in a live region, and offers an accessible retry on failure. Nothing replaced the
+dialog. Revocation keeps its dialog, and now documents pending, success, failure, retry and focus
+return explicitly.
+
+Also corrected: workspace labels are described as server-supplied and never client-ordered, and as
+**able to change when the underlying public name changes** — the earlier "stable across sessions"
+wording is gone. The baseline is recorded as commit `5d4b3de5d7b386d14dc72c5bbd03f17fead64b38`.
+
+## Previous pass — correction against the merged #154 contracts
+
+The #149a/#152 design package was corrected, not redesigned, against three newly merged contracts:
+the owner-only `GET /v1/businesses/:id/staff-management` projection (`displayLabel`, `labelSource`,
+`identificationHint`, `roles`), `FinanceWorkspaceEntry.displayLabel`, and
+`Cache-Control: private, no-store` on all nine authenticated finance routes.
+
+Removed everywhere in current-state surfaces: the «عضو نمونه» roster placeholder, the
+«فضای مالی ۱/۲/۳» session-local workspace ordinals and every claim that labels are locally
+generated or unstable, and the "missing `no-store`" prerequisite. The information architecture,
+interaction model, accessibility decisions and visual language are unchanged.
+
+**One bounded backend follow-up remains** — no read route exposes revoked-grant history — plus one
+documented residual: two finance workspaces identical in label, type and access mode have no safe
+differentiator, and none is invented.
+
+## Previous pass — owner finance-access UI and the persona-neutral finance workspace (baseline `b54bb846af09`)
+
+Two proposed design stories closed out against the merged contracts: **#149 (`#149a`)** owner grant/revoke of read-only finance access, and **#152 (`#149b`)** a persona-neutral `/finance` workspace that requires no professional profile. #44, #109, #111 and #123 verified closed from code.
+
+New: `Prototype - Finance Workspace.dc.html` (§F0–F5), `screens/45_OWNER_FINANCE_ACCESS.md`, `screens/46_FINANCE_WORKSPACE.md`, `V3.3_149_TRACEABILITY.md`. Updated: `Prototype - Pro and Admin.dc.html` §25 (seventeen states, both dialogs, the never-shown control list), requirement matrix, responsive/a11y handoff §6, handoff §35.
+
+**Four bounded backend follow-ups surfaced at that time, none invented around** (all but one closed the same day by #154 — see the correction pass above): the finance contract carried no workspace display name; the staff roster carried no member name (only raw UUIDs, and the bookkeeper persona has a NULL professional link); no read route exposes revoked-grant history; `Cache-Control: no-store` is absent from the finance routes. The customer prototype is deliberately untouched — both stories are seller/operator-side.
+
+## Previous pass — V3.3 Closure Sync
 
 Exported: 2026-09-12 · Baseline `itsmyfinance77-dev/BeauClick@master` → **`6695234eded1`**
 Verdict: **READY WITH DOCUMENTED LIMITATIONS**
@@ -12,10 +54,6 @@ Also: `docs/design/V3.3_RESPONSIVE_AND_A11Y_HANDOFF.md` (mobile/tablet/desktop r
 **C-5 remains open** at this baseline: the live 1500 bp commission constant still contradicts `V33-DEC-028`. No commission figure appears in any screen.
 
 ## Previous pass — V3.3 Commercial, Payment and Legal Flexibility Update
-
-> **Historical record.** The implementation-status statements in this section describe the
-> 2026-09-11 pass and are superseded by “Latest pass” above. They are retained only as an audit
-> trail and must not be used as the current frontend-handoff status.
 
 Exported: 2026-09-11
 Repository: `itsmyfinance77-dev/BeauClick`, `v3/` scope. Audited against `master` → `4c7506347030` — **50 commits / 279 files ahead** of the previous design sync at `12c92f974529`, adding ADR-042…ADR-050.

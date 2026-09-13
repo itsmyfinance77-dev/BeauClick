@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas" />
+<style>
+  @font-face { font-family: 'Vazirmatn'; src: url('fonts/Vazir-Light.ttf') format('truetype'); font-weight: 300; font-display: swap; }
+  @font-face { font-family: 'Vazirmatn'; src: url('fonts/Vazir-Regular.ttf') format('truetype'); font-weight: 400; font-display: swap; }
+  @font-face { font-family: 'Vazirmatn'; src: url('fonts/Vazir-Medium.ttf') format('truetype'); font-weight: 500; font-display: swap; }
+  @font-face { font-family: 'Vazirmatn'; src: url('fonts/Vazir-Bold.ttf') format('truetype'); font-weight: 600 700; font-display: swap; }
+  @font-face { font-family: 'Vazirmatn'; src: url('fonts/Vazir-Black.ttf') format('truetype'); font-weight: 800 900; font-display: swap; }
+  @font-face { font-family: 'Anjoman'; src: url('fonts/Anjoman-SemiBold.ttf') format('truetype'); font-weight: 600; font-display: swap; }
+  @font-face { font-family: 'Anjoman'; src: url('fonts/Anjoman-Bold.ttf') format('truetype'); font-weight: 700; font-display: swap; }
+  @font-face { font-family: 'Anjoman'; src: url('fonts/Anjoman-ExtraBold.ttf') format('truetype'); font-weight: 800; font-display: swap; }
+  @font-face { font-family: 'Peyda'; src: url('fonts/Peyda-SemiBold.ttf') format('truetype'); font-weight: 600; font-display: swap; }
+  @font-face { font-family: 'Peyda'; src: url('fonts/Peyda-Bold.ttf') format('truetype'); font-weight: 700 900; font-display: swap; }
+  body { margin: 0; background: oklch(0.94 0.005 60); font-family: 'Vazirmatn', system-ui, sans-serif; }
+  a { color: oklch(0.42 0.13 340); text-decoration: none; }
+  a:hover { color: oklch(0.34 0.12 340); }
+  code { font-family: ui-monospace, Menlo, monospace; font-size: 0.85em; direction: ltr; unicode-bidi: isolate; }
+</style>
+</helmet>
+
+<div dir="rtl" style="padding: 40px; display: flex; flex-direction: column; gap: 56px;">
+
+  <div style="max-width: 940px; display: flex; flex-direction: column; gap: 10px;">
+    <div style="font-size: 13px; font-weight: 700; letter-spacing: 0.04em; color: oklch(0.58 0.015 330);">BEAUCLICK V3.3 — فضای مالیِ مستقل از نقش</div>
+    <h1 style="margin: 0; font-family: 'Peyda', sans-serif; font-size: 44px; font-weight: 800; line-height: 1.4; color: oklch(0.22 0.02 330);">امور مالی</h1>
+    <p style="margin: 0; font-size: 16px; line-height: 1.85; color: oklch(0.46 0.02 330);">داستانِ ‎#149b‎ / ‎#152‎ (‏<span dir="ltr">status:proposed</span>‏، ۵ امتیاز). یک مقصدِ تازه در <code dir="ltr">/finance</code> که <strong>هیچ پروفایلِ تخصصی نمی‌خواهد</strong>: مالکِ کسب‌وکار، مالکِ تخصصی، مالکِ دوگانه، دفتردارِ بدونِ پروفایل و کسی که به چند فضای مالی دسترسی دارد، همه از همین‌جا وارد می‌شوند.</p>
+    <p style="margin: 0; font-size: 14px; line-height: 1.85; color: oklch(0.46 0.02 330);">هر پنج مسیرِ خواندنِ فضامحورِ مالی در سرور <strong>پیاده شده‌اند</strong> (‏#72‎ و ‎#111‎ بسته). آنچه ساخته نشده همین رابط است. هیچ مسیرِ سرورِ تازه‌ای در این طراحی فرض نشده.</p>
+  </div>
+
+  <section data-screen-label="F0" style="display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.42 0.13 340); color: #fff;">F۰</span>
+      <h2 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 24px; font-weight: 800; color: oklch(0.22 0.02 330);">قراردادی که این صفحه رویش ایستاده</h2>
+      <code style="color: oklch(0.58 0.015 330);" dir="ltr">v1/me/finance/*</code>
+    </div>
+
+    <div tabindex="0" role="region" aria-label="مسیرهای مالیِ فضامحور — جدولِ لغزان" style="width: min(1280px, 100%); box-sizing: border-box; background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; overflow-x: auto;">
+      <table style="width: 100%; min-width: 720px; border-collapse: collapse;">
+        <caption style="caption-side: top; text-align: start; padding: 14px 18px; font-size: 12.5px; line-height: 1.75; color: oklch(0.58 0.015 330);">پنج مسیرِ فضامحور. هیچ‌کدام هیچ شناسه‌ای از کاربر، مالک، متخصص، کسب‌وکار یا طرف نمی‌پذیرند: تماس‌گیرنده از نشست می‌آید و فضا از یک ارجاعِ مات که فقط <em>تطبیق</em> داده می‌شود.</caption>
+        <thead>
+          <tr style="border-bottom: 1px solid oklch(0.9 0.008 60);">
+            <th style="text-align: start; padding: 11px 18px; font-size: 12px; font-weight: 700; color: oklch(0.58 0.015 330);">مسیر</th>
+            <th style="text-align: start; padding: 11px 10px; font-size: 12px; font-weight: 700; color: oklch(0.58 0.015 330);">چه برمی‌گرداند</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom: 1px solid oklch(0.96 0.005 60);"><td style="padding: 11px 18px; font-size: 13px;" dir="ltr">GET /workspaces</td><td style="padding: 11px 10px; font-size: 12.5px; color: oklch(0.46 0.02 330);">هر ورودی دقیقاً چهار چیز: ارجاعِ مات، نوعِ فضا (تخصصی یا کسب‌وکار)، شیوهٔ دسترسی (مالک یا فقط‌خواندنی) و <code dir="ltr">displayLabel</code>، که نامِ عمومیِ سروری است.</td></tr>
+          <tr style="border-bottom: 1px solid oklch(0.96 0.005 60);"><td style="padding: 11px 18px; font-size: 13px;" dir="ltr">GET /:ref/summary</td><td style="padding: 11px 10px; font-size: 12.5px; color: oklch(0.46 0.02 330);">نوعِ فضا، دریافتنیِ خالص، تسویه‌شده، مانده، و واحدِ پول.</td></tr>
+          <tr style="border-bottom: 1px solid oklch(0.96 0.005 60);"><td style="padding: 11px 18px; font-size: 13px;" dir="ltr">GET /:ref/outstanding-orders</td><td style="padding: 11px 10px; font-size: 12.5px; color: oklch(0.46 0.02 330);">سفارش‌هایی که هنوز تسویه نشده‌اند.</td></tr>
+          <tr style="border-bottom: 1px solid oklch(0.96 0.005 60);"><td style="padding: 11px 18px; font-size: 13px;" dir="ltr">GET /:ref/settlements</td><td style="padding: 11px 10px; font-size: 12.5px; color: oklch(0.46 0.02 330);">یک صفحهٔ کلیدی، تازه‌ترین اول، با نشانگرِ صفحهٔ بعد. پیش‌فرض ۲۰، سقف ۱۰۰.</td></tr>
+          <tr><td style="padding: 11px 18px; font-size: 13px;" dir="ltr">GET /:ref/orders/:orderId/ledger</td><td style="padding: 11px 10px; font-size: 12.5px; color: oklch(0.46 0.02 330);">ردیف‌های دفترِ یک سفارش، در همین فضا. سفارشِ فضای دیگر، فهرستِ خالی می‌گیرد.</td></tr>
+        </tbody>
+      </table>
+      <div style="padding: 14px 18px; border-top: 1px solid oklch(0.94 0.006 60); font-size: 12.5px; line-height: 1.8; color: oklch(0.58 0.015 330);">گیرندهٔ دسترسیِ فقط‌خواندنی <strong>همین پنج مسیر</strong> را با <strong>همان پیش‌نمایشِ داده</strong> می‌خواند و هیچ چیزِ دیگری. چهار مسیرِ قدیمیِ مفرد فقط با مالکیت کار می‌کنند و اختیارِ اعطاشده در آن‌ها اصلاً دیده نمی‌شود.</div>
+    </div>
+
+    <div style="width: min(1280px, 100%); box-sizing: border-box; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px;">
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 9px;">
+        <div style="font-size: 14px; font-weight: 800;">چرا مسیرِ تازه، و نه عنوانِ تازه روی مسیرِ قدیمی</div>
+        <p style="margin: 0; font-size: 12.5px; line-height: 1.85; color: oklch(0.46 0.02 330);">مسیرِ <code dir="ltr">/pro/finance</code> پشتِ نگهبانِ متخصص و پوستهٔ متخصص است. دفتردارِ بدونِ پروفایلِ تخصصی از آن رد نمی‌شود، و اگر هم رد می‌شد، «متخصص» نامیده می‌شد. مقصدِ تازه پشتِ هیچ‌کدام نیست.</p>
+      </div>
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 9px;">
+        <div style="font-size: 14px; font-weight: 800;">مسیرِ قدیمی می‌ماند</div>
+        <p style="margin: 0; font-size: 12.5px; line-height: 1.85; color: oklch(0.46 0.02 330);">هر دو مسیر <strong>یک مؤلفهٔ مشترک</strong> را نشان می‌دهند و مسیرِ قدیمی به همان واگذار می‌کند. رفتارِ مالکِ تک‌تخصصی ذره‌ای عوض نمی‌شود و هیچ مالکی بی‌صدا به شخصیتِ دیگری هدایت نمی‌شود.</p>
+      </div>
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 9px;">
+        <div style="font-size: 14px; font-weight: 800;">برچسبِ ناوبری</div>
+        <p style="margin: 0; font-size: 12.5px; line-height: 1.85; color: oklch(0.46 0.02 330);">«امور مالی» — خنثی، و هرگز «متخصص». دفتردارِ فقط‌مالی در هیچ عنوان، هیچ نوارِ کناری و هیچ نشانی «متخصص» نامیده نمی‌شود.</p>
+      </div>
+    </div>
+  </section>
+
+  <section data-screen-label="F1" style="display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.42 0.13 340); color: #fff;">F۱</span>
+      <h2 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 24px; font-weight: 800; color: oklch(0.22 0.02 330);">انتخابِ فضا — دسکتاپ</h2>
+      <code style="color: oklch(0.58 0.015 330);" dir="ltr">/finance</code>
+    </div>
+
+    <div role="note" aria-labelledby="fw-name-note" style="width: min(1280px, 100%); box-sizing: border-box; border: 2px dashed oklch(0.7 0.02 330); border-radius: 16px; padding: 18px 20px; background: repeating-linear-gradient(135deg, oklch(0.97 0.004 330) 0 10px, oklch(0.955 0.006 330) 10px 20px); display: flex; flex-direction: column; gap: 10px;">
+      <div style="display: flex; align-items: center; gap: 9px; flex-wrap: wrap;">
+        <span style="font-size: 11px; font-weight: 800; letter-spacing: 0.04em; padding: 4px 11px; border-radius: 999px; background: oklch(0.3 0.02 330); color: #fff;">بازبینیِ طراحی — بخشی از محصول نیست</span>
+        <h3 id="fw-name-note" style="margin: 0; font-size: 15px; font-weight: 700; color: oklch(0.3 0.02 330);">نامِ فضا را سرور می‌دهد — رابط هیچ برچسبی نمی‌سازد</h3>
+      </div>
+      <p style="margin: 0; font-size: 12.5px; line-height: 1.85; color: oklch(0.46 0.02 330);">هر ورودیِ فهرستِ فضاها چهار میدان دارد: ارجاعِ مات، نوعِ فضا، شیوهٔ دسترسی، و <code dir="ltr">displayLabel</code> — نامِ عمومیِ همان کسب‌وکار یا متخصص که سرور از منبعِ معتبر حل می‌کند. این نام <strong>فرادادهٔ نمایشی است، نه اجازه</strong>؛ اختیار همچنان در هر درخواست دوباره بررسی می‌شود.</p>
+      <p style="margin: 0; font-size: 12.5px; line-height: 1.85; color: oklch(0.46 0.02 330);">برچسب‌ها از سرور می‌آیند و <strong>هیچ‌گاه از ترتیبِ سمتِ کاربر یا شماره‌گذاریِ محلیِ نشست ساخته نمی‌شوند</strong>. اگر نامِ عمومیِ آن کسب‌وکار یا متخصص عوض شود، برچسب هم عوض می‌شود — این درست است، نه ناپایداری.</p>
+      <p style="margin: 0; font-size: 12.5px; line-height: 1.85; color: oklch(0.46 0.02 330);">ارجاع به‌هیچ‌روی نمایش داده، کوتاه یا ذخیره نمی‌شود، و هیچ برچسبی از ترتیبِ پاسخ یا شمارهٔ ردیف ساخته نمی‌شود. اگر سرور برای یک طرف نامی نداشته باشد، آن ورودی اصلاً در پاسخ نمی‌آید — پس حالتِ «فضای بی‌نام» وجود ندارد.</p>
+    </div>
+
+    <div style="width: min(1280px, 100%); box-sizing: border-box; background: oklch(0.98 0.004 75); border: 1px solid oklch(0.9 0.008 60); border-radius: 18px; overflow: hidden;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 18px 24px; background: oklch(1 0 0); border-bottom: 1px solid oklch(0.9 0.008 60);">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span aria-hidden="true" style="width: 34px; height: 34px; border-radius: 10px; background: oklch(0.42 0.13 340);"></span>
+          <div>
+            <div style="font-size: 17px; font-weight: 800; color: oklch(0.22 0.02 330);">امور مالی</div>
+            <div style="font-size: 12px; color: oklch(0.58 0.015 330);">مستقل از نقش — بدونِ نیاز به پروفایلِ تخصصی</div>
+          </div>
+        </div>
+        <nav aria-label="ناوبریِ اصلی" style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <a href="#" style="min-height: 44px; display: inline-flex; align-items: center; padding: 0 16px; border-radius: 10px; background: oklch(0.95 0.02 340); color: oklch(0.35 0.12 340); font-size: 14px; font-weight: 700;" aria-current="page">امور مالی</a>
+          <a href="#" style="min-height: 44px; display: inline-flex; align-items: center; padding: 0 16px; border-radius: 10px; font-size: 14px; font-weight: 600; color: oklch(0.46 0.02 330);">حساب کاربری</a>
+        </nav>
+      </div>
+
+      <div style="padding: 24px;">
+        <fieldset style="margin: 0; border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 18px 20px; background: oklch(1 0 0);">
+          <legend style="padding: 0 8px; font-size: 14px; font-weight: 800; color: oklch(0.3 0.02 330);">کدام فضای مالی؟</legend>
+          <p style="margin: 0 0 14px; font-size: 12.5px; line-height: 1.8; color: oklch(0.58 0.015 330);">هیچ فضایی خودبه‌خود انتخاب نمی‌شود. تا وقتی یکی را انتخاب نکنید، هیچ رقمی نمایش داده نمی‌شود.</p>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px;">
+            <label style="border: 2px solid oklch(0.42 0.13 340); border-radius: 12px; padding: 15px 17px; display: flex; align-items: flex-start; gap: 12px; cursor: pointer; background: oklch(0.985 0.012 340);">
+              <input type="radio" name="fw-space" checked="checked" style="margin-top: 3px; width: 20px; height: 20px; flex: none;" />
+              <span style="display: flex; flex-direction: column; gap: 6px;">
+                <span style="font-size: 14px; font-weight: 800; color: oklch(0.22 0.02 330);">سالن نور · کسب‌وکار</span>
+                <span style="display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; color: oklch(0.35 0.12 340);"><span aria-hidden="true" style="width: 9px; height: 9px; border-radius: 999px; background: oklch(0.42 0.13 340);"></span>دسترسیِ مالکانه — خواندن و کارهای مالکانه</span>
+              </span>
+            </label>
+            <label style="border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 15px 17px; display: flex; align-items: flex-start; gap: 12px; cursor: pointer; background: oklch(1 0 0);">
+              <input type="radio" name="fw-space" style="margin-top: 3px; width: 20px; height: 20px; flex: none;" />
+              <span style="display: flex; flex-direction: column; gap: 6px;">
+                <span style="font-size: 14px; font-weight: 800; color: oklch(0.22 0.02 330);">کلینیک آفتاب · کسب‌وکار</span>
+                <span style="display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; color: oklch(0.4 0.02 330);"><span aria-hidden="true" style="width: 9px; height: 9px; border: 2px solid oklch(0.4 0.02 330); border-radius: 2px;"></span>دسترسیِ فقط‌خواندنیِ واگذارشده</span>
+              </span>
+            </label>
+            <label style="border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 15px 17px; display: flex; align-items: flex-start; gap: 12px; cursor: pointer; background: oklch(1 0 0);">
+              <input type="radio" name="fw-space" style="margin-top: 3px; width: 20px; height: 20px; flex: none;" />
+              <span style="display: flex; flex-direction: column; gap: 6px;">
+                <span style="font-size: 14px; font-weight: 800; color: oklch(0.22 0.02 330);">مریم سلطانی · تخصصی</span>
+                <span style="display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; color: oklch(0.35 0.12 340);"><span aria-hidden="true" style="width: 9px; height: 9px; border-radius: 999px; background: oklch(0.42 0.13 340);"></span>دسترسیِ مالکانه — خواندن و کارهای مالکانه</span>
+              </span>
+            </label>
+            <label style="border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 15px 17px; display: flex; align-items: flex-start; gap: 12px; cursor: pointer; background: oklch(1 0 0);">
+              <input type="radio" name="fw-space" style="margin-top: 3px; width: 20px; height: 20px; flex: none;" />
+              <span style="display: flex; flex-direction: column; gap: 6px; min-width: 0;">
+                <span title="مجتمعِ زیبایی و سلامتِ باغ‌های ایرانیِ شمالِ تهران" style="font-size: 14px; font-weight: 800; color: oklch(0.22 0.02 330); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">مجتمعِ زیبایی و سلامتِ باغ‌های ایرانیِ شمالِ تهران</span>
+                <span style="display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; color: oklch(0.4 0.02 330);"><span aria-hidden="true" style="width: 9px; height: 9px; border: 2px solid oklch(0.4 0.02 330); border-radius: 2px;"></span>کسب‌وکار · دسترسیِ فقط‌خواندنیِ واگذارشده</span>
+                <span style="font-size: 11.5px; color: oklch(0.58 0.015 330);">نامِ بلند در دید کوتاه می‌شود، ولی متنِ کامل برای صفحه‌خوان و راهنمای ابزار در دسترس می‌ماند</span>
+              </span>
+            </label>
+          </div>
+          <p style="margin: 14px 0 0; font-size: 12px; line-height: 1.8; color: oklch(0.58 0.015 330);">شکلِ نشان تفاوت را می‌گوید، نه رنگ: دایرهٔ توپر یعنی مالکانه، مربعِ توخالی یعنی واگذارشده. اگر یک فضا هم از راهِ مالکیت و هم از راهِ اعطا برسد، <strong>یک‌بار</strong> و به‌عنوانِ مالکانه نمایش داده می‌شود.</p>
+          <p style="margin: 8px 0 0; font-size: 12px; line-height: 1.8; color: oklch(0.58 0.015 330);">اگر دو فضا <strong>همنام</strong> باشند، نوعِ فضا و شیوهٔ دسترسی آن‌ها را جدا می‌کنند — و اگر آن دو هم یکسان باشند، رابط <strong>هیچ تفاوتِ ساختگی‌ای نمی‌سازد</strong>: نه شماره، نه ترتیب، نه بخشی از ارجاع. این حالتِ نادر در مستندات ثبت شده و باز است.</p>
+        </fieldset>
+      </div>
+    </div>
+  </section>
+
+  <section data-screen-label="F2" style="display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.42 0.13 340); color: #fff;">F۲</span>
+      <h2 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 24px; font-weight: 800; color: oklch(0.22 0.02 330);">محتوای فضای انتخاب‌شده — دسترسیِ فقط‌خواندنی</h2>
+      <code style="color: oklch(0.58 0.015 330);" dir="ltr">summary · outstanding-orders · settlements</code>
+    </div>
+
+    <div style="width: min(1280px, 100%); box-sizing: border-box; display: flex; flex-direction: column; gap: 16px;">
+      <div style="background: oklch(0.97 0.008 330); border: 1px solid oklch(0.88 0.015 330); border-radius: 12px; padding: 14px 18px; display: flex; align-items: center; gap: 11px; flex-wrap: wrap;">
+        <span aria-hidden="true" style="width: 10px; height: 10px; border: 2px solid oklch(0.35 0.02 330); border-radius: 2px; flex: none;"></span>
+        <div style="font-size: 13px; font-weight: 700; color: oklch(0.3 0.02 330);">شما این فضا را فقط می‌خوانید</div>
+        <div style="font-size: 12.5px; line-height: 1.8; color: oklch(0.46 0.02 330);">هیچ تغییری در تسویه، پرداخت، بازگشتِ وجه یا دفترِ مالی از اینجا ممکن نیست — و هیچ دکمهٔ غیرفعالی هم برای آن‌ها نشان داده نمی‌شود.</div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px;">
+        <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 7px;">
+          <div style="font-size: 12.5px; color: oklch(0.58 0.015 330);">دریافتنیِ خالص</div>
+          <div style="font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; color: oklch(0.22 0.02 330);">۱۲٬۴۶۰٬۰۰۰ <span style="font-size: 13px; font-weight: 600; color: oklch(0.58 0.015 330);">تومان</span></div>
+          <span style="align-self: flex-start; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: oklch(0.94 0.006 60); color: oklch(0.46 0.02 330);">نمونه — تصویب‌نشده</span>
+        </div>
+        <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 7px;">
+          <div style="font-size: 12.5px; color: oklch(0.58 0.015 330);">تسویه‌شده</div>
+          <div style="font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; color: oklch(0.22 0.02 330);">۸٬۰۸۰٬۰۰۰ <span style="font-size: 13px; font-weight: 600; color: oklch(0.58 0.015 330);">تومان</span></div>
+          <span style="align-self: flex-start; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: oklch(0.94 0.006 60); color: oklch(0.46 0.02 330);">نمونه — تصویب‌نشده</span>
+        </div>
+        <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 7px;">
+          <div style="font-size: 12.5px; color: oklch(0.58 0.015 330);">مانده</div>
+          <div style="font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; color: oklch(0.22 0.02 330);">۴٬۳۸۰٬۰۰۰ <span style="font-size: 13px; font-weight: 600; color: oklch(0.58 0.015 330);">تومان</span></div>
+          <span style="align-self: flex-start; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: oklch(0.94 0.006 60); color: oklch(0.46 0.02 330);">نمونه — تصویب‌نشده</span>
+        </div>
+      </div>
+      <p style="margin: 0; font-size: 12px; line-height: 1.8; color: oklch(0.58 0.015 330);">این سه رقم دقیقاً همان سه عددی هستند که خلاصهٔ سرور می‌دهد. هیچ «درآمدِ شما»، هیچ نرخِ رشد، هیچ پیش‌بینی و هیچ عددِ ساختگیِ دیگری اضافه نشده — معنایی که سرور تثبیت نکرده، اینجا ساخته نمی‌شود.</p>
+
+      <div tabindex="0" role="region" aria-label="تاریخچهٔ تسویه — جدولِ لغزان" style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; overflow-x: auto;">
+        <table style="width: 100%; min-width: 680px; border-collapse: collapse;">
+          <caption style="caption-side: top; text-align: start; padding: 16px 20px 10px; font-size: 16px; font-weight: 700; color: oklch(0.22 0.02 330);">تاریخچهٔ تسویه <span style="font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: oklch(0.94 0.006 60); color: oklch(0.46 0.02 330);">نمونه — تصویب‌نشده</span></caption>
+          <thead>
+            <tr style="border-bottom: 1px solid oklch(0.9 0.008 60);">
+              <th style="text-align: start; padding: 11px 20px; font-size: 12px; font-weight: 700; color: oklch(0.58 0.015 330);">تاریخ</th>
+              <th style="text-align: start; padding: 11px 10px; font-size: 12px; font-weight: 700; color: oklch(0.58 0.015 330);">نوع</th>
+              <th style="text-align: start; padding: 11px 10px; font-size: 12px; font-weight: 700; color: oklch(0.58 0.015 330);">روش</th>
+              <th style="text-align: start; padding: 11px 10px; font-size: 12px; font-weight: 700; color: oklch(0.58 0.015 330);">ارجاع</th>
+              <th style="text-align: end; padding: 11px 20px; font-size: 12px; font-weight: 700; color: oklch(0.58 0.015 330);">مبلغ</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom: 1px solid oklch(0.96 0.005 60);"><td style="padding: 13px 20px; font-size: 13px;">۱۴۰۵/۰۶/۱۸</td><td style="padding: 13px 10px; font-size: 13px;">تسویه</td><td style="padding: 13px 10px; font-size: 13px;">انتقالِ بانکی</td><td style="padding: 13px 10px; font-size: 12.5px; color: oklch(0.58 0.015 330);" dir="ltr">STL-4471</td><td style="padding: 13px 20px; font-size: 13px; font-weight: 700; text-align: end; font-variant-numeric: tabular-nums;">۳٬۲۰۰٬۰۰۰</td></tr>
+            <tr style="border-bottom: 1px solid oklch(0.96 0.005 60);"><td style="padding: 13px 20px; font-size: 13px;">۱۴۰۵/۰۶/۰۴</td><td style="padding: 13px 10px; font-size: 13px;">تسویه</td><td style="padding: 13px 10px; font-size: 13px;">انتقالِ بانکی</td><td style="padding: 13px 10px; font-size: 12.5px; color: oklch(0.58 0.015 330);" dir="ltr">STL-4312</td><td style="padding: 13px 20px; font-size: 13px; font-weight: 700; text-align: end; font-variant-numeric: tabular-nums;">۲٬۸۸۰٬۰۰۰</td></tr>
+            <tr><td style="padding: 13px 20px; font-size: 13px;">۱۴۰۵/۰۵/۲۱</td><td style="padding: 13px 10px; font-size: 13px;">برگشتِ تسویه</td><td style="padding: 13px 10px; font-size: 13px;">—</td><td style="padding: 13px 10px; font-size: 12.5px; color: oklch(0.58 0.015 330);" dir="ltr">STL-4290</td><td style="padding: 13px 20px; font-size: 13px; font-weight: 700; text-align: end; font-variant-numeric: tabular-nums;">−۴۴۰٬۰۰۰</td></tr>
+          </tbody>
+        </table>
+        <div style="padding: 14px 20px; border-top: 1px solid oklch(0.94 0.006 60); display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+          <span style="font-size: 12.5px; color: oklch(0.58 0.015 330);">صفحه‌بندیِ نشانگری، تازه‌ترین اول. شمارهٔ صفحه و تعدادِ کل وجود ندارد، چون سرور نمی‌دهد.</span>
+          <button type="button" style="font: inherit; min-height: 44px; padding: 0 20px; border: 1px solid oklch(0.86 0.01 60); border-radius: 10px; background: oklch(1 0 0); font-size: 14px; font-weight: 700; cursor: pointer;">صفحهٔ بعد</button>
+        </div>
+      </div>
+
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px;">
+        <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: oklch(0.22 0.02 330);">ریزِ دفترِ یک سفارش</h3>
+        <p style="margin: 0; font-size: 12.5px; line-height: 1.8; color: oklch(0.46 0.02 330);">از فهرستِ سفارش‌های در انتظارِ تسویه باز می‌شود. هر ردیف <strong>نرخِ کارمزدِ ثبت‌شدهٔ همان تراکنش</strong> را دارد — این یک واقعیتِ تاریخیِ ثبت‌شده در دفتر است، نه نرخِ تأییدشدهٔ پلتفرم. این صفحه هیچ نرخی را به‌عنوانِ سیاستِ جاری اعلام نمی‌کند.</p>
+        <div tabindex="0" role="region" aria-label="ریزِ دفترِ سفارش — جدولِ لغزان" style="overflow-x: auto;">
+          <table style="width: 100%; min-width: 560px; border-collapse: collapse;">
+            <thead>
+              <tr style="border-bottom: 1px solid oklch(0.9 0.008 60);">
+                <th style="text-align: start; padding: 10px 6px; font-size: 12px; font-weight: 700; color: oklch(0.58 0.015 330);">نوعِ ردیف</th>
+                <th style="text-align: start; padding: 10px 6px; font-size: 12px; font-weight: 700; color: oklch(0.58 0.015 330);">مرجع</th>
+                <th style="text-align: start; padding: 10px 6px; font-size: 12px; font-weight: 700; color: oklch(0.58 0.015 330);">نرخِ ثبت‌شده</th>
+                <th style="text-align: end; padding: 10px 6px; font-size: 12px; font-weight: 700; color: oklch(0.58 0.015 330);">مبلغ</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-bottom: 1px solid oklch(0.96 0.005 60);"><td style="padding: 12px 6px; font-size: 13px;">پرداختِ سفارش</td><td style="padding: 12px 6px; font-size: 12.5px; color: oklch(0.58 0.015 330);">پرداخت</td><td style="padding: 12px 6px; font-size: 12.5px; color: oklch(0.58 0.015 330);">—</td><td style="padding: 12px 6px; font-size: 13px; font-weight: 700; text-align: end; font-variant-numeric: tabular-nums;">۱٬۸۰۰٬۰۰۰</td></tr>
+              <tr><td style="padding: 12px 6px; font-size: 13px;">کارمزدِ پلتفرم</td><td style="padding: 12px 6px; font-size: 12.5px; color: oklch(0.58 0.015 330);">پرداخت</td><td style="padding: 12px 6px; font-size: 12.5px; color: oklch(0.58 0.015 330);">ثبت‌شده در همان تراکنش</td><td style="padding: 12px 6px; font-size: 13px; font-weight: 700; text-align: end; font-variant-numeric: tabular-nums;">−۲۷۰٬۰۰۰</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="margin: 0; font-size: 12px; line-height: 1.8; color: oklch(0.58 0.015 330);">هیچ شناسهٔ مشتری، هیچ اطلاعاتِ هویتیِ متخصص، هیچ شناسهٔ طرف، هیچ شناسهٔ عضویت یا اختیار، و هیچ فراداده‌ٔ حسابرسی در این جدول‌ها نیست — چون در پیش‌نمایشِ سرور هم نیست.</p>
+      </div>
+    </div>
+  </section>
+
+  <section data-screen-label="F3" style="display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.42 0.13 340); color: #fff;">F۳</span>
+      <h2 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 24px; font-weight: 800; color: oklch(0.22 0.02 330);">موبایل ۳۹۰ — فضاها اول، بعد محتوا</h2>
+    </div>
+    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+      <div style="width: min(390px, 100%); box-sizing: border-box; background: oklch(0.98 0.004 75); border: 1px solid oklch(0.9 0.008 60); border-radius: 20px; overflow: hidden; display: flex; flex-direction: column;">
+        <div style="padding: 14px 16px; background: oklch(1 0 0); border-bottom: 1px solid oklch(0.9 0.008 60);">
+          <div style="font-size: 16px; font-weight: 800; color: oklch(0.22 0.02 330);">امور مالی</div>
+        </div>
+        <div style="padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;">
+          <div style="font-size: 13px; font-weight: 700; color: oklch(0.3 0.02 330);">کدام فضای مالی؟</div>
+          <button type="button" style="font: inherit; text-align: start; min-height: 44px; padding: 13px 15px; border: 2px solid oklch(0.42 0.13 340); border-radius: 12px; background: oklch(0.985 0.012 340); cursor: pointer; display: flex; flex-direction: column; gap: 5px;">
+            <span style="font-size: 14px; font-weight: 800;">سالن نور · کسب‌وکار</span>
+            <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: oklch(0.35 0.12 340);"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 999px; background: oklch(0.42 0.13 340);"></span>دسترسیِ مالکانه</span>
+          </button>
+          <button type="button" style="font: inherit; text-align: start; min-height: 44px; padding: 13px 15px; border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; background: oklch(1 0 0); cursor: pointer; display: flex; flex-direction: column; gap: 5px;">
+            <span style="font-size: 14px; font-weight: 800;">کلینیک آفتاب · کسب‌وکار</span>
+            <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: oklch(0.4 0.02 330);"><span aria-hidden="true" style="width: 8px; height: 8px; border: 2px solid oklch(0.4 0.02 330); border-radius: 2px;"></span>فقط‌خواندنیِ واگذارشده</span>
+          </button>
+          <div style="height: 1px; background: oklch(0.92 0.006 60); margin: 4px 0;"></div>
+          <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px;">
+            <div style="font-size: 12px; color: oklch(0.58 0.015 330);">دریافتنیِ خالص</div>
+            <div style="font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums;">۱۲٬۴۶۰٬۰۰۰</div>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 12px 14px;"><div style="font-size: 11.5px; color: oklch(0.58 0.015 330);">تسویه‌شده</div><div style="font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums;">۸٬۰۸۰٬۰۰۰</div></div>
+            <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 12px 14px;"><div style="font-size: 11.5px; color: oklch(0.58 0.015 330);">مانده</div><div style="font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums;">۴٬۳۸۰٬۰۰۰</div></div>
+          </div>
+          <div style="font-size: 13px; font-weight: 700; margin-top: 4px;">تاریخچهٔ تسویه</div>
+          <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px;">
+            <div style="display: flex; justify-content: space-between; gap: 10px;"><span style="font-size: 12px; color: oklch(0.58 0.015 330);">تاریخ</span><span style="font-size: 13px; font-weight: 600;">۱۴۰۵/۰۶/۱۸</span></div>
+            <div style="display: flex; justify-content: space-between; gap: 10px;"><span style="font-size: 12px; color: oklch(0.58 0.015 330);">نوع</span><span style="font-size: 13px; font-weight: 600;">تسویه</span></div>
+            <div style="display: flex; justify-content: space-between; gap: 10px;"><span style="font-size: 12px; color: oklch(0.58 0.015 330);">مبلغ</span><span style="font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums;">۳٬۲۰۰٬۰۰۰</span></div>
+          </div>
+          <p style="margin: 0; font-size: 11.5px; line-height: 1.75; color: oklch(0.58 0.015 330);">جدولِ عریض روی موبایل به کارتِ برچسب‌دار تبدیل می‌شود، نه به جدولِ افقی‌لغزان. ستونِ مبلغ در همهٔ کارت‌ها هم‌تراز می‌ماند.</p>
+        </div>
+      </div>
+
+      <div style="width: min(390px, 100%); box-sizing: border-box; display: flex; flex-direction: column; gap: 12px;">
+        <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 8px;">
+          <div style="font-size: 13.5px; font-weight: 800;">ناوبری، بر حسبِ اینکه کاربر که باشد</div>
+          <ul style="margin: 0; padding-inline-start: 18px; display: flex; flex-direction: column; gap: 7px; font-size: 12.5px; line-height: 1.8; color: oklch(0.46 0.02 330);">
+            <li><strong>مالکِ یک فضا:</strong> انتخابگر نمایش داده نمی‌شود؛ همان یک فضا مستقیم باز می‌شود. اگر چیزی برای انتخاب نیست، انتخاب خواستن آزاردهنده است.</li>
+            <li><strong>مالکِ چند فضا:</strong> انتخابگر اول، هیچ فضایی از پیش انتخاب‌نشده.</li>
+            <li><strong>دفتردارِ فقط‌مالی:</strong> «امور مالی» تنها مقصدِ اوست؛ هیچ پوسته یا عنوانِ متخصصی نمی‌بیند.</li>
+            <li><strong>مالک + واگذارشده:</strong> همه در یک فهرست، با نشانِ متفاوتِ شکلی؛ فضای تکراری یک‌بار و مالکانه.</li>
+            <li><strong>موبایل:</strong> «امور مالی» یک مقصد در نوارِ پایین. <strong>تبلت:</strong> انتخابگر بالای محتوا و همیشه دیده‌شدنی. <strong>دسکتاپ:</strong> انتخابگر و محتوا کنارِ هم.</li>
+          </ul>
+        </div>
+        <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 8px;">
+          <div style="font-size: 13.5px; font-weight: 800;">حافظهٔ نهان و حریمِ خصوصی — الزامِ پیاده‌سازی</div>
+          <ul style="margin: 0; padding-inline-start: 18px; display: flex; flex-direction: column; gap: 7px; font-size: 12.5px; line-height: 1.8; color: oklch(0.46 0.02 330);">
+            <li>هیچ پاسخِ مالی در حافظهٔ ماندگارِ مرورگر ذخیره نمی‌شود.</li>
+            <li>حافظهٔ موقت به‌ازای «کاربرِ احرازشده × فضا» تفکیک می‌شود.</li>
+            <li>با خروج و با تعویضِ حساب، پاک می‌شود.</li>
+            <li>با هر ردِ دسترسی، دادهٔ همان فضا باطل می‌شود.</li>
+            <li>پیش از نمایشِ فضای دیگر، دادهٔ فضای قبلی برداشته می‌شود.</li>
+            <li>هیچ رقمِ کهنه‌ای زیرِ پیامِ ردِ دسترسی باقی نمی‌ماند.</li>
+          </ul>
+          <p style="margin: 0; font-size: 12px; line-height: 1.8; color: oklch(0.35 0.09 155);"><strong>پیاده‌شده در ‎#154‎:</strong> هر نه مسیرِ مالیِ احرازشده سرصفحهٔ <code dir="ltr">Cache-Control: private, no-store</code> می‌دهند — از طریقِ میان‌افزارِ خانوادهٔ مسیر، روی پاسخِ موفق و روی <span dir="ltr">401</span>، <span dir="ltr">404</span> و <span dir="ltr">409</span>. این سرصفحه <strong>جایگزینِ پاک‌سازیِ حافظهٔ سمتِ کاربر نیست</strong>؛ شش قاعدهٔ بالا همچنان الزامِ پیاده‌سازی‌اند.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section data-screen-label="F4" style="display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.42 0.13 340); color: #fff;">F۴</span>
+      <h2 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 24px; font-weight: 800; color: oklch(0.22 0.02 330);">از دست رفتنِ دسترسی، وسطِ کار</h2>
+    </div>
+    <div style="width: min(1280px, 100%); box-sizing: border-box; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px;">
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 10px;">
+        <div style="font-size: 14px; font-weight: 800;">ترتیبِ کارها</div>
+        <ol style="margin: 0; padding-inline-start: 20px; display: flex; flex-direction: column; gap: 7px; font-size: 12.5px; line-height: 1.8; color: oklch(0.46 0.02 330);">
+          <li>صفحهٔ مالی باز است.</li>
+          <li>مالک دسترسی را بازپس می‌گیرد.</li>
+          <li>اولین درخواستِ بعدی همان ردِ خنثای همیشگی را می‌گیرد.</li>
+          <li>دادهٔ مالیِ نمایش‌داده‌شده <strong>پاک</strong> می‌شود.</li>
+          <li>آن فضا از فهرستِ انتخاب برداشته می‌شود.</li>
+          <li>کاربر به فضاهای باقی‌مانده می‌رود؛ اگر چیزی نمانده، به حالتِ «دسترسی‌ای نیست».</li>
+        </ol>
+      </div>
+      <div role="alert" style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.03 25); border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 10px;">
+        <div style="display: flex; align-items: center; gap: 9px;"><span aria-hidden="true" style="width: 10px; height: 10px; border-radius: 2px; background: oklch(0.5 0.16 25);"></span><div style="font-size: 14px; font-weight: 800; color: oklch(0.48 0.16 25);">یک پیامِ واحد، برای همهٔ علت‌ها</div></div>
+        <p style="margin: 0; padding: 12px 14px; border-radius: 10px; background: oklch(0.98 0.02 25); font-size: 13px; line-height: 1.85; color: oklch(0.45 0.1 25);">«این مورد پیدا نشد یا در دسترسِ شما نیست.»</p>
+        <p style="margin: 0; font-size: 12.5px; line-height: 1.8; color: oklch(0.46 0.02 330);">نمی‌گوید کسب‌وکار هنوز هست یا نه، عضویت برداشته شده یا نه، اختیار بازپس گرفته شده یا نه، ارجاع بدشکل بوده یا نه، و اصلاً هیچ‌وقت دسترسی داشته‌اید یا نه. سرور هم همین‌طور رفتار می‌کند؛ این صفحه فقط همان را بازتاب می‌دهد.</p>
+      </div>
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 10px;">
+        <div style="font-size: 14px; font-weight: 800;">همین رفتار، در پنج حالتِ دیگر</div>
+        <ul style="margin: 0; padding-inline-start: 18px; display: flex; flex-direction: column; gap: 7px; font-size: 12.5px; line-height: 1.8; color: oklch(0.46 0.02 330);">
+          <li>ارجاعِ کهنه پس از بارگذاریِ دوباره</li>
+          <li>حذفِ نرمِ کسب‌وکار</li>
+          <li>غیرفعال‌شدنِ عضویت</li>
+          <li>نشانهٔ معتبر ولی اختیارِ بازپس‌گرفته — اختیار در نشانه ذخیره نمی‌شود، پس بی‌اثر است</li>
+          <li>خروج و تعویضِ حساب — حافظهٔ موقت کاملاً پاک</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3 style="margin: 8px 0 0; font-size: 15px; font-weight: 700; color: oklch(0.3 0.02 330);">حالت‌های خالی، خطا و ناقص</h3>
+    <div style="width: min(1280px, 100%); box-sizing: border-box; display: grid; grid-template-columns: repeat(auto-fit, minmax(272px, 1fr)); gap: 14px;">
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 15px 17px; display: flex; flex-direction: column; gap: 7px;"><div style="font-size: 13px; font-weight: 800;">هیچ فضایی در دسترس نیست</div><p style="margin: 0; font-size: 12.5px; line-height: 1.8; color: oklch(0.58 0.015 330);">فهرستِ خالی یک پاسخِ درست است، نه خطا. متن می‌گوید دسترسیِ مالی‌ای در کار نیست و راهِ سرراستِ بعدی چیست.</p></div>
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 15px 17px; display: flex; flex-direction: column; gap: 7px;"><div style="font-size: 13px; font-weight: 800;">تاریخچهٔ مالیِ خالی</div><p style="margin: 0; font-size: 12.5px; line-height: 1.8; color: oklch(0.58 0.015 330);">فضا هست، هنوز تسویه‌ای نیست. ارقامِ خلاصه صفر نمایش داده می‌شوند، نه خط‌تیره — صفر یک واقعیت است.</p></div>
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 15px 17px; display: flex; flex-direction: column; gap: 7px;"><div style="font-size: 13px; font-weight: 800;">بخشِ ناقص</div><p style="margin: 0; font-size: 12.5px; line-height: 1.8; color: oklch(0.58 0.015 330);">اگر خلاصه بیاید و تسویه‌ها نه، همان بخش پیامِ خودش را دارد و بقیهٔ صفحه پاک نمی‌شود.</p></div>
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 15px 17px; display: flex; flex-direction: column; gap: 7px;"><div style="font-size: 13px; font-weight: 800;">خطای سرور</div><p style="margin: 0; font-size: 12.5px; line-height: 1.8; color: oklch(0.58 0.015 330);">متمایز از رد: قابلِ تلاشِ دوباره و بدونِ پاک‌کردنِ انتخابِ فضا.</p></div>
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 15px 17px; display: flex; flex-direction: column; gap: 7px;"><div style="font-size: 13px; font-weight: 800;">بارگذاری</div><p style="margin: 0; font-size: 12.5px; line-height: 1.8; color: oklch(0.58 0.015 330);">اسکلت با <span dir="ltr">aria-busy</span>؛ هیچ رقمِ قدیمی زیرِ اسکلت باقی نمی‌ماند.</p></div>
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 15px 17px; display: flex; flex-direction: column; gap: 7px;"><div style="font-size: 13px; font-weight: 800;">تلاشِ دوباره</div><p style="margin: 0; font-size: 12.5px; line-height: 1.8; color: oklch(0.58 0.015 330);">دکمهٔ تلاشِ دوباره فقط روی خطای شبکه/سرور می‌آید، نه روی ردِ دسترسی — تکرارِ یک رد، همان رد است. انتخابِ فضا حفظ می‌شود و هیچ رقمی دوباره از حافظهٔ کهنه نشان داده نمی‌شود.</p></div>
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 15px 17px; display: flex; flex-direction: column; gap: 7px;"><div style="font-size: 13px; font-weight: 800;">مسیرِ مفرد، پاسخِ <span dir="ltr">409</span></div><p style="margin: 0; font-size: 12.5px; line-height: 1.8; color: oklch(0.58 0.015 330);">مالکِ چندفضایی روی مسیرِ قدیمیِ مفرد <code dir="ltr">finance_workspace_selection_required</code> می‌گیرد. رابط این را خطا نشان نمی‌دهد، بلکه همان انتخابگرِ فضا را باز می‌کند — بدونِ اینکه بگوید کدام فضا منظور بوده یا چند تا فضا هست.</p></div>
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 15px 17px; display: flex; flex-direction: column; gap: 7px;"><div style="font-size: 13px; font-weight: 800;">تنها یک فضای واگذارشده</div><p style="margin: 0; font-size: 12.5px; line-height: 1.8; color: oklch(0.58 0.015 330);">دفترداری که فقط یک فضای فقط‌خواندنی دارد، مستقیم واردِ همان می‌شود — با نامِ سروری در سرصفحه و نوارِ فقط‌خواندنیِ همیشگی.</p></div>
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 15px 17px; display: flex; flex-direction: column; gap: 7px;"><div style="font-size: 13px; font-weight: 800;">عددِ بلند</div><p style="margin: 0; font-size: 12.5px; line-height: 1.8; color: oklch(0.58 0.015 330);">رقم‌های فارسی با جداکنندهٔ هزارگان، ارقامِ هم‌عرض، و ستونِ مبلغ همیشه هم‌تراز — حتی وقتی رقم ده‌رقمی می‌شود.</p></div>
+    </div>
+  </section>
+
+  <section data-screen-label="F5" style="display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.53 0.115 70); color: #fff;">F۵</span>
+      <h2 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 24px; font-weight: 800; color: oklch(0.22 0.02 330);">وضعیتِ ساخت، و آنچه هنوز تصمیم می‌خواهد</h2>
+    </div>
+    <div style="width: min(1280px, 100%); box-sizing: border-box; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px;">
+      <div style="background: oklch(0.965 0.05 155); border: 1px solid oklch(0.85 0.07 155); border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px;"><span aria-hidden="true" style="width: 9px; height: 9px; border-radius: 999px; background: oklch(0.4 0.1 155);"></span><div style="font-size: 14px; font-weight: 800; color: oklch(0.35 0.09 155);">سرور پیاده شده</div></div>
+        <p style="margin: 0; font-size: 12.5px; line-height: 1.8; color: oklch(0.35 0.09 155);">هر پنج مسیرِ خواندنِ فضامحور، شیوهٔ دسترسی و <code dir="ltr">displayLabel</code> در فهرستِ فضاها، ردِ خنثای واحد، صفحه‌بندیِ نشانگری، بازخوانیِ اختیار در هر درخواست، و <code dir="ltr">Cache-Control: private, no-store</code> روی هر نه مسیر.</p>
+      </div>
+      <div style="background: oklch(1 0 0); border: 1px dashed oklch(0.8 0.02 330); border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px;"><span aria-hidden="true" style="width: 9px; height: 9px; border: 2px solid oklch(0.45 0.02 330); border-radius: 999px;"></span><div style="font-size: 14px; font-weight: 800;">طراحی‌شده، ساخته‌نشده</div></div>
+        <p style="margin: 0; font-size: 12.5px; line-height: 1.8; color: oklch(0.46 0.02 330);">خودِ مقصدِ <code dir="ltr">/finance</code>، انتخابگرِ فضا، واگذاریِ مسیرِ قدیمی به مؤلفهٔ مشترک، و همهٔ حالت‌های این سند.</p>
+      </div>
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.03 25); border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px;"><span aria-hidden="true" style="width: 9px; height: 9px; border-radius: 2px; background: oklch(0.5 0.16 25);"></span><div style="font-size: 14px; font-weight: 800; color: oklch(0.48 0.16 25);">پیگیریِ کراندارِ سرور یا امنیت</div></div>
+        <ul style="margin: 0; padding-inline-start: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; line-height: 1.8; color: oklch(0.45 0.1 25);">
+          <li>خواندنِ تاریخچهٔ اختیارِ پایان‌یافته (امروز هیچ مسیری ندارد)</li>
+          <li>دو فضای همنام با نوع و شیوهٔ دسترسیِ یکسان — نادر، بدونِ تمایزِ ایمن، و برایِ آن هیچ برچسبی اختراع نمی‌شود</li>
+        </ul>
+      </div>
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 8px;">
+        <div style="font-size: 14px; font-weight: 800;">هیچ مقدارِ تجاری اینجا انتخاب نشده</div>
+        <p style="margin: 0; font-size: 12.5px; line-height: 1.8; color: oklch(0.46 0.02 330);">نه کارمزد، نه زمان‌بندیِ تسویه، نه حداقلِ پرداخت، نه درصدِ ذخیره. ارقامِ نمونه همه برچسبِ «نمونه — تصویب‌نشده» دارند و ساختارِ واقعی را نشان می‌دهند، نه مقدارِ واقعی را.</p>
+      </div>
+    </div>
+  </section>
+
+</div>
+</x-dc>
+</body>
+</html>
