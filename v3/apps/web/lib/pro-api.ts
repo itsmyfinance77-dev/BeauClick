@@ -244,13 +244,23 @@ export interface LedgerEntry {
 }
 
 /**
- * One finance workspace the signed-in seller OWNS -- V3.3 #72,
- * `V33-DEC-020`.
+ * How this session reaches a finance workspace -- V3.3 #111 (`#44e`),
+ * ADR-049 §5. `owner` is the seller's own workspace; `finance_read` is a
+ * live, business-scoped, read-only grant to a consented staff member who is
+ * typically not a professional at all. A workspace reachable through both is
+ * reported ONCE by the server, as `owner`.
+ */
+export type FinanceAccessMode = 'owner' | 'finance_read';
+
+/**
+ * One finance workspace this session may ADDRESS -- V3.3 #72, `V33-DEC-020`,
+ * widened by #111 (`#44e`) and #154 (`V33-DEC-038`).
  *
  * `workspaceRef` is opaque and issued by the server. It is NOT a credential:
- * live ownership is re-verified on every request, so it stops working the
- * moment the workspace stops being owned. Never persist it as if it granted
- * anything -- if it stops resolving, re-read the list.
+ * live ownership or grant is re-verified on every request, so it stops
+ * working the moment the workspace stops being reachable. Never persist it
+ * as if it granted anything, never display, decode or shorten it -- if it
+ * stops resolving, re-read the list.
  *
  * One user may own both a professional profile and a business, and each has its
  * own separate financial position. That is why this is a list and not a field.
@@ -258,6 +268,14 @@ export interface LedgerEntry {
 export interface FinanceWorkspace {
   workspaceRef: string;
   workspaceType: 'professional' | 'business';
+  accessMode: FinanceAccessMode;
+  /**
+   * The public display name of the business or professional (#154,
+   * `V33-DEC-038` R7). Presentation metadata only -- never an authorization
+   * input, never generated locally, never a session-local ordinal. May change
+   * when the underlying public name changes; that is correct, not instability.
+   */
+  displayLabel: string;
 }
 
 export interface SettlementPage {
@@ -277,8 +295,13 @@ export function outstandingOrders(api: ApiClient, workspaceRef: string) {
   return api.get<OutstandingOrder[]>(`/v1/me/finance/${workspaceRef}/outstanding-orders`);
 }
 
-export function settlements(api: ApiClient, workspaceRef: string) {
-  return api.get<SettlementPage>(`/v1/me/finance/${workspaceRef}/settlements`);
+/** `cursor`/`limit` mirror the server's keyset contract -- opaque, workspace-bound, never constructed by the caller. */
+export function settlements(api: ApiClient, workspaceRef: string, page: { cursor?: string; limit?: number } = {}) {
+  const query = new URLSearchParams();
+  if (page.cursor) query.set('cursor', page.cursor);
+  if (page.limit) query.set('limit', String(page.limit));
+  const suffix = query.toString();
+  return api.get<SettlementPage>(`/v1/me/finance/${workspaceRef}/settlements${suffix ? `?${suffix}` : ''}`);
 }
 
 export function orderLedger(api: ApiClient, workspaceRef: string, orderId: string) {

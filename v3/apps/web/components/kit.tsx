@@ -274,6 +274,8 @@ export function ConfirmDialog({
   busy = false,
   onConfirm,
   onCancel,
+  describedById,
+  confirmDisabled = false,
 }: {
   open: boolean;
   title: string;
@@ -283,11 +285,29 @@ export function ConfirmDialog({
   busy?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
+  /**
+   * Id of an element already rendered inside `body` -- wires `aria-describedby`
+   * on the dialog panel. Optional and additive: every existing caller renders
+   * exactly as before, and a caller with a genuine consequence description
+   * (V3.3 Story #149, the finance-access revoke dialog) can now tie it to the
+   * dialog rather than leaving it as unlinked prose.
+   */
+  describedById?: string;
+  /**
+   * Disables the confirm button independently of `busy` -- for a dialog that
+   * requires an explicit acknowledgement (a checkbox) before its destructive
+   * action may fire, without inventing a second dialog component for it.
+   */
+  confirmDisabled?: boolean;
 }) {
   const panelRef = useRef<HTMLDivElement | null>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
   const pressStartedInsideRef = useRef(false);
   const titleId = useId();
+  // Read inside the key handler without re-running the open effect (and
+  // re-stealing focus) every time a mutation starts or ends.
+  const busyRef = useRef(busy);
+  busyRef.current = busy;
 
   useEffect(() => {
     if (!open) return;
@@ -305,6 +325,10 @@ export function ConfirmDialog({
 
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
+        // While a mutation is in flight the dialog must stay open and its
+        // controls disabled (V3.3 Story #149) -- otherwise Escape would
+        // abandon the dialog mid-request with no way to observe the outcome.
+        if (busyRef.current) return;
         event.preventDefault();
         onCancel();
         return;
@@ -362,6 +386,7 @@ export function ConfirmDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        aria-describedby={describedById}
         style={{
           background: 'var(--bc-color-surface)',
           borderRadius: 'var(--bc-radius-card)',
@@ -377,7 +402,13 @@ export function ConfirmDialog({
         </h2>
         <div style={{ fontSize: 14, color: 'var(--bc-color-ink-soft)', marginBlockEnd: 20 }}>{body}</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <Button type="button" onClick={onConfirm} loading={busy} variant={tone === 'danger' ? 'danger' : 'primary'}>
+          <Button
+            type="button"
+            onClick={onConfirm}
+            loading={busy}
+            disabled={confirmDisabled}
+            variant={tone === 'danger' ? 'danger' : 'primary'}
+          >
             {confirmLabel}
           </Button>
           <Button type="button" variant="ghost" onClick={onCancel} disabled={busy}>

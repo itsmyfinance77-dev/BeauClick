@@ -107,6 +107,70 @@ export function removeStaff(api: ApiClient, businessId: string, staffId: string)
   return api.post<{ removed: boolean }>(`/v1/businesses/${businessId}/staff/${staffId}/remove`);
 }
 
+/**
+ * The closed scoped-role vocabulary, mirroring the server's
+ * `SCOPED_STAFF_ROLES` -- V3.3 Story #109 (`#44c`), extended by Story #111
+ * (`#44e`). `practitioner_chat` requires a linked professional profile;
+ * `finance_read` is business-scoped, read-only, and does not.
+ */
+export type ScopedStaffRole = 'practitioner_chat' | 'finance_read';
+
+/** What the grant/revoke/list routes answer: the membership's live scoped roles, and nothing else. */
+export interface MembershipGrantView {
+  readonly roles: readonly ScopedStaffRole[];
+}
+
+/**
+ * Where a staff-management row's `displayLabel` came from -- V3.3 #154,
+ * `V33-DEC-038` R3-R4. Chooses the PRESENTATION only; never shown to the
+ * owner as text.
+ */
+export type StaffLabelSource = 'professional' | 'phone';
+
+/**
+ * One row of the owner-only staff-management read -- V3.3 #154,
+ * `V33-DEC-038` R5, consumed by V3.3 Story #149 (`#149a`).
+ *
+ * Exactly these seven keys. What is deliberately NOT here: `userId`,
+ * `professionalId`, `invitedBy`, the full phone, an email, a grant id, an
+ * actor or a timestamp. `id` is the existing membership id -- the same
+ * selector `remove`, `grants` and `grants/revoke` already take.
+ */
+export interface StaffManagementMember {
+  id: string;
+  role: BusinessStaffRole;
+  status: BusinessStaffStatus;
+  displayLabel: string;
+  labelSource: StaffLabelSource;
+  /** Exactly the final four digits of the member's verified phone. */
+  identificationHint: string;
+  roles: ScopedStaffRole[];
+}
+
+/**
+ * The owner-only staff-management read -- V3.3 #154, sibling of the general
+ * roster (`listBusinessStaff`), never a replacement for it. The general
+ * roster stays byte-for-byte unchanged and carries no identity; this read
+ * is what a grant/revoke UI may safely take a member's identity from.
+ */
+export function getStaffManagement(api: ApiClient, businessId: string) {
+  return api.get<{ items: StaffManagementMember[] }>(`/v1/businesses/${businessId}/staff-management`);
+}
+
+/**
+ * Grants `role` to `staffId`, idempotently. The server always answers with
+ * the membership's live roles, so the caller reconciles the row from THIS
+ * response rather than assuming success from the empty `200`.
+ */
+export function grantStaffRole(api: ApiClient, businessId: string, staffId: string, role: ScopedStaffRole) {
+  return api.post<MembershipGrantView>(`/v1/businesses/${businessId}/staff/${staffId}/grants`, { role });
+}
+
+/** Revokes `role` from `staffId`, one-way and idempotently. Same reconciliation contract as `grantStaffRole`. */
+export function revokeStaffRole(api: ApiClient, businessId: string, staffId: string, role: ScopedStaffRole) {
+  return api.post<MembershipGrantView>(`/v1/businesses/${businessId}/staff/${staffId}/grants/revoke`, { role });
+}
+
 export function myBusinessMemberships(api: ApiClient) {
   return api.get<BusinessStaffMember[]>('/v1/me/business-staff');
 }

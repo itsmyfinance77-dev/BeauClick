@@ -48,18 +48,22 @@ const BUSINESS = {
 };
 
 const STAFF_ROUTE = '/v1/businesses/biz-1/staff';
+const STAFF_MANAGEMENT_ROUTE = '/v1/businesses/biz-1/staff-management';
 
-function member(overrides: Record<string, unknown> = {}) {
+/**
+ * A staff-management row -- V3.3 #154, consumed by Story #149 (`#149a`). The
+ * owner roster reads a member's identity ONLY from this projection, never
+ * from the general roster's raw membership shape.
+ */
+function managementRow(overrides: Record<string, unknown> = {}) {
   return {
     id: 'staff-1',
-    businessId: 'biz-1',
-    userId: 'u2',
-    professionalId: null,
     role: 'staff',
     status: 'active',
-    invitedBy: 'u1',
-    respondedAt: null,
-    createdAt: new Date().toISOString(),
+    displayLabel: 'شمارهٔ منتهی به 1234',
+    labelSource: 'phone',
+    identificationHint: '1234',
+    roles: [],
     ...overrides,
   };
 }
@@ -91,7 +95,8 @@ function allUrls(): string[] {
 interface Scenario {
   /** What the invite POST answers. Defaults to the real `202 {}`. */
   invite?: () => Promise<unknown>;
-  staff?: unknown[];
+  /** Rows for the owner-only staff-management read -- V3.3 #154/#149a. */
+  staffManagement?: unknown[];
 }
 
 function mockApi(scenario: Scenario = {}) {
@@ -106,7 +111,10 @@ function mockApi(scenario: Scenario = {}) {
     if (url.includes(STAFF_ROUTE) && init?.method === 'POST') {
       return (scenario.invite ?? (() => ok({}, 202)))();
     }
-    if (url.includes(STAFF_ROUTE)) return ok(scenario.staff ?? []);
+    // Declared before the plain roster fragment: `staff-management` contains
+    // `staff` as a substring, and this dispatcher matches by `includes`.
+    if (url.includes(STAFF_MANAGEMENT_ROUTE)) return ok({ items: scenario.staffManagement ?? [] });
+    if (url.includes(STAFF_ROUTE)) return ok([]);
     return ok([]);
   });
 }
@@ -327,7 +335,7 @@ describe('submission discipline', () => {
 
 describe('the removed membership status', () => {
   it('renders its Persian label and never blank text', async () => {
-    mockApi({ staff: [member({ status: 'removed' })] });
+    mockApi({ staffManagement: [managementRow({ status: 'removed' })] });
     await renderBusiness();
 
     await waitFor(() => expect(screen.getByText('حذف‌شده')).toBeInTheDocument());
@@ -336,12 +344,12 @@ describe('the removed membership status', () => {
 
   it('still renders every pre-existing status, so the map was extended and not replaced', async () => {
     mockApi({
-      staff: [
-        member({ id: 's1', userId: 'u2', status: 'active' }),
-        member({ id: 's2', userId: 'u3', status: 'invited' }),
-        member({ id: 's3', userId: 'u4', status: 'inactive' }),
-        member({ id: 's4', userId: 'u5', status: 'declined' }),
-        member({ id: 's5', userId: 'u6', status: 'removed' }),
+      staffManagement: [
+        managementRow({ id: 's1', identificationHint: '0002', displayLabel: 'شمارهٔ منتهی به 0002', status: 'active' }),
+        managementRow({ id: 's2', identificationHint: '0003', displayLabel: 'شمارهٔ منتهی به 0003', status: 'invited' }),
+        managementRow({ id: 's3', identificationHint: '0004', displayLabel: 'شمارهٔ منتهی به 0004', status: 'inactive' }),
+        managementRow({ id: 's4', identificationHint: '0005', displayLabel: 'شمارهٔ منتهی به 0005', status: 'declined' }),
+        managementRow({ id: 's5', identificationHint: '0006', displayLabel: 'شمارهٔ منتهی به 0006', status: 'removed' }),
       ],
     });
     await renderBusiness();

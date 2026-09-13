@@ -76,8 +76,14 @@ export default function ProOverviewPage() {
       setSlots(slotRes.data ?? []);
 
       const workspaces = financeRes.data?.items ?? [];
-      // Exactly one, or nothing. Never the first of several.
-      if (workspaces.length === 1) {
+      /*
+       * Exactly one, or nothing. Never the first of several -- and, since
+       * V3.3 #111/#154, never a `finance_read` grant either: this tile is the
+       * OWNER's own dashboard figure, and a bookkeeper's one delegated
+       * workspace is somebody else's money, not "your net receivable". A
+       * finance-only grantee reads it at `/finance` instead.
+       */
+      if (workspaces.length === 1 && workspaces[0].accessMode === 'owner') {
         const summaryRes = await financeSummary(api, workspaces[0].workspaceRef).catch(() => ({
           data: null as FinanceSummary | null,
         }));
