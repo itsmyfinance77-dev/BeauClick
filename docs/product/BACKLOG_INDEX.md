@@ -1111,3 +1111,44 @@ introduced (`V33-DEC-030`). `scripts/docs-audit.mjs` now requires exactly 43 con
 cards and 51 contiguous ADRs. No code, migration, schema, frontend, provider or credential was
 introduced; no tag in the `v*` release namespace was created; implementation of `#42a` has not
 started.
+
+## V3.3 Stories #149 (`#149a`) and #152 (`#149b`) delivered, 2026-09-13
+
+Both frontend halves of the finance-read closure shipped against the #154 backend contract and
+design pass **V3.3-FIN-149-R2** (`design/claude-design` commit `cc9371d`, screens 45 and 46).
+Preflight found `origin/master` one commit ahead of the recorded baseline (`49557fb`, the `#42`
+decomposition governance PR — README/BACKLOG_INDEX/decision-register only, no code) and proceeded
+on it; #42/#43/#47/#99, the decision register, the commercial packet and this index were not
+touched by the implementation.
+
+**#149 (`#149a`), 3 Story Points.** The owner's business staff roster now grants and revokes a
+consented, active member's `finance_read` access, reading identity exclusively from the owner-only
+`GET /businesses/:id/staff-management` read (#154) — `displayLabel`, `labelSource`,
+`identificationHint`, live `roles` — never a raw id. Grant is reversible and has no confirmation
+step: the row's own button, its accessible name carrying the member's identity, submits
+immediately, disables and marks itself `aria-busy` while pending, and reconciles the row from the
+server's returned roles only. Revoke keeps its confirmation dialog, names the exact member, requires
+an explicit acknowledgement, and returns focus to the invoking control. No backend, schema or route
+change.
+
+**#152 (`#149b`), 5 Story Points.** A new persona-neutral `/finance` route reads any of a session's
+addressable finance workspaces without a professional profile, sharing one `FinanceWorkspaceSurface`
+component with the retained `/pro/finance` compatibility route. A single reachable workspace opens
+directly; two or more never preselect. Summary, outstanding orders and settlements load as three
+independent sections so one failing section never blanks the others; settlements page by the
+existing keyset cursor with no auto-fetch. A `finance_read` workspace shows a persistent read-only
+banner and exposes no write control of any kind. A `404`/`409` from any workspace-aware read clears
+the panel, drops the workspace, and returns to selection with the server's own non-enumerating
+refusal. No backend, schema or route change.
+
+Both merged via PR #164 (squash `d4871d3`), closing #149 and #152.
+
+| Item | Before | After | Outcome it owns |
+|---|---|---|---|
+| #149 (`#149a`) | `status:proposed`, 3 | **Closed, 3** | Owner grant/revoke UI, delivered as described above |
+| #152 (`#149b`) | `status:proposed`, 5 | **Closed, 5** | Persona-neutral `/finance` workspace, delivered as described above |
+
+**What moved.** V3.3 done **230 → 238** (+8 = 3 + 5), scope unchanged at **350**. The live dashboard
+(issue #2) reports **238 / 350, zero data-quality warnings** as of this delivery. Both issues close
+with their `sp:` labels preserved and no status label. No backend, migration, schema, provider,
+payment, tag or Release was introduced or changed.
