@@ -1118,8 +1118,10 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
       // number is what makes a table added without a subject-data claim fail
       // HERE with a readable message instead of at application boot -- so it is
       // raised deliberately, with the new table's own claim shipped alongside,
-      // and never relaxed to `toBeGreaterThan`.
-      expect(rows).toHaveLength(15);
+      // and never relaxed to `toBeGreaterThan`. Twenty-one since Story #42
+      // (`#42a`) added the six booking-outcome policy, copy and Legal-evidence
+      // tables (ADR-051 §10), each claimed by its own contract.
+      expect(rows).toHaveLength(21);
 
       const contracts = app.get<SubjectDataContract[]>(SUBJECT_DATA_CONTRACTS);
       const report = evaluateCoverage(rows, contracts);

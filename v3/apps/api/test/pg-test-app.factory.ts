@@ -455,6 +455,16 @@ export const RESETTABLE_TABLES = [
   // V3.3 Story #104 (`#41d-2a`). Before the policy tables it references, and
   // the migration seeds none of the three.
   'commercial.seller_collection_policy_assignments',
+  // V3.3 Story #42 (`#42a`), ADR-051 §1/§5/§10. Children before parents:
+  // options -> versions -> keys, and the evidence records last because a
+  // version references one. The migration seeds NONE of the six, so a reset
+  // returns them to exactly the state a clean migration leaves.
+  'commercial.booking_outcome_policy_retention_options',
+  'commercial.booking_outcome_policy_versions',
+  'commercial.booking_outcome_policies',
+  'commercial.customer_policy_copy_versions',
+  'commercial.customer_policy_copies',
+  'commercial.legal_evidence_records',
   // V3.3 Story #83 (`#41d-1`). Versions before their key, so the FK does not
   // decide the order for us. The migration seeds NEITHER table, so a reset
   // returns them to exactly the state a clean migration leaves.

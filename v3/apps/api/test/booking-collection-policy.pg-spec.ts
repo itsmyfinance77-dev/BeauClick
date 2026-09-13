@@ -865,7 +865,10 @@ describePg('booking collection policy — publication, lifecycle and constraints
       // added without a claim fails HERE with a readable message rather than
       // at application boot -- which is what this number is for, and why it
       // is bumped deliberately rather than loosened to a lower bound.
-      expect(rows).toHaveLength(15);
+      // Twenty-one since Story #42 (`#42a`) added the six tables of the
+      // booking-outcome policy, copy and Legal-evidence plane (ADR-051 §10),
+      // each with its own claim in `BookingOutcomePolicySubjectDataContract`.
+      expect(rows).toHaveLength(21);
 
       const report = evaluateCoverage(rows, contracts);
       expect(report.violations.filter((v) => v.table.startsWith('commercial.'))).toEqual([]);
