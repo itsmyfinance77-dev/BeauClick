@@ -298,6 +298,26 @@ describePg('booking outcome policy, customer copy and Legal evidence — publica
         'uq_ler_evidence_key',
       ]);
 
+      // Foreign keys, by column and target. The evidence FK is the layer behind
+      // the trigger: behaviour cannot see it go (the trigger answers first), so
+      // it is pinned here.
+      const foreignKeys = await dataSource.query(
+        `SELECT t.relname || '.' || a.attname || ' -> ' || rt.relname || '.' || ra.attname AS fk
+           FROM pg_constraint c
+           JOIN pg_class t ON t.oid = c.conrelid JOIN pg_namespace n ON n.oid = t.relnamespace
+           JOIN pg_class rt ON rt.oid = c.confrelid
+           JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = c.conkey[1]
+           JOIN pg_attribute ra ON ra.attrelid = c.confrelid AND ra.attnum = c.confkey[1]
+          WHERE n.nspname = 'commercial' AND t.relname = ANY($1) AND c.contype = 'f'`,
+        [NEW_TABLES],
+      );
+      expect(foreignKeys.map((f: { fk: string }) => f.fk).sort()).toEqual([
+        'booking_outcome_policy_retention_options.version_id -> booking_outcome_policy_versions.id',
+        'booking_outcome_policy_versions.legal_evidence_id -> legal_evidence_records.id',
+        'booking_outcome_policy_versions.policy_key -> booking_outcome_policies.policy_key',
+        'customer_policy_copy_versions.copy_key -> customer_policy_copies.copy_key',
+      ]);
+
       const triggers = await dataSource.query(
         `SELECT tgname FROM pg_trigger tg JOIN pg_class t ON t.oid = tg.tgrelid JOIN pg_namespace n ON n.oid = t.relnamespace
           WHERE n.nspname = 'commercial' AND t.relname = ANY($1) AND NOT tg.tgisinternal ORDER BY tgname`,
@@ -562,6 +582,27 @@ describePg('booking outcome policy, customer copy and Legal evidence — publica
         [row.activation_starts_at, row.activation_ends_at, row.retired_at],
       );
       expect(overlaps).toBe(false);
+
+      // The same property through the exclusion constraint itself, not only the
+      // function: a replacement ending 1 ms inside the first window is refused,
+      // and one starting at exactly its forward bound is accepted. The bound is
+      // read inside SQL so no microsecond is lost to a JS Date round trip.
+      const bounded = await policyKey();
+      const head = await draft(bounded, terms(), null, new Date(Date.now() + 3_600_000));
+      await policies.publishVersion(admin.id, bounded, head.version.version, 'suite');
+      const next = await insertRawVersion(bounded, { version: 2 });
+      await insertRawOption(next, 'late_cancellation', 0, 'none');
+      await insertRawOption(next, 'no_show', 0, 'none');
+      const startAt = (offset: string) =>
+        dataSource.query(
+          `UPDATE ${VERSIONS} SET lifecycle_state='published', published_at=now(), published_by_label='suite',
+                  activation_starts_at=(SELECT activation_ends_at ${offset} FROM ${VERSIONS} WHERE id=$2)
+            WHERE id=$1`,
+          [next, head.version.id],
+        );
+      await expect(startAt(`- INTERVAL '1 millisecond'`)).rejects.toThrow(/ex_bopv_no_effective_overlap/);
+      await startAt('');
+      expect((await versionRow(bounded, 2)).lifecycle_state).toBe('published');
     });
 
     it('lets exactly one of two concurrent publications survive', async () => {
