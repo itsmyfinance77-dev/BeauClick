@@ -39,6 +39,7 @@ import { WISHLIST_ENTITIES } from '@beauclick/wishlist';
 import { REFERRAL_ENTITIES } from '@beauclick/referral';
 import {
   BOOKING_COLLECTION_POLICY_ENTITIES,
+  BOOKING_OUTCOME_POLICY_ENTITIES,
   COLLECTION_POLICY_ASSIGNMENT_ENTITIES,
   COMMERCIAL_ENTITIES,
   SUBSCRIPTION_ENTITIES,
@@ -153,6 +154,9 @@ import { MetricsController } from './observability/metrics.controller';
           // looks like a query bug while the app boots cleanly.
           ...COMMERCIAL_ENTITIES,
           ...BOOKING_COLLECTION_POLICY_ENTITIES,
+          // V3.3 #42 (`#42a`), ADR-051: the six outcome-policy, copy and
+          // Legal-evidence tables, registered here for the same reason as above.
+          ...BOOKING_OUTCOME_POLICY_ENTITIES,
           ...COLLECTION_POLICY_ASSIGNMENT_ENTITIES,
           ...SUBSCRIPTION_ENTITIES,
         ],

@@ -26,6 +26,8 @@ import { ReferralModule, ReferralSubjectDataContract } from '@beauclick/referral
 import {
   BookingCreditEnforcementModule,
   BookingCreditEnforcementSubjectDataContract,
+  BookingOutcomePolicyModule,
+  BookingOutcomePolicySubjectDataContract,
   CollectionPolicyAssignmentModule,
   CollectionPolicyAssignmentSubjectDataContract,
   CommercialCatalogueModule,
@@ -166,6 +168,9 @@ export class PrivacyErasureCompleter {
     // see it) and the per-party governance fact (`retained`, so erasure can
     // never silently return a seller to legacy exemption). ADR-050 §8.
     BookingCreditEnforcementModule,
+    // V3.3 #42 (`#42a`). Imported for its contract only: six `retained` tables
+    // (ADR-051 §10), every one carrying administrator attribution.
+    BookingOutcomePolicyModule,
   ],
   providers: [
     PrivacyErasureCompleter,
@@ -208,6 +213,9 @@ export class PrivacyErasureCompleter {
         // V3.3 #95 (`#58b-1`), ADR-050 §8: the control singleton (no_subject_data)
         // and the per-party governance fact (retained).
         BookingCreditEnforcementSubjectDataContract,
+        // V3.3 #42 (`#42a`), ADR-051 §10: six retained tables of the outcome-policy,
+        // copy and Legal-evidence publication plane.
+        BookingOutcomePolicySubjectDataContract,
       ],
       useFactory: (...contracts: SubjectDataContract[]): SubjectDataContract[] => contracts,
     },
