@@ -106,6 +106,18 @@ export function AppShell({ children }: { children: ReactNode }) {
                   کسب‌وکار
                 </NavLink>
                 {/*
+                  V3.3 Story #152 (`#149b`) -- persona-neutral, shown to every
+                  authenticated user exactly like `/business` and `/pro`
+                  above: a finance-only staff member has no professional
+                  profile and no business ownership, so conditioning this link
+                  on either would hide the one destination that IS theirs. The
+                  page itself answers truthfully with an empty state for a
+                  session that reaches no finance workspace at all.
+                */}
+                <NavLink href="/finance">
+                  امور مالی
+                </NavLink>
+                {/*
                   Shown to every authenticated user, and that is deliberate
                   rather than an oversight: becoming a professional in V3 is
                   self-service (`POST /v1/providers`, any session), so this is

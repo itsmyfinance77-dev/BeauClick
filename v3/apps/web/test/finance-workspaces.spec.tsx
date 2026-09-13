@@ -11,19 +11,24 @@ jest.mock('next/navigation', () => ({
 }));
 
 /**
- * The finance screen after the workspace migration — V3.3 #72,
- * `V33-DEC-020`.
+ * The finance screen after the workspace migration — V3.3 #72 (`V33-DEC-020`),
+ * widened by #111/#154 and Story #152 (`#149b`) into the shared
+ * `FinanceWorkspaceSurface` that `/pro/finance` now delegates to.
  *
  * ## What these cases are actually about
  *
  * The screen used to call four singular routes and render whatever party the
  * server picked. A dual owner saw their business figures with nothing saying
  * their professional earnings existed, and an affiliated staff professional saw
- * their EMPLOYER's position.
+ * their EMPLOYER's position. Since #152, it must ALSO never pick a default
+ * workspace for a caller who owns or is granted more than one — the previous
+ * `items[0]` fallback here was exactly the defect `V33-DEC-020` forbids, and
+ * `/pro/finance` inherits the fix because it shares the one component.
  *
  * So the cases below are not "does the page render" — they are: does it ask
- * which workspace, does switching genuinely re-fetch, and can one workspace's
- * numbers ever appear under another's heading.
+ * which workspace, does it refuse to guess when there are several, does
+ * switching genuinely re-fetch, and can one workspace's numbers ever appear
+ * under another's heading.
  *
  * ## The figures are deliberately distinguishable
  *
@@ -33,6 +38,20 @@ jest.mock('next/navigation', () => ({
 
 const PROFESSIONAL_REF = 'p'.repeat(43);
 const BUSINESS_REF = 'b'.repeat(43);
+
+const PROFESSIONAL_WORKSPACE = {
+  workspaceRef: PROFESSIONAL_REF,
+  workspaceType: 'professional' as const,
+  accessMode: 'owner' as const,
+  displayLabel: 'نمایه',
+};
+
+const BUSINESS_WORKSPACE = {
+  workspaceRef: BUSINESS_REF,
+  workspaceType: 'business' as const,
+  accessMode: 'owner' as const,
+  displayLabel: 'سالن نور',
+};
 
 // Every figure on this page is distinct, within a summary and across the two.
 // Three stat cards showing one repeated number would make `findByText` ambiguous
@@ -77,10 +96,10 @@ function refused(status: number, code: string) {
  * handler that ignored the reference would make a mixed-cache bug invisible.
  */
 function mockApi(options: {
-  workspaces?: Array<{ workspaceRef: string; workspaceType: 'professional' | 'business' }>;
+  workspaces?: Array<{ workspaceRef: string; workspaceType: 'professional' | 'business'; accessMode: 'owner' | 'finance_read'; displayLabel: string }>;
   workspacesFails?: boolean;
 }) {
-  const workspaces = options.workspaces ?? [{ workspaceRef: PROFESSIONAL_REF, workspaceType: 'professional' }];
+  const workspaces = options.workspaces ?? [PROFESSIONAL_WORKSPACE];
 
   (global.fetch as jest.Mock).mockImplementation((url: string) => {
     if (url.includes('/v1/auth/refresh')) return ok({ accessToken: 'a', csrfToken: 'c' });
@@ -119,6 +138,9 @@ function renderFinance() {
   );
 }
 
+/** The workspace-selection fieldset's accessible name — native `<fieldset>`/`<legend>`, not `aria-label`. */
+const SELECTOR_NAME = 'کدام فضای مالی؟';
+
 beforeEach(() => {
   // A fresh mock per case, matching `pro-surface.spec.tsx`: `global.fetch` is
   // not stubbed by the shared setup, so each suite installs its own.
@@ -134,7 +156,7 @@ describe('a seller who owns one workspace', () => {
 
     expect(await screen.findByText(/۱٬۱۱۱٬۰۰۰|1,111,000/)).toBeInTheDocument();
     // No selector: a group of one is a puzzle, not a control.
-    expect(screen.queryByRole('group', { name: 'انتخاب کسب‌وکار' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: SELECTOR_NAME })).not.toBeInTheDocument();
   });
 
   it('addresses the summary by workspaceRef, not by a singular route', async () => {
@@ -157,7 +179,7 @@ describe('a seller who owns nothing', () => {
     mockApi({ workspaces: [] });
     renderFinance();
 
-    expect(await screen.findByText('هنوز کسب‌وکاری برای نمایش اطلاعات مالی ندارید.')).toBeInTheDocument();
+    expect(await screen.findByText('در حال حاضر دسترسیِ مالی‌ای ندارید.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'تلاش دوباره' })).not.toBeInTheDocument();
   });
 });
@@ -174,7 +196,7 @@ describe('an affiliated staff professional', () => {
       if (/\/v1\/me(\?|$)/.test(url)) return ok({ id: 'u1', phone: '+98912', displayName: null, roles: [], capabilities: [] });
       if (url.includes('/v1/me/provider')) return ok({ id: 'prof-1', displayName: 'کارمند', verificationStatus: 'verified' });
       if (url.includes('/v1/me/finance/workspaces')) {
-        return ok({ items: [{ workspaceRef: PROFESSIONAL_REF, workspaceType: 'professional' }] });
+        return ok({ items: [PROFESSIONAL_WORKSPACE] });
       }
       if (url.includes('/summary')) {
         return ok({ partyType: 'professional', receivableNetToman: 0, settledToman: 0, outstandingToman: 0, currency: 'IRT' });
@@ -185,48 +207,49 @@ describe('an affiliated staff professional', () => {
 
     renderFinance();
 
-    expect(await screen.findByText('سفارشی در انتظار تسویه ندارید.')).toBeInTheDocument();
+    // A generous timeout on both the query and the surrounding test itself:
+    // this case waits on several sequential requests (session, provider
+    // profile, workspace list, then summary/orders/settlements) before the
+    // assertion renders, which was observed flaky against RTL's 1000ms
+    // default and jest's 5000ms per-test default under load.
+    expect(await screen.findByText('سفارشی در انتظار تسویه ندارید.', {}, { timeout: 10000 })).toBeInTheDocument();
     // The employer's distinguishable figure appears nowhere on the page.
     expect(screen.queryByText(/۲٬۲۲۲٬۰۰۰|2,222,000/)).not.toBeInTheDocument();
-  });
+  }, 15000);
 });
 
 describe('a dual owner', () => {
-  const both = [
-    { workspaceRef: BUSINESS_REF, workspaceType: 'business' as const },
-    { workspaceRef: PROFESSIONAL_REF, workspaceType: 'professional' as const },
-  ];
+  const both = [BUSINESS_WORKSPACE, PROFESSIONAL_WORKSPACE];
 
-  it('gets an accessible selector naming both workspaces', async () => {
+  it('gets an accessible selector naming both workspaces, with NEITHER preselected', async () => {
     mockApi({ workspaces: both });
     renderFinance();
 
-    const group = await screen.findByRole('group', { name: 'انتخاب کسب‌وکار' });
-    const buttons = within(group).getAllByRole('button');
+    const group = await screen.findByRole('group', { name: SELECTOR_NAME });
+    const radios = within(group).getAllByRole('radio');
 
-    expect(buttons.map((button) => button.textContent)).toEqual(['کسب‌وکار', 'حرفه‌ای']);
-    // Selection is conveyed by `aria-pressed`, not by colour alone.
-    expect(buttons[0]).toHaveAttribute('aria-pressed', 'true');
-    expect(buttons[1]).toHaveAttribute('aria-pressed', 'false');
+    expect(radios).toHaveLength(2);
+    // V3.3 Story #152: never `items[0]`. Nothing is checked until the caller
+    // picks, and no figure is shown until then either.
+    expect(radios.every((radio) => !(radio as HTMLInputElement).checked)).toBe(true);
+    expect(screen.queryByText(/۱٬۱۱۱٬۰۰۰|1,111,000|۲٬۲۲۲٬۰۰۰|2,222,000/)).not.toBeInTheDocument();
+
+    // Each workspace is named by its server-supplied `displayLabel`, never by
+    // `workspaceType` alone.
+    expect(within(group).getByText('سالن نور')).toBeInTheDocument();
+    expect(within(group).getByText('نمایه')).toBeInTheDocument();
   });
 
-  it('switches workspace on keyboard activation and re-fetches everything', async () => {
+  it('loads the chosen workspace only after an explicit selection', async () => {
     mockApi({ workspaces: both });
     renderFinance();
 
-    // The first workspace loads first.
-    expect(await screen.findByText(/۲٬۲۲۲٬۰۰۰|2,222,000/)).toBeInTheDocument();
+    const group = await screen.findByRole('group', { name: SELECTOR_NAME });
+    await userEvent.click(within(group).getByText('سالن نور'));
 
-    const group = screen.getByRole('group', { name: 'انتخاب کسب‌وکار' });
-    const professionalButton = within(group).getAllByRole('button')[1];
-
-    // Tab-then-Enter, which is exactly what a labelled group of toggle buttons
-    // promises — no arrow-key contract is claimed or required.
-    professionalButton.focus();
-    await userEvent.keyboard('{Enter}');
-
-    await waitFor(() => expect(screen.getByText(/۱٬۱۱۱٬۰۰۰|1,111,000/)).toBeInTheDocument());
-    expect(professionalButton).toHaveAttribute('aria-pressed', 'true');
+    await waitFor(() => expect(screen.getByText(/۲٬۲۲۲٬۰۰۰|2,222,000/)).toBeInTheDocument());
+    const radios = within(group).getAllByRole('radio');
+    expect((radios[0] as HTMLInputElement).checked).toBe(true);
   });
 
   it('never shows one workspace figure under the other, even for an instant', async () => {
@@ -238,11 +261,12 @@ describe('a dual owner', () => {
      */
     mockApi({ workspaces: both });
     renderFinance();
-    await screen.findByText(/۲٬۲۲۲٬۰۰۰|2,222,000/);
 
-    const group = screen.getByRole('group', { name: 'انتخاب کسب‌وکار' });
-    await userEvent.click(within(group).getAllByRole('button')[1]);
+    const group = await screen.findByRole('group', { name: SELECTOR_NAME });
+    await userEvent.click(within(group).getByText('سالن نور'));
+    await waitFor(() => expect(screen.getByText(/۲٬۲۲۲٬۰۰۰|2,222,000/)).toBeInTheDocument());
 
+    await userEvent.click(within(group).getByText('نمایه'));
     await waitFor(() => expect(screen.getByText(/۱٬۱۱۱٬۰۰۰|1,111,000/)).toBeInTheDocument());
     // The business figure is not merely superseded — it is not on the page.
     expect(screen.queryByText(/۲٬۲۲۲٬۰۰۰|2,222,000/)).not.toBeInTheDocument();
@@ -251,10 +275,12 @@ describe('a dual owner', () => {
   it('requests each workspace by its own reference', async () => {
     mockApi({ workspaces: both });
     renderFinance();
-    await screen.findByText(/۲٬۲۲۲٬۰۰۰|2,222,000/);
 
-    const group = screen.getByRole('group', { name: 'انتخاب کسب‌وکار' });
-    await userEvent.click(within(group).getAllByRole('button')[1]);
+    const group = await screen.findByRole('group', { name: SELECTOR_NAME });
+    await userEvent.click(within(group).getByText('سالن نور'));
+    await waitFor(() => expect(screen.getByText(/۲٬۲۲۲٬۰۰۰|2,222,000/)).toBeInTheDocument());
+
+    await userEvent.click(within(group).getByText('نمایه'));
     await waitFor(() => expect(screen.getByText(/۱٬۱۱۱٬۰۰۰|1,111,000/)).toBeInTheDocument());
 
     const requested: string[] = (global.fetch as jest.Mock).mock.calls.map((call) => String(call[0]));
@@ -271,6 +297,6 @@ describe('failure states stay distinct', () => {
     renderFinance();
 
     expect(await screen.findByRole('button', { name: 'تلاش دوباره' })).toBeInTheDocument();
-    expect(screen.queryByText('هنوز کسب‌وکاری برای نمایش اطلاعات مالی ندارید.')).not.toBeInTheDocument();
+    expect(screen.queryByText('در حال حاضر دسترسیِ مالی‌ای ندارید.')).not.toBeInTheDocument();
   });
 });
