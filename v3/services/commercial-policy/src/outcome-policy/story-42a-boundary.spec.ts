@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
@@ -178,6 +179,21 @@ describe('Story #42 (`#42a`) contains none of #42b–#42e, #43, #47 or #99', () 
     const registry = read('services/commercial-policy/src/commercial-policy.registry.ts');
     expect(registry).toContain('BookingCommercialTermsV1');
     expect(registry).not.toMatch(/outcome|LegalEvidence/i);
+
+    // Byte identity, not only markers: a neutral new field passes every check
+    // above. Hashes of the content at the #42a baseline (49557fb), line endings
+    // normalised so a CRLF checkout and CI's LF checkout agree. A later story
+    // that deliberately changes one of these files updates its hash with it.
+    const sha = (file: string) => createHash('sha256').update(read(file).replace(/\r\n/g, '\n')).digest('hex');
+    expect(sha('packages/commercial-policy-contract/src/commercial-policy-contract.ts')).toBe(
+      '3f2b5da5dabc81ed11a17dbcf811f6e08f1ebe8663c2de393ca8c249053f73b2',
+    );
+    expect(sha('packages/commercial-policy-contract/src/booking-collection-policy-contract.ts')).toBe(
+      '07e97941fc45d73f148e69e1442bd3de981df4fe2202efda6fea34c7081ea320',
+    );
+    expect(sha('services/commercial-policy/src/commercial-policy.registry.ts')).toBe(
+      'c7909110fd6610a4180280d6e251072c59510e73d49659f28c05bbb9db6d1d7e',
+    );
   });
 
   describe('the boundary detector is not vacuous', () => {
