@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { formatFullJalaliDate, normalizeDigits } from '@beauclick/persian-utils';
 import { useAuth } from '@/lib/auth-context';
+import { ApiRequestError } from '@/lib/api-client';
 import { ProtectedRoute } from '@/components/protected-route';
 import { Alert, Button, Card, ErrorState, Input, LoadingState } from '@/components/ui';
 import { Badge, ConfirmDialog, PageHeader, SegmentedControl } from '@/components/kit';
@@ -11,15 +12,18 @@ import {
   createBusiness,
   declineStaffInvite,
   getBusiness,
+  getStaffManagement,
+  grantStaffRole,
   inviteStaff,
   leaveBusinessStaff,
-  listBusinessStaff,
   myBusiness,
   myBusinessMemberships,
   removeStaff,
+  revokeStaffRole,
   type Business,
   type BusinessStaffMember,
   type BusinessStaffStatus,
+  type StaffManagementMember,
 } from '@/lib/phase4-api';
 
 /**
@@ -47,9 +51,15 @@ const ROLE_OPTIONS = [
  * it, the same reason the professional's booking card shows a truncated
  * reference rather than a customer identity.
  */
-type PendingAction = { kind: 'remove' | 'decline' | 'leave'; staffId: string };
+type PendingAction = { kind: 'remove' | 'decline' | 'leave' | 'revokeFinance'; staffId: string };
 
-const PENDING_COPY: Record<PendingAction['kind'], { title: string; confirm: string; body: string }> = {
+/**
+ * Static copy for the three pre-existing pending kinds. `revokeFinance` is
+ * deliberately absent -- V3.3 Story #149 requires its dialog to name the
+ * EXACT member shown in the row, which static copy cannot do, so it is built
+ * from the member record at render time instead (see `RevokeFinanceDialog`).
+ */
+const PENDING_COPY: Record<Exclude<PendingAction['kind'], 'revokeFinance'>, { title: string; confirm: string; body: string }> = {
   remove: {
     title: 'حذف عضو',
     confirm: 'حذف کن',
@@ -94,6 +104,46 @@ const STATUS_TONE: Record<BusinessStaffStatus, 'neutral' | 'success' | 'warning'
   removed: 'neutral',
 };
 
+/**
+ * A row's identity, in the ONE plain-text form used everywhere it must be
+ * spoken rather than shown: an action's accessible name, a dialog title, a
+ * live-region announcement -- V3.3 Story #149 (`#149a`), screen 45 §1-a/§6.
+ *
+ * `labelSource: 'phone'` means the server's `displayLabel` already IS the
+ * four-digit hint (no live professional profile), so repeating it verbatim
+ * would read as "به ۰۰۰۰، شمارهٔ منتهی به ۰۰۰۰" -- the same four digits
+ * twice. The neutral "عضوِ با شمارهٔ منتهی به …" frame is used instead, which
+ * is also the only frame available when there is no name at all.
+ */
+function memberIdentityText(member: StaffManagementMember): string {
+  return member.labelSource === 'phone'
+    ? `عضوِ با شمارهٔ منتهی به ${member.identificationHint}`
+    : `${member.displayLabel}، شمارهٔ منتهی به ${member.identificationHint}`;
+}
+
+/** The four-digit hint, LTR-isolated so it is never reordered inside an RTL line -- screen 45 §6. */
+function HintDigits({ value }: { value: string }) {
+  return (
+    <span dir="ltr" style={{ unicodeBidi: 'isolate', fontVariantNumeric: 'tabular-nums' }}>
+      {value}
+    </span>
+  );
+}
+
+/** The row's primary identity line -- screen 45 §1-b: a phone-labelled row is framed, never left as bare digits. */
+function MemberIdentityLine({ member }: { member: StaffManagementMember }) {
+  return member.labelSource === 'phone' ? (
+    <span style={{ fontSize: 14, fontWeight: 700 }}>
+      شمارهٔ منتهی به <HintDigits value={member.identificationHint} />
+    </span>
+  ) : (
+    <span style={{ fontSize: 14, fontWeight: 700 }}>{member.displayLabel}</span>
+  );
+}
+
+const FINANCE_READ = 'finance_read' as const;
+const PRACTITIONER_CHAT = 'practitioner_chat' as const;
+
 export default function BusinessPage() {
   return (
     <ProtectedRoute>
@@ -107,7 +157,13 @@ function BusinessDashboard() {
   const [owned, setOwned] = useState<Business | null>(null);
   const [memberships, setMemberships] = useState<BusinessStaffMember[]>([]);
   const [staffBusiness, setStaffBusiness] = useState<Business | null>(null);
-  const [staff, setStaff] = useState<BusinessStaffMember[]>([]);
+  /**
+   * The owner-only staff-management read -- V3.3 #154, consumed by Story #149
+   * (`#149a`). A sibling of the general roster (`GET .../staff`), never a
+   * replacement for it: this is the ONLY source this screen reads a member's
+   * identity from, because it is the only read that carries one safely.
+   */
+  const [staffManagement, setStaffManagement] = useState<StaffManagementMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // A failed load leaves `owned` null, which is indistinguishable from
@@ -124,8 +180,28 @@ function BusinessDashboard() {
    * fresh invitation from the owner. All three fired on a single click. The
    * professional surface confirms every destructive action through
    * `ConfirmDialog`; this surface simply predates that contract.
+   *
+   * `revokeFinance` (V3.3 Story #149, `#149a`) joins the same union rather
+   * than a second dialog: revoking `finance_read` is exactly as destructive
+   * and confirmed exactly the same way, and one dialog implementation is what
+   * keeps the focus-trap/return contract from drifting between two.
    */
   const [pending, setPending] = useState<PendingAction | null>(null);
+  /**
+   * One in-flight grant per membership, keyed by staff id. Grant has NO
+   * confirmation dialog (screen 45 §3-a): the button submits immediately, so
+   * this is what disables it, marks it `aria-busy`, and prevents a duplicate
+   * submission while the request is open. `{ error }` is a failed grant
+   * that returned the row to its previous state and needs a retry control.
+   */
+  const [grantState, setGrantState] = useState<Record<string, 'pending' | { error: string } | undefined>>({});
+  /** The last grant/revoke outcome, announced once through a shared polite live region -- screen 45 §3-a/§6. */
+  const [financeAnnouncement, setFinanceAnnouncement] = useState('');
+  /** The revoke dialog's own in-flight/failure state -- kept separate from `busy` so a failure keeps the dialog OPEN with a retry, unlike remove/decline/leave. */
+  const [revokePending, setRevokePending] = useState(false);
+  const [revokeError, setRevokeError] = useState<string | null>(null);
+  /** The explicit acknowledgement checkbox -- gates the confirm button (screen 45 §4 state 14). */
+  const [revokeAcknowledged, setRevokeAcknowledged] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -137,8 +213,8 @@ function BusinessDashboard() {
       setMemberships(myMemberships);
 
       if (ownedRes.data) {
-        const staffRes = await listBusinessStaff(api, ownedRes.data.id);
-        setStaff(staffRes.data ?? []);
+        const managementRes = await getStaffManagement(api, ownedRes.data.id);
+        setStaffManagement(managementRes.data?.items ?? []);
       } else {
         // Not an owner -- am I an ACTIVE staff member of someone else's business?
         const activeMembership = myMemberships.find((m) => m.status === 'active');
@@ -260,6 +336,100 @@ function BusinessDashboard() {
     }
   }
 
+  /** Merges a grant/revoke response's live `roles` into the one row it belongs to -- never a client-side guess. */
+  function reconcileRoles(staffId: string, roles: readonly StaffManagementMember['roles'][number][]) {
+    setStaffManagement((current) =>
+      current.map((member) => (member.id === staffId ? { ...member, roles: [...roles] } : member)),
+    );
+  }
+
+  /**
+   * Grants `finance_read`, immediately -- V3.3 Story #149 (`#149a`), screen 45
+   * §3-a. NO confirmation dialog: the action is reversible, so the button
+   * itself (already carrying the member's identity in its accessible name)
+   * submits on activation. `grantState[member.id] === 'pending'` both disables
+   * the control and stops a second click from firing a second request.
+   */
+  async function handleGrant(member: StaffManagementMember) {
+    if (!owned || grantState[member.id] === 'pending') return;
+    const identity = memberIdentityText(member);
+    setGrantState((current) => ({ ...current, [member.id]: 'pending' }));
+    setFinanceAnnouncement(`در حال اعطای دسترسیِ فقط‌خواندنیِ مالی به ${identity}…`);
+    try {
+      const res = await grantStaffRole(api, owned.id, member.id, FINANCE_READ);
+      reconcileRoles(member.id, res.data?.roles ?? []);
+      setGrantState((current) => {
+        const next = { ...current };
+        delete next[member.id];
+        return next;
+      });
+      setFinanceAnnouncement(`دسترسیِ فقط‌خواندنیِ مالی به ${identity} اعطا شد.`);
+    } catch (err) {
+      if (err instanceof ApiRequestError && err.status === 404) {
+        // The membership stopped being grantable between the read and this
+        // request (removed, deactivated, or the owner's own authority
+        // lapsed). Re-reading the roster drops the row rather than leaving a
+        // stale control behind it.
+        setGrantState((current) => {
+          const next = { ...current };
+          delete next[member.id];
+          return next;
+        });
+        setFinanceAnnouncement('');
+        await load();
+        // `load()` resets the page-level error to null at its own start, so
+        // the neutral refusal is set AFTER it resolves -- otherwise the
+        // reload would silently swallow the message this branch exists to
+        // show.
+        setError(err.message);
+        return;
+      }
+      const message = err instanceof Error ? err.message : 'اعطا انجام نشد.';
+      setGrantState((current) => ({ ...current, [member.id]: { error: message } }));
+      setFinanceAnnouncement(`اعطای دسترسیِ مالی به ${identity} انجام نشد. وضعیتِ قبلیِ ردیف دست‌نخورده مانده است.`);
+    }
+  }
+
+  /**
+   * Revokes `finance_read` for the member named in `pending` -- V3.3 Story
+   * #149 (`#149a`). Unlike `confirmPending`, a failure here does NOT close
+   * the dialog: it stays open with the error and a retry, per screen 45 §4
+   * state 13 ("the dialog stays open with its buttons disabled" while
+   * pending, and offers retry on failure rather than dropping the owner back
+   * to the roster with no path forward).
+   */
+  async function confirmRevoke() {
+    if (!pending || pending.kind !== 'revokeFinance' || !owned) return;
+    const member = staffManagement.find((m) => m.id === pending.staffId);
+    if (!member) {
+      setPending(null);
+      return;
+    }
+    const identity = memberIdentityText(member);
+    setRevokePending(true);
+    setRevokeError(null);
+    try {
+      const res = await revokeStaffRole(api, owned.id, member.id, FINANCE_READ);
+      reconcileRoles(member.id, res.data?.roles ?? []);
+      setFinanceAnnouncement(`دسترسیِ فقط‌خواندنیِ مالیِ ${identity} بازپس گرفته شد.`);
+      setPending(null);
+      setRevokeAcknowledged(false);
+    } catch (err) {
+      if (err instanceof ApiRequestError && err.status === 404) {
+        setPending(null);
+        setRevokeAcknowledged(false);
+        await load();
+        // Set AFTER `load()` resolves -- `load()` clears the page-level error
+        // at its own start, which would otherwise erase this message.
+        setError(err.message);
+        return;
+      }
+      setRevokeError(err instanceof Error ? err.message : 'بازپس‌گیری انجام نشد.');
+    } finally {
+      setRevokePending(false);
+    }
+  }
+
   async function handleAccept(staffId: string) {
     setBusy(true);
     try {
@@ -332,30 +502,168 @@ function BusinessDashboard() {
 
           <Card>
             <h2 style={{ fontSize: 16, marginBlockStart: 0 }}>اعضای کسب‌وکار</h2>
-            {staff.length === 0 ? (
+
+            {/*
+              V3.3 Story #149 (`#149a`) §3 -- standing informational copy above
+              the roster, always visible and outside the action path: what a
+              `finance_read` grant lets a member read (this business's
+              summary, outstanding orders, settlement history, per-order
+              ledger) and what it never lets them do (settle, pay out, refund,
+              touch any ledger row, pick or cancel a subscription, buy
+              booking credit, assign a collection policy, or manage staff
+              authority).
+            */}
+            <div
+              style={{
+                marginBlockEnd: 16,
+                padding: '12px 14px',
+                borderRadius: 'var(--bc-radius-row)',
+                background: 'var(--bc-color-surface-tint)',
+                fontSize: 12.5,
+                lineHeight: 1.8,
+                color: 'var(--bc-color-ink-soft)',
+              }}
+            >
+              «دسترسیِ فقط‌خواندنیِ مالی» به عضو اجازه می‌دهد خلاصهٔ مالی، سفارش‌های در انتظارِ تسویه، تاریخچهٔ تسویه و ریزِ
+              تراکنشِ هر سفارشِ همین کسب‌وکار را بخواند. او نمی‌تواند تسویه، پرداخت، بازگشتِ وجه یا هیچ ردیفِ دفترِ مالی را
+              تغییر دهد، اشتراک را انتخاب یا لغو کند، اعتبار بخرد، سیاستِ دریافت را انتساب دهد یا اختیارِ کارکنان را مدیریت کند.
+            </div>
+
+            {/* Announces the start, success and failure of every grant/revoke,
+                naming the member each time -- screen 45 §3-a/§6. The node
+                stays mounted so a live region's text-only changes keep
+                announcing on every transition. */}
+            <div role="status" aria-live="polite" style={{ fontSize: 12.5, color: 'var(--bc-color-ink-soft)', minHeight: financeAnnouncement ? undefined : 0, marginBlockEnd: financeAnnouncement ? 12 : 0 }}>
+              {financeAnnouncement}
+            </div>
+
+            {staffManagement.length === 0 ? (
               <p style={{ margin: '0 0 16px', color: 'var(--bc-color-ink-soft)', fontSize: 14 }}>
                 هنوز عضوی اضافه نکرده‌اید.
               </p>
             ) : (
-              <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 16px', display: 'grid', gap: 8 }}>
-                {staff.map((member) => (
-                  <li key={member.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 14 }}>
-                      {ROLE_LABELS[member.role]}
-                      <Badge tone={STATUS_TONE[member.status] ?? 'neutral'}>{STATUS_LABELS[member.status]}</Badge>
-                    </span>
-                    <Button
-                      variant="danger"
-                      inline
-                      disabled={busy}
-                      onClick={() =>
-                        setPending({ kind: 'remove', staffId: member.id })
-                      }
+              <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 16px', display: 'grid', gap: 0 }}>
+                {staffManagement.map((member) => {
+                  const grant = grantState[member.id];
+                  const isGranting = grant === 'pending';
+                  const grantError = grant && typeof grant === 'object' ? grant.error : null;
+                  const hasFinance = member.roles.includes(FINANCE_READ);
+                  const hasPractitioner = member.roles.includes(PRACTITIONER_CHAT);
+                  const identity = memberIdentityText(member);
+                  const grantErrorId = `finance-grant-error-${member.id}`;
+
+                  return (
+                    <li
+                      key={member.id}
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 10,
+                        padding: '14px 0',
+                        borderBlockEnd: '1px solid var(--bc-color-line)',
+                      }}
                     >
-                      حذف
-                    </Button>
-                  </li>
-                ))}
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          gap: 12,
+                          flexWrap: 'wrap',
+                        }}
+                      >
+                        <span style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 240 }}>
+                          <MemberIdentityLine member={member} />
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 12, color: 'var(--bc-color-ink-faint)' }}>
+                            {ROLE_LABELS[member.role]}
+                            <Badge tone={STATUS_TONE[member.status] ?? 'neutral'}>{STATUS_LABELS[member.status]}</Badge>
+                            {member.labelSource === 'professional' ? (
+                              <span>
+                                شمارهٔ منتهی به <HintDigits value={member.identificationHint} />
+                              </span>
+                            ) : null}
+                          </span>
+                        </span>
+
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                          {hasPractitioner ? <Badge tone="neutral">اختیارِ گفتگوی متخصص</Badge> : null}
+
+                          {member.status === 'active' ? (
+                            hasFinance ? (
+                              <>
+                                <Badge tone="success">دسترسیِ فقط‌خواندنیِ مالی — فعال</Badge>
+                                <Button
+                                  type="button"
+                                  variant="danger"
+                                  inline
+                                  aria-label={`بازپس‌گیریِ دسترسیِ مالی از ${identity}`}
+                                  onClick={() => {
+                                    setRevokeAcknowledged(false);
+                                    setRevokeError(null);
+                                    setPending({ kind: 'revokeFinance', staffId: member.id });
+                                  }}
+                                >
+                                  بازپس‌گیری
+                                </Button>
+                              </>
+                            ) : (
+                              <>
+                                <Badge tone="neutral">بدونِ دسترسیِ مالی</Badge>
+                                <Button
+                                  type="button"
+                                  inline
+                                  disabled={isGranting}
+                                  busy={isGranting}
+                                  aria-label={
+                                    isGranting
+                                      ? `در حالِ اعطای دسترسیِ مالی به ${identity}`
+                                      : `اعطای دسترسیِ فقط‌خواندنیِ مالی به ${identity}`
+                                  }
+                                  onClick={() => void handleGrant(member)}
+                                >
+                                  {isGranting ? 'در حالِ اعطا…' : 'اعطای دسترسیِ فقط‌خواندنیِ مالی'}
+                                </Button>
+                              </>
+                            )
+                          ) : member.status === 'invited' ? (
+                            <span style={{ fontSize: 12, color: 'var(--bc-color-ink-faint)' }}>
+                              تا پیش از پذیرشِ دعوت، اعطا ممکن نیست
+                            </span>
+                          ) : null}
+                        </span>
+                      </div>
+
+                      {grantError ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          <span id={grantErrorId} role="alert" style={{ fontSize: 12.5, color: 'var(--bc-color-error)' }}>
+                            {grantError}
+                          </span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            inline
+                            aria-describedby={grantErrorId}
+                            aria-label={`تلاشِ دوباره برای اعطای دسترسیِ مالی به ${identity}`}
+                            onClick={() => void handleGrant(member)}
+                          >
+                            تلاشِ دوباره
+                          </Button>
+                        </div>
+                      ) : null}
+
+                      <div>
+                        <Button
+                          variant="danger"
+                          inline
+                          disabled={busy}
+                          onClick={() => setPending({ kind: 'remove', staffId: member.id })}
+                        >
+                          حذف
+                        </Button>
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             )}
             <InviteForm onInvite={handleInvite} busy={busy} />
@@ -389,16 +697,69 @@ function BusinessDashboard() {
         </Card>
       )}
 
-      <ConfirmDialog
-        open={pending !== null}
-        title={pending ? PENDING_COPY[pending.kind].title : ''}
-        tone="danger"
-        confirmLabel={pending ? PENDING_COPY[pending.kind].confirm : ''}
-        busy={busy}
-        onConfirm={() => void confirmPending()}
-        onCancel={() => setPending(null)}
-        body={pending ? <p style={{ margin: 0 }}>{PENDING_COPY[pending.kind].body}</p> : null}
-      />
+      {(() => {
+        const revokeMember =
+          pending?.kind === 'revokeFinance' ? staffManagement.find((m) => m.id === pending.staffId) ?? null : null;
+        const revokeIdentity = revokeMember ? memberIdentityText(revokeMember) : '';
+        const revokeDescriptionId = 'finance-revoke-description';
+
+        if (pending?.kind === 'revokeFinance') {
+          return (
+            <ConfirmDialog
+              open
+              title={`بازپس‌گیریِ دسترسیِ مالیِ ${revokeIdentity}؟`}
+              tone="danger"
+              confirmLabel={revokeError ? 'تلاشِ دوباره' : 'بازپس می‌گیرم'}
+              busy={revokePending}
+              confirmDisabled={!revokeAcknowledged}
+              describedById={revokeDescriptionId}
+              onConfirm={() => void confirmRevoke()}
+              onCancel={() => {
+                setPending(null);
+                setRevokeError(null);
+                setRevokeAcknowledged(false);
+              }}
+              body={
+                <div id={revokeDescriptionId} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <p style={{ margin: 0 }}>
+                    از درخواستِ بعدیِ این عضو، دسترسی‌اش به اطلاعاتِ مالیِ این کسب‌وکار قطع می‌شود. اگر همین حالا صفحهٔ مالی را
+                    باز داشته باشد، داده‌های نمایش‌داده‌شده پاک می‌شوند و به فهرستِ فضاهای باقی‌مانده بازمی‌گردد.
+                  </p>
+                  <p style={{ margin: 0 }}>عضویتِ او در کسب‌وکار دست‌نخورده می‌ماند؛ فقط این اختیار برداشته می‌شود.</p>
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 13 }}>
+                    <input
+                      type="checkbox"
+                      checked={revokeAcknowledged}
+                      disabled={revokePending}
+                      onChange={(event) => setRevokeAcknowledged(event.target.checked)}
+                      style={{ marginTop: 3, width: 18, height: 18, flexShrink: 0 }}
+                    />
+                    <span>می‌دانم که این کار دسترسیِ مالیِ {revokeIdentity} را قطع می‌کند.</span>
+                  </label>
+                  {revokeError ? (
+                    <span role="alert" style={{ fontSize: 12.5, color: 'var(--bc-color-error)' }}>
+                      {revokeError}
+                    </span>
+                  ) : null}
+                </div>
+              }
+            />
+          );
+        }
+
+        return (
+          <ConfirmDialog
+            open={pending !== null}
+            title={pending ? PENDING_COPY[pending.kind].title : ''}
+            tone="danger"
+            confirmLabel={pending ? PENDING_COPY[pending.kind].confirm : ''}
+            busy={busy}
+            onConfirm={() => void confirmPending()}
+            onCancel={() => setPending(null)}
+            body={pending ? <p style={{ margin: 0 }}>{PENDING_COPY[pending.kind].body}</p> : null}
+          />
+        );
+      })()}
     </section>
   );
 }

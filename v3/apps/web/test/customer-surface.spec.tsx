@@ -164,20 +164,25 @@ describe('business surface', () => {
     mockApi({
       '/v1/me/business-staff': () => ok([]),
       '/v1/me/business': () => ok({ id: 'biz-1', ownerId: 'u1', displayName: 'سالن', bio: null, cityId: null, verificationStatus: 'unverified', createdAt: '2099-01-01T00:00:00.000Z' }),
-      '/businesses/biz-1/staff': () =>
-        ok([
-          {
-            id: 'staff-1',
-            businessId: 'biz-1',
-            userId: 'u2',
-            professionalId: null,
-            role: 'staff',
-            status: 'active',
-            invitedBy: 'u1',
-            respondedAt: null,
-            createdAt: '2099-01-01T00:00:00.000Z',
-          },
-        ]),
+      // The more specific fragment MUST be declared first -- `staff-management`
+      // contains `staff` as a substring, and `mockApi` matches by `includes` in
+      // insertion order (V3.3 Story #149, `#149a`: the owner roster now reads
+      // its identity from the sibling staff-management route).
+      '/businesses/biz-1/staff-management': () =>
+        ok({
+          items: [
+            {
+              id: 'staff-1',
+              role: 'staff',
+              status: 'active',
+              displayLabel: 'شمارهٔ منتهی به 1234',
+              labelSource: 'phone',
+              identificationHint: '1234',
+              roles: [],
+            },
+          ],
+        }),
+      '/businesses/biz-1/staff': () => ok([]),
     });
     const user = userEvent.setup();
     render(

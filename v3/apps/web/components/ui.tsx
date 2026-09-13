@@ -22,17 +22,26 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
    */
   variant?: 'primary' | 'ghost' | 'danger';
   loading?: boolean;
+  /**
+   * Marks the control `aria-busy` WITHOUT swapping its label to the generic
+   * "در حال انجام…" or forcing it disabled on its own -- for a caller whose
+   * own text already says what is in progress (V3.3 Story #149's "در حالِ
+   * اعطا…") and who disables the control itself via `disabled`. A plain
+   * `aria-busy` passed through `...rest` would be silently overwritten by the
+   * `loading`-derived one below; this is the real prop for that case.
+   */
+  busy?: boolean;
   /** Sizing hook for rows where a full-width button would be absurd. Never below 44px. */
   inline?: boolean;
 };
 
-export function Button({ variant = 'primary', loading = false, inline = false, disabled, children, ...rest }: ButtonProps) {
+export function Button({ variant = 'primary', loading = false, busy = false, inline = false, disabled, children, ...rest }: ButtonProps) {
   const isDisabled = disabled || loading;
   return (
     <button
       {...rest}
       disabled={isDisabled}
-      aria-busy={loading || undefined}
+      aria-busy={loading || busy || undefined}
       style={{
         font: 'inherit',
         fontWeight: 600,
