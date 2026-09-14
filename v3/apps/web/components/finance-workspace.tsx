@@ -108,11 +108,17 @@ export function FinanceWorkspaceSurface() {
   const [orders, setOrders] = useState<OutstandingOrder[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [ordersError, setOrdersError] = useState<string | null>(null);
+  // The workspace the orders on screen were actually loaded for. Until it
+  // matches the active one the section is loading -- never "no orders", which
+  // would be a claim about a request that has not been answered (or sent).
+  const [ordersLoadedFor, setOrdersLoadedFor] = useState<string | null>(null);
 
   const [batches, setBatches] = useState<SettlementBatch[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [settlementsLoading, setSettlementsLoading] = useState(false);
   const [settlementsError, setSettlementsError] = useState<string | null>(null);
+  // Same rule as `ordersLoadedFor`, for the settlement history.
+  const [settlementsLoadedFor, setSettlementsLoadedFor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
 
   const [ledgerFor, setLedgerFor] = useState<string | null>(null);
@@ -129,9 +135,11 @@ export function FinanceWorkspaceSurface() {
     setSummaryError(null);
     setOrders([]);
     setOrdersError(null);
+    setOrdersLoadedFor(null);
     setBatches([]);
     setNextCursor(null);
     setSettlementsError(null);
+    setSettlementsLoadedFor(null);
     setLedgerFor(null);
     setLedger([]);
     setLedgerError(null);
@@ -211,6 +219,7 @@ export function FinanceWorkspaceSurface() {
         setOrdersError(errorMessage(err, 'سفارش‌های در انتظار تسویه بارگذاری نشد.'));
       } finally {
         setOrdersLoading(false);
+        setOrdersLoadedFor(workspaceRef);
       }
     },
     [api, handleAuthorityLoss],
@@ -232,6 +241,7 @@ export function FinanceWorkspaceSurface() {
         setSettlementsError(errorMessage(err, 'تاریخچهٔ تسویه بارگذاری نشد.'));
       } finally {
         setSettlementsLoading(false);
+        setSettlementsLoadedFor(workspaceRef);
       }
     },
     [api, handleAuthorityLoss],
@@ -434,7 +444,7 @@ export function FinanceWorkspaceSurface() {
           ) : null}
 
           <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 12px' }}>سفارش‌های در انتظار تسویه</h2>
-          {ordersLoading ? (
+          {ordersLoading || ordersLoadedFor !== active.workspaceRef ? (
             <LoadingState label="در حال بارگذاری سفارش‌ها…" />
           ) : ordersError ? (
             <ErrorState message={ordersError} onRetry={() => void loadOrders(active.workspaceRef)} />
@@ -497,7 +507,7 @@ export function FinanceWorkspaceSurface() {
               )}
 
               <h2 style={{ fontSize: 16, fontWeight: 700, margin: '24px 0 12px' }}>تاریخچه تسویه</h2>
-              {settlementsLoading ? (
+              {settlementsLoading || settlementsLoadedFor !== active.workspaceRef ? (
                 <LoadingState label="در حال بارگذاری تاریخچهٔ تسویه…" />
               ) : settlementsError ? (
                 <ErrorState message={settlementsError} onRetry={() => void loadSettlements(active.workspaceRef)} />
