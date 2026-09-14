@@ -32,6 +32,8 @@ import {
   CollectionPolicyAssignmentSubjectDataContract,
   CommercialCatalogueModule,
   CommercialSubjectDataContract,
+  OutcomePolicyAssignmentModule,
+  OutcomePolicyAssignmentSubjectDataContract,
   SellerSubscriptionModule,
   SubscriptionSubjectDataContract,
 } from '@beauclick/commercial-policy';
@@ -171,6 +173,10 @@ export class PrivacyErasureCompleter {
     // V3.3 #42 (`#42a`). Imported for its contract only: six `retained` tables
     // (ADR-051 §10), every one carrying administrator attribution.
     BookingOutcomePolicyModule,
+    // V3.3 #159 (`#42b`). Imported for its contract only: the seller's
+    // outcome-selection history, `retained` (ADR-051 §10) and exported to the
+    // owner as the selections they authored.
+    OutcomePolicyAssignmentModule,
   ],
   providers: [
     PrivacyErasureCompleter,
@@ -216,6 +222,8 @@ export class PrivacyErasureCompleter {
         // V3.3 #42 (`#42a`), ADR-051 §10: six retained tables of the outcome-policy,
         // copy and Legal-evidence publication plane.
         BookingOutcomePolicySubjectDataContract,
+        // V3.3 #159 (`#42b`), ADR-051 §10: the seller's outcome selections.
+        OutcomePolicyAssignmentSubjectDataContract,
       ],
       useFactory: (...contracts: SubjectDataContract[]): SubjectDataContract[] => contracts,
     },

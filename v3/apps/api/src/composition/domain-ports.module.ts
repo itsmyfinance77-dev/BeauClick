@@ -9,6 +9,7 @@ import { BOOKING_CANCELLATION_ENTITLEMENT_HOOK, PROFESSIONAL_DIRECTORY } from '@
 import {
   BOOKING_COLLECTION_POLICY_RESOLVER,
   BOOKING_CONFIRMATION_ENTITLEMENT_HOOK,
+  BOOKING_OUTCOME_POLICY_RESOLVER,
   PRICING_RULES,
   SERVICE_CATALOG,
 } from '@beauclick/commerce';
@@ -20,6 +21,7 @@ import {
 } from '@beauclick/financial';
 import {
   BookingCreditEnforcementModule,
+  BookingOutcomePolicyResolutionModule,
   CollectionPolicyResolutionModule,
   OWNED_SUBSCRIBER_PARTY_RESOLVER,
   SellerSubscriptionModule,
@@ -55,6 +57,7 @@ import {
   ProviderBackedProfessionalDirectory,
   ProviderBackedServiceCatalog,
   CommercialPolicyBackedCollectionResolver,
+  CommercialPolicyBackedOutcomeResolver,
   IdentityBackedOwnerRoleGrant,
   BusinessBackedDeliveryLocationDirectory,
   IdentityBackedStaffInviteResolver,
@@ -126,6 +129,9 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
      * is: a second "which policy governs this party" would be a second answer.
      */
     CollectionPolicyResolutionModule,
+    // V3.3 #159 (`#42b`), ADR-051 §3. The read-only outcome resolver module,
+    // imported for the same reason as the collection resolver just above.
+    BookingOutcomePolicyResolutionModule,
     // V3.3 #75 (`V33-DEC-021`). `IdentityBackedOwnerRoleGrant` delegates the
     // whole grant rule to `RoleService`, which lives here. Imported rather than
     // reimplemented for the same reason the finance workspace resolver
@@ -137,6 +143,7 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     ProviderBackedProfessionalDirectory,
     ProviderBackedServiceCatalog,
     CommercialPolicyBackedCollectionResolver,
+    CommercialPolicyBackedOutcomeResolver,
     ProviderBackedFinancialPartyResolver,
     OwnershipBackedSubscriberPartyResolver,
     { provide: PROFESSIONAL_DIRECTORY, useExisting: ProviderBackedProfessionalDirectory },
@@ -153,6 +160,13 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
      * Policy meet on the order path.
      */
     { provide: BOOKING_COLLECTION_POLICY_RESOLVER, useExisting: CommercialPolicyBackedCollectionResolver },
+    /*
+     * V3.3 #159 (`#42b`), ADR-051 §3. The one binding for outcome-terms
+     * resolution. MANDATORY: `OrderService` injects it without `@Optional()`,
+     * so a composition that forgets it fails to boot rather than letting every
+     * enrolled seller's booking go out with no terms and no acceptance.
+     */
+    { provide: BOOKING_OUTCOME_POLICY_RESOLVER, useExisting: CommercialPolicyBackedOutcomeResolver },
     /*
      * V3.3 #81 (`#41b`, ADR-044 §6). The entitlement seam a zero-collectible
      * confirmation passes through, bound to an explicit no-op until #58.
@@ -395,6 +409,7 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     PROFESSIONAL_OWNER_LOOKUP,
     SERVICE_CATALOG,
     BOOKING_COLLECTION_POLICY_RESOLVER,
+    BOOKING_OUTCOME_POLICY_RESOLVER,
     BOOKING_CONFIRMATION_ENTITLEMENT_HOOK,
     BOOKING_CANCELLATION_ENTITLEMENT_HOOK,
     FINANCIAL_PARTY_RESOLVER,

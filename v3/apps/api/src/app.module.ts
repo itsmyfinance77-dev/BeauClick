@@ -42,6 +42,7 @@ import {
   BOOKING_OUTCOME_POLICY_ENTITIES,
   COLLECTION_POLICY_ASSIGNMENT_ENTITIES,
   COMMERCIAL_ENTITIES,
+  OUTCOME_POLICY_ASSIGNMENT_ENTITIES,
   SUBSCRIPTION_ENTITIES,
 } from '@beauclick/commercial-policy';
 import { DomainCompositionModule } from './composition/domain-composition.module';
@@ -158,6 +159,8 @@ import { MetricsController } from './observability/metrics.controller';
           // Legal-evidence tables, registered here for the same reason as above.
           ...BOOKING_OUTCOME_POLICY_ENTITIES,
           ...COLLECTION_POLICY_ASSIGNMENT_ENTITIES,
+          // V3.3 #159 (`#42b`), ADR-051 §3: the seller's outcome-selection history.
+          ...OUTCOME_POLICY_ASSIGNMENT_ENTITIES,
           ...SUBSCRIPTION_ENTITIES,
         ],
         // V3_DATABASE_BLUEPRINT.md §2 mandates lower_snake_case columns;

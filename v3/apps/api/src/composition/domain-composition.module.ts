@@ -23,10 +23,12 @@ import { ReferralCompositionModule } from './referral-composition.module';
 import {
   BookingCreditEnforcementModule,
   BookingOutcomePolicyModule,
+  BookingOutcomePolicyResolutionModule,
   CommercialCatalogueModule,
   CommercialPolicyModule,
   SellerSubscriptionModule,
   CollectionPolicyAssignmentModule,
+  OutcomePolicyAssignmentModule,
   SellerSubscriptionSurfaceModule,
 } from '@beauclick/commercial-policy';
 import { CHAT_OUTBOX_SOURCES } from './chat-tokens';
@@ -37,6 +39,7 @@ import { REFERRAL_EVENT_HANDLERS, REFERRAL_OUTBOX_SOURCES } from './referral-tok
 import { DomainPortsModule } from './domain-ports.module';
 import { CheckoutService } from '../checkout/checkout.service';
 import { CheckoutController, SandboxGatewayController, PaymentCallbackController } from '../checkout/checkout.controller';
+import { CheckoutDisclosureController, CheckoutDisclosureService } from '../checkout/checkout-disclosure';
 import { OrderPaymentController } from '../checkout/order-payment.controller';
 import { OutboxSweepScheduler } from '../events/outbox-sweep.scheduler';
 import {
@@ -180,9 +183,18 @@ import {
     // Legal-evidence publication plane. Composed directly like the catalogue:
     // it has no port, no consumer and no seam; nothing reads it until `#42b`.
     BookingOutcomePolicyModule,
+    // V3.3 #159 (`#42b`), ADR-051 §3. The seller's selection surface, composed
+    // directly like #104's twin above; and the read-only resolver module, for
+    // the disclosure read's exact-copy lookup (the order path reaches it only
+    // through the port bound in `DomainPortsModule`).
+    OutcomePolicyAssignmentModule,
+    BookingOutcomePolicyResolutionModule,
   ],
   controllers: [
     CheckoutController,
+    // V3.3 #159 (`#42b`). `GET /v1/checkout/disclosure`: what the customer is
+    // shown and must accept, computed by the checkout's own steps, writing nothing.
+    CheckoutDisclosureController,
     PaymentCallbackController,
     SandboxGatewayController,
     // V3.1 Phase F. `POST /v1/orders/:id/payment/retry` -- order-scoped, so
@@ -195,6 +207,7 @@ import {
   ],
   providers: [
     CheckoutService,
+    CheckoutDisclosureService,
     WaitlistAcceptanceService,
     OutboxSweepScheduler,
 
@@ -319,6 +332,7 @@ import {
   SellerSubscriptionSurfaceModule,
     BookingCreditEnforcementModule,
     BookingOutcomePolicyModule,
+    OutcomePolicyAssignmentModule,
     FINANCIAL_OUTBOX_RELAY,
     PrivacyModule,
     // V3.1 Phase F. Re-exported so the root injector can resolve
