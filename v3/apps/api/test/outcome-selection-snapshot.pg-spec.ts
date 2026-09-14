@@ -697,6 +697,17 @@ describePg('booking outcome selection, snapshot and acceptance (real PostgreSQL)
           [uuidv7(), uuidv7(), policy.key, seller.owner.id],
         ),
       ).rejects.toThrow(/no-show retention rule is not an option/);
+      // A key whose only version has been retired offers nothing to select.
+      const retired = await publishedOutcome();
+      await outcomes.retireVersion(admin.id, retired.key, retired.version, 'suite setup');
+      await expect(
+        dataSource.query(
+          `INSERT INTO ${SELECTIONS} (id, seller_party_type, seller_party_id, policy_key, cutoff_hours, late_retention_kind,
+             grace_minutes, no_show_retention_kind, assigned_by_user_id)
+           VALUES ($1, 'professional', $2, $3, 6, 'none', 5, 'none', $4)`,
+          [uuidv7(), uuidv7(), retired.key, seller.owner.id],
+        ),
+      ).rejects.toThrow(/no version published and active/);
       await expect(insert(6, "'2020-01-01'")).rejects.toThrow(/must be the database clock/);
       await expect(
         dataSource.query(
