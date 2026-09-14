@@ -218,6 +218,64 @@ describe('an affiliated staff professional', () => {
   }, 15000);
 });
 
+describe('a workspace whose sections are still loading', () => {
+  const NO_ORDERS = 'سفارشی در انتظار تسویه ندارید.';
+  const NO_SETTLEMENTS = 'هنوز تسویه‌ای انجام نشده است.';
+
+  it('never claims "no orders" or "no settlements" before those requests have settled', async () => {
+    /*
+     * The workspace used to become active one render BEFORE its sections
+     * started loading, so that render said "no orders awaiting settlement" and
+     * "no settlement yet" about requests that had not been sent. It was a
+     * false statement on screen for one frame, and it was the cause of the
+     * CI-only failure of the staff case below: `findByText` could resolve on
+     * that transient node, which the loading state then detached.
+     *
+     * A `MutationObserver` watches every DOM change for the whole time both
+     * responses are held, so even a single committed frame is caught — a
+     * point-in-time `queryByText` would miss it.
+     */
+    let releaseOrders!: () => void;
+    let releaseSettlements!: () => void;
+    const ordersHeld = new Promise<void>((resolve) => (releaseOrders = resolve));
+    const settlementsHeld = new Promise<void>((resolve) => (releaseSettlements = resolve));
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes('/v1/auth/refresh')) return ok({ accessToken: 'a', csrfToken: 'c' });
+      if (/\/v1\/me(\?|$)/.test(url)) return ok({ id: 'u1', phone: '+98912', displayName: null, roles: [], capabilities: [] });
+      if (url.includes('/v1/me/provider')) return ok({ id: 'prof-1', displayName: 'نمایه', verificationStatus: 'verified' });
+      if (url.includes('/v1/me/finance/workspaces')) return ok({ items: [PROFESSIONAL_WORKSPACE] });
+      if (url.includes('/summary')) return ok(PROFESSIONAL_SUMMARY);
+      if (url.includes('/outstanding-orders')) return ordersHeld.then(() => ok([]));
+      if (url.includes('/settlements')) return settlementsHeld.then(() => ok({ items: [], nextCursor: null }));
+      return ok([]);
+    });
+
+    const claimedBeforeSettling = new Set<string>();
+    const observer = new MutationObserver(() => {
+      const text = document.body.textContent ?? '';
+      if (text.includes(NO_ORDERS)) claimedBeforeSettling.add('orders');
+      if (text.includes(NO_SETTLEMENTS)) claimedBeforeSettling.add('settlements');
+    });
+    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+
+    try {
+      renderFinance();
+      // The workspace is open and its summary has rendered: every frame that
+      // used to flash is behind us, and both sections are still unanswered.
+      expect(await screen.findByText(/۱٬۱۱۱٬۰۰۰|1,111,000/, {}, { timeout: 10000 })).toBeInTheDocument();
+      expect([...claimedBeforeSettling]).toEqual([]);
+    } finally {
+      observer.disconnect();
+    }
+
+    // Once the server has actually answered "none", saying so is truthful.
+    releaseOrders();
+    releaseSettlements();
+    expect(await screen.findByText(NO_ORDERS, {}, { timeout: 10000 })).toBeInTheDocument();
+    expect(await screen.findByText(NO_SETTLEMENTS, {}, { timeout: 10000 })).toBeInTheDocument();
+  }, 20000);
+});
+
 describe('a dual owner', () => {
   const both = [BUSINESS_WORKSPACE, PROFESSIONAL_WORKSPACE];
 
