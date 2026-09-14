@@ -5,6 +5,7 @@ export * from './entities/order-item.entity';
 export * from './entities/order-adjustment.entity';
 export * from './entities/order-payment-schedule.entity';
 export * from './entities/commerce-outbox.entity';
+export * from './entities/order-outcome-terms.entity';
 export * from './pricing/pricing.types';
 export * from './pricing/pricing.service';
 export * from './order/order.service';

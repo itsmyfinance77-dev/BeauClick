@@ -7,6 +7,7 @@ import { OrderItemEntity } from './entities/order-item.entity';
 import { OrderAdjustmentEntity } from './entities/order-adjustment.entity';
 import { OrderPaymentScheduleEntity } from './entities/order-payment-schedule.entity';
 import { CommerceOutboxEntity } from './entities/commerce-outbox.entity';
+import { OrderOutcomeTermsEntity } from './entities/order-outcome-terms.entity';
 
 import { PricingService } from './pricing/pricing.service';
 import { OrderService } from './order/order.service';
@@ -22,6 +23,8 @@ export const COMMERCE_ENTITIES = [
   // the platform spreads `COMMERCE_ENTITIES`, so a second registration path
   // would be a second place to forget it.
   OrderPaymentScheduleEntity,
+  // V3.3 #159 (`#42b`), ADR-051 §3. The order's accepted outcome terms, 1:1.
+  OrderOutcomeTermsEntity,
   CommerceOutboxEntity,
 ];
 
