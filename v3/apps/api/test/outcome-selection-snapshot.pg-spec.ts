@@ -104,10 +104,13 @@ describePg('booking outcome selection, snapshot and acceptance (real PostgreSQL)
     await app.close();
   });
 
+  let testStartedAt: Date;
+
   beforeEach(async () => {
     await resetDatabase(dataSource);
     admin = await seedUser(app, dataSource, nextPhone(), ['administrator']);
     activeCopy = null;
+    testStartedAt = (await dataSource.query(`SELECT clock_timestamp() AS t`))[0].t;
   });
 
   // =========================================================================
@@ -332,8 +335,18 @@ describePg('booking outcome selection, snapshot and acceptance (real PostgreSQL)
       [AUDIT_TARGET, partyId],
     );
 
+  /*
+   * Audit rows carrying one exact reason, written SINCE THIS TEST BEGAN.
+   *
+   * `admin.admin_audit_log` is owned by a role the application cannot
+   * TRUNCATE, so `resetDatabase` leaves it standing and rows accumulate for
+   * the life of the database — across cases, suites and earlier runs. Counting
+   * by reason alone once found rows a mutation run had legitimately written
+   * with the same reason; bounding by the test's own start instant (database
+   * clock) is what makes "this refusal wrote nothing" a statement about this test.
+   */
   const auditWithReason = (reason: string): Promise<Array<{ action: string }>> =>
-    dataSource.query(`SELECT action FROM admin.admin_audit_log WHERE reason = $1`, [reason]);
+    dataSource.query(`SELECT action FROM admin.admin_audit_log WHERE reason = $1 AND created_at >= $2`, [reason, testStartedAt]);
 
   /** Enrols a party in a pay-at-venue COLLECTION policy (#104's table, placed directly as #115's suite does). */
   async function payAtVenue(seller: Seller): Promise<void> {

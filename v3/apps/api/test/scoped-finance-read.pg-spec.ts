@@ -10,7 +10,7 @@ import {
   StaffService,
 } from '@beauclick/business';
 import { AdminAuditService } from '@beauclick/audit';
-import { BookingCollectionPolicyService, CommercialCatalogueService } from '@beauclick/commercial-policy';
+import { BookingCollectionPolicyService, BookingOutcomePolicyService, CommercialCatalogueService } from '@beauclick/commercial-policy';
 import { FinanceWorkspaceService, LedgerService, SettlementService } from '@beauclick/financial';
 import { SUBJECT_DATA_CONTRACTS, SubjectDataCoverageService } from '@beauclick/subject-data';
 import { assertNoLeak } from '@beauclick/testing';
@@ -871,6 +871,10 @@ describePg('scoped read-only business finance authority (real PostgreSQL, #111)'
       'GET /api/v1/me/subscriptions/:workspaceRef/credit-purchases',
       'GET /api/v1/me/collection-policy-assignments/:workspaceRef',
       'PUT /api/v1/me/collection-policy-assignments/:workspaceRef',
+      // V3.3 #159 (`#42b`): the seller's outcome selection, on the same
+      // ownership resolver — proved below like every other route here.
+      'GET /api/v1/me/outcome-policy-assignments/:workspaceRef',
+      'PUT /api/v1/me/outcome-policy-assignments/:workspaceRef',
     ];
 
     /**
@@ -945,14 +949,56 @@ describePg('scoped read-only business finance authority (real PostgreSQL, #111)'
       );
       await policies.publishVersion(admin.id, policyKey, policyDraft.version, 'suite setup');
       publishedPolicyKey = policyKey;
+
+      // V3.3 #159: one published outcome policy, for the same reason — an
+      // outcome selection outside a published version is refused with the same
+      // non-enumerating shape as a foreign workspace. Suite fixture values.
+      const outcomes = app.get(BookingOutcomePolicyService);
+      const outcomeKey = `op-${sequence}-${Date.now() % 100000}`;
+      await outcomes.createPolicy(admin.id, outcomeKey, `${outcomeKey} display`, 'suite setup');
+      const outcomeDraft = await outcomes.createVersionDraft(
+        admin.id,
+        {
+          policyKey: outcomeKey,
+          terms: {
+            contractVersion: 1,
+            cutoffHoursAllowed: [12],
+            lateRetentionOptions: [{ kind: 'none' }],
+            noShowGraceMinutesAllowed: [10],
+            noShowRetentionOptions: [{ kind: 'none' }],
+            rescheduleFreeCountBeforeCutoff: 1,
+            disputeWindowHours: 36,
+            bodilyHarmWindowHours: null,
+            appealWindowHours: 48,
+            caseFileRetentionDays: null,
+            legalCap: null,
+          },
+          legalEvidenceKey: null,
+          activationEndsAt: null,
+        },
+        'suite setup',
+      );
+      await outcomes.publishVersion(admin.id, outcomeKey, outcomeDraft.version.version, 'suite setup');
+      publishedOutcomeKey = outcomeKey;
     }
     let publishedPolicyKey = 'unpublished';
+    let publishedOutcomeKey = 'unpublished';
 
     /** A body every route above accepts syntactically, so the REFERENCE is what decides. */
     const bodyFor = (path: string): Record<string, unknown> => {
       if (path.endsWith('/selection')) return { planKey: 'starter', version: 1 };
       if (path.endsWith('/credit-purchases/quote') || path.endsWith('/credit-purchases')) return { quantity: 1 };
       if (path.includes('collection-policy-assignments')) return { policyKey: publishedPolicyKey, reason: 'bookkeeper reconciliation' };
+      if (path.includes('outcome-policy-assignments')) {
+        return {
+          policyKey: publishedOutcomeKey,
+          cutoffHours: 12,
+          lateCancellationRetention: { kind: 'none' },
+          noShowGraceMinutes: 10,
+          noShowRetention: { kind: 'none' },
+          reason: 'bookkeeper reconciliation',
+        };
+      }
       return {};
     };
 
