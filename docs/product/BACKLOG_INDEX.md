@@ -1190,3 +1190,41 @@ Merged via PR #166 (squash `4a0e6ae`), closing #42.
 dashboard (issue #2) reports **251 / 350, zero data-quality warnings** as of this delivery.
 #42 closes with its `sp:13` and `gate:legal` labels preserved and no status label. No provider,
 payment rail, tag or Release was introduced or changed.
+
+## V3.3 Story #159 (`#42b`) delivered, 2026-09-14
+
+The seller's booking-outcome selection, the order-level outcome snapshot and the customer's explicit
+acceptance shipped against ADR-051 §2–§4 and §10 (`V33-DEC-039` R4/R6/R13, `V33-DEC-042` R2/R4,
+`V33-DEC-031`). Implementation began on the recorded baseline (`dd186ae`); the issue body was
+corrected first by the 2026-09-14 preflight (corrections C1–C9, recorded on #159). No new ADR.
+
+**#159 (`#42b`), 13 Story Points.** A seller selects one cutoff, one late-retention rule, one no-show
+grace and one no-show retention rule inside the administrator-published ranges of `#42a`, as an
+immutable history bound to the stable policy key (`commercial.seller_outcome_policy_assignments`,
+#104's shape plus a trigger that makes a member the active version does not offer unwritable).
+Order creation resolves the terms through a Commerce-owned port — `FOR SHARE` on the selection, the
+active version and exactly one active copy version — and snapshots them by value in
+`commerce.order_outcome_terms` with the legal seller verified against the order. A customer sees the
+terms, the exact Persian copy version and the amounts from `GET /api/v1/checkout/disclosure`, and
+must echo the four-field `acceptedPolicy`; `policy_accepted_at` is written at the database instant
+only when the snapshot commits with it, and two deferred constraint triggers make acceptance and
+terms one fact. `unavailable` refuses only the online-collection path. The schedule gained no
+column, CHECK or immutability change; no value, selection, copy or evidence is seeded. **No money
+outcome changes.**
+
+Merged via PR #168 (squash `22c7266`), closing #159. Found on the way and fixed separately:
+the #149/#152 finance screen flashed "no orders" / "no settlement yet" for one frame before its
+requests started, which also made `finance-workspaces.spec.tsx` fail under load — fixed in PR #169
+(squash `b7cf494`).
+
+| Item | Before | After | Outcome it owns |
+|---|---|---|---|
+| #159 (`#42b`) | `status:review`, 13 | **Closed, 13** | Seller selection, booking snapshot and acceptance, delivered as described above |
+| #160 (`#42c`) | `status:proposed`, 13 | unchanged | Outcome evaluator — not started |
+| #161 (`#42d`) | `status:proposed`, 8 | unchanged | No-show declaration and remedy choice — not started |
+| #162 (`#42e`) | `status:proposed`, 13 | unchanged | Dispute and appeal case model — not started |
+
+**What moved.** V3.3 done **251 → 264** (+13), scope unchanged at **350**. The live dashboard
+(issue #2) reports **264 / 350, zero data-quality warnings** as of this delivery. #159 closes with its `sp:13`
+label preserved and no status label. No provider, payment rail, tag or Release was introduced or
+changed.
