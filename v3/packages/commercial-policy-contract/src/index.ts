@@ -16,3 +16,7 @@ export * from './collection-policy-assignment-contract';
 // seller later chooses inside, never the booking snapshot (`#42b`). Additive:
 // `BookingCommercialTermsV1` above is superseded by ADR-051 §2 but unchanged.
 export * from './booking-outcome-policy-contract';
+// V3.3 Story #159 (`#42b`). The seller's selection, the order-level outcome
+// snapshot and the customer's acceptance of it (ADR-051 §2–§4). Additive:
+// nothing above is changed.
+export * from './booking-outcome-contract';
