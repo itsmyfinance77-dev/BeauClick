@@ -1152,3 +1152,41 @@ Both merged via PR #164 (squash `d4871d3`), closing #149 and #152.
 (issue #2) reports **238 / 350, zero data-quality warnings** as of this delivery. Both issues close
 with their `sp:` labels preserved and no status label. No backend, migration, schema, provider,
 payment, tag or Release was introduced or changed.
+
+## V3.3 Story #42 (`#42a`) delivered, 2026-09-14
+
+The administrator publication plane for booking outcomes shipped against ADR-051 §1, §5 and §10
+(`V33-DEC-039`, `V33-DEC-042`, `V33-DEC-043`). Implementation began on the recorded baseline
+(`49557fb`) and was rebased onto `master` after #149/#152 merged (#164/#165, `1e63567`); the
+#149/#152 frontend was neither modified nor part of this change, and `v3/apps/web/**` and
+`design/claude-design` were not touched.
+
+**#42 (`#42a`), 13 Story Points.** Six `commercial` tables in one migration: the booking-outcome
+policy family (versions carry the ranges and sets a seller will later choose inside — allowed
+cutoff hours and no-show grace minutes, selectable retention options — plus the administrator
+values for free reschedules, dispute, bodily-harm and appeal windows, a nullable case-file
+retention and a nullable legal cap), the Persian customer-policy copy family (`fa-IR` text as data
+with a database-computed hash and no number column) and the Legal-evidence record (a reference and
+a summary, never a document). Forward-only lifecycles, immutable published rows, database clock,
+non-retroactive activation and half-open per-family windows are enforced by PostgreSQL; a cap is
+unwritable without a qualifying `retention_cap` record through a CHECK, an FK and
+`commercial.require_valid_legal_evidence_for_cap`. Twenty-two administrator routes under
+`v1/admin/commercial` on `bc_manage_commercial_plans`, same-transaction audit, all six tables
+`retained` under ADR-027. **No value, option, cap, copy or evidence is seeded or published**, and
+booking, checkout, order, refund, credit and notification behaviour is unchanged. `gate:legal`
+stays: publication of Legal-dependent content is not activated.
+
+Merged via PR #166 (squash `4a0e6ae`), closing #42.
+
+| Item | Before | After | Outcome it owns |
+|---|---|---|---|
+| #42 (`#42a`) | `status:review`, 13 | **Closed, 13** | Outcome-policy, copy and Legal-evidence publication plane, delivered as described above |
+| #159 (`#42b`) | `status:proposed`, 13 | unchanged | Seller selection, booking snapshot and acceptance — not started |
+| #160 (`#42c`) | `status:proposed`, 13 | unchanged | Outcome evaluator — not started |
+| #161 (`#42d`) | `status:proposed`, 8 | unchanged | No-show declaration and remedy choice — not started |
+| #162 (`#42e`) | `status:proposed`, 13 | unchanged | Dispute and appeal case model — not started |
+
+**What moved.** V3.3 done **238 → 251** (+13), scope unchanged at **350**. The live
+dashboard (issue #2) reports **251 / 350, zero data-quality warnings** as of this delivery.
+#42 closes with its `sp:13` and `gate:legal` labels preserved and no status label. No provider,
+payment rail, tag or Release was introduced or changed.
