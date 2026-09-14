@@ -345,10 +345,23 @@ describePg('order payment schedule — invariants, immutability, atomicity, back
     });
 
     it('accepts a complete policy reference, so the refusals above are about incompleteness', async () => {
+      await expect(insertSchedule({ policy_key: 'salon_deposit', policy_version: 2 })).resolves.toBeUndefined();
+      expect(await scheduleRows()).toHaveLength(1);
+    });
+
+    it('refuses an acceptance instant with no outcome terms committed beside it (V3.3 #159)', async () => {
+      /*
+       * This case used to write `policy_accepted_at` on its own and expect it
+       * to commit. V3.3 #159 (`#42b`, ADR-051 §4) made acceptance and the
+       * order's outcome terms one database fact: a deferred constraint trigger
+       * refuses, at COMMIT, a schedule that says "accepted" about an order with
+       * no `commerce.order_outcome_terms` row. Nothing here predates acceptance
+       * being writable at all, so no existing row is affected.
+       */
       await expect(
         insertSchedule({ policy_key: 'salon_deposit', policy_version: 2, policy_accepted_at: new Date() }),
-      ).resolves.toBeUndefined();
-      expect(await scheduleRows()).toHaveLength(1);
+      ).rejects.toThrow(/requires the order's outcome terms/);
+      expect(await scheduleRows()).toHaveLength(0);
     });
 
     it('accepts a key and version WITHOUT an acceptance time, which is what #115 writes', async () => {

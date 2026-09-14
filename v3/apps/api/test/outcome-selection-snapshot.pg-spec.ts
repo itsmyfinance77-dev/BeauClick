@@ -1120,7 +1120,10 @@ describePg('booking outcome selection, snapshot and acceptance (real PostgreSQL)
         const seller = await professionalSeller(150_000);
         const response = await checkout(seller).expect(201);
         const orderId = response.body.data.order.id;
-        const { order_id: _o, created_at: _c, ...schedule } = await scheduleRow(orderId);
+        // Per-row identity and instant drop out; every other column must match.
+        const schedule: Record<string, unknown> = { ...(await scheduleRow(orderId)) };
+        delete schedule.order_id;
+        delete schedule.created_at;
         return { response: strip(response.body.data), schedule, terms: await termsRow(orderId) };
       };
 
