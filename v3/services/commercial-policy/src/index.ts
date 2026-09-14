@@ -88,3 +88,13 @@ export * from './outcome-policy/customer-policy-copy.service';
 export * from './outcome-policy/booking-outcome-policy.controller';
 export * from './outcome-policy/booking-outcome-policy-subject-data.contract';
 export * from './outcome-policy/booking-outcome-policy.module';
+// V3.3 Story #159 (`#42b`). The seller's selection inside the published ranges,
+// and the READ-ONLY resolver the order path binds (ADR-051 §3). Selection and
+// resolution only: no evaluator, no refund, no no-show, no dispute.
+export * from './outcome-policy-assignment/outcome-policy-assignment.entities';
+export * from './outcome-policy-assignment/outcome-policy-assignment.exceptions';
+export * from './outcome-policy-assignment/outcome-policy-assignment.service';
+export * from './outcome-policy-assignment/outcome-policy-assignment.controller';
+export * from './outcome-policy-assignment/outcome-policy-assignment-subject-data.contract';
+export * from './outcome-policy-assignment/outcome-policy-assignment.module';
+export * from './outcome-policy-assignment/outcome-policy-resolution.service';

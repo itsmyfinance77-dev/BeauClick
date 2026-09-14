@@ -16,6 +16,7 @@ import {
   VerificationOutcome,
 } from '@beauclick/payment';
 import { OutboxRelay } from '@beauclick/events';
+import type { BookingOutcomeAcceptanceV1 } from '@beauclick/commercial-policy-contract';
 import { METRICS, MetricsRegistry } from '@beauclick/observability';
 
 export interface CheckoutResult {
@@ -203,7 +204,9 @@ export class CheckoutService {
    * "book" button therefore converges on ONE booking and ONE order, and a
    * network retry returns the same pair rather than a second slot claim.
    */
-  async checkout(input: CreateBookingInput & { callbackBaseUrl: string }): Promise<CheckoutResult> {
+  async checkout(
+    input: CreateBookingInput & { callbackBaseUrl: string; acceptedPolicy?: BookingOutcomeAcceptanceV1 | null },
+  ): Promise<CheckoutResult> {
     const { bookingId, order } = await this.dataSource.transaction(async (manager) => {
       const booking = await this.bookings.create(
         {
@@ -222,6 +225,10 @@ export class CheckoutService {
           customerId: booking.customerId,
           professionalId: booking.professionalId,
           serviceId: booking.serviceId,
+          // V3.3 #159 (`#42b`), ADR-051 §4. Passed through untouched; the order
+          // path compares it with the resolution in this same transaction, and
+          // a refusal there rolls back the booking created just above.
+          acceptedPolicy: input.acceptedPolicy ?? null,
         },
         manager,
       );

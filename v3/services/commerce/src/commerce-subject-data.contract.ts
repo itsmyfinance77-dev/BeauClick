@@ -63,6 +63,18 @@ export class CommerceSubjectDataContract implements SubjectDataContract {
         'The immutable collection schedule of a retained order: what the service cost, what BeauClick collected online, and what was payable at the venue. Part of the same commercial record as the order.',
     },
     {
+      /*
+       * V3.3 #159 (`#42b`), ADR-051 §10. `subject_data` via the order, although
+       * the table carries no `_user_id` column — the precedent is
+       * `booking.booking_resource_assignments`. The terms a customer accepted,
+       * and when, are part of their own order: exported with it, and reported
+       * retained on erasure for the order's own reason. Pinned by test, because
+       * the coverage heuristic cannot see a subject through a join.
+       */
+      table: 'commerce.order_outcome_terms',
+      disposition: 'subject_data',
+    },
+    {
       table: 'commerce.outbox_events',
       disposition: 'retained',
       reason: 'Transactional outbox.',
@@ -97,6 +109,25 @@ export class CommerceSubjectDataContract implements SubjectDataContract {
           `SELECT order_id, collection_mode, service_total_toman, platform_collectible_toman,
                   venue_balance_toman, created_at
              FROM commerce.order_payment_schedules WHERE order_id = ANY($1::uuid[]) ORDER BY order_id`,
+          [orderIds],
+        )
+      : [];
+    /*
+     * V3.3 #159. The outcome terms the customer accepted, batched like the
+     * sections above. What they were shown and agreed to — never the legal
+     * evidence reference, the cap internals or the case-file retention period,
+     * which the disclosure never showed either, and never the seller's id.
+     * `accepted_at` is `resolved_at`, equal to the schedule's acceptance
+     * instant by constraint.
+     */
+    const outcomeTerms = orderIds.length
+      ? await manager.query(
+          `SELECT order_id, policy_key, policy_version, copy_key, copy_version,
+                  cutoff_hours, late_retention_kind, late_retention_basis_points, late_retention_amount_toman,
+                  grace_minutes, no_show_retention_kind, no_show_retention_basis_points, no_show_retention_amount_toman,
+                  reschedule_free_count, dispute_window_hours, bodily_harm_window_hours, appeal_window_hours,
+                  resolved_at AS accepted_at
+             FROM commerce.order_outcome_terms WHERE order_id = ANY($1::uuid[]) ORDER BY order_id`,
           [orderIds],
         )
       : [];
@@ -143,6 +174,11 @@ export class CommerceSubjectDataContract implements SubjectDataContract {
         description: 'تخفیف‌ها و کارمزدهای سفارش‌های شما',
         rows: adjustments as Array<Record<string, unknown>>,
       },
+      {
+        key: 'order_outcome_terms',
+        description: 'شرایط لغو و عدم حضوری که هنگام رزرو پذیرفته‌اید',
+        rows: outcomeTerms as Array<Record<string, unknown>>,
+      },
     ];
   }
 
@@ -162,6 +198,10 @@ export class CommerceSubjectDataContract implements SubjectDataContract {
         {
           table: 'commerce.orders',
           reason: 'transaction records referenced by the append-only ledger',
+        },
+        {
+          table: 'commerce.order_outcome_terms',
+          reason: 'the accepted terms of a retained order; append-only and carrying no identifying content of their own',
         },
       ],
     };

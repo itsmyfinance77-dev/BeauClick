@@ -6,8 +6,10 @@ import { CityEntity, ProfessionalEntity, SellerOwnerRoleGrantPort, ServiceOfferi
 import { ProfessionalDirectory } from '@beauclick/booking';
 import {
   BookingCollectionPolicyResolver,
+  BookingOutcomePolicyResolver,
   OrderSellerParty,
   ResolvedBookingCollectionPolicy,
+  ResolvedBookingOutcomePolicy,
   ServiceCatalog,
   ServiceOfferingSnapshot,
 } from '@beauclick/commerce';
@@ -20,6 +22,7 @@ import {
   financePartyKey,
 } from '@beauclick/financial';
 import {
+  BookingOutcomePolicyResolutionService,
   CollectionPolicyResolutionService,
   OwnedSubscriberParty,
   OwnedSubscriberPartyResolver,
@@ -169,6 +172,38 @@ export class CommercialPolicyBackedCollectionResolver implements BookingCollecti
   ): Promise<ResolvedBookingCollectionPolicy> {
     const snapshot = await this.resolution.resolveForParty(manager, sellerParty.partyType, sellerParty.partyId);
     return snapshot === null ? { outcome: 'legacy_unenrolled' } : { outcome: 'enrolled', snapshot };
+  }
+}
+
+/**
+ * Commerce's booking-outcome resolver, answered by commercial-policy — V3.3
+ * #159 (`#42b`), ADR-051 §3.
+ *
+ * A delegation and nothing more, exactly as the collection resolver above:
+ * the one place the two domains meet on the order path for outcome terms. It
+ * binds the READ-ONLY `BookingOutcomePolicyResolutionService`, never the
+ * seller's `OutcomePolicyAssignmentService` or the administrator's
+ * `BookingOutcomePolicyService`, so no mutation surface sits on the code path
+ * every booking runs. The three outcomes are mapped member by member rather
+ * than passed through, so a fourth added on either side is a compile error.
+ */
+@Injectable()
+export class CommercialPolicyBackedOutcomeResolver implements BookingOutcomePolicyResolver {
+  constructor(private readonly resolution: BookingOutcomePolicyResolutionService) {}
+
+  async resolveForSellerParty(
+    manager: EntityManager,
+    sellerParty: OrderSellerParty,
+  ): Promise<ResolvedBookingOutcomePolicy> {
+    const resolved = await this.resolution.resolveForParty(manager, sellerParty.partyType, sellerParty.partyId);
+    switch (resolved.outcome) {
+      case 'legacy_unenrolled':
+        return { outcome: 'legacy_unenrolled' };
+      case 'resolved':
+        return { outcome: 'resolved', snapshot: resolved.snapshot };
+      case 'unavailable':
+        return { outcome: 'unavailable', cause: resolved.cause };
+    }
   }
 }
 

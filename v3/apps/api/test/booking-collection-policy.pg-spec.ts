@@ -868,7 +868,9 @@ describePg('booking collection policy — publication, lifecycle and constraints
       // Twenty-one since Story #42 (`#42a`) added the six tables of the
       // booking-outcome policy, copy and Legal-evidence plane (ADR-051 §10),
       // each with its own claim in `BookingOutcomePolicySubjectDataContract`.
-      expect(rows).toHaveLength(21);
+      // Twenty-two since Story #159 (`#42b`) added the seller's outcome
+      // selection table with its own `retained` claim.
+      expect(rows).toHaveLength(22);
 
       const report = evaluateCoverage(rows, contracts);
       expect(report.violations.filter((v) => v.table.startsWith('commercial.'))).toEqual([]);

@@ -1,5 +1,5 @@
 import type { EntityManager } from 'typeorm';
-import type { BookingCollectionPolicySnapshotV1 } from '@beauclick/commercial-policy-contract';
+import type { BookingCollectionPolicySnapshotV1, BookingOutcomeSnapshotV1 } from '@beauclick/commercial-policy-contract';
 
 /**
  * commerce-service's outbound ports.
@@ -138,6 +138,42 @@ export interface OrderSellerParty {
 }
 
 export const BOOKING_COLLECTION_POLICY_RESOLVER = Symbol('BEAUCLICK_BOOKING_COLLECTION_POLICY_RESOLVER');
+
+/**
+ * What the booking-outcome resolver decided for one seller party — V3.3 #159
+ * (`#42b`), ADR-051 §3.
+ *
+ * Three members, because the ratified text names three, and unlike the
+ * collection union above `unavailable` is a VALUE rather than a throw: when an
+ * enrolled seller's terms cannot be resolved, a booking that collects nothing
+ * online still proceeds (`V33-DEC-039` R13) and only the online-collection path
+ * is refused. The order path decides which, from the amounts; this port only
+ * reports. `cause` is a closed, identity-free label for a metric and never
+ * reaches a response.
+ */
+export type ResolvedBookingOutcomePolicy =
+  | { readonly outcome: 'legacy_unenrolled' }
+  | { readonly outcome: 'resolved'; readonly snapshot: BookingOutcomeSnapshotV1 }
+  | { readonly outcome: 'unavailable'; readonly cause: string };
+
+/**
+ * "Which cancellation and no-show terms govern this seller party's booking,
+ * right now?" — V3.3 #159 (`#42b`), ADR-051 §3.
+ *
+ * Declared here and answered in `apps/api` for the reason
+ * `BookingCollectionPolicyResolver` is: `scope:commerce` may not import
+ * Commercial Policy, so no outcome-policy ORM entity or service reaches this
+ * module — only the browser-safe snapshot contract.
+ *
+ * It takes the seller party Commerce already selected and the caller's
+ * transaction, and nothing else: no user, workspace reference, key, version or
+ * copy parameter exists, so no caller can name the terms it would like.
+ */
+export interface BookingOutcomePolicyResolver {
+  resolveForSellerParty(manager: EntityManager, sellerParty: OrderSellerParty): Promise<ResolvedBookingOutcomePolicy>;
+}
+
+export const BOOKING_OUTCOME_POLICY_RESOLVER = Symbol('BEAUCLICK_BOOKING_OUTCOME_POLICY_RESOLVER');
 
 /**
  * The entitlement seam every booking confirmation passes through —

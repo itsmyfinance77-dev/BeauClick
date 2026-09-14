@@ -13,21 +13,33 @@ import { OrderPaymentScheduleEntity } from '../entities/order-payment-schedule.e
 import { CommerceOutboxEntity } from '../entities/commerce-outbox.entity';
 import { PricingService } from '../pricing/pricing.service';
 import { PricingResult } from '../pricing/pricing.types';
+import type { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 import {
+  BOOKING_OUTCOME_UNAVAILABLE_CAUSES,
   BookingCollectionMode,
   BookingCollectionPolicySnapshotV1,
+  BookingOutcomeAcceptanceV1,
+  BookingOutcomeSnapshotV1,
   COMMERCIAL_POLICY_CONTRACT_VERSION,
+  acceptanceMatches,
   bookingCollectionAmountsV1,
+  bookingOutcomeRetentionColumns,
   validateBookingCollectionPolicySnapshotV1,
+  validateBookingOutcomeAcceptanceV1,
+  validateBookingOutcomeSnapshotV1,
 } from '@beauclick/commercial-policy-contract';
 import { METRICS, MetricsRegistry } from '@beauclick/observability';
 
 import {
   BOOKING_COLLECTION_POLICY_RESOLVER,
+  BOOKING_OUTCOME_POLICY_RESOLVER,
   BookingCollectionPolicyResolver,
+  BookingOutcomePolicyResolver,
   OrderSellerParty,
+  ResolvedBookingOutcomePolicy,
   SERVICE_CATALOG,
   ServiceCatalog,
+  ServiceOfferingSnapshot,
 } from '../ports';
 
 export class OrderNotFoundException extends DomainException {
@@ -160,6 +172,49 @@ export interface CreateBookingOrderInput {
   customerId: string;
   professionalId: string;
   serviceId: string | null;
+  /**
+   * V3.3 #159 (`#42b`), ADR-051 §4. The customer's explicit acceptance: the
+   * four identifiers the disclosure showed, echoed back. Compared with the
+   * resolution at the database instant — never filled in, never defaulted.
+   * Absent for a seller whose order carries no outcome terms.
+   */
+  acceptedPolicy?: BookingOutcomeAcceptanceV1 | null;
+}
+
+/**
+ * What a customer is shown before confirming — V3.3 #159 (`#42b`). Computed by
+ * the SAME steps order creation runs, writing nothing, so the disclosed amounts
+ * and terms cannot drift from what the checkout will commit.
+ */
+export interface BookingDisclosurePreview {
+  sellerParty: OrderSellerParty;
+  serviceTotalToman: number;
+  platformCollectibleToman: number;
+  venueBalanceToman: number;
+  /** The snapshot a checkout must accept, or `null` when the order will carry no outcome terms. */
+  outcome: BookingOutcomeSnapshotV1 | null;
+}
+
+/**
+ * Why the outcome-terms gate refused a checkout — V3.3 #159. Closed and
+ * identity-free: the resolver's unavailable causes, the three acceptance
+ * causes, and `unknown_error` for anything an adapter throws. A metric label,
+ * never a response.
+ */
+const OUTCOME_REFUSAL_CAUSES: ReadonlySet<string> = new Set([
+  ...BOOKING_OUTCOME_UNAVAILABLE_CAUSES,
+  'acceptance_missing',
+  'acceptance_mismatch',
+  'acceptance_unexpected',
+  'unknown_error',
+]);
+
+interface BookingQuote {
+  offering: ServiceOfferingSnapshot;
+  sellerParty: OrderSellerParty;
+  collection: ResolvedCollection;
+  outcome: ResolvedBookingOutcomePolicy;
+  priced: PricingResult;
 }
 
 export interface OrderWithDetail {
@@ -199,6 +254,13 @@ export class OrderService {
      */
     @Inject(BOOKING_COLLECTION_POLICY_RESOLVER)
     private readonly collectionPolicy: BookingCollectionPolicyResolver,
+    /*
+     * V3.3 #159 (`#42b`), ADR-051 §3. Mandatory for the reason the collection
+     * resolver above is: an optional outcome resolver would let every enrolled
+     * seller's bookings silently go out with no terms and no acceptance.
+     */
+    @Inject(BOOKING_OUTCOME_POLICY_RESOLVER)
+    private readonly outcomePolicy: BookingOutcomePolicyResolver,
     private readonly metrics: MetricsRegistry,
   ) {}
 
@@ -236,10 +298,41 @@ export class OrderService {
     }
   }
 
-  private async createForBookingWithin(
+  /**
+   * What the customer must be shown before confirming — V3.3 #159 (`#42b`).
+   *
+   * The same offering, seller, collection, outcome and pricing steps order
+   * creation runs, on the caller's manager, writing nothing and counting
+   * nothing on the order metrics. It refuses exactly where a checkout would
+   * refuse before its acceptance check, with the checkout's own exception, so
+   * the disclosure read cannot become an oracle the checkout is not.
+   */
+  async previewForBooking(
     manager: EntityManager,
-    input: CreateBookingOrderInput,
-  ): Promise<OrderWithDetail> {
+    input: { customerId: string; professionalId: string; serviceId: string | null },
+  ): Promise<BookingDisclosurePreview> {
+    const quote = await this.quoteBooking(manager, { ...input, bookingId: null }, false);
+    const amounts = collectionAmountsFor(quote.priced, quote.collection);
+    return {
+      sellerParty: quote.sellerParty,
+      ...amounts,
+      outcome: this.outcomeForCollection(quote.outcome, amounts.platformCollectibleToman, false),
+    };
+  }
+
+  /**
+   * Every READ order creation performs, in order, before anything is written:
+   * the offering and its seller (selected once), the collection policy, the
+   * outcome terms, and the price. Shared with the disclosure preview so the two
+   * cannot diverge.
+   *
+   * @param record whether this counts on the order metrics. The preview does not.
+   */
+  private async quoteBooking(
+    manager: EntityManager,
+    input: { customerId: string; professionalId: string; serviceId: string | null; bookingId: string | null },
+    record: boolean,
+  ): Promise<BookingQuote> {
     if (!input.serviceId) throw new UnsellableServiceException();
 
     /*
@@ -258,11 +351,12 @@ export class OrderService {
     /*
      * The seller of record, selected ONCE (ADR-048 R3).
      *
-     * Everything downstream -- the order row, the outbox payload and the policy
-     * resolution below -- uses this exact value. `SellerPartyLookup` is not
-     * consulted again anywhere in this transaction, and that is the actual
-     * guarantee: not that a re-read would return the same answer, but that
-     * there is no second read to disagree with the first.
+     * Everything downstream -- the order row, the outbox payload, both policy
+     * resolutions below and the outcome terms' legal seller -- uses this exact
+     * value. `SellerPartyLookup` is not consulted again anywhere in this
+     * transaction, and that is the actual guarantee: not that a re-read would
+     * return the same answer, but that there is no second read to disagree with
+     * the first.
      */
     const sellerParty: OrderSellerParty = {
       partyType: offering.sellerPartyType,
@@ -274,7 +368,16 @@ export class OrderService {
      * whose policy cannot be resolved refuses with no order, item, adjustment,
      * schedule or outbox row in existence (`V33-DEC-029` Ruling 8).
      */
-    const collection = await this.resolveCollection(manager, sellerParty);
+    const collection = await this.resolveCollection(manager, sellerParty, record);
+
+    /*
+     * V3.3 #159 (`#42b`). Also before any write, and after the collection
+     * locks: the locks are all share locks taken in one fixed order (collection
+     * selection, collection version, outcome selection, outcome version, copy
+     * version), so two orders never block each other and a writer waits for
+     * in-flight orders rather than deadlocking with them.
+     */
+    const outcome = await this.resolveOutcome(manager, sellerParty, record);
 
     const priced: PricingResult = await this.pricing.quote({
       customerId: input.customerId,
@@ -292,7 +395,32 @@ export class OrderService {
       ],
     });
 
+    return { offering, sellerParty, collection, outcome, priced };
+  }
+
+  private async createForBookingWithin(
+    manager: EntityManager,
+    input: CreateBookingOrderInput,
+  ): Promise<OrderWithDetail> {
+    const { offering, sellerParty, collection, outcome, priced } = await this.quoteBooking(manager, input, true);
+
     const orderId = uuidv7();
+    const schedule = scheduleValuesFor(orderId, priced, collection);
+
+    /*
+     * V3.3 #159 (`#42b`). The outcome gate, decided from the amounts and the
+     * acceptance BEFORE the first write, so a refusal leaves no booking-side
+     * trace in commerce at all:
+     *
+     *   * `unavailable` refuses only when this order collects online
+     *     (`V33-DEC-039` R13); a zero-collectible booking proceeds with no terms;
+     *   * `resolved` requires `acceptedPolicy` equal to what resolved at the
+     *     database instant — omitted, stale, mismatched or fabricated refuses;
+     *   * an acceptance sent for an order that carries no terms refuses too:
+     *     the customer accepted something this booking is not governed by.
+     */
+    const accepted = this.outcomeForCollection(outcome, Number(schedule.platformCollectibleToman), true);
+    this.requireAcceptance(accepted, input.acceptedPolicy ?? null);
     await manager.insert(OrderEntity, {
       id: orderId,
       sourceType: 'booking',
@@ -364,12 +492,23 @@ export class OrderService {
      *   * an ENROLLED party records the amounts its assigned policy produced
      *     and the exact key and version that produced them.
      *
-     * `policyAcceptedAt` stays null on BOTH paths. Neither #104 nor #115
-     * records customer acceptance -- that is #42's, after Legal -- and the
-     * migration shipped with this story is what makes a key and version
-     * writable without one.
+     * V3.3 #159 (`#42b`) sets `policyAcceptedAt`, and only when the customer
+     * genuinely accepted resolved outcome terms: the terms row goes in FIRST
+     * (the schedule is immutable, so acceptance cannot be added afterwards) and
+     * the schedule records `now()` -- the database's transaction instant, equal
+     * to the terms row's `resolved_at` and required to be by the deferred
+     * constraint triggers. Every other path writes NULL exactly as before, and
+     * its SQL is unchanged.
      */
-    await manager.insert(OrderPaymentScheduleEntity, scheduleValuesFor(orderId, priced, collection));
+    if (accepted) {
+      await this.insertOutcomeTerms(manager, orderId, sellerParty, accepted);
+      await manager.insert(OrderPaymentScheduleEntity, {
+        ...schedule,
+        policyAcceptedAt: () => 'now()',
+      } as QueryDeepPartialEntity<OrderPaymentScheduleEntity>);
+    } else {
+      await manager.insert(OrderPaymentScheduleEntity, schedule);
+    }
 
     await emitEvent(manager, CommerceOutboxEntity, {
       aggregateType: 'order',
@@ -389,7 +528,162 @@ export class OrderService {
     });
 
     this.auditLog.log({ action: 'order.created', orderId, bookingId: input.bookingId, total: priced.totalToman });
+    if (accepted) {
+      // The acceptance fact is the append-only terms row plus the schedule's
+      // instant; this line makes it visible. Identifiers only: no copy body,
+      // no evidence reference, no customer or seller identity.
+      this.auditLog.log({
+        action: 'order.outcome_terms_accepted',
+        orderId,
+        policyKey: accepted.policyKey,
+        policyVersion: accepted.policyVersion,
+        copyKey: accepted.copyKey,
+        copyVersion: accepted.copyVersion,
+      });
+    }
     return this.loadDetail(manager, orderId);
+  }
+
+  /**
+   * The snapshot this order will carry, or `null` — or the refusal.
+   *
+   * `unavailable` refuses only the online-collection path (`V33-DEC-039` R13,
+   * ADR-051 §3); a booking that collects nothing online carries no terms and
+   * needs no acceptance. `legacy_unenrolled` never carries terms.
+   */
+  private outcomeForCollection(
+    outcome: ResolvedBookingOutcomePolicy,
+    platformCollectibleToman: number,
+    record: boolean,
+  ): BookingOutcomeSnapshotV1 | null {
+    if (outcome.outcome === 'resolved') return outcome.snapshot;
+    if (outcome.outcome === 'unavailable' && platformCollectibleToman > 0) {
+      throw this.outcomeRefusal(outcome.cause, record);
+    }
+    return null;
+  }
+
+  /**
+   * Genuine acceptance, or the refusal (ADR-051 §4).
+   *
+   * Exactly the four identifiers, exactly equal. There is no partial credit and
+   * no backend fallback that fills a missing acceptance from the resolution:
+   * a server that "helpfully" accepted on the customer's behalf would make
+   * `policy_accepted_at` a statement nobody made.
+   */
+  private requireAcceptance(
+    snapshot: BookingOutcomeSnapshotV1 | null,
+    acceptance: BookingOutcomeAcceptanceV1 | null,
+  ): void {
+    if (snapshot === null) {
+      if (acceptance !== null) throw this.outcomeRefusal('acceptance_unexpected', true);
+      return;
+    }
+    if (acceptance === null) throw this.outcomeRefusal('acceptance_missing', true);
+    if (validateBookingOutcomeAcceptanceV1(acceptance).length > 0 || !acceptanceMatches(acceptance, snapshot)) {
+      throw this.outcomeRefusal('acceptance_mismatch', true);
+    }
+  }
+
+  /** The checkout's own refusal, so an outcome cause is indistinguishable from an unsellable offering. */
+  private outcomeRefusal(cause: string, record: boolean): UnsellableServiceException {
+    if (record) {
+      this.metrics.increment(METRICS.outcomePolicyRefusals, {
+        cause: OUTCOME_REFUSAL_CAUSES.has(cause) ? cause : 'unknown_error',
+      });
+    }
+    return new UnsellableServiceException();
+  }
+
+  /**
+   * Resolves the seller's outcome terms — V3.3 #159 (`#42b`), ADR-051 §3.
+   *
+   * A throw from the adapter is a fault, not an outcome, and becomes the
+   * generic refusal with a bounded cause, as #115 does for collection. A
+   * `resolved` snapshot is validated again here, at the trust boundary, because
+   * an unvalidated snapshot would become an immutable terms row.
+   */
+  private async resolveOutcome(
+    manager: EntityManager,
+    sellerParty: OrderSellerParty,
+    record: boolean,
+  ): Promise<ResolvedBookingOutcomePolicy> {
+    let resolved: ResolvedBookingOutcomePolicy;
+    try {
+      resolved = await this.outcomePolicy.resolveForSellerParty(manager, sellerParty);
+    } catch (error) {
+      throw this.outcomeRefusal(causeOf(error), record);
+    }
+
+    if (resolved.outcome === 'resolved' && validateBookingOutcomeSnapshotV1(resolved.snapshot).length > 0) {
+      resolved = { outcome: 'unavailable', cause: 'invalid_snapshot' };
+    }
+    if (resolved.outcome === 'unavailable' && !OUTCOME_REFUSAL_CAUSES.has(resolved.cause)) {
+      resolved = { outcome: 'unavailable', cause: 'unknown_error' };
+    }
+
+    if (record) this.metrics.increment(METRICS.outcomePolicyResolutions, { outcome: resolved.outcome });
+    return resolved;
+  }
+
+  /**
+   * The order's accepted outcome terms, by value — V3.3 #159 (`#42b`).
+   *
+   * `resolved_at` is omitted so the column default supplies the transaction
+   * instant, and the legal seller is the party this order was created for;
+   * `tg_oot_integrity` refuses anything else.
+   */
+  private async insertOutcomeTerms(
+    manager: EntityManager,
+    orderId: string,
+    sellerParty: OrderSellerParty,
+    snapshot: BookingOutcomeSnapshotV1,
+  ): Promise<void> {
+    const { terms } = snapshot;
+    const late = bookingOutcomeRetentionColumns(terms.lateCancellationRetention);
+    const noShow = bookingOutcomeRetentionColumns(terms.noShowRetention);
+    const cap = terms.legalCap ? bookingOutcomeRetentionColumns(terms.legalCap) : null;
+
+    await manager.query(
+      `INSERT INTO commerce.order_outcome_terms
+         (order_id, seller_party_type, seller_party_id,
+          policy_key, policy_version, copy_key, copy_version,
+          cutoff_hours, late_retention_kind, late_retention_basis_points, late_retention_amount_toman,
+          grace_minutes, no_show_retention_kind, no_show_retention_basis_points, no_show_retention_amount_toman,
+          reschedule_free_count, dispute_window_hours, bodily_harm_window_hours, appeal_window_hours,
+          case_file_retention_days,
+          legal_cap_kind, legal_cap_basis_points, legal_cap_amount_toman, legal_evidence_id,
+          contract_version)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
+               $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)`,
+      [
+        orderId,
+        sellerParty.partyType,
+        sellerParty.partyId,
+        snapshot.policyKey,
+        snapshot.policyVersion,
+        snapshot.copyKey,
+        snapshot.copyVersion,
+        terms.cutoffHours,
+        late.kind,
+        late.basisPoints,
+        late.amountToman,
+        terms.noShowGraceMinutes,
+        noShow.kind,
+        noShow.basisPoints,
+        noShow.amountToman,
+        terms.rescheduleFreeCountBeforeCutoff,
+        terms.disputeWindowHours,
+        terms.bodilyHarmWindowHours,
+        terms.appealWindowHours,
+        terms.caseFileRetentionDays,
+        cap?.kind ?? null,
+        cap?.basisPoints ?? null,
+        cap?.amountToman ?? null,
+        snapshot.legalEvidenceId,
+        terms.contractVersion,
+      ],
+    );
   }
 
   /**
@@ -840,17 +1134,18 @@ export class OrderService {
   private async resolveCollection(
     manager: EntityManager,
     sellerParty: OrderSellerParty,
+    record: boolean,
   ): Promise<ResolvedCollection> {
     let resolved;
     try {
       resolved = await this.collectionPolicy.resolveForSellerParty(manager, sellerParty);
     } catch (error) {
-      this.metrics.increment(METRICS.collectionPolicyResolutionFailures, { cause: causeOf(error) });
+      if (record) this.metrics.increment(METRICS.collectionPolicyResolutionFailures, { cause: causeOf(error) });
       throw new UnsellableServiceException();
     }
 
     if (resolved.outcome === 'legacy_unenrolled') {
-      this.metrics.increment(METRICS.collectionPolicyResolutions, { outcome: 'legacy_unenrolled' });
+      if (record) this.metrics.increment(METRICS.collectionPolicyResolutions, { outcome: 'legacy_unenrolled' });
       return { enrolled: false };
     }
 
@@ -865,11 +1160,11 @@ export class OrderService {
      * call and the cost of trusting once is a receipt nobody can correct.
      */
     if (validateBookingCollectionPolicySnapshotV1(resolved.snapshot).length > 0) {
-      this.metrics.increment(METRICS.collectionPolicyResolutionFailures, { cause: 'invalid_snapshot' });
+      if (record) this.metrics.increment(METRICS.collectionPolicyResolutionFailures, { cause: 'invalid_snapshot' });
       throw new UnsellableServiceException();
     }
 
-    this.metrics.increment(METRICS.collectionPolicyResolutions, { outcome: 'enrolled' });
+    if (record) this.metrics.increment(METRICS.collectionPolicyResolutions, { outcome: 'enrolled' });
     return { enrolled: true, snapshot: resolved.snapshot };
   }
 }
@@ -957,9 +1252,30 @@ function scheduleValuesFor(
     venueBalanceToman: amounts.venueBalanceToman,
     policyKey: collection.snapshot.policyKey,
     policyVersion: collection.snapshot.policyVersion,
-    // #42's, after Legal. Neither child of `#41d-2` records acceptance.
+    // Set to the database instant by the caller when, and only when, #159's
+    // outcome terms were genuinely accepted in this transaction.
     policyAcceptedAt: null,
     contractVersion: COMMERCIAL_POLICY_CONTRACT_VERSION,
+  };
+}
+
+/**
+ * The three disclosed amounts, by the exact arithmetic `scheduleValuesFor`
+ * uses — V3.3 #159. Kept beside it so the preview and the schedule read one
+ * computation: the legacy full-online figures, or the shipped collection helper.
+ */
+function collectionAmountsFor(
+  priced: PricingResult,
+  collection: ResolvedCollection,
+): { serviceTotalToman: number; platformCollectibleToman: number; venueBalanceToman: number } {
+  if (!collection.enrolled) {
+    return { serviceTotalToman: priced.totalToman, platformCollectibleToman: priced.totalToman, venueBalanceToman: 0 };
+  }
+  const amounts = bookingCollectionAmountsV1(priced.subtotalToman, priced.totalToman, collection.snapshot.terms);
+  return {
+    serviceTotalToman: amounts.serviceTotalToman,
+    platformCollectibleToman: amounts.platformCollectibleToman,
+    venueBalanceToman: amounts.venueBalanceToman,
   };
 }
 

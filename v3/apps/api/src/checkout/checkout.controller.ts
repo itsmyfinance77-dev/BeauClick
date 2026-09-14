@@ -3,11 +3,12 @@ import { ConfigService } from '@nestjs/config';
 import { Throttle } from '@nestjs/throttler';
 import { AuthenticatedUser, CurrentUser, SkipResponseEnvelope } from '@beauclick/http';
 import { Public, policy } from '@beauclick/auth';
-import { CreateBookingDto, toBookingShape, BookingService } from '@beauclick/booking';
+import { toBookingShape, BookingService } from '@beauclick/booking';
 import { toOrderDetail } from '@beauclick/commerce';
 import { SANDBOX_DECISIONS, SandboxDecision, SandboxPaymentProvider, PaymentService } from '@beauclick/payment';
 
 import { CheckoutService } from './checkout.service';
+import { CreateCheckoutDto } from './checkout-disclosure';
 
 /**
  * `POST /v1/bookings` -- the one endpoint that spans booking and commerce.
@@ -53,7 +54,7 @@ export class CheckoutController {
    */
   @Post('bookings')
   async create(
-    @Body() dto: CreateBookingDto,
+    @Body() dto: CreateCheckoutDto,
     @CurrentUser() user: AuthenticatedUser,
     @Headers('idempotency-key') idempotencyKey?: string,
   ) {
@@ -64,6 +65,16 @@ export class CheckoutController {
       serviceId: dto.serviceId ?? null,
       idempotencyKey: idempotencyKey ?? null,
       callbackBaseUrl: this.callbackBaseUrl(),
+      // V3.3 #159 (`#42b`). Copied field by field: exactly the four
+      // identifiers, or nothing. Never filled in by the server.
+      acceptedPolicy: dto.acceptedPolicy
+        ? {
+            policyKey: dto.acceptedPolicy.policyKey,
+            policyVersion: dto.acceptedPolicy.policyVersion,
+            copyKey: dto.acceptedPolicy.copyKey,
+            copyVersion: dto.acceptedPolicy.copyVersion,
+          }
+        : null,
     });
 
     const booking = await this.bookings.findById(result.bookingId);

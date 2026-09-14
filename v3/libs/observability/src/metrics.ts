@@ -232,6 +232,13 @@ export const METRICS = {
    */
   collectionPolicyResolutions: 'beauclick_collection_policy_resolutions_total',
   collectionPolicyResolutionFailures: 'beauclick_collection_policy_resolution_failures_total',
+  /**
+   * V3.3 #159 (`#42b`). How every booking order resolved its outcome terms, and
+   * why a governed checkout was refused. Same shape and same bounded-label
+   * discipline as the two collection-policy series above.
+   */
+  outcomePolicyResolutions: 'beauclick_outcome_policy_resolutions_total',
+  outcomePolicyRefusals: 'beauclick_outcome_policy_refusals_total',
 } as const;
 
 export function registerPlatformMetrics(registry: MetricsRegistry): void {
@@ -280,6 +287,24 @@ export function registerPlatformMetrics(registry: MetricsRegistry): void {
   registry.registerCounter(
     METRICS.collectionPolicyResolutionFailures,
     'Enrolled orders REFUSED because the assigned policy could not be resolved, by closed internal cause. Every increment is a booking that did not happen: this is the series to alert on.',
+    ['cause'],
+  );
+
+  /*
+   * V3.3 #159 (`#42b`), ADR-051 §3. `outcome` is exactly `legacy_unenrolled`,
+   * `resolved` or `unavailable`; `cause` is the closed vocabulary order
+   * creation defines (the resolver's unavailable causes plus the three
+   * acceptance causes plus `unknown_error`). No seller, key, version, copy,
+   * workspace reference, amount or identity is ever a label.
+   */
+  registry.registerCounter(
+    METRICS.outcomePolicyResolutions,
+    'Booking orders by how their cancellation and no-show terms resolved.',
+    ['outcome'],
+  );
+  registry.registerCounter(
+    METRICS.outcomePolicyRefusals,
+    'Booking orders REFUSED by the outcome-terms gate, by closed internal cause: terms unresolvable on an online-collection booking, or a missing, stale or unexpected acceptance.',
     ['cause'],
   );
 }

@@ -1120,8 +1120,10 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
       // raised deliberately, with the new table's own claim shipped alongside,
       // and never relaxed to `toBeGreaterThan`. Twenty-one since Story #42
       // (`#42a`) added the six booking-outcome policy, copy and Legal-evidence
-      // tables (ADR-051 §10), each claimed by its own contract.
-      expect(rows).toHaveLength(21);
+      // tables (ADR-051 §10), each claimed by its own contract. Twenty-two since
+      // Story #159 (`#42b`) added `seller_outcome_policy_assignments`, claimed
+      // `retained` by `OutcomePolicyAssignmentSubjectDataContract`.
+      expect(rows).toHaveLength(22);
 
       const contracts = app.get<SubjectDataContract[]>(SUBJECT_DATA_CONTRACTS);
       const report = evaluateCoverage(rows, contracts);
@@ -1254,6 +1256,9 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
         // and Legal-evidence publication plane (ADR-051 §1/§5/§10). Seeds
         // nothing.
         'commercial/20260918100001_create_booking_outcome_policy_family.sql',
+        // V3.3 Story #159 (`#42b`). The seller's outcome selection (ADR-051 §3).
+        // Seeds nothing. Its commerce companion is not matched by this query.
+        'commercial/20260919100001_create_seller_outcome_policy_assignments.sql',
         'identity/20260902800002_add_commercial_plan_capability.sql',
       ]);
     });
@@ -1337,6 +1342,10 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
         // update, it happens once, and there is no DELETE path at all.
         'tg_scpa_immutable',
         'tg_seller_subscriptions_immutable',
+        // V3.3 Story #159 (`#42b`), ADR-051 §3: #104's immutability rules for
+        // the outcome selection, and membership in the active version on INSERT.
+        'tg_sopa_immutable',
+        'tg_sopa_selection_within_active_version',
       ]);
     });
 
