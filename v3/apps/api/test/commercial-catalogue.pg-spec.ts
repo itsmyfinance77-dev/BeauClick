@@ -1118,8 +1118,10 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
       // number is what makes a table added without a subject-data claim fail
       // HERE with a readable message instead of at application boot -- so it is
       // raised deliberately, with the new table's own claim shipped alongside,
-      // and never relaxed to `toBeGreaterThan`.
-      expect(rows).toHaveLength(15);
+      // and never relaxed to `toBeGreaterThan`. Twenty-one since Story #42
+      // (`#42a`) added the six booking-outcome policy, copy and Legal-evidence
+      // tables (ADR-051 §10), each claimed by its own contract.
+      expect(rows).toHaveLength(21);
 
       const contracts = app.get<SubjectDataContract[]>(SUBJECT_DATA_CONTRACTS);
       const report = evaluateCoverage(rows, contracts);
@@ -1248,6 +1250,10 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
         // plane: the singleton control row and the per-party governance fact
         // (ADR-050 §2). Seeds one control row and no governance row.
         'commercial/20260917100001_create_booking_credit_enforcement_controls.sql',
+        // V3.3 Story #42 (`#42a`). The booking-outcome policy, Persian copy
+        // and Legal-evidence publication plane (ADR-051 §1/§5/§10). Seeds
+        // nothing.
+        'commercial/20260918100001_create_booking_outcome_policy_family.sql',
         'identity/20260902800002_add_commercial_plan_capability.sql',
       ]);
     });
@@ -1274,6 +1280,10 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
         // V3.3 Story #83 (`#41d-1`). Indexes the EFFECTIVE window, not the
         // configured one -- see the ADR-048 amendment.
         'ex_bcpv_no_effective_overlap',
+        // V3.3 Story #42 (`#42a`). One per family, over the same effective
+        // window expression (ADR-051 §1).
+        'ex_bopv_no_effective_overlap',
+        'ex_cpcv_no_effective_overlap',
         'ex_plan_versions_no_overlap',
         'ex_plan_versions_single_auto_assignable',
         'ex_price_schedule_versions_no_overlap',
@@ -1305,8 +1315,19 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
         'tg_bcr_immutable',
         'tg_booking_collection_policies_immutable',
         'tg_booking_credit_grants_immutable',
+        // V3.3 Story #42 (`#42a`), ADR-051 §1/§5: the outcome-policy key's
+        // permanence, the frozen options, the version lifecycle and the
+        // Legal-cap gate; the copy family's lifecycle and key; the evidence
+        // record's one-way lifecycle.
+        'tg_booking_outcome_policies_immutable',
+        'tg_bopro_freeze',
+        'tg_bopv_lifecycle',
+        'tg_bopv_require_evidence',
+        'tg_cpcv_lifecycle',
         // V3.3 Story #57 (`#40c-1`).
         'tg_credit_purchases_immutable',
+        'tg_customer_policy_copies_immutable',
+        'tg_ler_lifecycle',
         'tg_plan_versions_lifecycle',
         'tg_plans_immutable',
         'tg_price_schedule_versions_lifecycle',

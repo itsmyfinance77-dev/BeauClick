@@ -10,3 +10,9 @@ export * from './booking-collection-policy-contract';
 // assignable-policy list, the current-assignment view and one refusal code.
 // Projections only -- no version, terms, mode, amount, actor or audit field.
 export * from './collection-policy-assignment-contract';
+// V3.3 Story #42 (`#42a`). The administrator-published booking-outcome policy
+// family, the Persian customer-policy copy family and the Legal-evidence
+// record (ADR-051 §1, §5, §10). Publication vocabulary only: ranges and sets a
+// seller later chooses inside, never the booking snapshot (`#42b`). Additive:
+// `BookingCommercialTermsV1` above is superseded by ADR-051 §2 but unchanged.
+export * from './booking-outcome-policy-contract';

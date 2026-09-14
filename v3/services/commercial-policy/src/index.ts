@@ -74,3 +74,17 @@ export * from './enforcement/booking-credit-enforcement-governance.service';
 export * from './enforcement/booking-credit-enforcement.controller';
 export * from './enforcement/booking-credit-enforcement-subject-data.contract';
 export * from './enforcement/booking-credit-enforcement.module';
+// V3.3 Story #42 (`#42a`). The administrator-published booking-outcome policy
+// family, the Persian customer-policy copy family and the Legal-evidence
+// record with its database-enforced cap gate (ADR-051 §1, §5, §10). A seventh,
+// additive surface: publication only, read by no booking, order, payment or
+// refund path, and changing no customer- or seller-facing behaviour.
+export * from './outcome-policy/booking-outcome-policy.entities';
+export * from './outcome-policy/booking-outcome-policy.constants';
+export * from './outcome-policy/booking-outcome-policy.dto';
+export * from './outcome-policy/legal-evidence.service';
+export * from './outcome-policy/booking-outcome-policy.service';
+export * from './outcome-policy/customer-policy-copy.service';
+export * from './outcome-policy/booking-outcome-policy.controller';
+export * from './outcome-policy/booking-outcome-policy-subject-data.contract';
+export * from './outcome-policy/booking-outcome-policy.module';

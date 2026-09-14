@@ -22,6 +22,7 @@ import { WishlistCompositionModule } from './wishlist-composition.module';
 import { ReferralCompositionModule } from './referral-composition.module';
 import {
   BookingCreditEnforcementModule,
+  BookingOutcomePolicyModule,
   CommercialCatalogueModule,
   CommercialPolicyModule,
   SellerSubscriptionModule,
@@ -175,6 +176,10 @@ import {
     // catalogue: its one port-shaped dependency (the ledger's lock namespace)
     // is a constant, and its entitlement seam is bound in `DomainPortsModule`.
     BookingCreditEnforcementModule,
+    // V3.3 #42 (`#42a`), ADR-051 §1/§5/§10. The booking-outcome policy, copy and
+    // Legal-evidence publication plane. Composed directly like the catalogue:
+    // it has no port, no consumer and no seam; nothing reads it until `#42b`.
+    BookingOutcomePolicyModule,
   ],
   controllers: [
     CheckoutController,
@@ -313,6 +318,7 @@ import {
     CollectionPolicyAssignmentModule,
   SellerSubscriptionSurfaceModule,
     BookingCreditEnforcementModule,
+    BookingOutcomePolicyModule,
     FINANCIAL_OUTBOX_RELAY,
     PrivacyModule,
     // V3.1 Phase F. Re-exported so the root injector can resolve
