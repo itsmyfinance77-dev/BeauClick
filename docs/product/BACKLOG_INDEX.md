@@ -1224,7 +1224,7 @@ requests started, which also made `finance-workspaces.spec.tsx` fail under load 
 | #161 (`#42d`) | `status:proposed`, 8 | unchanged | No-show declaration and remedy choice — not started |
 | #162 (`#42e`) | `status:proposed`, 13 | unchanged | Dispute and appeal case model — not started |
 
-**What moved.** V3.3 done **251 → 264**, scope **unchanged at **350****. The live dashboard
+**What moved.** V3.3 done **251 → 264** (+13), scope unchanged at **350**. The live dashboard
 (issue #2) reports **264 / 350, zero data-quality warnings** as of this delivery. #159 closes with its `sp:13`
 label preserved and no status label. No provider, payment rail, tag or Release was introduced or
 changed.
