@@ -455,6 +455,9 @@ export const RESETTABLE_TABLES = [
   // V3.3 Story #104 (`#41d-2a`). Before the policy tables it references, and
   // the migration seeds none of the three.
   'commercial.seller_collection_policy_assignments',
+  // V3.3 Story #159 (`#42b`). Before the outcome-policy key it references; the
+  // migration seeds none.
+  'commercial.seller_outcome_policy_assignments',
   // V3.3 Story #42 (`#42a`), ADR-051 §1/§5/§10. Children before parents:
   // options -> versions -> keys, and the evidence records last because a
   // version references one. The migration seeds NONE of the six, so a reset
@@ -588,6 +591,9 @@ export const RESETTABLE_TABLES = [
   'commerce.outbox_events',
   'commerce.order_adjustments',
   'commerce.order_items',
+  // V3.3 Story #159 (`#42b`). Before `commerce.orders`, which it references by
+  // a real FK. TRUNCATE fires no row or constraint trigger.
+  'commerce.order_outcome_terms',
   'commerce.orders',
   'booking.outbox_events',
   'booking.idempotency_keys',

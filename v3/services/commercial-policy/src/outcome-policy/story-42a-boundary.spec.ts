@@ -135,19 +135,28 @@ describe('Story #42 (`#42a`) contains none of #42b–#42e, #43, #47 or #99', () 
     );
   });
 
-  it('is read by no production caller: only its own module and the two composition roots import it', () => {
+  it('is read by no production caller: only the composition roots and #159 import it, and nothing calls its writers', () => {
+    // #42a's OWN exported identifiers, named exactly. #159's
+    // `BookingOutcomePolicyResolver`, `ResolvedBookingOutcomePolicy` and
+    // `BookingOutcomePolicyResolution…` share the prefix and are not this plane.
+    const detector =
+      /outcome-policy\/|\bBookingOutcomePolicy(Service|Controller|Module|SubjectDataContract|Entity|VersionEntity|RetentionOptionEntity)\b|\bCustomerPolicyCopy(Service|Entity|VersionEntity)\b|\bLegalEvidence(Service|RecordEntity)\b/;
     const importers = [
       ...readTypeScriptSources('services'),
       ...readTypeScriptSources('apps/api/src'),
       ...readTypeScriptSources('libs'),
-    ].filter(({ file, source }) => !file.startsWith('services/commercial-policy/src/outcome-policy/') && /outcome-policy\/|BookingOutcomePolicy|CustomerPolicyCopy|LegalEvidence/.test(stripComments(source)));
+    ].filter(({ file, source }) => !file.startsWith('services/commercial-policy/src/outcome-policy/') && detector.test(stripComments(source)));
     expect(importers.map((i) => i.file).sort()).toEqual([
       'apps/api/src/composition/domain-composition.module.ts',
       'apps/api/src/composition/privacy-composition.module.ts',
       'services/commercial-policy/src/index.ts',
+      // #159 (`#42b`), the designed first consumer: it reuses this plane's
+      // retention-rule DTO for the seller's selection body, and reads the
+      // published family through narrow SQL projections, never a service.
+      'services/commercial-policy/src/outcome-policy-assignment/outcome-policy-assignment.controller.ts',
     ]);
-    // And those two roots only COMPOSE it: no root calls a service method.
-    for (const importer of importers.filter((i) => i.file.startsWith('apps/'))) {
+    // And no importer calls one of this plane's writers.
+    for (const importer of importers) {
       expect(stripComments(importer.source)).not.toMatch(/BookingOutcomePolicyService|CustomerPolicyCopyService|LegalEvidenceService/);
     }
   });

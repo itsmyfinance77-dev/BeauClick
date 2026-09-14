@@ -229,8 +229,9 @@ describePg('booking outcome policy, customer copy and Legal evidence — publica
       const tables = await dataSource.query(`SELECT tablename FROM pg_tables WHERE schemaname = 'commercial' ORDER BY tablename`);
       const names: string[] = tables.map((t: { tablename: string }) => t.tablename);
       for (const table of NEW_TABLES) expect(names).toContain(table);
-      // No premature `#42b`–`#42e` table.
-      expect(names.filter((n) => /outcome_policy_assignment|order_outcome|outcome_decision|no_show_declaration|remedy_choice|dispute/.test(n))).toEqual([]);
+      // No premature `#42c`–`#42e` table. (`#42b`'s selection table has shipped
+      // with #159, which asserts it in its own suite.)
+      expect(names.filter((n) => /outcome_decision|no_show_declaration|remedy_choice|dispute/.test(n))).toEqual([]);
     });
 
     it('declares the exact constraint, trigger, index and function set', async () => {
@@ -979,8 +980,12 @@ describePg('booking outcome policy, customer copy and Legal evidence — publica
       await request(app.getHttpServer()).get(`${BASE}/outcome-policies-that-do-not-exist`).set('Authorization', `Bearer ${admin.accessToken}`).expect(404);
     });
 
-    it('exposes no seller- or customer-facing route', async () => {
-      for (const path of ['/api/v1/me/outcome-policies', '/api/v1/me/outcome-policy-assignments/x', '/api/v1/outcome-policies', '/api/v1/legal-evidence', '/api/v1/customer-policy-copies']) {
+    // The seller routes `/api/v1/me/outcome-policies` and
+    // `/api/v1/me/outcome-policy-assignments/:ref` are `#42b`'s (#159) and are
+    // pinned by its own suite; this plane still exposes no route of its own
+    // outside the administrator prefix.
+    it('exposes no seller- or customer-facing route of its own', async () => {
+      for (const path of ['/api/v1/outcome-policies', '/api/v1/legal-evidence', '/api/v1/customer-policy-copies']) {
         const customer = await seedUser(app, dataSource, nextPhone(), ['customer']);
         await request(app.getHttpServer()).get(path).set('Authorization', `Bearer ${customer.accessToken}`).expect(404);
       }
