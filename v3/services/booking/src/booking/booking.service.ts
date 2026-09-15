@@ -4,7 +4,11 @@ import { DataSource, EntityManager, In, LessThan, Repository } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
 import {
   BOOKING_CANCELLATION_ENTITLEMENT_HOOK,
+  BOOKING_RESCHEDULE_OUTCOME_HOOK,
   BookingCancellationEntitlementHook,
+  BookingRescheduleFacts,
+  BookingRescheduleGovernance,
+  BookingRescheduleOutcomeHook,
   ELIGIBLE_RESOURCE_DIRECTORY,
   EligibleResourceDirectory,
   lockResourceForAssignment,
@@ -26,6 +30,7 @@ import { BookingResourceAssignmentEntity } from '../entities/booking-resource-as
 import { BookingConfig } from '../booking.config';
 import {
   InvalidBookingTransitionException,
+  RescheduleConsequenceRequiredException,
   RescheduleNotAllowedException,
   SlotUnavailableException,
   TooManyActiveHoldsException,
@@ -44,6 +49,35 @@ export interface BookingActor {
   type: BookingActorType;
   id: string | null;
 }
+
+/** V3.3 #160 (`#42c`). How a reschedule request was confirmed by its caller. */
+export interface RescheduleOptions {
+  /** The customer's explicit confirmation of a non-free reschedule's consequence. */
+  acceptConsequence?: boolean;
+}
+
+/**
+ * The database facts of one booking's cancellation — V3.3 #160 (`#42c`),
+ * `V33-DEC-039` R4.
+ *
+ * Read from the booking and its `cancelled` history row, on the caller's
+ * transaction. `eventInstant` is that history row's `created_at`: the database
+ * clock of the CANCELLING transaction, not of whoever reads it later. Instants
+ * cross as text so no JavaScript `Date` ever truncates a microsecond off the
+ * boundary, and `timely` is computed in the same SQL statement.
+ */
+export interface BookingCancellationFacts {
+  readonly cancelledByActorType: BookingActorType;
+  readonly wasConfirmed: boolean;
+  readonly eventInstant: string;
+  /** `slot_start − cutoff_hours`; `null` when no cutoff was supplied. */
+  readonly cutoffInstant: string | null;
+  /** `eventInstant <= cutoffInstant`; `null` when no cutoff was supplied. */
+  readonly timely: boolean | null;
+}
+
+/** ISO-8601 UTC with microseconds, so a `timestamptz` survives the round trip exactly. */
+const ISO_MICROS = `'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'`;
 
 /**
  * Every legal transition, in one table.
@@ -93,6 +127,14 @@ export class BookingService {
      */
     @Inject(ELIGIBLE_RESOURCE_DIRECTORY)
     private readonly eligibleResources: EligibleResourceDirectory,
+    /**
+     * V3.3 #160 (`#42c`). **Mandatory**, deliberately without `@Optional()`,
+     * for the reason the two seams above carry: a composition missing it would
+     * silently keep today's guards for every booking whose customer accepted
+     * outcome terms.
+     */
+    @Inject(BOOKING_RESCHEDULE_OUTCOME_HOOK)
+    private readonly rescheduleOutcome: BookingRescheduleOutcomeHook,
   ) {}
 
   // ---------------------------------------------------------------------
@@ -505,16 +547,35 @@ export class BookingService {
     actor: BookingActor,
     reason: string | null = null,
     manager?: EntityManager,
+    options: RescheduleOptions = {},
   ): Promise<BookingEntity> {
     return this.runInTransaction(manager, async (m) => {
-      const booking = await m.findOneOrFail(BookingEntity, { where: { id: bookingId } });
+      /*
+       * V3.3 #160 (`#42c`), `V33-DEC-039` R8. A CUSTOMER's reschedule of a
+       * booking whose order carries accepted outcome terms is governed by those
+       * terms instead of the two environment guards below. The seam runs first
+       * and, when governed, takes the order row `FOR UPDATE` before this method
+       * locks the booking row (ADR-050's order → booking).
+       *
+       * A professional's reschedule never asks, and a customer's reschedule of a
+       * booking without terms is answered `governed: false`: both continue on
+       * exactly the path this method has always taken.
+       */
+      const governance: BookingRescheduleGovernance =
+        actor.type === 'customer' ? await this.rescheduleOutcome.governReschedule(m, bookingId) : { governed: false };
+
+      const booking = governance.governed
+        ? await m.findOneOrFail(BookingEntity, { where: { id: bookingId }, lock: { mode: 'pessimistic_write' } })
+        : await m.findOneOrFail(BookingEntity, { where: { id: bookingId } });
 
       if (!SLOT_HOLDING_STATUSES.includes(booking.status)) throw new RescheduleNotAllowedException('status');
-      if (booking.rescheduleCount >= this.config.maxReschedulesPerBooking) {
-        throw new RescheduleNotAllowedException('max_reached');
+      if (!governance.governed) {
+        if (booking.rescheduleCount >= this.config.maxReschedulesPerBooking) {
+          throw new RescheduleNotAllowedException('max_reached');
+        }
+        const hoursUntil = (booking.slotStart.getTime() - Date.now()) / 3_600_000;
+        if (hoursUntil < this.config.rescheduleMinHoursBefore) throw new RescheduleNotAllowedException('too_close');
       }
-      const hoursUntil = (booking.slotStart.getTime() - Date.now()) / 3_600_000;
-      if (hoursUntil < this.config.rescheduleMinHoursBefore) throw new RescheduleNotAllowedException('too_close');
       if (newSlotId === booking.slotId) throw new RescheduleNotAllowedException('same_slot');
 
       const newSlot = await m.findOne(AvailabilitySlotEntity, { where: { id: newSlotId } });
@@ -525,6 +586,12 @@ export class BookingService {
       ) {
         throw new RescheduleNotAllowedException('invalid_slot');
       }
+
+      // `null` for a free governed reschedule; throws when the consequence is
+      // unavailable or not yet confirmed -- before anything is written.
+      const consequence = governance.governed
+        ? await this.governedRescheduleConsequence(m, booking, governance, options)
+        : null;
 
       const now = new Date();
       const holdExpiresAt =
@@ -607,6 +674,12 @@ export class BookingService {
         },
       });
 
+      // V3.3 #160 (`#42c`). The accepted consequence, in THIS transaction: the
+      // move and its decision commit together or not at all.
+      if (governance.governed && consequence) {
+        await this.rescheduleOutcome.recordConsequence(m, governance, consequence);
+      }
+
       await emitEvent(m, BookingOutboxEntity, {
         aggregateType: 'booking',
         aggregateId: bookingId,
@@ -626,6 +699,114 @@ export class BookingService {
       this.auditLog.log({ action: 'booking.rescheduled', bookingId, from: booking.slotId, to: claimed.id });
       return m.findOneOrFail(BookingEntity, { where: { id: bookingId } });
     });
+  }
+
+  /**
+   * Classifies a governed customer reschedule — V3.3 #160 (`#42c`),
+   * `V33-DEC-039` R8, on the database clock of THIS transaction.
+   *
+   * Free iff the booking's prior CUSTOMER reschedules are fewer than the
+   * snapshotted free count AND `now()` is at or before the snapshotted cutoff.
+   * The count reads the booking's own history rows by actor, so a professional's
+   * reschedule never consumes the customer's free one.
+   *
+   * Otherwise the reschedule is evaluated under the cancellation policy. A
+   * consequence that would carry money is refused — its meaning is not ratified
+   * — and a zero consequence needs the customer's explicit confirmation. Both
+   * refusals throw before anything is written; `null` means free.
+   */
+  private async governedRescheduleConsequence(
+    manager: EntityManager,
+    booking: BookingEntity,
+    governance: Extract<BookingRescheduleGovernance, { governed: true }>,
+    options: RescheduleOptions,
+  ): Promise<BookingRescheduleFacts | null> {
+    const [row]: Array<{ event_instant: string; cutoff_instant: string; timely: boolean; prior: number }> = await manager.query(
+      `SELECT to_char(now() AT TIME ZONE 'UTC', ${ISO_MICROS}) AS event_instant,
+              to_char((b.slot_start - make_interval(hours => $2::int)) AT TIME ZONE 'UTC', ${ISO_MICROS}) AS cutoff_instant,
+              now() <= b.slot_start - make_interval(hours => $2::int) AS timely,
+              (SELECT count(*)::int
+                 FROM booking.booking_history h
+                WHERE h.booking_id = b.id AND h.event = 'rescheduled' AND h.actor_type = 'customer') AS prior
+         FROM booking.bookings b
+        WHERE b.id = $1`,
+      [booking.id, governance.cutoffHours],
+    );
+
+    const facts: BookingRescheduleFacts = {
+      bookingId: booking.id,
+      eventInstant: row.event_instant,
+      cutoffInstant: row.cutoff_instant,
+      timely: row.timely,
+      wasConfirmed: booking.status === 'confirmed',
+    };
+    const prior = Number(row.prior);
+    if (prior < governance.rescheduleFreeCount && facts.timely) return null;
+
+    const retainedToman = this.rescheduleOutcome.consequenceRetainedToman(governance, facts);
+    if (retainedToman > 0n) throw new RescheduleNotAllowedException('consequence_unavailable');
+    if (options.acceptConsequence !== true) {
+      throw new RescheduleConsequenceRequiredException({
+        retainedToman: retainedToman.toString(),
+        cutoffAt: facts.cutoffInstant,
+        freeRemaining: Math.max(0, governance.rescheduleFreeCount - prior),
+      });
+    }
+    return facts;
+  }
+
+  // ---------------------------------------------------------------------
+  // Cancellation facts -- V3.3 #160 (`#42c`)
+  // ---------------------------------------------------------------------
+
+  /**
+   * The database facts a cancellation decision is judged on, read on the
+   * caller's transaction with the booking row held `FOR SHARE`.
+   *
+   * `null` when the booking does not exist or records no cancellation: a
+   * `BookingCancelled` fact with no cancelled booking behind it has nothing to
+   * decide, and no money moves on it.
+   *
+   * The caller passes the snapshotted cutoff (or `null` for an order without
+   * terms), and the comparison `created_at <= slot_start − cutoff` happens here,
+   * in SQL, against the cancelling transaction's own clock.
+   */
+  async cancellationFacts(
+    manager: EntityManager,
+    bookingId: string,
+    cutoffHours: number | null,
+  ): Promise<BookingCancellationFacts | null> {
+    const rows: Array<{
+      cancelled_by_actor_type: BookingActorType;
+      from_status: BookingStatus | null;
+      event_instant: string;
+      cutoff_instant: string | null;
+      timely: boolean | null;
+    }> = await manager.query(
+      `SELECT b.cancelled_by_actor_type,
+              h.from_status,
+              to_char(h.created_at AT TIME ZONE 'UTC', ${ISO_MICROS}) AS event_instant,
+              CASE WHEN $2::int IS NULL THEN NULL
+                   ELSE to_char((b.slot_start - make_interval(hours => $2::int)) AT TIME ZONE 'UTC', ${ISO_MICROS}) END AS cutoff_instant,
+              CASE WHEN $2::int IS NULL THEN NULL
+                   ELSE h.created_at <= b.slot_start - make_interval(hours => $2::int) END AS timely
+         FROM booking.bookings b
+         JOIN booking.booking_history h ON h.booking_id = b.id AND h.event = 'cancelled'
+        WHERE b.id = $1 AND b.status = 'cancelled'
+        ORDER BY h.id
+        LIMIT 1
+          FOR SHARE OF b`,
+      [bookingId, cutoffHours],
+    );
+    const row = rows[0];
+    if (!row || row.cancelled_by_actor_type === null) return null;
+    return {
+      cancelledByActorType: row.cancelled_by_actor_type,
+      wasConfirmed: row.from_status === 'confirmed',
+      eventInstant: row.event_instant,
+      cutoffInstant: row.cutoff_instant,
+      timely: row.timely,
+    };
   }
 
   // ---------------------------------------------------------------------

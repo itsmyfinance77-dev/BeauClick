@@ -119,7 +119,17 @@ export class BookingController {
     const role = await this.party.roleFor(id, user.userId);
     if (!role) throw new NotFoundOrNotYoursException();
 
-    const booking = await this.bookings.reschedule(id, dto.newSlotId, { type: role, id: user.userId }, dto.reason ?? null);
+    // `acceptConsequence` is only ever the caller's confirmation; the actor,
+    // and therefore whether the booking's outcome terms govern the move, is
+    // still derived from the session above (V3.3 #160).
+    const booking = await this.bookings.reschedule(
+      id,
+      dto.newSlotId,
+      { type: role, id: user.userId },
+      dto.reason ?? null,
+      undefined,
+      { acceptConsequence: dto.acceptConsequence === true },
+    );
     return toBookingShape(booking);
   }
 

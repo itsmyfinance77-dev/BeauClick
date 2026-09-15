@@ -40,7 +40,7 @@ export class InvalidBookingTransitionException extends DomainException {
 }
 
 export class RescheduleNotAllowedException extends DomainException {
-  constructor(reason: 'status' | 'max_reached' | 'too_close' | 'same_slot' | 'invalid_slot') {
+  constructor(reason: 'status' | 'max_reached' | 'too_close' | 'same_slot' | 'invalid_slot' | 'consequence_unavailable') {
     super('RESCHEDULE_NOT_ALLOWED', RESCHEDULE_MESSAGES[reason], HttpStatus.CONFLICT, { reason });
   }
 }
@@ -51,7 +51,32 @@ const RESCHEDULE_MESSAGES: Record<string, string> = {
   too_close: 'تا زمان نوبت فاصله‌ی کافی برای تغییر زمان باقی نمانده است.',
   same_slot: 'زمان انتخابی همان زمان فعلی رزرو است.',
   invalid_slot: 'زمان انتخابی برای این رزرو معتبر نیست.',
+  // V3.3 #160 (`#42c`). A reschedule whose consequence would carry money: its
+  // meaning is not ratified, so the move is refused and cancellation remains.
+  consequence_unavailable: 'تغییر زمان این رزرو در حال حاضر امکان‌پذیر نیست.',
 };
+
+/**
+ * A customer's reschedule of a booking under accepted outcome terms is not
+ * free, and they have not yet confirmed the consequence — V3.3 #160 (`#42c`),
+ * `V33-DEC-039` R8 ("the customer is shown that consequence before confirming").
+ *
+ * Nothing was written. The details are the customer's own facts about their own
+ * booking — the amount that would be retained, the cutoff instant and how many
+ * free reschedules remain — and nothing about the policy, the Legal cap or the
+ * evidence behind it. Repeating the request with `acceptConsequence: true`
+ * performs the move.
+ */
+export class RescheduleConsequenceRequiredException extends DomainException {
+  constructor(details: { retainedToman: string; cutoffAt: string; freeRemaining: number }) {
+    super(
+      'RESCHEDULE_CONSEQUENCE_REQUIRED',
+      'این تغییر زمان رایگان نیست. برای ادامه، پیامد آن را تأیید کنید.',
+      HttpStatus.CONFLICT,
+      details,
+    );
+  }
+}
 
 export class InvalidSlotRangeException extends DomainException {
   constructor(detail: string) {

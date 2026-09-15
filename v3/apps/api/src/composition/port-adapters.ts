@@ -7,6 +7,7 @@ import { ProfessionalDirectory } from '@beauclick/booking';
 import {
   BookingCollectionPolicyResolver,
   BookingOutcomePolicyResolver,
+  LegalEvidenceStateReader,
   OrderSellerParty,
   ResolvedBookingCollectionPolicy,
   ResolvedBookingOutcomePolicy,
@@ -24,6 +25,7 @@ import {
 import {
   BookingOutcomePolicyResolutionService,
   CollectionPolicyResolutionService,
+  LegalEvidenceStateService,
   OwnedSubscriberParty,
   OwnedSubscriberPartyResolver,
 } from '@beauclick/commercial-policy';
@@ -204,6 +206,24 @@ export class CommercialPolicyBackedOutcomeResolver implements BookingOutcomePoli
       case 'unavailable':
         return { outcome: 'unavailable', cause: resolved.cause };
     }
+  }
+}
+
+/**
+ * Commerce's Legal-evidence state port, answered by commercial-policy — V3.3
+ * #160 (`#42c`), ADR-051 §5.
+ *
+ * A delegation to the READ-ONLY `LegalEvidenceStateService`, never to #42a's
+ * `LegalEvidenceService`, so no administrator writer sits on the path every
+ * cancellation decision runs. The closed state is returned as-is; no reference,
+ * summary or subject crosses into Commerce.
+ */
+@Injectable()
+export class CommercialPolicyBackedLegalEvidenceState implements LegalEvidenceStateReader {
+  constructor(private readonly evidence: LegalEvidenceStateService) {}
+
+  capStateFor(manager: EntityManager, legalEvidenceId: string | null) {
+    return this.evidence.capStateFor(manager, legalEvidenceId);
   }
 }
 

@@ -1,5 +1,5 @@
 import type { EntityManager } from 'typeorm';
-import type { BookingCollectionPolicySnapshotV1, BookingOutcomeSnapshotV1 } from '@beauclick/commercial-policy-contract';
+import type { BookingCollectionPolicySnapshotV1, BookingOutcomeSnapshotV1, LegalCapState } from '@beauclick/commercial-policy-contract';
 
 /**
  * commerce-service's outbound ports.
@@ -262,3 +262,20 @@ export type BookingConfirmationEntitlement =
   | { outcome: 'control_refused'; reason: 'kill_switch_active' | 'business_policy_disabled' | 'entitlement_missing' };
 
 export const BOOKING_CONFIRMATION_ENTITLEMENT_HOOK = Symbol('BEAUCLICK_BOOKING_CONFIRMATION_ENTITLEMENT_HOOK');
+
+/**
+ * "Is the Legal cap this order's terms reference applicable right now?" —
+ * V3.3 #160 (`#42c`), ADR-051 §5.
+ *
+ * Declared here and answered in `apps/api` for the reason
+ * `BookingOutcomePolicyResolver` is: `scope:commerce` may not import Commercial
+ * Policy, which owns the Legal-evidence record. The only input is the evidence
+ * id the order's own terms snapshot carries, and the caller's transaction; the
+ * only output is the closed state. No reference, summary, key or subject ever
+ * crosses back, so no decision row, log line or response can carry one.
+ */
+export interface LegalEvidenceStateReader {
+  capStateFor(manager: EntityManager, legalEvidenceId: string | null): Promise<LegalCapState>;
+}
+
+export const LEGAL_EVIDENCE_STATE_READER = Symbol('BEAUCLICK_LEGAL_EVIDENCE_STATE_READER');

@@ -98,3 +98,8 @@ export * from './outcome-policy-assignment/outcome-policy-assignment.controller'
 export * from './outcome-policy-assignment/outcome-policy-assignment-subject-data.contract';
 export * from './outcome-policy-assignment/outcome-policy-assignment.module';
 export * from './outcome-policy-assignment/outcome-policy-resolution.service';
+// V3.3 Story #160 (`#42c`). The pure booking outcome evaluator and the read-only
+// Legal-evidence state reader its composition binds (ADR-051 §5, §6). No writer,
+// no controller, no entity: it decides from facts and records nothing itself.
+export * from './outcome-evaluation/evaluate-booking-outcome';
+export * from './outcome-evaluation/legal-evidence-state.service';

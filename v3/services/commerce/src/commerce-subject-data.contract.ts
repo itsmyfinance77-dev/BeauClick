@@ -75,6 +75,20 @@ export class CommerceSubjectDataContract implements SubjectDataContract {
       disposition: 'subject_data',
     },
     {
+      /*
+       * V3.3 #160 (`#42c`), ADR-051 §10. `retained`: a financial decision about
+       * a retained order must survive erasure, for the ledger's reason. The
+       * table carries no subject-shaped column, so the coverage heuristic would
+       * ALSO accept a dishonest `no_subject_data` claim here — which is why this
+       * claim and its reason are pinned by test rather than left to the boot
+       * assertion. Exported to the customer as their own amounts and instants.
+       */
+      table: 'commerce.booking_outcome_decisions',
+      disposition: 'retained',
+      reason:
+        'The closed decision about what happened to the money collected for a retained order when its booking was cancelled or rescheduled. A financial fact that must survive erasure; it holds no identifying content of its own.',
+    },
+    {
       table: 'commerce.outbox_events',
       disposition: 'retained',
       reason: 'Transactional outbox.',
@@ -131,6 +145,20 @@ export class CommerceSubjectDataContract implements SubjectDataContract {
           [orderIds],
         )
       : [];
+    /*
+     * V3.3 #160 (`#42c`). The subject's own decisions: what was retained and
+     * refunded, and the instants that decided it. Never the policy amount, the
+     * Legal cap, its state, the basis or the request key — none of which the
+     * customer was shown as a figure, and the cap never reaches a customer.
+     */
+    const outcomeDecisions = orderIds.length
+      ? await manager.query(
+          `SELECT order_id, decision_kind, event_instant, decided_at, timely, cutoff_instant,
+                  collected_remaining_toman, retained_toman, refund_toman, execution_status
+             FROM commerce.booking_outcome_decisions WHERE order_id = ANY($1::uuid[]) ORDER BY order_id, decided_at`,
+          [orderIds],
+        )
+      : [];
 
     return [
       {
@@ -179,6 +207,11 @@ export class CommerceSubjectDataContract implements SubjectDataContract {
         description: 'شرایط لغو و عدم حضوری که هنگام رزرو پذیرفته‌اید',
         rows: outcomeTerms as Array<Record<string, unknown>>,
       },
+      {
+        key: 'booking_outcome_decisions',
+        description: 'تصمیم‌های مالی لغو و تغییر زمان رزروهای شما',
+        rows: outcomeDecisions as Array<Record<string, unknown>>,
+      },
     ];
   }
 
@@ -202,6 +235,10 @@ export class CommerceSubjectDataContract implements SubjectDataContract {
         {
           table: 'commerce.order_outcome_terms',
           reason: 'the accepted terms of a retained order; append-only and carrying no identifying content of their own',
+        },
+        {
+          table: 'commerce.booking_outcome_decisions',
+          reason: 'financial decisions about a retained order; permanent and carrying no identifying content of their own',
         },
       ],
     };

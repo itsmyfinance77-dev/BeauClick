@@ -64,6 +64,64 @@ export interface BookingCancellationEntitlementHook {
 export const BOOKING_CANCELLATION_ENTITLEMENT_HOOK = Symbol('BEAUCLICK_BOOKING_CANCELLATION_ENTITLEMENT_HOOK');
 
 /**
+ * A customer reschedule of a booking whose order carries outcome terms, and the
+ * facts booking-service hands the outcome seam — V3.3 #160 (`#42c`), ADR-051 §6,
+ * `V33-DEC-039` R8.
+ *
+ * `governed: false` means the booking's order carries no outcome terms (or the
+ * booking has no order): the reschedule takes today's path, byte-for-byte.
+ * `governed: true` carries only the two snapshotted numbers booking-service
+ * needs to classify the reschedule; everything money-shaped stays behind the
+ * seam, which booking-service hands back unopened.
+ */
+export type BookingRescheduleGovernance =
+  | { readonly governed: false }
+  | { readonly governed: true; readonly cutoffHours: number; readonly rescheduleFreeCount: number };
+
+/** The database-clock facts of one governed reschedule, read in booking-service's transaction. */
+export interface BookingRescheduleFacts {
+  readonly bookingId: string;
+  /** The reschedule transaction's `now()`, as PostgreSQL text. */
+  readonly eventInstant: string;
+  /** `slot_start − cutoff_hours`, as PostgreSQL text. */
+  readonly cutoffInstant: string;
+  /** `now() <= slot_start − cutoff_hours`, computed in SQL. */
+  readonly timely: boolean;
+  readonly wasConfirmed: boolean;
+}
+
+/**
+ * The outcome seam a governed customer reschedule passes through — V3.3 #160
+ * (`#42c`).
+ *
+ * Declared here and implemented in `apps/api` for the reason
+ * `BookingCancellationEntitlementHook` is: booking-service owns the reschedule
+ * transaction but may not import commerce, payment or Commercial Policy.
+ *
+ * ## The lock order is the contract (ADR-050 §4.2/§7)
+ *
+ * `governReschedule` runs FIRST inside the reschedule transaction, before
+ * booking-service locks its own row: when the order carries terms it takes the
+ * order row `FOR UPDATE`, so a governed reschedule and a payment confirmation of
+ * the same booking both take order → booking and serialise rather than
+ * deadlock.
+ *
+ * ## Mandatory
+ *
+ * Without `@Optional()`, like the cancellation hook: a composition missing the
+ * binding would silently let every governed booking keep today's guards.
+ */
+export interface BookingRescheduleOutcomeHook {
+  governReschedule(manager: EntityManager, bookingId: string): Promise<BookingRescheduleGovernance>;
+  /** The consequence of a non-free reschedule, in integer toman; evaluated, never recorded. */
+  consequenceRetainedToman(governance: BookingRescheduleGovernance, facts: BookingRescheduleFacts): bigint;
+  /** Records the accepted, zero-money consequence inside the reschedule transaction. */
+  recordConsequence(manager: EntityManager, governance: BookingRescheduleGovernance, facts: BookingRescheduleFacts): Promise<void>;
+}
+
+export const BOOKING_RESCHEDULE_OUTCOME_HOOK = Symbol('BEAUCLICK_BOOKING_RESCHEDULE_OUTCOME_HOOK');
+
+/**
  * The authoritative delivery location for a professional's new slots --
  * V3.3 Story #127 (`#127a`), `V33-DEC-035` R3.
  *

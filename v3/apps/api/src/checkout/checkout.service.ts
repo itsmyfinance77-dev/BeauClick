@@ -16,8 +16,11 @@ import {
   VerificationOutcome,
 } from '@beauclick/payment';
 import { OutboxRelay } from '@beauclick/events';
+import { bookingCancellationRefundKey } from '@beauclick/commercial-policy-contract';
 import type { BookingOutcomeAcceptanceV1 } from '@beauclick/commercial-policy-contract';
 import { METRICS, MetricsRegistry } from '@beauclick/observability';
+
+import { BOOKING_CANCELLATION_REFUND_REASON } from '../outcome/booking-outcome.orchestrator';
 
 export interface CheckoutResult {
   bookingId: string;
@@ -432,7 +435,17 @@ export class CheckoutService {
   ): Promise<CallbackResult> {
     const prepared = await this.payments.prepareVerification(providerKey, providerReference, callbackParams);
 
-    const { outcome, bookingUnavailable, duplicateCharge } = await this.dataSource.transaction(async (manager) => {
+    const {
+      outcome,
+      bookingUnavailable,
+      duplicateCharge,
+      cancelledBookingId = null,
+    }: {
+      outcome: VerificationOutcome;
+      bookingUnavailable: boolean;
+      duplicateCharge: boolean;
+      cancelledBookingId?: string | null;
+    } = await this.dataSource.transaction(async (manager) => {
       const verification = await this.payments.applyVerification(prepared, manager);
       if (verification.status !== 'succeeded') {
         return { outcome: verification, bookingUnavailable: false, duplicateCharge: false };
@@ -509,7 +522,24 @@ export class CheckoutService {
       }
 
       const confirmed = await this.bookings.confirm(order.sourceId, { type: 'system', id: null }, manager);
-      return { outcome: verification, bookingUnavailable: !confirmed, duplicateCharge: false };
+      if (confirmed) return { outcome: verification, bookingUnavailable: false, duplicateCharge: false };
+
+      /*
+       * V3.3 #160 (`#42c`). WHY the booking could not be confirmed decides the
+       * compensation's request key. When the customer CANCELLED it while the
+       * payment was being captured, the cancellation's own consumer will also
+       * refund this capture -- and it did, under a second key, until #160: one
+       * captured payment, two full refunds (reproduced on real PostgreSQL in
+       * both orders). The booking is terminal once cancelled, so this read is
+       * final.
+       */
+      const booking = await this.bookings.findById(order.sourceId, manager);
+      return {
+        outcome: verification,
+        bookingUnavailable: true,
+        duplicateCharge: false,
+        cancelledBookingId: booking?.status === 'cancelled' ? booking.id : null,
+      };
     });
 
     let refundIssued = false;
@@ -541,10 +571,17 @@ export class CheckoutService {
       await this.payments.refund({
         orderId: outcome.orderId,
         amountToman: outcome.amountToman,
-        reason: 'زمان رزرو پیش از تکمیل پرداخت منقضی شد — بازگشت خودکار وجه.',
-        // Deterministic per order, so a retried callback reuses the same
-        // refund rather than issuing a second one.
-        requestKey: `booking-unconfirmable:${outcome.orderId}`,
+        // V3.3 #160 (`#42c`). A booking the customer cancelled is refunded under
+        // the CANCELLATION's own key, so this compensation and the
+        // `BookingCancelled` consumer converge on one refund row whichever runs
+        // first (`UNIQUE(order_id, request_key)`); the consumer's decision then
+        // records that refund instead of issuing another. Every other reason a
+        // capture cannot confirm (a lapsed hold, an entitlement refusal) keeps
+        // the per-order key, deterministic so a retried callback reuses it.
+        reason: cancelledBookingId ? BOOKING_CANCELLATION_REFUND_REASON : 'زمان رزرو پیش از تکمیل پرداخت منقضی شد — بازگشت خودکار وجه.',
+        requestKey: cancelledBookingId
+          ? bookingCancellationRefundKey(cancelledBookingId)
+          : `booking-unconfirmable:${outcome.orderId}`,
         actorType: 'system',
         actorId: null,
       });

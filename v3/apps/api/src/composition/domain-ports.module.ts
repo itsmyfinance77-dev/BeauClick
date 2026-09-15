@@ -10,6 +10,7 @@ import {
   BOOKING_COLLECTION_POLICY_RESOLVER,
   BOOKING_CONFIRMATION_ENTITLEMENT_HOOK,
   BOOKING_OUTCOME_POLICY_RESOLVER,
+  LEGAL_EVIDENCE_STATE_READER,
   PRICING_RULES,
   SERVICE_CATALOG,
 } from '@beauclick/commerce';
@@ -21,6 +22,7 @@ import {
 } from '@beauclick/financial';
 import {
   BookingCreditEnforcementModule,
+  BookingOutcomeEvaluationModule,
   BookingOutcomePolicyResolutionModule,
   CollectionPolicyResolutionModule,
   OWNED_SUBSCRIBER_PARTY_RESOLVER,
@@ -58,6 +60,7 @@ import {
   ProviderBackedServiceCatalog,
   CommercialPolicyBackedCollectionResolver,
   CommercialPolicyBackedOutcomeResolver,
+  CommercialPolicyBackedLegalEvidenceState,
   IdentityBackedOwnerRoleGrant,
   BusinessBackedDeliveryLocationDirectory,
   IdentityBackedStaffInviteResolver,
@@ -132,6 +135,9 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     // V3.3 #159 (`#42b`), ADR-051 §3. The read-only outcome resolver module,
     // imported for the same reason as the collection resolver just above.
     BookingOutcomePolicyResolutionModule,
+    // V3.3 #160 (`#42c`), ADR-051 §5. The read-only Legal-evidence state
+    // reader behind Commerce's port, imported for the same reason.
+    BookingOutcomeEvaluationModule,
     // V3.3 #75 (`V33-DEC-021`). `IdentityBackedOwnerRoleGrant` delegates the
     // whole grant rule to `RoleService`, which lives here. Imported rather than
     // reimplemented for the same reason the finance workspace resolver
@@ -167,6 +173,14 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
      * enrolled seller's booking go out with no terms and no acceptance.
      */
     { provide: BOOKING_OUTCOME_POLICY_RESOLVER, useExisting: CommercialPolicyBackedOutcomeResolver },
+    /*
+     * V3.3 #160 (`#42c`), ADR-051 §5. Whether an order's Legal cap applies at
+     * the decision instant. MANDATORY: `BookingOutcomeDecisionService` injects
+     * it without `@Optional()`, so a composition that drops this line fails to
+     * boot rather than reading every cap as unreadable.
+     */
+    CommercialPolicyBackedLegalEvidenceState,
+    { provide: LEGAL_EVIDENCE_STATE_READER, useExisting: CommercialPolicyBackedLegalEvidenceState },
     /*
      * V3.3 #81 (`#41b`, ADR-044 §6). The entitlement seam a zero-collectible
      * confirmation passes through, bound to an explicit no-op until #58.
@@ -410,6 +424,7 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     SERVICE_CATALOG,
     BOOKING_COLLECTION_POLICY_RESOLVER,
     BOOKING_OUTCOME_POLICY_RESOLVER,
+    LEGAL_EVIDENCE_STATE_READER,
     BOOKING_CONFIRMATION_ENTITLEMENT_HOOK,
     BOOKING_CANCELLATION_ENTITLEMENT_HOOK,
     FINANCIAL_PARTY_RESOLVER,
