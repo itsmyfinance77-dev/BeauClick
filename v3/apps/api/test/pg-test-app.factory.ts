@@ -8,7 +8,7 @@ import { getDataSourceToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
 
-import { ValidationException } from '@beauclick/http';
+import { ValidationException, sanitizeValidationErrors } from '@beauclick/http';
 import { assertPrivilegedMutationsAreAudited } from '@beauclick/audit';
 import { OTP_DEBUG_OBSERVER, OtpDebugObserver, capabilitiesForRoles } from '@beauclick/identity';
 import { CHAT_CLOCK, ChatClock } from '@beauclick/chat';
@@ -382,7 +382,7 @@ export async function createPgTestApp(envOverrides: Record<string, string> = {})
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
-      exceptionFactory: (errors) => new ValidationException(errors),
+      exceptionFactory: (errors) => new ValidationException(sanitizeValidationErrors(errors)),
     }),
   );
   await app.init();

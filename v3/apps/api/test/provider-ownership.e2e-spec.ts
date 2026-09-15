@@ -58,6 +58,16 @@ describe('Provider ownership isolation (e2e)', () => {
 
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    // #172: the rejected request's OWN unknown field carried party B's real
+    // id (party A already knew it, from `loginAsNewUser` above -- this is
+    // NOT proof against fetching a third party's data, only against echoing
+    // what the caller itself submitted). Pre-#172, class-validator's `target`
+    // put the whole submitted body -- `ownerId: partyB.userId` included --
+    // into this same 400 response regardless of which field failed.
+    assertNoLeak(res.body, partyB.userId);
+    // Non-vacuity: the caller must still be told the request was malformed
+    // because of an unrecognized field, not just given an opaque failure.
+    expect(JSON.stringify(res.body)).toContain('ownerId');
 
     // Confirm no profile was created under either party as a side effect of the rejected request.
     const created = await createProfessional(partyA.accessToken, 'Party A Salon (real)', 'test');
