@@ -12,3 +12,4 @@ export * from './order/order.service';
 export * from './order/order-owner.resolver';
 export * from './order/order.controller';
 export * from './commerce-subject-data.contract';
+export * from './outcome-decision/booking-outcome-decision.service';

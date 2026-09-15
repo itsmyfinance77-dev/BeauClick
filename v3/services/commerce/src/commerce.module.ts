@@ -14,6 +14,7 @@ import { OrderService } from './order/order.service';
 import { OrderOwnerResolver } from './order/order-owner.resolver';
 import { OrderController } from './order/order.controller';
 import { CommerceSubjectDataContract } from './commerce-subject-data.contract';
+import { BookingOutcomeDecisionService } from './outcome-decision/booking-outcome-decision.service';
 
 export const COMMERCE_ENTITIES = [
   OrderEntity,
@@ -43,8 +44,10 @@ export const COMMERCE_ENTITIES = [
   imports: [ConfigModule, TypeOrmModule.forFeature(COMMERCE_ENTITIES)],
   controllers: [OrderController],
   providers: [
-    CommerceSubjectDataContract,PricingService, OrderService, OrderOwnerResolver],
+    CommerceSubjectDataContract,PricingService, OrderService, OrderOwnerResolver,
+    // V3.3 #160 (`#42c`), ADR-051 §6. The booking outcome decision record.
+    BookingOutcomeDecisionService],
   exports: [
-    CommerceSubjectDataContract,OrderService, PricingService, TypeOrmModule],
+    CommerceSubjectDataContract,OrderService, PricingService, TypeOrmModule, BookingOutcomeDecisionService],
 })
 export class CommerceModule {}

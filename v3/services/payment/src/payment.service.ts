@@ -839,6 +839,46 @@ export class PaymentService {
     return this.refunds.findOneOrFail({ where: { id: refundId } });
   }
 
+  /**
+   * What an order's money is already committed to — V3.3 #160 (`#42c`).
+   *
+   * Read on the caller's transaction and never written. Two answers:
+   *
+   *  * `keyRefund` — the order refund already issued under `requestKey`, if
+   *    any, whatever its status. A decision about that key must record it
+   *    rather than issue a second one.
+   *  * `otherCommittedToman` — the sum of every OTHER order refund that has not
+   *    failed (`pending`, `succeeded`, `manual_required`). This is money the
+   *    platform has already asked to give back, whether or not commerce's
+   *    `refunded_total_toman` projection has caught up with it yet — which is
+   *    exactly the gap a second refund of the same capture would fall through.
+   *
+   * `duplicate_charge` refunds are excluded: they return a second charge that
+   * was never part of the order's collected amount.
+   */
+  async orderRefundCommitments(
+    manager: EntityManager,
+    orderId: string,
+    requestKey: string,
+  ): Promise<{ keyRefund: { amountToman: bigint; status: RefundStatus } | null; otherCommittedToman: bigint }> {
+    const rows: Array<{ request_key: string; amount_toman: string; status: RefundStatus }> = await manager.query(
+      `SELECT request_key, amount_toman::text AS amount_toman, status
+         FROM payment.refunds
+        WHERE order_id = $1 AND kind = 'order'`,
+      [orderId],
+    );
+    let keyRefund: { amountToman: bigint; status: RefundStatus } | null = null;
+    let otherCommittedToman = 0n;
+    for (const row of rows) {
+      if (row.request_key === requestKey) {
+        keyRefund = { amountToman: BigInt(row.amount_toman), status: row.status };
+      } else if (row.status !== 'failed') {
+        otherCommittedToman += BigInt(row.amount_toman);
+      }
+    }
+    return { keyRefund, otherCommittedToman };
+  }
+
   private async completeRefund(
     refundId: string,
     status: RefundStatus,
