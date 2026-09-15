@@ -1228,3 +1228,35 @@ requests started, which also made `finance-workspaces.spec.tsx` fail under load 
 (issue #2) reports **264 / 350, zero data-quality warnings** as of this delivery. #159 closes with its `sp:13`
 label preserved and no status label. No provider, payment rail, tag or Release was introduced or
 changed.
+
+## V3.3 Story #43 decomposition PROPOSED — not ratified, 2026-09-15
+
+A read-only readiness audit of #43 against `b71f10cbb524e687243f53b5b63812eee80ae9a8` returned
+**NEEDS SPLIT**. An independent critical review then confirmed, corrected or withdrew each of the
+audit's recommendations. The result is a **proposal awaiting the product owner's explicit
+approval**, not a decision:
+[`V33-DEC-044` PROPOSAL](../roadmap/v3.3/proposals/V33-DEC-044-PROPOSAL-story-43-decomposition.md),
+with its engineering record
+[ADR-052 (PROPOSED)](../roadmap/v3/adr/ADR-052-pending-funds-journal-commission-policy-and-settlement-release.md).
+`V33-DEC-040` stands verbatim. No accountant, tax adviser, provider or bank approved anything.
+
+| Proposed alias | Issue | Proposed outcome | SP | Proposed status |
+|---|---|---|---:|---|
+| `#43a` | #43 | pending-funds journal; in-code rate removed; immediate settlement route refused | 13 | ready |
+| `#43b` | new | commission / acquisition / processing-recovery policy families + order snapshot | 13 | proposed |
+| `#43c` | new | release predicate, dispute hold, recognition at release (OC-1 and OC-2 open) | 13 | proposed, `gate:external` |
+| `#43d` | new | schedule, minimum payout, reserve and risk-class publication | 8 | proposed |
+| `#43e` | new | schedule-gated settlement record, reversal, retry | 13 | proposed, `gate:external` |
+| `#43f` | new | receivable: reserve → future earnings → manual claim | 13 | proposed |
+| `#43g` | new | provider fee facts and allocation by cause (OC-3 open) | 8 | proposed, `gate:external` |
+| `#43h` | new | subscription and purchased-credit recognition facts | 5 | blocked, `gate:external` |
+
+**What moved: nothing.** No issue was created or edited; #43 keeps `status:proposed`, `sp:21`
+and `gate:external`. The live dashboard (issue #2) remains **264 / 350**, proposed 68, ready 0,
+blocked 18, zero data-quality warnings. If approved as written, the projection is scope
+**350 → 415** (+65), proposed 115, ready 13, blocked 23. Three owner decisions stay **open** until
+the owner answers them: OC-1 (release of a plain completed booking), OC-2 (commission on a
+retention outcome) and OC-3 (who bears provider fees on a completed booking).
+`scripts/docs-audit.mjs` still requires exactly 43 closed `V33-DEC` cards; it now also refuses a
+proposal that claims ratification or shares an id with a register card. No code, migration,
+schema, value, provider, payout, tag or Release was introduced.
