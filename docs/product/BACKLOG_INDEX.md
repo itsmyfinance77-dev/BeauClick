@@ -1228,3 +1228,88 @@ requests started, which also made `finance-workspaces.spec.tsx` fail under load 
 (issue #2) reports **264 / 350, zero data-quality warnings** as of this delivery. #159 closes with its `sp:13`
 label preserved and no status label. No provider, payment rail, tag or Release was introduced or
 changed.
+
+## V3.3 Story #43 decomposed and re-estimated, 2026-09-15
+
+A read-only readiness audit of #43 against `b71f10cbb524e687243f53b5b63812eee80ae9a8` returned
+**NEEDS SPLIT**. An independent critical review confirmed, corrected or withdrew each audit
+recommendation. It was first published as an explicit, unratified proposal in PR #171. The
+product owner, under the owner's standing delegation, then approved:
+- the eight-child decomposition;
+- the technical correction of `V33-DEC-040` R6's false exact-sum formula;
+- conservative answers to OC-1, OC-2 and OC-3.
+
+`V33-DEC-044` records them. **ADR-052**
+([record](../roadmap/v3/adr/ADR-052-pending-funds-journal-commission-policy-and-settlement-release.md))
+was accepted in its own commits first. `V33-DEC-040` R1–R8 stand verbatim, with R6's formula kept
+as superseded history. **This is not lawyer, accountant, tax or payment-provider approval, and no
+real money is activated.**
+
+| Item | Before | After | Outcome it owns |
+|---|---|---|---|
+| #43 | `status:proposed`, `gate:external`, 21 | **`#43a`**: retitled, **`status:ready`**, **13**, no gate | pending-funds journal; in-code rate removed; immediate settlement route refused; legacy rows byte-identical |
+| `#43b` | — | `status:proposed`, 13 | commission / acquisition / processing-recovery policy families and order snapshot |
+| `#43c` | — | `status:proposed`, 13, `gate:external` | release predicate, dispute hold, recognition at release — **not Ready** until its prerequisites and external facts are satisfied |
+| `#43d` | — | `status:proposed`, 8 | schedule, minimum payout, reserve and risk-class publication |
+| `#43e` | — | `status:proposed`, 13, `gate:external` | schedule-gated settlement record, reversal, retry; production record refused until #47 |
+| `#43f` | — | `status:proposed`, 13 | receivable: reserve → future earnings → manual claim |
+| `#43g` | — | `status:proposed`, 8, `gate:external` | provider fee facts; allocation by cause and by a published `completed` mapping |
+| `#43h` | — | `status:blocked`, 5, `gate:external` | subscription and purchased-credit recognition facts |
+| `#42f` | — | `status:proposed`, 8, `gate:legal` | valid completion fact and ordinary-completion dispute eligibility — kept out of #162 because together they exceed the 13-point ceiling |
+| #162, #47, #99 | — | dated cross-references only | clock rule and `#42f` split; exception sink and legacy disposition; `#43h` dependency |
+
+**Owner answers.**
+- **OC-1** — a plain completion releases only after the snapshotted window measured from a
+  database-clock completion fact at or after `slot_start`, and the customer may dispute during it.
+  An earlier completion is not a release fact and forfeits nothing.
+- **OC-2** — commission on a retained amount uses that amount as its base, capped by it, with no
+  receivable.
+- **OC-3** — completed-booking fees need a published mapping; with no default, nothing is deducted.
+
+**Still open.**
+- A separate **legacy disposition** for unenrolled orders before any real-money rollout. Until
+  then those orders stay `pending`, which is not forfeiture.
+- #47 (rail, fee schedule, reconciliation, payout), #99 (paid credits), the accountant's and tax
+  adviser's evidence, and Legal review of the dispute copy and retention.
+- Every commission rate, fee amount, schedule, reserve, minimum payout, risk class and copy stays
+  unpublished.
+
+**What moves.** Projected V3.3 scope **350 → 423** (+65 from the #43 family, +8 from `#42f`),
+done unchanged at **264**. The issue numbers and the live dashboard are recorded in the delivery
+entry that follows the issue mutations. `scripts/docs-audit.mjs` now requires exactly 44
+contiguous `V33-DEC` cards and 52 contiguous ADRs. No code, migration, schema, value, provider,
+payout, tag or Release was introduced, and implementation of `#43a` has not started.
+
+## V3.3 Story #43 decomposition applied to GitHub, 2026-09-15
+
+After PR #171 merged as `b2a2a805c6d6cfd3a360727e44f393bedd548ef3`, the `V33-DEC-044` issue
+mutations were applied. #43 keeps its number as `#43a`: retitled, `sp:21 → sp:13`,
+`status:proposed → status:ready`, `gate:external` removed, body replaced. Every child body carries
+a dated family map with live numbers.
+
+| Alias | Issue | SP | Status | Gate |
+|---|---|---:|---|---|
+| `#43a` | #43 | 13 | **ready** | none |
+| `#43b` | #173 | 13 | proposed | none |
+| `#43c` | #174 | 13 | proposed (not Ready: #160–#162, #180, #162's clock rule, external facts) | `gate:external` |
+| `#43d` | #175 | 8 | proposed | none |
+| `#43e` | #176 | 13 | proposed | `gate:external` |
+| `#43f` | #177 | 13 | proposed | none |
+| `#43g` | #178 | 8 | proposed | `gate:external` |
+| `#43h` | #179 | 5 | **blocked** (#99, #47) | `gate:external` |
+| `#42f` | #180 | 8 | proposed | `gate:legal` |
+
+Dated additive cross-references were added to #162 (clock rule; ordinary-completion disputes moved
+to #180), #47 (exception sink; legacy disposition before real money) and #99 (#179 dependency).
+#38's child line was updated. #160's active implementation and #161 were not modified. Number #172
+is an unrelated bug created by another turn between the merge and these issues.
+
+**What moved.** V3.3 scope **350 → 423** (+73), done unchanged at **264**. The live dashboard
+(issue #2), `scripts/backlog-report.mjs` and an independent recomputation from raw labels agree:
+**264 / 423**, proposed **110**, ready **13**, active **13**, review 0, blocked **23**.
+- Active 13 and proposed 110 (not the projected 123) reflect #160 moving to `status:in-progress` in
+  its own parallel turn.
+- The only data-quality warnings concern #172 (no milestone, no status label), which this change
+  did not create.
+- No code, migration, schema, value, provider, payout, tag or Release was introduced, and
+  implementation of `#43a` has not started.
