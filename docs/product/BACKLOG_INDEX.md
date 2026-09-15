@@ -1279,3 +1279,37 @@ done unchanged at **264**. The issue numbers and the live dashboard are recorded
 entry that follows the issue mutations. `scripts/docs-audit.mjs` now requires exactly 44
 contiguous `V33-DEC` cards and 52 contiguous ADRs. No code, migration, schema, value, provider,
 payout, tag or Release was introduced, and implementation of `#43a` has not started.
+
+## V3.3 Story #43 decomposition applied to GitHub, 2026-09-15
+
+After PR #171 merged as `b2a2a805c6d6cfd3a360727e44f393bedd548ef3`, the `V33-DEC-044` issue
+mutations were applied. #43 keeps its number as `#43a`: retitled, `sp:21 → sp:13`,
+`status:proposed → status:ready`, `gate:external` removed, body replaced. Every child body carries
+a dated family map with live numbers.
+
+| Alias | Issue | SP | Status | Gate |
+|---|---|---:|---|---|
+| `#43a` | #43 | 13 | **ready** | none |
+| `#43b` | #173 | 13 | proposed | none |
+| `#43c` | #174 | 13 | proposed (not Ready: #160–#162, #180, #162's clock rule, external facts) | `gate:external` |
+| `#43d` | #175 | 8 | proposed | none |
+| `#43e` | #176 | 13 | proposed | `gate:external` |
+| `#43f` | #177 | 13 | proposed | none |
+| `#43g` | #178 | 8 | proposed | `gate:external` |
+| `#43h` | #179 | 5 | **blocked** (#99, #47) | `gate:external` |
+| `#42f` | #180 | 8 | proposed | `gate:legal` |
+
+Dated additive cross-references were added to #162 (clock rule; ordinary-completion disputes moved
+to #180), #47 (exception sink; legacy disposition before real money) and #99 (#179 dependency).
+#38's child line was updated. #160's active implementation and #161 were not modified. Number #172
+is an unrelated bug created by another turn between the merge and these issues.
+
+**What moved.** V3.3 scope **350 → 423** (+73), done unchanged at **264**. The live dashboard
+(issue #2), `scripts/backlog-report.mjs` and an independent recomputation from raw labels agree:
+**264 / 423**, proposed **110**, ready **13**, active **13**, review 0, blocked **23**.
+- Active 13 and proposed 110 (not the projected 123) reflect #160 moving to `status:in-progress` in
+  its own parallel turn.
+- The only data-quality warnings concern #172 (no milestone, no status label), which this change
+  did not create.
+- No code, migration, schema, value, provider, payout, tag or Release was introduced, and
+  implementation of `#43a` has not started.
