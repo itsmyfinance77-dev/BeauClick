@@ -1313,3 +1313,51 @@ is an unrelated bug created by another turn between the merge and these issues.
   did not create.
 - No code, migration, schema, value, provider, payout, tag or Release was introduced, and
   implementation of `#43a` has not started.
+
+## V3.3 Story #160 (`#42c`) delivered, 2026-09-15
+
+The cancellation and reschedule outcome evaluator shipped against ADR-051 §5–§6 (`V33-DEC-039` R1,
+R2, R4, R5, R8, R14; `V33-DEC-028` Rulings 4 and 8; ADR-050's lock order). Implementation began on
+the recorded baseline (`b71f10c`) after a read-only readiness audit and a preflight. The issue
+body was corrected first; its acceptance criteria were replaced and recorded on #160. A dated
+consistency note was added to ADR-051, preserving every original sentence. No new ADR.
+
+**The preflight found a real double refund, repaired inside #160.** Reproduced on real PostgreSQL
+with positive controls: a booking cancelled while its payment was being captured received two
+full refund rows, under `booking-unconfirmable:<orderId>` and `booking-cancelled:<bookingId>`, in
+both orders. The capture compensation now uses the cancellation's own key when the booking was
+cancelled, and the decision nets out refunds already issued.
+
+**#160 (`#42c`), 13 Story Points.**
+- **One decision per cancellation.** A cancelled booking's money outcome is decided once, as an
+  immutable row in `commerce.booking_outcome_decisions`, and only then executed through the
+  unchanged booking-derived refund key.
+- **Retention is gated.** It is non-zero only for a customer's late cancellation of a confirmed
+  booking, under a Legal cap backed by a currently recorded `retention_cap` evidence record, at
+  `min(policy, cap, collectedRemaining)` in BigInt integer toman.
+- **Timeliness uses the cancelling transaction's clock**, not the later refund consumer's.
+- **Everything else refunds in full.** No terms, timely, non-customer cause, never confirmed, or a
+  missing, retired or wrong-subject cap all retain zero, and the reason is recorded.
+- **Customer reschedules follow the snapshot.** The free count counts only customer reschedules; a
+  non-free, zero-money consequence is shown first and must be explicitly accepted; a
+  money-carrying consequence is refused and database-unwritable.
+- **Unchanged:** professional and unenrolled reschedules. Also no route, capability, outbox event,
+  provider, ledger, settlement, frontend, seed or value.
+
+Merged via PR #183 (squash `6617b85`), closing #160. Post-merge V3 CI on `6617b85` was green in all
+three jobs, including real PostgreSQL / OpenSearch / object storage.
+
+| Item | Before | After | Outcome it owns |
+|---|---|---|---|
+| #160 (`#42c`) | `status:proposed`, 13 | **Closed, 13** | Outcome evaluator, decision record and governed reschedule, delivered as described above |
+| #161 (`#42d`) | `status:proposed`, 8 | unchanged | No-show declaration and remedy choice — not started |
+| #162 (`#42e`) | `status:proposed`, 13 | unchanged | Dispute and appeal case model — not started |
+
+**What moved.** V3.3 done **264 → 277** (+13), scope unchanged at **423**. The live dashboard
+(issue #2), `scripts/backlog-report.mjs` and an independent recomputation from raw labels agree:
+**277 / 423**, proposed **110**, ready **13**, active **0**, review 0, blocked **23**.
+- #160 closes with its `sp:13` label preserved and no status label.
+- The only data-quality warning is that #172 has no milestone. This delivery did not create it.
+- Still open and not built here: the force-majeure declaration of `V33-DEC-039` R8, which no story
+  owns yet, and the money semantics of a non-zero reschedule consequence.
+- No provider, payment rail, tag or Release was introduced or changed.
