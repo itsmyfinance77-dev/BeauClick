@@ -1,10 +1,11 @@
 # ADR-052 — Seller money is recorded as balanced append-only journal facts moving pending → available → settled; commission is a snapshotted administrator policy recognised at the outcome; release, settlement, reserve and receivable recovery fail closed
 
-**Status:** PROPOSED — 2026-09-15. **Not accepted.** This record becomes Accepted only when the product owner explicitly approves the Story #43 decomposition proposal `V33-DEC-044` (`docs/roadmap/v3.3/proposals/V33-DEC-044-PROPOSAL-story-43-decomposition.md`), together with the technical corrections and interpretations it lists. Until then, nothing here binds any story, and no schema, contract or code may be written against it.
-**Proposed by:** engineering, from the read-only readiness audit of #43 (2026-09-15, against `b71f10cbb524e687243f53b5b63812eee80ae9a8`) and an independent critical review of that audit (2026-09-15).
-**Backlog:** #43 and the proposed children `#43a`–`#43h`. No issue has been changed.
+**Status:** ACCEPTED — 2026-09-15
+**Approver:** product owner, under the owner's standing delegation. The 2026-09-15 approval covers four things: the eight-child decomposition of #43, the technical correction of `V33-DEC-040` R6's exact-sum formula, the interpretations A1–A9, and conservative answers to OC-1, OC-2 and OC-3. Everything is recorded as [`V33-DEC-044`](../../v3.3/V3.3_DECISION_REGISTER.md). **This is not lawyer, accountant, tax-adviser or payment-provider approval, and it authorizes no real-money activation.**
+**Drafted by:** engineering, from the read-only readiness audit of #43 (2026-09-15, against `b71f10cbb524e687243f53b5b63812eee80ae9a8`) and an independent critical review of that audit. The review history is PR #171.
+**Backlog:** #43 (`#43a`) and its children `#43b`–`#43h`, plus `#42f`. `V33-DEC-044` creates `#42f`: a completed booking's valid completion fact and its dispute eligibility.
 **Binding authorities (already ratified; none reopened):** [`V33-DEC-040`](../../v3.3/V3.3_DECISION_REGISTER.md) R1–R8 (owner commission, fee-allocation, revenue-recognition, settlement-release and reserve policy). [`V33-DEC-041`](../../v3.3/V3.3_DECISION_REGISTER.md) R1 (provider-held money released by outcome; the financial ledger stays the authoritative record of allocation facts). [`V33-DEC-039`](../../v3.3/V3.3_DECISION_REGISTER.md) R3, R9, R10 and R14. [`V33-DEC-028`](../../v3.3/V3.3_DECISION_REGISTER.md) Rulings 2–5, 8, 9 and 13. [`V33-DEC-024`](../../v3.3/V3.3_DECISION_REGISTER.md) Rulings 3–4. [`V33-DEC-025`](../../v3.3/V3.3_DECISION_REGISTER.md) R7. [`V33-DEC-042`](../../v3.3/V3.3_DECISION_REGISTER.md) R1.
-**Would supersede in part (on acceptance):** [ADR-009](ADR-009-financial-ledger.md) decision 1 — its rule that a settlement outstanding "can legitimately go negative", and its rejection of double-entry bookkeeping.
+**Supersedes in part:** [ADR-009](ADR-009-financial-ledger.md) decision 1 — its rule that a settlement outstanding "can legitimately go negative", and its rejection of double-entry bookkeeping.
 **Depends on:**
 - [ADR-017](ADR-017-financial-isolation-and-money.md) — separate financial role and DataSource.
 - [ADR-018](ADR-018-cross-domain-consistency.md) — eventual consistency across the DataSource boundary.
@@ -18,7 +19,12 @@
 
 **Scope of this record.** It writes no schema, migration, route, DTO, service, contract, event, capability, index, seed or test. It publishes no commission rate, fee allocation, schedule, reserve, minimum payout or risk class. It selects no provider and moves no money. It is **not** accounting, tax, Legal or payment-provider approval, and claims none.
 
-**Open owner decisions this record deliberately does not answer:** OC-1 (release of a plain completed booking), OC-2 (commission base on a retention outcome) and OC-3 (who bears provider fees outside the ratified cancellation causes). Each is stated in §6, §3 and §10, with the fail-closed behaviour that applies while it is open.
+**Owner decisions recorded by `V33-DEC-044` and applied here:**
+- **OC-1** — release of a plain completed booking (§6).
+- **OC-2** — commission on a seller-retained amount (§3).
+- **OC-3** — provider fees on a completed booking (§10).
+
+**Still open, and a prerequisite of any real-money rollout:** a separate **legacy disposition** of orders that have no outcome-terms snapshot (§6, §17). Until it is recorded, those orders stay `pending`. That is fail-closed, not forfeiture.
 
 ---
 
@@ -56,7 +62,7 @@
 
 ### Why this record exists
 
-`V33-DEC-040`'s implementation gate requires the next ADR, committed alone before any schema or code. It must record R1–R8 verbatim, the policy-family schema, the pending-funds state machine and release predicate, the receivable model, the exact-sum constraint and the ADR-027 dispositions. The readiness audit also found that R6's written identity is arithmetically false (§12), and that three places in the ratified text do not determine one behaviour (OC-1, OC-2, OC-3). This record fixes the mechanisms and names those gaps; it does not close them.
+`V33-DEC-040`'s implementation gate requires the next ADR, committed alone before any schema or code. It must record R1–R8 verbatim, the policy-family schema, the pending-funds state machine and release predicate, the receivable model, the exact-sum constraint and the ADR-027 dispositions. The readiness audit also found that R6's written identity is arithmetically false (§12), and that three places in the ratified text do not determine one behaviour (OC-1, OC-2, OC-3). This record fixes the mechanisms and applies the owner's answers to those three gaps as recorded by `V33-DEC-044`.
 
 ### `V33-DEC-040` R1–R8, as ratified (verbatim)
 
@@ -184,18 +190,18 @@ proposable**; the administrator's manual settlement route refuses until a schedu
 because "immediately, in full" is a schedule the owner rejected. With no published reserve value:
 reserve = 0. Nothing here changes the customer-facing refund behaviour of today.
 
-*The R6 identity above is kept verbatim as ratified history. §12 shows why it cannot hold as written. On acceptance of this record, §12's identities would supersede it as the engineering expression of R6's intent — exact sums, integer arithmetic, database enforcement, reconciliation as a read. The intent itself is unchanged.*
+*The R6 identity above is kept verbatim as superseded history. §12 shows why it cannot hold as written. §12's identities supersede it as the engineering expression of R6's intent — exact sums, integer arithmetic, database enforcement, reconciliation as a read. That intent is unchanged.*
 
 ---
 
-## Decision (proposed)
+## Decision
 
-Each section separates **obligation** from **rejected alternatives**. Table and column names are binding shapes once accepted; a story may add a column a section does not forbid.
+Each section separates **obligation** from **rejected alternatives**. Table and column names are binding shapes; a story may add a column a section does not forbid.
 
 Every rule below is classified:
 - **[T]** — a technical repair of a contradiction.
-- **[A]** — an interpretation of ratified text that the owner approves together with `V33-DEC-044`.
-- **[OC]** — an open owner decision, not decided here.
+- **[A]** — an interpretation of ratified text, approved with `V33-DEC-044`.
+- **[OC]** — an owner answer recorded by `V33-DEC-044`.
 
 ### 1. Policy-family persistence
 
@@ -220,22 +226,24 @@ Every rule below is classified:
 
 **Rejected.** *Resolve the version "as of" the order or collection instant when the ledger handler runs.* It is not deterministic: a publication stamped `now() = T0` that commits at T0+5 s is invisible to a handler running at T0+2 and visible at T0+6, and the ±1-minute tolerance makes it worse. *Snapshot at collection instead of order creation* — that would let a rate published between booking and capture reach a booking the seller accepted earlier.
 
-### 3. Commission arithmetic, ceiling and OC-2
+### 3. Commission arithmetic, ceiling and the retained-amount rule
 
 **Obligation [T].**
-- Base values: `platform_collected_amount` = `commerce.orders.collected_total_toman`; `service_total` = `commerce.orders.total_toman`.
-- Per component: `zero → 0`; `percentage → floor(base × bp / 10000)`; `fixed → fixed_toman`; `hybrid → fixed_toman + floor(base × bp / 10000)`, all in BigInt.
+- Per component, with `base_value` as defined below: `zero → 0`; `percentage → floor(base_value × bp / 10000)`; `fixed → fixed_toman`; `hybrid → fixed_toman + floor(base_value × bp / 10000)`, all in BigInt.
 - Components are evaluated in the fixed order `booking_commission, acquisition, processing_recovery`, and `k = Σ`.
-- `held` = seller-attributable money still recorded for the order at recognition. `deductible = min(k, held)`, allocated in the same order.
-- On a **completion** recognition, `excess = k − deductible` becomes a seller receivable with cause `commission_excess`: R1's own mechanism, never revenue before recovery.
-- A refunded amount is never deductible, because R2 keeps the refund undiminished **[T]**.
+- A refunded amount is never deductible, because R2 keeps the refund undiminished.
 
-**OC-2 — open owner decision: commission on a retention outcome.**
-- R1 fixes the base vocabulary `{platform_collected_amount, service_total}`.
-- R3 says retained amounts are the seller's "except for BeauClick's published commission share **on them**".
-- For a late cancellation that collected 100, refunded 60 and retained 40, the two readings differ. Literal R1 gives 10% of 100 = 10; the "on them" reading gives 10% of 40 = 4. With a `service_total` base or a `fixed` component, the literal reading can also leave a seller who retained 40 owing a receivable for a booking that never took place.
-- **While OC-2 is open:** a retention-outcome recognition whose snapshot has any non-`zero` component **does not release** (the money stays `pending`, labelled `commission_rule_undecided`). With every component `zero` — the owner-endorsed first publication — both readings coincide and release proceeds.
-- The options and the recommendation are in `V33-DEC-044`.
+**Completion outcome (R1 as ratified).**
+- `base_value` is `commerce.orders.collected_total_toman` for `platform_collected_amount` and `commerce.orders.total_toman` for `service_total`.
+- `held` = seller-attributable money still recorded for the order at recognition, and `deductible = min(k, held)`, allocated in the component order.
+- `excess = k − deductible` becomes a seller receivable with cause `commission_excess` — R1's own mechanism, never revenue before recovery.
+
+**Seller-retained cancellation or no-show outcome [OC-2, decided by `V33-DEC-044`].**
+- R3 gives BeauClick "its published commission share **on**" retained amounts.
+- For every component, whatever its `base` kind, `base_value` is the **retained amount** (`retained_toman` of the outcome decision).
+- The total deduction is capped at `min(k, retained_toman)`.
+- **No receivable is ever created from a cancellation or no-show outcome**; any computed amount above the cap is simply not charged.
+- Example: collected 100, refunded 60, retained 40, 10% commission ⇒ deduction 4; with `fixed 50` ⇒ deduction 40 and no receivable.
 
 **Legacy arithmetic [T].** An order whose collection is a `financial.ledger_entries` row stays on that ledger for life (§16). Its later refunds reverse there at the original rate. The reversal amount is computed **cumulatively**: the commission share of the remaining net amount, minus what was already reversed. No residue survives a full refund, and no existing row changes.
 
@@ -271,7 +279,7 @@ Grants: writer INSERT + SELECT; no UPDATE, DELETE or TRUNCATE; the application r
 | `refund` | `OrderRefunded v1`; key `refund:<refund_id>`; draws `pending`, then `available`; beyond both (already settled) → `platform_advance` plus a receivable (§9) | `refunded +r` / `pending −x`, `available −y`, `platform_advance −z` |
 | `dispute_hold` | an open case observed (§7); `h = held_toman ≤ pending` | `disputed +h` / `pending −h` |
 | `dispute_outcome` | the case closed with a decision | `disputed −h` / `refunded +r_d`, `pending +(h − r_d)` |
-| `release` | §6 predicate true; commission snapshot not `absent`; OC-2 rule of §3 satisfied | `pending −p` / `platform_earned +d_i` (per component), `available +(p − Σd)` |
+| `release` | §6 predicate true; commission snapshot not `absent`; deduction computed per §3 for the recognition kind | `pending −p` / `platform_earned +d_i` (per component), `available +(p − Σd)` |
 | `reserve_hold` / `reserve_release` | settlement record (§8) | `reserve ±` / `available ∓` |
 | `settlement` | privileged record (§8) | `settled +x` / `available −x` |
 | `settlement_reversal` | reported failure; one per batch | `available +x` / `settled −x` |
@@ -283,19 +291,34 @@ Grants: writer INSERT + SELECT; no UPDATE, DELETE or TRUNCATE; the application r
 - `reserve` is kept as a separate account so that no settlement can consume it **[A7]**. R5 calls the reserve "a held fraction of `available` money"; a reader who wants R5's grouping sums `available + reserve`.
 - `reversed` is the `settlement_reversal` journal kind, not an account.
 
-### 6. Release predicate and OC-1
+### 6. Release predicate and the completion rule
 
-**Obligation.** Release eligibility is decided in the **application** DataSource, where the booking, outcome and dispute facts live. `commerce.order_release_decisions (id, order_id, recognition_kind IN ('retention_outcome','completion'), recognition_instant, window_closed_at, observed_refunded_total_toman, decided_at)` has one live row per order, and its outbox event is `SellerFundsReleaseDecided v1`. A sweep and a lazy read converge on the same unique index.
+**Obligation.** Release eligibility is decided in the **application** DataSource, where the booking, outcome and dispute facts live.
+- `commerce.order_release_decisions (id, order_id, recognition_kind IN ('retention_outcome','completion'), recognition_instant, window_closed_at, observed_refunded_total_toman, decided_at)` has one live row per order.
+- Its outbox event is `SellerFundsReleaseDecided v1`.
+- A sweep and a lazy read converge on the same unique index.
 
-- **(a2) Retention outcome in the seller's favour.** A live ADR-051 cancellation or no-show decision with `retained_toman > 0`, final because either its window closed with no case or its case closed upholding retention, with the appeal window closed. The instant used is the decision's **database-clock** outcome instant. **Enabled** once the #160–#162 facts exist.
-- **(a1) Plain completion.** **Disabled while OC-1 is open.** No ordinary-completion release path exists until the owner decides:
-  - OC-1a — whether a window applies to a plain completion, and from which instant;
-  - OC-1b — whether a customer may dispute a completed booking inside it;
-  - OC-1c — whether a completion recorded before `slot_start` counts.
+**(a2) Retention outcome in the seller's favour.**
+- The fact is a live ADR-051 cancellation or no-show decision with `retained_toman > 0`.
+- It is final when its objection window closed with no case, or its case closed upholding retention, with the appeal window closed.
+- The anchor is the decision's **database-clock** outcome instant.
 
-  If accepted, the recommended answers (`V33-DEC-044`) would use `booking_history.created_at` of the `completed` row as the database-clock anchor, the snapshotted `dispute_window_hours` as the window, and "never before `slot_start`" for early completions.
-- **Window closure and open cases.** The deciding transaction locks the booking row `FOR UPDATE`, **then** reads `clock_timestamp()`, and requires it to be at or after the window end and that no `dispute.cases` row for the booking is outside `closed`. `now()` (the transaction start) is never used **[T]**.
-- **Orders with no outcome-terms snapshot** (ADR-051 `legacy_unenrolled`) have no `dispute_window_hours`. The window condition is therefore never met, and their money stays `pending` **[A4]**. Any other treatment is a new owner decision.
+**(a1) Plain completion [OC-1, decided by `V33-DEC-044`].**
+- **Valid completion fact.** Either
+  - the booking's `completed` row in `booking.booking_history`, when its `created_at` (database clock) is **at or after** `slot_start`; or
+  - when that row predates `slot_start`, a later **completion attestation** by the performing professional, recorded on the database clock at or after `slot_start`.
+
+  A completion recorded before `slot_start` is **not** a valid release fact. It forfeits nothing: the money stays `pending` until a later valid completion or outcome fact exists. The attestation fact and its guard are owned by `#42f`.
+- **Window.** Release requires `clock_timestamp()` ≥ the valid completion fact's instant + the order's snapshotted `dispute_window_hours` (`commerce.order_outcome_terms`).
+- **Customer dispute.** During that window the customer may file an eligible dispute against the completed booking (the `completed_booking` subject owned by `#42f`, extending ADR-051 §9). An open case holds exactly its `held_toman` (§7).
+
+**Window closure and open cases [T].** The deciding transaction locks the booking row `FOR UPDATE`, **then** reads `clock_timestamp()`. It requires the instant to be at or after the window end, and no `dispute.cases` row for the booking outside `closed`. `now()` (the transaction start) is never used.
+
+**Orders with no outcome-terms snapshot [A4].** ADR-051's `legacy_unenrolled` orders have no `dispute_window_hours`, so they cannot satisfy the window condition, and their money stays `pending`.
+- This is **fail-closed and not forfeiture**; no old order is reinterpreted.
+- A **separate legacy disposition** is a prerequisite of any real-money rollout (§17). It is not decided here.
+
+**Answering OC-1 activates nothing by itself.** `#43c` stays `status:proposed` until its implementation prerequisites (#160, #161, #162, `#42f`, #162's clock rule) and its external accounting and provider facts are satisfied.
 - **Linearization with dispute filing [T].** ADR-051 §9's filing takes the booking `FOR SHARE` and compares its window against the transaction-start `now()`. A filing transaction that started just before the window end could therefore insert a case after a release committed. Before `#43c` is Ready, #162's filing must compare against `clock_timestamp()` read **after** acquiring the booking lock. Whichever transaction locks first then wins, and the other sees the committed result. This amends a mechanism ADR-051 owns; the correction is recorded in #162's own pull request.
 - **Financial consumer convergence [T].** The consumer writes `release` keyed `release:<decision_id>`. It **defers** (throws; the relay retries) while its projected `refunded` for the order is below the decision's `observed_refunded_total_toman`, so a refund that preceded the decision never lands in `available`.
 
@@ -303,7 +326,7 @@ Grants: writer INSERT + SELECT; no UPDATE, DELETE or TRUNCATE; the application r
 
 ### 7. Dispute hold input
 
-A hold is observed by `#43c`'s evaluator through a composition-root port over `dispute.cases`: `state`, `held_toman`, window and appeal window. The evaluator emits `DisputeHoldChanged v1` (keys `hold:<case_id>`, `hold_outcome:<case_decision_id>`). The hold is exactly `held_toman`, never the order's whole pending amount (`V33-DEC-039` R10). A case opened after money was released cannot occur while §6's linearization holds. If a hold cannot be posted, the consumer records a reconciliation exception (§12) and never forces a negative balance.
+A hold is observed by `#43c`'s evaluator through a composition-root port over `dispute.cases` — `state`, `held_toman`, window and appeal window. It covers cases against retention outcomes, no-show declarations and, through `#42f`, completed bookings. The evaluator emits `DisputeHoldChanged v1` (keys `hold:<case_id>`, `hold_outcome:<case_decision_id>`). The hold is exactly `held_toman`, never the order's whole pending amount (`V33-DEC-039` R10). A case opened after money was released cannot occur while §6's linearization holds. If a hold cannot be posted, the consumer records a reconciliation exception (§12) and never forces a negative balance.
 
 ### 8. Settlement schedule, reserve, proposal and record
 
@@ -342,7 +365,11 @@ A hold is observed by `#43c`'s evaluator through a composition-root port over `d
   - `seller` → deducted from that order's held seller money. For `customer_late` and `no_show` it is bounded by `retained_toman`, with the remainder borne by the platform. For `seller`, any shortfall becomes a `seller_fee` receivable.
   - An **unpublished pair** → `provider_fee / platform_advance`, labelled `unallocated`, with no deduction from anyone (R8). A refund posting never includes a fee.
 
-**OC-3 — open owner decision.** R2 allocates fees by the cancellation cause. A collection fee on an ordinary **completed** booking, the most common case, has no ratified bearer. **While OC-3 is open**, such fees are `unallocated` and no mapping key for completed bookings exists.
+**Completed bookings [OC-3, decided by `V33-DEC-044`].**
+- R2 allocates fees by the cancellation cause, so a completed booking has no ratified bearer.
+- A provider fee on a completed booking is allocated **only** through an administrator-published mapping for the cause key `completed` (per `fee_kind`, bearer `platform` or `seller`).
+- **No default exists.** While that mapping is absent the fee is `unallocated`, and **no deduction is taken from anyone**.
+- No mapping is published by this record.
 
 ### 11. Revenue-recognition facts
 
@@ -452,9 +479,10 @@ Nothing in this record activates a real toman. The following stay refused or unb
 - real fee reports — #47 and the provider's fee schedule;
 - rail failure ingestion — #47;
 - "recognised revenue" labels — accountant and tax evidence;
-- subscription and credit recognition — #99, #47 and a paid-subscription decision.
+- subscription and credit recognition — #99, #47 and a paid-subscription decision;
+- **any real-money release of seller funds** — additionally a separate, recorded **legacy disposition** for orders without an outcome-terms snapshot (A4), and for bookings whose only completion predates `slot_start` without a later valid fact.
 
-Publishing any policy value moves no money.
+Until that disposition exists, such money stays `pending`. That is never described or treated as forfeiture, and no old order is reinterpreted. Publishing a policy value moves no money. Answering OC-1, OC-2 or OC-3 moves no money.
 
 ---
 
@@ -472,7 +500,12 @@ Publishing any policy value moves no money.
 
 ## Failure semantics
 
-- Missing policy, snapshot `absent`, OC-2 undecided, OC-1 undecided, unresolved schedule, or a production record without a rail ⇒ **no journal written**, a closed reason recorded. This is never a refusal of a customer refund.
+- Any of the following ⇒ **no journal written**, and a closed reason recorded. This is never a refusal of a customer refund, and never a forfeiture:
+  - missing policy, or a commission snapshot `absent`;
+  - no valid completion or outcome fact, or no snapshotted window;
+  - unresolved schedule;
+  - an unpublished `completed` fee mapping;
+  - a production record without a rail.
 - A refund is never blocked: beyond held money it draws `platform_advance`.
 - A consumer behind its preconditions throws and the relay retries. A permanent mismatch becomes an exception item.
 - Any trigger refusal rolls back the whole transaction.
@@ -487,7 +520,7 @@ Publishing any policy value moves no money.
 6. A dispute filing and a release on the same booking cannot both succeed across the window boundary.
 7. One reversal per batch.
 
-## Migration ordering (per proposed child)
+## Migration ordering (per child)
 
 1. `#43a`: `fund_journals` → `fund_postings` → chain and balance triggers → grants → ADR-027 claims.
 2. `#43b`: `commercial.commission_policies/_versions` → `commerce.order_commission_terms`.
@@ -512,12 +545,12 @@ Every migration is additive, proved from an empty database and against an alread
 | Shape CHECKs, required base, strict publication instant | each malformed shape refused; a backdated or tolerance-stamped publication refused | b, d |
 | Snapshot at commitment | three rows per order; none on rollback; publication racing checkout deterministic; a version published after checkout does not change the release | b, c |
 | BigInt floor and held ceiling | property tests assert at least one exact-half case was generated | b |
-| Release predicate | retention-outcome matrix; plain completion releases nothing while OC-1 is open; absent snapshot and OC-2 non-zero stay pending | c |
+| Release predicate | Retention-outcome matrix. Completion at or after `slot_start` releases only after the snapshotted window with no open case. A completion before `slot_start` releases nothing until a later attestation at or after `slot_start`. An absent snapshot or an unenrolled order stays pending. The retained-amount base, cap and no receivable (OC-2) | c (+ `#42f`) |
 | Clock boundary | a filing started before the window end versus a release after it: exactly one wins | c (+ #162) |
 | Convergence | a decision ahead of its refund projection defers | c |
 | Schedule, reserve, minimum payout, interval, production refusal, reversal, retry | boundary values; 10 parallel records never exceed available | d, e |
 | Recovery order; post-settlement refund never refused | reserve then future available then claim; refund posted before the receivable | f |
-| Allocation matrix; customer refund invariance; unallocated deducts nothing; forged report writes nothing | per `(cause, fee_kind)` | g |
+| Allocation matrix; customer refund invariance; unallocated deducts nothing (including completed bookings without a published mapping); forged report writes nothing | per `(cause, fee_kind)` | g |
 | Written-formula oracle | the R6 formula disagrees with the database on D1, D2, D3 and D5, and agrees on the trivial full-payment case | a |
 | ADR-027 | boot coverage assertion; export and erasure per table | all |
 
@@ -551,9 +584,12 @@ Every migration is additive, proved from an empty database and against an alread
 | §12 identities | M0, M1, M4, M5 read | — | extends | — | extends | M3 | exception sink | — |
 | §15–§16 privacy, legacy | **owns** | own tables | own tables | own tables | own tables | own tables | own tables | — |
 
+`#42f` (a completed booking's valid completion fact and dispute eligibility) sits outside this map. It owns the attestation fact and the `completed_booking` dispute subject that `#43c` consumes, and it amends ADR-051 §9 in its own pull request.
+
 ## Open gates
 
-- **Owner:** acceptance of this record and of `V33-DEC-044`. OC-1 gates `#43c` Ready (plain-completion release). OC-2 gates `#43c` release of retention outcomes with non-zero commission. OC-3 gates `#43g` allocation for completed bookings.
-- **#162:** the `clock_timestamp()`-after-lock filing rule, before `#43c` is Ready.
-- **External:** #47 (rail, fee schedule, reconciliation feed, payout); #99 (paid credits); accountant and tax evidence (recognition labels).
+- **Implementation prerequisites of `#43c`:** #160, #161, #162, `#42f`, and #162's `clock_timestamp()`-after-lock filing rule.
+- **Legacy disposition:** a separate recorded decision for unenrolled orders and for completions that never gain a valid fact, before any real-money rollout.
+- **External:** #47 (rail, fee schedule, reconciliation feed, payout); #99 (paid credits); accountant and tax evidence (recognition labels); Legal review of dispute copy and case-file retention (`gate:legal` on #162 and `#42f`).
+- **Unpublished values:** every commission rate, fee allocation, schedule, reserve, minimum payout and risk class.
 - **Deferred named decision:** maker-checker (`V33-DEC-028` Ruling 13).
