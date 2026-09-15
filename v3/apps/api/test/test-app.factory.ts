@@ -6,7 +6,7 @@ import { ConfigModule } from '@nestjs/config';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { DataSource } from 'typeorm';
 
-import { BeauClickExceptionFilter, ResponseEnvelopeInterceptor, ValidationException } from '@beauclick/http';
+import { BeauClickExceptionFilter, ResponseEnvelopeInterceptor, ValidationException, sanitizeValidationErrors } from '@beauclick/http';
 import { JwtAuthGuard, CapabilityGuard } from '@beauclick/auth';
 import { OwnershipGuard } from '@beauclick/ownership';
 import { IdentityModule, IDENTITY_ENTITIES, OTP_DEBUG_OBSERVER, OtpDebugObserver } from '@beauclick/identity';
@@ -306,7 +306,7 @@ export async function createTestApp(): Promise<TestApp> {
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
-      exceptionFactory: (errors) => new ValidationException(errors),
+      exceptionFactory: (errors) => new ValidationException(sanitizeValidationErrors(errors)),
     }),
   );
   await app.init();

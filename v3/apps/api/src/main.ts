@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import helmet from 'helmet';
-import { ValidationException } from '@beauclick/http';
+import { ValidationException, sanitizeValidationErrors } from '@beauclick/http';
 import { assertPrivilegedMutationsAreAudited } from '@beauclick/audit';
 import { StructuredLogger, logFormatFromEnv } from '@beauclick/observability';
 import { AppModule } from './app.module';
@@ -77,12 +77,21 @@ async function bootstrap() {
   // unknown fields (never trust an unexpected client-supplied field);
   // forbidNonWhitelisted rejects the request outright rather than silently
   // dropping fields a caller might expect to matter.
+  //
+  // `sanitizeValidationErrors` (#172): `errors` here is class-validator's
+  // RAW `ValidationError[]`, whose `target` is the entire submitted body --
+  // every field, valid or not -- and whose `value` is the exact submitted
+  // value of the failing one, recursively through `children`. Passing that
+  // straight into `ValidationException` used to serialise it verbatim into
+  // the public 400 response (OTP codes and phone numbers included, on
+  // pre-auth routes). The sanitizer keeps only the field name and the
+  // constraint messages, which never echo a submitted value.
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
-      exceptionFactory: (errors) => new ValidationException(errors),
+      exceptionFactory: (errors) => new ValidationException(sanitizeValidationErrors(errors)),
     }),
   );
 
