@@ -20,3 +20,7 @@ export * from './booking-outcome-policy-contract';
 // snapshot and the customer's acceptance of it (ADR-051 §2–§4). Additive:
 // nothing above is changed.
 export * from './booking-outcome-contract';
+// V3.3 Story #160 (`#42c`). The decision vocabulary shared by the evaluator,
+// the commerce decision record and the composition root (ADR-051 §6).
+// Additive: nothing above is changed.
+export * from './booking-outcome-decision-contract';
