@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
 /**
  * Note what is NOT here: no price, no total, no discount, no currency.
@@ -38,4 +38,14 @@ export class RescheduleBookingDto {
   @IsString()
   @MaxLength(255)
   reason?: string;
+
+  /**
+   * V3.3 #160 (`#42c`). The customer's explicit confirmation of a non-free
+   * reschedule's consequence, after the server showed it. Only `true` counts;
+   * absent or `false` never moves a governed booking that is not free, and the
+   * field changes nothing for a free, legacy or professional reschedule.
+   */
+  @IsOptional()
+  @IsBoolean()
+  acceptConsequence?: boolean;
 }

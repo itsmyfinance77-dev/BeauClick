@@ -37,6 +37,7 @@ import { AI_OUTBOX_SOURCES } from './ai-tokens';
 import { REFERRAL_EVENT_HANDLERS, REFERRAL_OUTBOX_SOURCES } from './referral-tokens';
 
 import { DomainPortsModule } from './domain-ports.module';
+import { BookingOutcomeCompositionModule } from './booking-outcome-composition.module';
 import { CheckoutService } from '../checkout/checkout.service';
 import { CheckoutController, SandboxGatewayController, PaymentCallbackController } from '../checkout/checkout.controller';
 import { CheckoutDisclosureController, CheckoutDisclosureService } from '../checkout/checkout-disclosure';
@@ -92,6 +93,10 @@ import {
     // Global, so BookingModule/CommerceModule/FinancialModule each resolve
     // the ports they declare without importing one another.
     DomainPortsModule,
+    // V3.3 #160 (`#42c`), ADR-051 §6. Global for the reason its own docblock
+    // records: it binds booking-service's mandatory reschedule seam, whose
+    // implementation needs Commerce and Payment.
+    BookingOutcomeCompositionModule,
     ProviderModule,
     BookingModule,
     CommerceModule,

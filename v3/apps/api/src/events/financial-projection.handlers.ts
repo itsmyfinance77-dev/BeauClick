@@ -1,9 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DomainEventHandler, EventEnvelope, AuditLogger } from '@beauclick/events';
 import { LedgerService } from '@beauclick/financial';
-import { OrderService, OrderStatus } from '@beauclick/commerce';
+import { OrderService } from '@beauclick/commerce';
 import { PaymentService } from '@beauclick/payment';
 import { BookingService } from '@beauclick/booking';
+
+import { BookingOutcomeOrchestrator } from '../outcome/booking-outcome.orchestrator';
 
 /**
  * The Phase 2 event graph, in one file so the whole reaction chain is
@@ -203,88 +205,54 @@ export class OrderRefundedLedgerHandler implements DomainEventHandler {
 }
 
 /**
- * The order statuses that mean **BeauClick collected nothing** — V3.3 #81
- * (`#41b`), ADR-044 §10, `V33-DEC-023` Ruling 10.
+ * A cancelled booking's money outcome — decided once, then executed.
  *
- * ## This closed a real money defect, not a hypothetical one
+ * ## What it was, and what it is now (V3.3 #160, `#42c`, ADR-051 §6)
  *
- * The handler below used to ask `status === 'pending'` and send **everything
- * else** to `remainingRefundable(order)`, which is
- * `totalToman - refundedTotalToman`.
+ * This handler used to refund the order's whole remaining collected amount for
+ * every cancellation, with no time comparison, no terms and no record of why.
+ * That behaviour closed V2's FIN-02 gap by construction — the refund is a
+ * consequence of the cancellation event itself, so no cancellation path can be
+ * added later that forgets it — and that property is kept.
  *
- * `online_collection_not_required` would have fallen into that else. Its
- * `totalToman` is the full service price — non-zero under `pay_at_venue`, where
- * the whole amount is a venue balance owed to the seller — so a cancelled
- * pay-at-venue booking would have called the payment provider and refunded
- * money that never reached BeauClick. The customer would have been "refunded"
- * an amount they had not paid, out of a gateway balance that funds real refunds.
+ * What changed is who decides the amount. `BookingOutcomeOrchestrator` commits
+ * ONE `commerce.booking_outcome_decisions` row from the booking's accepted
+ * terms (or their absence), the database-clock instant of the cancelling
+ * transaction, the Legal cap's current state and the money already committed
+ * to refunds; only then is the refund executed, under the same booking-derived
+ * key this handler always used. Without every input a retention needs, the
+ * decision is today's full refund. A never-collected order is still cancelled
+ * with no provider call (`NEVER_COLLECTED_STATUSES`, V3.3 #81).
  *
- * The list is explicit rather than an inverted "not paid-ish" test: a future
- * status must be classified deliberately, and a wrong answer here spends money.
+ * ## Idempotent
  *
- * **`online_collection_completed` is deliberately NOT here** (V3.3 #82,
- * ADR-045 §5). BeauClick genuinely holds money in that state, so a cancelled
- * deposit falls through to the refund branch below and gets back exactly its
- * remaining collected principal — which `remainingRefundable` now computes from
- * `collectedTotalToman`, so the refund can never include a venue balance.
+ * A redelivery finds the live decision and never evaluates again; the refund
+ * call is idempotent on `UNIQUE(order_id, request_key)`.
+ *
+ * ## No money on a fact with nothing behind it
+ *
+ * The cause, confirmation and instant are read from the booking itself, never
+ * from the payload. A `BookingCancelled` whose booking records no cancellation
+ * decides nothing and refunds nothing.
  */
-const NEVER_COLLECTED_STATUSES: readonly OrderStatus[] = ['pending', 'online_collection_not_required'];
-
 @Injectable()
 export class BookingCancelledRefundHandler implements DomainEventHandler {
   readonly eventType = 'BookingCancelled';
-  private readonly logger = new Logger('BookingCancelledRefundHandler');
 
   constructor(
-    private readonly orders: OrderService,
-    private readonly payments: PaymentService,
+    private readonly outcomes: BookingOutcomeOrchestrator,
+    private readonly bookings: BookingService,
   ) {}
 
-  /**
-   * A cancelled booking whose order was already paid gets its money back — and
-   * one BeauClick never collected for gets cancelled, with no provider call.
-   *
-   * This closes V2's FIN-02 gap by construction: there, the customer-facing
-   * cancel path did not trigger a refund at all for an already-paid booking
-   * until it was found in an audit. Here the refund is a consequence of the
-   * cancellation event itself, so no cancellation path can be added later
-   * that forgets it.
-   *
-   * Refunds the order's real REMAINING refundable amount, recomputed from the
-   * order every time -- never an independently tracked figure. Correct
-   * whether this is the first refund or a second, and correct regardless of
-   * any discount already reflected in the total.
-   *
-   * Idempotent on `UNIQUE(order_id, request_key)` with a request key derived
-   * from the booking id.
-   */
   async handle(envelope: EventEnvelope): Promise<void> {
-    const payload = envelope.payload as { bookingId: string };
+    const { bookingId } = envelope.payload as { bookingId: string };
 
-    const detail = await this.orders.findBySource('booking', payload.bookingId);
-    if (!detail) return;
+    const decision = await this.outcomes.decideCancellation(bookingId, (manager, cutoffHours) =>
+      this.bookings.cancellationFacts(manager, bookingId, cutoffHours),
+    );
+    if (!decision) return;
 
-    const order = detail.order;
-    if (NEVER_COLLECTED_STATUSES.includes(order.status)) {
-      // Never collected -- nothing to refund. Cancel the order so it stops
-      // appearing as awaiting payment.
-      await this.orders.cancel(order.id, `booking_cancelled:${payload.bookingId}`);
-      return;
-    }
-
-    const remaining = this.orders.remainingRefundable(order);
-    if (remaining <= 0) return;
-
-    await this.payments.refund({
-      orderId: order.id,
-      amountToman: remaining,
-      reason: 'رزرو مرتبط لغو شد — بازگشت خودکار وجه.',
-      requestKey: `booking-cancelled:${payload.bookingId}`,
-      actorType: 'system',
-      actorId: null,
-    });
-
-    this.logger.log(`Refund issued for cancelled booking ${payload.bookingId} (order ${order.id}, ${remaining} Toman)`);
+    await this.outcomes.executeCancellation(decision);
   }
 }
 
