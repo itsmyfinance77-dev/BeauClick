@@ -1,6 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import request from 'supertest';
+import { assertNoLeak } from '@beauclick/testing';
 import { createTestApp, CapturingOtpObserver } from './test-app.factory';
 
 const PHONE = '09121234567';
@@ -86,6 +87,43 @@ describe('Authentication flow (e2e)', () => {
       const res = await request(app.getHttpServer()).post('/api/v1/auth/verify-otp').send({ phone, code: '000000', purpose: 'login' });
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    });
+  });
+
+  describe('validation-error echo regression (#172)', () => {
+    it('a DTO-shape failure on `code` never echoes the submitted code, and never echoes a VALID sibling `phone` either', async () => {
+      // `phone` here is well-formed (passes @Matches on its own) -- the ONLY
+      // thing wrong with this request is `code`'s length. Pre-#172, class-
+      // validator's `target` put the whole submitted object (including this
+      // valid `phone`) into the public response regardless of which field
+      // actually failed.
+      const validSiblingPhone = '09126660000';
+      const submittedCode = 'CANARY_OTP_ATTEMPT_bad_length_9f8a3c';
+
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/auth/verify-otp')
+        .send({ phone: validSiblingPhone, code: submittedCode, purpose: 'login' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+      assertNoLeak(res.body, submittedCode);
+      assertNoLeak(res.body, validSiblingPhone);
+      // Non-vacuity: the caller must still be told WHICH field was wrong.
+      expect(JSON.stringify(res.body)).toContain('code');
+    });
+
+    it('an unknown-field probe on a PUBLIC route echoes neither the probed field value nor the rest of the submitted body', async () => {
+      const canaryPhone = '09126660001';
+      const canaryExtra = 'CANARY_UNKNOWN_FIELD_PROBE_1a2b3c';
+
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/auth/request-otp')
+        .send({ phone: canaryPhone, purpose: 'login', notARealField: canaryExtra });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+      assertNoLeak(res.body, canaryExtra);
+      assertNoLeak(res.body, canaryPhone);
     });
   });
 
