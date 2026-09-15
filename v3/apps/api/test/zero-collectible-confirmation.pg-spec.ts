@@ -455,6 +455,10 @@ describePg('zero-collectible confirmation (real PostgreSQL)', () => {
       await dataSource.transaction((m) => orders.confirmNoOnlineCollection(booked.orderId, m));
       expect((await orderRow(booked.orderId)).status).toBe('online_collection_not_required');
 
+      // V3.3 #160 (`#42c`). The booking is cancelled first, as every real
+      // `BookingCancelled` is: the consumer now decides from the booking's own
+      // recorded cancellation and moves no money on an event with none behind it.
+      await bookings.cancel(booked.bookingId, { type: 'customer', id: booked.customer.id });
       const handler = app.get(BookingCancelledRefundHandler);
       await handler.handle({ payload: { bookingId: booked.bookingId } } as never);
 
@@ -493,6 +497,8 @@ describePg('zero-collectible confirmation (real PostgreSQL)', () => {
         [booked.orderId, 'paid'],
       );
 
+      // V3.3 #160 (`#42c`): cancelled first, for the reason the case above records.
+      await bookings.cancel(booked.bookingId, { type: 'customer', id: booked.customer.id });
       const handler = app.get(BookingCancelledRefundHandler);
 
       await expect(handler.handle({ payload: { bookingId: booked.bookingId } } as never)).rejects.toThrow(

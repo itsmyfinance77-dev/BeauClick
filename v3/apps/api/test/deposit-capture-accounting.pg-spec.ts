@@ -4,6 +4,7 @@ import request from 'supertest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { BookingService } from '@beauclick/booking';
 import { OrderService } from '@beauclick/commerce';
 import { SandboxPaymentProvider } from '@beauclick/payment';
 
@@ -503,6 +504,11 @@ describePg('deposit capture and collected-money accounting (real PostgreSQL)', (
       const booked = await depositCapture();
       await ctx.relay.drain();
 
+      // V3.3 #160 (`#42c`). Cancelled first, as every real `BookingCancelled`
+      // is: the consumer decides from the booking's recorded cancellation and
+      // moves no money on an event with none behind it. The relay is not drained
+      // after it, so the handler below is the only consumer that runs.
+      await app.get(BookingService).cancel(booked.bookingId, { type: 'customer', id: booked.customer.id });
       const handler = app.get(BookingCancelledRefundHandler);
       await handler.handle({ payload: { bookingId: booked.bookingId } } as never);
       await handler.handle({ payload: { bookingId: booked.bookingId } } as never);
@@ -518,6 +524,7 @@ describePg('deposit capture and collected-money accounting (real PostgreSQL)', (
 
     it('control: a never-collected order calls no provider refund', async () => {
       const booked = await book(0);
+      await app.get(BookingService).cancel(booked.bookingId, { type: 'customer', id: booked.customer.id });
       const handler = app.get(BookingCancelledRefundHandler);
       await handler.handle({ payload: { bookingId: booked.bookingId } } as never);
 

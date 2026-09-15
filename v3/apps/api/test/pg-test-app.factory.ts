@@ -594,6 +594,9 @@ export const RESETTABLE_TABLES = [
   // V3.3 Story #159 (`#42b`). Before `commerce.orders`, which it references by
   // a real FK. TRUNCATE fires no row or constraint trigger.
   'commerce.order_outcome_terms',
+  // V3.3 Story #160 (`#42c`). Before `commerce.orders`, for the same reason;
+  // TRUNCATE bypasses its forward-only trigger, as it does every immutable table here.
+  'commerce.booking_outcome_decisions',
   'commerce.orders',
   'booking.outbox_events',
   'booking.idempotency_keys',
