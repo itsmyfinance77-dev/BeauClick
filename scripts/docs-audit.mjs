@@ -67,7 +67,53 @@ function assertDecisionSequence(file, prefix, expected) {
 }
 
 assertDecisionSequence('docs/roadmap/v3.2/V3.2_DECISION_REGISTER.md', 'V32-DEC-', 36);
-assertDecisionSequence('docs/roadmap/v3.3/V3.3_DECISION_REGISTER.md', 'V33-DEC-', 43);
+const V33_CLOSED_CARDS = 44;
+assertDecisionSequence('docs/roadmap/v3.3/V3.3_DECISION_REGISTER.md', 'V33-DEC-', V33_CLOSED_CARDS);
+
+// Unratified decision proposals live outside the register, in
+// docs/roadmap/v3.3/proposals/, so they can never be counted as closed cards.
+// Each one must say it is a PROPOSAL, must not claim ratification in its
+// status line, must name an id beyond the closed sequence, and must not
+// coexist with a register card of the same id: ratifying moves the card into
+// the register and deletes the proposal in the same change.
+const v33RegisterText = readFileSync(resolve(root, 'docs/roadmap/v3.3/V3.3_DECISION_REGISTER.md'), 'utf8');
+const proposalDirectory = resolve(root, 'docs/roadmap/v3.3/proposals');
+const proposalFiles = existsSync(proposalDirectory)
+  ? readdirSync(proposalDirectory).filter((name) => extname(name).toLowerCase() === '.md')
+  : [];
+for (const name of proposalFiles) {
+  const file = `docs/roadmap/v3.3/proposals/${name}`;
+  const match = /^V33-DEC-(\d{3})-PROPOSAL-[a-z0-9-]+\.md$/.exec(name);
+  if (!match) {
+    failures.push(`${file}: a proposal must be named V33-DEC-NNN-PROPOSAL-<slug>.md`);
+    continue;
+  }
+  const id = `V33-DEC-${match[1]}`;
+  const status =
+    readFileSync(resolve(proposalDirectory, name), 'utf8')
+      .split(/\r?\n/)
+      .find((line) => line.startsWith('**Status:**')) ?? '';
+  if (!/\bPROPOSAL\b/.test(status)) failures.push(`${file}: status line must declare PROPOSAL`);
+  if (/\b(?:RATIFIED|CLOSED|ACCEPTED)\b/.test(status.replace(/\bNOT (?:RATIFIED|CLOSED|ACCEPTED)\b/g, ''))) {
+    failures.push(`${file}: a proposal must not claim ratification in its status line`);
+  }
+  if (Number(match[1]) <= V33_CLOSED_CARDS) failures.push(`${file}: ${id} is inside the closed V33 sequence`);
+  if (new RegExp('^#{2,3} `' + id + '` —', 'm').test(v33RegisterText)) {
+    failures.push(`${file}: ${id} is already a register card; delete the proposal when ratifying`);
+  }
+}
+
+// An ADR whose status is PROPOSED must point at an existing decision proposal,
+// so a proposed ADR cannot outlive, or silently precede, the decision it waits on.
+for (const name of readdirSync(resolve(root, 'docs/roadmap/v3/adr')).filter((n) => /^ADR-\d{3}-.*\.md$/.test(n))) {
+  const text = readFileSync(resolve(root, 'docs/roadmap/v3/adr', name), 'utf8');
+  const status = text.split(/\r?\n/).find((line) => line.startsWith('**Status:**')) ?? '';
+  if (!/\bPROPOSED\b/.test(status)) continue;
+  const reference = /docs\/roadmap\/v3\.3\/proposals\/(V33-DEC-\d{3}-PROPOSAL-[a-z0-9-]+\.md)/.exec(text);
+  if (!reference || !proposalFiles.includes(reference[1])) {
+    failures.push(`docs/roadmap/v3/adr/${name}: a PROPOSED ADR must reference an existing docs/roadmap/v3.3/proposals/ file`);
+  }
+}
 
 const adrFiles = readdirSync(resolve(root, 'docs/roadmap/v3/adr'))
   .map((name) => /^ADR-(\d{3})-.*\.md$/.exec(name))
@@ -99,4 +145,4 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log(`Documentation audit passed: ${markdownFiles.length} Markdown files, ${checkedRelativeLinks} relative links, ${adrFiles.length} ADRs, V3.2/V3.3 decision sequences complete.`);
+console.log(`Documentation audit passed: ${markdownFiles.length} Markdown files, ${checkedRelativeLinks} relative links, ${adrFiles.length} ADRs, V3.2/V3.3 decision sequences complete, ${proposalFiles.length} unratified V3.3 proposal(s).`);

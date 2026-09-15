@@ -60,6 +60,21 @@ On **2026-09-13** Story #42 was decomposed by `V33-DEC-043` after a read-only re
 committed alone as the family's engineering record. Every child ships disabled by absence;
 no product policy changed and implementation has not started.
 
+On **2026-09-15** Story #43 was decomposed by `V33-DEC-044` after a read-only readiness audit and
+an unratified proposal (PR #171):
+- `#43a` (#43, 13, Ready);
+- `#43b` (13), `#43c` (13, `gate:external`), `#43d` (8), `#43e` (13, `gate:external`),
+  `#43f` (13), `#43g` (8, `gate:external`);
+- `#43h` (5, blocked);
+- plus the completed-booking dependency `#42f` (8, `gate:legal`).
+
+That is 21 → 86 SP for the #43 family, plus 8 for `#42f`.
+[ADR-052](docs/roadmap/v3/adr/ADR-052-pending-funds-journal-commission-policy-and-settlement-release.md)
+is the engineering record. It also corrects `V33-DEC-040` R6's false exact-sum formula and applies
+the owner's conservative OC-1–OC-3 answers. No commission rate, fee, schedule, reserve, risk class,
+provider or payout is published or activated; a legacy disposition remains required before any
+real-money rollout.
+
 | Programme | Delivered | Status |
 |---|---|---|
 | **V3.0** (Phases 0–5) | The WordPress exit: 16 ADRs, the Nx/pnpm workspace, and the identity, provider, booking, commerce, payment, financial, search, loyalty, journey, notification, analytics, admin and privacy domains on PostgreSQL | Released — `v3.0.0`, `v3.0.1` |
@@ -685,7 +700,7 @@ evidence.
 
 | Path | What it holds |
 |---|---|
-| [`docs/roadmap/v3/adr/`](docs/roadmap/v3/adr/) | **ADR-001 … ADR-051** — architecture decisions and their dated status. ADR-040 reconciles the implemented deployment topology; ADR-041–ADR-050 record the V3.3 commercial, collection, credit, business-operations and control-plane designs; ADR-051 records the booking-outcome policy, snapshot/acceptance, evaluator, no-show, remedy-choice and dispute model behind `#42a`–`#42e`. |
+| [`docs/roadmap/v3/adr/`](docs/roadmap/v3/adr/) | **ADR-001 … ADR-052** — architecture decisions and their dated status. ADR-040 reconciles the implemented deployment topology; ADR-041–ADR-050 record the V3.3 commercial, collection, credit, business-operations and control-plane designs; ADR-051 records the booking-outcome policy, snapshot/acceptance, evaluator, no-show, remedy-choice and dispute model behind `#42a`–`#42e`; ADR-052 records the pending-funds journal, commission snapshot, release predicate, settlement and receivable model behind `#43a`–`#43h`. |
 | [`docs/roadmap/v3/`](docs/roadmap/v3/) | The V3 blueprint corpus: domain boundaries, database and API blueprints, event architecture and catalog, security model, infrastructure plan, migration matrix, release audits |
 | [`docs/roadmap/v3.1/`](docs/roadmap/v3.1/) | V3.1 roadmap, phase reports, release strategy, and the external-enablement execution policy |
 | [`docs/roadmap/v3.2/`](docs/roadmap/v3.2/) | V3.2 roadmap, capability catalog, decision register, external-dependency ledger, phase reports |

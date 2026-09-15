@@ -3,6 +3,8 @@
 **Status:** Accepted and amended — ledger implemented; isolation and money representation refined by ADR-017.
 **Date:** 2026-08-19.
 
+*(Superseded in part 2026-09-15 by [ADR-052](ADR-052-pending-funds-journal-commission-policy-and-settlement-release.md) under `V33-DEC-044`. For orders on the new pending-funds journal, decision 1's rule that an outstanding balance "can legitimately go negative" and the rejection of double-entry bookkeeping no longer apply: seller money moves through a balanced append-only journal with no negative balance, and a post-settlement shortfall is a seller receivable. Orders already recorded in `financial.ledger_entries` keep this ADR's behaviour, byte-identical. The text below is unchanged.)*
+
 ## Context
 
 Financial is explicitly named, in every existing V3 doc, as "the highest-stakes, most sensitive domain found in the whole discovery pass" (`V3_ARCHITECTURE_PLAN.md` §1, row 7). V2's real, verified strengths: commission computation and the append-only log discipline are correct in code (not just documented); refunds reverse using the *original* captured commission rate, never live config (so a later rate change never retroactively alters historical refund math); idempotency is enforced by a real DB constraint (`UNIQUE(entry_type, reference_type, reference_id)`), confirmed to have actually absorbed a real double-fire bug in production-equivalent testing; cross-professional isolation was recently hardened to the data-access layer itself (`GAP-05`, resolved post-v2.4.0 — verified in this pass's own re-audit of `LedgerService::receivable_net_for_current_session()`/`SettlementService::my_party_summary()`, confirmed present and matching the documented fix exactly).
