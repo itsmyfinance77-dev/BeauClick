@@ -67,7 +67,7 @@ function assertDecisionSequence(file, prefix, expected) {
 }
 
 assertDecisionSequence('docs/roadmap/v3.2/V3.2_DECISION_REGISTER.md', 'V32-DEC-', 36);
-const V33_CLOSED_CARDS = 43;
+const V33_CLOSED_CARDS = 44;
 assertDecisionSequence('docs/roadmap/v3.3/V3.3_DECISION_REGISTER.md', 'V33-DEC-', V33_CLOSED_CARDS);
 
 // Unratified decision proposals live outside the register, in
