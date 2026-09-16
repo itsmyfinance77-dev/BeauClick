@@ -453,7 +453,7 @@ export function buildAnalyticsHandlers(
  * twice against the boot-time contract check, which is confusing to read
  * even though not incorrect.
  */
-const FINANCIAL_EVENT_TYPES = new Set(['LedgerEntriesRecorded', 'SettlementRecorded', 'SettlementReversed']);
+const FINANCIAL_EVENT_TYPES = new Set(['LedgerEntriesRecorded', 'SettlementRecorded', 'SettlementReversed', 'FundsJournalRecorded']);
 
 export function buildFinancialAnalyticsHandlers(
   ingestion: AnalyticsIngestionService,

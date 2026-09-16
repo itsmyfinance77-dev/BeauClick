@@ -11,8 +11,10 @@ import {
 
 import { LedgerEntryEntity } from './entities/ledger-entry.entity';
 import { SettlementBatchEntity } from './entities/settlement.entity';
+import { FUND_POSTING_ACCOUNTS, FundPostingAccount } from './entities/fund-posting.entity';
 import { FinanceWorkspaceSelectionRequiredException } from './finance.exceptions';
 import { LedgerService } from './ledger.service';
+import { FundJournalService } from './fund-journal.service';
 import {
   AddressableFinancialParty,
   FINANCE_WORKSPACE_LABEL_RESOLVER,
@@ -88,6 +90,7 @@ export class FinanceWorkspaceService {
   constructor(
     private readonly ledger: LedgerService,
     private readonly settlements: SettlementService,
+    private readonly fundJournal: FundJournalService,
     @Inject(FINANCE_WORKSPACE_OWNER_RESOLVER) private readonly owners: FinanceWorkspaceOwnerResolver,
     @Inject(WORKSPACE_REFERENCE_SECRET) private readonly secret: string,
     @Inject(FINANCE_WORKSPACE_LABEL_RESOLVER) private readonly labels: FinanceWorkspaceLabelResolver,
@@ -261,6 +264,31 @@ export class FinanceWorkspaceService {
   async summaryFor(sessionUserId: string, workspaceRef: string): Promise<PartySummary> {
     const party = await this.resolveAddressableWorkspace(sessionUserId, workspaceRef);
     return this.settlements.partySummary(party.partyType, party.partyId);
+  }
+
+  /**
+   * `GET /me/finance/:workspaceRef/funds` -- the tenth route (ADR-052 §16).
+   * Every new-regime pending-funds STATE, as its own field, never summed
+   * across states and never mixing seller money with a platform figure
+   * (§11, §14): `pending`/`disputed`/`available`/`reserve`/`settled`/`refunded`
+   * are this workspace's own money; `platform_earned`/`provider_fee`/
+   * `recovery_out` are the platform's recognised facts ABOUT this workspace's
+   * orders, never this workspace's balance; `collected`/`platform_advance`/
+   * `recovered_in` are custody/cash-position facts (§12's M1), not a payable
+   * figure. A field absent from every posting this party has ever received
+   * reads `0`, the same honest "nothing yet" every other finance read gives.
+   *
+   * `#43a` posts only `collection`/`refund` journals, so only `pending`,
+   * `collected` and `refunded` are ever non-zero today; every other field is
+   * reserved shape for `#43b`–`#43g`.
+   */
+  async fundsFor(sessionUserId: string, workspaceRef: string): Promise<Record<FundPostingAccount, number>> {
+    const party = await this.resolveAddressableWorkspace(sessionUserId, workspaceRef);
+    const states = await this.fundJournal.statesForParty(party.partyType, party.partyId);
+    return Object.fromEntries(FUND_POSTING_ACCOUNTS.map((account) => [account, states[account] ?? 0])) as Record<
+      FundPostingAccount,
+      number
+    >;
   }
 
   async outstandingOrdersFor(sessionUserId: string, workspaceRef: string): Promise<OutstandingOrder[]> {

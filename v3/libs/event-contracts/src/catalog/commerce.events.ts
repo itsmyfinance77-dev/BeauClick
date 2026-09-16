@@ -268,4 +268,43 @@ export const SettlementReversed = defineEvent({
   }),
 });
 
-export const FINANCIAL_EVENTS = [LedgerEntriesRecorded, SettlementRecorded, SettlementReversed];
+/**
+ * A balanced journal was written to the pending-funds journal -- `#43a`,
+ * ADR-052 §13: "New financial facts leave through the existing financial
+ * relay as `FundsJournalRecorded v1`, with every consumer classified as
+ * ADR-045 §7 did." One event covers every journal kind (`kind` distinguishes
+ * them); `#43a` emits only `collection` and `refund`.
+ */
+export const FundsJournalRecorded = defineEvent({
+  name: 'FundsJournalRecorded',
+  version: 1,
+  aggregateType: 'fund_journal',
+  producer: 'financial',
+  description: 'A balanced journal was written to financial.fund_journals/fund_postings (ADR-052 §4).',
+  idempotency: 'UNIQUE(idempotency_key) on financial.fund_journals itself.',
+  schema: z.object({
+    journalId: uuid(),
+    orderId: uuid(),
+    kind: z.enum([
+      'collection',
+      'refund',
+      'dispute_hold',
+      'dispute_outcome',
+      'release',
+      'reserve_hold',
+      'reserve_release',
+      'settlement',
+      'settlement_reversal',
+      'recovery',
+      'fee',
+    ]),
+    sellerPartyType: partyType(),
+    sellerPartyId: uuid(),
+    // The journal's principal amount -- always positive; `kind` says what it
+    // means. Never a signed posting value: the event describes the FACT, and
+    // the signed accounting detail stays inside `financial.fund_postings`.
+    amountToman: positiveToman(),
+  }),
+});
+
+export const FINANCIAL_EVENTS = [LedgerEntriesRecorded, SettlementRecorded, SettlementReversed, FundsJournalRecorded];

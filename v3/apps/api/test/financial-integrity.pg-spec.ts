@@ -4,7 +4,7 @@ import { Client } from 'pg';
 import request from 'supertest';
 import { uuidv7 } from 'uuidv7';
 
-import { LedgerService, MyFinanceService, SettlementService } from '@beauclick/financial';
+import { FundJournalService, LedgerService, MyFinanceService, SettlementService } from '@beauclick/financial';
 import { SandboxPaymentProvider } from '@beauclick/payment';
 import { OrderService } from '@beauclick/commerce';
 import { assertNoLeak } from '@beauclick/testing';
@@ -19,6 +19,8 @@ import {
   requiredPgEnv,
   resetDatabase,
   resetFinancial,
+  seedLegacyPayment,
+  seedSettlementBatch,
   seedProfessional,
   seedSlot,
   seedUser,
@@ -54,6 +56,7 @@ describeIfPg('Financial integrity on real PostgreSQL', () => {
   let financialDataSource: DataSource;
   let ledger: LedgerService;
   let settlements: SettlementService;
+  let fundJournal: FundJournalService;
   let myFinance: MyFinanceService;
   let orders: OrderService;
   let checkout: CheckoutService;
@@ -66,6 +69,7 @@ describeIfPg('Financial integrity on real PostgreSQL', () => {
     financialDataSource = ctx.financialDataSource;
     ledger = app.get(LedgerService);
     settlements = app.get(SettlementService);
+    fundJournal = app.get(FundJournalService);
     myFinance = app.get(MyFinanceService);
     orders = app.get(OrderService);
     checkout = app.get(CheckoutService);
@@ -192,87 +196,95 @@ describeIfPg('Financial integrity on real PostgreSQL', () => {
   // Commission and refunds
   // -------------------------------------------------------------------
 
-  describe('commission and refund arithmetic', () => {
+  describe('commission and refund arithmetic (LEGACY regime -- ADR-052 §16)', () => {
     const orderId = '01926a3e-2222-7000-8000-00000000bbbb';
     const partyId = '01926a3e-2222-7000-8000-00000000cccc';
     const paymentRef = '01926a3e-2222-7000-8000-00000000dddd';
 
-    async function recordPayment(netAmountToman: number) {
-      return ledger.recordPayment({
+    /**
+     * `LedgerService.recordPayment` is REMOVED (ADR-052 §16); every order
+     * collected from `#43a` on posts to `financial.fund_journals` instead
+     * (see `fund-journal.pg-spec.ts`). A test that needs a LEGACY
+     * `ledger_entries` row -- to exercise `recordRefund`, which still owns
+     * that table's one remaining write path -- seeds one directly, exactly
+     * as ADR-052 §16 requires.
+     */
+    async function seedPayment(netAmountToman: number, rateBp = 1500) {
+      return seedLegacyPayment(financialDataSource, {
         orderId,
         sourceId: null,
         sellerPartyType: 'professional',
         sellerPartyId: partyId,
         netAmountToman,
+        rateBp,
         paymentReferenceId: paymentRef,
       });
     }
 
-    it('splits a payment into commission + receivable that sum EXACTLY to the amount paid', async () => {
-      expect(await recordPayment(200_000)).toBe(true);
+    it('the fixture splits a payment into commission + receivable that sum EXACTLY to the amount paid', async () => {
+      const split = await seedPayment(200_000);
+      expect(split.commissionToman).toBe(30_000); // 15%
+      expect(split.receivableToman).toBe(170_000);
 
-      const entries = await ledger.entriesForOrder(orderId);
-      const commission = entries.find((e) => e.entryType === 'commission');
-      const receivable = entries.find((e) => e.entryType === 'receivable');
-
-      expect(commission?.amountToman).toBe(30_000); // 15%
-      expect(receivable?.amountToman).toBe(170_000);
-      expect((commission?.amountToman ?? 0) + (receivable?.amountToman ?? 0)).toBe(200_000);
-    });
-
-    it('captures the commission rate ON THE ROW, not by live lookup', async () => {
-      await recordPayment(200_000);
       const entries = await ledger.entriesForOrder(orderId);
       expect(entries.every((e) => e.commissionRateBp === 1500)).toBe(true);
       expect(entries.every((e) => e.basis === 'net_customer_amount')).toBe(true);
     });
 
-    it('is idempotent: a redelivered payment event records nothing further', async () => {
-      expect(await recordPayment(200_000)).toBe(true);
-      expect(await recordPayment(200_000)).toBe(false);
-      expect(await recordPayment(200_000)).toBe(false);
-      expect(await ledger.entriesForOrder(orderId)).toHaveLength(2);
+    it("reverses a refund at the ORIGINAL row's captured rate, never a live-looked-up one -- there is no live rate left to look up at all (`FinancialConfig` is removed)", async () => {
+      await seedPayment(200_000, 1500);
+
+      const refundId = uuidv7();
+      expect(await ledger.recordRefund({ orderId, refundId, refundAmountToman: 200_000 })).toBe(true);
+
+      const entries = await ledger.entriesForOrder(orderId);
+      const reversal = entries.filter((e) => e.referenceType === 'order_refund');
+      expect(reversal).toHaveLength(2);
+      expect(reversal.every((e) => e.commissionRateBp === 1500)).toBe(true);
+      expect(reversal.find((e) => e.entryType === 'commission')?.amountToman).toBe(-30_000);
+      expect(reversal.find((e) => e.entryType === 'receivable')?.amountToman).toBe(-170_000);
     });
 
-    it('is idempotent under genuinely CONCURRENT payment recording', async () => {
-      const results = await Promise.all([recordPayment(200_000), recordPayment(200_000), recordPayment(200_000)]);
-      expect(results.filter(Boolean)).toHaveLength(1);
-      expect(await ledger.entriesForOrder(orderId)).toHaveLength(2);
-    });
+    it("two DIFFERENT orders, seeded at two DIFFERENT rates, each reverse at their OWN row's rate", async () => {
+      const orderA = uuidv7();
+      const orderB = uuidv7();
+      await seedLegacyPayment(financialDataSource, {
+        orderId: orderA,
+        sellerPartyType: 'professional',
+        sellerPartyId: partyId,
+        netAmountToman: 100_000,
+        rateBp: 1000,
+        paymentReferenceId: uuidv7(),
+      });
+      await seedLegacyPayment(financialDataSource, {
+        orderId: orderB,
+        sellerPartyType: 'professional',
+        sellerPartyId: partyId,
+        netAmountToman: 100_000,
+        rateBp: 4000,
+        paymentReferenceId: uuidv7(),
+      });
 
-    it('reverses a refund at the ORIGINAL captured rate, not the platform current rate', async () => {
-      await recordPayment(200_000);
+      await ledger.recordRefund({ orderId: orderA, refundId: uuidv7(), refundAmountToman: 100_000 });
+      await ledger.recordRefund({ orderId: orderB, refundId: uuidv7(), refundAmountToman: 100_000 });
 
-      // The platform changes its commission after the fact. The refund must
-      // be immune to it -- this is V2's most important financial rule.
-      const originalRate = process.env.FINANCIAL_COMMISSION_RATE_BP;
-      process.env.FINANCIAL_COMMISSION_RATE_BP = '5000';
-      try {
-        const refundId = uuidv7();
-        expect(await ledger.recordRefund({ orderId, refundId, refundAmountToman: 200_000 })).toBe(true);
-
-        const entries = await ledger.entriesForOrder(orderId);
-        const reversal = entries.filter((e) => e.referenceType === 'order_refund');
-        expect(reversal).toHaveLength(2);
-        // Reversed at 15%, not the new 50%.
-        expect(reversal.every((e) => e.commissionRateBp === 1500)).toBe(true);
-        expect(reversal.find((e) => e.entryType === 'commission')?.amountToman).toBe(-30_000);
-        expect(reversal.find((e) => e.entryType === 'receivable')?.amountToman).toBe(-170_000);
-      } finally {
-        if (originalRate === undefined) delete process.env.FINANCIAL_COMMISSION_RATE_BP;
-        else process.env.FINANCIAL_COMMISSION_RATE_BP = originalRate;
-      }
+      expect(await ledger.orderReceivableNet(orderA)).toBe(0);
+      expect(await ledger.orderReceivableNet(orderB)).toBe(0);
+      const reversalA = (await ledger.entriesForOrder(orderA)).find((e) => e.referenceType === 'order_refund' && e.entryType === 'commission');
+      const reversalB = (await ledger.entriesForOrder(orderB)).find((e) => e.referenceType === 'order_refund' && e.entryType === 'commission');
+      expect(reversalA?.amountToman).toBe(-10_000); // 10% of 100,000
+      expect(reversalB?.amountToman).toBe(-40_000); // 40% of 100,000
     });
 
     it('nets a full refund back to exactly zero', async () => {
-      await recordPayment(200_000);
+      await seedPayment(200_000);
       await ledger.recordRefund({ orderId, refundId: uuidv7(), refundAmountToman: 200_000 });
       expect(await ledger.orderReceivableNet(orderId)).toBe(0);
       expect(await ledger.partyReceivableNet('professional', partyId)).toBe(0);
     });
 
     it('handles a PARTIAL refund proportionally', async () => {
-      await recordPayment(200_000);
+      await seedPayment(200_000);
       await ledger.recordRefund({ orderId, refundId: uuidv7(), refundAmountToman: 50_000 });
 
       // 15% of 50,000 = 7,500 commission reversed; 42,500 receivable reversed.
@@ -283,7 +295,7 @@ describeIfPg('Financial integrity on real PostgreSQL', () => {
     });
 
     it('is idempotent on a replayed refund', async () => {
-      await recordPayment(200_000);
+      await seedPayment(200_000);
       const refundId = uuidv7();
       expect(await ledger.recordRefund({ orderId, refundId, refundAmountToman: 50_000 })).toBe(true);
       expect(await ledger.recordRefund({ orderId, refundId, refundAmountToman: 50_000 })).toBe(false);
@@ -296,33 +308,48 @@ describeIfPg('Financial integrity on real PostgreSQL', () => {
       ).toBe(false);
     });
 
-    it('refuses to record a negative payment', async () => {
+    it('refuses to record a negative refund', async () => {
+      await seedPayment(200_000);
       await expect(
-        ledger.recordPayment({
-          orderId: uuidv7(),
-          sourceId: null,
-          sellerPartyType: 'professional',
-          sellerPartyId: partyId,
-          netAmountToman: -1,
-          paymentReferenceId: uuidv7(),
-        }),
+        ledger.recordRefund({ orderId, refundId: uuidv7(), refundAmountToman: -1 }),
       ).rejects.toThrow(/must not be negative/);
     });
 
-    it('keeps commission + receivable summing exactly, across many awkward amounts', async () => {
-      for (const amount of [1, 3, 7, 33, 12_345, 199_999, 1_000_001]) {
-        const oid = uuidv7();
-        await ledger.recordPayment({
-          orderId: oid,
-          sourceId: null,
-          sellerPartyType: 'professional',
-          sellerPartyId: partyId,
-          netAmountToman: amount,
-          paymentReferenceId: uuidv7(),
-        });
-        const entries = await ledger.entriesForOrder(oid);
-        expect(entries.reduce((sum, e) => sum + e.amountToman, 0)).toBe(amount);
-      }
+    /**
+     * ADR-052 §3's own worked example, and the technical repair `#43a`
+     * exists to make true: the OLD (independent) reversal split 50 then 51
+     * of a 101-toman, 1500bp payment as 8+8=16 commission reversed against
+     * an original 15 -- leaving -1 commission and +1 receivable after a
+     * FULL refund. `LedgerService.recordRefund` now recomputes the target
+     * split from the REMAINING net amount on every call, so the same two
+     * partial refunds leave exactly 0 / 0.
+     */
+    it('101 refunded as 50 + 51 (1500bp) leaves commission 0 and receivable 0 -- the cumulative-reversal repair', async () => {
+      const split = await seedPayment(101);
+      expect(split.commissionToman).toBe(15);
+      expect(split.receivableToman).toBe(86);
+
+      await ledger.recordRefund({ orderId, refundId: uuidv7(), refundAmountToman: 50 });
+      await ledger.recordRefund({ orderId, refundId: uuidv7(), refundAmountToman: 51 });
+
+      const entries = await ledger.entriesForOrder(orderId);
+      const commissionTotal = entries.filter((e) => e.entryType === 'commission').reduce((sum, e) => sum + e.amountToman, 0);
+      const receivableTotal = entries.filter((e) => e.entryType === 'receivable').reduce((sum, e) => sum + e.amountToman, 0);
+      expect(commissionTotal).toBe(0);
+      expect(receivableTotal).toBe(0);
+      expect(await ledger.orderReceivableNet(orderId)).toBe(0);
+    });
+
+    it('a cumulative reversal is idempotent per refund id, even mid-sequence', async () => {
+      await seedPayment(101);
+      const firstRefundId = uuidv7();
+      expect(await ledger.recordRefund({ orderId, refundId: firstRefundId, refundAmountToman: 50 })).toBe(true);
+      expect(await ledger.recordRefund({ orderId, refundId: firstRefundId, refundAmountToman: 50 })).toBe(false);
+      await ledger.recordRefund({ orderId, refundId: uuidv7(), refundAmountToman: 51 });
+
+      const entries = await ledger.entriesForOrder(orderId);
+      expect(entries.filter((e) => e.referenceType === 'order_refund')).toHaveLength(4); // 2 refunds x 2 rows, the replay inserted nothing
+      expect(await ledger.orderReceivableNet(orderId)).toBe(0);
     });
   });
 
@@ -330,17 +357,17 @@ describeIfPg('Financial integrity on real PostgreSQL', () => {
   // Settlement
   // -------------------------------------------------------------------
 
-  describe('settlement', () => {
+  describe('settlement (LEGACY regime; the immediate route is refused for good -- ADR-052 §8, §16)', () => {
     const partyId = '01926a3e-3333-7000-8000-00000000eeee';
 
-    async function seedReceivable(amount: number): Promise<string> {
+    async function seedReceivable(amount: number, rateBp = 1500): Promise<string> {
       const orderId = uuidv7();
-      await ledger.recordPayment({
+      await seedLegacyPayment(financialDataSource, {
         orderId,
-        sourceId: null,
         sellerPartyType: 'professional',
         sellerPartyId: partyId,
         netAmountToman: amount,
+        rateBp,
         paymentReferenceId: uuidv7(),
       });
       return orderId;
@@ -356,60 +383,44 @@ describeIfPg('Financial integrity on real PostgreSQL', () => {
       expect(summary.outstandingToman).toBe(170_000);
     });
 
-    it('settles specific orders in full, at the system-computed amount', async () => {
-      const a = await seedReceivable(200_000);
-      const b = await seedReceivable(100_000);
+    /**
+     * `#43a` (ADR-052 §8; a story acceptance criterion). "Immediately, in
+     * full" is exactly the settlement the owner rejected (R4/R8) -- the
+     * route stays refused at the SERVICE level unconditionally, whatever the
+     * caller asks for: an empty selection, one order, several orders,
+     * another party's order. There is no longer a per-input outcome to
+     * distinguish, which is itself the proof that no caller can bypass it.
+     */
+    it('createSettlement refuses EVERY request with SETTLEMENT_REJECTED / settlement_schedule_unpublished', async () => {
+      const orderId = await seedReceivable(200_000);
 
-      const batch = await settlements.createSettlement({
+      for (const orderIds of [[], [orderId], [uuidv7()]]) {
+        await expect(
+          settlements.createSettlement({
+            partyType: 'professional',
+            partyId,
+            orderIds,
+            method: 'bank_transfer',
+            reference: 'TRX-1',
+            note: null,
+            actorId: uuidv7(),
+          }),
+        ).rejects.toMatchObject({ code: 'SETTLEMENT_REJECTED', details: { reason: 'settlement_schedule_unpublished' } });
+      }
+
+      // Refused means NOTHING is written -- not a batch with zero items.
+      const rows = await financialDataSource.query('SELECT count(*)::int AS n FROM financial.settlement_batches');
+      expect(rows[0].n).toBe(0);
+      expect(await settlements.outstandingForOrder(orderId)).toBe(170_000);
+    });
+
+    it('reverses an EXISTING (previously settled) batch non-destructively, leaving the original row intact', async () => {
+      const orderId = await seedReceivable(200_000);
+      const batch = await seedSettlementBatch(financialDataSource, {
         partyType: 'professional',
         partyId,
-        orderIds: [a, b],
-        method: 'bank_transfer',
-        reference: 'TRX-1',
-        note: null,
-        actorId: uuidv7(),
-      });
-
-      expect(batch.amountToman).toBe(170_000 + 85_000);
-      expect(await settlements.outstandingForOrder(a)).toBe(0);
-      expect((await settlements.partySummary('professional', partyId)).outstandingToman).toBe(0);
-    });
-
-    it('refuses to settle the same order twice', async () => {
-      const orderId = await seedReceivable(200_000);
-      const actorId = uuidv7();
-      await settlements.createSettlement({ partyType: 'professional', partyId, orderIds: [orderId], method: null, reference: null, note: null, actorId });
-
-      await expect(
-        settlements.createSettlement({ partyType: 'professional', partyId, orderIds: [orderId], method: null, reference: null, note: null, actorId }),
-      ).rejects.toThrow(/قابل تسویه نیست/);
-    });
-
-    it("refuses to settle another party's order", async () => {
-      const orderId = await seedReceivable(200_000);
-      await expect(
-        settlements.createSettlement({
-          partyType: 'professional',
-          partyId: uuidv7(), // a different party
-          orderIds: [orderId],
-          method: null,
-          reference: null,
-          note: null,
-          actorId: uuidv7(),
-        }),
-      ).rejects.toThrow(/قابل تسویه نیست/);
-    });
-
-    it('reverses a settlement non-destructively, leaving the original row intact', async () => {
-      const orderId = await seedReceivable(200_000);
-      const batch = await settlements.createSettlement({
-        partyType: 'professional',
-        partyId,
-        orderIds: [orderId],
-        method: null,
-        reference: null,
-        note: null,
-        actorId: uuidv7(),
+        items: [{ orderId, amountToman: 170_000 }],
+        createdBy: uuidv7(),
       });
 
       const reversal = await settlements.reverseSettlement(batch.id, uuidv7(), 'bank returned the transfer');
@@ -429,14 +440,30 @@ describeIfPg('Financial integrity on real PostgreSQL', () => {
 
     it('refuses to reverse the same settlement twice', async () => {
       const orderId = await seedReceivable(200_000);
-      const batch = await settlements.createSettlement({ partyType: 'professional', partyId, orderIds: [orderId], method: null, reference: null, note: null, actorId: uuidv7() });
+      const batch = await seedSettlementBatch(financialDataSource, {
+        partyType: 'professional',
+        partyId,
+        items: [{ orderId, amountToman: 170_000 }],
+        createdBy: uuidv7(),
+      });
       await settlements.reverseSettlement(batch.id, uuidv7(), 'first');
       await expect(settlements.reverseSettlement(batch.id, uuidv7(), 'second')).rejects.toThrow(/قبلاً برگشت خورده/);
     });
 
+    /**
+     * The pinned "outstanding goes negative" test -- kept for the LEGACY
+     * regime only (ADR-052 §16). The new regime proves non-negativity
+     * instead (`fund-journal.pg-spec.ts`'s `CHECK (balance_after >= 0)`
+     * proofs).
+     */
     it('lets outstanding go NEGATIVE after a refund lands post-settlement, rather than hiding it', async () => {
       const orderId = await seedReceivable(200_000);
-      await settlements.createSettlement({ partyType: 'professional', partyId, orderIds: [orderId], method: null, reference: null, note: null, actorId: uuidv7() });
+      await seedSettlementBatch(financialDataSource, {
+        partyType: 'professional',
+        partyId,
+        items: [{ orderId, amountToman: 170_000 }],
+        createdBy: uuidv7(),
+      });
       expect(await settlements.outstandingForOrder(orderId)).toBe(0);
 
       // The customer is refunded AFTER the professional was already paid out.
@@ -451,7 +478,12 @@ describeIfPg('Financial integrity on real PostgreSQL', () => {
     it('offers only genuinely-positive outstanding orders for settlement', async () => {
       const paid = await seedReceivable(200_000);
       const settled = await seedReceivable(100_000);
-      await settlements.createSettlement({ partyType: 'professional', partyId, orderIds: [settled], method: null, reference: null, note: null, actorId: uuidv7() });
+      await seedSettlementBatch(financialDataSource, {
+        partyType: 'professional',
+        partyId,
+        items: [{ orderId: settled, amountToman: 85_000 }],
+        createdBy: uuidv7(),
+      });
 
       const available = await settlements.outstandingOrdersForParty('professional', partyId);
       expect(available.map((o) => o.orderId)).toEqual([paid]);
@@ -478,14 +510,15 @@ describeIfPg('Financial integrity on real PostgreSQL', () => {
       professionalB = { ownerId: ownerB.id, professionalId: profB.id, token: ownerB.accessToken };
       customer = { id: cust.id, token: cust.accessToken };
 
-      // A distinguishable amount for each, so a leak is unmistakable.
-      await ledger.recordPayment({
-        orderId: uuidv7(), sourceId: null, sellerPartyType: 'professional',
-        sellerPartyId: profA.id, netAmountToman: 1_111_000, paymentReferenceId: uuidv7(),
+      // A distinguishable amount for each, so a leak is unmistakable. Legacy
+      // fixtures (ADR-052 §16) -- `LedgerService.recordPayment` is removed.
+      await seedLegacyPayment(financialDataSource, {
+        orderId: uuidv7(), sellerPartyType: 'professional',
+        sellerPartyId: profA.id, netAmountToman: 1_111_000, rateBp: 1500, paymentReferenceId: uuidv7(),
       });
-      await ledger.recordPayment({
-        orderId: uuidv7(), sourceId: null, sellerPartyType: 'professional',
-        sellerPartyId: profB.id, netAmountToman: 2_222_000, paymentReferenceId: uuidv7(),
+      await seedLegacyPayment(financialDataSource, {
+        orderId: uuidv7(), sellerPartyType: 'professional',
+        sellerPartyId: profB.id, netAmountToman: 2_222_000, rateBp: 1500, paymentReferenceId: uuidv7(),
       });
     });
 
@@ -526,9 +559,9 @@ describeIfPg('Financial integrity on real PostgreSQL', () => {
 
     it("filters another party's rows out of a per-order ledger read, even with a valid order id", async () => {
       const sharedOrderId = uuidv7();
-      await ledger.recordPayment({
-        orderId: sharedOrderId, sourceId: null, sellerPartyType: 'professional',
-        sellerPartyId: professionalB.professionalId, netAmountToman: 500_000, paymentReferenceId: uuidv7(),
+      await seedLegacyPayment(financialDataSource, {
+        orderId: sharedOrderId, sellerPartyType: 'professional',
+        sellerPartyId: professionalB.professionalId, netAmountToman: 500_000, rateBp: 1500, paymentReferenceId: uuidv7(),
       });
 
       // A knows the order id. They still see nothing: the rows are filtered
@@ -578,8 +611,8 @@ describeIfPg('Financial integrity on real PostgreSQL', () => {
   // End-to-end: money moving all the way through
   // -------------------------------------------------------------------
 
-  describe('end to end, from booking to ledger', () => {
-    it('records commission and receivable once a real payment is verified', async () => {
+  describe('end to end, from booking to ledger (NEW regime -- #43a)', () => {
+    it('posts a `collection` journal once a real payment is verified -- no commission, no receivable, no ledger_entries row at all', async () => {
       const owner = await seedUser(app, dataSource, '+989125550001', ['professional']);
       const customer = await seedUser(app, dataSource, '+989135550001');
       const professional = await seedProfessional(dataSource, owner.id, 'الهام', 300_000);
@@ -600,21 +633,30 @@ describeIfPg('Financial integrity on real PostgreSQL', () => {
       await sandbox.decide(provider_reference, 'success');
       await checkout.handleCallback('sandbox', provider_reference, { reference: provider_reference });
 
-      // The ledger is reached via the outbox, so drain it -- exactly what the
+      // The journal is reached via the outbox, so drain it -- exactly what the
       // periodic sweep does in production.
       await ctx.relay.drain();
 
-      const entries = await ledger.entriesForOrder(result.order.order.id);
-      expect(entries).toHaveLength(2);
-      expect(entries.find((e) => e.entryType === 'commission')?.amountToman).toBe(45_000);
-      expect(entries.find((e) => e.entryType === 'receivable')?.amountToman).toBe(255_000);
-      expect(entries.find((e) => e.entryType === 'receivable')?.partyId).toBe(professional.id);
+      const orderId = result.order.order.id;
 
+      // No LEGACY row exists at all -- `recordPayment` is removed.
+      expect(await ledger.entriesForOrder(orderId)).toEqual([]);
+
+      const states = await fundJournal.statesForOrder(orderId);
+      expect(states.pending).toBe(300_000);
+      expect(states.collected).toBe(300_000);
+      expect(states.platform_earned).toBeUndefined(); // no commission exists until #43b/#43c
+
+      // The LEGACY summary route reads only legacy + new-regime
+      // available/reserve/settled (ADR-052 §16) -- money sitting in `pending`
+      // is invisible there BY DESIGN; the additive `/funds` route is what
+      // shows it (`finance-workspace.service.spec.ts` and the funds route
+      // tests cover that surface).
       const summary = await myFinance.mySummary(owner.id);
-      expect(summary?.outstandingToman).toBe(255_000);
+      expect(summary?.outstandingToman).toBe(0);
     });
 
-    it('reverses the ledger when a paid booking is cancelled and refunded', async () => {
+    it('draws the refund from `pending` when a paid booking is cancelled and refunded, leaving pending/collected/refunded balanced at zero net', async () => {
       const owner = await seedUser(app, dataSource, '+989125550002', ['professional']);
       const customer = await seedUser(app, dataSource, '+989135550002');
       const professional = await seedProfessional(dataSource, owner.id, 'نگار', 300_000);
@@ -635,24 +677,27 @@ describeIfPg('Financial integrity on real PostgreSQL', () => {
       await checkout.handleCallback('sandbox', provider_reference, { reference: provider_reference });
       await ctx.relay.drain();
 
-      expect((await myFinance.mySummary(owner.id))?.outstandingToman).toBe(255_000);
+      const orderId = result.order.order.id;
+      expect((await fundJournal.statesForOrder(orderId)).pending).toBe(300_000);
 
-      // The customer cancels. Refund and ledger reversal follow through the
-      // event chain: BookingCancelled -> refund -> RefundCompleted ->
-      // OrderRefunded -> ledger reversal.
+      // The customer cancels. Refund follows through the event chain:
+      // BookingCancelled -> refund -> RefundCompleted -> OrderRefunded ->
+      // the regime router -> FundJournalService.recordRefund (this order has
+      // no legacy ledger row, so the router sends it here, never to
+      // `LedgerService`).
       const bookings = app.get(await import('@beauclick/booking').then((m) => m.BookingService));
       await bookings.cancel(result.bookingId, { type: 'customer', id: customer.id }, 'تغییر برنامه');
       for (let i = 0; i < 4; i++) await ctx.relay.drain();
 
-      const order = await orders.findById(result.order.order.id);
+      const order = await orders.findById(orderId);
       expect(order?.status).toBe('refunded');
       expect(order?.refundedTotalToman).toBe(300_000);
 
-      // Ledger reversed at the original rate; the professional is owed nothing.
-      expect((await myFinance.mySummary(owner.id))?.outstandingToman).toBe(0);
-      const entries = await ledger.entriesForOrder(result.order.order.id);
-      expect(entries).toHaveLength(4);
-      expect(entries.reduce((sum, e) => sum + e.amountToman, 0)).toBe(0);
+      expect(await ledger.entriesForOrder(orderId)).toEqual([]); // still no legacy row
+      const states = await fundJournal.statesForOrder(orderId);
+      expect(states.pending).toBe(0);
+      expect(states.refunded).toBe(300_000);
+      expect(states.collected).toBe(300_000); // a custody fact -- what was collected, never reduced by a refund
     });
   });
 });

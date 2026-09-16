@@ -331,6 +331,15 @@ const FACT_MAPPINGS: Record<string, FactMapping> = {
     metricOf: (p) => num(p.amountToman),
     dimensions: (p) => ({ partyType: str(p.partyType) }),
   },
+  // `#43a` (ADR-052 §13). Order-scoped, like `LedgerEntriesRecorded` above --
+  // the pending-funds journal replaces the legacy ledger's write path for
+  // every new collection, so its analytics fact keeps the same subject.
+  FundsJournalRecorded: {
+    subjectType: 'order',
+    subjectOf: (p) => str(p.orderId),
+    metricOf: (p) => num(p.amountToman),
+    dimensions: (p) => ({ kind: str(p.kind), sellerPartyType: str(p.sellerPartyType) }),
+  },
 
   // ---- privacy (V3.1 Phase E)
   //

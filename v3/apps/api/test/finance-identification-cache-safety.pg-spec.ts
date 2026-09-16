@@ -4,7 +4,6 @@ import request from 'supertest';
 import { uuidv7 } from 'uuidv7';
 
 import { StaffService } from '@beauclick/business';
-import { LedgerService } from '@beauclick/financial';
 import { assertNoLeak } from '@beauclick/testing';
 import {
   WORKSPACE_REFERENCE_DOMAIN,
@@ -23,6 +22,7 @@ import {
   resetDatabase,
   resetFinancial,
   seedBusiness,
+  seedLegacyPayment,
   seedMembership,
   seedProfessional,
   seedUser,
@@ -59,7 +59,6 @@ describePg('safe staff identification, finance workspace labels and cache safety
   let ctx: PgTestApp;
   let app: INestApplication;
   let dataSource: DataSource;
-  let ledger: LedgerService;
   let staff: StaffService;
   let secret: string;
 
@@ -70,7 +69,6 @@ describePg('safe staff identification, finance workspace labels and cache safety
     ctx = await createPgTestApp();
     app = ctx.app;
     dataSource = ctx.dataSource;
-    ledger = app.get(LedgerService);
     staff = app.get(StaffService);
     secret = app.get<string>(WORKSPACE_REFERENCE_SECRET);
   });
@@ -144,14 +142,15 @@ describePg('safe staff identification, finance workspace labels and cache safety
     return { user, professional, membershipId, name, hint: user.phone.slice(-4) };
   }
 
+  /** LEGACY fixture (ADR-052 §16) -- `LedgerService.recordPayment` is removed; this suite's finance-workspace reads are the legacy singular/plural surface either way. */
   async function earn(partyType: 'professional' | 'business', partyId: string, paid: number): Promise<string> {
     const orderId = uuidv7();
-    await ledger.recordPayment({
+    await seedLegacyPayment(ctx.financialDataSource, {
       orderId,
-      sourceId: null,
       sellerPartyType: partyType,
       sellerPartyId: partyId,
       netAmountToman: paid,
+      rateBp: 1500,
       paymentReferenceId: uuidv7(),
     });
     return orderId;
@@ -594,7 +593,7 @@ describePg('safe staff identification, finance workspace labels and cache safety
   // =======================================================================
 
   describe('§3 Cache-Control: private, no-store on every seller finance response', () => {
-    it('is on all nine routes for a successful read, on the collection, and on the four singular routes', async () => {
+    it('is on all ten routes for a successful read, on the collection, and on the four singular routes', async () => {
       const owner = await seedUser(app, dataSource, nextPhone(), ['customer', 'business']);
       const business = await seedBusiness(dataSource, owner.id, 'سالن نور');
       const orderId = await earn('business', business.id, 1_000_000);
@@ -606,12 +605,15 @@ describePg('safe staff identification, finance workspace labels and cache safety
         `/me/finance/${entry.workspaceRef}/outstanding-orders`,
         `/me/finance/${entry.workspaceRef}/settlements`,
         `/me/finance/${entry.workspaceRef}/orders/${orderId}/ledger`,
+        // `#43a` (ADR-052 §16): the ADDITIVE tenth route -- workspace-aware
+        // only, no singular sibling.
+        `/me/finance/${entry.workspaceRef}/funds`,
         '/me/finance/summary',
         '/me/finance/outstanding-orders',
         '/me/finance/settlements',
         `/me/finance/orders/${orderId}/ledger`,
       ];
-      expect(paths).toHaveLength(9);
+      expect(paths).toHaveLength(10);
       for (const path of paths) {
         const res = await get(path, owner).expect(200);
         expect(res.headers['cache-control']).toBe(NO_STORE);

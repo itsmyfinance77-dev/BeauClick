@@ -11,19 +11,15 @@ import {
   LedgerReferenceType,
 } from './entities/ledger-entry.entity';
 import { FinancialOutboxEntity } from './entities/financial-outbox.entity';
-import { FinancialConfig } from './financial.config';
 import { FINANCIAL_DATA_SOURCE } from './ports';
 
-export interface RecordPaymentInput {
-  orderId: string;
-  sourceId: string | null;
-  sellerPartyType: 'professional' | 'business';
-  sellerPartyId: string;
-  /** The real amount the customer paid -- already discounted. The figure platform and seller actually split. */
-  netAmountToman: number;
-  /** The payment intent id. Becomes the ledger reference, and therefore the idempotency key. */
-  paymentReferenceId: string;
-}
+/**
+ * What the rate was applied TO. `#43a` (ADR-052 §16) removed `FinancialConfig`
+ * and the whole in-code commission rate along with it; this literal is the
+ * one thing `recordRefund` still needs from that class, kept here because a
+ * legacy row's `basis` column must keep meaning what it always meant.
+ */
+const LEGACY_BASIS = 'net_customer_amount';
 
 export interface RecordRefundInput {
   orderId: string;
@@ -32,7 +28,12 @@ export interface RecordRefundInput {
 }
 
 /**
- * Sole owner of `financial.ledger_entries`.
+ * Sole owner of `financial.ledger_entries` -- the LEGACY regime only, from
+ * `#43a` onward (ADR-052 §16). Every order that collected before this deploy
+ * keeps its ledger rows for life, here; every order collected from this
+ * deploy on uses `FundJournalService` instead, and never writes a
+ * `ledger_entries` row at all -- `recordPayment` (and the in-code commission
+ * rate it read) is removed, not merely unused.
  *
  * Runs on its own `DataSource` -- a connection whose PostgreSQL role holds
  * INSERT + SELECT and nothing else on this schema. This class could not
@@ -42,98 +43,38 @@ export interface RecordRefundInput {
 export class LedgerService {
   private readonly auditLog = new AuditLogger('financial');
 
-  constructor(
-    @Inject(FINANCIAL_DATA_SOURCE) private readonly dataSource: DataSource,
-    private readonly config: FinancialConfig,
-  ) {}
+  constructor(@Inject(FINANCIAL_DATA_SOURCE) private readonly dataSource: DataSource) {}
 
-  /**
-   * Records the commission + receivable pair for a real, confirmed payment.
-   *
-   * **Idempotent by a real database constraint**, not by a preceding SELECT:
-   * `UNIQUE(entry_type, reference_type, reference_id)` with an
-   * ON CONFLICT DO NOTHING insert. V2's version of this constraint is the
-   * single strongest idempotency guarantee found anywhere in that codebase
-   * -- confirmed to have absorbed a real double-fire in production-
-   * equivalent testing -- and it is carried over verbatim in shape.
-   *
-   * The two amounts are produced by `splitExact`, so they always sum to
-   * exactly the net amount. Computing them as two independent roundings is
-   * how a ledger ends up a Toman short of the money that actually moved.
-   *
-   * @returns true if this call newly recorded the pair; false if it was
-   *          already recorded -- a normal idempotent no-op, never an error.
-   */
-  async recordPayment(input: RecordPaymentInput): Promise<boolean> {
-    assertNonNegativeAmount(input.netAmountToman, 'net payment amount');
-    if (input.netAmountToman === 0) return false;
-
-    const rateBp = this.config.commissionRateBp();
-    const { part: commissionToman, remainder: receivableToman } = splitExact(input.netAmountToman, rateBp);
-
-    return this.dataSource.transaction(async (manager) => {
-      const inserted = await this.insertEntries(manager, [
-        {
-          orderId: input.orderId,
-          sourceId: input.sourceId,
-          partyType: 'platform',
-          partyId: null,
-          entryType: 'commission',
-          amountToman: commissionToman,
-          commissionRateBp: rateBp,
-          referenceType: 'order_payment',
-          referenceId: input.paymentReferenceId,
-        },
-        {
-          orderId: input.orderId,
-          sourceId: input.sourceId,
-          partyType: input.sellerPartyType,
-          partyId: input.sellerPartyId,
-          entryType: 'receivable',
-          amountToman: receivableToman,
-          commissionRateBp: rateBp,
-          referenceType: 'order_payment',
-          referenceId: input.paymentReferenceId,
-        },
-      ]);
-
-      if (inserted === 0) return false;
-
-      await emitEvent(manager, FinancialOutboxEntity, {
-        aggregateType: 'ledger',
-        aggregateId: input.orderId,
-        eventType: 'LedgerEntriesRecorded',
-        payload: {
-          orderId: input.orderId,
-          referenceType: 'order_payment',
-          referenceId: input.paymentReferenceId,
-          commissionToman,
-          receivableToman,
-          commissionRateBp: rateBp,
-          sellerPartyType: input.sellerPartyType,
-          sellerPartyId: input.sellerPartyId,
-        },
-      });
-
-      this.auditLog.log({
-        action: 'ledger.payment_recorded',
-        orderId: input.orderId,
-        commissionToman,
-        receivableToman,
-        commissionRateBp: rateBp,
-      });
-      return true;
-    });
+  /** True iff this order's collection was ever recorded on the LEGACY ledger -- the regime router `financial-projection.handlers.ts` uses to send a refund here instead of to `FundJournalService` (ADR-052 §16: "the regime is fixed per order by where its collection fact lives"). */
+  async hasLegacyPayment(orderId: string): Promise<boolean> {
+    const count = await this.dataSource
+      .getRepository(LedgerEntryEntity)
+      .count({ where: { orderId, referenceType: 'order_payment', entryType: 'commission' } });
+    return count > 0;
   }
 
   /**
-   * Records the negative reversal pair for a refund.
+   * Records the reversal pair for a refund against a LEGACY order.
    *
    * **Reuses the ORIGINAL entry's captured commission rate, never the
-   * platform's current rate.** A refund therefore reverses exactly the
-   * proportion it originally recorded, immune to a rate change made in
-   * between. This is V2's single most important financial rule and it
+   * platform's current one** (which no longer exists in code at all --
+   * every legacy row's rate is frozen forever at the value it was written
+   * with). This is V2's single most important financial rule and it
    * transfers unchanged.
+   *
+   * **Cumulative, not independent, reversal (ADR-052 §3, §16; a `#43a`
+   * technical repair).** Each call used to split `-refundAmountToman`
+   * on its own, at the original rate -- which double-rounds: two partial
+   * refunds of an order collected at 1500bp (50 then 51 of 101) reversed 8+8
+   * = 16 of commission against an original 15, leaving −1 commission and +1
+   * receivable after a FULL refund (ADR-052 §3's own worked example). Instead,
+   * every call recomputes the commission/receivable split the order SHOULD
+   * carry after this refund, from the order's still-remaining net amount, and
+   * posts only the DELTA from what is already recorded. The final refund of a
+   * fully-refunded order therefore always leaves exactly 0 / 0, however many
+   * partial refunds preceded it, because the target is re-derived from the
+   * remaining amount every time rather than accumulated from independent
+   * roundings.
    *
    * Nothing here touches settlement. A refund landing after a settlement is
    * handled identically to one landing before: the receivable total simply
@@ -146,11 +87,11 @@ export class LedgerService {
     assertNonNegativeAmount(input.refundAmountToman, 'refund amount');
     if (input.refundAmountToman === 0) return false;
 
-    const originals = await this.dataSource.getRepository(LedgerEntryEntity).find({
-      where: { orderId: input.orderId, referenceType: 'order_payment' },
+    const rows = await this.dataSource.getRepository(LedgerEntryEntity).find({
+      where: { orderId: input.orderId },
     });
-    const originalCommission = originals.find((e) => e.entryType === 'commission');
-    const originalReceivable = originals.find((e) => e.entryType === 'receivable');
+    const originalCommission = rows.find((e) => e.referenceType === 'order_payment' && e.entryType === 'commission');
+    const originalReceivable = rows.find((e) => e.referenceType === 'order_payment' && e.entryType === 'receivable');
 
     if (!originalCommission || !originalReceivable) {
       // No payment was ever recorded for this order (a refund racing ahead of
@@ -161,7 +102,30 @@ export class LedgerService {
     }
 
     const rateBp = originalCommission.commissionRateBp;
-    const { part: commissionPart, remainder: receivablePart } = splitExact(-input.refundAmountToman, rateBp);
+    const originalNetToman = originalCommission.amountToman + originalReceivable.amountToman;
+
+    // Every prior reversal this order has already recorded (each negative,
+    // or zero on the first refund). Idempotency means a redelivered refundId
+    // is already among these rows by the time a second call could observe
+    // them, so a retried delivery recomputes the SAME target and the insert
+    // below is a real no-op via the unique constraint -- never a double
+    // reversal.
+    const priorCommissionReversed = rows
+      .filter((e) => e.referenceType === 'order_refund' && e.entryType === 'commission')
+      .reduce((sum, e) => sum + e.amountToman, 0);
+    const priorReceivableReversed = rows
+      .filter((e) => e.referenceType === 'order_refund' && e.entryType === 'receivable')
+      .reduce((sum, e) => sum + e.amountToman, 0);
+    const alreadyRefundedToman = -(priorCommissionReversed + priorReceivableReversed);
+
+    const remainingNetToman = originalNetToman - alreadyRefundedToman - input.refundAmountToman;
+    const target = splitExact(remainingNetToman, rateBp);
+
+    const currentCommissionRecorded = originalCommission.amountToman + priorCommissionReversed;
+    const currentReceivableRecorded = originalReceivable.amountToman + priorReceivableReversed;
+
+    const commissionPart = target.part - currentCommissionRecorded;
+    const receivablePart = target.remainder - currentReceivableRecorded;
 
     return this.dataSource.transaction(async (manager) => {
       const inserted = await this.insertEntries(manager, [
@@ -308,7 +272,7 @@ export class LedgerService {
    * guarantee anyway. Same discipline V2 settled on after a real double-fire.
    */
   private async insertEntries(manager: EntityManager, entries: NewLedgerEntry[]): Promise<number> {
-    const basis = this.config.basis();
+    const basis = LEGACY_BASIS;
     const COLUMNS_PER_ROW = 11;
 
     const values: unknown[] = [];

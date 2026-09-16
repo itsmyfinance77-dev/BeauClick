@@ -67,6 +67,7 @@ function serviceFor(
     outstandingOrdersForParty: jest.fn(),
     settlementPageForParty: jest.fn().mockResolvedValue([]),
   };
+  const fundJournal = { statesForParty: jest.fn().mockResolvedValue({}) };
   const owners = {
     ownedWorkspacesFor: jest.fn().mockResolvedValue(owned),
     addressableWorkspacesFor: jest.fn().mockResolvedValue(
@@ -93,11 +94,12 @@ function serviceFor(
   const service = new FinanceWorkspaceService(
     ledger as never,
     settlements as never,
+    fundJournal as never,
     owners as never,
     SECRET,
     labels as never,
   );
-  return { service, ledger, settlements, owners, labels };
+  return { service, ledger, settlements, fundJournal, owners, labels };
 }
 
 describe('owned workspaces', () => {
