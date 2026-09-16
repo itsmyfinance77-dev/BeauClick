@@ -1,13 +1,17 @@
 import { Global, Module } from '@nestjs/common';
 
-import { BOOKING_RESCHEDULE_OUTCOME_HOOK } from '@beauclick/booking';
+import { BOOKING_RESCHEDULE_OUTCOME_HOOK, BookingModule } from '@beauclick/booking';
 import { CommerceModule } from '@beauclick/commerce';
 import { PaymentModule } from '@beauclick/payment';
 
 import { BookingOutcomeOrchestrator } from '../outcome/booking-outcome.orchestrator';
+import { CustomerRemedyResolutionService } from '../outcome/customer-remedy-resolution.service';
+import { BookingRemedyController } from '../outcome/booking-remedy.controller';
 
 /**
  * The booking outcome composition — V3.3 Story #160 (`#42c`), ADR-051 §6.
+ * Extended by #161 (`#42d`), ADR-051 §7–§8, with the no-show governance
+ * method on the SAME hook and the customer-remedy route.
  *
  * ## Why a module of its own, and why `@Global()`
  *
@@ -19,16 +23,24 @@ import { BookingOutcomeOrchestrator } from '../outcome/booking-outcome.orchestra
  * depends on it or on Booking — and exposes the one token globally, so
  * `BookingModule` resolves it without importing anything.
  *
- * It binds exactly one booking token and exports the orchestrator for the
- * `BookingCancelled` consumer; it declares no controller, route or event.
+ * `BookingModule` joined the imports in #161, for `CustomerRemedyResolutionService`
+ * alone (it needs `BookingService` to perform the remedy's reschedule) --
+ * a one-way edge: `BookingModule` still imports nothing from here.
+ *
+ * It binds one booking token and exports the orchestrator for the
+ * `BookingCancelled` consumer, and declares the one route #161 adds
+ * (`POST bookings/:id/remedy`) -- the composition root's own controller,
+ * for the reason `CheckoutController` is: the route needs both domains.
  */
 @Global()
 @Module({
-  imports: [CommerceModule, PaymentModule],
+  imports: [CommerceModule, PaymentModule, BookingModule],
+  controllers: [BookingRemedyController],
   providers: [
     BookingOutcomeOrchestrator,
     { provide: BOOKING_RESCHEDULE_OUTCOME_HOOK, useExisting: BookingOutcomeOrchestrator },
+    CustomerRemedyResolutionService,
   ],
-  exports: [BookingOutcomeOrchestrator, BOOKING_RESCHEDULE_OUTCOME_HOOK],
+  exports: [BookingOutcomeOrchestrator, BOOKING_RESCHEDULE_OUTCOME_HOOK, CustomerRemedyResolutionService],
 })
 export class BookingOutcomeCompositionModule {}

@@ -6,6 +6,7 @@ import {
   BookingOutcomeDecisionRecord,
   BookingOutcomeDecisionService,
   BookingOutcomeExecutionStatus,
+  CustomerRemedyChoiceService,
   LockedBookingOrder,
   NewBookingOutcomeDecision,
   OrderDecisionTerms,
@@ -15,6 +16,7 @@ import {
 import { PaymentService, RefundStatus } from '@beauclick/payment';
 import {
   BookingCancellationFacts,
+  BookingNoShowGovernance,
   BookingRescheduleFacts,
   BookingRescheduleGovernance,
   BookingRescheduleOutcomeHook,
@@ -23,8 +25,12 @@ import { evaluateBookingOutcome } from '@beauclick/commercial-policy';
 import {
   BookingOutcomeEvaluationV1,
   bookingCancellationRefundKey,
+  bookingNoShowRefundKey,
   bookingOutcomeCauseForActor,
 } from '@beauclick/commercial-policy-contract';
+
+/** ISO-8601 UTC with microseconds — mirrors `booking.service.ts`'s own constant, so `event_instant` survives a `timestamptz` round trip exactly. */
+const ISO_MICROS = `'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'`;
 
 /**
  * The order statuses that mean BeauClick collected nothing — V3.3 #81
@@ -35,6 +41,9 @@ export const NEVER_COLLECTED_STATUSES: readonly OrderStatus[] = ['pending', 'onl
 
 /** The refund reason the cancellation path has always used. */
 export const BOOKING_CANCELLATION_REFUND_REASON = 'رزرو مرتبط لغو شد — بازگشت خودکار وجه.';
+
+/** V3.3 #161 (`#42d`). The refund reason a no-show window's un-retained remainder is issued under. */
+export const BOOKING_NO_SHOW_REFUND_REASON = 'ارزیابی عدم حضور رزرو مرتبط انجام شد — بازگشت خودکار مبلغ باقی‌مانده.';
 
 /** Reads the cancellation facts inside the deciding transaction, given the snapshot's cutoff. */
 export type CancellationFactsReader = (manager: EntityManager, cutoffHours: number | null) => Promise<BookingCancellationFacts | null>;
@@ -88,6 +97,8 @@ export class BookingOutcomeOrchestrator implements BookingRescheduleOutcomeHook 
     private readonly decisions: BookingOutcomeDecisionService,
     private readonly payments: PaymentService,
     private readonly orders: OrderService,
+    // V3.3 #161 (`#42d`), ADR-051 §8.
+    private readonly remedyChoices: CustomerRemedyChoiceService,
   ) {}
 
   // ---------------------------------------------------------------------
@@ -130,6 +141,19 @@ export class BookingOutcomeOrchestrator implements BookingRescheduleOutcomeHook 
         await this.orders.cancel(order.orderId, `booking_cancelled:${bookingId}`, m);
       }
 
+      /*
+       * V3.3 #161 (`#42d`), ADR-051 §8. A seller/platform/provider
+       * cancellation additionally offers the customer's remedy choice,
+       * already resolved to the ratified default (full refund) -- see
+       * `commerce.customer_remedy_choices`'s own migration for why there is
+       * no genuinely open state to model. Idempotent on `order_id`, so a
+       * redelivery that reaches the `live` early-return above never
+       * re-offers (the row already exists from the original decision).
+       */
+      if (decision.cause === 'seller' || decision.cause === 'platform' || decision.cause === 'provider') {
+        await this.remedyChoices.offerDefault(m, order.orderId, bookingId);
+      }
+
       this.auditLog.log({
         action: 'commerce.booking_outcome_decided',
         bookingId,
@@ -154,12 +178,53 @@ export class BookingOutcomeOrchestrator implements BookingRescheduleOutcomeHook 
    * as failed and is not re-executed here (re-driving a real refund is #47).
    */
   async executeCancellation(decision: BookingOutcomeDecisionRecord): Promise<void> {
+    /*
+     * V3.3 #161 (`#42d`), ADR-051 §8. A customer who already chose
+     * `reschedule` instead of the default refund must never also receive
+     * one. Read unlocked, on the orchestrator's own connection -- this
+     * method's refund call is itself outside any transaction, exactly like
+     * the payment gateway call and the execution-status CAS it wraps -- and
+     * checked immediately before issuing the refund. The remedy route's own
+     * eligibility check (only while this decision's `execution_status` is
+     * still `pending`/`manual_required`) is what bounds the race this leaves
+     * open, not a re-check here: once `recordExecution` below moves this row
+     * out of `pending`, the remedy route refuses a reschedule against it.
+     * Only `cancellation` decisions are ever offered a remedy (`decideCancellation`),
+     * so a no-show decision never reads this table at all.
+     */
+    if (decision.kind === 'cancellation') {
+      const resolution = await this.remedyChoices.resolution(this.dataSource.manager, decision.orderId);
+      if (resolution?.chosen === 'reschedule') {
+        this.auditLog.log({
+          action: 'commerce.booking_outcome_refund_skipped_for_remedy',
+          bookingId: decision.bookingId,
+          decisionId: decision.id,
+        });
+        return;
+      }
+    }
+
+    await this.executeDecision(decision, BOOKING_CANCELLATION_REFUND_REASON);
+  }
+
+  /**
+   * Executes any committed decision's refund: one call under its own key,
+   * only when it refunds something and is still `pending`, then one
+   * compare-and-swap recording how it ended — shared by `executeCancellation`
+   * and #161's `decideNoShowWindow`, which differ only in the Persian reason
+   * shown at the gateway and in whether a remedy choice can pre-empt it.
+   *
+   * A redelivery re-calls with the same key, and `PaymentService.refund`
+   * returns the refund that key already has — so a `failed` refund is reported
+   * as failed and is not re-executed here (re-driving a real refund is #47).
+   */
+  private async executeDecision(decision: BookingOutcomeDecisionRecord, reason: string): Promise<void> {
     if (decision.executionStatus !== 'pending' || decision.refundToman <= 0n || decision.refundRequestKey === null) return;
 
     const refund = await this.payments.refund({
       orderId: decision.orderId,
       amountToman: Number(decision.refundToman),
-      reason: BOOKING_CANCELLATION_REFUND_REASON,
+      reason,
       requestKey: decision.refundRequestKey,
       actorType: 'system',
       actorId: null,
@@ -353,6 +418,170 @@ export class BookingOutcomeOrchestrator implements BookingRescheduleOutcomeHook 
       terms: context.terms,
       legalCapState: context.terms.legalCapState,
     });
+  }
+
+  // ---------------------------------------------------------------------
+  // No-show -- booking-service's BookingRescheduleOutcomeHook, extended by
+  // V3.3 #161 (`#42d`), ADR-051 §7
+  // ---------------------------------------------------------------------
+
+  /**
+   * Whether, and under what snapshotted values, a booking's no-show guard is
+   * governed. No lock at all: a declaration moves no money, and the terms it
+   * reads are immutable (ADR-051's lock order for the declaration itself
+   * never touches the order row).
+   */
+  async governNoShow(manager: EntityManager, bookingId: string): Promise<BookingNoShowGovernance> {
+    const orderId = await this.decisions.orderIdForBooking(manager, bookingId);
+    if (!orderId) return { governed: false };
+    const terms = await this.decisions.termsFor(manager, orderId);
+    if (!terms) return { governed: false };
+    return { governed: true, graceMinutes: terms.noShowGraceMinutes, disputeWindowHours: terms.disputeWindowHours };
+  }
+
+  /**
+   * Evaluates ONE booking's no-show window if it is due, and executes its
+   * refund (if any) immediately afterward — there is no separate consumer
+   * step the way `BookingCancelled` gives cancellation, so the decision and
+   * its execution happen back to back here, exactly as #160's own handler
+   * calls `decideCancellation` then `executeCancellation` in sequence.
+   *
+   * Both the periodic sweep (`expireNoShowWindows`) and any future lazy
+   * caller call this SAME method -- there is no separate "lazy" code path to
+   * drift from the sweep's, only a different reason to have called it.
+   */
+  async decideNoShowWindow(bookingId: string): Promise<BookingOutcomeDecisionRecord | null> {
+    const decision = await this.decideNoShowWindowOnly(bookingId);
+    if (decision) await this.executeDecision(decision, BOOKING_NO_SHOW_REFUND_REASON);
+    return decision;
+  }
+
+  /**
+   * The decision half of `decideNoShowWindow`, in its own transaction: the
+   * declaration row `FOR UPDATE`, re-validated after the lock (not
+   * `window_open`, or not yet due -- both ordinary outcomes for an
+   * opportunistic caller, never an error), the order `FOR UPDATE`, the
+   * decision inserted through the SAME `uq_bod_one_live_per_kind` index
+   * every other decision kind converges on, and finally the declaration
+   * moved to `evaluated`. Two concurrent calls for the same booking converge
+   * on one decision: the second transaction's `FOR UPDATE` blocks until the
+   * first commits, then observes `evaluation_state = 'evaluated'` and
+   * returns the now-live decision without writing a second one.
+   */
+  private async decideNoShowWindowOnly(bookingId: string): Promise<BookingOutcomeDecisionRecord | null> {
+    return this.dataSource.transaction(async (m) => {
+      const declarations: Array<{ declared_at: string; evaluation_state: string; due: boolean }> = await m.query(
+        `SELECT to_char(declared_at AT TIME ZONE 'UTC', ${ISO_MICROS}) AS declared_at,
+                evaluation_state,
+                (objection_window_ends_at IS NOT NULL AND objection_window_ends_at <= now()) AS due
+           FROM booking.no_show_declarations
+          WHERE booking_id = $1
+            FOR UPDATE`,
+        [bookingId],
+      );
+      const declaration = declarations[0];
+      if (!declaration) return null;
+      if (declaration.evaluation_state === 'evaluated') {
+        // Converge: a concurrent sweep tick or lazy call already decided this
+        // window (whichever of the two transactions locked the declaration
+        // row second observes this, after the first committed) -- the SAME
+        // live decision, not nothing.
+        return this.decisions.liveDecision(m, bookingId, 'no_show');
+      }
+      if (declaration.evaluation_state !== 'window_open' || !declaration.due) return null;
+
+      const order = await this.decisions.lockOrderForBooking(m, bookingId);
+      if (!order) {
+        // Structurally unreachable (a governed declaration always has an
+        // order), fail closed rather than crash a sweep tick over it.
+        this.logger.warn(`No-show window due for booking ${bookingId} with no order; nothing decided.`);
+        return null;
+      }
+
+      const terms = await this.decisions.termsFor(m, order.orderId);
+      const requestKey = bookingNoShowRefundKey(bookingId);
+      const commitments = await this.payments.orderRefundCommitments(m, order.orderId, requestKey);
+      const committed = order.refundedTotalToman > commitments.otherCommittedToman ? order.refundedTotalToman : commitments.otherCommittedToman;
+      const collectedRemaining = order.collectedTotalToman > committed ? order.collectedTotalToman - committed : 0n;
+
+      const evaluation = evaluateBookingOutcome({
+        cause: 'no_show',
+        bookingWasConfirmed: true,
+        timely: null,
+        collectedRemainingToman: collectedRemaining,
+        terms,
+        legalCapState: terms?.legalCapState ?? 'absent',
+      });
+
+      const decision: NewBookingOutcomeDecision = {
+        bookingId,
+        orderId: order.orderId,
+        kind: 'no_show',
+        cause: 'no_show',
+        eventInstant: declaration.declared_at,
+        bookingWasConfirmed: true,
+        policyKey: terms?.policyKey ?? null,
+        policyVersion: terms?.policyVersion ?? null,
+        cutoffInstant: null,
+        timely: null,
+        collectedRemainingToman: collectedRemaining,
+        policyAmountToman: evaluation.policyAmountToman,
+        legalCapToman: evaluation.legalCapToman,
+        legalCapState: evaluation.legalCapState,
+        retainedToman: evaluation.retainedToman,
+        refundToman: evaluation.refundToman,
+        basis: evaluation.basis,
+        executionStatus: evaluation.refundToman > 0n ? 'pending' : 'executed',
+        refundRequestKey: requestKey,
+      };
+
+      const recorded = await this.decisions.recordDecision(m, decision);
+      await this.markNoShowEvaluated(m, bookingId);
+
+      this.auditLog.log({
+        action: 'commerce.booking_outcome_decided',
+        bookingId,
+        orderId: order.orderId,
+        decisionId: recorded.id,
+        decisionKind: recorded.kind,
+        cause: decision.cause,
+        basis: recorded.basis,
+        executionStatus: recorded.executionStatus,
+      });
+      return recorded;
+    });
+  }
+
+  private async markNoShowEvaluated(manager: EntityManager, bookingId: string): Promise<void> {
+    await manager.query(
+      `UPDATE booking.no_show_declarations SET evaluation_state = 'evaluated'
+        WHERE booking_id = $1 AND evaluation_state = 'window_open'`,
+      [bookingId],
+    );
+  }
+
+  /**
+   * The periodic backstop: due, still-open windows, oldest first, each
+   * decided in its own transaction so one failure cannot strand the rest of
+   * the batch -- the same shape `BookingService.expireStaleHolds` uses. A
+   * plain, unlocked scan; `decideNoShowWindow`'s own `FOR UPDATE` and its
+   * re-validation after the lock are what make a concurrent lazy evaluation
+   * of the same booking safe, not this scan's locking (there is none).
+   */
+  async expireNoShowWindows(limit = 100): Promise<number> {
+    const due: Array<{ booking_id: string }> = await this.dataSource.query(
+      `SELECT booking_id FROM booking.no_show_declarations
+        WHERE evaluation_state = 'window_open' AND objection_window_ends_at <= now()
+        ORDER BY objection_window_ends_at ASC
+        LIMIT $1`,
+      [limit],
+    );
+    let decided = 0;
+    for (const row of due) {
+      const outcome = await this.decideNoShowWindow(row.booking_id);
+      if (outcome) decided += 1;
+    }
+    return decided;
   }
 }
 

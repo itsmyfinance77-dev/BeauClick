@@ -110,6 +110,25 @@ export const NOTIFICATION_RULES: NotificationRule[] = [
     },
   },
   {
+    // V3.3 #161 (`#42d`), ADR-051 §7. The customer's objection window opened
+    // by a professional's no-show declaration.
+    eventType: 'BookingNoShowDeclared',
+    templateKey: 'booking_no_show_declared',
+    channels: ['in_app'],
+    entityType: 'booking',
+    build: async (p, enricher) => {
+      const details = await enricher.bookingDetails(str(p.bookingId), str(p.professionalId));
+      return {
+        userId: str(p.customerId),
+        entityId: str(p.bookingId),
+        vars: {
+          professionalName: details.professionalName,
+          date: formatFullJalaliDate(details.startAt ?? new Date(str(p.declaredAt))),
+        },
+      };
+    },
+  },
+  {
     eventType: 'BookingRescheduled',
     templateKey: 'booking_rescheduled',
     channels: ['in_app'],

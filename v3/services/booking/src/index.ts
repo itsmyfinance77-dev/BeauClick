@@ -7,6 +7,7 @@ export * from './entities/booking.entity';
 export * from './entities/booking-history.entity';
 export * from './entities/booking-idempotency-key.entity';
 export * from './entities/booking-outbox.entity';
+export * from './entities/no-show-declaration.entity';
 export * from './availability/availability.service';
 export * from './availability/platform-time';
 export * from './booking/booking.service';

@@ -73,9 +73,26 @@ export function bookingCancellationRefundKey(bookingId: string): string {
   return `booking-cancelled:${bookingId}`;
 }
 
-/** The two terms the evaluator reads; everything else on the snapshot is another story's. */
+/**
+ * The request key a no-show's refund (the collected amount not retained) is
+ * issued under — V3.3 #161 (`#42d`), ADR-051 §7. Distinct from the
+ * cancellation key by construction: a booking can be in at most one of
+ * `cancelled`/`no_show`, so the two keys are never both live for one
+ * booking, but keeping them textually distinct means a log or a payment
+ * gateway record never has to disambiguate which outcome a refund belongs to.
+ */
+export function bookingNoShowRefundKey(bookingId: string): string {
+  return `booking-no-show:${bookingId}`;
+}
+
+/**
+ * The terms the evaluator reads; everything else on the snapshot is another
+ * story's. `noShowRetention` was added by #161 — the seller's separate
+ * selection for a no-show, read only when `cause === 'no_show'`.
+ */
 export interface BookingOutcomeEvaluationTermsV1 {
   readonly lateCancellationRetention: BookingOutcomeRetentionRule;
+  readonly noShowRetention: BookingOutcomeRetentionRule;
   readonly legalCap: BookingOutcomeRetentionRule | null;
 }
 

@@ -63,6 +63,12 @@ export class BookingSubjectDataContract implements SubjectDataContract {
     // person, and `resource_id` is an opaque `business` id -- so the
     // disposition is pinned by an explicit test, exactly as `#131`'s is.
     { table: 'booking.booking_resource_assignments', disposition: 'subject_data' },
+    // V3.3 #161 (`#42d`), ADR-051 §10. `subject_data` for BOTH parties: a
+    // statement the professional authored about the customer's booking.
+    // Export to the customer returns instant and statement; to the
+    // professional, their own row. Erasure of either party anonymises the
+    // statement and keeps the instant and money consequence.
+    { table: 'booking.no_show_declarations', disposition: 'subject_data' },
   ];
 
   async exportSubjectData(manager: EntityManager, userId: string): Promise<SubjectExportSection[]> {
@@ -99,6 +105,28 @@ export class BookingSubjectDataContract implements SubjectDataContract {
       [userId],
     );
 
+    // V3.3 #161 (`#42d`), ADR-051 §10. Both directions of the same table: the
+    // subject's OWN bookings that were declared no-show (they were the
+    // customer), and the declarations the subject themselves authored as the
+    // professional. `declared_by_user_id` is exported only in the second
+    // case, where it names the subject's own row -- never the other party's
+    // id in the first.
+    const noShowDeclarations = await manager.query(
+      `SELECT d.booking_id, d.declared_at, d.statement, d.objection_window_ends_at, d.evaluation_state
+         FROM booking.no_show_declarations d
+         JOIN booking.bookings b ON b.id = d.booking_id
+        WHERE b.customer_id = $1
+        ORDER BY d.declared_at DESC`,
+      [userId],
+    );
+    const ownDeclarations = await manager.query(
+      `SELECT booking_id, declared_at, statement, objection_window_ends_at, evaluation_state
+         FROM booking.no_show_declarations
+        WHERE declared_by_user_id = $1
+        ORDER BY declared_at DESC`,
+      [userId],
+    );
+
     return [
       {
         key: 'bookings',
@@ -126,6 +154,16 @@ export class BookingSubjectDataContract implements SubjectDataContract {
         key: 'booking_resource_assignments',
         description: 'وضعیت تخصیص منبع برای رزروهایتان',
         rows: resourceAssignments as Array<Record<string, unknown>>,
+      },
+      {
+        key: 'no_show_declarations',
+        description: 'اعلام عدم حضور ثبت‌شده روی رزروهایتان',
+        rows: noShowDeclarations as Array<Record<string, unknown>>,
+      },
+      {
+        key: 'no_show_declarations_authored',
+        description: 'اعلام‌های عدم حضوری که خودتان ثبت کرده‌اید',
+        rows: ownDeclarations as Array<Record<string, unknown>>,
       },
     ];
   }
@@ -159,6 +197,22 @@ export class BookingSubjectDataContract implements SubjectDataContract {
     const keys = await manager.query('DELETE FROM booking.idempotency_keys WHERE owner_id = $1', [userId]);
     deleted += rowCount(keys);
 
+    // V3.3 #161 (`#42d`), ADR-051 §10. Either party's erasure anonymises the
+    // statement -- as the customer the declaration was about, or as the
+    // professional who authored it -- and keeps the instant and the money
+    // consequence it later produces. `statement` is deliberately excluded
+    // from the table's forward-only trigger for exactly this UPDATE.
+    const declarations = await manager.query(
+      `UPDATE booking.no_show_declarations d
+          SET statement = '[REDACTED]'
+         FROM booking.bookings b
+        WHERE d.booking_id = b.id
+          AND (b.customer_id = $1 OR d.declared_by_user_id = $1)
+          AND d.statement <> '[REDACTED]'`,
+      [userId],
+    );
+    anonymized += rowCount(declarations);
+
     return {
       moduleKey: this.moduleKey,
       anonymized,
@@ -173,6 +227,11 @@ export class BookingSubjectDataContract implements SubjectDataContract {
           table: 'booking.booking_resource_assignments',
           reason:
             "which resource served an appointment is the other party's operational record, not the subject's free text; there is nothing here to anonymize, and destroying it would corrupt that record for no privacy gain",
+        },
+        {
+          table: 'booking.no_show_declarations',
+          reason:
+            'the instant and the money consequence a declaration later produces are the other party\'s operational and financial record; the statement, the only free text, is anonymised above rather than the row being removed',
         },
       ],
     };

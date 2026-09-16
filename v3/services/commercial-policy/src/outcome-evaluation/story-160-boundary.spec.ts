@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 
 /**
  * Story #160 (`#42c`) stays inside its outcome — proved structurally against
- * the real files. It contains none of #161, #162, #43, #47 or #99; it writes
+ * the real files. It contains none of #162, #43, #47 or #99; it writes
  * no ledger row and emits no event; Commerce imports no other domain; the
  * evaluator is pure; the migration seeds and alters nothing; no audit or log
  * line carries an amount, a cap or evidence; and the superseded v1 contract is
@@ -11,6 +11,17 @@ import { resolve } from 'node:path';
  *
  * Mirrors `story-159-boundary.spec.ts`: a detector, planted positives and
  * controls, so an empty finding list means something.
+ *
+ * ## The #161 entry, retired 2026-09-21
+ *
+ * `LATER_STORY_CONSTRUCTS` originally forbade `no_show_declarations` /
+ * `customer_remedy_choices` vocabulary in these same six files, exactly
+ * because ADR-051 §7/§8 name `#161` (`#42d`) as the story that extends this
+ * evaluator, this decision service and this orchestrator to build them. Now
+ * that #161 is that story, the entry is removed rather than dodged by
+ * contorted naming — the remaining entries (#162, #43, #47, #99, the
+ * superseded v1 contract, no new outbox event, no route/capability) are
+ * still #161's own boundaries and are unchanged.
  */
 
 const WORKSPACE_ROOT = resolve(__dirname, '../../../..');
@@ -26,7 +37,6 @@ const MIGRATION = 'database/migrations/commerce/20260920100001_create_booking_ou
 const CREATED_FILES = [EVALUATOR, EVIDENCE_STATE, CONTRACT, DECISION_SERVICE, ORCHESTRATOR, COMPOSITION];
 
 export const LATER_STORY_CONSTRUCTS: ReadonlyArray<{ pattern: RegExp; owner: string }> = [
-  { pattern: /no_show_declarations|NoShowDeclar|markNoShow|customer_remedy_choices|RemedyChoice|remedy_choice/, owner: '#161 (`#42d`) — no-show and remedy' },
   { pattern: /dispute\.cases|DisputeCase|bc_review_disputes|case_statements|appealCase|held_toman/, owner: '#162 (`#42e`) — the dispute case model' },
   { pattern: /commissionRate|commission_rate|settlement|pendingFunds|revenueRecogni|LedgerService|recordPayment\(|financial\./i, owner: '#43 — commission, ledger and settlement' },
   { pattern: /PaymentProvider\b|zarinpal|supportsAutomaticRefund/i, owner: '#47 — the production rail' },
@@ -74,7 +84,7 @@ describe('Story #160 (`#42c`) stays inside its outcome', () => {
     expect(read(MIGRATION)).toContain('uq_bod_one_live_per_kind');
   });
 
-  it('contains nothing owned by #161, #162, #43, #47 or #99, no event, route or capability, and no v1 contract', () => {
+  it('contains nothing owned by #162, #43, #47 or #99, no new outbox event, no route or capability, and no v1 contract', () => {
     expect(created.flatMap(({ file, source }) => findConstructs(file, source))).toEqual([]);
   });
 
@@ -139,7 +149,6 @@ describe('Story #160 (`#42c`) stays inside its outcome', () => {
 
   describe('the detectors are not vacuous', () => {
     it.each([
-      ['a no-show declaration', "await m.insert('no_show_declarations', {});"],
       ['a dispute', 'class DisputeCase {}'],
       ['a ledger write', 'await this.ledger.recordPayment({});'],
       ['a provider', 'const p: PaymentProvider = x;'],
@@ -162,7 +171,7 @@ describe('Story #160 (`#42c`) stays inside its outcome', () => {
 
     it('does NOT fire on the same words inside a comment', () => {
       const documented = `
-        // #161 owns no_show_declarations; #43 owns settlement.
+        // #162 owns dispute.cases; #43 owns settlement.
         /* emitEvent is deliberately absent. */
         const ok = 1;
       `;

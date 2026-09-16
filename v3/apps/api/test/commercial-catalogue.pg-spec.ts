@@ -1259,6 +1259,9 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
         // V3.3 Story #159 (`#42b`). The seller's outcome selection (ADR-051 §3).
         // Seeds nothing. Its commerce companion is not matched by this query.
         'commercial/20260919100001_create_seller_outcome_policy_assignments.sql',
+        // V3.3 #161 (`#42d`), ADR-051 §8. Additive column on the numeric
+        // family: remedy_choice_window_hours. Seeds nothing.
+        'commercial/20260921100004_add_remedy_choice_window_to_outcome_policy.sql',
         'identity/20260902800002_add_commercial_plan_capability.sql',
       ]);
     });

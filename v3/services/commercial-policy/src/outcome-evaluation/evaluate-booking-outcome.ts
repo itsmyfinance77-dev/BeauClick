@@ -7,7 +7,8 @@ import {
 
 /**
  * THE booking outcome evaluator — V3.3 Story #160 (`#42c`), ADR-051 §6,
- * `V33-DEC-039` R1, R2, R4, R5.
+ * `V33-DEC-039` R1, R2, R4, R5. Extended by #161 (`#42d`), ADR-051 §7, for
+ * `cause === 'no_show'`.
  *
  * Pure: no clock, no I/O, no configuration, no default. Every input is a fact
  * the caller read inside the deciding transaction — the timeliness comparison
@@ -18,11 +19,19 @@ import {
  *
  *  1. no terms row                  → `legacy_unenrolled`, retain 0 (today's full refund)
  *  2. terms the contract rejects    → `invalid_terms`, retain 0 (defence in depth)
- *  3. cause is not the customer     → `non_customer_cause`, retain 0 (R7)
- *  4. the booking was never confirmed → `not_confirmed`, retain 0 (R1: only after a valid event)
- *  5. timely (the boundary included) → `timely`, retain 0 (R2, R4)
- *  6. Legal cap absent / retired    → `cap_absent` / `cap_retired`, retain 0 (R5, ADR-051 §5)
- *  7. otherwise                     → `cap_applied`, retain `min(policy, cap, collectedRemaining)`
+ *  3. `cause === 'no_show'`         → §7's own branch (below), never R7's non-customer rule
+ *  4. cause is not the customer     → `non_customer_cause`, retain 0 (R7)
+ *  5. the booking was never confirmed → `not_confirmed`, retain 0 (R1: only after a valid event)
+ *  6. timely (the boundary included) → `timely`, retain 0 (R2, R4)
+ *  7. Legal cap absent / retired    → `cap_absent` / `cap_retired`, retain 0 (R5, ADR-051 §5)
+ *  8. otherwise                     → `cap_applied`, retain `min(policy, cap, collectedRemaining)`
+ *
+ * A no-show reads `terms.noShowRetention` instead of `terms.lateCancellationRetention`
+ * and carries no cutoff/timeliness concept at all (`timely` and `cutoffInstant`
+ * are always `null` for this decision kind, ADR-051 §7): the window that gates
+ * evaluation is the declaration's objection window, not a cutoff, and a
+ * no-show is reachable only from `confirmed` (R6), so `bookingWasConfirmed` is
+ * checked for defence in depth rather than because it can genuinely be false.
  *
  * An absent cap is never "capped at the policy amount": it short-circuits to
  * zero, which is the one reading that cannot activate retention without
@@ -59,8 +68,10 @@ export function evaluateBookingOutcome(input: BookingOutcomeEvaluationInputV1): 
     return zero('legacy_unenrolled', 0n, null, 'absent');
   }
 
-  const policyAmount = retentionAmount(input.terms.lateCancellationRetention, collected);
-  if (policyAmount === null || input.timely === null) {
+  const isNoShow = input.cause === 'no_show';
+  const retentionRule = isNoShow ? input.terms.noShowRetention : input.terms.lateCancellationRetention;
+  const policyAmount = retentionAmount(retentionRule, collected);
+  if (policyAmount === null || (!isNoShow && input.timely === null)) {
     return zero('invalid_terms', 0n, null, 'absent');
   }
 
@@ -72,9 +83,9 @@ export function evaluateBookingOutcome(input: BookingOutcomeEvaluationInputV1): 
     if (capAmount === null) capState = 'absent';
   }
 
-  if (input.cause !== 'customer') return zero('non_customer_cause', policyAmount, capAmount, capState);
+  if (!isNoShow && input.cause !== 'customer') return zero('non_customer_cause', policyAmount, capAmount, capState);
   if (!input.bookingWasConfirmed) return zero('not_confirmed', policyAmount, capAmount, capState);
-  if (input.timely) return zero('timely', policyAmount, capAmount, capState);
+  if (!isNoShow && input.timely) return zero('timely', policyAmount, capAmount, capState);
   if (capState === 'retired') return zero('cap_retired', policyAmount, null, 'retired');
   if (capState === 'absent' || capAmount === null) return zero('cap_absent', policyAmount, null, 'absent');
 

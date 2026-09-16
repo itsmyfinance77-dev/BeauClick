@@ -89,6 +89,19 @@ export class CommerceSubjectDataContract implements SubjectDataContract {
         'The closed decision about what happened to the money collected for a retained order when its booking was cancelled or rescheduled. A financial fact that must survive erasure; it holds no identifying content of its own.',
     },
     {
+      /*
+       * V3.3 #161 (`#42d`), ADR-051 §10. `retained`, same reasoning as
+       * `commerce.booking_outcome_decisions` above: the customer's remedy
+       * resolution is a financial fact that must survive erasure. Exported to
+       * the customer as their own choice and instants, never the reviewer or
+       * seller id (there is none on this table).
+       */
+      table: 'commerce.customer_remedy_choices',
+      disposition: 'retained',
+      reason:
+        'The customer\'s remedy after a seller/platform/provider cancellation and its resolution. A financial fact that must survive erasure; it holds no identifying content of its own.',
+    },
+    {
       table: 'commerce.outbox_events',
       disposition: 'retained',
       reason: 'Transactional outbox.',
@@ -159,6 +172,17 @@ export class CommerceSubjectDataContract implements SubjectDataContract {
           [orderIds],
         )
       : [];
+    // V3.3 #161 (`#42d`). The subject's own remedy resolution: what was
+    // offered, what they chose (if anything) and when. Never the fact that
+    // it was a `professional`/`platform`/`provider` cancellation -- the
+    // linked decision above already carries the cancellation's own facts.
+    const remedyChoices = orderIds.length
+      ? await manager.query(
+          `SELECT order_id, offered_at, options, chosen, chosen_at, resolved_by, resolved_at
+             FROM commerce.customer_remedy_choices WHERE order_id = ANY($1::uuid[]) ORDER BY order_id`,
+          [orderIds],
+        )
+      : [];
 
     return [
       {
@@ -212,6 +236,11 @@ export class CommerceSubjectDataContract implements SubjectDataContract {
         description: 'تصمیم‌های مالی لغو و تغییر زمان رزروهای شما',
         rows: outcomeDecisions as Array<Record<string, unknown>>,
       },
+      {
+        key: 'customer_remedy_choices',
+        description: 'گزینه‌ی جبران انتخابی شما پس از لغو رزرو',
+        rows: remedyChoices as Array<Record<string, unknown>>,
+      },
     ];
   }
 
@@ -239,6 +268,10 @@ export class CommerceSubjectDataContract implements SubjectDataContract {
         {
           table: 'commerce.booking_outcome_decisions',
           reason: 'financial decisions about a retained order; permanent and carrying no identifying content of their own',
+        },
+        {
+          table: 'commerce.customer_remedy_choices',
+          reason: 'the customer\'s remedy resolution for a retained order; permanent and carrying no identifying content of its own',
         },
       ],
     };
