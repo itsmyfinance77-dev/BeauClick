@@ -105,3 +105,17 @@ export class SlotNotReleasableException extends DomainException {
     );
   }
 }
+
+/**
+ * V3.3 #161 (`#42d`), ADR-051 §7. A no-show declaration for a booking whose
+ * order carries accepted outcome terms needs a statement -- the DTO cannot
+ * refuse this itself (`MarkNoShowDto.statement` is optional so the SAME
+ * route keeps accepting no body at all for a booking with no terms), so
+ * `BookingService` refuses it here, the moment it has read enough to know
+ * the booking is governed and the caller sent nothing usable.
+ */
+export class NoShowStatementRequiredException extends DomainException {
+  constructor() {
+    super('NO_SHOW_STATEMENT_REQUIRED', 'برای ثبت عدم حضور، یک یادداشت کوتاه لازم است.', HttpStatus.BAD_REQUEST);
+  }
+}

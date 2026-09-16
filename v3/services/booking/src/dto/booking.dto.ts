@@ -60,9 +60,18 @@ export class RescheduleBookingDto {
  * silently stripping it. The length bound mirrors
  * `ck_nsd_statement_length` exactly, so a request the DTO accepts is a
  * request the database accepts.
+ *
+ * Optional here, not required: a booking with no outcome terms keeps the
+ * pre-#161 route byte-for-byte (no declaration is ever written for it, so it
+ * has no statement to validate) and the pre-existing suite calls this route
+ * with no body at all for exactly that booking shape. `BookingService`
+ * itself refuses a GOVERNED declaration with nothing usable in `statement`
+ * once it knows the booking is governed -- a database read `MarkNoShowDto`
+ * cannot perform.
  */
 export class MarkNoShowDto {
+  @IsOptional()
   @IsString()
   @Length(1, 2000)
-  statement!: string;
+  statement?: string;
 }

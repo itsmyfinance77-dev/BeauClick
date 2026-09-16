@@ -145,7 +145,7 @@ export class BookingController {
   @ResolveOwner(BookingProfessionalResolver)
   @Post('bookings/:id/no-show')
   async noShow(@Param('id') id: string, @Body() dto: MarkNoShowDto, @CurrentUser() user: AuthenticatedUser) {
-    await this.bookings.markNoShow(id, { type: 'professional', id: user.userId }, dto.statement);
+    await this.bookings.markNoShow(id, { type: 'professional', id: user.userId }, dto.statement ?? null);
     const booking = await this.bookings.findById(id);
     if (!booking) throw new NotFoundOrNotYoursException();
     return toBookingShape(booking);

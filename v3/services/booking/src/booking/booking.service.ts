@@ -31,6 +31,7 @@ import { BookingResourceAssignmentEntity } from '../entities/booking-resource-as
 import { BookingConfig } from '../booking.config';
 import {
   InvalidBookingTransitionException,
+  NoShowStatementRequiredException,
   RescheduleConsequenceRequiredException,
   RescheduleNotAllowedException,
   SlotUnavailableException,
@@ -583,10 +584,19 @@ export class BookingService {
         throw new InvalidBookingTransitionException(row.status, 'no_show');
       }
 
+      // `MarkNoShowDto.statement` is optional at the DTO boundary (a booking
+      // with no outcome terms keeps the pre-#161 route byte-for-byte, no
+      // body required) -- so a GOVERNED declaration with nothing usable is
+      // refused here, before anything is written, rather than by the
+      // database's own `ck_nsd_statement_length` a moment later.
+      const trimmedStatement = (statement ?? '').trim();
+      if (!trimmedStatement) {
+        throw new NoShowStatementRequiredException();
+      }
+
       const moved = await this.transition(m, bookingId, 'no_show', ['confirmed'], actor, null, {});
       if (!moved) return false;
 
-      const trimmedStatement = (statement ?? '').trim();
       const declarationId = uuidv7();
       const inserted: Array<{ declared_at: Date; objection_window_ends_at: Date }> = await m.query(
         `INSERT INTO booking.no_show_declarations
