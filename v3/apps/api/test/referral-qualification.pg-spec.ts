@@ -142,8 +142,13 @@ describePg('referral qualification — CAS, two sides, cap, ledger (real Postgre
     options: { attributedAt?: Date; expiresAt?: Date } = {},
   ): Promise<string> {
     const id = uuidv7();
-    const attributedAt = options.attributedAt ?? new Date(Date.now() - DAY_MS);
-    const expiresAt = options.expiresAt ?? new Date(Date.now() + 89 * DAY_MS);
+    // `ctx.referralClock.now()`, not `Date.now()`: a test that freezes the
+    // clock to a fixed qualification instant needs attribution to land
+    // relative to THAT instant, never to real wall-clock time -- which drifts
+    // past any fixed calendar literal as the suite ages and trips
+    // `ck_referrals_qualified_after_attribution`.
+    const attributedAt = options.attributedAt ?? new Date(ctx.referralClock.now().getTime() - DAY_MS);
+    const expiresAt = options.expiresAt ?? new Date(ctx.referralClock.now().getTime() + 89 * DAY_MS);
     await dataSource.query(
       `INSERT INTO referral.referrals
          (id, referrer_user_id, referee_user_id, referral_code_id, attributed_at, expires_at)
@@ -251,9 +256,9 @@ describePg('referral qualification — CAS, two sides, cap, ledger (real Postgre
     it('increments the referrer cap counter in the JALALI month', async () => {
       const referrer = await customer();
       const referee = await customer();
+      ctx.referralClock.freeze(new Date('2026-09-15T10:00:00.000Z'));
       await pendingReferral(referrer, referee);
 
-      ctx.referralClock.freeze(new Date('2026-09-15T10:00:00.000Z'));
       await qualifyFor(referee);
 
       expect(await counters(referrer.id)).toEqual([{ period: '1405-06', qualified_count: 1 }]);
@@ -262,10 +267,10 @@ describePg('referral qualification — CAS, two sides, cap, ledger (real Postgre
     it('emits exactly one ReferralQualified v1, with a truthful payload', async () => {
       const referrer = await customer();
       const referee = await customer();
+      ctx.referralClock.freeze(new Date('2026-09-15T10:00:00.000Z'));
       const referralId = await pendingReferral(referrer, referee);
       const bookingId = uuidv7();
 
-      ctx.referralClock.freeze(new Date('2026-09-15T10:00:00.000Z'));
       await qualifyFor(referee, bookingId);
 
       const events = await outboxEvents();
@@ -810,8 +815,8 @@ describePg('referral qualification — CAS, two sides, cap, ledger (real Postgre
     it('duplicate delivery does not increment the cap twice', async () => {
       const referrer = await customer();
       const referee = await customer();
-      await pendingReferral(referrer, referee);
       ctx.referralClock.freeze(new Date('2026-09-15T10:00:00.000Z'));
+      await pendingReferral(referrer, referee);
 
       await qualifyFor(referee);
       await qualifyFor(referee);
@@ -984,8 +989,8 @@ describePg('referral qualification — CAS, two sides, cap, ledger (real Postgre
     it('DELETES the cap counters on erasure and reports a truthful count', async () => {
       const referrer = await customer();
       const referee = await customer();
-      await pendingReferral(referrer, referee);
       ctx.referralClock.freeze(new Date('2026-09-15T10:00:00.000Z'));
+      await pendingReferral(referrer, referee);
       await qualifyFor(referee);
 
       expect(await counters(referrer.id)).toHaveLength(1);
