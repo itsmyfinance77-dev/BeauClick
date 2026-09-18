@@ -1411,3 +1411,83 @@ active **0**, review **0**, blocked **23**.
   force majeure, business-owner/delegated-calendar authority, the money semantics of a non-zero
   reschedule consequence, and #43's remaining release/settlement children (#43b–#43h).
 - No provider, payment rail, tag or Release was introduced or changed.
+
+## V3.3 Story #185 delivered, 2026-09-19
+
+The additive seller funds read — `GET /api/v1/me/finance/:workspaceRef/funds` — is complete. The
+story was split out of `#43a` on 2026-09-16 by that story's own acceptance criterion, when its
+preflight returned "does not fit within 13 points".
+
+**#185, 3 Story Points (re-estimated from 5 before work started).**
+
+**What the preflight found.** A read-only preflight against `acc6e90`, recorded on the issue before
+any code was written, established that `#43a` (#187) had already shipped more of this story than
+its own text claimed: the route (`financial.controller.ts:237`), `FinanceWorkspaceService.fundsFor`,
+the distinct-field projection (`V33-DEC-040` R3 — no field sums seller and platform money), and all
+four route-count pin sites (9 → 10). What `#43a` did **not** ship is the battery this story's
+estimate was built around, and three of the five gaps were security-relevant:
+
+- nothing proved a live `finance_read` grantee can read `/funds` at all — `scoped-finance-read` §4
+  reads "all **four** workspace-aware routes", written before the tenth existed;
+- nothing proved a `manager` or `staff` row without a grant reaches nothing there;
+- the refusal was asserted as a bare **404 status**, never as the byte-identical body every other
+  reference failure returns;
+- `no-store` was proved on success only, never on a refusal;
+- no total had ever been reconciled against `financial.fund_postings`, and no cross-party leakage
+  assertion existed for the route.
+
+**What #185 delivered.** Five tests, 294 insertions, **no production change** — PR #190
+(squash `0f2fdcf`):
+
+- a grantee reads `/funds` with the OWNER projection byte-for-byte, on new-regime money (the grant
+  suite's `earn` fixture writes the LEGACY ledger, which this route cannot see, so the figures also
+  prove the two regimes are not mixed), with `no-store` and no identifier reaching the bookkeeper;
+- the bare-affiliation sweep — staff, manager, `practitioner_chat` holder, stranger — now probes
+  `/funds` through both the caller's own derivation and the owner's reference;
+- the eight reference-failure modes on `/funds` (malformed, wrong length, unknown, raw id, another
+  user's reference, another business, missing role, revoked grant, removed membership, deleted
+  business) answer with byte-identical bodies and `private, no-store` on every one, and identically
+  to the same failure on a pre-existing route; the revoked case carries a positive control that
+  reads 200 before revocation;
+- the totals reconcile field-for-field against a RAW re-derivation from `amount_toman` — never
+  `balance_after`, which both the service query and the chain trigger read — across two orders
+  where `pending` and `refunded` each move twice, plus M1 summed over the party's orders;
+- a second seller's distinctive figure and every party identifier are absent from the response, and
+  their reference derived inside the caller's session is refused indistinguishably from an unknown
+  one.
+
+**Evidence.** Disposable CI-mirror cluster (PostgreSQL 16, CI's own role provisioning, 78 migrations
+from empty): both suites **67/67 green**; each new test green individually, so none is silently
+filtered; `tsc --noEmit` and `eslint` clean. All four CI checks green on `f1ca910`, including real
+PostgreSQL / OpenSearch / object storage. **Mutation probe:** replacing `statesForParty`'s
+latest-balance-per-order query with a naive `SUM(balance_after)` over every posting fails the
+reconciliation test and leaves the leakage test passing — the guard is specific, not decorative.
+
+| Item | Before | After | Outcome it owns |
+|---|---|---|---|
+| #185 | `status:ready`, 5 | **Closed, 3** | The authority, refusal and reconciliation battery for the tenth finance route |
+| #172 | Closed, 5, **no milestone** | Closed, 5, milestone V3.3 | Unchanged work; only the missing milestone was corrected |
+
+**What moved.** V3.3 done **298 → 306**, scope **428 → 431**. Two independent causes, neither of
+them scope growth:
+
+- **#185** adds its 3 points to done, and removes 2 from scope, because the story closed at the
+  re-estimated 3 rather than the 5 it carried while `status:ready` (+3 done, −2 scope);
+- **#172** was the single data-quality warning the #161 record named — a closed, pointed issue with
+  no milestone, so its 5 points were invisible to the burn-up. Assigning it the V3.3 milestone adds
+  the same 5 points to **both** done and scope (+5 done, +5 scope). No work was performed and no
+  scope was added; a figure that was already true became visible.
+
+`scripts/backlog-report.mjs` (run at `2026-09-18T22:05:30.326Z`) reports **306 / 431**, 71%,
+proposed **102**, decision **0**, ready **0**, active **0**, review **0**, blocked **23**,
+unestimated **0**.
+
+- #185 closes with `sp:3` and no status label, per the operating model's §3 rule.
+- **There are now no data-quality warnings on V3.3.**
+- **Nothing is `status:ready`.** The next item must be moved out of `status:proposed` by owner
+  triage before work starts. The unblocked p1 candidates are `#43b` (#173, 13), `#43c` (#174, 13,
+  `gate:external`), `#43d` (#175, 8), `#43f` (#177, 13), `#42e` (#162, 13, `gate:legal`) and `#42f`
+  (#180, 8, `gate:legal`).
+- Still open and not built here: everything #185's own non-goals list — no release, settlement,
+  reserve, receivable, commission, fee or schedule value is read or published.
+- No provider, payment rail, migration, tag or Release was introduced or changed.
