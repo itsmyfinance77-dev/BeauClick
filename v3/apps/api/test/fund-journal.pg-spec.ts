@@ -664,5 +664,163 @@ describeIfPg('The pending-funds journal on real PostgreSQL (#43a)', () => {
         currency: 'IRT',
       });
     });
+
+    /**
+     * `#185` — reconciled against a RAW re-derivation of the postings, not
+     * against the same `DISTINCT ON` query the service itself runs, and
+     * across more than one order: a per-order check cannot catch a total
+     * that double-counts an account which moved twice.
+     */
+    it('reconciles field-for-field against a raw re-derivation of financial.fund_postings under M1, across several orders', async () => {
+      const owner = await seedUser(app, dataSource, `+98947${String(Date.now()).slice(-6)}`, ['professional']);
+      const professional = await seedProfessional(dataSource, owner.id, 'نگار');
+
+      const first = uuidv7();
+      await fundJournal.recordCollection({
+        orderId: first,
+        sellerPartyType: 'professional',
+        sellerPartyId: professional.id,
+        collectedToman: 900_000,
+        paymentReferenceId: uuidv7(),
+      });
+      // `refunded` and `pending` both move TWICE on this order. A total built
+      // by summing every posting instead of each order's latest balance would
+      // report a larger `refunded` and a smaller `pending` than the truth.
+      await fundJournal.recordRefund({ orderId: first, refundId: uuidv7(), refundAmountToman: 250_000 });
+      await fundJournal.recordRefund({ orderId: first, refundId: uuidv7(), refundAmountToman: 200_000 });
+
+      const second = uuidv7();
+      await fundJournal.recordCollection({
+        orderId: second,
+        sellerPartyType: 'professional',
+        sellerPartyId: professional.id,
+        collectedToman: 500_000,
+        paymentReferenceId: uuidv7(),
+      });
+
+      // The independent derivation: each account's natural total from the RAW
+      // signed `amount_toman` (ADR-052 §4 — a credit-normal account stores the
+      // negative on an increase), never from `balance_after`, which is what
+      // both the service's query and the chain trigger read.
+      const rows: Array<{ account: string; total: string }> = await financialDataSource.query(
+        `SELECT account,
+                SUM(CASE WHEN account IN ('pending','disputed','available','reserve','settled','refunded',
+                                          'platform_earned','provider_fee','recovery_out')
+                         THEN amount_toman ELSE -amount_toman END) AS total
+           FROM financial.fund_postings
+          WHERE seller_party_type = 'professional' AND seller_party_id = $1
+          GROUP BY account`,
+        [professional.id],
+      );
+      const derived: Record<string, number> = Object.fromEntries(rows.map((r) => [r.account, Number(r.total)]));
+
+      const ref = workspaces.referenceFor(owner.id, { partyType: 'professional', partyId: professional.id });
+      const request = (await import('supertest')).default;
+      const res = await request(app.getHttpServer())
+        .get(`/api/v1/me/finance/${ref}/funds`)
+        .set('Authorization', `Bearer ${owner.accessToken}`)
+        .expect(200);
+
+      const body = res.body.data;
+      expect(body).toEqual({
+        pending: derived.pending ?? 0,
+        disputed: derived.disputed ?? 0,
+        available: derived.available ?? 0,
+        reserve: derived.reserve ?? 0,
+        settled: derived.settled ?? 0,
+        refunded: derived.refunded ?? 0,
+        platformEarned: derived.platform_earned ?? 0,
+        providerFee: derived.provider_fee ?? 0,
+        recoveryOut: derived.recovery_out ?? 0,
+        collected: derived.collected ?? 0,
+        platformAdvance: derived.platform_advance ?? 0,
+        recoveredIn: derived.recovered_in ?? 0,
+        currency: 'IRT',
+      });
+
+      // Non-vacuity: the derivation is not a row of zeros agreeing with a
+      // broken read, and the twice-moved accounts are not double-counted.
+      expect(body.collected).toBe(1_400_000);
+      expect(body.refunded).toBe(450_000);
+      expect(body.pending).toBe(950_000);
+
+      // M1 summed over the party's orders — the custody half of M2
+      // (ADR-052 §12). `recovered_in`/`recovery_out` are zero here.
+      const left = body.collected + body.platformAdvance + body.recoveredIn;
+      const right =
+        body.refunded +
+        body.pending +
+        body.disputed +
+        body.available +
+        body.reserve +
+        body.settled +
+        body.platformEarned +
+        body.providerFee +
+        body.recoveryOut;
+      expect(left).toBe(right);
+    });
+
+    it("never reaches another party's postings: a foreign seller's money is absent, and their reference is refused indistinguishably", async () => {
+      const owner = await seedUser(app, dataSource, `+98948${String(Date.now()).slice(-6)}`, ['professional']);
+      const mine = await seedProfessional(dataSource, owner.id, 'مینا');
+      const stranger = await seedUser(app, dataSource, `+98949${String(Date.now()).slice(-6)}`, ['professional']);
+      const theirs = await seedProfessional(dataSource, stranger.id, 'سارا');
+
+      await fundJournal.recordCollection({
+        orderId: uuidv7(),
+        sellerPartyType: 'professional',
+        sellerPartyId: mine.id,
+        collectedToman: 300_000,
+        paymentReferenceId: uuidv7(),
+      });
+      // A deliberately distinctive figure: if any part of it leaked into the
+      // response — as a field, a label or a rounded share — the assertions
+      // below would see it.
+      await fundJournal.recordCollection({
+        orderId: uuidv7(),
+        sellerPartyType: 'professional',
+        sellerPartyId: theirs.id,
+        collectedToman: 7_777_000,
+        paymentReferenceId: uuidv7(),
+      });
+
+      const request = (await import('supertest')).default;
+      const myRef = workspaces.referenceFor(owner.id, { partyType: 'professional', partyId: mine.id });
+      const res = await request(app.getHttpServer())
+        .get(`/api/v1/me/finance/${myRef}/funds`)
+        .set('Authorization', `Bearer ${owner.accessToken}`)
+        .expect(200);
+
+      expect(res.body.data.collected).toBe(300_000);
+      expect(res.body.data.pending).toBe(300_000);
+      const serialised = JSON.stringify(res.body);
+      for (const forbidden of ['7777000', theirs.id, stranger.id, mine.id, owner.id]) {
+        expect([forbidden, serialised.includes(forbidden)]).toEqual([forbidden, false]);
+      }
+
+      // Their workspace, derived inside MY session, reaches nothing — and the
+      // refusal is byte-identical to the one an unknown reference gets, so
+      // "exists but not yours" is indistinguishable from "does not exist".
+      const theirRefInMySession = workspaces.referenceFor(owner.id, { partyType: 'professional', partyId: theirs.id });
+      const foreign = await request(app.getHttpServer())
+        .get(`/api/v1/me/finance/${theirRefInMySession}/funds`)
+        .set('Authorization', `Bearer ${owner.accessToken}`)
+        .expect(404);
+      const unknown = await request(app.getHttpServer())
+        .get(`/api/v1/me/finance/${'A'.repeat(43)}/funds`)
+        .set('Authorization', `Bearer ${owner.accessToken}`)
+        .expect(404);
+
+      expect(JSON.stringify(foreign.body)).toBe(JSON.stringify(unknown.body));
+      expect(foreign.body).toEqual({
+        data: null,
+        meta: null,
+        error: { code: 'NOT_FOUND_OR_NOT_YOURS', message: expect.any(String) },
+      });
+      // `no-store` on the REFUSAL, not merely on the success (ADR-052 §16,
+      // `V33-DEC-038` R10) — a cached 404 is as much a disclosure as a body.
+      expect(foreign.headers['cache-control']).toBe('private, no-store');
+      expect(unknown.headers['cache-control']).toBe('private, no-store');
+    });
   });
 });

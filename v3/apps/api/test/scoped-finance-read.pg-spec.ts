@@ -11,7 +11,7 @@ import {
 } from '@beauclick/business';
 import { AdminAuditService } from '@beauclick/audit';
 import { BookingCollectionPolicyService, BookingOutcomePolicyService, CommercialCatalogueService } from '@beauclick/commercial-policy';
-import { FinanceWorkspaceService } from '@beauclick/financial';
+import { FinanceWorkspaceService, FundJournalService } from '@beauclick/financial';
 import { SUBJECT_DATA_CONTRACTS, SubjectDataCoverageService } from '@beauclick/subject-data';
 import { assertNoLeak } from '@beauclick/testing';
 import { SellerPartyLookup } from '../src/composition/port-adapters';
@@ -73,6 +73,7 @@ describePg('scoped read-only business finance authority (real PostgreSQL, #111)'
   let staff: StaffService;
   let authorizer: ScopedStaffAuthorizerPort;
   let workspaces: FinanceWorkspaceService;
+  let fundJournal: FundJournalService;
 
   let sequence = 0;
   const nextPhone = (): string => `+98916${String(100000 + (sequence += 1)).slice(-6)}`;
@@ -84,6 +85,7 @@ describePg('scoped read-only business finance authority (real PostgreSQL, #111)'
     staff = app.get(StaffService);
     authorizer = app.get(SCOPED_STAFF_AUTHORIZER);
     workspaces = app.get(FinanceWorkspaceService);
+    fundJournal = app.get(FundJournalService);
   });
 
   afterAll(async () => {
@@ -210,6 +212,15 @@ describePg('scoped read-only business finance authority (real PostgreSQL, #111)'
     `/me/finance/${ref}/settlements`,
     `/me/finance/${ref}/orders/${orderId}/ledger`,
   ];
+
+  /**
+   * The tenth route (`#43a`, ADR-052 §16). Kept separate from `fourReads`
+   * rather than folded into it: those four read the LEGACY receivable regime
+   * and take an order id, this one reads the new-regime journal and does not.
+   * `#185` is what puts it under the same authority, refusal and leakage
+   * battery the other four have carried since #111.
+   */
+  const fundsRead = (ref: string) => `/me/finance/${ref}/funds`;
 
   const REFUSAL = { data: null, meta: null, error: { code: 'NOT_FOUND_OR_NOT_YOURS', message: expect.any(String) } };
 
@@ -617,7 +628,12 @@ describePg('scoped read-only business finance authority (real PostgreSQL, #111)'
         // if affiliation counted -- is inert.
         const theirRef = workspaces.referenceFor(user.id, { partyType: 'business', partyId: s.businessId });
         const bodies = new Set<string>();
-        for (const path of [...fourReads(theirRef, s.orderId), ...fourReads(ownerRef, s.orderId)]) {
+        for (const path of [
+          ...fourReads(theirRef, s.orderId),
+          ...fourReads(ownerRef, s.orderId),
+          fundsRead(theirRef),
+          fundsRead(ownerRef),
+        ]) {
           const res = await get(path, user);
           expect([label, path, res.status]).toEqual([label, path, 404]);
           bodies.add(JSON.stringify(res.body));
@@ -681,6 +697,57 @@ describePg('scoped read-only business finance authority (real PostgreSQL, #111)'
         for (const identifier of [k.user.id, s.owner.id, s.businessId, k.membershipId, 'operator note']) {
           assertNoLeak(body, identifier);
         }
+      }
+    });
+
+    /**
+     * `#185` — the tenth route, under the same authority the other four have
+     * carried since #111. Nothing before this proved that a live `finance_read`
+     * grantee can read `/funds` at all: `#43a` shipped the route with an OWNER
+     * read only, and §4 above reads the four legacy-regime routes.
+     */
+    it('a grantee reads the TENTH route, /funds, with the OWNER projection byte-for-byte', async () => {
+      const { salon: s, bookkeeper: k, ref } = await grantedBookkeeper();
+      const ownerRef = await refFor(s.owner, 'business', 'owner');
+
+      // New-regime money. The suite's `earn` fixture writes the LEGACY ledger,
+      // which this route deliberately cannot see — so the figures below also
+      // prove the two regimes are not being mixed.
+      const orderId = uuidv7();
+      await fundJournal.recordCollection({
+        orderId,
+        sellerPartyType: 'business',
+        sellerPartyId: s.businessId,
+        collectedToman: 1_300_000,
+        paymentReferenceId: uuidv7(),
+      });
+      await fundJournal.recordRefund({ orderId, refundId: uuidv7(), refundAmountToman: 300_000 });
+
+      const granteeRes = await get(fundsRead(ref), k.user).expect(200);
+      const ownerRes = await get(fundsRead(ownerRef), s.owner).expect(200);
+
+      // Same projection, key for key and value for value.
+      expect(JSON.stringify(granteeRes.body)).toBe(JSON.stringify(ownerRes.body));
+      expect(granteeRes.body.data).toEqual({
+        pending: 1_000_000,
+        disputed: 0,
+        available: 0,
+        reserve: 0,
+        settled: 0,
+        refunded: 300_000,
+        platformEarned: 0,
+        providerFee: 0,
+        recoveryOut: 0,
+        collected: 1_300_000,
+        platformAdvance: 0,
+        recoveredIn: 0,
+        currency: 'IRT',
+      });
+      expect(granteeRes.headers['cache-control']).toBe('private, no-store');
+
+      // No identity of any kind reaches the bookkeeper through it.
+      for (const identifier of [k.user.id, s.owner.id, s.businessId, k.membershipId, orderId]) {
+        assertNoLeak(granteeRes.body, identifier);
       }
     });
 
@@ -1342,6 +1409,73 @@ describePg('scoped read-only business finance authority (real PostgreSQL, #111)'
         expect([label, JSON.stringify(res.body)]).toEqual([label, JSON.stringify(first[1].body)]);
       }
       expect(first[1].body).toEqual(REFUSAL);
+    });
+
+    /**
+     * `#185` — the same eight reference failures the test above proves on
+     * `/summary`, now on the tenth route, plus the header on every one of
+     * them. `#43a` asserted a bare 404 status for one malformed reference and
+     * nothing about the body or the header, so a refusal that leaked a
+     * distinguishable shape, or that a cache could keep, would have passed.
+     */
+    it('answers the same eight reference failures identically on /funds, and never allows a refusal to be cached', async () => {
+      const { salon: s, bookkeeper: k, ref } = await grantedBookkeeper();
+      const other = await salon();
+      const otherOwnerRef = await refFor(other.owner, 'business', 'owner');
+      const noRole = await bookkeeper(s);
+      const noRoleRef = workspaces.referenceFor(noRole.user.id, { partyType: 'business', partyId: s.businessId });
+
+      const responses: Array<[string, request.Response]> = [];
+      const probe = async (label: string, reference: string, user: SeededUser) => {
+        responses.push([label, await get(fundsRead(reference), user)]);
+      };
+
+      await probe('malformed', encodeURIComponent('not-a-reference'), k.user);
+      await probe('wrong length', 'A'.repeat(42), k.user);
+      await probe('unknown', 'A'.repeat(43), k.user);
+      await probe('raw business id', s.businessId, k.user);
+      await probe("another user's reference", otherOwnerRef, k.user);
+      await probe(
+        'another business, own derivation',
+        workspaces.referenceFor(k.user.id, { partyType: 'business', partyId: other.businessId }),
+        k.user,
+      );
+      await probe('missing role', noRoleRef, noRole.user);
+
+      // Revoked — with a positive control first, so the refusal proves
+      // revocation rather than a fixture that never worked.
+      const revokedK = await bookkeeper(s);
+      await grantVia(s.businessId, s.owner.accessToken, revokedK.membershipId, 'finance_read').expect(201);
+      const revokedRef = await refFor(revokedK.user, 'business', 'finance_read');
+      await get(fundsRead(revokedRef), revokedK.user).expect(200);
+      await revokeVia(s.businessId, s.owner.accessToken, revokedK.membershipId, 'finance_read').expect(201);
+      await probe('revoked grant', revokedRef, revokedK.user);
+
+      // Removed membership.
+      const removedK = await bookkeeper(s);
+      await grantVia(s.businessId, s.owner.accessToken, removedK.membershipId, 'finance_read').expect(201);
+      const removedRef = await refFor(removedK.user, 'business', 'finance_read');
+      await staff.deactivate(removedK.membershipId);
+      await probe('removed membership', removedRef, removedK.user);
+
+      // Deleted business — last, because it withdraws everyone's access.
+      await dataSource.query(`UPDATE business.businesses SET deleted_at = now() WHERE id = $1`, [s.businessId]);
+      await probe('deleted business', ref, k.user);
+
+      const [first, ...rest] = responses;
+      expect(first[1].status).toBe(404);
+      expect(first[1].body).toEqual(REFUSAL);
+      expect(first[1].headers['cache-control']).toBe('private, no-store');
+      for (const [label, res] of rest) {
+        expect([label, res.status]).toEqual([label, 404]);
+        expect([label, JSON.stringify(res.body)]).toEqual([label, JSON.stringify(first[1].body)]);
+        expect([label, res.headers['cache-control']]).toEqual([label, 'private, no-store']);
+      }
+
+      // And identical to the SAME failure on a route that existed before, so
+      // the tenth route did not invent a refusal shape of its own.
+      const onSummary = await get(`/me/finance/${'A'.repeat(43)}/summary`, k.user).expect(404);
+      expect(JSON.stringify(first[1].body)).toBe(JSON.stringify(onSummary.body));
     });
 
     it('an unauthenticated request is refused before any reference or grant is consulted, on all five routes', async () => {
