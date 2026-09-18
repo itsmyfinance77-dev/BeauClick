@@ -138,7 +138,9 @@ const HERMETIC_ENV: Record<string, string> = {
   PAYMENT_INTENT_TTL_MINUTES: '30',
   PAYMENT_ENVIRONMENT: 'sandbox',
   PAYMENT_SANDBOX_CHECKOUT_URL: 'http://localhost:3100/sandbox-gateway',
-  FINANCIAL_COMMISSION_RATE_BP: '1500',
+  // `#43a` (ADR-052 §16): no commission-rate env var exists any more. Left
+  // absent deliberately, rather than removed silently -- see
+  // `no-hardcoded-commission-rate.spec.ts` for the proof nothing reads one.
   BOOKING_HOLD_MINUTES: '15',
   BOOKING_MAX_CONCURRENT_HOLDS: '5',
   BOOKING_MAX_RESCHEDULES: '2',
@@ -728,7 +730,8 @@ export async function resetFinancial(ownerUrl: string): Promise<void> {
   await client.connect();
   try {
     await client.query(
-      'TRUNCATE financial.settlement_items, financial.settlement_batches, financial.ledger_entries, financial.outbox_events CASCADE',
+      'TRUNCATE financial.settlement_items, financial.settlement_batches, financial.ledger_entries, ' +
+        'financial.fund_postings, financial.fund_journals, financial.outbox_events CASCADE',
     );
   } finally {
     await client.end();
@@ -877,6 +880,121 @@ export async function seedCity(dataSource: DataSource, name: string, isLaunched 
     isLaunched,
   ]);
   return id;
+}
+
+// ---------------------------------------------------------------------------
+// Legacy ledger fixture -- `#43a` (ADR-052 §16)
+// ---------------------------------------------------------------------------
+// `LedgerService.recordPayment` is REMOVED: every new collection now goes
+// through `FundJournalService` instead (see `fund-journal.service.ts`).
+// A test that needs a LEGACY `financial.ledger_entries` row -- to exercise
+// `LedgerService.recordRefund`'s cumulative reversal, or the ledger's own
+// immutability/settlement machinery -- seeds one directly, exactly as ADR-052
+// §16 requires ("test seeds that call recordPayment ... move to real-PostgreSQL
+// fixtures"). This is the one place that insert is spelled, so every suite
+// that needs a legacy row produces the identical shape `recordPayment` used to.
+
+/** Mirrors `LedgerService.insertEntries`'s own shape byte-for-byte, so a fixture row is indistinguishable from one `recordPayment` would have written. */
+export async function seedLegacyPayment(
+  financialDataSource: DataSource,
+  input: {
+    orderId: string;
+    sourceId?: string | null;
+    sellerPartyType: 'professional' | 'business';
+    sellerPartyId: string;
+    netAmountToman: number;
+    rateBp: number;
+    paymentReferenceId: string;
+  },
+): Promise<{ commissionToman: number; receivableToman: number }> {
+  const { splitExact } = await import('@beauclick/money');
+  const { part: commissionToman, remainder: receivableToman } = splitExact(input.netAmountToman, input.rateBp);
+
+  await financialDataSource.query(
+    `INSERT INTO financial.ledger_entries
+       (id, order_id, source_id, party_type, party_id, entry_type, amount_toman, currency, basis, commission_rate_bp, reference_type, reference_id)
+     VALUES
+       ($1, $2, $3, 'platform', NULL, 'commission', $4, 'IRT', 'net_customer_amount', $5, 'order_payment', $6),
+       ($7, $8, $3, $9, $10, 'receivable', $11, 'IRT', 'net_customer_amount', $5, 'order_payment', $6)
+     ON CONFLICT (entry_type, reference_type, reference_id) DO NOTHING`,
+    [
+      uuidv7(),
+      input.orderId,
+      input.sourceId ?? null,
+      String(commissionToman),
+      input.rateBp,
+      input.paymentReferenceId,
+      uuidv7(),
+      input.orderId,
+      input.sellerPartyType,
+      input.sellerPartyId,
+      String(receivableToman),
+    ],
+  );
+
+  return { commissionToman, receivableToman };
+}
+
+/**
+ * A legacy settlement batch fixture -- `#43a` (ADR-052 §8, §16).
+ *
+ * `SettlementService.createSettlement` now refuses every request
+ * unconditionally (the immediate-settlement route the owner rejected). A test
+ * that needs an EXISTING batch -- to prove `reverseSettlement` still works,
+ * or to exercise `outstandingForOrder`'s read side -- seeds one directly, the
+ * same fixture discipline `seedLegacyPayment` applies to `ledger_entries`.
+ * Mirrors `SettlementService.createSettlement`'s own insert shape exactly.
+ */
+export async function seedSettlementBatch(
+  financialDataSource: DataSource,
+  input: {
+    partyType: 'professional' | 'business';
+    partyId: string;
+    items: { orderId: string; amountToman: number }[];
+    method?: string | null;
+    reference?: string | null;
+    note?: string | null;
+    createdBy: string;
+  },
+): Promise<{ id: string; amountToman: number }> {
+  const id = uuidv7();
+  const amountToman = input.items.reduce((sum, item) => sum + item.amountToman, 0);
+
+  await financialDataSource.query(
+    `INSERT INTO financial.settlement_batches
+       (id, kind, reverses_settlement_id, party_type, party_id, amount_toman, currency, method, reference, note, created_by)
+     VALUES ($1, 'settlement', NULL, $2, $3, $4, 'IRT', $5, $6, $7, $8)`,
+    [id, input.partyType, input.partyId, String(amountToman), input.method ?? null, input.reference ?? null, input.note ?? null, input.createdBy],
+  );
+
+  for (const item of input.items) {
+    await financialDataSource.query(
+      `INSERT INTO financial.settlement_items (id, settlement_id, order_id, amount_toman) VALUES ($1, $2, $3, $4)`,
+      [uuidv7(), id, item.orderId, String(item.amountToman)],
+    );
+  }
+
+  return { id, amountToman };
+}
+
+/**
+ * A financial outbox row, seeded directly -- for a consumer-side test that
+ * needs an event of a kind no `#43a` code path currently produces (e.g.
+ * `SettlementRecorded`, which `SettlementService.createSettlement` no longer
+ * emits, but which a future schedule-gated settlement record, `#43e`, will
+ * reuse unchanged). Proves the relay/analytics/notification MACHINERY for
+ * that event type independent of whichever production code currently emits
+ * it, if any.
+ */
+export async function seedFinancialOutboxEvent(
+  financialDataSource: DataSource,
+  input: { aggregateType: string; aggregateId: string; eventType: string; payload: Record<string, unknown> },
+): Promise<void> {
+  await financialDataSource.query(
+    `INSERT INTO financial.outbox_events (id, aggregate_type, aggregate_id, event_type, event_version, payload)
+     VALUES ($1, $2, $3, $4, 1, $5)`,
+    [uuidv7(), input.aggregateType, input.aggregateId, input.eventType, JSON.stringify(input.payload)],
+  );
 }
 
 /** A slot far enough ahead to satisfy the reschedule minimum-notice rule. */

@@ -5,10 +5,8 @@ import { uuidv7 } from 'uuidv7';
 
 import {
   FinanceWorkspaceService,
-  LedgerService,
   MyFinanceController,
   MyFinanceService,
-  SettlementService,
 } from '@beauclick/financial';
 import { assertNoLeak } from '@beauclick/testing';
 
@@ -22,7 +20,9 @@ import {
   resetDatabase,
   resetFinancial,
   seedBusiness,
+  seedLegacyPayment,
   seedProfessional,
+  seedSettlementBatch,
   seedUser,
 } from './pg-test-app.factory';
 
@@ -62,8 +62,6 @@ describePg('finance workspace authorization (real PostgreSQL)', () => {
   let ctx: PgTestApp;
   let app: INestApplication;
   let dataSource: DataSource;
-  let ledger: LedgerService;
-  let settlements: SettlementService;
   let workspaces: FinanceWorkspaceService;
   let myFinance: MyFinanceService;
 
@@ -74,8 +72,6 @@ describePg('finance workspace authorization (real PostgreSQL)', () => {
     ctx = await createPgTestApp();
     app = ctx.app;
     dataSource = ctx.dataSource;
-    ledger = app.get(LedgerService);
-    settlements = app.get(SettlementService);
     workspaces = app.get(FinanceWorkspaceService);
     myFinance = app.get(MyFinanceService);
   });
@@ -96,14 +92,15 @@ describePg('finance workspace authorization (real PostgreSQL)', () => {
   /** 15% commission, so a payment of N leaves a receivable of N * 0.85. */
   const receivableOf = (paid: number) => paid - Math.round(paid * 0.15);
 
+  /** LEGACY fixture (ADR-052 §16) -- `LedgerService.recordPayment` is removed. */
   async function earn(partyType: 'professional' | 'business', partyId: string, paid: number): Promise<string> {
     const orderId = uuidv7();
-    await ledger.recordPayment({
+    await seedLegacyPayment(ctx.financialDataSource, {
       orderId,
-      sourceId: null,
       sellerPartyType: partyType,
       sellerPartyId: partyId,
       netAmountToman: paid,
+      rateBp: 1500,
       paymentReferenceId: uuidv7(),
     });
     return orderId;
@@ -565,7 +562,7 @@ describePg('finance workspace authorization (real PostgreSQL)', () => {
   // =======================================================================
 
   describe('§5 authentication', () => {
-    it('refuses all nine finance routes without a token', async () => {
+    it('refuses all ten finance routes without a token', async () => {
       const ref = 'A'.repeat(43);
       const orderId = uuidv7();
 
@@ -575,6 +572,7 @@ describePg('finance workspace authorization (real PostgreSQL)', () => {
         `/me/finance/${ref}/outstanding-orders`,
         `/me/finance/${ref}/settlements`,
         `/me/finance/${ref}/orders/${orderId}/ledger`,
+        `/me/finance/${ref}/funds`,
         '/me/finance/summary',
         '/me/finance/outstanding-orders',
         '/me/finance/settlements',
@@ -583,7 +581,7 @@ describePg('finance workspace authorization (real PostgreSQL)', () => {
         await get(path).expect(401);
       }
 
-      // The control that proves the nine above are real routes rather than
+      // The control that proves the ten above are real routes rather than
       // 401s produced by a catch-all.
       await get('/me/finance/no-such-route/at/all').expect(404);
     });
@@ -625,18 +623,18 @@ describePg('finance workspace authorization (real PostgreSQL)', () => {
       const businessRef = await refFor(owner.user, 'business');
 
       // Two settlements per workspace, so a page of one leaves a cursor.
+      // Seeded directly (ADR-052 §16, §8) -- `createSettlement` now refuses
+      // unconditionally; only `seedSettlementBatch`/`reverseSettlement`
+      // still produce a real batch row.
       for (const [type, partyId, orderId] of [
         ['professional', owner.professionalId, owner.professionalOrder],
         ['business', owner.businessId, owner.businessOrder],
       ] as const) {
-        await settlements.createSettlement({
+        await seedSettlementBatch(ctx.financialDataSource, {
           partyType: type,
           partyId,
-          orderIds: [orderId],
-          method: null,
-          reference: null,
-          note: null,
-          actorId: owner.user.id,
+          items: [{ orderId, amountToman: 1 }],
+          createdBy: owner.user.id,
         });
       }
 
@@ -671,17 +669,15 @@ describePg('finance workspace authorization (real PostgreSQL)', () => {
       const solo = await soloProfessional();
       const ref = await refFor(solo.user, 'professional');
 
-      // Three settled orders, so two pages of two.
+      // Three settled orders, so two pages of two. Seeded directly (ADR-052
+      // §16, §8) -- `createSettlement` now refuses unconditionally.
       const orderIds = [solo.orderId, await earn('professional', solo.partyId, 500_000), await earn('professional', solo.partyId, 600_000)];
       for (const orderId of orderIds) {
-        await settlements.createSettlement({
+        await seedSettlementBatch(ctx.financialDataSource, {
           partyType: 'professional',
           partyId: solo.partyId,
-          orderIds: [orderId],
-          method: null,
-          reference: null,
-          note: null,
-          actorId: solo.user.id,
+          items: [{ orderId, amountToman: 1 }],
+          createdBy: solo.user.id,
         });
       }
 
@@ -811,7 +807,7 @@ describePg('finance workspace authorization (real PostgreSQL)', () => {
       expect(summaryWithTwo).toBe(summaryWithOne);
     });
 
-    it('writes nothing, anywhere, on any of the nine routes', async () => {
+    it('writes nothing, anywhere, on any of the ten routes', async () => {
       const owner = await dualOwner();
       const ref = await refFor(owner.user, 'professional');
       const orderId = owner.professionalOrder;
@@ -824,6 +820,7 @@ describePg('finance workspace authorization (real PostgreSQL)', () => {
       await get(`/me/finance/${ref}/outstanding-orders`, owner.user).expect(200);
       await get(`/me/finance/${ref}/settlements`, owner.user).expect(200);
       await get(`/me/finance/${ref}/orders/${orderId}/ledger`, owner.user).expect(200);
+      await get(`/me/finance/${ref}/funds`, owner.user).expect(200);
       await get('/me/finance/summary', owner.user).expect(409);
       await get(`/me/finance/${'A'.repeat(43)}/summary`, owner.user).expect(404);
 
@@ -837,7 +834,7 @@ describePg('finance workspace authorization (real PostgreSQL)', () => {
   // =======================================================================
 
   describe('§8 route registration', () => {
-    it('maps all nine finance routes, and the static one is not captured by the dynamic', async () => {
+    it('maps all ten finance routes, and the static one is not captured by the dynamic', async () => {
       const server = app.getHttpServer();
       const router = server._events.request._router as { stack: Array<{ route?: { path: string } }> };
       const paths = router.stack.filter((layer) => layer.route).map((layer) => layer.route!.path);
@@ -850,6 +847,7 @@ describePg('finance workspace authorization (real PostgreSQL)', () => {
           '/api/v1/me/finance/:workspaceRef/outstanding-orders',
           '/api/v1/me/finance/:workspaceRef/settlements',
           '/api/v1/me/finance/:workspaceRef/orders/:orderId/ledger',
+          '/api/v1/me/finance/:workspaceRef/funds',
           '/api/v1/me/finance/summary',
           '/api/v1/me/finance/outstanding-orders',
           '/api/v1/me/finance/settlements',

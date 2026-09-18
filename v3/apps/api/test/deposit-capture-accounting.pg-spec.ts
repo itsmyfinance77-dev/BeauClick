@@ -324,20 +324,34 @@ describePg('deposit capture and collected-money accounting (real PostgreSQL)', (
       expect(Object.keys(payload)).not.toContain('totalToman');
     });
 
-    it('the ledger records the collectible and no venue balance', async () => {
+    /**
+     * `#43a` (ADR-052 §16): every new collection posts to the pending-funds
+     * journal, never to `financial.ledger_entries` -- `LedgerService.recordPayment`
+     * is removed. `pending +c / collected -c` is the exact `collection`
+     * journal shape (ADR-052 §5); no commission or receivable exists to post.
+     */
+    it('the fund journal records the collectible and no venue balance', async () => {
       const booked = await depositCapture();
       await ctx.relay.drain();
 
-      const entries = await ctx.financialDataSource.query(
-        `SELECT entry_type, amount_toman FROM financial.ledger_entries WHERE order_id = $1 ORDER BY entry_type`,
+      expect(
+        await ctx.financialDataSource.query(`SELECT 1 FROM financial.ledger_entries WHERE order_id = $1`, [booked.orderId]),
+      ).toEqual([]);
+
+      const postings = await ctx.financialDataSource.query(
+        `SELECT account, amount_toman FROM financial.fund_postings WHERE order_id = $1 ORDER BY account`,
         [booked.orderId],
       );
-      expect(entries.length).toBeGreaterThan(0);
-      const sum = entries.reduce((acc: number, e: { amount_toman: string }) => acc + Number(e.amount_toman), 0);
-      expect(sum).toBe(COLLECTIBLE);
-      for (const e of entries) {
-        expect(Number(e.amount_toman)).not.toBe(SERVICE_TOTAL);
-        expect(Number(e.amount_toman)).not.toBe(VENUE_BALANCE);
+      expect(postings.length).toBeGreaterThan(0);
+      const pending = postings.find((p: { account: string; amount_toman: string }) => p.account === 'pending');
+      const collected = postings.find((p: { account: string; amount_toman: string }) => p.account === 'collected');
+      expect(Number(pending.amount_toman)).toBe(COLLECTIBLE);
+      expect(Number(collected.amount_toman)).toBe(-COLLECTIBLE);
+      for (const p of postings) {
+        expect(Number(p.amount_toman)).not.toBe(SERVICE_TOTAL);
+        expect(Number(p.amount_toman)).not.toBe(-SERVICE_TOTAL);
+        expect(Number(p.amount_toman)).not.toBe(VENUE_BALANCE);
+        expect(Number(p.amount_toman)).not.toBe(-VENUE_BALANCE);
       }
     });
 

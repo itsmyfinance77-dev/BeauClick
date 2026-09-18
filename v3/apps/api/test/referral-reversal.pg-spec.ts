@@ -154,11 +154,17 @@ describePg('referral reversal — full refund, clawback, convergence (real Postg
   /** A pending attribution, written directly — Story #27's claim route is not under test here. */
   async function pendingReferral(referrer: SeededUser, referee: SeededUser): Promise<string> {
     const id = uuidv7();
+    // `ctx.referralClock.now()`, not `Date.now()`: a test that freezes the
+    // clock to a fixed qualification/reversal instant needs attribution to
+    // land relative to THAT instant, never real wall-clock time -- which
+    // drifts past any fixed calendar literal as the suite ages and trips
+    // `ck_referrals_qualified_after_attribution`.
+    const now = ctx.referralClock.now().getTime();
     await dataSource.query(
       `INSERT INTO referral.referrals
          (id, referrer_user_id, referee_user_id, referral_code_id, attributed_at, expires_at)
        VALUES ($1, $2, $3, $4, $5, $6)`,
-      [id, referrer.id, referee.id, uuidv7(), new Date(Date.now() - DAY_MS), new Date(Date.now() + 89 * DAY_MS)],
+      [id, referrer.id, referee.id, uuidv7(), new Date(now - DAY_MS), new Date(now + 89 * DAY_MS)],
     );
     return id;
   }

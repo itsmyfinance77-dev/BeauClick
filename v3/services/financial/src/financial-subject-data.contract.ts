@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 
 import {
@@ -9,6 +9,8 @@ import {
 } from '@beauclick/subject-data';
 
 import { MyFinanceService } from './my-finance.service';
+import { FundJournalService } from './fund-journal.service';
+import { FinanceWorkspaceOwnerResolver, FINANCE_WORKSPACE_OWNER_RESOLVER } from './ports';
 
 /**
  * financial's subject-data contract -- the one module that is `retained` end
@@ -46,7 +48,11 @@ import { MyFinanceService } from './my-finance.service';
 export class FinancialSubjectDataContract implements SubjectDataContract {
   readonly moduleKey = 'financial';
 
-  constructor(private readonly finance: MyFinanceService) {}
+  constructor(
+    private readonly finance: MyFinanceService,
+    private readonly fundJournal: FundJournalService,
+    @Inject(FINANCE_WORKSPACE_OWNER_RESOLVER) private readonly owners: FinanceWorkspaceOwnerResolver,
+  ) {}
 
   readonly tables: ReadonlyArray<SubjectTableClaim> = [
     {
@@ -70,6 +76,17 @@ export class FinancialSubjectDataContract implements SubjectDataContract {
       disposition: 'retained',
       reason: 'The financial outbox, on the same isolated connection and under the same append-only role.',
     },
+    {
+      table: 'financial.fund_journals',
+      disposition: 'retained',
+      reason:
+        'The pending-funds journal (ADR-052 §4, `#43a`). Append-only by database role and the append-only half of the same legal-retention reasoning as the legacy ledger -- an accounting fact is not erasable because a subject later asks.',
+    },
+    {
+      table: 'financial.fund_postings',
+      disposition: 'retained',
+      reason: 'Every balanced leg of a retained journal (ADR-052 §15). Same append-only role, same retention.',
+    },
   ];
 
   /**
@@ -90,6 +107,19 @@ export class FinancialSubjectDataContract implements SubjectDataContract {
       this.finance.mySettlements(userId),
       this.finance.myOutstandingOrders(userId),
     ]);
+
+    // Every OWNED party's fund states (ADR-052 §15: "to the seller: its own
+    // states") -- read through `ownedWorkspacesFor` directly rather than
+    // `MyFinanceService`'s singular methods, which throw
+    // `FinanceWorkspaceSelectionRequiredException` for a dual owner (V33-DEC-020).
+    // An export must never fail for the exact sellers #111 exists to serve.
+    const ownedParties = await this.owners.ownedWorkspacesFor(userId);
+    const fundStates = await Promise.all(
+      ownedParties.map(async (party) => ({
+        partyType: party.partyType,
+        ...(await this.fundJournal.statesForParty(party.partyType, party.partyId)),
+      })),
+    );
 
     return [
       {
@@ -114,6 +144,11 @@ export class FinancialSubjectDataContract implements SubjectDataContract {
         key: 'outstanding_orders',
         description: 'سفارش‌های تسویه‌نشده',
         rows: (outstanding ?? []) as unknown as Array<Record<string, unknown>>,
+      },
+      {
+        key: 'fund_states',
+        description: 'وضعیت وجوه در حال انتظار شما (#43a)',
+        rows: fundStates as unknown as Array<Record<string, unknown>>,
       },
     ];
   }

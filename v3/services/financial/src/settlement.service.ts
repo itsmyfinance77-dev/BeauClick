@@ -3,12 +3,12 @@ import { DataSource } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
 import { emitEvent, AuditLogger } from '@beauclick/events';
 import { DomainException } from '@beauclick/http';
-import { sumAmounts } from '@beauclick/money';
 
 import { LedgerPartyType } from './entities/ledger-entry.entity';
 import { SettlementBatchEntity, SettlementItemEntity } from './entities/settlement.entity';
 import { FinancialOutboxEntity } from './entities/financial-outbox.entity';
 import { LedgerService } from './ledger.service';
+import { FundJournalService } from './fund-journal.service';
 import { FINANCIAL_DATA_SOURCE } from './ports';
 
 export class SettlementRejectedException extends DomainException {
@@ -60,6 +60,7 @@ export class SettlementService {
   constructor(
     @Inject(FINANCIAL_DATA_SOURCE) private readonly dataSource: DataSource,
     private readonly ledger: LedgerService,
+    private readonly fundJournal: FundJournalService,
   ) {}
 
   /**
@@ -93,14 +94,32 @@ export class SettlementService {
     return Number(row.total);
   }
 
+  /**
+   * `#43a` (ADR-052 §16): `receivableNetToman = legacy receivable + new-regime
+   * (available + reserve + settled)`; `settledToman = legacy + new-regime
+   * settled`. The nine (now ten) existing shapes are unchanged; what changed
+   * is that they now ALSO read the new regime -- always zero today, since
+   * `#43a` never populates `available`/`reserve`/`settled` (`release`,
+   * `#43c`, is the only journal kind that does), but the formula is real now
+   * rather than a documented intention to add it later.
+   */
   async partySummary(partyType: LedgerPartyType, partyId: string): Promise<PartySummary> {
-    const receivableNetToman = await this.ledger.partyReceivableNet(partyType, partyId);
+    const legacyReceivableNet = await this.ledger.partyReceivableNet(partyType, partyId);
     const [row]: { total: string }[] = await this.dataSource.query(
       `SELECT COALESCE(SUM(amount_toman), 0) AS total
        FROM financial.settlement_batches WHERE party_type = $1 AND party_id = $2`,
       [partyType, partyId],
     );
-    const settledToman = Number(row.total);
+    const legacySettled = Number(row.total);
+
+    const newRegimeStates =
+      partyType === 'platform' ? {} : await this.fundJournal.statesForParty(partyType, partyId);
+    const newRegimeAvailable = newRegimeStates.available ?? 0;
+    const newRegimeReserve = newRegimeStates.reserve ?? 0;
+    const newRegimeSettled = newRegimeStates.settled ?? 0;
+
+    const receivableNetToman = legacyReceivableNet + newRegimeAvailable + newRegimeReserve + newRegimeSettled;
+    const settledToman = legacySettled + newRegimeSettled;
     return {
       partyType,
       partyId,
@@ -186,93 +205,34 @@ export class SettlementService {
   }
 
   /**
-   * Records a payout covering specific orders.
+   * Immediate, full manual settlement -- refused for good, at the SERVICE
+   * level (ADR-052 §8, §16; `V33-DEC-040` R4, R8; a `#43a` acceptance
+   * criterion). "Immediately, in full" is exactly the settlement the owner
+   * rejected: R4 requires money to reach `available` only on an explicit
+   * completion-and-closed-window fact, then settle on an ADMINISTRATOR-
+   * PUBLISHED schedule; `#43d`/`#43e` own publishing and executing that
+   * schedule, and neither exists yet. R8's fail-closed rule applies to the
+   * SAME absence: with no published schedule policy, no settlement batch is
+   * proposable, so THIS route -- which never reads a schedule at all -- must
+   * refuse unconditionally rather than propose one anyway.
    *
-   * Every order's outstanding amount is re-read INSIDE the transaction,
-   * immediately before writing. That re-read -- not the operator's UI
-   * selection, which is advisory only -- is the real guard against settling
-   * an order twice or above its outstanding amount.
+   * Refusing here, in the service, rather than only at the controller or
+   * only by removing the route, is what "no caller bypasses it" means: any
+   * future caller of this method -- a new controller, a script, a different
+   * capability grant -- gets the identical refusal, because the method
+   * itself carries no settlement logic left to reach.
    *
-   * Ownership is re-verified per order too: an order's receivable must
-   * genuinely belong to the party being settled. A caller-supplied order id
-   * list is never trusted on its own.
+   * `reverseSettlement` below is UNCHANGED and still works: ADR-052 §8 is
+   * explicit that reversing an EXISTING batch is not the immediate-route
+   * behaviour it rejects -- a reversal returns money that was already
+   * settled through a route this platform no longer offers, and refusing it
+   * too would strand every batch settled before this deploy.
    */
-  async createSettlement(input: CreateSettlementInput): Promise<SettlementBatchEntity> {
-    if (input.orderIds.length === 0) {
-      throw new SettlementRejectedException('حداقل یک سفارش باید انتخاب شود.');
-    }
-
-    const uniqueOrderIds = Array.from(new Set(input.orderIds));
-
-    return this.dataSource.transaction(async (manager) => {
-      const eligible = await this.outstandingOrdersForParty(input.partyType, input.partyId);
-      const byOrderId = new Map(eligible.map((o) => [o.orderId, o.outstandingToman]));
-
-      const items = uniqueOrderIds.map((orderId) => {
-        const outstanding = byOrderId.get(orderId);
-        if (outstanding === undefined) {
-          // Covers both "not this party's order" and "nothing outstanding"
-          // with one message -- an operator has no need to distinguish them,
-          // and separate messages would let a caller probe which orders
-          // belong to which party.
-          throw new SettlementRejectedException(`سفارش ${orderId} برای این طرف حساب قابل تسویه نیست.`, { orderId });
-        }
-        return { orderId, amountToman: outstanding };
-      });
-
-      const totalToman = sumAmounts(items.map((i) => i.amountToman));
-      const settlementId = uuidv7();
-
-      await manager.insert(SettlementBatchEntity, {
-        id: settlementId,
-        kind: 'settlement',
-        reversesSettlementId: null,
-        partyType: input.partyType,
-        partyId: input.partyId,
-        amountToman: totalToman,
-        currency: 'IRT',
-        method: input.method,
-        reference: input.reference,
-        note: input.note,
-        createdBy: input.actorId,
-      });
-
-      await manager.insert(
-        SettlementItemEntity,
-        items.map((item) => ({
-          id: uuidv7(),
-          settlementId,
-          orderId: item.orderId,
-          amountToman: item.amountToman,
-        })),
-      );
-
-      await emitEvent(manager, FinancialOutboxEntity, {
-        aggregateType: 'settlement',
-        aggregateId: settlementId,
-        eventType: 'SettlementRecorded',
-        payload: {
-          settlementId,
-          partyType: input.partyType,
-          partyId: input.partyId,
-          amountToman: totalToman,
-          orderCount: items.length,
-          method: input.method,
-        },
-      });
-
-      this.auditLog.log({
-        action: 'settlement.created',
-        settlementId,
-        partyType: input.partyType,
-        partyId: input.partyId,
-        amountToman: totalToman,
-        orderCount: items.length,
-        actorId: input.actorId,
-      });
-
-      return manager.findOneOrFail(SettlementBatchEntity, { where: { id: settlementId } });
-    });
+  async createSettlement(_input: CreateSettlementInput): Promise<SettlementBatchEntity> {
+    throw new SettlementRejectedException(
+      'تسویه فوری غیرفعال است: زمان‌بندی تسویه هنوز منتشر نشده است.',
+      { reason: 'settlement_schedule_unpublished' },
+    );
   }
 
   /**

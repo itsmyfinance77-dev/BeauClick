@@ -2,7 +2,7 @@ import { INestApplication } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
 
-import { LedgerService, SettlementService } from '@beauclick/financial';
+import { FundJournalService } from '@beauclick/financial';
 import { OutboxRelay } from '@beauclick/events';
 
 import {
@@ -12,6 +12,7 @@ import {
   requiredPgEnv,
   resetDatabase,
   resetFinancial,
+  seedFinancialOutboxEvent,
   seedProfessional,
   seedUser,
 } from './pg-test-app.factory';
@@ -47,16 +48,16 @@ const describeIfPg = requiredPgEnv() && OWNER_URL ? describe : describe.skip;
 describeIfPg('Financial outbox consumer on real PostgreSQL', () => {
   let app: INestApplication;
   let dataSource: DataSource;
-  let ledger: LedgerService;
-  let settlements: SettlementService;
+  let financialDataSource: DataSource;
+  let fundJournal: FundJournalService;
   let financialRelay: OutboxRelay;
 
   beforeAll(async () => {
     const ctx = await createPgTestApp();
     app = ctx.app;
     dataSource = ctx.dataSource;
-    ledger = app.get(LedgerService);
-    settlements = app.get(SettlementService);
+    financialDataSource = ctx.financialDataSource;
+    fundJournal = app.get(FundJournalService);
     financialRelay = app.get(FINANCIAL_OUTBOX_RELAY);
   });
 
@@ -69,18 +70,23 @@ describeIfPg('Financial outbox consumer on real PostgreSQL', () => {
     await resetFinancial(requireFinancialOwnerUrl());
   });
 
-  it('drains LedgerEntriesRecorded into an analytics fact row -- the ONLY path financial data can leave the isolated schema by', async () => {
+  /**
+   * `#43a` (ADR-052 §13): `FundsJournalRecorded` is the pending-funds
+   * journal's own event, replacing `LedgerEntriesRecorded` as the path a NEW
+   * collection reaches analytics by -- `LedgerService.recordPayment` (and
+   * the event it used to emit for a fresh payment) is removed.
+   */
+  it('drains FundsJournalRecorded into an analytics fact row -- the ONLY path fund-journal data can leave the isolated schema by', async () => {
     const owner = await seedUser(app, dataSource, `+98941${String(Date.now()).slice(-6)}`, ['professional']);
     const professional = await seedProfessional(dataSource, owner.id, 'حسابدار');
     const orderId = uuidv7();
     const paymentRef = uuidv7();
 
-    const recorded = await ledger.recordPayment({
+    const recorded = await fundJournal.recordCollection({
       orderId,
-      sourceId: null,
       sellerPartyType: 'professional',
       sellerPartyId: professional.id,
-      netAmountToman: 100_000,
+      collectedToman: 100_000,
       paymentReferenceId: paymentRef,
     });
     expect(recorded).toBe(true);
@@ -90,44 +96,49 @@ describeIfPg('Financial outbox consumer on real PostgreSQL', () => {
     expect(result.dispatched).toBeGreaterThan(0);
 
     const facts = await dataSource.query(
-      `SELECT subject_id, metric_value, dimensions FROM analytics.events WHERE event_type = 'LedgerEntriesRecorded' AND subject_id = $1`,
+      `SELECT subject_id, metric_value, dimensions FROM analytics.events WHERE event_type = 'FundsJournalRecorded' AND subject_id = $1`,
       [orderId],
     );
     expect(facts).toHaveLength(1);
     expect(facts[0].dimensions.sellerPartyType).toBe('professional');
+    expect(facts[0].dimensions.kind).toBe('collection');
+    expect(Number(facts[0].metric_value)).toBe(100_000);
 
     // Redelivery: draining again finds nothing new (already published), but
     // even a re-ingestion attempt of the SAME event id must not double-count
     // -- proven directly against the idempotent-by-primary-key insert.
     const again = await financialRelay.drain();
     expect(again.dispatched).toBe(0);
-    const stillOne = await dataSource.query(`SELECT count(*) FROM analytics.events WHERE event_type = 'LedgerEntriesRecorded' AND subject_id = $1`, [orderId]);
+    const stillOne = await dataSource.query(`SELECT count(*) FROM analytics.events WHERE event_type = 'FundsJournalRecorded' AND subject_id = $1`, [orderId]);
     expect(Number(stillOne[0].count)).toBe(1);
   });
 
-  it('drains SettlementRecorded into a fact row AND notifies the seller who was actually paid', async () => {
+  /**
+   * `SettlementService.createSettlement` no longer emits `SettlementRecorded`
+   * at all (ADR-052 §8: the immediate route is refused unconditionally), but
+   * the event contract, and the relay/analytics/notification machinery that
+   * consumes it, are UNCHANGED -- a future schedule-gated settlement record
+   * (`#43e`) reuses them without a new consumer registration. The event is
+   * seeded directly (`seedFinancialOutboxEvent`) to prove that machinery
+   * still works, independent of which production code currently emits it.
+   */
+  it('drains a seeded SettlementRecorded into a fact row AND notifies the seller who was actually paid', async () => {
     const owner = await seedUser(app, dataSource, `+98942${String(Date.now()).slice(-6)}`, ['professional']);
     const professional = await seedProfessional(dataSource, owner.id, 'استاد');
-    const orderId = uuidv7();
+    const settlementId = uuidv7();
 
-    await ledger.recordPayment({
-      orderId,
-      sourceId: null,
-      sellerPartyType: 'professional',
-      sellerPartyId: professional.id,
-      netAmountToman: 200_000,
-      paymentReferenceId: uuidv7(),
-    });
-    await financialRelay.drain(); // clear the LedgerEntriesRecorded row first, for a clean settlement-only assertion below.
-
-    const batch = await settlements.createSettlement({
-      partyType: 'professional',
-      partyId: professional.id,
-      orderIds: [orderId],
-      method: 'bank_transfer',
-      reference: null,
-      note: null,
-      actorId: uuidv7(),
+    await seedFinancialOutboxEvent(financialDataSource, {
+      aggregateType: 'settlement',
+      aggregateId: settlementId,
+      eventType: 'SettlementRecorded',
+      payload: {
+        settlementId,
+        partyType: 'professional',
+        partyId: professional.id,
+        amountToman: 170_000,
+        orderCount: 1,
+        method: 'bank_transfer',
+      },
     });
 
     const result = await financialRelay.drain();
@@ -135,10 +146,10 @@ describeIfPg('Financial outbox consumer on real PostgreSQL', () => {
 
     const facts = await dataSource.query(
       `SELECT metric_value, dimensions FROM analytics.events WHERE event_type = 'SettlementRecorded' AND aggregate_id = $1`,
-      [batch.id],
+      [settlementId],
     );
     expect(facts).toHaveLength(1);
-    expect(Number(facts[0].metric_value)).toBeGreaterThan(0);
+    expect(Number(facts[0].metric_value)).toBe(170_000);
 
     const notifications = await dataSource.query(
       `SELECT user_id, template_key FROM notification.notifications WHERE template_key = 'settlement_recorded'`,

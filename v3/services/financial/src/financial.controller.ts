@@ -10,8 +10,28 @@ import { LedgerService } from './ledger.service';
 import { SettlementService } from './settlement.service';
 import { LedgerEntryEntity, LedgerPartyType } from './entities/ledger-entry.entity';
 import { SettlementBatchEntity } from './entities/settlement.entity';
+import { FundPostingAccount } from './entities/fund-posting.entity';
 import { CreateSettlementDto, PartyQueryDto, ReverseSettlementDto } from './dto/settlement.dto';
 import { EmptyFinanceQueryDto, SettlementPageQueryDto } from './dto/finance-workspace.dto';
+
+/** camelCase field per account (ADR-052 §16's "distinct fields"). Never a loop over the raw snake_case account name -- an added account is a deliberate edit here, not an automatic new field. */
+function toFundsResponse(states: Record<FundPostingAccount, number>) {
+  return {
+    pending: states.pending,
+    disputed: states.disputed,
+    available: states.available,
+    reserve: states.reserve,
+    settled: states.settled,
+    refunded: states.refunded,
+    platformEarned: states.platform_earned,
+    providerFee: states.provider_fee,
+    recoveryOut: states.recovery_out,
+    collected: states.collected,
+    platformAdvance: states.platform_advance,
+    recoveredIn: states.recovered_in,
+    currency: 'IRT' as const,
+  };
+}
 
 /** The seller-safe projection of a settlement batch. One shape, both surfaces. */
 function toSettlement(batch: SettlementBatchEntity) {
@@ -42,9 +62,13 @@ function toLedgerEntry(entry: LedgerEntryEntity) {
 /**
  * A seller's own finances -- V3.3 #72, `V33-DEC-020`.
  *
- * ## Nine routes, in two families
+ * ## Ten routes, in two families
  *
- * The five WORKSPACE-AWARE routes name one addressable workspace by an opaque,
+ * `#43a` (ADR-052 §16) added the tenth, `:workspaceRef/funds`, workspace-aware
+ * only -- the pending-funds journal has no legacy singular shape to keep
+ * compatible, so it gets no singular sibling.
+ *
+ * The five (now six) WORKSPACE-AWARE routes name one addressable workspace by an opaque,
  * server-issued `workspaceRef`. They are what a dual owner uses to reach each of
  * their workspaces separately, and what makes "which workspace?" an explicit
  * question instead of a silent server-side choice. Since V3.3 #111 (`#44e`,
@@ -200,6 +224,24 @@ export class MyFinanceController {
   ) {
     const entries = await this.workspaces.ledgerFor(user.userId, workspaceRef, orderId);
     return entries.map(toLedgerEntry);
+  }
+
+  /**
+   * `GET /me/finance/:workspaceRef/funds` -- the ADDITIVE tenth route
+   * (ADR-052 §16, a `#43a` acceptance criterion; the pinned route count
+   * moves 9 → 10, with the reason recorded in
+   * `finance-identification-cache-safety.pg-spec.ts`). Workspace-aware ONLY
+   * -- there is no singular sibling, matching ADR-052's own text ("One
+   * additive route").
+   */
+  @Get(':workspaceRef/funds')
+  async workspaceFunds(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('workspaceRef') workspaceRef: string,
+    @Query() _query: EmptyFinanceQueryDto,
+  ) {
+    const states = await this.workspaces.fundsFor(user.userId, workspaceRef);
+    return toFundsResponse(states);
   }
 
   // =========================================================================
