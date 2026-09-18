@@ -72,9 +72,35 @@ export const BookingCancelled = defineEvent({
     slotId: uuid(),
     previousStatus: z.string(),
     cancelledAt: instant(),
-    actorType: z.enum(['customer', 'professional', 'system']),
+    // V3.3 #161 (`#42d`), ADR-051 §7/§8 F5: 'admin' joins the vocabulary --
+    // `CAUSE_BY_ACTOR` now maps it to `platform_cancelled` and it drives the
+    // customer's remedy choice, exactly as `system` already does.
+    actorType: z.enum(['customer', 'professional', 'system', 'admin']),
     actorId: uuid().nullable(),
     reason: z.string().nullable(),
+  }),
+});
+
+/**
+ * V3.3 #161 (`#42d`), ADR-051 §7. The professional's no-show declaration: an
+ * immutable fact that moves no money and opens the customer's objection
+ * window. Distinct from `BookingCancelled` -- a no-show never emitted an
+ * event before this story, since the merged `markNoShow` had no commerce
+ * awareness at all.
+ */
+export const BookingNoShowDeclared = defineEvent({
+  name: 'BookingNoShowDeclared',
+  version: 1,
+  aggregateType: 'booking',
+  producer: 'booking',
+  description: 'The professional declared a no-show at or after the snapshotted grace. Moves no money on its own.',
+  idempotency: 'booking_id UNIQUE on booking.no_show_declarations; at most one declaration per booking, ever.',
+  schema: z.object({
+    bookingId: uuid(),
+    professionalId: uuid(),
+    customerId: uuid(),
+    declaredAt: instant(),
+    objectionWindowEndsAt: instant(),
   }),
 });
 
@@ -120,4 +146,5 @@ export const BOOKING_EVENTS = [
   BookingCancelled,
   BookingRescheduled,
   BookingExpired,
+  BookingNoShowDeclared,
 ];

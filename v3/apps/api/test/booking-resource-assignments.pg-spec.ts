@@ -227,6 +227,9 @@ describeIfPg('Booking resource assignment and collision prevention (#128 / #110b
         'booking_resource_assignments',
         'bookings',
         'idempotency_keys',
+        // V3.3 #161 (`#42d`), ADR-051 §7. The professional's no-show
+        // declaration.
+        'no_show_declarations',
         'outbox_events',
       ]);
     });

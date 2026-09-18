@@ -150,12 +150,13 @@ export class BookingCreditEntitlementAdapter implements BookingConfirmationEntit
  *
  * ## The actor mapping is the policy boundary, and it is narrow on purpose
  *
- * Only two actors are both reachable and already authorised. `customer`
- * cancellation is deliberately absent: whether it returns the seller's credit is
- * retention policy under `V33-DEC-013` and #46, and answering it here would be
- * inventing commercial policy in an adapter. `admin` is absent because no
- * production route produces that actor, and `business` because the booking actor
- * vocabulary has no such value.
+ * `customer` cancellation is deliberately absent: whether it returns the
+ * seller's credit is retention policy under `V33-DEC-013` and #46, and
+ * answering it here would be inventing commercial policy in an adapter.
+ * `business` is absent because the booking actor vocabulary has no such
+ * value. `admin` joined `system` as of V3.3 #161 (`#42d`), ADR-051 §7 F5 --
+ * both map to `platform_cancelled`, exactly as `bookingOutcomeCauseForActor`
+ * already maps both to cause `platform` (`@beauclick/commercial-policy-contract`).
  */
 @Injectable()
 export class BookingCreditCancellationAdapter {
@@ -183,6 +184,8 @@ export class BookingCreditCancellationAdapter {
 const CAUSE_BY_ACTOR: Record<string, BookingCreditReturnCause | undefined> = {
   professional: 'seller_cancelled',
   system: 'platform_cancelled',
+  // V3.3 #161 (`#42d`), ADR-051 §7 F5.
+  admin: 'platform_cancelled',
 };
 
 /**

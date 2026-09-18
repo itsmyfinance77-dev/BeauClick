@@ -91,12 +91,30 @@ export interface BookingRescheduleFacts {
 }
 
 /**
+ * The database-clock facts a no-show guard is judged on — V3.3 #161
+ * (`#42d`), ADR-051 §7, `V33-DEC-039` R6.
+ *
+ * `governed: false` means the booking's order carries no outcome terms: the
+ * legacy `slotEnd > now()` guard applies verbatim, and no declaration row,
+ * event or audit line is written — byte-for-byte the pre-#161 behaviour.
+ * `governed: true` carries only the two snapshotted numbers booking-service
+ * needs — the grace minutes for its own SQL guard, and the dispute-window
+ * hours to stamp the declaration's objection window; everything money-shaped
+ * (the retention rule, the Legal cap) stays behind the seam.
+ */
+export type BookingNoShowGovernance =
+  | { readonly governed: false }
+  | { readonly governed: true; readonly graceMinutes: number; readonly disputeWindowHours: number };
+
+/**
  * The outcome seam a governed customer reschedule passes through — V3.3 #160
- * (`#42c`).
+ * (`#42c`). Extended by #161 (`#42d`), ADR-051 §7, with the no-show guard's
+ * own governance read.
  *
  * Declared here and implemented in `apps/api` for the reason
  * `BookingCancellationEntitlementHook` is: booking-service owns the reschedule
- * transaction but may not import commerce, payment or Commercial Policy.
+ * (and, since #161, the no-show) transaction but may not import commerce,
+ * payment or Commercial Policy.
  *
  * ## The lock order is the contract (ADR-050 §4.2/§7)
  *
@@ -104,7 +122,10 @@ export interface BookingRescheduleFacts {
  * booking-service locks its own row: when the order carries terms it takes the
  * order row `FOR UPDATE`, so a governed reschedule and a payment confirmation of
  * the same booking both take order → booking and serialise rather than
- * deadlock.
+ * deadlock. `governNoShow` takes NO lock at all (ADR-051's lock table: "booking
+ * FOR UPDATE -> grace check in SQL -> declaration insert" — the order is never
+ * locked, because a declaration moves no money and the terms it reads are
+ * immutable).
  *
  * ## Mandatory
  *
@@ -117,6 +138,8 @@ export interface BookingRescheduleOutcomeHook {
   consequenceRetainedToman(governance: BookingRescheduleGovernance, facts: BookingRescheduleFacts): bigint;
   /** Records the accepted, zero-money consequence inside the reschedule transaction. */
   recordConsequence(manager: EntityManager, governance: BookingRescheduleGovernance, facts: BookingRescheduleFacts): Promise<void>;
+  /** V3.3 #161 (`#42d`). Whether, and under what snapshotted values, a booking's no-show guard is governed. */
+  governNoShow(manager: EntityManager, bookingId: string): Promise<BookingNoShowGovernance>;
 }
 
 export const BOOKING_RESCHEDULE_OUTCOME_HOOK = Symbol('BEAUCLICK_BOOKING_RESCHEDULE_OUTCOME_HOOK');

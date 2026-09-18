@@ -27,6 +27,10 @@ export interface LockedBookingOrder {
  * The part of an order's accepted outcome terms a decision reads, plus the
  * Legal cap's state at this instant. `null` from `termsFor` is the fail-closed
  * fact: the order carries no terms (`legacy_unenrolled`).
+ *
+ * `noShowGraceMinutes`, `noShowRetention` and `disputeWindowHours` were added
+ * by V3.3 #161 (`#42d`), ADR-051 §7 — additive fields on an already-published
+ * shape, read the same way every other member here is.
  */
 export interface OrderDecisionTerms {
   readonly policyKey: string;
@@ -34,6 +38,9 @@ export interface OrderDecisionTerms {
   readonly cutoffHours: number;
   readonly rescheduleFreeCount: number;
   readonly lateCancellationRetention: BookingOutcomeRetentionRule;
+  readonly noShowGraceMinutes: number;
+  readonly noShowRetention: BookingOutcomeRetentionRule;
+  readonly disputeWindowHours: number;
   readonly legalCap: BookingOutcomeRetentionRule | null;
   readonly legalCapState: LegalCapState;
 }
@@ -169,6 +176,11 @@ export class BookingOutcomeDecisionService {
       late_retention_kind: string;
       late_retention_basis_points: number | null;
       late_retention_amount_toman: string | null;
+      grace_minutes: number;
+      no_show_retention_kind: string;
+      no_show_retention_basis_points: number | null;
+      no_show_retention_amount_toman: string | null;
+      dispute_window_hours: number;
       legal_cap_kind: string | null;
       legal_cap_basis_points: number | null;
       legal_cap_amount_toman: string | null;
@@ -176,6 +188,8 @@ export class BookingOutcomeDecisionService {
     }> = await manager.query(
       `SELECT policy_key, policy_version, cutoff_hours, reschedule_free_count,
               late_retention_kind, late_retention_basis_points, late_retention_amount_toman::text AS late_retention_amount_toman,
+              grace_minutes, no_show_retention_kind, no_show_retention_basis_points,
+              no_show_retention_amount_toman::text AS no_show_retention_amount_toman, dispute_window_hours,
               legal_cap_kind, legal_cap_basis_points, legal_cap_amount_toman::text AS legal_cap_amount_toman,
               legal_evidence_id
          FROM commerce.order_outcome_terms
@@ -202,9 +216,33 @@ export class BookingOutcomeDecisionService {
         row.late_retention_basis_points,
         row.late_retention_amount_toman,
       ),
+      noShowGraceMinutes: Number(row.grace_minutes),
+      noShowRetention: bookingOutcomeRetentionRuleFromColumns(
+        row.no_show_retention_kind,
+        row.no_show_retention_basis_points,
+        row.no_show_retention_amount_toman,
+      ),
+      disputeWindowHours: Number(row.dispute_window_hours),
       legalCap,
       legalCapState,
     };
+  }
+
+  /**
+   * The order id for a booking, WITHOUT any lock — V3.3 #161 (`#42d`).
+   *
+   * Mirrors `bookingHasOutcomeTerms`'s reasoning: an order's `(source_type,
+   * source_id)` never changes after creation, so this answer cannot go stale
+   * between an unlocked read and a later, separately-locked write. Used to
+   * resolve a booking's remedy-choice row by its order id without taking the
+   * order lock a no-show or remedy-choice READ does not need.
+   */
+  async orderIdForBooking(manager: EntityManager, bookingId: string): Promise<string | null> {
+    const rows: Array<{ id: string }> = await manager.query(
+      `SELECT id FROM commerce.orders WHERE source_type = 'booking' AND source_id = $1`,
+      [bookingId],
+    );
+    return rows[0]?.id ?? null;
   }
 
   /** The live decision of this kind for this booking, if one exists. */

@@ -6,6 +6,7 @@ import { WaitlistService } from '@beauclick/waitlist';
 import { MediaService } from '@beauclick/media';
 import { PrivacyConfig, PrivacySweepService } from '@beauclick/privacy';
 import { FINANCIAL_OUTBOX_RELAY } from '../composition/financial-outbox-relay.provider';
+import { BookingOutcomeOrchestrator } from '../outcome/booking-outcome.orchestrator';
 
 /**
  * Two periodic backstops, both deliberately backstops rather than mechanisms.
@@ -39,6 +40,8 @@ export class OutboxSweepScheduler implements OnApplicationBootstrap, OnApplicati
     private readonly privacySweep: PrivacySweepService,
     private readonly privacyConfig: PrivacyConfig,
     private readonly config: ConfigService,
+    // V3.3 #161 (`#42d`), ADR-051 §7. The no-show window-expiry sweep.
+    private readonly bookingOutcomes: BookingOutcomeOrchestrator,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -52,6 +55,9 @@ export class OutboxSweepScheduler implements OnApplicationBootstrap, OnApplicati
       this.every(this.intervalMs('FINANCIAL_OUTBOX_SWEEP_INTERVAL_MS', 5_000), () => this.sweepFinancialOutbox()),
     );
     this.timers.push(this.every(this.intervalMs('HOLD_EXPIRY_SWEEP_INTERVAL_MS', 60_000), () => this.sweepHolds()));
+    this.timers.push(
+      this.every(this.intervalMs('NO_SHOW_WINDOW_SWEEP_INTERVAL_MS', 60_000), () => this.sweepNoShowWindows()),
+    );
     this.timers.push(
       this.every(this.intervalMs('WAITLIST_OFFER_EXPIRY_SWEEP_INTERVAL_MS', 60_000), () => this.sweepWaitlistOffers()),
     );
@@ -116,6 +122,18 @@ export class OutboxSweepScheduler implements OnApplicationBootstrap, OnApplicati
   private async sweepHolds(): Promise<void> {
     const expired = await this.bookings.expireStaleHolds();
     if (expired > 0) this.logger.log(`Hold expiry sweep: ${expired} booking(s) expired`);
+  }
+
+  /**
+   * V3.3 #161 (`#42d`), ADR-051 §7. Also a backstop, not the mechanism: any
+   * future lazy read that calls `BookingOutcomeOrchestrator.decideNoShowWindow`
+   * directly converges on the same decision this sweep would have written --
+   * what this sweep adds is that money moves even when nobody ever reads the
+   * outcome.
+   */
+  private async sweepNoShowWindows(): Promise<void> {
+    const decided = await this.bookingOutcomes.expireNoShowWindows();
+    if (decided > 0) this.logger.log(`No-show window sweep: ${decided} booking(s) decided`);
   }
 
   /**

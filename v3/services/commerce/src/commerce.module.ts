@@ -8,6 +8,7 @@ import { OrderAdjustmentEntity } from './entities/order-adjustment.entity';
 import { OrderPaymentScheduleEntity } from './entities/order-payment-schedule.entity';
 import { CommerceOutboxEntity } from './entities/commerce-outbox.entity';
 import { OrderOutcomeTermsEntity } from './entities/order-outcome-terms.entity';
+import { CustomerRemedyChoiceEntity } from './entities/customer-remedy-choice.entity';
 
 import { PricingService } from './pricing/pricing.service';
 import { OrderService } from './order/order.service';
@@ -15,6 +16,7 @@ import { OrderOwnerResolver } from './order/order-owner.resolver';
 import { OrderController } from './order/order.controller';
 import { CommerceSubjectDataContract } from './commerce-subject-data.contract';
 import { BookingOutcomeDecisionService } from './outcome-decision/booking-outcome-decision.service';
+import { CustomerRemedyChoiceService } from './outcome-decision/customer-remedy-choice.service';
 
 export const COMMERCE_ENTITIES = [
   OrderEntity,
@@ -26,6 +28,9 @@ export const COMMERCE_ENTITIES = [
   OrderPaymentScheduleEntity,
   // V3.3 #159 (`#42b`), ADR-051 §3. The order's accepted outcome terms, 1:1.
   OrderOutcomeTermsEntity,
+  // V3.3 #161 (`#42d`), ADR-051 §8. The customer's remedy after a
+  // seller/platform/provider cancellation.
+  CustomerRemedyChoiceEntity,
   CommerceOutboxEntity,
 ];
 
@@ -46,8 +51,11 @@ export const COMMERCE_ENTITIES = [
   providers: [
     CommerceSubjectDataContract,PricingService, OrderService, OrderOwnerResolver,
     // V3.3 #160 (`#42c`), ADR-051 §6. The booking outcome decision record.
-    BookingOutcomeDecisionService],
+    BookingOutcomeDecisionService,
+    // V3.3 #161 (`#42d`), ADR-051 §8. The customer's remedy choice record.
+    CustomerRemedyChoiceService],
   exports: [
-    CommerceSubjectDataContract,OrderService, PricingService, TypeOrmModule, BookingOutcomeDecisionService],
+    CommerceSubjectDataContract,OrderService, PricingService, TypeOrmModule, BookingOutcomeDecisionService,
+    CustomerRemedyChoiceService],
 })
 export class CommerceModule {}

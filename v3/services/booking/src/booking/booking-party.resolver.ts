@@ -55,3 +55,20 @@ export class BookingProfessionalResolver implements OwnerResolver<{ id: string }
     return (await this.party.roleFor(params.id, sessionUserId)) === 'professional' ? sessionUserId : null;
   }
 }
+
+/**
+ * Narrower variant for routes only the CUSTOMER may call -- V3.3 #161
+ * (`#42d`), ADR-051 §8: the remedy after a seller/platform/provider
+ * cancellation is the customer's choice alone. A professional holding a
+ * valid session for their own delivered booking resolves to null here,
+ * exactly as `BookingProfessionalResolver` refuses a customer the opposite
+ * way.
+ */
+@Injectable()
+export class BookingCustomerResolver implements OwnerResolver<{ id: string }> {
+  constructor(private readonly party: BookingPartyResolver) {}
+
+  async resolve(sessionUserId: string, params: { id: string }): Promise<string | null> {
+    return (await this.party.roleFor(params.id, sessionUserId)) === 'customer' ? sessionUserId : null;
+  }
+}

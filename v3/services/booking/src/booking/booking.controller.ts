@@ -6,7 +6,7 @@ import { BookingService } from './booking.service';
 import { BookingPartyResolver, BookingProfessionalResolver } from './booking-party.resolver';
 import { BookingEntity } from '../entities/booking.entity';
 import { BookingHistoryEntity } from '../entities/booking-history.entity';
-import { CancelBookingDto, RescheduleBookingDto } from '../dto/booking.dto';
+import { CancelBookingDto, MarkNoShowDto, RescheduleBookingDto } from '../dto/booking.dto';
 import { PROFESSIONAL_DIRECTORY, ProfessionalDirectory } from '../ports';
 
 export function toBookingShape(booking: BookingEntity) {
@@ -144,8 +144,8 @@ export class BookingController {
 
   @ResolveOwner(BookingProfessionalResolver)
   @Post('bookings/:id/no-show')
-  async noShow(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
-    await this.bookings.markNoShow(id, { type: 'professional', id: user.userId });
+  async noShow(@Param('id') id: string, @Body() dto: MarkNoShowDto, @CurrentUser() user: AuthenticatedUser) {
+    await this.bookings.markNoShow(id, { type: 'professional', id: user.userId }, dto.statement ?? null);
     const booking = await this.bookings.findById(id);
     if (!booking) throw new NotFoundOrNotYoursException();
     return toBookingShape(booking);

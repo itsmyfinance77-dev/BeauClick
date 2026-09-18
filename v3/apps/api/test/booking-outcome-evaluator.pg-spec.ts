@@ -892,7 +892,9 @@ describePg('booking outcome evaluator, decision and execution (real PostgreSQL)'
       ['a reschedule consequence carrying money', { ...RESCHEDULE, refund_toman: '1' }, /ck_bod_reschedule_consequence_dormant/],
       ['a cancellation under another request key', { refund_request_key: 'suite-other-key' }, /ck_bod_cancellation_key/],
       ['a pending execution with nothing to refund', { collected_remaining_toman: '0', refund_toman: '0', execution_status: 'pending' }, /ck_bod_execution_needs_refund/],
-      ['a kind this story defines no rules for', { decision_kind: 'no_show', refund_request_key: null }, /ck_bod_kind_defined/],
+      // V3.3 #161 (`#42d`) unlocked `no_show`; `dispute_outcome` (#162) is the
+      // one kind this story still defines no rules for.
+      ['a kind no story yet defines rules for', { decision_kind: 'dispute_outcome', refund_request_key: null }, /ck_bod_kind_defined/],
       ['terms other than the order’s own', { ...RESCHEDULE, policy_key: 'suite-other' }, /must record the order's own accepted terms/],
       ['a booking that is not the order’s', { ...RESCHEDULE, booking_id: uuidv7() }, /must decide the booking its order was created for/],
       ['a supplied decided_at', { ...RESCHEDULE, decided_at: '2030-01-01T00:00:00Z' }, /decided_at must be the database transaction instant/],
