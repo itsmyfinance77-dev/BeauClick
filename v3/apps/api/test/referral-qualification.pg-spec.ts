@@ -226,6 +226,33 @@ describePg('referral qualification — CAS, two sides, cap, ledger (real Postgre
       expect(row.qualifying_booking_id).toBe(bookingId);
     });
 
+    it('REGRESSION: the fixture default attribution never lands after a frozen qualification clock, however far in the past the freeze is', async () => {
+      // `pendingReferral`'s default `attributed_at`/`expires_at` read through
+      // `ctx.referralClock` so they stay anchored to whatever instant is
+      // active at call time -- real or frozen. This guards the invariant
+      // itself rather than a specific calendar literal: freezing far enough
+      // in the past that no future run of this suite can ever catch up to it
+      // is what makes it a real regression guard. On a fixture that instead
+      // read the real wall clock, `attributed_at` would land in the present
+      // while `qualified_at` is pinned to 2020, and the CHECK
+      // (`ck_referrals_qualified_after_attribution`) would fail on the very
+      // first `qualifyFor` below.
+      const referrer = await customer();
+      const referee = await customer();
+
+      ctx.referralClock.freeze(new Date('2020-01-01T00:00:00.000Z'));
+      const referralId = await pendingReferral(referrer, referee);
+
+      const [{ attributed_at: attributedAt }] = await dataSource.query(
+        'SELECT attributed_at FROM referral.referrals WHERE id = $1',
+        [referralId],
+      );
+      expect((attributedAt as Date).getTime()).toBeLessThanOrEqual(ctx.referralClock.now().getTime());
+
+      const result = await qualifyFor(referee);
+      expect(result.qualified).toBe(true);
+    });
+
     it('writes BOTH grants, independently, even though both pay nothing', async () => {
       const referrer = await customer();
       const referee = await customer();
