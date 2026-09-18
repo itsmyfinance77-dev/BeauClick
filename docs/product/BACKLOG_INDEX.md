@@ -1361,3 +1361,53 @@ three jobs, including real PostgreSQL / OpenSearch / object storage.
 - Still open and not built here: the force-majeure declaration of `V33-DEC-039` R8, which no story
   owns yet, and the money semantics of a non-zero reschedule consequence.
 - No provider, payment rail, tag or Release was introduced or changed.
+
+## V3.3 Story #161 (`#42d`) delivered, 2026-09-18
+
+No-show declaration and the non-customer-cancellation customer remedy shipped against ADR-051
+§7–§8 (`V33-DEC-039` R6–R7), in an isolated worktree/branch from `origin/master` at `56938d7`.
+
+**#161 (`#42d`), 8 Story Points.**
+- **No-show declaration** (`booking.no_show_declarations`) — one immutable, evidence-minimal
+  declaration per booking. A governed booking (its order carries accepted outcome terms) requires
+  `now() >= slot_start + grace_minutes` in SQL; a legacy booking with no terms keeps the pre-#161
+  `slotEnd > now()` rule byte-for-byte. A declaration moves no money.
+- **Window evaluation** extends `#42c`'s evaluator with a `no_show` branch (own retention snapshot,
+  no cutoff/timeliness), converging sweep and lazy callers on one decision through the existing
+  `uq_bod_one_live_per_kind` index; `commerce.booking_outcome_decisions` gained the kind via an
+  additive `ALTER`, the #160 migration untouched.
+- **Customer remedy** (`commerce.customer_remedy_choices`) — a non-customer cancellation offers
+  exactly one remedy, born already resolved to the default full refund; the customer may override
+  to a free reschedule only while the refund is still pending/manual-required. `admin` cancellation
+  now maps to `platform_cancelled` for credit return.
+
+**What moved concurrently.** Two other deliveries landed on `master` in the same window and are
+reflected in the totals below, not attributed to #161: `#43a` (#187, 13 points, pending-funds
+journal) and a test-only fixture-clock guard (#188, 0 points) that fixed an unrelated, pre-existing
+referral-suite failure blocking every PR's merge gate — reproduced identically on unmodified
+`origin/master` before diagnosing it as unrelated to #161, confirmed fixed after #188 landed.
+Because master's protected-branch ruleset requires every PR to be up to date at merge time,
+`origin/master` was merged into `#161`'s branch twice (picking up `#187` then `#188`), with the
+full CI battery re-run green each time before the final squash merge.
+
+Merged via PR #186 (squash `4f575f1`), closing #161. Post-merge V3 CI on `4f575f1` inherits the
+green `4e3ca37` run (all four jobs, including real PostgreSQL / OpenSearch / object storage) since
+the squash changed no content already verified there.
+
+| Item | Before | After | Outcome it owns |
+|---|---|---|---|
+| #161 (`#42d`) | `status:review`, 8 | **Closed, 8** | No-show declaration and customer remedy choice, delivered as described above |
+| #162 (`#42e`) | `status:proposed`, 13 | unchanged | Dispute and appeal case model — not started |
+| #43a | `status:ready`, 13 | **Closed, 13** (concurrent, not this delivery) | Pending-funds journal, commission-rate removal, settlement refusal |
+
+**What moved.** V3.3 done **277 → 298** (+21: `#161`'s 8, `#43a`'s 13), scope **423 → 428** (+5,
+a story split off `#43a`'s preflight, not created by this delivery). The live dashboard (issue #2),
+`scripts/backlog-report.mjs` (its own CI-triggered run at `2026-09-18T18:36:05.291Z`) and an
+independent recomputation from raw labels agree: **298 / 428**, proposed **102**, ready **5**,
+active **0**, review **0**, blocked **23**.
+- #161 closes with its `sp:8` label preserved and no status label.
+- The only data-quality warning is that #172 has no milestone. This delivery did not create it.
+- Still open and not built here: dispute filing/review (#162), ordinary-completion dispute (#180),
+  force majeure, business-owner/delegated-calendar authority, the money semantics of a non-zero
+  reschedule consequence, and #43's remaining release/settlement children (#43b–#43h).
+- No provider, payment rail, tag or Release was introduced or changed.
