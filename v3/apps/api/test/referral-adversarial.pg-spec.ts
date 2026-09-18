@@ -380,6 +380,37 @@ describePg('referral — abuse, security and concurrency adversarial suite (real
   }
 
   // ==========================================================================
+  // 0. The fixture itself, proved immune to wall-clock drift
+  // ==========================================================================
+
+  describe('the pendingReferral fixture', () => {
+    it('REGRESSION: default attribution never lands after a frozen qualification clock, however far in the past the freeze is', async () => {
+      // `pendingReferral`'s default `attributed_at`/`expires_at` read through
+      // `ctx.referralClock` so they stay anchored to whatever instant is
+      // active at call time -- real or frozen. Freezing far enough in the
+      // past that no future run of this suite can ever catch up to it is what
+      // makes this a real regression guard for the invariant, rather than
+      // another instance of the bug it once caught (a fixture that read the
+      // real wall clock instead would trip
+      // `ck_referrals_qualified_after_attribution` here immediately).
+      const referrer = await customer();
+      const referee = await customer();
+
+      ctx.referralClock.freeze(new Date('2020-01-01T00:00:00.000Z'));
+      const referralId = await pendingReferral(referrer, referee);
+
+      const [{ attributed_at: attributedAt }] = await dataSource.query(
+        'SELECT attributed_at FROM referral.referrals WHERE id = $1',
+        [referralId],
+      );
+      expect((attributedAt as Date).getTime()).toBeLessThanOrEqual(ctx.referralClock.now().getTime());
+
+      const result = await qualifyFor(referee);
+      expect(result.qualified).toBe(true);
+    });
+  });
+
+  // ==========================================================================
   // A. ATTRIBUTION AND OWNERSHIP
   // ==========================================================================
 
