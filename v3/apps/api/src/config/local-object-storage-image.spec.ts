@@ -31,8 +31,8 @@ import { resolve } from 'node:path';
 const WORKSPACE = resolve(__dirname, '../../../..');
 const REPO = resolve(WORKSPACE, '..');
 
-const compose = readFileSync(resolve(WORKSPACE, 'infra/docker/docker-compose.yml'), 'utf8');
-const ci = readFileSync(resolve(REPO, '.github/workflows/v3-ci.yml'), 'utf8');
+const compose = readFileSync(resolve(WORKSPACE, 'infra/docker/docker-compose.yml'), 'utf8').replace(/\r\n/g, '\n');
+const ci = readFileSync(resolve(REPO, '.github/workflows/v3-ci.yml'), 'utf8').replace(/\r\n/g, '\n');
 
 const QUAY_MINIO = 'quay.io/minio/minio';
 
