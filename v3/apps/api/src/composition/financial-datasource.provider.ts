@@ -103,6 +103,35 @@ async function assertRoleIsNotPrivileged(dataSource: DataSource): Promise<void> 
         'append-only (ADR-009) -- revoke UPDATE/DELETE/TRUNCATE from this role before starting.',
     );
   }
+
+  // `#43a` (ADR-052 §4): the pending-funds journal rests on the SAME
+  // INSERT-only guarantee, and on the writer being unable to `SELECT ... FOR
+  // UPDATE` -- the reason `FundJournalService` takes an advisory lock instead
+  // of a row lock. Both are proved here, at boot, not merely assumed from the
+  // ledger's own check above.
+  const [fundGrant]: { has: boolean }[] = await dataSource.query(
+    "SELECT has_table_privilege('financial.fund_postings', 'UPDATE') AS has",
+  );
+  if (fundGrant?.has) {
+    throw new Error(
+      'The financial connection holds UPDATE on financial.fund_postings. The fund journal must be ' +
+        'append-only (ADR-052 §4) -- revoke UPDATE/DELETE/TRUNCATE from this role before starting.',
+    );
+  }
+
+  try {
+    await dataSource.query('SELECT 1 FROM financial.fund_postings FOR UPDATE LIMIT 1');
+    throw new Error(
+      'The financial connection can SELECT ... FOR UPDATE on financial.fund_postings. ADR-052 §4 relies ' +
+        'on the writer role being UNABLE to row-lock, so FundJournalService serialises with an advisory ' +
+        'lock instead -- if row locking is possible here, that design assumption no longer holds.',
+    );
+  } catch (err) {
+    // `permission denied` (Postgres code 42501) is the expected, REQUIRED
+    // outcome -- everything else (including the error thrown above, on
+    // purpose) is a genuine failure and must propagate.
+    if ((err as { code?: string } | null)?.code !== '42501') throw err;
+  }
 }
 
 function maskUser(url: string): string {

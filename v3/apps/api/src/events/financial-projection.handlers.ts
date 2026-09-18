@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DomainEventHandler, EventEnvelope, AuditLogger } from '@beauclick/events';
-import { LedgerService } from '@beauclick/financial';
+import { FundJournalService, LedgerService } from '@beauclick/financial';
 import { OrderService } from '@beauclick/commerce';
 import { PaymentService } from '@beauclick/payment';
 import { BookingService } from '@beauclick/booking';
@@ -11,9 +11,11 @@ import { BookingOutcomeOrchestrator } from '../outcome/booking-outcome.orchestra
  * The Phase 2 event graph, in one file so the whole reaction chain is
  * readable at once:
  *
- *   OrderPaid        -> record commission + receivable in the ledger
+ *   OrderPaid        -> post a `collection` journal (`FundJournalService`)
  *   RefundCompleted  -> record the refund against the order
- *   OrderRefunded    -> reverse the ledger at the ORIGINAL captured rate
+ *   OrderRefunded    -> reverse against whichever regime this order's
+ *                       collection actually lives in (see the router note
+ *                       on `OrderRefundedLedgerHandler` below)
  *   BookingCancelled -> refund the linked order if it was paid, cancel it if
  *                       BeauClick never collected for it (V3.3 #81)
  *   BookingExpired   -> cancel the uncollected order
@@ -27,6 +29,21 @@ import { BookingOutcomeOrchestrator } from '../outcome/booking-outcome.orchestra
  * decides financial consequences; commerce and payment decide those. That is
  * V2's separation of concerns, preserved deliberately -- inverting it would
  * put refund policy inside the scheduling domain.
+ *
+ * ## `#43a` (ADR-052 §16): every order collected from this deploy is the NEW
+ * regime, unconditionally
+ *
+ * `OrderPaidLedgerHandler`/`OrderCollectionCapturedLedgerHandler` used to
+ * call `LedgerService.recordPayment`, which posted a commission + receivable
+ * pair at the platform's then-current rate. `recordPayment` and the in-code
+ * rate it read are REMOVED (ADR-052 §16), not merely bypassed: every new
+ * collection now posts a balanced `collection` journal through
+ * `FundJournalService` instead, carrying no commission and no receivable at
+ * all (neither commission policy nor release exist until `#43b`/`#43c`).
+ * There is no branch here because there is no legacy path left to choose for
+ * a COLLECTION -- only a refund can land against an order that collected
+ * before this deploy, which is what `OrderRefundedLedgerHandler`'s router
+ * decides.
  */
 
 @Injectable()
@@ -40,19 +57,20 @@ export class OrderPaidLedgerHandler implements DomainEventHandler {
   private readonly logger = new Logger('OrderPaidLedgerHandler');
 
   constructor(
-    private readonly ledger: LedgerService,
+    private readonly fundJournal: FundJournalService,
     private readonly payments: PaymentService,
   ) {}
 
   /**
    * Consumes `OrderPaid` rather than `PaymentSucceeded` on purpose: the
    * commerce event already carries the seller party and the authoritative
-   * total, so the ledger never has to re-derive who earns what. It also
-   * means the ledger reacts to "the order is paid" -- the business fact --
-   * rather than to a gateway-level detail.
+   * total, so the journal never has to re-derive who earns what. It also
+   * means it reacts to "the order is paid" -- the business fact -- rather
+   * than to a gateway-level detail.
    *
-   * Idempotent via `UNIQUE(entry_type, reference_type, reference_id)` on the
-   * ledger: a redelivery inserts zero rows and returns false.
+   * Idempotent via `uq_fund_journals_idempotency_key` on
+   * `collection:<paymentIntentId>`: a redelivery writes zero rows and
+   * returns false.
    */
   async handle(envelope: EventEnvelope): Promise<void> {
     const payload = envelope.payload as {
@@ -92,17 +110,16 @@ export class OrderPaidLedgerHandler implements DomainEventHandler {
       throw new Error(`No payment intent found for paid order ${payload.orderId}`);
     }
 
-    const recorded = await this.ledger.recordPayment({
+    const recorded = await this.fundJournal.recordCollection({
       orderId: payload.orderId,
-      sourceId: payload.sourceType === 'booking' ? payload.sourceId : null,
       sellerPartyType: payload.sellerPartyType,
       sellerPartyId: payload.sellerPartyId,
-      netAmountToman: collectedToman,
+      collectedToman,
       paymentReferenceId: intent.id,
     });
 
     if (!recorded) {
-      this.logger.debug(`Ledger already recorded payment for order ${payload.orderId} -- idempotent no-op`);
+      this.logger.debug(`Fund journal already recorded collection for order ${payload.orderId} -- idempotent no-op`);
     }
   }
 }
@@ -182,21 +199,51 @@ export class RefundCompletedCommerceHandler implements DomainEventHandler {
   }
 }
 
+/**
+ * The regime router (ADR-052 §16): "the regime is fixed per order by where
+ * its collection fact lives". An order's `financial.ledger_entries` row, if
+ * it has one, was written before this deploy (`LedgerService.recordPayment`
+ * no longer exists to write a new one) and stays authoritative for that
+ * order FOREVER -- so a refund against it must keep reversing there, at the
+ * cumulative rule `LedgerService.recordRefund` now implements. Every other
+ * order collected a `financial.fund_journals` `collection` row instead, and
+ * its refund draws `pending` through `FundJournalService`.
+ *
+ * The check is a real read (`LedgerService.hasLegacyPayment`), not a date or
+ * a feature flag: a race between a very-late legacy payment record and this
+ * deploy is resolved by which table actually has the row, not by when the
+ * order was created.
+ */
 @Injectable()
 export class OrderRefundedLedgerHandler implements DomainEventHandler {
   readonly eventType = 'OrderRefunded';
 
-  constructor(private readonly ledger: LedgerService) {}
+  constructor(
+    private readonly ledger: LedgerService,
+    private readonly fundJournal: FundJournalService,
+  ) {}
 
   /**
-   * Reverses the ledger at the ORIGINAL captured commission rate, never the
-   * platform's current one -- `LedgerService.recordRefund` reads the rate off
-   * the original entry. Idempotent via the same unique constraint, keyed on
-   * the refund id.
+   * Idempotent on both sides of the router: `LedgerService.recordRefund` via
+   * `UNIQUE(entry_type, reference_type, reference_id)`, `FundJournalService.recordRefund`
+   * via `uq_fund_journals_idempotency_key` on `refund:<refundId>`. A
+   * redelivery re-evaluates the SAME routing decision (the order's regime
+   * never changes) and lands on the same no-op either way.
    */
   async handle(envelope: EventEnvelope): Promise<void> {
     const payload = envelope.payload as { orderId: string; refundId: string; refundAmountToman: number };
-    await this.ledger.recordRefund({
+
+    const isLegacy = await this.ledger.hasLegacyPayment(payload.orderId);
+    if (isLegacy) {
+      await this.ledger.recordRefund({
+        orderId: payload.orderId,
+        refundId: payload.refundId,
+        refundAmountToman: payload.refundAmountToman,
+      });
+      return;
+    }
+
+    await this.fundJournal.recordRefund({
       orderId: payload.orderId,
       refundId: payload.refundId,
       refundAmountToman: payload.refundAmountToman,

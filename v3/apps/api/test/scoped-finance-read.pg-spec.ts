@@ -11,7 +11,7 @@ import {
 } from '@beauclick/business';
 import { AdminAuditService } from '@beauclick/audit';
 import { BookingCollectionPolicyService, BookingOutcomePolicyService, CommercialCatalogueService } from '@beauclick/commercial-policy';
-import { FinanceWorkspaceService, LedgerService, SettlementService } from '@beauclick/financial';
+import { FinanceWorkspaceService } from '@beauclick/financial';
 import { SUBJECT_DATA_CONTRACTS, SubjectDataCoverageService } from '@beauclick/subject-data';
 import { assertNoLeak } from '@beauclick/testing';
 import { SellerPartyLookup } from '../src/composition/port-adapters';
@@ -26,8 +26,10 @@ import {
   resetDatabase,
   resetFinancial,
   seedBusiness,
+  seedLegacyPayment,
   seedMembership,
   seedProfessional,
+  seedSettlementBatch,
   seedUser,
 } from './pg-test-app.factory';
 
@@ -68,8 +70,6 @@ describePg('scoped read-only business finance authority (real PostgreSQL, #111)'
   let ctx: PgTestApp;
   let app: INestApplication;
   let dataSource: DataSource;
-  let ledger: LedgerService;
-  let settlements: SettlementService;
   let staff: StaffService;
   let authorizer: ScopedStaffAuthorizerPort;
   let workspaces: FinanceWorkspaceService;
@@ -81,8 +81,6 @@ describePg('scoped read-only business finance authority (real PostgreSQL, #111)'
     ctx = await createPgTestApp();
     app = ctx.app;
     dataSource = ctx.dataSource;
-    ledger = app.get(LedgerService);
-    settlements = app.get(SettlementService);
     staff = app.get(StaffService);
     authorizer = app.get(SCOPED_STAFF_AUTHORIZER);
     workspaces = app.get(FinanceWorkspaceService);
@@ -103,14 +101,15 @@ describePg('scoped read-only business finance authority (real PostgreSQL, #111)'
 
   const receivableOf = (paid: number) => paid - Math.round(paid * 0.15);
 
+  /** LEGACY fixture (ADR-052 §16) -- `LedgerService.recordPayment` is removed. */
   async function earn(partyType: 'professional' | 'business', partyId: string, paid: number): Promise<string> {
     const orderId = uuidv7();
-    await ledger.recordPayment({
+    await seedLegacyPayment(ctx.financialDataSource, {
       orderId,
-      sourceId: null,
       sellerPartyType: partyType,
       sellerPartyId: partyId,
       netAmountToman: paid,
+      rateBp: 1500,
       paymentReferenceId: uuidv7(),
     });
     return orderId;
@@ -637,14 +636,17 @@ describePg('scoped read-only business finance authority (real PostgreSQL, #111)'
   describe('§4 reads', () => {
     it('a grantee reads all four workspace-aware routes with the OWNER projection, byte-for-byte', async () => {
       const { salon: s, bookkeeper: k, ref } = await grantedBookkeeper();
-      await settlements.createSettlement({
+      // Seeded directly (ADR-052 §16, §8) -- `createSettlement` now refuses
+      // unconditionally. The FULL outstanding amount, so this test's
+      // downstream `settledToman`/`outstandingToman` assertions still hold.
+      await seedSettlementBatch(ctx.financialDataSource, {
         partyType: 'business',
         partyId: s.businessId,
-        orderIds: [s.orderId],
+        items: [{ orderId: s.orderId, amountToman: s.receivable }],
         method: 'bank',
         reference: 'SET-1',
         note: 'operator note',
-        actorId: s.owner.id,
+        createdBy: s.owner.id,
       });
       const secondOrder = await earn('business', s.businessId, 800_000);
       const ownerRef = await refFor(s.owner, 'business', 'owner');
@@ -772,14 +774,13 @@ describePg('scoped read-only business finance authority (real PostgreSQL, #111)'
       const ownerRef = await refFor(s.owner, 'business', 'owner');
       const orders = [s.orderId, await earn('business', s.businessId, 500_000), await earn('business', s.businessId, 600_000)];
       for (const orderId of orders) {
-        await settlements.createSettlement({
+        // Seeded directly (ADR-052 §16, §8) -- `createSettlement` now
+        // refuses unconditionally.
+        await seedSettlementBatch(ctx.financialDataSource, {
           partyType: 'business',
           partyId: s.businessId,
-          orderIds: [orderId],
-          method: null,
-          reference: null,
-          note: null,
-          actorId: s.owner.id,
+          items: [{ orderId, amountToman: 1 }],
+          createdBy: s.owner.id,
         });
       }
 
@@ -1385,7 +1386,7 @@ describePg('scoped read-only business finance authority (real PostgreSQL, #111)'
   // =======================================================================
 
   describe('§9 the surface is unchanged', () => {
-    it('the finance route table is still exactly nine routes', () => {
+    it('the finance route table is still exactly ten routes -- `#43a` added ONE additive, workspace-aware-only route (ADR-052 §16)', () => {
       const server = app.getHttpServer();
       const router = server._events.request._router as { stack: Array<{ route?: { path: string } }> };
       const paths = router.stack.filter((layer) => layer.route).map((layer) => layer.route!.path);
@@ -1396,6 +1397,7 @@ describePg('scoped read-only business finance authority (real PostgreSQL, #111)'
           '/api/v1/me/finance/:workspaceRef/outstanding-orders',
           '/api/v1/me/finance/:workspaceRef/settlements',
           '/api/v1/me/finance/:workspaceRef/orders/:orderId/ledger',
+          '/api/v1/me/finance/:workspaceRef/funds',
           '/api/v1/me/finance/summary',
           '/api/v1/me/finance/outstanding-orders',
           '/api/v1/me/finance/settlements',

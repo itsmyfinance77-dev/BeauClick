@@ -5,10 +5,12 @@ import { ConfigModule } from '@nestjs/config';
 import { LedgerEntryEntity } from './entities/ledger-entry.entity';
 import { SettlementBatchEntity, SettlementItemEntity } from './entities/settlement.entity';
 import { FinancialOutboxEntity } from './entities/financial-outbox.entity';
+import { FundJournalEntity } from './entities/fund-journal.entity';
+import { FundPostingEntity } from './entities/fund-posting.entity';
 
-import { FinancialConfig } from './financial.config';
 import { LedgerService } from './ledger.service';
 import { SettlementService } from './settlement.service';
+import { FundJournalService } from './fund-journal.service';
 import { MyFinanceService } from './my-finance.service';
 import { FinanceWorkspaceService } from './finance-workspace.service';
 import { FinancialAdminController, MyFinanceController } from './financial.controller';
@@ -20,6 +22,8 @@ export const FINANCIAL_ENTITIES = [
   SettlementBatchEntity,
   SettlementItemEntity,
   FinancialOutboxEntity,
+  FundJournalEntity,
+  FundPostingEntity,
 ];
 
 /**
@@ -50,9 +54,9 @@ export const FINANCIAL_ENTITIES = [
   controllers: [MyFinanceController, FinancialAdminController],
   providers: [
     FinancialSubjectDataContract,
-    FinancialConfig,
     LedgerService,
     SettlementService,
+    FundJournalService,
     FinanceWorkspaceService,
     MyFinanceService,
     FinanceNoStoreMiddleware,
@@ -61,9 +65,9 @@ export const FINANCIAL_ENTITIES = [
     FinancialSubjectDataContract,
     LedgerService,
     SettlementService,
+    FundJournalService,
     FinanceWorkspaceService,
     MyFinanceService,
-    FinancialConfig,
   ],
 })
 export class FinancialModule implements NestModule {

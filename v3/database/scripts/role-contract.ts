@@ -192,6 +192,48 @@ export async function verifyRoleContract(client: Client): Promise<RoleCheck[]> {
     }
   }
 
+  // ---- The pending-funds journal's append-only guarantee (`#43a`, ADR-052 §4) ----
+  for (const [prefix, tableName] of [
+    ['fund_journals', 'fund_journals'],
+    ['fund_postings', 'fund_postings'],
+  ] as const) {
+    const table = financial.find((f) => f.table === tableName);
+    if (!table) {
+      add(`${prefix}.present`, `financial.${tableName} exists`, false, 'table not found');
+      continue;
+    }
+    add(`${prefix}.present`, `financial.${tableName} exists`, true);
+    add(`${prefix}.writer.insert`, `${FINANCIAL_WRITER} may INSERT into financial.${tableName}`, table.privileges[FINANCIAL_WRITER]?.INSERT === true);
+    add(`${prefix}.writer.select`, `${FINANCIAL_WRITER} may SELECT financial.${tableName}`, table.privileges[FINANCIAL_WRITER]?.SELECT === true);
+
+    for (const privilege of ['UPDATE', 'DELETE', 'TRUNCATE'] as const) {
+      add(
+        `${prefix}.writer.no_${privilege.toLowerCase()}`,
+        `${FINANCIAL_WRITER} may NOT ${privilege} financial.${tableName}`,
+        table.privileges[FINANCIAL_WRITER]?.[privilege] === false,
+        table.privileges[FINANCIAL_WRITER]?.[privilege] ? `${privilege} is granted -- the fund journal is not append-only here` : null,
+      );
+    }
+
+    add(`${prefix}.reader.select`, `${FINANCIAL_READER} may SELECT financial.${tableName}`, table.privileges[FINANCIAL_READER]?.SELECT === true);
+    for (const privilege of ['INSERT', 'UPDATE', 'DELETE'] as const) {
+      add(
+        `${prefix}.reader.no_${privilege.toLowerCase()}`,
+        `${FINANCIAL_READER} may NOT ${privilege} financial.${tableName}`,
+        table.privileges[FINANCIAL_READER]?.[privilege] === false,
+      );
+    }
+
+    for (const privilege of PRIVILEGES) {
+      add(
+        `${prefix}.app.no_${privilege.toLowerCase()}`,
+        `${APP_ROLE} may NOT ${privilege} financial.${tableName}`,
+        table.privileges[APP_ROLE]?.[privilege] === false,
+        table.privileges[APP_ROLE]?.[privilege] ? `the application role holds ${privilege} on financial.${tableName}` : null,
+      );
+    }
+  }
+
   const { rows: usageRows } = await client.query<{ has_usage: boolean }>(
     `SELECT has_schema_privilege($1, 'financial', 'USAGE') AS has_usage`,
     [APP_ROLE],

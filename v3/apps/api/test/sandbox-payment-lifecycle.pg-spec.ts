@@ -174,7 +174,13 @@ describeIfPg('Sandbox payment lifecycle on real PostgreSQL', () => {
   });
 
   describe('SUCCESS path', () => {
-    it('runs initiate -> decide -> callback -> verify -> paid -> confirmed, and lands a real ledger entry', async () => {
+    /**
+     * `#43a` (ADR-052 §16): every new collection posts a balanced
+     * `collection` journal to `financial.fund_postings` -- never a
+     * commission/receivable pair to `financial.ledger_entries`, which
+     * `LedgerService.recordPayment` no longer writes at all.
+     */
+    it('runs initiate -> decide -> callback -> verify -> paid -> confirmed, and lands a real fund journal entry', async () => {
       const { result, reference } = await reachGateway(500_000);
 
       expect(await sandbox.decide(reference, 'success')).toBe(true);
@@ -192,16 +198,20 @@ describeIfPg('Sandbox payment lifecycle on real PostgreSQL', () => {
       // The financial consequence, through the REAL financial service on its
       // own append-only connection -- not a fake path.
       await drainUntilQuiet();
-      const entries = await financialDataSource.query(
-        `SELECT entry_type, amount_toman FROM financial.ledger_entries WHERE order_id = $1 ORDER BY entry_type`,
+      expect(
+        await financialDataSource.query(`SELECT 1 FROM financial.ledger_entries WHERE order_id = $1`, [result.order.order.id]),
+      ).toEqual([]);
+
+      const postings = await financialDataSource.query(
+        `SELECT account, amount_toman FROM financial.fund_postings WHERE order_id = $1 ORDER BY account`,
         [result.order.order.id],
       );
-      expect(entries).toHaveLength(2);
-      const commission = entries.find((e: { entry_type: string }) => e.entry_type === 'commission');
-      const receivable = entries.find((e: { entry_type: string }) => e.entry_type === 'receivable');
-      // 15% commission of 500,000, and the two must sum EXACTLY to what was paid.
-      expect(Number(commission.amount_toman) + Number(receivable.amount_toman)).toBe(500_000);
-      expect(Number(commission.amount_toman)).toBe(75_000);
+      expect(postings).toHaveLength(2);
+      const pending = postings.find((p: { account: string; amount_toman: string }) => p.account === 'pending');
+      const collected = postings.find((p: { account: string; amount_toman: string }) => p.account === 'collected');
+      // No commission, no receivable -- neither exists until #43b/#43c.
+      expect(Number(pending.amount_toman)).toBe(500_000);
+      expect(Number(collected.amount_toman)).toBe(-500_000);
     });
 
     it('assigns a settlement reference only on the paid path', async () => {
@@ -238,6 +248,11 @@ describeIfPg('Sandbox payment lifecycle on real PostgreSQL', () => {
         [result.order.order.id],
       );
       expect(entries[0].n).toBe(0);
+      const postings = await financialDataSource.query(
+        `SELECT count(*)::int AS n FROM financial.fund_postings WHERE order_id = $1`,
+        [result.order.order.id],
+      );
+      expect(postings[0].n).toBe(0);
     });
   });
 
@@ -265,6 +280,11 @@ describeIfPg('Sandbox payment lifecycle on real PostgreSQL', () => {
         [result.order.order.id],
       );
       expect(entries[0].n).toBe(0);
+      const postings = await financialDataSource.query(
+        `SELECT count(*)::int AS n FROM financial.fund_postings WHERE order_id = $1`,
+        [result.order.order.id],
+      );
+      expect(postings[0].n).toBe(0);
     });
   });
 
@@ -316,13 +336,22 @@ describeIfPg('Sandbox payment lifecycle on real PostgreSQL', () => {
       const tx = await sandbox.inspect(reference);
       expect(tx?.refundReference).toMatch(/^SBXRF-/);
 
-      // The ledger reverses; it never rewrites. Net receivable returns to zero.
-      const [{ net }] = await financialDataSource.query(
-        `SELECT COALESCE(SUM(amount_toman), 0)::bigint AS net FROM financial.ledger_entries
-          WHERE order_id = $1 AND entry_type = 'receivable'`,
+      // The fund journal draws `pending` down to zero on a full refund
+      // (ADR-052 §5) -- it never rewrites, this order has no legacy ledger
+      // row to reverse (`#43a`, ADR-052 §16), and `refunded` carries the
+      // full amount as a permanent fact.
+      const [{ pending }] = await financialDataSource.query(
+        `SELECT COALESCE(SUM(amount_toman), 0)::bigint AS pending FROM financial.fund_postings
+          WHERE order_id = $1 AND account = 'pending'`,
         [result.order.order.id],
       );
-      expect(Number(net)).toBe(0);
+      expect(Number(pending)).toBe(0);
+      const [{ refunded }] = await financialDataSource.query(
+        `SELECT COALESCE(SUM(amount_toman), 0)::bigint AS refunded FROM financial.fund_postings
+          WHERE order_id = $1 AND account = 'refunded'`,
+        [result.order.order.id],
+      );
+      expect(Number(refunded)).toBe(400_000);
     });
 
     it('is idempotent on the gateway side -- a replayed refund returns the FIRST reference, never a second', async () => {
