@@ -102,6 +102,20 @@ export * from './commission-policy/commission-policy.service';
 export * from './commission-policy/commission-policy.controller';
 export * from './commission-policy/commission-policy-subject-data.contract';
 export * from './commission-policy/commission-policy.module';
+// V3.3 Story #175 (`#43d`), ADR-052 §1 and §8. The settlement schedule family
+// and the seller risk class: publication and classification only, read by no
+// settlement path until `#43e` (#176), which is `gate:external`.
+export * from './settlement-schedule/settlement-schedule.entities';
+export * from './settlement-schedule/settlement-schedule.dto';
+export * from './settlement-schedule/settlement-schedule.service';
+export * from './settlement-schedule/seller-risk-class.service';
+export * from './settlement-schedule/settlement-schedule-resolution.service';
+export * from './settlement-schedule/settlement-schedule.controller';
+export * from './settlement-schedule/settlement-schedule-subject-data.contract';
+export * from './settlement-schedule/settlement-schedule.module';
+// Narrow on purpose: the SQLSTATE helpers beside these are this plane's own
+// copies and would collide at the package boundary.
+export { SETTLEMENT_AUDIT_ACTIONS, SETTLEMENT_AUDIT_TARGETS } from './settlement-schedule/settlement-schedule.constants';
 // V3.3 Story #159 (`#42b`). The seller's selection inside the published ranges,
 // and the READ-ONLY resolver the order path binds (ADR-051 §3). Selection and
 // resolution only: no evaluator, no refund, no no-show, no dispute.

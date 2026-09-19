@@ -26,6 +26,7 @@ import {
   BookingOutcomePolicyResolutionModule,
   CommercialCatalogueModule,
   CommissionPolicyModule,
+  SettlementScheduleModule,
   CommercialPolicyModule,
   SellerSubscriptionModule,
   CollectionPolicyAssignmentModule,
@@ -193,6 +194,11 @@ import {
     // directly like the outcome plane above: no port, no consumer and no seam;
     // nothing reads it until `#43b-2` (#192) snapshots it onto orders.
     CommissionPolicyModule,
+    // V3.3 #175 (`#43d`), ADR-052 §1/§8. The settlement schedule family and
+    // the seller risk class. Composed directly like the commission plane
+    // above: no port, no consumer and no seam; `#43e` is the first reader
+    // and is `gate:external`.
+    SettlementScheduleModule,
     // V3.3 #159 (`#42b`), ADR-051 §3. The seller's selection surface, composed
     // directly like #104's twin above; and the read-only resolver module, for
     // the disclosure read's exact-copy lookup (the order path reaches it only
@@ -343,6 +349,7 @@ import {
     BookingCreditEnforcementModule,
     BookingOutcomePolicyModule,
     CommissionPolicyModule,
+    SettlementScheduleModule,
     OutcomePolicyAssignmentModule,
     FINANCIAL_OUTBOX_RELAY,
     PrivacyModule,

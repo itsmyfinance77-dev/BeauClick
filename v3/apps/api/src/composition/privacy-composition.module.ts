@@ -34,6 +34,8 @@ import {
   CommercialSubjectDataContract,
   CommissionPolicyModule,
   CommissionPolicySubjectDataContract,
+  SettlementScheduleModule,
+  SettlementScheduleSubjectDataContract,
   OutcomePolicyAssignmentModule,
   OutcomePolicyAssignmentSubjectDataContract,
   SellerSubscriptionModule,
@@ -176,6 +178,9 @@ export class PrivacyErasureCompleter {
     // (ADR-051 §10), every one carrying administrator attribution.
     BookingOutcomePolicyModule,
     CommissionPolicyModule,
+    // V3.3 #175 (`#43d`). Imported for its contract only: three `retained`
+    // tables, one of which exports the seller's own risk class.
+    SettlementScheduleModule,
     // V3.3 #159 (`#42b`). Imported for its contract only: the seller's
     // outcome-selection history, `retained` (ADR-051 §10) and exported to the
     // owner as the selections they authored.
@@ -231,6 +236,10 @@ export class PrivacyErasureCompleter {
         // keeps and can never be edited — an erasable attribution would make
         // it changeable in the one way that matters.
         CommissionPolicySubjectDataContract,
+        // V3.3 #175 (`#43d`), ADR-052 §15: the settlement schedule family and
+        // the seller risk class. The class is exported to the owning seller;
+        // the administrator's free-text reason deliberately is not.
+        SettlementScheduleSubjectDataContract,
         // V3.3 #159 (`#42b`), ADR-051 §10: the seller's outcome selections.
         OutcomePolicyAssignmentSubjectDataContract,
       ],
