@@ -610,6 +610,10 @@ export const RESETTABLE_TABLES = [
   // V3.3 Story #160 (`#42c`). Before `commerce.orders`, for the same reason;
   // TRUNCATE bypasses its forward-only trigger, as it does every immutable table here.
   'commerce.booking_outcome_decisions',
+  // V3.3 Story #192 (`#43b-2`). Before `commerce.orders`, for the same
+  // reason; TRUNCATE bypasses its append-only trigger, as it does every
+  // immutable table here.
+  'commerce.order_commission_terms',
   'commerce.orders',
   'booking.outbox_events',
   'booking.idempotency_keys',

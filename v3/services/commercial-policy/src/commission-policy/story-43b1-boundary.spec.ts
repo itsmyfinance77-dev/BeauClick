@@ -164,9 +164,13 @@ describe('Story #173 (`#43b-1`) contains none of #43b-2, #43c–#43h or #47', ()
     expect(sql).not.toMatch(/INTERVAL\s+'1 minute'/i);
   });
 
-  it('is read by no production caller: only the composition roots and the package index name it', () => {
+  it('is read by its DESIGNED first reader and the composition roots, and by nothing else', () => {
+    // `ResolutionService` is in the alternation deliberately: `#43b-2` added
+    // the read-only resolver to this plane, and a detector that could not see
+    // it would let a later story reach the plane through the resolver without
+    // ever appearing in the list below.
     const detector =
-      /commission-policy\/|\bCommissionPolicy(Service|Controller|Module|SubjectDataContract|Entity|VersionEntity)\b/;
+      /commission-policy\/|\bCommissionPolicy(Service|ResolutionService|Controller|Module|SubjectDataContract|Entity|VersionEntity)\b/;
     const importers = [
       ...readTypeScriptSources('services'),
       ...readTypeScriptSources('apps/api/src'),
@@ -178,12 +182,21 @@ describe('Story #173 (`#43b-1`) contains none of #43b-2, #43c–#43h or #47', ()
 
     expect(importers.map((i) => i.file).sort()).toEqual([
       'apps/api/src/composition/domain-composition.module.ts',
+      // V3.3 #192 (`#43b-2`), ADR-052 §2: the designed first reader. It binds
+      // the Commerce-owned `COMMISSION_TERMS_RESOLVER` to this plane's
+      // READ-ONLY resolution service — which is why the assertion below,
+      // that no importer reaches the WRITER, is the one that still matters.
+      'apps/api/src/composition/domain-ports.module.ts',
+      'apps/api/src/composition/port-adapters.ts',
       // Imported for its ADR-027 contract only — the plane's two `retained`
       // tables have to be claimed or the application refuses to boot.
       'apps/api/src/composition/privacy-composition.module.ts',
       'services/commercial-policy/src/index.ts',
     ]);
-    // And no importer calls the writer.
+    // And no importer calls the WRITER. `#43b-2` reads through the resolution
+    // service; a caller that reached `CommissionPolicyService` from the order
+    // path would put an administrator's publication surface inside a
+    // customer's checkout.
     for (const importer of importers) {
       expect(stripComments(importer.source)).not.toMatch(/CommissionPolicyService\s*\./);
     }

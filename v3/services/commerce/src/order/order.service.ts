@@ -33,6 +33,8 @@ import { METRICS, MetricsRegistry } from '@beauclick/observability';
 import {
   BOOKING_COLLECTION_POLICY_RESOLVER,
   BOOKING_OUTCOME_POLICY_RESOLVER,
+  COMMISSION_TERMS_RESOLVER,
+  CommissionTermsResolver,
   BookingCollectionPolicyResolver,
   BookingOutcomePolicyResolver,
   OrderSellerParty,
@@ -261,6 +263,8 @@ export class OrderService {
      */
     @Inject(BOOKING_OUTCOME_POLICY_RESOLVER)
     private readonly outcomePolicy: BookingOutcomePolicyResolver,
+    @Inject(COMMISSION_TERMS_RESOLVER)
+    private readonly commissionTerms: CommissionTermsResolver,
     private readonly metrics: MetricsRegistry,
   ) {}
 
@@ -510,6 +514,22 @@ export class OrderService {
       await manager.insert(OrderPaymentScheduleEntity, schedule);
     }
 
+    /*
+     * V3.3 #192 (`#43b-2`), ADR-052 §2. The commission snapshot, on the SAME
+     * manager as everything above, so it commits with the order or not at all.
+     *
+     * Unconditional and for all three components: an order with no active
+     * rule records three `absent` rows rather than none, because "nobody
+     * published a rule" and "no snapshot was taken" are different facts and
+     * `#43c` has to tell them apart.
+     *
+     * It cannot refuse a checkout. The resolver has no failure answer — a
+     * component without an active version is `absent` — so there is no path
+     * from a missing commission policy to a customer being unable to book,
+     * which is ADR-052 §2's own requirement and #173's non-goal.
+     */
+    await this.insertCommissionTerms(manager, orderId);
+
     await emitEvent(manager, CommerceOutboxEntity, {
       aggregateType: 'order',
       aggregateId: orderId,
@@ -633,6 +653,50 @@ export class OrderService {
    * instant, and the legal seller is the party this order was created for;
    * `tg_oot_integrity` refuses anything else.
    */
+  /**
+   * The commission snapshot — V3.3 #192 (`#43b-2`), ADR-052 §2.
+   *
+   * ONE statement for all three components: they are resolved from one
+   * database snapshot and written in one round trip, so `resolved_at` is
+   * identical across the three rows and no interleaving can leave an order
+   * with two components bound by different publications.
+   *
+   * Written by value. Nothing here is a reference a later reader must
+   * dereference, because `V33-DEC-028` Ruling 4 forbids re-reading live
+   * policy at recognition.
+   */
+  private async insertCommissionTerms(manager: EntityManager, orderId: string): Promise<void> {
+    const terms = await this.commissionTerms.resolveForOrder(manager);
+
+    const values: string[] = [];
+    const parameters: unknown[] = [];
+    for (const term of terms) {
+      const base = parameters.length;
+      values.push(
+        `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8}, $${base + 9}, $${base + 10})`,
+      );
+      parameters.push(
+        orderId,
+        term.component,
+        term.state,
+        term.policyKey,
+        term.policyVersion,
+        term.ruleKind,
+        term.basisPoints,
+        term.fixedToman,
+        term.base,
+        term.arithmeticVersion,
+      );
+    }
+
+    await manager.query(
+      `INSERT INTO commerce.order_commission_terms
+         (order_id, component, state, policy_key, policy_version, rule_kind, bp, fixed_toman, base, arithmetic_version)
+       VALUES ${values.join(', ')}`,
+      parameters,
+    );
+  }
+
   private async insertOutcomeTerms(
     manager: EntityManager,
     orderId: string,

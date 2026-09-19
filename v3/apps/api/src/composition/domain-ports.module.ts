@@ -10,6 +10,7 @@ import {
   BOOKING_COLLECTION_POLICY_RESOLVER,
   BOOKING_CONFIRMATION_ENTITLEMENT_HOOK,
   BOOKING_OUTCOME_POLICY_RESOLVER,
+  COMMISSION_TERMS_RESOLVER,
   LEGAL_EVIDENCE_STATE_READER,
   PRICING_RULES,
   SERVICE_CATALOG,
@@ -24,6 +25,7 @@ import {
   BookingCreditEnforcementModule,
   BookingOutcomeEvaluationModule,
   BookingOutcomePolicyResolutionModule,
+  CommissionPolicyModule,
   CollectionPolicyResolutionModule,
   OWNED_SUBSCRIBER_PARTY_RESOLVER,
   SellerSubscriptionModule,
@@ -59,6 +61,7 @@ import {
   ProviderBackedProfessionalDirectory,
   ProviderBackedServiceCatalog,
   CommercialPolicyBackedCollectionResolver,
+  CommercialPolicyBackedCommissionTerms,
   CommercialPolicyBackedOutcomeResolver,
   CommercialPolicyBackedLegalEvidenceState,
   IdentityBackedOwnerRoleGrant,
@@ -135,6 +138,13 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     // V3.3 #159 (`#42b`), ADR-051 §3. The read-only outcome resolver module,
     // imported for the same reason as the collection resolver just above.
     BookingOutcomePolicyResolutionModule,
+    /*
+     * V3.3 #192 (`#43b-2`), ADR-052 §2. Imported for its READ-ONLY
+     * `CommissionPolicyResolutionService`, which the commission-terms
+     * adapter below delegates to. The administrator writer in the same
+     * module is never reached from here: the adapter takes the resolver.
+     */
+    CommissionPolicyModule,
     // V3.3 #160 (`#42c`), ADR-051 §5. The read-only Legal-evidence state
     // reader behind Commerce's port, imported for the same reason.
     BookingOutcomeEvaluationModule,
@@ -149,6 +159,7 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     ProviderBackedProfessionalDirectory,
     ProviderBackedServiceCatalog,
     CommercialPolicyBackedCollectionResolver,
+    CommercialPolicyBackedCommissionTerms,
     CommercialPolicyBackedOutcomeResolver,
     ProviderBackedFinancialPartyResolver,
     OwnershipBackedSubscriberPartyResolver,
@@ -173,6 +184,9 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
      * enrolled seller's booking go out with no terms and no acceptance.
      */
     { provide: BOOKING_OUTCOME_POLICY_RESOLVER, useExisting: CommercialPolicyBackedOutcomeResolver },
+    // V3.3 #192 (`#43b-2`), ADR-052 §2. The commission terms an order is
+    // snapshotted against, answered by the READ-ONLY resolution service.
+    { provide: COMMISSION_TERMS_RESOLVER, useExisting: CommercialPolicyBackedCommissionTerms },
     /*
      * V3.3 #160 (`#42c`), ADR-051 §5. Whether an order's Legal cap applies at
      * the decision instant. MANDATORY: `BookingOutcomeDecisionService` injects
@@ -424,6 +438,7 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     SERVICE_CATALOG,
     BOOKING_COLLECTION_POLICY_RESOLVER,
     BOOKING_OUTCOME_POLICY_RESOLVER,
+    COMMISSION_TERMS_RESOLVER,
     LEGAL_EVIDENCE_STATE_READER,
     BOOKING_CONFIRMATION_ENTITLEMENT_HOOK,
     BOOKING_CANCELLATION_ENTITLEMENT_HOOK,
