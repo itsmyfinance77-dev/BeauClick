@@ -87,12 +87,21 @@ export type CommissionTermState = (typeof COMMISSION_TERM_STATES)[number];
 export interface CommissionTermV1 {
   readonly component: CommissionComponent;
   readonly state: CommissionTermState;
+  /**
+   * WHICH published version bound the order (`#43b-2`, ADR-052 §2). Present
+   * exactly for `zero` and `rule`: a published `zero` is a decision and must
+   * be traceable to the version that made it, while an `absent` names nothing
+   * because nothing was published.
+   */
+  readonly policyKey: string | null;
+  readonly policyVersion: number | null;
   /** Absent exactly when `state === 'absent'`. */
   readonly ruleKind: CommissionRuleKind | null;
   readonly basisPoints: number | null;
   readonly fixedToman: number | null;
   readonly base: CommissionBase | null;
-  readonly arithmeticVersion: number;
+  /** Null exactly when `state === 'absent'`: no version bound the order, so no arithmetic did either. */
+  readonly arithmeticVersion: number | null;
 }
 
 /** Why a recognition produced the amount it did. Closed, and recorded by `#43c`. */
@@ -248,11 +257,13 @@ export function evaluateCommission(input: CommissionEvaluationInputV1): Commissi
     const term: CommissionTermV1 = byComponent.get(component) ?? {
       component,
       state: 'absent',
+      policyKey: null,
+      policyVersion: null,
       ruleKind: null,
       basisPoints: null,
       fixedToman: null,
       base: null,
-      arithmeticVersion: COMMISSION_ARITHMETIC_VERSION,
+      arithmeticVersion: null,
     };
 
     // The retained outcome overrides the rule's own base — deliberately, and

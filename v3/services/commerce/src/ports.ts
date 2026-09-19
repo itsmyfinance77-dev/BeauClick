@@ -1,5 +1,10 @@
 import type { EntityManager } from 'typeorm';
-import type { BookingCollectionPolicySnapshotV1, BookingOutcomeSnapshotV1, LegalCapState } from '@beauclick/commercial-policy-contract';
+import type {
+  BookingCollectionPolicySnapshotV1,
+  BookingOutcomeSnapshotV1,
+  CommissionTermV1,
+  LegalCapState,
+} from '@beauclick/commercial-policy-contract';
 
 /**
  * commerce-service's outbound ports.
@@ -174,6 +179,31 @@ export interface BookingOutcomePolicyResolver {
 }
 
 export const BOOKING_OUTCOME_POLICY_RESOLVER = Symbol('BEAUCLICK_BOOKING_OUTCOME_POLICY_RESOLVER');
+
+/**
+ * "Which published commission rule binds an order committing right now?" —
+ * V3.3 #192 (`#43b-2`), ADR-052 §2, ADR-048 §1.
+ *
+ * Declared here and answered in `apps/api` for the reason
+ * `BookingOutcomePolicyResolver` is: `scope:commerce` may not import
+ * Commercial Policy, so no commission ORM entity or service reaches this
+ * module — only the browser-safe term contract.
+ *
+ * It takes the caller's transaction and NOTHING else. There is no seller
+ * party, no key, no version and no component parameter, because commission is
+ * a platform-wide published rule rather than a per-seller selection, and a
+ * caller able to name one could choose the rule its own order is charged
+ * under.
+ *
+ * It always answers with exactly three terms, in ADR-052 §3's fixed component
+ * order, and a component with no active version comes back as `absent` —
+ * never omitted, and never defaulted to a rate.
+ */
+export interface CommissionTermsResolver {
+  resolveForOrder(manager: EntityManager): Promise<readonly CommissionTermV1[]>;
+}
+
+export const COMMISSION_TERMS_RESOLVER = Symbol('BEAUCLICK_COMMISSION_TERMS_RESOLVER');
 
 /**
  * The entitlement seam every booking confirmation passes through —

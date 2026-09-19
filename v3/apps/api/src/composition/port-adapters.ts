@@ -7,6 +7,7 @@ import { ProfessionalDirectory } from '@beauclick/booking';
 import {
   BookingCollectionPolicyResolver,
   BookingOutcomePolicyResolver,
+  CommissionTermsResolver,
   LegalEvidenceStateReader,
   OrderSellerParty,
   ResolvedBookingCollectionPolicy,
@@ -25,6 +26,7 @@ import {
 import {
   BookingOutcomePolicyResolutionService,
   CollectionPolicyResolutionService,
+  CommissionPolicyResolutionService,
   LegalEvidenceStateService,
   OwnedSubscriberParty,
   OwnedSubscriberPartyResolver,
@@ -45,6 +47,7 @@ import {
   StaffIdentityLookup,
   StaffInviteIdentityResolverPort,
 } from '@beauclick/business';
+import type { CommissionTermV1 } from '@beauclick/commercial-policy-contract';
 import { RoleService, UserEntity, canonicalizePhone } from '@beauclick/identity';
 import { DeliveryLocationDirectory, EligibleResourceDirectory, lockResourceForAssignment } from '@beauclick/booking';
 
@@ -206,6 +209,24 @@ export class CommercialPolicyBackedOutcomeResolver implements BookingOutcomePoli
       case 'unavailable':
         return { outcome: 'unavailable', cause: resolved.cause };
     }
+  }
+}
+
+/**
+ * Commerce's commission-terms port, answered by commercial-policy — V3.3 #192
+ * (`#43b-2`), ADR-052 §2.
+ *
+ * A delegation to the READ-ONLY `CommissionPolicyResolutionService`, never to
+ * `#43b-1`'s `CommissionPolicyService`, so no administrator writer sits on the
+ * path every checkout runs. The three terms cross as the browser-safe contract
+ * type; no ORM entity, no lifecycle state and no audit row reaches Commerce.
+ */
+@Injectable()
+export class CommercialPolicyBackedCommissionTerms implements CommissionTermsResolver {
+  constructor(private readonly resolution: CommissionPolicyResolutionService) {}
+
+  async resolveForOrder(manager: EntityManager): Promise<readonly CommissionTermV1[]> {
+    return this.resolution.resolveForOrder(manager);
   }
 }
 
