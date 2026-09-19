@@ -30,3 +30,8 @@ export * from './booking-outcome-decision-contract';
 // the engine that turns a published rule into a number. Additive: nothing
 // above is changed.
 export * from './commission-policy-contract';
+// V3.3 Story #175 (`#43d`), ADR-052 §1 and §8. The settlement schedule family
+// and the seller risk class. Carries no interval, minimum, reserve or class —
+// only boundaries, closed vocabularies and the resolver's answer shape.
+// Additive: nothing above is changed.
+export * from './settlement-schedule-contract';

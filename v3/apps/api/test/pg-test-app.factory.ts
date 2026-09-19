@@ -480,6 +480,12 @@ export const RESETTABLE_TABLES = [
   // version survives.
   'commercial.commission_policy_versions',
   'commercial.commission_policies',
+  // V3.3 Story #175 (`#43d`), ADR-052 §1/§8. Versions before keys; the
+  // classification table has no FK but is truncated with them so a reset
+  // leaves the plane exactly as a clean migration does — empty.
+  'commercial.settlement_schedule_policy_versions',
+  'commercial.settlement_schedule_policies',
+  'commercial.seller_risk_class_assignments',
   // V3.2-C Story #27. Attribution and its claim throttle. Still no outbox --
   // `ReferralAttributed` is deliberately not defined because it has no consumer
   // (ADR-036 §10).

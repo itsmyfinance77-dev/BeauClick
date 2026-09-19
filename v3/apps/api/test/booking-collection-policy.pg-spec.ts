@@ -873,7 +873,11 @@ describePg('booking collection policy — publication, lifecycle and constraints
       // Twenty-four since Story #173 (`#43b-1`) added `commission_policies` and
       // `commission_policy_versions` (ADR-052 §1), both claimed `retained` by
       // `CommissionPolicySubjectDataContract`.
-      expect(rows).toHaveLength(24);
+      // Twenty-seven since Story #175 (`#43d`) added `settlement_schedule_policies`,
+      // `settlement_schedule_policy_versions` and `seller_risk_class_assignments`
+      // (ADR-052 §1/§8), all three claimed `retained` by
+      // `SettlementScheduleSubjectDataContract`.
+      expect(rows).toHaveLength(27);
 
       const report = evaluateCoverage(rows, contracts);
       expect(report.violations.filter((v) => v.table.startsWith('commercial.'))).toEqual([]);

@@ -1126,7 +1126,11 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
       // Twenty-four since Story #173 (`#43b-1`) added `commission_policies` and
       // `commission_policy_versions` (ADR-052 §1), both claimed `retained` by
       // `CommissionPolicySubjectDataContract`.
-      expect(rows).toHaveLength(24);
+      // Twenty-seven since Story #175 (`#43d`) added `settlement_schedule_policies`,
+      // `settlement_schedule_policy_versions` and `seller_risk_class_assignments`
+      // (ADR-052 §1/§8), all three claimed `retained` by
+      // `SettlementScheduleSubjectDataContract`.
+      expect(rows).toHaveLength(27);
 
       const contracts = app.get<SubjectDataContract[]>(SUBJECT_DATA_CONTRACTS);
       const report = evaluateCoverage(rows, contracts);
@@ -1267,6 +1271,8 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
         'commercial/20260921100004_add_remedy_choice_window_to_outcome_policy.sql',
         // V3.3 Story #173 (`#43b-1`), ADR-052 §1: the commission policy family.
         'commercial/20260922100001_create_commission_policy_family.sql',
+        // V3.3 Story #175 (`#43d`), ADR-052 §1/§8.
+        'commercial/20260924100001_create_settlement_schedule_family.sql',
         'identity/20260902800002_add_commercial_plan_capability.sql',
       ]);
     });
@@ -1306,6 +1312,8 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
         'ex_plan_versions_single_auto_assignable',
         'ex_price_schedule_versions_no_overlap',
         'ex_price_tiers_no_overlap',
+        // V3.3 Story #175 (`#43d`), ADR-052 §1/§8. One per (plan, risk class).
+        'ex_sspv_no_effective_overlap',
       ]);
 
       const triggers: Array<{ tgname: string }> = await dataSource.query(
@@ -1361,10 +1369,16 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
         // update, it happens once, and there is no DELETE path at all.
         'tg_scpa_immutable',
         'tg_seller_subscriptions_immutable',
+        // V3.3 Story #175 (`#43d`): the schedule key's permanence.
+        'tg_settlement_schedule_policies_immutable',
         // V3.3 Story #159 (`#42b`), ADR-051 §3: #104's immutability rules for
         // the outcome selection, and membership in the active version on INSERT.
         'tg_sopa_immutable',
         'tg_sopa_selection_within_active_version',
+        // V3.3 Story #175 (`#43d`): the risk class's forward-only
+        // supersession, and the schedule version's lifecycle.
+        'tg_srca_forward_only',
+        'tg_sspv_lifecycle',
       ]);
     });
 
