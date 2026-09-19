@@ -25,7 +25,19 @@ Not read for plausibility — each factual claim was matched against the code it
 | No invented value | grep of all five prototypes | **Clean**; no `7`, no rate, no cap; 46 `SAMPLE` labels |
 | Self-contained | external URL scan | **Clean**; no external reference in any prototype |
 
-## Corrections, recorded in the specs themselves
+## Corrections — applied, not just recorded
+
+Each correction is written into the spec **and** into the prototype it affects, by the reviewer
+rather than by a second Claude Design pass: all three are narrow and mechanical, and screen 49
+will need a design revision anyway once its missing read route is specified, so a round trip now
+would be redone later. All three prototypes were re-validated as well-formed after editing.
+
+| Correction | Spec | Prototype |
+|---|---|---|
+| C1 funds boundary | §A-2/A-3 + correction block | three bounded blocks on desktop and mobile; table banded and re-captioned |
+| C2 statement required | §1 + correction block | label, `required`, 1–2000 bound, review note rewritten |
+| C3 seller reason | §3 + correction block | required `reason` textarea added to §B3; the "no free field" badge narrowed to selection |
+
 
 **C1 — screen 46, the boundary has three sides.** `collected`, `platformAdvance` and `recoveredIn`
 are custody and cash-position facts (ADR-052 §12's M1), **not** this workspace's money. Shown

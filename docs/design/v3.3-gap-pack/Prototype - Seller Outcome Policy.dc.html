@@ -36,7 +36,7 @@
     <p style="margin: 0; font-size: 14px; line-height: 1.85; color: oklch(0.46 0.02 330);"><code dir="ltr">GET /api/v1/me/outcome-policies</code> می‌گوید این فروشنده چه چیزهایی می‌تواند انتخاب کند؛ <code dir="ltr">GET|PUT /api/v1/me/outcome-policy-assignments/:workspaceRef</code> انتخابِ جاری را می‌خواند و <strong>جایگزین</strong> می‌کند.</p>
     <div style="margin-top: 6px; display: flex; gap: 10px; flex-wrap: wrap; font-size: 12.5px;">
       <span style="padding: 5px 12px; border-radius: 999px; background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60);">هیچ فضای کاری از پیش انتخاب نمی‌شود</span>
-      <span style="padding: 5px 12px; border-radius: 999px; background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60);">هیچ میدانِ متنی یا عددیِ آزاد</span>
+      <span style="padding: 5px 12px; border-radius: 999px; background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60);">هیچ شرطی تایپ نمی‌شود — فقط انتخاب</span>
       <span style="padding: 5px 12px; border-radius: 999px; background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60);">هر مقدارِ نمونه با برچسب <strong>SAMPLE</strong></span>
     </div>
   </div>
@@ -129,6 +129,14 @@
         <p style="margin: 0; font-size: 12.5px; line-height: 1.85; color: oklch(0.46 0.02 330);">تعدادِ جابه‌جاییِ رایگان پیش از مهلت، پنجرهٔ اختلاف، پنجرهٔ آسیبِ جسمانی، پنجرهٔ فرجام و سقفِ قانونی — اگر منتشر شده باشند — همان‌طور که منتشر شده‌اند نمایش داده می‌شوند و انتخابی ندارند. رابط هیچ‌کدام را پیش‌فرض نمی‌گذارد؛ اگر منتشر نشده باشند، خطی برایشان نیست.</p>
       </div>
 
+      <div style="display: flex; flex-direction: column; gap: 7px;">
+        <label for="b3-reason" style="font-size: 13px; font-weight: 700; color: oklch(0.3 0.02 330);">دلیلِ این انتخاب <span style="font-weight: 700; color: oklch(0.45 0.13 25);">— الزامی</span></label>
+        <textarea id="b3-reason" rows="2" required aria-required="true" aria-describedby="b3-reason-help" placeholder="در یک جمله بنویسید چرا این شرایط را انتخاب می‌کنید." style="font-family: inherit; font-size: 13.5px; line-height: 1.8; padding: 11px 13px; border: 1px solid oklch(0.86 0.01 60); border-radius: 10px; resize: vertical; min-height: 44px;"></textarea>
+        <div id="b3-reason-help" style="display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 11.5px; line-height: 1.75; color: oklch(0.58 0.015 330);">
+          <span>سرور بدونِ دلیل، ثبت را رد می‌کند. کرانِ کمینه و بیشینه را سرور تعیین می‌کند و پیش از ارسال نشان داده می‌شود.</span>
+          <span dir="ltr" style="font-variant-numeric: tabular-nums;">SAMPLE</span>
+        </div>
+      </div>
       <div style="display: flex; gap: 10px; flex-wrap: wrap;">
         <button type="button" style="min-height: 44px; padding: 0 20px; border-radius: 10px; border: 1px solid oklch(0.42 0.13 340); background: oklch(0.42 0.13 340); color: #fff; font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer;">ثبتِ انتخابِ تازه</button>
         <span style="align-self: center; font-size: 12px; color: oklch(0.58 0.015 330);">انتخابِ قبلی ویرایش نمی‌شود؛ جایگزین می‌شود و به تاریخچه می‌رود.</span>
