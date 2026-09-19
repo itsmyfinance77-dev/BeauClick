@@ -1491,3 +1491,99 @@ unestimated **0**.
 - Still open and not built here: everything #185's own non-goals list — no release, settlement,
   reserve, receivable, commission, fee or schedule value is read or published.
 - No provider, payment rail, migration, tag or Release was introduced or changed.
+
+## V3.3 Story #173 (`#43b-1`) delivered, and `#43b` split, 2026-09-19
+
+The commission publication plane and its arithmetic shipped. The same day, `#43b` became two
+stories — recorded here because the decomposition happened **before** implementation started and
+is the reason the delivery landed inside its estimate.
+
+**#173 (`#43b-1`), 13 Story Points.**
+
+### The split, and why it was not absorbed
+
+A read-only preflight against `25ffa05`, recorded on #173 before any code was written, measured
+the undivided `#43b` at roughly **4,000–5,300 insertions across 28–38 files**, using the
+repository's own closest templates rather than an estimate from the issue text:
+
+| Anchor | Files | Insertions |
+|---|---:|---:|
+| #82 deposit-capture (13) | 19 | 1,787 |
+| #149/#152 finance workspace surface (13) | 15 | 2,179 |
+| #160 outcome evaluator (13) | 31 | 3,281 |
+| `#43a` preflight measurement (13) | ~28 | 3,000–3,500 |
+
+`#43a` measured at the ceiling and **still** overran, which is why #185 exists. `#43b` measured
+above it. Operating model §4 requires a split before Ready, and the split followed ADR-052's own
+section boundary, so no scope was added, removed or re-ordered and `V33-DEC-044`'s chain is
+intact — `#43c` now depends on both halves rather than on one. No ADR amendment was needed: the
+mechanism-to-child map's `#43b` column still reads correctly for both halves.
+
+- **#173 (`#43b-1`), 13** — ADR-052 §1 and §3: the family, the four shapes, the lifecycle and the
+  arithmetic. **Delivered below.**
+- **#192 (`#43b-2`), 8** — ADR-052 §2: `commerce.order_commission_terms`, the Commerce-owned
+  `FOR SHARE` resolver, the checkout-transaction write and the racing-publication proof. Now
+  `status:ready`, unblocked by this delivery.
+
+**The measurement held.** `#43b-1` landed at **3,389 insertions across 21 files** — inside the
+13-point band, where the undivided story would not have been.
+
+### What #173 delivered
+
+- **`commercial.commission_policies` / `_versions`** — one stable key per component, with
+  `UNIQUE (component)` as a load-bearing constraint rather than tidiness: ADR-052 §2's resolver
+  asks "the active committed version for this component", and two keys would give that question
+  two answers. The four shapes are ONE CHECK: `zero` carries nothing; `percentage` a rate and a
+  base; `fixed` an amount strictly above zero; `hybrid` all three with an amount that may be zero.
+  `base` has **no DEFAULT** — the two bases differ by exactly what the customer has not paid yet.
+- **A publication rule stricter than every earlier family's.** ADR-048's families accept
+  `published_at` within ±1 minute; ADR-052 §1 requires equality with the transaction `now()`,
+  **no tolerance**, because `#43b-2` resolves this rule inside a checkout transaction and the
+  width of that window is the width of the race. A migration-level test pins the absence of
+  `INTERVAL '1 minute'` so the tolerance cannot return by copy-paste from a sibling.
+- **The pure engine** (`packages/commercial-policy-contract`, BigInt, zero imports) — the four
+  shapes, the fixed component order, the held ceiling with the remainder becoming a
+  `commission_excess` receivable for `#43f`, `V33-DEC-044`'s OC-2 rule (every component computed
+  on the retained amount, and **no receivable ever**), and the legacy cumulative reversal that
+  leaves no residue after a full refund.
+- **Nothing seeded, no value published.** `no-hardcoded-commission-rate.spec.ts` — built by
+  `#43a` — now scans the commission plane and the commercial migrations, so the one story that
+  could reintroduce a constant is checked by the test that exists to forbid one.
+
+### Evidence
+
+Disposable CI-mirror cluster (PostgreSQL 16, CI's own role provisioning, 79 migrations from empty,
+`Applied: 0` on re-run): `commission-policy-family.pg-spec.ts` **37/37**, every constraint attacked
+with raw SQL as well as through the service and each raw attack paired with a positive control;
+`commission-policy-contract.spec.ts` **26/26**, including both worked examples ADR-052 §3 states in
+prose and a property block to the representational ceiling; `story-43b1-boundary.spec.ts` **9/9**;
+commercial-catalogue **68/68** and four other adjacent suites green. `pnpm typecheck` (41 projects),
+`pnpm lint` (0 errors), `nx build api`, `pnpm verify:roles` all pass. All four CI checks green on
+`3f4e466`.
+
+Four exact-set pins were extended, as any story adding schema objects must: the commercial table
+count in two suites (22 → 24), the exclusion-constraint list, the trigger list and the
+migration-filename list. Three wiring defects surfaced and were fixed in the same branch — entities
+unregistered in the app DataSource, the new tables missing from the test factory's TRUNCATE list,
+and audit assertions unscoped against an audit log that deliberately survives a reset.
+
+| Item | Before | After | Outcome it owns |
+|---|---|---|---|
+| #173 (`#43b-1`) | `status:proposed`, 13 (as undivided `#43b`) | **Closed, 13** | The commission family, its lifecycle and the pure arithmetic |
+| #192 (`#43b-2`) | did not exist | **`status:ready`, 8** | The per-order snapshot, split out before implementation |
+
+**What moved.** V3.3 done **306 → 319** (+13, `#173`), scope **431 → 439** (+8, `#192`, created by
+the split rather than by new work: the same total effort, now in two estimated pieces).
+`scripts/backlog-report.mjs` (run at `2026-09-19T05:52:35.415Z`) reports **319 / 439**, 73%,
+proposed **89**, decision **0**, ready **8**, active **0**, review **0**, blocked **23**,
+unestimated **0**.
+
+- #173 closes with `sp:13` and no status label.
+- There are still no data-quality warnings on V3.3.
+- The only `status:ready` item is #192 (`#43b-2`), which this delivery unblocked; the map's order
+  puts #175 (`#43d`, 8) beside it as the other child depending on `#43` alone.
+- Still open and not built here: the snapshot (#192), recognition and release (`#43c`), receivable
+  and recovery (`#43f`), fee allocation (`#43g`), settlement schedule and batches (`#43d`, `#43e`),
+  revenue-recognition facts (`#43h`).
+- No provider, payment rail, tag or Release was introduced or changed, and no commission value was
+  published — the plane ships empty by construction.
