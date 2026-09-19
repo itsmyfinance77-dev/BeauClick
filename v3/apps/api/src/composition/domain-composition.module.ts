@@ -25,6 +25,7 @@ import {
   BookingOutcomePolicyModule,
   BookingOutcomePolicyResolutionModule,
   CommercialCatalogueModule,
+  CommissionPolicyModule,
   CommercialPolicyModule,
   SellerSubscriptionModule,
   CollectionPolicyAssignmentModule,
@@ -188,6 +189,10 @@ import {
     // Legal-evidence publication plane. Composed directly like the catalogue:
     // it has no port, no consumer and no seam; nothing reads it until `#42b`.
     BookingOutcomePolicyModule,
+    // V3.3 #173 (`#43b-1`), ADR-052 §1. The commission policy family. Composed
+    // directly like the outcome plane above: no port, no consumer and no seam;
+    // nothing reads it until `#43b-2` (#192) snapshots it onto orders.
+    CommissionPolicyModule,
     // V3.3 #159 (`#42b`), ADR-051 §3. The seller's selection surface, composed
     // directly like #104's twin above; and the read-only resolver module, for
     // the disclosure read's exact-copy lookup (the order path reaches it only
@@ -337,6 +342,7 @@ import {
   SellerSubscriptionSurfaceModule,
     BookingCreditEnforcementModule,
     BookingOutcomePolicyModule,
+    CommissionPolicyModule,
     OutcomePolicyAssignmentModule,
     FINANCIAL_OUTBOX_RELAY,
     PrivacyModule,

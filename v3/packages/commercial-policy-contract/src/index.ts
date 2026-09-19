@@ -24,3 +24,9 @@ export * from './booking-outcome-contract';
 // the commerce decision record and the composition root (ADR-051 §6).
 // Additive: nothing above is changed.
 export * from './booking-outcome-decision-contract';
+// V3.3 Story #173 (`#43b-1`). The commission policy family's vocabulary and
+// its pure arithmetic (ADR-052 §1, §3; `V33-DEC-040` R1, R3). Carries no rate,
+// amount, base or component default — only boundaries, closed vocabularies and
+// the engine that turns a published rule into a number. Additive: nothing
+// above is changed.
+export * from './commission-policy-contract';

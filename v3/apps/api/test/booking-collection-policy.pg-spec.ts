@@ -870,7 +870,10 @@ describePg('booking collection policy — publication, lifecycle and constraints
       // each with its own claim in `BookingOutcomePolicySubjectDataContract`.
       // Twenty-two since Story #159 (`#42b`) added the seller's outcome
       // selection table with its own `retained` claim.
-      expect(rows).toHaveLength(22);
+      // Twenty-four since Story #173 (`#43b-1`) added `commission_policies` and
+      // `commission_policy_versions` (ADR-052 §1), both claimed `retained` by
+      // `CommissionPolicySubjectDataContract`.
+      expect(rows).toHaveLength(24);
 
       const report = evaluateCoverage(rows, contracts);
       expect(report.violations.filter((v) => v.table.startsWith('commercial.'))).toEqual([]);
