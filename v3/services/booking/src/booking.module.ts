@@ -8,11 +8,12 @@ import { BookingHistoryEntity } from './entities/booking-history.entity';
 import { BookingIdempotencyKeyEntity } from './entities/booking-idempotency-key.entity';
 import { BookingOutboxEntity } from './entities/booking-outbox.entity';
 import { BookingResourceAssignmentEntity } from './entities/booking-resource-assignment.entity';
+import { NoShowDeclarationEntity } from './entities/no-show-declaration.entity';
 
 import { BookingConfig } from './booking.config';
 import { AvailabilityService } from './availability/availability.service';
 import { BookingService } from './booking/booking.service';
-import { BookingPartyResolver, BookingProfessionalResolver } from './booking/booking-party.resolver';
+import { BookingCustomerResolver, BookingPartyResolver, BookingProfessionalResolver } from './booking/booking-party.resolver';
 import { BookingController } from './booking/booking.controller';
 import { MyAvailabilityController, PublicAvailabilityController } from './availability/availability.controller';
 import { BookingSubjectDataContract } from './booking-subject-data.contract';
@@ -28,6 +29,9 @@ export const BOOKING_ENTITIES = [
   // booking table cannot be reachable at runtime while being invisible to
   // the ORM.
   BookingResourceAssignmentEntity,
+  // V3.3 #161 (`#42d`), ADR-051 §7. Registered here and nowhere else, for the
+  // same reason `BookingResourceAssignmentEntity` above is.
+  NoShowDeclarationEntity,
 ];
 
 /**
@@ -42,8 +46,11 @@ export const BOOKING_ENTITIES = [
   imports: [ConfigModule, TypeOrmModule.forFeature(BOOKING_ENTITIES)],
   controllers: [BookingController, PublicAvailabilityController, MyAvailabilityController],
   providers: [
-    BookingSubjectDataContract,BookingConfig, AvailabilityService, BookingService, BookingPartyResolver, BookingProfessionalResolver],
+    BookingSubjectDataContract,BookingConfig, AvailabilityService, BookingService, BookingPartyResolver, BookingProfessionalResolver,
+    // V3.3 #161 (`#42d`), ADR-051 §8. Used by `apps/api`'s remedy route via `ModuleRef` (`@ResolveOwner`, non-strict).
+    BookingCustomerResolver],
   exports: [
-    BookingSubjectDataContract,BookingService, AvailabilityService, BookingConfig, BookingPartyResolver, TypeOrmModule],
+    BookingSubjectDataContract,BookingService, AvailabilityService, BookingConfig, BookingPartyResolver, TypeOrmModule,
+    BookingCustomerResolver],
 })
 export class BookingModule {}

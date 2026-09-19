@@ -263,6 +263,9 @@ describePg('booking outcome policy, customer copy and Legal evidence — publica
         'ck_bopv_lifecycle',
         'ck_bopv_not_retroactive',
         'ck_bopv_published_actor',
+        // V3.3 #161 (`#42d`), ADR-051 §8. Additive: the nullable
+        // remedy_choice_window_hours column's bound.
+        'ck_bopv_remedy_choice_window',
         'ck_bopv_reschedule_free_count',
         'ck_bopv_retired_actor',
         'ck_bopv_version',

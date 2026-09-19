@@ -6,6 +6,7 @@ import {
   BOOKING_CANCELLATION_ENTITLEMENT_HOOK,
   BOOKING_RESCHEDULE_OUTCOME_HOOK,
   BookingCancellationEntitlementHook,
+  BookingNoShowGovernance,
   BookingRescheduleFacts,
   BookingRescheduleGovernance,
   BookingRescheduleOutcomeHook,
@@ -30,6 +31,7 @@ import { BookingResourceAssignmentEntity } from '../entities/booking-resource-as
 import { BookingConfig } from '../booking.config';
 import {
   InvalidBookingTransitionException,
+  NoShowStatementRequiredException,
   RescheduleConsequenceRequiredException,
   RescheduleNotAllowedException,
   SlotUnavailableException,
@@ -54,6 +56,17 @@ export interface BookingActor {
 export interface RescheduleOptions {
   /** The customer's explicit confirmation of a non-free reschedule's consequence. */
   acceptConsequence?: boolean;
+  /**
+   * V3.3 #161 (`#42d`), ADR-051 §8. Set only by the customer-remedy seam,
+   * never by a caller acting on the customer's own initiative: bypasses the
+   * cutoff and free-count guards unconditionally (the booking's own
+   * reschedule governance, if any, is not consulted at all — the cause of
+   * this move is the seller/platform/provider cancellation being remedied,
+   * never the customer's), evaluates no consequence, and writes no outcome
+   * decision. Price and terms are otherwise untouched, exactly as every
+   * reschedule already is (same professional, same service).
+   */
+  remedyBypass?: boolean;
 }
 
 /**
@@ -507,18 +520,111 @@ export class BookingService {
   }
 
   /**
-   * confirmed -> no_show. Only after the slot has actually ended -- a
-   * professional may never pre-emptively mark a future booking as a
-   * no-show. V2's rule, preserved verbatim.
+   * confirmed -> no_show.
+   *
+   * V3.3 #161 (`#42d`), ADR-051 §7, `V33-DEC-039` R6. For a booking whose
+   * order carries accepted outcome terms, the guard is `now() >= slot_start +
+   * grace_minutes` -- checked in SQL, on the database clock, inside this
+   * transaction -- and a successful call writes an immutable declaration row
+   * (evidence-minimal: actor, instant, statement; no photo, file, geolocation
+   * or health field), opens the customer's objection window, emits
+   * `BookingNoShowDeclared` and an audit line. The declaration moves no
+   * money: `#42c`'s evaluator decides the retention only after the window
+   * closes (this story's own sweep/lazy mechanism).
+   *
+   * For a booking with NO outcome terms, the guard is V2's rule preserved
+   * VERBATIM -- only after the slot has actually ended, on the APPLICATION
+   * clock -- with no declaration, no event and no audit line: byte-for-byte
+   * the pre-#161 behaviour (`booking-lifecycle.pg-spec.ts:156` stays valid
+   * for it, ADR-051's "disabled by absence" rollout boundary).
    */
-  async markNoShow(bookingId: string, actor: BookingActor, manager?: EntityManager): Promise<boolean> {
+  async markNoShow(
+    bookingId: string,
+    actor: BookingActor,
+    statement: string | null = null,
+    manager?: EntityManager,
+  ): Promise<boolean> {
     return this.runInTransaction(manager, async (m) => {
-      const booking = await m.findOne(BookingEntity, { where: { id: bookingId } });
-      if (!booking) return false;
-      if (booking.slotEnd.getTime() > Date.now()) {
-        throw new InvalidBookingTransitionException(booking.status, 'no_show');
+      const governance: BookingNoShowGovernance = await this.rescheduleOutcome.governNoShow(m, bookingId);
+
+      if (!governance.governed) {
+        const booking = await m.findOne(BookingEntity, { where: { id: bookingId } });
+        if (!booking) return false;
+        if (booking.slotEnd.getTime() > Date.now()) {
+          throw new InvalidBookingTransitionException(booking.status, 'no_show');
+        }
+        return this.transition(m, bookingId, 'no_show', ['confirmed'], actor, null, {});
       }
-      return this.transition(m, bookingId, 'no_show', ['confirmed'], actor, null, {});
+
+      // Declaring actor is the professional session (`BookingProfessionalResolver`);
+      // no production route reaches here with a null id, but a missing one is
+      // refused rather than written as an orphaned declaration.
+      if (!actor.id) {
+        throw new InvalidBookingTransitionException('confirmed', 'no_show');
+      }
+
+      // ADR-051's lock order: booking FOR UPDATE -> grace check in SQL ->
+      // declaration insert -> transition -> event.
+      const rows: Array<{ status: BookingStatus; eligible: boolean }> = await m.query(
+        `SELECT status, now() >= slot_start + make_interval(mins => $2::int) AS eligible
+           FROM booking.bookings
+          WHERE id = $1
+            FOR UPDATE`,
+        [bookingId, governance.graceMinutes],
+      );
+      const row = rows[0];
+      if (!row) return false;
+      // Both a wrong status (a cancelled booking, or the losing side of a
+      // declare-vs-declare race whose `FOR UPDATE` unblocked onto an
+      // already-`no_show` row) and grace not yet reached are refused the
+      // same way `InvalidBookingTransitionException` refuses the legacy
+      // path's own status/timing guard, above -- a caller-visible refusal,
+      // not a silently swallowed `false`.
+      if (row.status !== 'confirmed' || !row.eligible) {
+        throw new InvalidBookingTransitionException(row.status, 'no_show');
+      }
+
+      // `MarkNoShowDto.statement` is optional at the DTO boundary (a booking
+      // with no outcome terms keeps the pre-#161 route byte-for-byte, no
+      // body required) -- so a GOVERNED declaration with nothing usable is
+      // refused here, before anything is written, rather than by the
+      // database's own `ck_nsd_statement_length` a moment later.
+      const trimmedStatement = (statement ?? '').trim();
+      if (!trimmedStatement) {
+        throw new NoShowStatementRequiredException();
+      }
+
+      const moved = await this.transition(m, bookingId, 'no_show', ['confirmed'], actor, null, {});
+      if (!moved) return false;
+
+      const declarationId = uuidv7();
+      const inserted: Array<{ declared_at: Date; objection_window_ends_at: Date }> = await m.query(
+        `INSERT INTO booking.no_show_declarations
+           (id, booking_id, declared_by_user_id, statement, grace_minutes_snapshot, objection_window_ends_at)
+         VALUES ($1, $2, $3, $4, $5, now() + make_interval(hours => $6::int))
+         RETURNING declared_at, objection_window_ends_at`,
+        [declarationId, bookingId, actor.id, trimmedStatement, governance.graceMinutes, governance.disputeWindowHours],
+      );
+      const declared = inserted[0];
+
+      const booking = await m.findOneOrFail(BookingEntity, { where: { id: bookingId } });
+      await emitEvent(m, BookingOutboxEntity, {
+        aggregateType: 'booking',
+        aggregateId: bookingId,
+        eventType: 'BookingNoShowDeclared',
+        payload: {
+          bookingId,
+          professionalId: booking.professionalId,
+          customerId: booking.customerId,
+          declaredAt: declared.declared_at.toISOString(),
+          objectionWindowEndsAt: declared.objection_window_ends_at.toISOString(),
+        },
+      });
+
+      // Never the statement body -- ADR-051 §7: "statement bodies never
+      // appear in logs, metrics or errors".
+      this.auditLog.log({ action: 'booking.no_show_declared', bookingId, actorType: actor.type });
+      return true;
     });
   }
 
@@ -560,16 +666,32 @@ export class BookingService {
        * A professional's reschedule never asks, and a customer's reschedule of a
        * booking without terms is answered `governed: false`: both continue on
        * exactly the path this method has always taken.
+       *
+       * V3.3 #161 (`#42d`), ADR-051 §8. `options.remedyBypass` skips this
+       * governance read entirely: the customer-remedy seam already decided
+       * this move is free (bypassing cutoff and free-count, never evaluating
+       * a consequence), so asking again would be a second, contradictory
+       * opinion about the same reschedule.
        */
       const governance: BookingRescheduleGovernance =
-        actor.type === 'customer' ? await this.rescheduleOutcome.governReschedule(m, bookingId) : { governed: false };
+        options.remedyBypass || actor.type !== 'customer'
+          ? { governed: false }
+          : await this.rescheduleOutcome.governReschedule(m, bookingId);
 
       const booking = governance.governed
         ? await m.findOneOrFail(BookingEntity, { where: { id: bookingId }, lock: { mode: 'pessimistic_write' } })
         : await m.findOneOrFail(BookingEntity, { where: { id: bookingId } });
 
-      if (!SLOT_HOLDING_STATUSES.includes(booking.status)) throw new RescheduleNotAllowedException('status');
-      if (!governance.governed) {
+      /*
+       * V3.3 #161 (`#42d`), ADR-051 §8. A remedy reschedule is the one caller
+       * allowed to move a `cancelled` booking: "the old slot is already
+       * released" is the ADR's own description of exactly this state. Every
+       * other caller keeps today's rule -- only a slot-holding booking may be
+       * rescheduled.
+       */
+      const eligibleStatuses: readonly BookingStatus[] = options.remedyBypass ? [...SLOT_HOLDING_STATUSES, 'cancelled'] : SLOT_HOLDING_STATUSES;
+      if (!eligibleStatuses.includes(booking.status)) throw new RescheduleNotAllowedException('status');
+      if (!governance.governed && !options.remedyBypass) {
         if (booking.rescheduleCount >= this.config.maxReschedulesPerBooking) {
           throw new RescheduleNotAllowedException('max_reached');
         }
@@ -593,9 +715,14 @@ export class BookingService {
         ? await this.governedRescheduleConsequence(m, booking, governance, options)
         : null;
 
+      // A remedy reschedule revives a `cancelled` booking straight to
+      // `confirmed` -- there is no hold phase to re-enter, the online
+      // amount is already collected (or its refund already decided).
+      const targetStatus: BookingStatus = options.remedyBypass && booking.status === 'cancelled' ? 'confirmed' : booking.status;
+
       const now = new Date();
       const holdExpiresAt =
-        booking.status === 'pending' ? new Date(now.getTime() + this.config.holdMinutes * 60_000) : null;
+        targetStatus === 'pending' ? new Date(now.getTime() + this.config.holdMinutes * 60_000) : null;
 
       // Step 1 -- claim the new slot with the identical atomic predicate.
       const claimed = await this.claimSlot(
@@ -630,6 +757,7 @@ export class BookingService {
           slotEnd: claimed.endAt,
           rescheduleCount: booking.rescheduleCount + 1,
           holdExpiresAt: holdExpiresAt,
+          status: targetStatus,
         })
         .where('id = :id AND status = :status AND reschedule_count = :count', {
           id: bookingId,
@@ -646,9 +774,10 @@ export class BookingService {
         throw new RescheduleNotAllowedException('status');
       }
 
-      // Step 3 -- an already-confirmed booking's new slot becomes booked
+      // Step 3 -- a booking ENDING UP confirmed (already was, or a remedy
+      // reschedule reviving a cancelled one) gets its new slot booked
       // outright; a pending one's stays held until payment confirms it.
-      if (booking.status === 'confirmed') {
+      if (targetStatus === 'confirmed') {
         await m.update(
           AvailabilitySlotEntity,
           { id: claimed.id },
@@ -663,7 +792,7 @@ export class BookingService {
         bookingId,
         event: 'rescheduled',
         fromStatus: booking.status,
-        toStatus: booking.status,
+        toStatus: targetStatus,
         actor,
         reason,
         metadata: {

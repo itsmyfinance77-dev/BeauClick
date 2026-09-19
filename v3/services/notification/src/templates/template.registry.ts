@@ -185,6 +185,19 @@ const TEMPLATES: TemplateDefinition[] = [
     deepLink: '/bookings',
   },
   {
+    // V3.3 #161 (`#42d`), ADR-051 §7. No amount, no penalty and no policy
+    // number appears here -- the retention decision, if any, is evaluated
+    // only after the objection window closes, and this notification is sent
+    // the moment the window opens.
+    key: 'booking_no_show_declared',
+    category: 'booking',
+    requiredVars: ['professionalName', 'date'],
+    subject: 'عدم حضور شما در رزرو ثبت شد',
+    body: 'نزد {professionalName} برای رزرو {date}، عدم حضور شما ثبت شد. در صورت اعتراض با پشتیبانی تماس بگیرید.',
+    short: 'عدم حضور شما در رزرو {date} نزد {professionalName} ثبت شد.',
+    deepLink: '/bookings',
+  },
+  {
     key: 'payment_succeeded',
     category: 'payment',
     requiredVars: ['amountToman'],

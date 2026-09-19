@@ -32,6 +32,8 @@ import {
   CollectionPolicyAssignmentSubjectDataContract,
   CommercialCatalogueModule,
   CommercialSubjectDataContract,
+  CommissionPolicyModule,
+  CommissionPolicySubjectDataContract,
   OutcomePolicyAssignmentModule,
   OutcomePolicyAssignmentSubjectDataContract,
   SellerSubscriptionModule,
@@ -173,6 +175,7 @@ export class PrivacyErasureCompleter {
     // V3.3 #42 (`#42a`). Imported for its contract only: six `retained` tables
     // (ADR-051 §10), every one carrying administrator attribution.
     BookingOutcomePolicyModule,
+    CommissionPolicyModule,
     // V3.3 #159 (`#42b`). Imported for its contract only: the seller's
     // outcome-selection history, `retained` (ADR-051 §10) and exported to the
     // owner as the selections they authored.
@@ -222,6 +225,12 @@ export class PrivacyErasureCompleter {
         // V3.3 #42 (`#42a`), ADR-051 §10: six retained tables of the outcome-policy,
         // copy and Legal-evidence publication plane.
         BookingOutcomePolicySubjectDataContract,
+        // V3.3 #173 (`#43b-1`), ADR-052 §15: two retained tables of the
+        // commission publication plane. Retained rather than erasable because
+        // a published rule decides how much of a seller's money the platform
+        // keeps and can never be edited — an erasable attribution would make
+        // it changeable in the one way that matters.
+        CommissionPolicySubjectDataContract,
         // V3.3 #159 (`#42b`), ADR-051 §10: the seller's outcome selections.
         OutcomePolicyAssignmentSubjectDataContract,
       ],

@@ -1361,3 +1361,229 @@ three jobs, including real PostgreSQL / OpenSearch / object storage.
 - Still open and not built here: the force-majeure declaration of `V33-DEC-039` R8, which no story
   owns yet, and the money semantics of a non-zero reschedule consequence.
 - No provider, payment rail, tag or Release was introduced or changed.
+
+## V3.3 Story #161 (`#42d`) delivered, 2026-09-18
+
+No-show declaration and the non-customer-cancellation customer remedy shipped against ADR-051
+§7–§8 (`V33-DEC-039` R6–R7), in an isolated worktree/branch from `origin/master` at `56938d7`.
+
+**#161 (`#42d`), 8 Story Points.**
+- **No-show declaration** (`booking.no_show_declarations`) — one immutable, evidence-minimal
+  declaration per booking. A governed booking (its order carries accepted outcome terms) requires
+  `now() >= slot_start + grace_minutes` in SQL; a legacy booking with no terms keeps the pre-#161
+  `slotEnd > now()` rule byte-for-byte. A declaration moves no money.
+- **Window evaluation** extends `#42c`'s evaluator with a `no_show` branch (own retention snapshot,
+  no cutoff/timeliness), converging sweep and lazy callers on one decision through the existing
+  `uq_bod_one_live_per_kind` index; `commerce.booking_outcome_decisions` gained the kind via an
+  additive `ALTER`, the #160 migration untouched.
+- **Customer remedy** (`commerce.customer_remedy_choices`) — a non-customer cancellation offers
+  exactly one remedy, born already resolved to the default full refund; the customer may override
+  to a free reschedule only while the refund is still pending/manual-required. `admin` cancellation
+  now maps to `platform_cancelled` for credit return.
+
+**What moved concurrently.** Two other deliveries landed on `master` in the same window and are
+reflected in the totals below, not attributed to #161: `#43a` (#187, 13 points, pending-funds
+journal) and a test-only fixture-clock guard (#188, 0 points) that fixed an unrelated, pre-existing
+referral-suite failure blocking every PR's merge gate — reproduced identically on unmodified
+`origin/master` before diagnosing it as unrelated to #161, confirmed fixed after #188 landed.
+Because master's protected-branch ruleset requires every PR to be up to date at merge time,
+`origin/master` was merged into `#161`'s branch twice (picking up `#187` then `#188`), with the
+full CI battery re-run green each time before the final squash merge.
+
+Merged via PR #186 (squash `4f575f1`), closing #161. Post-merge V3 CI on `4f575f1` inherits the
+green `4e3ca37` run (all four jobs, including real PostgreSQL / OpenSearch / object storage) since
+the squash changed no content already verified there.
+
+| Item | Before | After | Outcome it owns |
+|---|---|---|---|
+| #161 (`#42d`) | `status:review`, 8 | **Closed, 8** | No-show declaration and customer remedy choice, delivered as described above |
+| #162 (`#42e`) | `status:proposed`, 13 | unchanged | Dispute and appeal case model — not started |
+| #43a | `status:ready`, 13 | **Closed, 13** (concurrent, not this delivery) | Pending-funds journal, commission-rate removal, settlement refusal |
+
+**What moved.** V3.3 done **277 → 298** (+21: `#161`'s 8, `#43a`'s 13), scope **423 → 428** (+5,
+a story split off `#43a`'s preflight, not created by this delivery). The live dashboard (issue #2),
+`scripts/backlog-report.mjs` (its own CI-triggered run at `2026-09-18T18:36:05.291Z`) and an
+independent recomputation from raw labels agree: **298 / 428**, proposed **102**, ready **5**,
+active **0**, review **0**, blocked **23**.
+- #161 closes with its `sp:8` label preserved and no status label.
+- The only data-quality warning is that #172 has no milestone. This delivery did not create it.
+- Still open and not built here: dispute filing/review (#162), ordinary-completion dispute (#180),
+  force majeure, business-owner/delegated-calendar authority, the money semantics of a non-zero
+  reschedule consequence, and #43's remaining release/settlement children (#43b–#43h).
+- No provider, payment rail, tag or Release was introduced or changed.
+
+## V3.3 Story #185 delivered, 2026-09-19
+
+The additive seller funds read — `GET /api/v1/me/finance/:workspaceRef/funds` — is complete. The
+story was split out of `#43a` on 2026-09-16 by that story's own acceptance criterion, when its
+preflight returned "does not fit within 13 points".
+
+**#185, 3 Story Points (re-estimated from 5 before work started).**
+
+**What the preflight found.** A read-only preflight against `acc6e90`, recorded on the issue before
+any code was written, established that `#43a` (#187) had already shipped more of this story than
+its own text claimed: the route (`financial.controller.ts:237`), `FinanceWorkspaceService.fundsFor`,
+the distinct-field projection (`V33-DEC-040` R3 — no field sums seller and platform money), and all
+four route-count pin sites (9 → 10). What `#43a` did **not** ship is the battery this story's
+estimate was built around, and three of the five gaps were security-relevant:
+
+- nothing proved a live `finance_read` grantee can read `/funds` at all — `scoped-finance-read` §4
+  reads "all **four** workspace-aware routes", written before the tenth existed;
+- nothing proved a `manager` or `staff` row without a grant reaches nothing there;
+- the refusal was asserted as a bare **404 status**, never as the byte-identical body every other
+  reference failure returns;
+- `no-store` was proved on success only, never on a refusal;
+- no total had ever been reconciled against `financial.fund_postings`, and no cross-party leakage
+  assertion existed for the route.
+
+**What #185 delivered.** Five tests, 294 insertions, **no production change** — PR #190
+(squash `0f2fdcf`):
+
+- a grantee reads `/funds` with the OWNER projection byte-for-byte, on new-regime money (the grant
+  suite's `earn` fixture writes the LEGACY ledger, which this route cannot see, so the figures also
+  prove the two regimes are not mixed), with `no-store` and no identifier reaching the bookkeeper;
+- the bare-affiliation sweep — staff, manager, `practitioner_chat` holder, stranger — now probes
+  `/funds` through both the caller's own derivation and the owner's reference;
+- the eight reference-failure modes on `/funds` (malformed, wrong length, unknown, raw id, another
+  user's reference, another business, missing role, revoked grant, removed membership, deleted
+  business) answer with byte-identical bodies and `private, no-store` on every one, and identically
+  to the same failure on a pre-existing route; the revoked case carries a positive control that
+  reads 200 before revocation;
+- the totals reconcile field-for-field against a RAW re-derivation from `amount_toman` — never
+  `balance_after`, which both the service query and the chain trigger read — across two orders
+  where `pending` and `refunded` each move twice, plus M1 summed over the party's orders;
+- a second seller's distinctive figure and every party identifier are absent from the response, and
+  their reference derived inside the caller's session is refused indistinguishably from an unknown
+  one.
+
+**Evidence.** Disposable CI-mirror cluster (PostgreSQL 16, CI's own role provisioning, 78 migrations
+from empty): both suites **67/67 green**; each new test green individually, so none is silently
+filtered; `tsc --noEmit` and `eslint` clean. All four CI checks green on `f1ca910`, including real
+PostgreSQL / OpenSearch / object storage. **Mutation probe:** replacing `statesForParty`'s
+latest-balance-per-order query with a naive `SUM(balance_after)` over every posting fails the
+reconciliation test and leaves the leakage test passing — the guard is specific, not decorative.
+
+| Item | Before | After | Outcome it owns |
+|---|---|---|---|
+| #185 | `status:ready`, 5 | **Closed, 3** | The authority, refusal and reconciliation battery for the tenth finance route |
+| #172 | Closed, 5, **no milestone** | Closed, 5, milestone V3.3 | Unchanged work; only the missing milestone was corrected |
+
+**What moved.** V3.3 done **298 → 306**, scope **428 → 431**. Two independent causes, neither of
+them scope growth:
+
+- **#185** adds its 3 points to done, and removes 2 from scope, because the story closed at the
+  re-estimated 3 rather than the 5 it carried while `status:ready` (+3 done, −2 scope);
+- **#172** was the single data-quality warning the #161 record named — a closed, pointed issue with
+  no milestone, so its 5 points were invisible to the burn-up. Assigning it the V3.3 milestone adds
+  the same 5 points to **both** done and scope (+5 done, +5 scope). No work was performed and no
+  scope was added; a figure that was already true became visible.
+
+`scripts/backlog-report.mjs` (run at `2026-09-18T22:05:30.326Z`) reports **306 / 431**, 71%,
+proposed **102**, decision **0**, ready **0**, active **0**, review **0**, blocked **23**,
+unestimated **0**.
+
+- #185 closes with `sp:3` and no status label, per the operating model's §3 rule.
+- **There are now no data-quality warnings on V3.3.**
+- **Nothing is `status:ready`.** The next item must be moved out of `status:proposed` by owner
+  triage before work starts. The unblocked p1 candidates are `#43b` (#173, 13), `#43c` (#174, 13,
+  `gate:external`), `#43d` (#175, 8), `#43f` (#177, 13), `#42e` (#162, 13, `gate:legal`) and `#42f`
+  (#180, 8, `gate:legal`).
+- Still open and not built here: everything #185's own non-goals list — no release, settlement,
+  reserve, receivable, commission, fee or schedule value is read or published.
+- No provider, payment rail, migration, tag or Release was introduced or changed.
+
+## V3.3 Story #173 (`#43b-1`) delivered, and `#43b` split, 2026-09-19
+
+The commission publication plane and its arithmetic shipped. The same day, `#43b` became two
+stories — recorded here because the decomposition happened **before** implementation started and
+is the reason the delivery landed inside its estimate.
+
+**#173 (`#43b-1`), 13 Story Points.**
+
+### The split, and why it was not absorbed
+
+A read-only preflight against `25ffa05`, recorded on #173 before any code was written, measured
+the undivided `#43b` at roughly **4,000–5,300 insertions across 28–38 files**, using the
+repository's own closest templates rather than an estimate from the issue text:
+
+| Anchor | Files | Insertions |
+|---|---:|---:|
+| #82 deposit-capture (13) | 19 | 1,787 |
+| #149/#152 finance workspace surface (13) | 15 | 2,179 |
+| #160 outcome evaluator (13) | 31 | 3,281 |
+| `#43a` preflight measurement (13) | ~28 | 3,000–3,500 |
+
+`#43a` measured at the ceiling and **still** overran, which is why #185 exists. `#43b` measured
+above it. Operating model §4 requires a split before Ready, and the split followed ADR-052's own
+section boundary, so no scope was added, removed or re-ordered and `V33-DEC-044`'s chain is
+intact — `#43c` now depends on both halves rather than on one. No ADR amendment was needed: the
+mechanism-to-child map's `#43b` column still reads correctly for both halves.
+
+- **#173 (`#43b-1`), 13** — ADR-052 §1 and §3: the family, the four shapes, the lifecycle and the
+  arithmetic. **Delivered below.**
+- **#192 (`#43b-2`), 8** — ADR-052 §2: `commerce.order_commission_terms`, the Commerce-owned
+  `FOR SHARE` resolver, the checkout-transaction write and the racing-publication proof. Now
+  `status:ready`, unblocked by this delivery.
+
+**The measurement held.** `#43b-1` landed at **3,389 insertions across 21 files** — inside the
+13-point band, where the undivided story would not have been.
+
+### What #173 delivered
+
+- **`commercial.commission_policies` / `_versions`** — one stable key per component, with
+  `UNIQUE (component)` as a load-bearing constraint rather than tidiness: ADR-052 §2's resolver
+  asks "the active committed version for this component", and two keys would give that question
+  two answers. The four shapes are ONE CHECK: `zero` carries nothing; `percentage` a rate and a
+  base; `fixed` an amount strictly above zero; `hybrid` all three with an amount that may be zero.
+  `base` has **no DEFAULT** — the two bases differ by exactly what the customer has not paid yet.
+- **A publication rule stricter than every earlier family's.** ADR-048's families accept
+  `published_at` within ±1 minute; ADR-052 §1 requires equality with the transaction `now()`,
+  **no tolerance**, because `#43b-2` resolves this rule inside a checkout transaction and the
+  width of that window is the width of the race. A migration-level test pins the absence of
+  `INTERVAL '1 minute'` so the tolerance cannot return by copy-paste from a sibling.
+- **The pure engine** (`packages/commercial-policy-contract`, BigInt, zero imports) — the four
+  shapes, the fixed component order, the held ceiling with the remainder becoming a
+  `commission_excess` receivable for `#43f`, `V33-DEC-044`'s OC-2 rule (every component computed
+  on the retained amount, and **no receivable ever**), and the legacy cumulative reversal that
+  leaves no residue after a full refund.
+- **Nothing seeded, no value published.** `no-hardcoded-commission-rate.spec.ts` — built by
+  `#43a` — now scans the commission plane and the commercial migrations, so the one story that
+  could reintroduce a constant is checked by the test that exists to forbid one.
+
+### Evidence
+
+Disposable CI-mirror cluster (PostgreSQL 16, CI's own role provisioning, 79 migrations from empty,
+`Applied: 0` on re-run): `commission-policy-family.pg-spec.ts` **37/37**, every constraint attacked
+with raw SQL as well as through the service and each raw attack paired with a positive control;
+`commission-policy-contract.spec.ts` **26/26**, including both worked examples ADR-052 §3 states in
+prose and a property block to the representational ceiling; `story-43b1-boundary.spec.ts` **9/9**;
+commercial-catalogue **68/68** and four other adjacent suites green. `pnpm typecheck` (41 projects),
+`pnpm lint` (0 errors), `nx build api`, `pnpm verify:roles` all pass. All four CI checks green on
+`3f4e466`.
+
+Four exact-set pins were extended, as any story adding schema objects must: the commercial table
+count in two suites (22 → 24), the exclusion-constraint list, the trigger list and the
+migration-filename list. Three wiring defects surfaced and were fixed in the same branch — entities
+unregistered in the app DataSource, the new tables missing from the test factory's TRUNCATE list,
+and audit assertions unscoped against an audit log that deliberately survives a reset.
+
+| Item | Before | After | Outcome it owns |
+|---|---|---|---|
+| #173 (`#43b-1`) | `status:proposed`, 13 (as undivided `#43b`) | **Closed, 13** | The commission family, its lifecycle and the pure arithmetic |
+| #192 (`#43b-2`) | did not exist | **`status:ready`, 8** | The per-order snapshot, split out before implementation |
+
+**What moved.** V3.3 done **306 → 319** (+13, `#173`), scope **431 → 439** (+8, `#192`, created by
+the split rather than by new work: the same total effort, now in two estimated pieces).
+`scripts/backlog-report.mjs` (run at `2026-09-19T05:52:35.415Z`) reports **319 / 439**, 73%,
+proposed **89**, decision **0**, ready **8**, active **0**, review **0**, blocked **23**,
+unestimated **0**.
+
+- #173 closes with `sp:13` and no status label.
+- There are still no data-quality warnings on V3.3.
+- The only `status:ready` item is #192 (`#43b-2`), which this delivery unblocked; the map's order
+  puts #175 (`#43d`, 8) beside it as the other child depending on `#43` alone.
+- Still open and not built here: the snapshot (#192), recognition and release (`#43c`), receivable
+  and recovery (`#43f`), fee allocation (`#43g`), settlement schedule and batches (`#43d`, `#43e`),
+  revenue-recognition facts (`#43h`).
+- No provider, payment rail, tag or Release was introduced or changed, and no commission value was
+  published — the plane ships empty by construction.

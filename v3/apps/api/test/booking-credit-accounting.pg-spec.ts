@@ -573,6 +573,25 @@ describePg('booking-credit accounting (real PostgreSQL)', () => {
       expect(await credits.balanceFor(dataSource.manager, { partyType: booked.partyType, partyId: booked.partyId })).toBe(1);
     });
 
+    it('an ADMIN cancellation returns the credit exactly once — V3.3 #161 (`#42d`), ADR-051 §7 F5', async () => {
+      // CAUSE_BY_ACTOR gained `admin -> platform_cancelled` in #161; before
+      // it, this actor returned nothing (the same shape the CUSTOMER test
+      // below still asserts for `customer`, which stays deliberately absent).
+      const booked = await bookZeroCollectible();
+      await grantCredits(booked, 1);
+      const bookingId = booked.bookingId;
+      await dataSource.transaction((m) => credits.consumeForConfirmation(m, bookingId, { partyType: booked.partyType, partyId: booked.partyId }));
+      expect(await credits.balanceFor(dataSource.manager, { partyType: booked.partyType, partyId: booked.partyId })).toBe(0);
+
+      await bookings.cancel(bookingId, { type: 'admin', id: uuidv7() }, 'اقدام پلتفرم');
+      await bookings.cancel(bookingId, { type: 'admin', id: uuidv7() }, 'اقدام پلتفرم');
+
+      const rows = await returns();
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ return_cause: 'platform_cancelled' });
+      expect(await credits.balanceFor(dataSource.manager, { partyType: booked.partyType, partyId: booked.partyId })).toBe(1);
+    });
+
     it('a CUSTOMER cancellation returns nothing — retention is #46, not this story', async () => {
       const booked = await bookZeroCollectible();
       await grantCredits(booked, 1);

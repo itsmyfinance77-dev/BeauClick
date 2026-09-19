@@ -1123,7 +1123,10 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
       // tables (ADR-051 §10), each claimed by its own contract. Twenty-two since
       // Story #159 (`#42b`) added `seller_outcome_policy_assignments`, claimed
       // `retained` by `OutcomePolicyAssignmentSubjectDataContract`.
-      expect(rows).toHaveLength(22);
+      // Twenty-four since Story #173 (`#43b-1`) added `commission_policies` and
+      // `commission_policy_versions` (ADR-052 §1), both claimed `retained` by
+      // `CommissionPolicySubjectDataContract`.
+      expect(rows).toHaveLength(24);
 
       const contracts = app.get<SubjectDataContract[]>(SUBJECT_DATA_CONTRACTS);
       const report = evaluateCoverage(rows, contracts);
@@ -1259,6 +1262,11 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
         // V3.3 Story #159 (`#42b`). The seller's outcome selection (ADR-051 §3).
         // Seeds nothing. Its commerce companion is not matched by this query.
         'commercial/20260919100001_create_seller_outcome_policy_assignments.sql',
+        // V3.3 #161 (`#42d`), ADR-051 §8. Additive column on the numeric
+        // family: remedy_choice_window_hours. Seeds nothing.
+        'commercial/20260921100004_add_remedy_choice_window_to_outcome_policy.sql',
+        // V3.3 Story #173 (`#43b-1`), ADR-052 §1: the commission policy family.
+        'commercial/20260922100001_create_commission_policy_family.sql',
         'identity/20260902800002_add_commercial_plan_capability.sql',
       ]);
     });
@@ -1289,6 +1297,11 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
         // window expression (ADR-051 §1).
         'ex_bopv_no_effective_overlap',
         'ex_cpcv_no_effective_overlap',
+        // V3.3 Story #173 (`#43b-1`), ADR-052 §1. Same effective-window
+        // expression; with one key per component, an overlap here would mean
+        // an order could resolve two commission rules for one component at
+        // the same instant.
+        'ex_cpv_no_effective_overlap',
         'ex_plan_versions_no_overlap',
         'ex_plan_versions_single_auto_assignable',
         'ex_price_schedule_versions_no_overlap',
@@ -1328,7 +1341,13 @@ describePg('commercial catalogue — lifecycle, immutability and constraints (re
         'tg_bopro_freeze',
         'tg_bopv_lifecycle',
         'tg_bopv_require_evidence',
+        // V3.3 Story #173 (`#43b-1`), ADR-052 §1: the commission key's
+        // permanence (its component included) and the version lifecycle,
+        // whose publication instant must EQUAL the transaction clock. Sorted
+        // where the server sorts them, not where the story sits.
+        'tg_commission_policies_immutable',
         'tg_cpcv_lifecycle',
+        'tg_cpv_lifecycle',
         // V3.3 Story #57 (`#40c-1`).
         'tg_credit_purchases_immutable',
         'tg_customer_policy_copies_immutable',

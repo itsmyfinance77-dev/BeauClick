@@ -19,6 +19,16 @@ import { evaluateBookingOutcome, retentionAmount } from './evaluate-booking-outc
 
 const late = (rule: BookingOutcomeRetentionRule, cap: BookingOutcomeRetentionRule | null) => ({
   lateCancellationRetention: rule,
+  // Unused whenever `cause !== 'no_show'`, exactly as `lateCancellationRetention`
+  // is unused whenever `cause === 'no_show'` — see `noShow()` below.
+  noShowRetention: { kind: 'none' } as BookingOutcomeRetentionRule,
+  legalCap: cap,
+});
+
+/** V3.3 #161 (`#42d`). The no-show mirror of `late()`: only `noShowRetention` is read. */
+const noShow = (rule: BookingOutcomeRetentionRule, cap: BookingOutcomeRetentionRule | null) => ({
+  lateCancellationRetention: { kind: 'none' } as BookingOutcomeRetentionRule,
+  noShowRetention: rule,
   legalCap: cap,
 });
 
@@ -102,6 +112,74 @@ describe('evaluateBookingOutcome — the ratified order of rules', () => {
 
   it('refuses a negative collected amount rather than deciding on it', () => {
     expect(() => evaluateBookingOutcome(base({ collectedRemainingToman: -1n }))).toThrow(/must not be negative/);
+  });
+});
+
+describe('evaluateBookingOutcome — the no-show branch (V3.3 #161, ADR-051 §7)', () => {
+  const noShowBase = (overrides: Partial<BookingOutcomeEvaluationInputV1> = {}): BookingOutcomeEvaluationInputV1 => ({
+    cause: 'no_show',
+    bookingWasConfirmed: true,
+    timely: null,
+    collectedRemainingToman: 1_000_000n,
+    terms: noShow({ kind: 'full_collected' }, { kind: 'full_collected' }),
+    legalCapState: 'applied',
+    ...overrides,
+  });
+
+  it('positive control: a no-show under an applied cap retains via noShowRetention, not lateCancellationRetention', () => {
+    const d = evaluateBookingOutcome(noShowBase());
+    expect(d).toEqual({
+      basis: 'cap_applied',
+      policyAmountToman: 1_000_000n,
+      legalCapToman: 1_000_000n,
+      legalCapState: 'applied',
+      retainedToman: 1_000_000n,
+      refundToman: 0n,
+    });
+  });
+
+  it('never reads lateCancellationRetention for a no-show, even when it differs from noShowRetention', () => {
+    const terms = {
+      lateCancellationRetention: { kind: 'full_collected' } as BookingOutcomeRetentionRule,
+      noShowRetention: { kind: 'none' } as BookingOutcomeRetentionRule,
+      legalCap: { kind: 'full_collected' } as BookingOutcomeRetentionRule,
+    };
+    const d = evaluateBookingOutcome(noShowBase({ terms }));
+    expect(d.basis).toBe('cap_applied');
+    expect(d.retainedToman).toBe(0n); // noShowRetention is 'none', not lateCancellationRetention's 'full_collected'
+  });
+
+  it('carries no timeliness concept: `timely` stays null and never routes to the `timely` basis', () => {
+    // Even a caller mistakenly passing timely: true must not short-circuit a
+    // no-show to a free outcome the way it would a customer's cancellation.
+    const d = evaluateBookingOutcome(noShowBase({ timely: true }));
+    expect(d.basis).not.toBe('timely');
+    expect(d.basis).toBe('cap_applied');
+  });
+
+  it.each<[string, Partial<BookingOutcomeEvaluationInputV1>, string]>([
+    ['no terms row', { terms: null }, 'legacy_unenrolled'],
+    ['an invalid no-show retention rule', { terms: noShow({ kind: 'percentage_of_collected', basisPoints: 10_000 }, null) }, 'invalid_terms'],
+    ['a booking never confirmed (defence in depth)', { bookingWasConfirmed: false }, 'not_confirmed'],
+    ['an absent cap', { legalCapState: 'absent' }, 'cap_absent'],
+    ['a retired cap', { legalCapState: 'retired' }, 'cap_retired'],
+    ['"applied" with no cap rule on the terms', { terms: noShow({ kind: 'full_collected' }, null) }, 'cap_absent'],
+  ])('%s retains zero and refunds everything remaining', (_label, overrides, basis) => {
+    const d = evaluateBookingOutcome(noShowBase(overrides));
+    expect(d.basis).toBe(basis);
+    expect(d.retainedToman).toBe(0n);
+    expect(d.refundToman).toBe(1_000_000n);
+  });
+
+  it('never reaches `non_customer_cause`: a no-show is not "not the customer"', () => {
+    const d = evaluateBookingOutcome(noShowBase());
+    expect(d.basis).not.toBe('non_customer_cause');
+  });
+
+  it('a `none` no-show rule retains zero even under an applied cap', () => {
+    const d = evaluateBookingOutcome(noShowBase({ terms: noShow({ kind: 'none' }, { kind: 'full_collected' }) }));
+    expect(d.basis).toBe('cap_applied');
+    expect(d.retainedToman).toBe(0n);
   });
 });
 
