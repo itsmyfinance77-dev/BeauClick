@@ -25,3 +25,16 @@ When using the branch:
 5. update the canonical workspace rather than adding another full sibling snapshot.
 
 The canonical implementation surface remains `v3/apps/web`.
+
+## V3.3 design gap (2026-09-19)
+
+`V3.3_DESIGN_GAP_AND_HANDOFF.md` records which V3.3 surfaces have a screen specification on
+`design/claude-design` and which do not, checked against all 45 screens in the canonical
+snapshot rather than inferred. Four surfaces with merged, tested backends have **no design at
+all** — `#42a`'s outcome-policy publication, `#42b`'s seller selection, `#42d`'s no-show
+declaration and customer remedy, and `#43b-1`'s commission publication — and screen 46 needs an
+amendment for the per-state funds read that `#43a` and #185 added.
+
+It carries a self-contained Claude Design prompt for each, written against the constraints the
+server actually enforces, so a design cannot be produced that the backend would refuse to
+support.
