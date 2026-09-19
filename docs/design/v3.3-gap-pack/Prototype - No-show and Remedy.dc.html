@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas" />
+<style>
+  @font-face { font-family: 'Vazirmatn'; src: url('fonts/Vazir-Light.ttf') format('truetype'); font-weight: 300; font-display: swap; }
+  @font-face { font-family: 'Vazirmatn'; src: url('fonts/Vazir-Regular.ttf') format('truetype'); font-weight: 400; font-display: swap; }
+  @font-face { font-family: 'Vazirmatn'; src: url('fonts/Vazir-Medium.ttf') format('truetype'); font-weight: 500; font-display: swap; }
+  @font-face { font-family: 'Vazirmatn'; src: url('fonts/Vazir-Bold.ttf') format('truetype'); font-weight: 600 700; font-display: swap; }
+  @font-face { font-family: 'Vazirmatn'; src: url('fonts/Vazir-Black.ttf') format('truetype'); font-weight: 800 900; font-display: swap; }
+  @font-face { font-family: 'Anjoman'; src: url('fonts/Anjoman-SemiBold.ttf') format('truetype'); font-weight: 600; font-display: swap; }
+  @font-face { font-family: 'Anjoman'; src: url('fonts/Anjoman-Bold.ttf') format('truetype'); font-weight: 700; font-display: swap; }
+  @font-face { font-family: 'Anjoman'; src: url('fonts/Anjoman-ExtraBold.ttf') format('truetype'); font-weight: 800; font-display: swap; }
+  @font-face { font-family: 'Peyda'; src: url('fonts/Peyda-SemiBold.ttf') format('truetype'); font-weight: 600; font-display: swap; }
+  @font-face { font-family: 'Peyda'; src: url('fonts/Peyda-Bold.ttf') format('truetype'); font-weight: 700 900; font-display: swap; }
+  body { margin: 0; background: oklch(0.94 0.005 60); font-family: 'Vazirmatn', system-ui, sans-serif; }
+  a { color: oklch(0.42 0.13 340); text-decoration: none; }
+  a:hover { color: oklch(0.34 0.12 340); }
+  code { font-family: ui-monospace, Menlo, monospace; font-size: 0.85em; direction: ltr; unicode-bidi: isolate; }
+</style>
+</helmet>
+
+<div dir="rtl" style="padding: 40px; display: flex; flex-direction: column; gap: 56px;">
+
+  <div style="max-width: 940px; display: flex; flex-direction: column; gap: 10px;">
+    <div style="font-size: 13px; font-weight: 700; letter-spacing: 0.04em; color: oklch(0.58 0.015 330);">BEAUCLICK V3.3 — اعلامِ عدم‌حضور و جبرانِ مشتری</div>
+    <h1 style="margin: 0; font-family: 'Peyda', sans-serif; font-size: 44px; font-weight: 800; line-height: 1.4; color: oklch(0.22 0.02 330);">دو لحظه در یک نوبت</h1>
+    <p style="margin: 0; font-size: 16px; line-height: 1.85; color: oklch(0.46 0.02 330);">داستانِ <span dir="ltr">#42d</span> / ‎<span dir="ltr">#161</span>‎ (ADR-051 §۷–§۸). فروشنده عدم‌حضور را <strong>اعلام</strong> می‌کند؛ این اعلام به‌خودیِ‌خود هیچ پولی جابه‌جا نمی‌کند. در سوی دیگر، مشتری پس از لغوی که کارِ خودش نبوده، <strong>جبران</strong> را می‌بیند که از پیش روی بازپرداختِ کامل نشسته است.</p>
+    <div style="margin-top: 6px; display: flex; gap: 10px; flex-wrap: wrap; font-size: 12.5px;">
+      <span style="padding: 5px 12px; border-radius: 999px; background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60);">مدرکِ کمینه — نه عکس، نه موقعیت، نه میدانِ سلامت</span>
+      <span style="padding: 5px 12px; border-radius: 999px; background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60);">هیچ شمارشِ معکوسی که سرور به آن پایبند نیست</span>
+      <span style="padding: 5px 12px; border-radius: 999px; background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60);">هر رقمِ نمونه با برچسب <strong>SAMPLE</strong></span>
+    </div>
+  </div>
+
+  <section data-screen-label="C1" style="display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.42 0.13 340); color: #fff;">C۱</span>
+      <h2 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 24px; font-weight: 800; color: oklch(0.22 0.02 330);">فروشنده — نقطهٔ ورود، و حالتِ «هنوز زود است»</h2>
+      <code style="color: oklch(0.58 0.015 330);" dir="ltr">POST /bookings/:id/no-show</code>
+    </div>
+
+    <div style="width: min(1280px, 100%); box-sizing: border-box; display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px;">
+
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; padding: 20px 22px; display: flex; flex-direction: column; gap: 14px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;">
+          <div style="font-size: 14px; font-weight: 800;">پس از مهلتِ ارفاق — اعلام ممکن است</div>
+          <span style="font-size: 11px; font-weight: 800; padding: 3px 9px; border-radius: 6px; background: oklch(0.93 0.01 60);" dir="ltr">SAMPLE</span>
+        </div>
+        <div style="border: 1px solid oklch(0.92 0.008 60); border-radius: 12px; padding: 15px 16px; display: flex; flex-direction: column; gap: 8px; background: oklch(0.99 0.003 75);">
+          <div style="font-size: 14px; font-weight: 800; color: oklch(0.22 0.02 330);">نوبتِ ساعت ۱۰:۳۰ · خدمتِ نمونه</div>
+          <div style="font-size: 12.5px; color: oklch(0.58 0.015 330);">تأییدشده · مهلتِ ارفاقِ این نوبت سپری شده</div>
+          <button type="button" style="align-self: flex-start; margin-top: 4px; min-height: 44px; padding: 0 18px; border-radius: 10px; border: 1px solid oklch(0.42 0.13 340); background: oklch(0.42 0.13 340); color: #fff; font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer;">اعلامِ عدم‌حضور</button>
+        </div>
+        <p style="margin: 0; font-size: 12.5px; line-height: 1.8; color: oklch(0.46 0.02 330);">مهلتِ ارفاق از شرایطی می‌آید که همین نوبت با آن گرفته شده. رابط هیچ عددی برای آن نمی‌سازد و هیچ مهلتی را پیش‌فرض نمی‌گیرد.</p>
+      </div>
+
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; padding: 20px 22px; display: flex; flex-direction: column; gap: 14px;">
+        <div style="font-size: 14px; font-weight: 800;">پیش از مهلت — «هنوز زود است»</div>
+        <div style="border: 1px solid oklch(0.92 0.008 60); border-radius: 12px; padding: 15px 16px; display: flex; flex-direction: column; gap: 10px; background: oklch(0.99 0.003 75);">
+          <div style="font-size: 14px; font-weight: 800; color: oklch(0.22 0.02 330);">نوبتِ ساعت ۱۲:۰۰ · خدمتِ نمونه</div>
+          <div role="status" style="font-size: 12.5px; line-height: 1.8; color: oklch(0.42 0.04 40); background: oklch(0.97 0.025 70); border: 1px solid oklch(0.82 0.08 70); border-radius: 10px; padding: 11px 13px;">اعلامِ عدم‌حضور برای این نوبت هنوز ممکن نیست. پس از پایانِ مهلتِ ارفاقِ همین نوبت، همین‌جا فعال می‌شود.</div>
+        </div>
+        <p style="margin: 0; font-size: 12.5px; line-height: 1.8; color: oklch(0.46 0.02 330);">دکمهٔ غیرفعالِ بی‌توضیح نداریم: جای دکمه، جمله می‌نشیند. هیچ شمارشِ معکوسی نمایش داده نمی‌شود، چون لحظهٔ مجاز را سرور تعیین می‌کند و رابط آن را حساب نمی‌کند.</p>
+      </div>
+
+    </div>
+  </section>
+
+  <section data-screen-label="C2" style="display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.42 0.13 340); color: #fff;">C۲</span>
+      <h2 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 24px; font-weight: 800; color: oklch(0.22 0.02 330);">تأییدِ اعلام — آنچه می‌کند و آنچه نمی‌کند</h2>
+    </div>
+
+    <div role="dialog" aria-modal="true" aria-labelledby="c2-title" style="width: min(620px, 100%); box-sizing: border-box; background: oklch(1 0 0); border: 1px solid oklch(0.86 0.01 60); border-radius: 18px; box-shadow: 0 18px 44px oklch(0.2 0.02 330 / 0.14); padding: 24px 26px; display: flex; flex-direction: column; gap: 16px;">
+      <h3 id="c2-title" style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 20px; font-weight: 800; color: oklch(0.22 0.02 330);">عدم‌حضور را اعلام می‌کنید</h3>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px;">
+        <div style="border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 13px 15px; display: flex; flex-direction: column; gap: 7px;">
+          <div style="font-size: 12.5px; font-weight: 800; color: oklch(0.3 0.02 330);">این اعلام چه می‌کند</div>
+          <ul style="margin: 0; padding-inline-start: 18px; font-size: 12.5px; line-height: 1.9; color: oklch(0.46 0.02 330);">
+            <li>یک رویدادِ ثبتِ دائمی می‌سازد: یک کنشگر، یک لحظه.</li>
+            <li>پنجرهٔ اعتراضِ مشتری را باز می‌کند.</li>
+          </ul>
+        </div>
+        <div style="border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 13px 15px; display: flex; flex-direction: column; gap: 7px;">
+          <div style="font-size: 12.5px; font-weight: 800; color: oklch(0.3 0.02 330);">چه نمی‌کند</div>
+          <ul style="margin: 0; padding-inline-start: 18px; font-size: 12.5px; line-height: 1.9; color: oklch(0.46 0.02 330);">
+            <li>هیچ مبلغی را برنمی‌دارد و نگه نمی‌دارد.</li>
+            <li>هیچ بازپرداختی را لغو نمی‌کند.</li>
+            <li>پس گرفته نمی‌شود — این ثبت تغییرناپذیر است.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 7px;">
+        <label for="c2-stmt" style="font-size: 13px; font-weight: 700; color: oklch(0.3 0.02 330);">توضیح <span style="font-weight: 500; color: oklch(0.58 0.015 330);">— اختیاری</span></label>
+        <textarea id="c2-stmt" rows="3" maxlength="2000" placeholder="اگر چیزی برای گفتن دارید بنویسید. خالی گذاشتنش کاملاً عادی است." style="font-family: inherit; font-size: 13.5px; line-height: 1.8; padding: 11px 13px; border: 1px solid oklch(0.86 0.01 60); border-radius: 10px; resize: vertical; background: oklch(0.995 0.002 75);"></textarea>
+        <div style="display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 11.5px; color: oklch(0.58 0.015 330);">
+          <span>حداکثر ۲۰۰۰ نویسه. هیچ عکسی، موقعیتی یا اطلاعاتِ سلامتی پذیرفته نمی‌شود — سرور آن‌ها را رد می‌کند.</span>
+          <span dir="ltr" style="font-variant-numeric: tabular-nums;">0 / 2000</span>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <button type="button" style="min-height: 44px; padding: 0 20px; border-radius: 10px; border: 1px solid oklch(0.42 0.13 340); background: oklch(0.42 0.13 340); color: #fff; font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer;">اعلام می‌کنم</button>
+        <button type="button" style="min-height: 44px; padding: 0 20px; border-radius: 10px; border: 1px solid oklch(0.86 0.01 60); background: oklch(1 0 0); font-family: inherit; font-size: 14px; font-weight: 700; color: oklch(0.3 0.02 330); cursor: pointer;">انصراف</button>
+      </div>
+    </div>
+
+    <div role="note" aria-labelledby="c2-note" style="width: min(1280px, 100%); box-sizing: border-box; border: 2px dashed oklch(0.7 0.02 330); border-radius: 16px; padding: 18px 20px; background: repeating-linear-gradient(135deg, oklch(0.97 0.004 330) 0 10px, oklch(0.955 0.006 330) 10px 20px); display: flex; flex-direction: column; gap: 10px;">
+      <div style="display: flex; align-items: center; gap: 9px; flex-wrap: wrap;">
+        <span style="font-size: 11px; font-weight: 800; letter-spacing: 0.04em; padding: 4px 11px; border-radius: 999px; background: oklch(0.3 0.02 330); color: #fff;">بازبینیِ طراحی — بخشی از محصول نیست</span>
+        <h3 id="c2-note" style="margin: 0; font-size: 15px; font-weight: 700; color: oklch(0.3 0.02 330);">چرا رابط برای توضیح اصرار نمی‌کند</h3>
+      </div>
+      <p style="margin: 0; font-size: 12.5px; line-height: 1.85; color: oklch(0.46 0.02 330);">کمینه‌بودنِ مدرک یک <strong>ویژگیِ حریمِ خصوصی</strong> است، نه کاستی. پس نه ستاره، نه «برای بررسیِ سریع‌تر توضیح بدهید»، نه نوارِ پیشرفتِ کامل‌بودنِ پرونده، و نه هیچ اشاره‌ای که خالی‌گذاشتن به ضررِ فروشنده تمام می‌شود.</p>
+    </div>
+  </section>
+
+  <section data-screen-label="C3" style="display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.42 0.13 340); color: #fff;">C۳</span>
+      <h2 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 24px; font-weight: 800; color: oklch(0.22 0.02 330);">مشتری — اعلانِ ورودی</h2>
+    </div>
+
+    <div style="width: min(720px, 100%); box-sizing: border-box; background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; padding: 20px 22px; display: flex; flex-direction: column; gap: 12px;">
+      <div style="font-size: 15px; font-weight: 800; color: oklch(0.22 0.02 330);">دربارهٔ نوبتِ ۱۰:۳۰ شما</div>
+      <p style="margin: 0; font-size: 13.5px; line-height: 1.9; color: oklch(0.42 0.02 330);">ارائه‌دهنده برای این نوبت عدم‌حضور ثبت کرده است. اگر نظر دیگری دارید، از همین‌جا می‌توانید بگویید.</p>
+      <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <a href="#" style="min-height: 44px; display: inline-flex; align-items: center; padding: 0 18px; border-radius: 10px; background: oklch(0.42 0.13 340); color: #fff; font-size: 14px; font-weight: 700;">دیدنِ نوبت</a>
+      </div>
+      <p style="margin: 0; font-size: 12px; line-height: 1.8; color: oklch(0.58 0.015 330);">هیچ مبلغی در این اعلان نیست، چون اعلام هیچ مبلغی را تعیین نکرده. اگر فروشنده توضیحی نوشته باشد، در صفحهٔ نوبت دیده می‌شود، نه در اعلان.</p>
+    </div>
+  </section>
+
+  <section data-screen-label="C4" style="display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.42 0.13 340); color: #fff;">C۴</span>
+      <h2 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 24px; font-weight: 800; color: oklch(0.22 0.02 330);">جبران — پیش‌فرض از پیش اجرا شده</h2>
+      <code style="color: oklch(0.58 0.015 330);" dir="ltr">POST /bookings/:id/remedy</code>
+    </div>
+
+    <div style="width: min(760px, 100%); box-sizing: border-box; background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 18px; overflow: hidden;">
+      <div style="padding: 20px 24px; background: oklch(0.96 0.03 155); border-bottom: 1px solid oklch(0.86 0.04 155); display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 9px; flex-wrap: wrap;">
+          <span aria-hidden="true" style="width: 11px; height: 11px; border-radius: 999px; background: oklch(0.5 0.11 155);"></span>
+          <div style="font-size: 17px; font-weight: 800; color: oklch(0.28 0.05 155);">بازپرداختِ کامل در جریان است</div>
+        </div>
+        <p style="margin: 0; font-size: 13.5px; line-height: 1.9; color: oklch(0.33 0.04 155);">لازم نیست کاری بکنید. کلِ مبلغی که پرداخت کرده‌اید به شما بازمی‌گردد. اگر کاری نکنید، همین اتفاق می‌افتد.</p>
+      </div>
+      <div style="padding: 22px 24px; display: flex; flex-direction: column; gap: 16px;">
+        <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; border: 1px solid oklch(0.92 0.008 60); border-radius: 12px; padding: 14px 16px;">
+          <span style="font-size: 13px; color: oklch(0.46 0.02 330);">مبلغِ بازپرداخت</span>
+          <span style="font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums;">۴۸۰٬۰۰۰ <span style="font-size: 12px; font-weight: 600; color: oklch(0.58 0.015 330);">تومان</span> <span style="font-size: 10.5px; font-weight: 800; color: oklch(0.55 0.02 330);" dir="ltr">SAMPLE</span></span>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 9px;">
+          <div style="font-size: 14px; font-weight: 800; color: oklch(0.22 0.02 330);">ترجیح می‌دهید به‌جایش نوبتِ تازه بگیرید؟</div>
+          <p style="margin: 0; font-size: 12.5px; line-height: 1.85; color: oklch(0.46 0.02 330);">تا وقتی بازپرداخت اجرا نشده، می‌توانید آن را به <strong>یک نوبتِ رایگانِ دیگر</strong> تبدیل کنید. این تنها گزینهٔ جایگزین است.</p>
+          <button type="button" style="align-self: flex-start; min-height: 44px; padding: 0 18px; border-radius: 10px; border: 1px solid oklch(0.42 0.13 340); background: oklch(1 0 0); color: oklch(0.35 0.12 340); font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer;">به‌جای بازپرداخت، نوبتِ تازه می‌خواهم</button>
+          <p style="margin: 0; font-size: 12px; line-height: 1.8; color: oklch(0.58 0.015 330);">پنجرهٔ این تغییر را وضعیتِ خودِ بازپرداخت می‌بندد، نه یک ساعتِ شمارشِ معکوس. تا وقتی این دکمه هست، تغییر ممکن است؛ وقتی نیست، دیگر نیست.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section data-screen-label="C5" style="display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.42 0.13 340); color: #fff;">C۵</span>
+      <h2 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 24px; font-weight: 800; color: oklch(0.22 0.02 330);">بازدیدِ دوم — پس از اجرای بازپرداخت</h2>
+      <span style="font-size: 12.5px; color: oklch(0.58 0.015 330);">درخواستِ تکراری خطا نیست؛ همان پاسخ را می‌گیرد</span>
+    </div>
+
+    <div style="width: min(1280px, 100%); box-sizing: border-box; display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 16px;">
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; padding: 20px 22px; display: flex; flex-direction: column; gap: 12px;">
+        <div style="font-size: 14px; font-weight: 800;">بازپرداخت اجرا شده — انتخاب بسته است</div>
+        <div style="border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 15px 16px; background: oklch(0.985 0.003 75); display: flex; flex-direction: column; gap: 8px;">
+          <div style="font-size: 13.5px; font-weight: 700; color: oklch(0.28 0.05 155);">بازپرداختِ کامل انجام شد.</div>
+          <div style="font-size: 12.5px; color: oklch(0.46 0.02 330);">۴۸۰٬۰۰۰ تومان <span dir="ltr" style="font-size: 10.5px; font-weight: 800; color: oklch(0.55 0.02 330);">SAMPLE</span></div>
+          <p style="margin: 0; font-size: 12.5px; line-height: 1.8; color: oklch(0.46 0.02 330);">گزینهٔ نوبتِ تازه دیگر در دسترس نیست. این جمله جای دکمه نشسته — دکمهٔ غیرفعالی باقی نمانده.</p>
+        </div>
+        <p style="margin: 0; font-size: 12px; line-height: 1.8; color: oklch(0.58 0.015 330);">اگر مشتری صفحه را دوباره باز کند یا درخواست را تکرار کند، <strong>همین صفحه</strong> را می‌بیند: نه خطا، نه «قبلاً انجام شده» با لحنِ تذکر.</p>
+      </div>
+
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; padding: 20px 22px; display: flex; flex-direction: column; gap: 12px;">
+        <div style="font-size: 14px; font-weight: 800;">نوبتِ تازه انتخاب شده بود</div>
+        <div style="border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 15px 16px; background: oklch(0.985 0.003 75); display: flex; flex-direction: column; gap: 8px;">
+          <div style="font-size: 13.5px; font-weight: 700; color: oklch(0.3 0.02 330);">جبرانِ شما: نوبتِ رایگانِ تازه.</div>
+          <p style="margin: 0; font-size: 12.5px; line-height: 1.8; color: oklch(0.46 0.02 330);">بازپرداخت انجام نشد، چون خودتان جایگزینش کردید. این هم بسته است و بازگشتی ندارد.</p>
+        </div>
+        <p style="margin: 0; font-size: 12px; line-height: 1.8; color: oklch(0.58 0.015 330);">هر دو حالتِ بسته یک ساختار دارند: نتیجه، مبلغ یا مابه‌ازا، و یک جملهٔ صریح که کاری باقی نمانده.</p>
+      </div>
+
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; padding: 20px 22px; display: flex; flex-direction: column; gap: 12px;">
+        <div style="font-size: 14px; font-weight: 800;">بارگذاری و خطا</div>
+        <div aria-busy="true" aria-label="در حال خواندن وضعیت جبران" style="border: 1px solid oklch(0.94 0.006 60); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 9px;">
+          <div style="height: 10px; width: 55%; border-radius: 4px; background: oklch(0.92 0.006 60);"></div>
+          <div style="height: 18px; width: 75%; border-radius: 4px; background: oklch(0.9 0.006 60);"></div>
+        </div>
+        <div role="alert" style="border: 1px solid oklch(0.75 0.11 40); background: oklch(0.97 0.03 60); border-radius: 12px; padding: 13px 15px; display: flex; flex-direction: column; gap: 9px;">
+          <div style="font-size: 13px; font-weight: 700; color: oklch(0.35 0.08 40);">وضعیتِ جبران خوانده نشد.</div>
+          <p style="margin: 0; font-size: 12.5px; line-height: 1.8; color: oklch(0.42 0.04 40);">بازپرداختِ پیش‌فرض همچنان در جریان است؛ این خطا فقط دربارهٔ خواندنِ وضعیت است.</p>
+          <button type="button" style="align-self: flex-start; min-height: 44px; padding: 0 16px; border-radius: 10px; border: 1px solid oklch(0.5 0.1 40); background: oklch(1 0 0); font-family: inherit; font-size: 13px; font-weight: 700; color: oklch(0.35 0.08 40); cursor: pointer;">تلاش دوباره</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section data-screen-label="C6" style="display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.42 0.13 340); color: #fff;">C۶</span>
+      <h2 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 24px; font-weight: 800; color: oklch(0.22 0.02 330);">موبایل — ۳۹۰ پیکسل</h2>
+    </div>
+
+    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+      <div style="width: 390px; max-width: 100%; box-sizing: border-box; border: 10px solid oklch(0.2 0.02 330); border-radius: 34px; overflow: hidden; background: oklch(0.98 0.004 75);">
+        <div style="padding: 14px 16px; background: oklch(1 0 0); border-bottom: 1px solid oklch(0.9 0.008 60); font-size: 15px; font-weight: 800; color: oklch(0.22 0.02 330);">نوبتِ شما</div>
+        <div style="padding: 16px; display: flex; flex-direction: column; gap: 14px;">
+          <div style="border-radius: 14px; background: oklch(0.96 0.03 155); border: 1px solid oklch(0.86 0.04 155); padding: 15px 16px; display: flex; flex-direction: column; gap: 7px;">
+            <div style="font-size: 15px; font-weight: 800; color: oklch(0.28 0.05 155);">بازپرداختِ کامل در جریان است</div>
+            <div style="font-size: 12.5px; line-height: 1.85; color: oklch(0.33 0.04 155);">لازم نیست کاری بکنید.</div>
+            <div style="font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; color: oklch(0.25 0.04 155);">۴۸۰٬۰۰۰ <span style="font-size: 11px; font-weight: 600;">تومان</span></div>
+          </div>
+          <button type="button" style="min-height: 48px; border-radius: 12px; border: 1px solid oklch(0.42 0.13 340); background: oklch(1 0 0); color: oklch(0.35 0.12 340); font-family: inherit; font-size: 14.5px; font-weight: 700; cursor: pointer;">به‌جایش نوبتِ تازه می‌خواهم</button>
+          <p style="margin: 0; font-size: 11.5px; line-height: 1.8; color: oklch(0.58 0.015 330);">تا وقتی بازپرداخت اجرا نشده.</p>
+        </div>
+      </div>
+
+      <div style="width: 390px; max-width: 100%; box-sizing: border-box; border: 10px solid oklch(0.2 0.02 330); border-radius: 34px; overflow: hidden; background: oklch(0.98 0.004 75);">
+        <div style="padding: 14px 16px; background: oklch(1 0 0); border-bottom: 1px solid oklch(0.9 0.008 60); font-size: 15px; font-weight: 800; color: oklch(0.22 0.02 330);">نوبتِ ۱۰:۳۰ · فروشنده</div>
+        <div style="padding: 16px; display: flex; flex-direction: column; gap: 14px;">
+          <div style="border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; background: oklch(1 0 0); padding: 15px 16px; display: flex; flex-direction: column; gap: 8px;">
+            <div style="font-size: 14px; font-weight: 800; color: oklch(0.22 0.02 330);">مشتری نیامد؟</div>
+            <p style="margin: 0; font-size: 12.5px; line-height: 1.85; color: oklch(0.46 0.02 330);">اعلام، یک ثبتِ تغییرناپذیر است و به‌خودیِ‌خود پولی جابه‌جا نمی‌کند.</p>
+            <button type="button" style="min-height: 48px; border-radius: 12px; border: 1px solid oklch(0.42 0.13 340); background: oklch(0.42 0.13 340); color: #fff; font-family: inherit; font-size: 14.5px; font-weight: 700; cursor: pointer;">اعلامِ عدم‌حضور</button>
+          </div>
+          <div role="status" style="font-size: 12px; line-height: 1.8; color: oklch(0.42 0.04 40); background: oklch(0.97 0.025 70); border: 1px solid oklch(0.82 0.08 70); border-radius: 11px; padding: 11px 13px;">در نوبتِ بعدی که هنوز مهلتِ ارفاقش نگذشته، همین جعبه به‌جای دکمه یک جمله نشان می‌دهد.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+</x-dc>
+</body>
+</html>

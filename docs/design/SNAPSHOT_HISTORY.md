@@ -16,6 +16,7 @@ rewrite their history.
 | V3.3-A commercial catalogue | `d2f51c34739f35ea5435f363f484dff0e23d7dbb` | 2026-09-03 | Canonical current workspace |
 | V3.3 frontend handoff closure | `f887bb4c90beef90efc3490a9dca1e72ce16685e` | 2026-09-12 | Canonical current workspace; implementation baseline `6695234eded1` |
 | V3.3 finance-read closure | `82ac644cbc151804edc679a28266fd0691cd5840` | 2026-09-13 | Canonical current workspace; implementation baseline `5d4b3de5d7b386d14dc72c5bbd03f17fead64b38` |
+| V3.3 design-gap pack (A–E) | this commit | 2026-09-20 | Sibling pack `v3.3-gap-pack/`, not a workspace copy; canonical snapshot untouched; reviewed against `694d037` |
 
 Examples:
 

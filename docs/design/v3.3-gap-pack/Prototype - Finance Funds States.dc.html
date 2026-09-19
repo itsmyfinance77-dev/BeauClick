@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas" />
+<style>
+  @font-face { font-family: 'Vazirmatn'; src: url('fonts/Vazir-Light.ttf') format('truetype'); font-weight: 300; font-display: swap; }
+  @font-face { font-family: 'Vazirmatn'; src: url('fonts/Vazir-Regular.ttf') format('truetype'); font-weight: 400; font-display: swap; }
+  @font-face { font-family: 'Vazirmatn'; src: url('fonts/Vazir-Medium.ttf') format('truetype'); font-weight: 500; font-display: swap; }
+  @font-face { font-family: 'Vazirmatn'; src: url('fonts/Vazir-Bold.ttf') format('truetype'); font-weight: 600 700; font-display: swap; }
+  @font-face { font-family: 'Vazirmatn'; src: url('fonts/Vazir-Black.ttf') format('truetype'); font-weight: 800 900; font-display: swap; }
+  @font-face { font-family: 'Anjoman'; src: url('fonts/Anjoman-SemiBold.ttf') format('truetype'); font-weight: 600; font-display: swap; }
+  @font-face { font-family: 'Anjoman'; src: url('fonts/Anjoman-Bold.ttf') format('truetype'); font-weight: 700; font-display: swap; }
+  @font-face { font-family: 'Anjoman'; src: url('fonts/Anjoman-ExtraBold.ttf') format('truetype'); font-weight: 800; font-display: swap; }
+  @font-face { font-family: 'Peyda'; src: url('fonts/Peyda-SemiBold.ttf') format('truetype'); font-weight: 600; font-display: swap; }
+  @font-face { font-family: 'Peyda'; src: url('fonts/Peyda-Bold.ttf') format('truetype'); font-weight: 700 900; font-display: swap; }
+  body { margin: 0; background: oklch(0.94 0.005 60); font-family: 'Vazirmatn', system-ui, sans-serif; }
+  a { color: oklch(0.42 0.13 340); text-decoration: none; }
+  a:hover { color: oklch(0.34 0.12 340); }
+  code { font-family: ui-monospace, Menlo, monospace; font-size: 0.85em; direction: ltr; unicode-bidi: isolate; }
+</style>
+</helmet>
+
+<div dir="rtl" style="padding: 40px; display: flex; flex-direction: column; gap: 56px;">
+
+  <div style="max-width: 940px; display: flex; flex-direction: column; gap: 10px;">
+    <div style="font-size: 13px; font-weight: 700; letter-spacing: 0.04em; color: oklch(0.58 0.015 330);">BEAUCLICK V3.3 — اصلاحیهٔ صفحهٔ ۴۶ · وجوه به تفکیک وضعیت</div>
+    <h1 style="margin: 0; font-family: 'Peyda', sans-serif; font-size: 44px; font-weight: 800; line-height: 1.4; color: oklch(0.22 0.02 330);">وجوه، وضعیت‌به‌وضعیت</h1>
+    <p style="margin: 0; font-size: 16px; line-height: 1.85; color: oklch(0.46 0.02 330);">‏<span dir="ltr">#43a</span>‏ و ‎<span dir="ltr">#185</span>‎ (ADR-052 §۱۴ و §۱۶). این یک صفحهٔ تازه نیست: بخشی است که به <a href="#e2">صفحهٔ ۴۶</a> افزوده می‌شود. سه رقمِ قدیمیِ آن صفحه سرِ جای خود می‌مانند و <strong>دوازده میدانِ تازه</strong> کنارشان می‌نشینند، بی‌آنکه با هم جمع شوند.</p>
+    <p style="margin: 0; font-size: 14px; line-height: 1.85; color: oklch(0.46 0.02 330);">مسیر: <code dir="ltr">GET /api/v1/me/finance/:workspaceRef/funds</code> — همان الگوی فضامحورِ صفحهٔ ۴۶، همان <code dir="ltr">Cache-Control: private, no-store</code>. خواننده می‌تواند مالک باشد یا دفتردارِ دارندهٔ <code dir="ltr">finance_read</code>؛ <strong>هر دو بایت‌به‌بایت یک چیز می‌بینند</strong>.</p>
+    <div style="margin-top: 6px; display: flex; gap: 10px; flex-wrap: wrap; font-size: 12.5px;">
+      <span style="padding: 5px 12px; border-radius: 999px; background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60);">هر رقمِ نمونه با برچسب <strong>SAMPLE</strong></span>
+      <span style="padding: 5px 12px; border-radius: 999px; background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60);">هیچ جمعی از مرزِ فروشنده/سکو رد نمی‌شود</span>
+      <span style="padding: 5px 12px; border-radius: 999px; background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60);">هیچ زمان‌بندیِ تسویه‌ای فرض نشده</span>
+    </div>
+  </div>
+
+  <section id="e1" data-screen-label="E1" style="display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.42 0.13 340); color: #fff;">E۱</span>
+      <h2 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 24px; font-weight: 800; color: oklch(0.22 0.02 330);">دوازده میدان و اینکه هرکدام به چه پرسشی پاسخ می‌دهد</h2>
+      <code style="color: oklch(0.58 0.015 330);" dir="ltr">:ref/funds</code>
+    </div>
+
+    <div tabindex="0" role="region" aria-label="دوازده میدانِ وجوه" style="width: min(1280px, 100%); box-sizing: border-box; background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; overflow-x: auto;">
+      <table style="width: 100%; min-width: 760px; border-collapse: collapse;">
+        <caption style="caption-side: top; text-align: start; padding: 14px 18px; font-size: 12.5px; line-height: 1.75; color: oklch(0.58 0.015 330);">نُه میدانِ نخست پولِ سمتِ فروشنده را توصیف می‌کنند و سه میدانِ آخر پولِ سکو را. مرز میان این دو <strong>قاعده است، نه سلیقهٔ چیدمان</strong>.</caption>
+        <thead>
+          <tr style="border-bottom: 1px solid oklch(0.9 0.008 60);">
+            <th style="text-align: start; padding: 11px 18px; font-size: 12px; font-weight: 700; color: oklch(0.58 0.015 330);">میدان</th>
+            <th style="text-align: start; padding: 11px 10px; font-size: 12px; font-weight: 700; color: oklch(0.58 0.015 330);">برچسب فارسی</th>
+            <th style="text-align: start; padding: 11px 10px; font-size: 12px; font-weight: 700; color: oklch(0.58 0.015 330);">به چه پرسشی پاسخ می‌دهد</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom: 1px solid oklch(0.96 0.005 60);"><td style="padding: 11px 18px; font-size: 13px;" dir="ltr">pending</td><td style="padding: 11px 10px; font-size: 13px; font-weight: 700;">در انتظار</td><td style="padding: 11px 10px; font-size: 12.5px; color: oklch(0.46 0.02 330);">وصول شده، ولی هنوز به هیچ وضعیتِ بعدی نرفته.</td></tr>
+          <tr style="border-bottom: 1px solid oklch(0.96 0.005 60);"><td style="padding: 11px 18px; font-size: 13px;" dir="ltr">disputed</td><td style="padding: 11px 10px; font-size: 13px; font-weight: 700;">درگیرِ اختلاف</td><td style="padding: 11px 10px; font-size: 12.5px; color: oklch(0.46 0.02 330);">نگه‌داشته‌شده تا تعیینِ تکلیفِ یک اختلاف.</td></tr>
+          <tr style="border-bottom: 1px solid oklch(0.96 0.005 60);"><td style="padding: 11px 18px; font-size: 13px;" dir="ltr">available</td><td style="padding: 11px 10px; font-size: 13px; font-weight: 700;">قابلِ تسویه</td><td style="padding: 11px 10px; font-size: 12.5px; color: oklch(0.46 0.02 330);">آمادهٔ ورود به یک تسویه. <strong>نه</strong> «پولی که فردا می‌رسد» — هیچ زمانی وعده داده نمی‌شود.</td></tr>
+          <tr style="border-bottom: 1px solid oklch(0.96 0.005 60);"><td style="padding: 11px 18px; font-size: 13px;" dir="ltr">reserve</td><td style="padding: 11px 10px; font-size: 13px; font-weight: 700;">ذخیره</td><td style="padding: 11px 10px; font-size: 12.5px; color: oklch(0.46 0.02 330);">به قاعده نگه داشته شده. درصدِ ذخیره هرگز در رابط ساخته نمی‌شود.</td></tr>
+          <tr style="border-bottom: 1px solid oklch(0.96 0.005 60);"><td style="padding: 11px 18px; font-size: 13px;" dir="ltr">settled</td><td style="padding: 11px 10px; font-size: 13px; font-weight: 700;">تسویه‌شده</td><td style="padding: 11px 10px; font-size: 12.5px; color: oklch(0.46 0.02 330);">از این دفتر خارج و به فروشنده رسیده.</td></tr>
+          <tr style="border-bottom: 1px solid oklch(0.96 0.005 60);"><td style="padding: 11px 18px; font-size: 13px;" dir="ltr">refunded</td><td style="padding: 11px 10px; font-size: 13px; font-weight: 700;">بازگردانده‌شده</td><td style="padding: 11px 10px; font-size: 12.5px; color: oklch(0.46 0.02 330);">به مشتری برگشته.</td></tr>
+          <tr style="border-bottom: 1px solid oklch(0.96 0.005 60);"><td style="padding: 11px 18px; font-size: 13px;" dir="ltr">collected</td><td style="padding: 11px 10px; font-size: 13px; font-weight: 700;">وصول‌شده</td><td style="padding: 11px 10px; font-size: 12.5px; color: oklch(0.46 0.02 330);">آنچه واقعاً از مشتری گرفته شده؛ مبنای بسیاری از تصمیم‌ها، نه یک مانده.</td></tr>
+          <tr style="border-bottom: 1px solid oklch(0.96 0.005 60);"><td style="padding: 11px 18px; font-size: 13px;" dir="ltr">platformAdvance</td><td style="padding: 11px 10px; font-size: 13px; font-weight: 700;">پیش‌دادهٔ سکو</td><td style="padding: 11px 10px; font-size: 12.5px; color: oklch(0.46 0.02 330);">آنچه سکو پیش از وصول، به این فضا رسانده.</td></tr>
+          <tr style="border-bottom: 1px solid oklch(0.96 0.005 60);"><td style="padding: 11px 18px; font-size: 13px;" dir="ltr">recoveredIn</td><td style="padding: 11px 10px; font-size: 13px; font-weight: 700;">بازیافتِ واردشده</td><td style="padding: 11px 10px; font-size: 12.5px; color: oklch(0.46 0.02 330);">آنچه از پیش‌داده به این فضا بازگشته.</td></tr>
+          <tr style="border-bottom: 1px solid oklch(0.96 0.005 60); background: oklch(0.975 0.006 60);"><td style="padding: 11px 18px; font-size: 13px;" dir="ltr">platformEarned</td><td style="padding: 11px 10px; font-size: 13px; font-weight: 700;">درآمدِ سکو</td><td style="padding: 11px 10px; font-size: 12.5px; color: oklch(0.46 0.02 330);"><strong>پولِ سکو.</strong> در همین پاسخ می‌آید تا شفاف باشد، نه تا با بالایی‌ها جمع شود.</td></tr>
+          <tr style="border-bottom: 1px solid oklch(0.96 0.005 60); background: oklch(0.975 0.006 60);"><td style="padding: 11px 18px; font-size: 13px;" dir="ltr">providerFee</td><td style="padding: 11px 10px; font-size: 13px; font-weight: 700;">کارمزدِ درگاه</td><td style="padding: 11px 10px; font-size: 12.5px; color: oklch(0.46 0.02 330);"><strong>پولِ سکو.</strong> هزینهٔ پرداخت‌یارِ ثبت‌شده روی این وصول‌ها.</td></tr>
+          <tr style="background: oklch(0.975 0.006 60);"><td style="padding: 11px 18px; font-size: 13px;" dir="ltr">recoveryOut</td><td style="padding: 11px 10px; font-size: 13px; font-weight: 700;">بازیافتِ خارج‌شده</td><td style="padding: 11px 10px; font-size: 12.5px; color: oklch(0.46 0.02 330);"><strong>پولِ سکو.</strong> قرینهٔ <code dir="ltr">recoveredIn</code> از سمتِ سکو.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div role="note" aria-labelledby="e-nosum" style="width: min(1280px, 100%); box-sizing: border-box; border: 2px dashed oklch(0.7 0.02 330); border-radius: 16px; padding: 18px 20px; background: repeating-linear-gradient(135deg, oklch(0.97 0.004 330) 0 10px, oklch(0.955 0.006 330) 10px 20px); display: flex; flex-direction: column; gap: 10px;">
+      <div style="display: flex; align-items: center; gap: 9px; flex-wrap: wrap;">
+        <span style="font-size: 11px; font-weight: 800; letter-spacing: 0.04em; padding: 4px 11px; border-radius: 999px; background: oklch(0.3 0.02 330); color: #fff;">بازبینیِ طراحی — بخشی از محصول نیست</span>
+        <h3 id="e-nosum" style="margin: 0; font-size: 15px; font-weight: 700; color: oklch(0.3 0.02 330);">چرا هیچ «موجودی» یکه‌ای اینجا نیست</h3>
+      </div>
+      <p style="margin: 0; font-size: 12.5px; line-height: 1.85; color: oklch(0.46 0.02 330);">هر عددی که از نُه میدانِ فروشنده و سه میدانِ سکو یک رقم بسازد، مرزی را می‌شکند که سرور نگه می‌دارد. پس رابط <strong>هیچ جمعِ کل، هیچ «موجودی شما» و هیچ کارتِ خلاصهٔ واحدی</strong> نمی‌سازد. حتی جمعِ درونِ سمتِ فروشنده هم ساخته نمی‌شود، چون میدان‌ها وضعیت‌اند و نه سهم‌هایی از یک کل.</p>
+      <p style="margin: 0; font-size: 12.5px; line-height: 1.85; color: oklch(0.46 0.02 330);">همچنین ساخته نمی‌شود: تاریخِ تسویه، «‏۷ روزِ کاری»، حداقلِ برداشت، درصدِ ذخیره، طبقهٔ ریسک. سرور هیچ‌کدام را نمی‌دهد.</p>
+    </div>
+  </section>
+
+  <section id="e2" data-screen-label="E2" style="display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.42 0.13 340); color: #fff;">E۲</span>
+      <h2 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 24px; font-weight: 800; color: oklch(0.22 0.02 330);">بخشِ افزوده در صفحهٔ ۴۶ — دسکتاپ</h2>
+      <code style="color: oklch(0.58 0.015 330);" dir="ltr">/finance · workspace selected</code>
+    </div>
+
+    <div style="width: min(1280px, 100%); box-sizing: border-box; background: oklch(0.98 0.004 75); border: 1px solid oklch(0.9 0.008 60); border-radius: 18px; overflow: hidden;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 18px 24px; background: oklch(1 0 0); border-bottom: 1px solid oklch(0.9 0.008 60);">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span aria-hidden="true" style="width: 34px; height: 34px; border-radius: 10px; background: oklch(0.42 0.13 340);"></span>
+          <div>
+            <div style="font-size: 17px; font-weight: 800; color: oklch(0.22 0.02 330);">امور مالی · سالن نور <span style="font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 6px; background: oklch(0.93 0.01 60); color: oklch(0.42 0.02 330);" dir="ltr">SAMPLE</span></div>
+            <div style="font-size: 12px; color: oklch(0.58 0.015 330);">کسب‌وکار · دسترسیِ فقط‌خواندنیِ واگذارشده</div>
+          </div>
+        </div>
+        <span style="font-size: 12px; font-weight: 700; padding: 7px 13px; border-radius: 999px; background: oklch(0.95 0.01 250); color: oklch(0.35 0.06 250);">این پاسخ ذخیره نمی‌شود — <span dir="ltr">no-store</span></span>
+      </div>
+
+      <div style="padding: 24px; display: flex; flex-direction: column; gap: 22px;">
+
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;">
+            <h3 style="margin: 0; font-size: 16px; font-weight: 800; color: oklch(0.22 0.02 330);">ارقامِ سامانهٔ پیشین</h3>
+            <span style="font-size: 12px; color: oklch(0.58 0.015 330);">سفارش‌هایی که پیش از دفترِ وضعیت‌ها وصول شده‌اند</span>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px;">
+            <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 15px 17px; display: flex; flex-direction: column; gap: 6px;">
+              <span style="font-size: 12.5px; color: oklch(0.46 0.02 330);">دریافتنیِ خالص</span>
+              <span style="font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums;">۴٬۲۰۰٬۰۰۰ <span style="font-size: 12px; font-weight: 600; color: oklch(0.58 0.015 330);">تومان</span></span>
+              <span style="font-size: 10.5px; font-weight: 800; color: oklch(0.55 0.02 330);" dir="ltr">SAMPLE · receivableNetToman</span>
+            </div>
+            <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 15px 17px; display: flex; flex-direction: column; gap: 6px;">
+              <span style="font-size: 12.5px; color: oklch(0.46 0.02 330);">تسویه‌شده</span>
+              <span style="font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums;">۳٬۱۰۰٬۰۰۰ <span style="font-size: 12px; font-weight: 600; color: oklch(0.58 0.015 330);">تومان</span></span>
+              <span style="font-size: 10.5px; font-weight: 800; color: oklch(0.55 0.02 330);" dir="ltr">SAMPLE · settledToman</span>
+            </div>
+            <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 15px 17px; display: flex; flex-direction: column; gap: 6px;">
+              <span style="font-size: 12.5px; color: oklch(0.46 0.02 330);">مانده</span>
+              <span style="font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums;">۱٬۱۰۰٬۰۰۰ <span style="font-size: 12px; font-weight: 600; color: oklch(0.58 0.015 330);">تومان</span></span>
+              <span style="font-size: 10.5px; font-weight: 800; color: oklch(0.55 0.02 330);" dir="ltr">SAMPLE · outstandingToman</span>
+            </div>
+          </div>
+          <p style="margin: 2px 0 0; font-size: 12px; line-height: 1.8; color: oklch(0.58 0.015 330);">این سه رقم و دوازده میدانِ زیر <strong>به دو پرسشِ متفاوت پاسخ می‌دهند و با هم جمع نمی‌شوند</strong>. هیچ نسبتی میانشان محاسبه نمی‌شود.</p>
+        </div>
+
+        <hr style="border: none; border-top: 1px solid oklch(0.9 0.008 60); margin: 0;" />
+
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <div style="display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;">
+            <h3 style="margin: 0; font-size: 16px; font-weight: 800; color: oklch(0.22 0.02 330);">وجوهِ این فضا، وضعیت‌به‌وضعیت</h3>
+            <span style="font-size: 12px; color: oklch(0.58 0.015 330);">نُه وضعیت · پولِ فروشنده</span>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+            <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 5px;">
+              <span style="font-size: 12.5px; color: oklch(0.46 0.02 330);">در انتظار</span>
+              <span style="font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums;">۸۴۰٬۰۰۰</span>
+              <span style="font-size: 10.5px; font-weight: 800; color: oklch(0.55 0.02 330);" dir="ltr">SAMPLE · pending</span>
+            </div>
+            <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 5px;">
+              <span style="font-size: 12.5px; color: oklch(0.46 0.02 330);">درگیرِ اختلاف</span>
+              <span style="font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums;">۰</span>
+              <span style="font-size: 10.5px; font-weight: 800; color: oklch(0.55 0.02 330);" dir="ltr">SAMPLE · disputed</span>
+            </div>
+            <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 5px;">
+              <span style="font-size: 12.5px; color: oklch(0.46 0.02 330);">قابلِ تسویه</span>
+              <span style="font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums;">۱٬۲۶۰٬۰۰۰</span>
+              <span style="font-size: 10.5px; font-weight: 800; color: oklch(0.55 0.02 330);" dir="ltr">SAMPLE · available</span>
+            </div>
+            <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 5px;">
+              <span style="font-size: 12.5px; color: oklch(0.46 0.02 330);">ذخیره</span>
+              <span style="font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums;">۱۴۰٬۰۰۰</span>
+              <span style="font-size: 10.5px; font-weight: 800; color: oklch(0.55 0.02 330);" dir="ltr">SAMPLE · reserve</span>
+            </div>
+            <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 5px;">
+              <span style="font-size: 12.5px; color: oklch(0.46 0.02 330);">تسویه‌شده</span>
+              <span style="font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums;">۲٬۰۰۰٬۰۰۰</span>
+              <span style="font-size: 10.5px; font-weight: 800; color: oklch(0.55 0.02 330);" dir="ltr">SAMPLE · settled</span>
+            </div>
+            <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 5px;">
+              <span style="font-size: 12.5px; color: oklch(0.46 0.02 330);">بازگردانده‌شده</span>
+              <span style="font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums;">۳۲۰٬۰۰۰</span>
+              <span style="font-size: 10.5px; font-weight: 800; color: oklch(0.55 0.02 330);" dir="ltr">SAMPLE · refunded</span>
+            </div>
+            <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 5px;">
+              <span style="font-size: 12.5px; color: oklch(0.46 0.02 330);">وصول‌شده</span>
+              <span style="font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums;">۴٬۵۶۰٬۰۰۰</span>
+              <span style="font-size: 10.5px; font-weight: 800; color: oklch(0.55 0.02 330);" dir="ltr">SAMPLE · collected</span>
+            </div>
+            <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 5px;">
+              <span style="font-size: 12.5px; color: oklch(0.46 0.02 330);">پیش‌دادهٔ سکو</span>
+              <span style="font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums;">۰</span>
+              <span style="font-size: 10.5px; font-weight: 800; color: oklch(0.55 0.02 330);" dir="ltr">SAMPLE · platformAdvance</span>
+            </div>
+            <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 5px;">
+              <span style="font-size: 12.5px; color: oklch(0.46 0.02 330);">بازیافتِ واردشده</span>
+              <span style="font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums;">۰</span>
+              <span style="font-size: 10.5px; font-weight: 800; color: oklch(0.55 0.02 330);" dir="ltr">SAMPLE · recoveredIn</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="border: 2px solid oklch(0.3 0.02 330); border-radius: 16px; padding: 18px 20px; background: oklch(0.965 0.006 330); display: flex; flex-direction: column; gap: 10px;">
+          <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <span aria-hidden="true" style="width: 10px; height: 10px; background: oklch(0.3 0.02 330); transform: rotate(45deg);"></span>
+            <h3 style="margin: 0; font-size: 16px; font-weight: 800; color: oklch(0.22 0.02 330);">آن سوی مرز — پولِ سکو، نه پولِ شما</h3>
+          </div>
+          <p style="margin: 0; font-size: 12.5px; line-height: 1.8; color: oklch(0.46 0.02 330);">این سه رقم برای شفافیت نشان داده می‌شوند. به هیچ‌یک از نُه وضعیتِ بالا افزوده یا از آن‌ها کم نمی‌شوند.</p>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+            <div style="background: oklch(1 0 0); border: 1px dashed oklch(0.6 0.02 330); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 5px;">
+              <span style="font-size: 12.5px; color: oklch(0.46 0.02 330);">درآمدِ سکو</span>
+              <span style="font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums;">۶۸۴٬۰۰۰</span>
+              <span style="font-size: 10.5px; font-weight: 800; color: oklch(0.55 0.02 330);" dir="ltr">SAMPLE · platformEarned</span>
+            </div>
+            <div style="background: oklch(1 0 0); border: 1px dashed oklch(0.6 0.02 330); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 5px;">
+              <span style="font-size: 12.5px; color: oklch(0.46 0.02 330);">کارمزدِ درگاه</span>
+              <span style="font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums;">۹۱٬۰۰۰</span>
+              <span style="font-size: 10.5px; font-weight: 800; color: oklch(0.55 0.02 330);" dir="ltr">SAMPLE · providerFee</span>
+            </div>
+            <div style="background: oklch(1 0 0); border: 1px dashed oklch(0.6 0.02 330); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 5px;">
+              <span style="font-size: 12.5px; color: oklch(0.46 0.02 330);">بازیافتِ خارج‌شده</span>
+              <span style="font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums;">۰</span>
+              <span style="font-size: 10.5px; font-weight: 800; color: oklch(0.55 0.02 330);" dir="ltr">SAMPLE · recoveryOut</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <section id="e3" data-screen-label="E3" style="display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.42 0.13 340); color: #fff;">E۳</span>
+      <h2 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 24px; font-weight: 800; color: oklch(0.22 0.02 330);">همه‌صفر، بارگذاری، و خطا</h2>
+    </div>
+
+    <div style="width: min(1280px, 100%); box-sizing: border-box; display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px;">
+
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px;">
+        <div style="font-size: 14px; font-weight: 800;">همهٔ دوازده میدان صفر</div>
+        <p style="margin: 0; font-size: 12.5px; line-height: 1.8; color: oklch(0.46 0.02 330);">این <strong>پاسخِ درست</strong> است، نه حالتِ خالی و نه خطا. فضایی که هنوز در سامانهٔ تازه وصولی نداشته دقیقاً همین را می‌گیرد. کارت‌ها حذف یا خاکستری نمی‌شوند؛ صفر، صفر نشان داده می‌شود.</p>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px;">
+          <div style="border: 1px solid oklch(0.92 0.008 60); border-radius: 10px; padding: 10px 12px;"><div style="font-size: 11.5px; color: oklch(0.58 0.015 330);">در انتظار</div><div style="font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums;">۰</div></div>
+          <div style="border: 1px solid oklch(0.92 0.008 60); border-radius: 10px; padding: 10px 12px;"><div style="font-size: 11.5px; color: oklch(0.58 0.015 330);">قابلِ تسویه</div><div style="font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums;">۰</div></div>
+          <div style="border: 1px solid oklch(0.92 0.008 60); border-radius: 10px; padding: 10px 12px;"><div style="font-size: 11.5px; color: oklch(0.58 0.015 330);">وصول‌شده</div><div style="font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums;">۰</div></div>
+        </div>
+        <p style="margin: 0; font-size: 12px; line-height: 1.8; color: oklch(0.58 0.015 330);">یک جملهٔ توضیحی زیرِ گروه می‌آید: «در این فضا هنوز وصولی در سامانهٔ تازه ثبت نشده.» — بدون پیشنهاد، بدون دکمه.</p>
+      </div>
+
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px;">
+        <div style="font-size: 14px; font-weight: 800;">در حالِ بارگذاری</div>
+        <p style="margin: 0; font-size: 12.5px; line-height: 1.8; color: oklch(0.46 0.02 330);">اسکلتِ کارت‌ها با <code dir="ltr">aria-busy="true"</code>. هیچ رقمِ کهنه‌ای زیرِ اسکلت نمی‌ماند و ارقامِ فضای قبلی پیش از رندرِ فضای تازه پاک می‌شوند.</p>
+        <div aria-busy="true" aria-label="در حال بارگذاری وجوه" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px;">
+          <div style="border: 1px solid oklch(0.94 0.006 60); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 8px;"><div style="height: 9px; width: 60%; border-radius: 4px; background: oklch(0.92 0.006 60);"></div><div style="height: 16px; width: 80%; border-radius: 4px; background: oklch(0.9 0.006 60);"></div></div>
+          <div style="border: 1px solid oklch(0.94 0.006 60); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 8px;"><div style="height: 9px; width: 55%; border-radius: 4px; background: oklch(0.92 0.006 60);"></div><div style="height: 16px; width: 70%; border-radius: 4px; background: oklch(0.9 0.006 60);"></div></div>
+          <div style="border: 1px solid oklch(0.94 0.006 60); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 8px;"><div style="height: 9px; width: 65%; border-radius: 4px; background: oklch(0.92 0.006 60);"></div><div style="height: 16px; width: 75%; border-radius: 4px; background: oklch(0.9 0.006 60);"></div></div>
+        </div>
+      </div>
+
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px;">
+        <div style="font-size: 14px; font-weight: 800;">خطای شبکه — جدا از ردِ دسترسی</div>
+        <div role="alert" style="border: 1px solid oklch(0.75 0.11 40); background: oklch(0.97 0.03 60); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;">
+          <div style="font-size: 13.5px; font-weight: 700; color: oklch(0.35 0.08 40);">وجوهِ این فضا خوانده نشد.</div>
+          <p style="margin: 0; font-size: 12.5px; line-height: 1.8; color: oklch(0.42 0.04 40);">بخش‌های دیگرِ صفحه دست‌نخورده می‌مانند؛ فقط همین بخش خطا دارد.</p>
+          <button type="button" style="align-self: flex-start; min-height: 44px; padding: 0 18px; border-radius: 10px; border: 1px solid oklch(0.5 0.1 40); background: oklch(1 0 0); font-family: inherit; font-size: 13.5px; font-weight: 700; color: oklch(0.35 0.08 40); cursor: pointer;">تلاش دوباره</button>
+        </div>
+        <p style="margin: 0; font-size: 12px; line-height: 1.8; color: oklch(0.58 0.015 330);">«تلاش دوباره» فقط روی خطا می‌آید. روی ردِ دسترسی — که پیامِ خنثای صفحهٔ ۴۶ را دارد — هیچ دکمهٔ تلاشی نیست.</p>
+      </div>
+
+    </div>
+  </section>
+
+  <section id="e4" data-screen-label="E4" style="display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.42 0.13 340); color: #fff;">E۴</span>
+      <h2 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 24px; font-weight: 800; color: oklch(0.22 0.02 330);">موبایل — ۳۹۰ پیکسل</h2>
+      <span style="font-size: 12.5px; color: oklch(0.58 0.015 330);">کارتِ برچسب‌دار، نه جدولِ افقی</span>
+    </div>
+
+    <div style="width: 390px; max-width: 100%; box-sizing: border-box; border: 10px solid oklch(0.2 0.02 330); border-radius: 34px; overflow: hidden; background: oklch(0.98 0.004 75);">
+      <div style="padding: 14px 16px; background: oklch(1 0 0); border-bottom: 1px solid oklch(0.9 0.008 60);">
+        <div style="font-size: 15px; font-weight: 800; color: oklch(0.22 0.02 330);">امور مالی</div>
+        <div style="font-size: 11.5px; color: oklch(0.58 0.015 330);">سالن نور · فقط‌خواندنی <span dir="ltr">SAMPLE</span></div>
+      </div>
+      <div style="padding: 14px 16px; display: flex; flex-direction: column; gap: 14px;">
+        <div style="font-size: 13px; font-weight: 800; color: oklch(0.3 0.02 330);">وجوه، وضعیت‌به‌وضعیت</div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 11px; padding: 12px 14px; display: flex; align-items: baseline; justify-content: space-between; gap: 10px;"><span style="font-size: 13px; color: oklch(0.42 0.02 330);">در انتظار</span><span style="font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums;">۸۴۰٬۰۰۰</span></div>
+          <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 11px; padding: 12px 14px; display: flex; align-items: baseline; justify-content: space-between; gap: 10px;"><span style="font-size: 13px; color: oklch(0.42 0.02 330);">قابلِ تسویه</span><span style="font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums;">۱٬۲۶۰٬۰۰۰</span></div>
+          <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 11px; padding: 12px 14px; display: flex; align-items: baseline; justify-content: space-between; gap: 10px;"><span style="font-size: 13px; color: oklch(0.42 0.02 330);">ذخیره</span><span style="font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums;">۱۴۰٬۰۰۰</span></div>
+          <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 11px; padding: 12px 14px; display: flex; align-items: baseline; justify-content: space-between; gap: 10px;"><span style="font-size: 13px; color: oklch(0.42 0.02 330);">وصول‌شده</span><span style="font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums;">۴٬۵۶۰٬۰۰۰</span></div>
+        </div>
+        <div style="border: 2px solid oklch(0.3 0.02 330); border-radius: 13px; padding: 13px 14px; background: oklch(0.965 0.006 330); display: flex; flex-direction: column; gap: 9px;">
+          <div style="font-size: 12.5px; font-weight: 800; color: oklch(0.22 0.02 330);">پولِ سکو — جدا از ارقامِ بالا</div>
+          <div style="background: oklch(1 0 0); border: 1px dashed oklch(0.6 0.02 330); border-radius: 10px; padding: 11px 13px; display: flex; align-items: baseline; justify-content: space-between; gap: 10px;"><span style="font-size: 12.5px; color: oklch(0.42 0.02 330);">درآمدِ سکو</span><span style="font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums;">۶۸۴٬۰۰۰</span></div>
+          <div style="background: oklch(1 0 0); border: 1px dashed oklch(0.6 0.02 330); border-radius: 10px; padding: 11px 13px; display: flex; align-items: baseline; justify-content: space-between; gap: 10px;"><span style="font-size: 12.5px; color: oklch(0.42 0.02 330);">کارمزدِ درگاه</span><span style="font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums;">۹۱٬۰۰۰</span></div>
+        </div>
+        <p style="margin: 0; font-size: 11.5px; line-height: 1.8; color: oklch(0.58 0.015 330);">ستونِ مبلغ در همهٔ کارت‌ها هم‌تراز می‌ماند و هیچ ردیفی جمعِ ردیف‌های دیگر نیست.</p>
+      </div>
+    </div>
+  </section>
+
+</div>
+</x-dc>
+</body>
+</html>

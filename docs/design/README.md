@@ -21,6 +21,24 @@ is historical and must not be read as the current workspace status.
 The snapshot is **not** a production frontend implementation. The executable UI
 source of truth remains `v3/apps/web` on `master`.
 
+## The V3.3 design-gap pack (`v3.3-gap-pack/`)
+
+Added 2026-09-20. A **sibling pack, not a workspace copy**: the canonical
+snapshot above is untouched, and nothing in it was rewritten. It closes the five
+surfaces recorded in `docs/design/V3.3_DESIGN_GAP_AND_HANDOFF.md` on `master` —
+four that had merged backend and no design at all, plus an amendment to screen
+46 for the per-state funds read.
+
+- Five prototypes and five screen specs, numbered `47`–`50` plus
+  `46_FINANCE_WORKSPACE_AMENDMENT.md`. `43` remains an unassigned gap.
+- `MANIFEST.md` is Claude Design's own delivery record.
+- [`REVIEW.md`](v3.3-gap-pack/REVIEW.md) is the reviewer's acceptance: every
+  factual claim matched against the code it describes, three corrections, and
+  one blocking backend dependency. **Read it before implementing any of these
+  screens.**
+- Screens 46, 47, 48 and 50 are implementable against today's API. **Screen 49
+  is not** — no route reads back a no-show declaration or a remedy resolution.
+
 ## Historical snapshots
 
 Earlier complete workspace copies were removed from the branch tip on

@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas" />
+<style>
+  @font-face { font-family: 'Vazirmatn'; src: url('fonts/Vazir-Light.ttf') format('truetype'); font-weight: 300; font-display: swap; }
+  @font-face { font-family: 'Vazirmatn'; src: url('fonts/Vazir-Regular.ttf') format('truetype'); font-weight: 400; font-display: swap; }
+  @font-face { font-family: 'Vazirmatn'; src: url('fonts/Vazir-Medium.ttf') format('truetype'); font-weight: 500; font-display: swap; }
+  @font-face { font-family: 'Vazirmatn'; src: url('fonts/Vazir-Bold.ttf') format('truetype'); font-weight: 600 700; font-display: swap; }
+  @font-face { font-family: 'Vazirmatn'; src: url('fonts/Vazir-Black.ttf') format('truetype'); font-weight: 800 900; font-display: swap; }
+  @font-face { font-family: 'Anjoman'; src: url('fonts/Anjoman-SemiBold.ttf') format('truetype'); font-weight: 600; font-display: swap; }
+  @font-face { font-family: 'Anjoman'; src: url('fonts/Anjoman-Bold.ttf') format('truetype'); font-weight: 700; font-display: swap; }
+  @font-face { font-family: 'Anjoman'; src: url('fonts/Anjoman-ExtraBold.ttf') format('truetype'); font-weight: 800; font-display: swap; }
+  @font-face { font-family: 'Peyda'; src: url('fonts/Peyda-SemiBold.ttf') format('truetype'); font-weight: 600; font-display: swap; }
+  @font-face { font-family: 'Peyda'; src: url('fonts/Peyda-Bold.ttf') format('truetype'); font-weight: 700 900; font-display: swap; }
+  body { margin: 0; background: oklch(0.94 0.005 60); font-family: 'Vazirmatn', system-ui, sans-serif; }
+  a { color: oklch(0.42 0.13 340); text-decoration: none; }
+  a:hover { color: oklch(0.34 0.12 340); }
+  code { font-family: ui-monospace, Menlo, monospace; font-size: 0.85em; direction: ltr; unicode-bidi: isolate; }
+</style>
+</helmet>
+
+<div dir="rtl" style="padding: 40px; display: flex; flex-direction: column; gap: 56px;">
+
+  <div style="max-width: 940px; display: flex; flex-direction: column; gap: 10px;">
+    <div style="font-size: 13px; font-weight: 700; letter-spacing: 0.04em; color: oklch(0.58 0.015 330);">BEAUCLICK V3.3 — انتخابِ سیاستِ سرانجامِ نوبت، سمتِ فروشنده</div>
+    <h1 style="margin: 0; font-family: 'Peyda', sans-serif; font-size: 44px; font-weight: 800; line-height: 1.4; color: oklch(0.22 0.02 330);">انتخاب از میانِ آنچه منتشر شده</h1>
+    <p style="margin: 0; font-size: 16px; line-height: 1.85; color: oklch(0.46 0.02 330);">داستانِ <span dir="ltr">#42b</span> / ‎<span dir="ltr">#159</span>‎ (ADR-051 §۳). فروشنده سیاست نمی‌نویسد. مدیر <strong>بازه‌ها و مجموعه‌ها</strong> را منتشر می‌کند و فروشنده برای هر فضای کاری، از هر مجموعه <strong>یک عضو</strong> برمی‌دارد.</p>
+    <p style="margin: 0; font-size: 14px; line-height: 1.85; color: oklch(0.46 0.02 330);"><code dir="ltr">GET /api/v1/me/outcome-policies</code> می‌گوید این فروشنده چه چیزهایی می‌تواند انتخاب کند؛ <code dir="ltr">GET|PUT /api/v1/me/outcome-policy-assignments/:workspaceRef</code> انتخابِ جاری را می‌خواند و <strong>جایگزین</strong> می‌کند.</p>
+    <div style="margin-top: 6px; display: flex; gap: 10px; flex-wrap: wrap; font-size: 12.5px;">
+      <span style="padding: 5px 12px; border-radius: 999px; background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60);">هیچ فضای کاری از پیش انتخاب نمی‌شود</span>
+      <span style="padding: 5px 12px; border-radius: 999px; background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60);">هیچ میدانِ متنی یا عددیِ آزاد</span>
+      <span style="padding: 5px 12px; border-radius: 999px; background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60);">هر مقدارِ نمونه با برچسب <strong>SAMPLE</strong></span>
+    </div>
+  </div>
+
+  <section data-screen-label="B1" style="display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.42 0.13 340); color: #fff;">B۱</span>
+      <h2 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 24px; font-weight: 800; color: oklch(0.22 0.02 330);">کدام فضای کاری؟</h2>
+      <code style="color: oklch(0.58 0.015 330);" dir="ltr">workspaceRef · opaque</code>
+    </div>
+
+    <div style="width: min(1280px, 100%); box-sizing: border-box; background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 18px; padding: 24px;">
+      <fieldset style="margin: 0; border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; padding: 18px 20px;">
+        <legend style="padding: 0 8px; font-size: 14px; font-weight: 800; color: oklch(0.3 0.02 330);">این انتخاب برای کدام فضای کاری است؟</legend>
+        <p style="margin: 0 0 14px; font-size: 12.5px; line-height: 1.8; color: oklch(0.58 0.015 330);">هیچ فضایی خودبه‌خود انتخاب نمی‌شود، حتی اگر فقط یکی باشد و حتی اگر بارِ قبل همان را انتخاب کرده باشید. تا انتخاب نکنید، هیچ سیاستی نمایش داده نمی‌شود.</p>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px;">
+          <label style="border: 2px solid oklch(0.42 0.13 340); border-radius: 12px; padding: 15px 17px; display: flex; align-items: flex-start; gap: 12px; cursor: pointer; background: oklch(0.985 0.012 340); min-height: 44px;">
+            <input type="radio" name="b-ws" checked="checked" style="margin-top: 3px; width: 20px; height: 20px; flex: none;" />
+            <span style="display: flex; flex-direction: column; gap: 6px;">
+              <span style="font-size: 14px; font-weight: 800; color: oklch(0.22 0.02 330);">سالن نور · کسب‌وکار <span style="font-size: 10.5px; font-weight: 800; color: oklch(0.55 0.02 330);" dir="ltr">SAMPLE</span></span>
+              <span style="font-size: 12px; font-weight: 700; color: oklch(0.35 0.12 340);">انتخابِ جاری دارد</span>
+            </span>
+          </label>
+          <label style="border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 15px 17px; display: flex; align-items: flex-start; gap: 12px; cursor: pointer; background: oklch(1 0 0); min-height: 44px;">
+            <input type="radio" name="b-ws" style="margin-top: 3px; width: 20px; height: 20px; flex: none;" />
+            <span style="display: flex; flex-direction: column; gap: 6px;">
+              <span style="font-size: 14px; font-weight: 800; color: oklch(0.22 0.02 330);">مریم سلطانی · تخصصی <span style="font-size: 10.5px; font-weight: 800; color: oklch(0.55 0.02 330);" dir="ltr">SAMPLE</span></span>
+              <span style="font-size: 12px; font-weight: 700; color: oklch(0.42 0.02 330);">هنوز انتخابی ثبت نشده</span>
+            </span>
+          </label>
+        </div>
+        <p style="margin: 14px 0 0; font-size: 12px; line-height: 1.8; color: oklch(0.58 0.015 330);">ارجاعِ فضا نه نمایش داده می‌شود، نه کوتاه می‌شود و نه جایی برای تایپ‌کردنش هست. نامِ فضا از سرور می‌آید.</p>
+      </fieldset>
+    </div>
+  </section>
+
+  <section data-screen-label="B2" style="display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.42 0.13 340); color: #fff;">B۲</span>
+      <h2 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 24px; font-weight: 800; color: oklch(0.22 0.02 330);">صفحهٔ انتخاب — فقط اعضای مجاز</h2>
+    </div>
+
+    <div style="width: min(1280px, 100%); box-sizing: border-box; background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 18px; padding: 24px; display: flex; flex-direction: column; gap: 20px;">
+
+      <div style="display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;">
+        <h3 style="margin: 0; font-size: 16px; font-weight: 800; color: oklch(0.22 0.02 330);">سالن نور</h3>
+        <span style="font-size: 12.5px; color: oklch(0.58 0.015 330);">مقادیرِ زیر همان‌هایی‌اند که مدیر منتشر کرده — نه کمتر، نه بیشتر</span>
+      </div>
+
+      <fieldset style="margin: 0; border: 1px solid oklch(0.92 0.008 60); border-radius: 14px; padding: 16px 18px;">
+        <legend style="padding: 0 8px; font-size: 13.5px; font-weight: 800; color: oklch(0.3 0.02 330);">مهلتِ لغو پیش از نوبت</legend>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <label style="min-height: 44px; display: inline-flex; align-items: center; gap: 9px; padding: 0 16px; border: 2px solid oklch(0.42 0.13 340); border-radius: 10px; background: oklch(0.985 0.012 340); cursor: pointer; font-size: 13.5px; font-weight: 700;"><input type="radio" name="b-cutoff" checked="checked" style="width: 18px; height: 18px;" />۱۲ ساعت</label>
+          <label style="min-height: 44px; display: inline-flex; align-items: center; gap: 9px; padding: 0 16px; border: 1px solid oklch(0.88 0.01 60); border-radius: 10px; cursor: pointer; font-size: 13.5px;"><input type="radio" name="b-cutoff" style="width: 18px; height: 18px;" />۶ ساعت</label>
+          <label style="min-height: 44px; display: inline-flex; align-items: center; gap: 9px; padding: 0 16px; border: 1px solid oklch(0.88 0.01 60); border-radius: 10px; cursor: pointer; font-size: 13.5px;"><input type="radio" name="b-cutoff" style="width: 18px; height: 18px;" />۴۸ ساعت</label>
+          <span style="align-self: center; font-size: 10.5px; font-weight: 800; color: oklch(0.55 0.02 330);" dir="ltr">SAMPLE SET</span>
+        </div>
+      </fieldset>
+
+      <fieldset style="margin: 0; border: 1px solid oklch(0.92 0.008 60); border-radius: 14px; padding: 16px 18px;">
+        <legend style="padding: 0 8px; font-size: 13.5px; font-weight: 800; color: oklch(0.3 0.02 330);">نگه‌داشت در لغوِ دیرهنگام</legend>
+        <div style="display: flex; flex-direction: column; gap: 9px;">
+          <label style="min-height: 44px; display: flex; align-items: center; gap: 10px; padding: 11px 14px; border: 2px solid oklch(0.42 0.13 340); border-radius: 10px; background: oklch(0.985 0.012 340); cursor: pointer; font-size: 13.5px; font-weight: 700;"><input type="radio" name="b-late" checked="checked" style="width: 18px; height: 18px;" />هیچ نگه‌داشتی</label>
+          <label style="min-height: 44px; display: flex; align-items: center; gap: 10px; padding: 11px 14px; border: 1px solid oklch(0.88 0.01 60); border-radius: 10px; cursor: pointer; font-size: 13.5px;"><input type="radio" name="b-late" style="width: 18px; height: 18px;" />درصدی از مبلغ <span style="font-size: 10.5px; font-weight: 800; color: oklch(0.55 0.02 330);" dir="ltr">SAMPLE</span></label>
+          <label style="min-height: 44px; display: flex; align-items: center; gap: 10px; padding: 11px 14px; border: 1px solid oklch(0.88 0.01 60); border-radius: 10px; cursor: pointer; font-size: 13.5px;"><input type="radio" name="b-late" style="width: 18px; height: 18px;" />مبلغِ ثابت <span style="font-size: 10.5px; font-weight: 800; color: oklch(0.55 0.02 330);" dir="ltr">SAMPLE</span></label>
+          <label style="min-height: 44px; display: flex; align-items: center; gap: 10px; padding: 11px 14px; border: 1px solid oklch(0.88 0.01 60); border-radius: 10px; cursor: pointer; font-size: 13.5px;"><input type="radio" name="b-late" style="width: 18px; height: 18px;" />تمامِ مبلغِ وصول‌شده</label>
+        </div>
+        <p style="margin: 11px 0 0; font-size: 12px; line-height: 1.8; color: oklch(0.58 0.015 330);">هر گزینه یک <strong>عضوِ منتشرشده</strong> است؛ درصد و مبلغ هم از همان مجموعه می‌آیند و اینجا تایپ نمی‌شوند.</p>
+      </fieldset>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px;">
+        <fieldset style="margin: 0; border: 1px solid oklch(0.92 0.008 60); border-radius: 14px; padding: 16px 18px;">
+          <legend style="padding: 0 8px; font-size: 13.5px; font-weight: 800; color: oklch(0.3 0.02 330);">مهلتِ ارفاقِ عدم‌حضور</legend>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <label style="min-height: 44px; display: inline-flex; align-items: center; gap: 9px; padding: 0 15px; border: 2px solid oklch(0.42 0.13 340); border-radius: 10px; background: oklch(0.985 0.012 340); cursor: pointer; font-size: 13.5px; font-weight: 700;"><input type="radio" name="b-grace" checked="checked" style="width: 18px; height: 18px;" />۱۵ دقیقه</label>
+            <label style="min-height: 44px; display: inline-flex; align-items: center; gap: 9px; padding: 0 15px; border: 1px solid oklch(0.88 0.01 60); border-radius: 10px; cursor: pointer; font-size: 13.5px;"><input type="radio" name="b-grace" style="width: 18px; height: 18px;" />۳۰ دقیقه</label>
+          </div>
+        </fieldset>
+        <fieldset style="margin: 0; border: 1px solid oklch(0.92 0.008 60); border-radius: 14px; padding: 16px 18px;">
+          <legend style="padding: 0 8px; font-size: 13.5px; font-weight: 800; color: oklch(0.3 0.02 330);">نگه‌داشت در عدم‌حضور</legend>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <label style="min-height: 44px; display: inline-flex; align-items: center; gap: 9px; padding: 0 15px; border: 2px solid oklch(0.42 0.13 340); border-radius: 10px; background: oklch(0.985 0.012 340); cursor: pointer; font-size: 13.5px; font-weight: 700;"><input type="radio" name="b-nsr" checked="checked" style="width: 18px; height: 18px;" />هیچ</label>
+            <label style="min-height: 44px; display: inline-flex; align-items: center; gap: 9px; padding: 0 15px; border: 1px solid oklch(0.88 0.01 60); border-radius: 10px; cursor: pointer; font-size: 13.5px;"><input type="radio" name="b-nsr" style="width: 18px; height: 18px;" />درصدی <span style="font-size: 10.5px; font-weight: 800; color: oklch(0.55 0.02 330);" dir="ltr">SAMPLE</span></label>
+          </div>
+        </fieldset>
+      </div>
+
+      <div style="border: 1px solid oklch(0.92 0.008 60); border-radius: 14px; padding: 16px 18px; background: oklch(0.985 0.003 75); display: flex; flex-direction: column; gap: 9px;">
+        <div style="font-size: 13.5px; font-weight: 800; color: oklch(0.3 0.02 330);">آنچه انتخاب نمی‌کنید — و در شرایطِ شما ثابت است</div>
+        <p style="margin: 0; font-size: 12.5px; line-height: 1.85; color: oklch(0.46 0.02 330);">تعدادِ جابه‌جاییِ رایگان پیش از مهلت، پنجرهٔ اختلاف، پنجرهٔ آسیبِ جسمانی، پنجرهٔ فرجام و سقفِ قانونی — اگر منتشر شده باشند — همان‌طور که منتشر شده‌اند نمایش داده می‌شوند و انتخابی ندارند. رابط هیچ‌کدام را پیش‌فرض نمی‌گذارد؛ اگر منتشر نشده باشند، خطی برایشان نیست.</p>
+      </div>
+
+      <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <button type="button" style="min-height: 44px; padding: 0 20px; border-radius: 10px; border: 1px solid oklch(0.42 0.13 340); background: oklch(0.42 0.13 340); color: #fff; font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer;">ثبتِ انتخابِ تازه</button>
+        <span style="align-self: center; font-size: 12px; color: oklch(0.58 0.015 330);">انتخابِ قبلی ویرایش نمی‌شود؛ جایگزین می‌شود و به تاریخچه می‌رود.</span>
+      </div>
+    </div>
+  </section>
+
+  <section data-screen-label="B3" style="display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.42 0.13 340); color: #fff;">B۳</span>
+      <h2 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 24px; font-weight: 800; color: oklch(0.22 0.02 330);">تأیید — مشتری چه خواهد دید</h2>
+    </div>
+
+    <div role="dialog" aria-modal="true" aria-labelledby="b3-title" style="width: min(640px, 100%); box-sizing: border-box; background: oklch(1 0 0); border: 1px solid oklch(0.86 0.01 60); border-radius: 18px; box-shadow: 0 18px 44px oklch(0.2 0.02 330 / 0.14); padding: 24px 26px; display: flex; flex-direction: column; gap: 16px;">
+      <h3 id="b3-title" style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 20px; font-weight: 800; color: oklch(0.22 0.02 330);">از این پس، مشتریِ سالن نور این را می‌بیند</h3>
+      <div style="border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; padding: 15px 17px; background: oklch(0.985 0.003 75); display: flex; flex-direction: column; gap: 9px;">
+        <div style="font-size: 13px; font-weight: 700; color: oklch(0.3 0.02 330);">پیش از تأییدِ رزرو</div>
+        <p style="margin: 0; font-size: 13px; line-height: 1.95; color: oklch(0.42 0.02 330);">«لغوِ رایگان تا ۱۲ ساعت پیش از نوبت. پس از آن مبلغی نگه داشته نمی‌شود. اگر در نوبت حاضر نشوید، تا ۱۵ دقیقه ارفاق هست.» <span style="font-size: 10.5px; font-weight: 800; color: oklch(0.55 0.02 330);" dir="ltr">SAMPLE</span></p>
+      </div>
+      <p style="margin: 0; font-size: 12.5px; line-height: 1.85; color: oklch(0.46 0.02 330);">نوبت‌هایی که تا این لحظه گرفته شده‌اند، با <strong>همان شرایطی که زیرِ آن گرفته شده‌اند</strong> باقی می‌مانند. این انتخاب فقط نوبت‌های تازه را در بر می‌گیرد.</p>
+      <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <button type="button" style="min-height: 44px; padding: 0 20px; border-radius: 10px; border: 1px solid oklch(0.42 0.13 340); background: oklch(0.42 0.13 340); color: #fff; font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer;">تأیید و ثبت</button>
+        <button type="button" style="min-height: 44px; padding: 0 20px; border-radius: 10px; border: 1px solid oklch(0.86 0.01 60); background: oklch(1 0 0); font-family: inherit; font-size: 14px; font-weight: 700; color: oklch(0.3 0.02 330); cursor: pointer;">بازگشت</button>
+      </div>
+    </div>
+  </section>
+
+  <section data-screen-label="B4" style="display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.42 0.13 340); color: #fff;">B۴</span>
+      <h2 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 24px; font-weight: 800; color: oklch(0.22 0.02 330);">تاریخچهٔ انتخاب‌ها</h2>
+      <span style="font-size: 12.5px; color: oklch(0.58 0.015 330);">جایگزین‌شده، نه ویرایش‌شده</span>
+    </div>
+
+    <div tabindex="0" role="region" aria-label="تاریخچهٔ انتخاب‌های سیاست" style="width: min(1280px, 100%); box-sizing: border-box; background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 14px; overflow-x: auto;">
+      <table style="width: 100%; min-width: 700px; border-collapse: collapse;">
+        <caption style="caption-side: top; text-align: start; padding: 14px 18px; font-size: 12.5px; color: oklch(0.58 0.015 330);">تازه‌ترین بالا. هیچ ردیفی قابلِ ویرایش یا حذف نیست.</caption>
+        <thead>
+          <tr style="border-bottom: 1px solid oklch(0.9 0.008 60);">
+            <th style="text-align: start; padding: 11px 18px; font-size: 12px; font-weight: 700; color: oklch(0.58 0.015 330);">وضعیت</th>
+            <th style="text-align: start; padding: 11px 10px; font-size: 12px; font-weight: 700; color: oklch(0.58 0.015 330);">مهلتِ لغو</th>
+            <th style="text-align: start; padding: 11px 10px; font-size: 12px; font-weight: 700; color: oklch(0.58 0.015 330);">نگه‌داشتِ دیرهنگام</th>
+            <th style="text-align: start; padding: 11px 10px; font-size: 12px; font-weight: 700; color: oklch(0.58 0.015 330);">ارفاقِ عدم‌حضور</th>
+            <th style="text-align: start; padding: 11px 18px; font-size: 12px; font-weight: 700; color: oklch(0.58 0.015 330);">از</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom: 1px solid oklch(0.96 0.005 60); background: oklch(0.985 0.012 340);">
+            <td style="padding: 12px 18px; font-size: 12.5px;"><span style="display: inline-flex; align-items: center; gap: 7px; font-weight: 800; color: oklch(0.35 0.12 340);"><span aria-hidden="true" style="width: 9px; height: 9px; border-radius: 999px; background: oklch(0.42 0.13 340);"></span>جاری</span></td>
+            <td style="padding: 12px 10px; font-size: 13px;">۱۲ ساعت</td>
+            <td style="padding: 12px 10px; font-size: 13px;">هیچ</td>
+            <td style="padding: 12px 10px; font-size: 13px;">۱۵ دقیقه</td>
+            <td style="padding: 12px 18px; font-size: 12.5px; color: oklch(0.46 0.02 330);">۱۴۰۵/۰۶/۲۸ <span dir="ltr" style="font-size: 10.5px; font-weight: 800; color: oklch(0.55 0.02 330);">SAMPLE</span></td>
+          </tr>
+          <tr>
+            <td style="padding: 12px 18px; font-size: 12.5px;"><span style="display: inline-flex; align-items: center; gap: 7px; font-weight: 700; color: oklch(0.46 0.02 330);"><span aria-hidden="true" style="width: 9px; height: 9px; border: 2px solid oklch(0.46 0.02 330); border-radius: 2px;"></span>جایگزین‌شده</span></td>
+            <td style="padding: 12px 10px; font-size: 13px;">۴۸ ساعت</td>
+            <td style="padding: 12px 10px; font-size: 13px;">درصدی</td>
+            <td style="padding: 12px 10px; font-size: 13px;">۳۰ دقیقه</td>
+            <td style="padding: 12px 18px; font-size: 12.5px; color: oklch(0.46 0.02 330);">۱۴۰۵/۰۵/۰۲ <span dir="ltr" style="font-size: 10.5px; font-weight: 800; color: oklch(0.55 0.02 330);">SAMPLE</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <div style="padding: 13px 18px; border-top: 1px solid oklch(0.94 0.006 60); font-size: 12.5px; line-height: 1.8; color: oklch(0.58 0.015 330);">وضعیت با متن و شکل گفته می‌شود، نه با رنگ: دایرهٔ توپر یعنی جاری، مربعِ توخالی یعنی جایگزین‌شده.</div>
+    </div>
+  </section>
+
+  <section data-screen-label="B5" style="display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.42 0.13 340); color: #fff;">B۵</span>
+      <h2 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 24px; font-weight: 800; color: oklch(0.22 0.02 330);">حالت‌های مرزی</h2>
+    </div>
+
+    <div style="width: min(1280px, 100%); box-sizing: border-box; display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 16px;">
+
+      <div style="background: oklch(1 0 0); border: 2px solid oklch(0.72 0.12 40); border-radius: 16px; padding: 20px 22px; display: flex; flex-direction: column; gap: 12px;">
+        <div style="font-size: 14px; font-weight: 800; color: oklch(0.35 0.08 40);">بسته‌شدنِ ایمن — بازهٔ تازه عضوِ شما را ندارد</div>
+        <div role="alert" style="border: 1px solid oklch(0.8 0.09 40); background: oklch(0.97 0.03 60); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 9px;">
+          <p style="margin: 0; font-size: 13px; line-height: 1.9; color: oklch(0.35 0.06 40);">سیاستِ منتشرشده تغییر کرده و انتخابِ قبلیِ این فضا دیگر در میانِ گزینه‌ها نیست. تا انتخابِ تازه، <strong>نوبتِ تازه‌ای گرفته نمی‌شود</strong>. نوبت‌های گرفته‌شده دست‌نخورده‌اند.</p>
+          <button type="button" style="align-self: flex-start; min-height: 44px; padding: 0 18px; border-radius: 10px; border: 1px solid oklch(0.42 0.13 340); background: oklch(0.42 0.13 340); color: #fff; font-family: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer;">انتخابِ تازه</button>
+        </div>
+        <p style="margin: 0; font-size: 12px; line-height: 1.8; color: oklch(0.58 0.015 330);">این یک صفحهٔ واقعی و قابلِ رسیدن است، نه صفحهٔ خطا. لحن خبر می‌دهد و راهِ بعدی را نشان می‌دهد، بدونِ سرزنش.</p>
+      </div>
+
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; padding: 20px 22px; display: flex; flex-direction: column; gap: 12px;">
+        <div style="font-size: 14px; font-weight: 800;">بدونِ انتخاب — مسیرِ پیشین</div>
+        <div style="border: 1px solid oklch(0.92 0.008 60); border-radius: 12px; padding: 14px 16px; background: oklch(0.985 0.003 75);">
+          <p style="margin: 0; font-size: 13px; line-height: 1.9; color: oklch(0.42 0.02 330);">برای این فضا هنوز سیاستی انتخاب نکرده‌اید. نوبت‌ها مثلِ قبل و بر مبنای مسیرِ پیشین گرفته می‌شوند. چیزی خراب نیست.</p>
+        </div>
+        <p style="margin: 0; font-size: 12px; line-height: 1.8; color: oklch(0.58 0.015 330);">نه نشانِ هشدار، نه علامتِ تعجب، نه «تنظیماتِ ناقص». یک جملهٔ خبری و یک دعوتِ اختیاری برای انتخاب.</p>
+      </div>
+
+      <div style="background: oklch(1 0 0); border: 1px solid oklch(0.9 0.008 60); border-radius: 16px; padding: 20px 22px; display: flex; flex-direction: column; gap: 12px;">
+        <div style="font-size: 14px; font-weight: 800;">هیچ سیاستی منتشر نشده</div>
+        <div style="border: 1px dashed oklch(0.78 0.012 60); border-radius: 12px; padding: 14px 16px; background: oklch(0.985 0.003 75);">
+          <p style="margin: 0; font-size: 13px; line-height: 1.9; color: oklch(0.42 0.02 330);">در حالِ حاضر سیاستی برای انتخاب منتشر نشده است. وقتی منتشر شود، همین‌جا دیده می‌شود.</p>
+        </div>
+        <div aria-busy="true" aria-label="در حال خواندن گزینه‌های مجاز" style="display: flex; flex-direction: column; gap: 8px;">
+          <div style="height: 10px; width: 45%; border-radius: 4px; background: oklch(0.92 0.006 60);"></div>
+          <div style="height: 40px; border-radius: 10px; background: oklch(0.945 0.005 60);"></div>
+        </div>
+        <div role="alert" style="border: 1px solid oklch(0.75 0.11 40); background: oklch(0.97 0.03 60); border-radius: 11px; padding: 12px 14px; font-size: 12.5px; line-height: 1.8; color: oklch(0.35 0.08 40);">گزینه‌ها خوانده نشد. <button type="button" style="min-height: 44px; margin-inline-start: 8px; padding: 0 14px; border-radius: 9px; border: 1px solid oklch(0.5 0.1 40); background: oklch(1 0 0); font-family: inherit; font-size: 12.5px; font-weight: 700; color: oklch(0.35 0.08 40); cursor: pointer;">تلاش دوباره</button></div>
+      </div>
+
+    </div>
+  </section>
+
+  <section data-screen-label="B6" style="display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.42 0.13 340); color: #fff;">B۶</span>
+      <h2 style="margin: 0; font-family: 'Anjoman', sans-serif; font-size: 24px; font-weight: 800; color: oklch(0.22 0.02 330);">موبایل — ۳۹۰ پیکسل</h2>
+    </div>
+
+    <div style="width: 390px; max-width: 100%; box-sizing: border-box; border: 10px solid oklch(0.2 0.02 330); border-radius: 34px; overflow: hidden; background: oklch(0.98 0.004 75);">
+      <div style="padding: 14px 16px; background: oklch(1 0 0); border-bottom: 1px solid oklch(0.9 0.008 60); font-size: 15px; font-weight: 800; color: oklch(0.22 0.02 330);">سیاستِ سرانجامِ نوبت</div>
+      <div style="padding: 16px; display: flex; flex-direction: column; gap: 14px;">
+        <div style="font-size: 12.5px; color: oklch(0.58 0.015 330);">گامِ ۱ از ۲ — فضای کاری</div>
+        <div style="display: flex; flex-direction: column; gap: 9px;">
+          <label style="min-height: 48px; display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 2px solid oklch(0.42 0.13 340); border-radius: 12px; background: oklch(0.985 0.012 340); font-size: 13.5px; font-weight: 700;"><input type="radio" name="b-ws-m" style="width: 20px; height: 20px;" />سالن نور · کسب‌وکار</label>
+          <label style="min-height: 48px; display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid oklch(0.9 0.008 60); border-radius: 12px; background: oklch(1 0 0); font-size: 13.5px;"><input type="radio" name="b-ws-m" style="width: 20px; height: 20px;" />مریم سلطانی · تخصصی</label>
+        </div>
+        <button type="button" style="min-height: 48px; border-radius: 12px; border: 1px solid oklch(0.42 0.13 340); background: oklch(0.42 0.13 340); color: #fff; font-family: inherit; font-size: 14.5px; font-weight: 700; cursor: pointer;">ادامه</button>
+        <p style="margin: 0; font-size: 11.5px; line-height: 1.8; color: oklch(0.58 0.015 330);">در موبایل انتخاب دو گام است: اول فضا، بعد اعضا. هر گروه یک صفحهٔ پیمایشیِ جدا با همان رادیوهای بومی.</p>
+      </div>
+    </div>
+  </section>
+
+</div>
+</x-dc>
+</body>
+</html>
