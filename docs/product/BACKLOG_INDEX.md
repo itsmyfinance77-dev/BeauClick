@@ -1587,3 +1587,109 @@ unestimated **0**.
   revenue-recognition facts (`#43h`).
 - No provider, payment rail, tag or Release was introduced or changed, and no commission value was
   published — the plane ships empty by construction.
+
+## V3.3 Stories #192 (`#43b-2`) and #175 (`#43d`) delivered, 2026-09-19
+
+Two deliveries in one record, because together they exhaust what #43 can build without an
+external gate.
+
+**#192 (`#43b-2`), 8 Story Points. #175 (`#43d`), 8 Story Points.**
+
+### #192 — the per-order commission snapshot (ADR-052 §2)
+
+Every new order now records **by value, inside the checkout transaction**, which published
+commission rule — or its explicit absence — binds it. `commerce.order_commission_terms` holds one
+row per (order, component) in a three-state matrix: `absent` carries nothing, `zero` names the
+version that decided to charge nothing, `rule` names its version and carries exactly the fields
+its shape requires. Append-only by trigger. No backfill — an order older than the table reads as
+`absent`, which ADR-052 §2 fixes as the reading rather than something to manufacture.
+
+The resolver is read-only and Commerce-owned (ADR-048 §1), reading all three components in **one
+statement under `FOR SHARE`**: that is what makes a mixed snapshot — one component bound by a new
+rate and another by the previous one — unrepresentable rather than merely unlikely. It has no
+failure answer, so a missing commission policy can never refuse a checkout.
+
+Two proofs needed a real server and got one: a checkout rolled back inside a test-owned
+transaction leaves **no** row (asserted present inside the transaction first, so the
+after-assertion cannot pass for the wrong reason), and a retirement **genuinely blocks** on an
+in-flight checkout — raced against a 1.5-second timer, proved still waiting, then proved to
+complete once the checkout commits.
+
+**949 insertions across 13 files.** `order-commission-snapshot.pg-spec.ts` 13/13; 14 raw-SQL
+probes; adjacent order-path suites 216/216.
+
+### #175 — the settlement schedule family and the seller risk class (ADR-052 §1, §8)
+
+`commercial.settlement_schedule_policies` / `_versions`, keyed by `(plan_key, risk_class)`, plus
+`commercial.seller_risk_class_assignments` with one current row per party and forward-only
+supersession. A read-only resolver answers `resolved{terms by value}` or one of two distinct
+`unresolved` causes.
+
+Three absences are the substance of the story, and each is enforced rather than asserted in prose:
+
+- **There is no 7.** `settlement_interval_days` is NOT NULL with no DEFAULT, and the literal
+  appears nowhere in the migration or the service. If BeauClick ever settles weekly it will be
+  because an administrator published 7 and the row records who and when.
+- **No risk class is ever inferred** (`V33-DEC-040` R4). An unclassified seller resolves to
+  `no_risk_class`, never to `standard`, and the boundary spec forbids `riskScore`,
+  `computeRiskClass`, `inferRiskClass` and `autoClassif*` by name.
+- **"No minimum" and "no reserve" stay distinct from zero.** Null means nothing is held back;
+  zero means zero is held back and somebody said so.
+
+**The privacy review this story's own acceptance criteria demanded at preflight** was recorded
+before implementation and is now enforced by test: the risk **class** is exported to the owning
+seller party, because it materially changes when their money moves; the administrator's free-text
+**reason** is not, because an `elevated` classification encodes risk and fraud-detection signal
+and a self-service export is not the place to disclose the platform's detection posture. Neither
+is erasable. The test asserts the export contains `elevated` and does **not** contain the reason
+text or the administrator's id.
+
+**2,933 insertions across 21 files** — inside the 8-point band the issue itself cites (#104:
+3,425 / 21) and inside the preflight's 3,300–4,200 prediction.
+`settlement-schedule-family.pg-spec.ts` 30/30, green on the first run; 17 raw-SQL probes;
+`story-43d-boundary.spec.ts` 7/7.
+
+### What the guards caught
+
+Both stories were finished by their own gates rather than by review:
+
+- `#43b-1`'s boundary pin claimed "read by no production caller"; #192 is the reader its comment
+  predicted. Updating the list revealed the pin's detector matched only **writer**-side
+  identifiers, so the read-only resolver was invisible to it — a later story could have reached
+  that plane through the resolver without ever appearing. Both were fixed; the assertion that no
+  importer reaches the administrator's writer is untouched and now carries the weight.
+- #175's own cadence scan tripped on `{0,63}` in a key-shape regex and on `ADR-052` inside
+  `RAISE EXCEPTION` prose. Both are stripped before the scan rather than allow-listed, because an
+  allow-list entry for `63` would let a genuine 63-day interval hide behind it forever.
+- The trigger names had to be placed where the **server** sorts them, not where the story sits.
+
+| Item | Before | After | Outcome it owns |
+|---|---|---|---|
+| #192 (`#43b-2`) | `status:ready`, 8 | **Closed, 8** | The per-order commission snapshot at commitment |
+| #175 (`#43d`) | `status:proposed`, 8 | **Closed, 8** | The settlement schedule family and the seller risk class |
+
+**What moved.** V3.3 done **319 → 335** (+16), scope unchanged at **439**.
+`scripts/backlog-report.mjs` (run at `2026-09-19T11:17:30.701Z`) reports **335 / 439**, 76%,
+proposed **81**, decision 0, **ready 0, active 0, review 0**, blocked **23**, unestimated 0.
+
+### The position this leaves, stated plainly
+
+**Every child of #43 that is not behind an external gate is now delivered** — `#43a`, `#43b-1`,
+`#43b-2` and `#43d`. What remains of the family is gated and cannot be engineered open:
+
+- `#43c` (#174) — `gate:external`, and additionally depends on #162 and `#42f`, both `gate:legal`
+  and neither built;
+- `#43e` (#176) — `gate:external`, depends on #174 and #175;
+- `#43f` (#177) — no gate label, but depends on `#43e`, so effectively behind the same gate;
+- `#43g` (#178) — `gate:external`; `#43h` (#179) — `blocked`, `gate:external`.
+
+**Nothing in the backlog is `status:ready`, and nothing is `active`.** The only open engineering
+story without a gate label is #177, which its own dependency blocks. The remaining unblocked work
+is #45 (`track:design`, 13) — the multi-workspace commercial and operations dashboard.
+
+That is the real state: **the executable backend is exhausted for this milestone.** What stands
+between BeauClick and its users now is not backend capability but the absence of interfaces —
+several complete, tested server surfaces (`#42a`'s outcome-policy publication, `#42b`'s seller
+selection, `#42d`'s no-show declaration and customer remedy, `#43b-1`'s commission publication,
+and the per-state funds read) have no screen, and four of the five have no design either. Closing
+that gap is the next work, and it starts in design rather than in this repository.
