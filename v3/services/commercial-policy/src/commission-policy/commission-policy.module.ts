@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { CommissionPolicyController } from './commission-policy.controller';
 import { COMMISSION_POLICY_ENTITIES } from './commission-policy.entities';
+import { CommissionPolicyResolutionService } from './commission-policy-resolution.service';
 import { CommissionPolicyService } from './commission-policy.service';
 import { CommissionPolicySubjectDataContract } from './commission-policy-subject-data.contract';
 
@@ -24,7 +25,7 @@ import { CommissionPolicySubjectDataContract } from './commission-policy-subject
 @Module({
   imports: [TypeOrmModule.forFeature([...COMMISSION_POLICY_ENTITIES])],
   controllers: [CommissionPolicyController],
-  providers: [CommissionPolicyService, CommissionPolicySubjectDataContract],
-  exports: [CommissionPolicyService, CommissionPolicySubjectDataContract],
+  providers: [CommissionPolicyService, CommissionPolicyResolutionService, CommissionPolicySubjectDataContract],
+  exports: [CommissionPolicyService, CommissionPolicyResolutionService, CommissionPolicySubjectDataContract],
 })
 export class CommissionPolicyModule {}

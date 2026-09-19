@@ -102,6 +102,27 @@ export class CommerceSubjectDataContract implements SubjectDataContract {
         'The customer\'s remedy after a seller/platform/provider cancellation and its resolution. A financial fact that must survive erasure; it holds no identifying content of its own.',
     },
     {
+      /*
+       * V3.3 #192 (`#43b-2`), ADR-052 §2 and §15. `retained`, for the reason
+       * `commerce.booking_outcome_decisions` above is retained and then some:
+       * this records WHICH published commission rule bound the order, and
+       * `#43c` computes money from it. An erasure able to remove it would
+       * leave an order whose charge could never be explained or reconciled.
+       * It carries no subject-shaped column, so the coverage heuristic would
+       * ALSO accept a dishonest `no_subject_data` claim here -- which is why
+       * this claim and its reason are pinned by test.
+       *
+       * Not exported: it says nothing about the customer. What the platform
+       * charges the seller under is an arrangement between the platform and
+       * the seller, and a customer's own-data export is not the place to
+       * disclose it.
+       */
+      table: 'commerce.order_commission_terms',
+      disposition: 'retained',
+      reason:
+        'Which published commission rule -- or its explicit absence -- bound the order at commitment. The basis on which the platform later charges the seller; it must survive erasure or the charge becomes unexplainable, and it holds no identifying content of its own.',
+    },
+    {
       table: 'commerce.outbox_events',
       disposition: 'retained',
       reason: 'Transactional outbox.',
@@ -272,6 +293,10 @@ export class CommerceSubjectDataContract implements SubjectDataContract {
         {
           table: 'commerce.customer_remedy_choices',
           reason: 'the customer\'s remedy resolution for a retained order; permanent and carrying no identifying content of its own',
+        },
+        {
+          table: 'commerce.order_commission_terms',
+          reason: 'the commission rule that bound a retained order; append-only and carrying no identifying content of its own',
         },
       ],
     };

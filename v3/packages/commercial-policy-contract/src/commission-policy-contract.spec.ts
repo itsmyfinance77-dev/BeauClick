@@ -29,6 +29,8 @@ const term = (
 ): CommissionTermV1 => ({
   component,
   state: 'rule',
+  policyKey: 'suite-key',
+  policyVersion: 1,
   ruleKind: 'percentage',
   basisPoints: 1_000,
   fixedToman: null,
@@ -40,11 +42,15 @@ const term = (
 const absent = (component: CommissionComponent): CommissionTermV1 => ({
   component,
   state: 'absent',
+  policyKey: null,
+  policyVersion: null,
   ruleKind: null,
   basisPoints: null,
   fixedToman: null,
   base: null,
-  arithmeticVersion: COMMISSION_ARITHMETIC_VERSION,
+  // Null, not the engine's constant: nothing bound the order, so no
+  // arithmetic did either (`#43b-2`, ADR-052 §2).
+  arithmeticVersion: null,
 });
 
 describe('the commission vocabulary', () => {

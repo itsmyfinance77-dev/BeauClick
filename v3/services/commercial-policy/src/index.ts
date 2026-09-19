@@ -99,6 +99,9 @@ export * from './commission-policy/commission-policy.entities';
 export { COMMISSION_AUDIT_ACTIONS, COMMISSION_AUDIT_TARGETS } from './commission-policy/commission-policy.constants';
 export * from './commission-policy/commission-policy.dto';
 export * from './commission-policy/commission-policy.service';
+// V3.3 Story #192 (`#43b-2`), ADR-052 §2. The READ-ONLY resolver the order
+// path reaches through a Commerce-owned port — never the writer above.
+export * from './commission-policy/commission-policy-resolution.service';
 export * from './commission-policy/commission-policy.controller';
 export * from './commission-policy/commission-policy-subject-data.contract';
 export * from './commission-policy/commission-policy.module';
