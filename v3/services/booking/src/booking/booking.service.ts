@@ -27,6 +27,7 @@ import {
 import { BookingHistoryEntity, BookingHistoryEvent, BookingHistoryMetadata } from '../entities/booking-history.entity';
 import { BookingIdempotencyKeyEntity } from '../entities/booking-idempotency-key.entity';
 import { BookingOutboxEntity } from '../entities/booking-outbox.entity';
+import { NoShowDeclarationEntity, NoShowEvaluationState } from '../entities/no-show-declaration.entity';
 import { BookingResourceAssignmentEntity } from '../entities/booking-resource-assignment.entity';
 import { BookingConfig } from '../booking.config';
 import {
@@ -626,6 +627,81 @@ export class BookingService {
       this.auditLog.log({ action: 'booking.no_show_declared', bookingId, actorType: actor.type });
       return true;
     });
+  }
+
+  /**
+   * What `markNoShow` would do right now, and what it already did — V3.3
+   * `#42d-read` (#201), the read half of ADR-051 §7.
+   *
+   * Exists because a screen cannot be built against a write-only surface: the
+   * declaration entry point has to know whether the moment has arrived and
+   * whether a statement is required, and ADR-051 forbids the client computing
+   * either. So the server answers both, and answers them **the same way the
+   * write does** rather than by a parallel rule that could drift:
+   *
+   *  - a GOVERNED booking is judged on the DATABASE clock, by the same
+   *    `now() >= slot_start + grace` expression `markNoShow`'s `FOR UPDATE`
+   *    guard uses;
+   *  - an UNGOVERNED booking is judged on the APPLICATION clock against
+   *    `slot_end`, which is V2's rule and which `markNoShow` preserves
+   *    verbatim for exactly that booking shape. Two clocks is not an
+   *    oversight -- a read that used one clock for both would disagree with
+   *    the write for one of them.
+   *
+   * ## What it deliberately does not return
+   *
+   * **The permitted instant.** A client given `slot_start + grace` would
+   * render a countdown to it, which is the one thing ADR-051 §7 does not
+   * allow: the instant belongs to the database, and a client clock that runs
+   * fast would offer a control the server then refuses. Only the boolean
+   * crosses.
+   *
+   * **`declared_by_user_id`.** `BookingSubjectDataContract` already settled
+   * what this table may disclose about a declaration (ADR-051 §10): the
+   * instant, the statement, the window and the state -- never the declaring
+   * party's id. That projection is reused here rather than re-decided, even
+   * though this route's only reader is the declaring professional themselves.
+   *
+   * No lock, for the reason `governNoShow` takes none: nothing here moves
+   * money and the terms it reads are immutable.
+   */
+  async noShowStateFor(bookingId: string, manager?: EntityManager): Promise<BookingNoShowState | null> {
+    const m = manager ?? this.dataSource.manager;
+    const governance: BookingNoShowGovernance = await this.rescheduleOutcome.governNoShow(m, bookingId);
+
+    const booking = await m.findOne(BookingEntity, { where: { id: bookingId } });
+    if (!booking) return null;
+
+    const declaration = await m.findOne(NoShowDeclarationEntity, { where: { bookingId } });
+
+    // `confirmed` is half of the guard in both branches; a booking already
+    // moved on is not "not yet permitted", it is never permitted again.
+    const open = booking.status === 'confirmed';
+
+    if (!governance.governed) {
+      return {
+        governed: false,
+        graceMinutes: null,
+        statementRequired: false,
+        declarationPermitted: open && booking.slotEnd.getTime() <= Date.now(),
+        declaration: toDeclarationView(declaration),
+      };
+    }
+
+    const rows: Array<{ eligible: boolean }> = await m.query(
+      `SELECT now() >= slot_start + make_interval(mins => $2::int) AS eligible
+         FROM booking.bookings
+        WHERE id = $1`,
+      [bookingId, governance.graceMinutes],
+    );
+
+    return {
+      governed: true,
+      graceMinutes: governance.graceMinutes,
+      statementRequired: true,
+      declarationPermitted: open && (rows[0]?.eligible ?? false),
+      declaration: toDeclarationView(declaration),
+    };
   }
 
   // ---------------------------------------------------------------------
@@ -1329,6 +1405,47 @@ export class BookingService {
 }
 
 export { BOOKING_STATUSES, LEGAL_TRANSITIONS };
+
+/**
+ * One declaration as every reader outside this service may see it — V3.3
+ * `#42d-read` (#201).
+ *
+ * Exactly `BookingSubjectDataContract`'s projection of
+ * `booking.no_show_declarations` (ADR-051 §10), field for field: the
+ * declaring party's id is absent, and there is no variant of this type that
+ * carries it.
+ */
+export interface NoShowDeclarationView {
+  readonly declaredAt: string;
+  readonly statement: string;
+  readonly objectionWindowEndsAt: string | null;
+  readonly evaluationState: NoShowEvaluationState;
+}
+
+/**
+ * The state of one booking's no-show guard — V3.3 `#42d-read` (#201).
+ *
+ * `graceMinutes` is `null` rather than a number for an ungoverned booking
+ * because no grace was ever snapshotted for it. Zero would be a different
+ * claim: that somebody published a grace of zero.
+ */
+export interface BookingNoShowState {
+  readonly governed: boolean;
+  readonly graceMinutes: number | null;
+  readonly statementRequired: boolean;
+  readonly declarationPermitted: boolean;
+  readonly declaration: NoShowDeclarationView | null;
+}
+
+function toDeclarationView(row: NoShowDeclarationEntity | null): NoShowDeclarationView | null {
+  if (!row) return null;
+  return {
+    declaredAt: row.declaredAt.toISOString(),
+    statement: row.statement,
+    objectionWindowEndsAt: row.objectionWindowEndsAt?.toISOString() ?? null,
+    evaluationState: row.evaluationState,
+  };
+}
 
 function isUniqueViolation(err: unknown): boolean {
   return (err as { code?: string } | null)?.code === '23505';

@@ -43,6 +43,26 @@ export interface CustomerRemedyResolutionResult {
 }
 
 /**
+ * The remedy as the customer's own screen must render it — V3.3
+ * `#42d-read` (#201), the read half of ADR-051 §8.
+ *
+ * `rescheduleStillAvailable` is the ONE derived field, and it is derived
+ * from the same `ESCAPABLE_EXECUTION_STATUSES` set the write path consults,
+ * in the same file, so the control the screen shows and the answer the POST
+ * gives can never disagree. It is a boolean rather than a deadline on
+ * purpose: the window is bounded by the refund's own state, not by a clock,
+ * so there is nothing for a client to count down to and the design must not
+ * be given a number that would invite one.
+ */
+export interface CustomerRemedyView {
+  readonly chosen: CustomerRemedyChoiceOption | null;
+  readonly resolvedBy: 'customer' | 'default';
+  readonly rescheduleStillAvailable: boolean;
+  readonly refundToman: string | null;
+  readonly executionStatus: string | null;
+}
+
+/**
  * `POST /api/v1/bookings/:id/remedy` — V3.3 #161 (`#42d`), ADR-051 §8, the
  * composition root's own join of Commerce's remedy-choice record and
  * booking-service's reschedule, for the reason `BookingOutcomeOrchestrator`
@@ -120,6 +140,51 @@ export class CustomerRemedyResolutionService {
       this.auditLog.log({ action: 'commerce.customer_remedy_resolved', bookingId, orderId, chosen: 'reschedule' });
       return { chosen: 'reschedule', resolvedBy: 'customer' };
     });
+  }
+
+  /**
+   * The same resolution `resolve` would answer from, read without writing —
+   * V3.3 `#42d-read` (#201).
+   *
+   * ## Why it refuses identically rather than returning an "absent" shape
+   *
+   * Both causes `resolve` refuses for -- no remedy was ever offered for this
+   * booking, and the booking is foreign or nonexistent -- collapse into the
+   * same `RemedyNotOfferedException` here, for the reason they collapse
+   * there: a distinct shape for "offered but not to you" would let a caller
+   * who guessed a booking id learn that it exists. A GET that enumerated
+   * what the POST refuses to enumerate would undo the POST's discipline.
+   *
+   * ## No lock, and no transaction of its own
+   *
+   * `lockResolution` exists so the write path can serialise against a
+   * concurrent reschedule. A read has nothing to serialise: the row it reads
+   * moves at most once in its whole life, and a caller who observes the
+   * pre-move value simply re-reads. Taking `FOR UPDATE` here would make a
+   * screen refresh block a checkout's neighbour for no gain.
+   */
+  async read(bookingId: string): Promise<CustomerRemedyView> {
+    const m = this.dataSource.manager;
+
+    const orderId = await this.decisions.orderIdForBooking(m, bookingId);
+    if (!orderId) throw new RemedyNotOfferedException();
+
+    const current = await this.remedyChoices.resolution(m, orderId);
+    if (!current) throw new RemedyNotOfferedException();
+
+    // A remedy is always born against a live cancellation decision, but the
+    // read must not assume one is still there: `null` reads as "no refund
+    // figure yet", never as a zero the platform never decided.
+    const decision = await this.decisions.liveDecision(m, bookingId, 'cancellation');
+
+    return {
+      chosen: current.chosen,
+      resolvedBy: current.resolvedBy,
+      rescheduleStillAvailable:
+        current.resolvedBy === 'default' && !!decision && ESCAPABLE_EXECUTION_STATUSES.has(decision.executionStatus),
+      refundToman: decision ? decision.refundToman.toString() : null,
+      executionStatus: decision ? decision.executionStatus : null,
+    };
   }
 }
 

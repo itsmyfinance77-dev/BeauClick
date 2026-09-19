@@ -893,6 +893,212 @@ describePg('no-show declaration and customer remedy (real PostgreSQL)', () => {
   });
 
   // =========================================================================
+  // 4b. The read routes — V3.3 `#42d-read` (#201)
+  //
+  // Screen 49 of the design gap pack could not be built against the write-only
+  // surface #161 left. These two routes close that, and every property below
+  // is about the routes AGREEING WITH THE WRITES they mirror rather than about
+  // the shape of a payload: the same guard, the same refusal, the same clock,
+  // the same escape window.
+  // =========================================================================
+
+  describe('GET /bookings/:id/no-show — the declaration read', () => {
+    /** Exactly the keys the route may ever return. A new one must be added deliberately. */
+    const STATE_KEYS = ['governed', 'graceMinutes', 'statementRequired', 'declarationPermitted', 'declaration'];
+    const DECLARATION_KEYS = ['declaredAt', 'statement', 'objectionWindowEndsAt', 'evaluationState'];
+
+    const request_ = (bookingId: string, user: SeededUser) =>
+      request(server()).get(`/api/v1/bookings/${bookingId}/no-show`).set(auth(user));
+
+    /** The route's own payload, unwrapped from the `{ data, error, meta }` envelope every route shares. */
+    const readNoShow = async (bookingId: string, user: SeededUser) => (await request_(bookingId, user).expect(200)).body.data;
+
+    it('is professional-only, refusing the customer of the very same booking', async () => {
+      const seller = await governedSeller({ graceMinutes: 15 });
+      const booked = await confirmedBooking(seller);
+
+      await request_(booked.bookingId, booked.customer).expect(404);
+      await request_(booked.bookingId, seller.owner).expect(200);
+    });
+
+    it('reports the grace the booking was taken under, and never invents one for a legacy booking', async () => {
+      const governed = await governedSeller({ graceMinutes: 25 });
+      const governedBooking = await confirmedBooking(governed);
+      const governedState = await readNoShow(governedBooking.bookingId, governed.owner);
+      expect(governedState).toMatchObject({ governed: true, graceMinutes: 25, statementRequired: true });
+
+      const legacy = await legacySeller();
+      const legacyBooking = await confirmedBooking(legacy);
+      const legacyState = await readNoShow(legacyBooking.bookingId, legacy.owner);
+      // `null`, not `0`: zero would claim somebody published a grace of zero.
+      expect(legacyState).toMatchObject({ governed: false, graceMinutes: null, statementRequired: false });
+    });
+
+    it('flips declarationPermitted on the DATABASE clock, at the same boundary the write refuses on', async () => {
+      const seller = await governedSeller({ graceMinutes: 15 });
+      const booked = await confirmedBooking(seller);
+
+      await placeSlotStartForGrace(booked.bookingId, 15, false);
+      const before = await readNoShow(booked.bookingId, seller.owner);
+      expect(before.declarationPermitted).toBe(false);
+      // The read said no; the write must say no for the same booking, now.
+      await expect(declareNoShow(booked.bookingId, seller.owner.id)).rejects.toMatchObject({
+        response: { code: 'INVALID_BOOKING_TRANSITION' },
+      });
+
+      await placeSlotStartForGrace(booked.bookingId, 15, true);
+      const after = await readNoShow(booked.bookingId, seller.owner);
+      expect(after.declarationPermitted).toBe(true);
+      // And now the write agrees the other way.
+      await expect(declareNoShow(booked.bookingId, seller.owner.id)).resolves.toBe(true);
+    });
+
+    it('a legacy booking is judged on slot_end, the application clock the write keeps for it', async () => {
+      const seller = await legacySeller();
+      const booked = await confirmedBooking(seller);
+
+      expect((await readNoShow(booked.bookingId, seller.owner)).declarationPermitted).toBe(false);
+
+      await dataSource.query(`UPDATE booking.bookings SET slot_end = now() - interval '1 minute' WHERE id = $1`, [booked.bookingId]);
+      expect((await readNoShow(booked.bookingId, seller.owner)).declarationPermitted).toBe(true);
+    });
+
+    it('returns the declaration once made, and stops offering the control', async () => {
+      const seller = await governedSeller({ graceMinutes: 10, disputeWindowHours: 36 });
+      const booked = await confirmedBooking(seller);
+      await placeSlotStartForGrace(booked.bookingId, 10, true);
+
+      expect((await readNoShow(booked.bookingId, seller.owner)).declaration).toBeNull();
+
+      await declareNoShow(booked.bookingId, seller.owner.id, 'یادداشت آزمون');
+
+      const body = await readNoShow(booked.bookingId, seller.owner);
+      expect(body.declaration).toMatchObject({ statement: 'یادداشت آزمون', evaluationState: 'window_open' });
+      expect(body.declaration.objectionWindowEndsAt).not.toBeNull();
+      // The booking is no longer `confirmed`, so this is not "not yet" -- it
+      // is never again, and the screen must not leave a control behind.
+      expect(body.declarationPermitted).toBe(false);
+    });
+
+    it('discloses neither the declaring party nor the permitted instant', async () => {
+      const seller = await governedSeller({ graceMinutes: 10 });
+      const booked = await confirmedBooking(seller);
+      await placeSlotStartForGrace(booked.bookingId, 10, true);
+      await declareNoShow(booked.bookingId, seller.owner.id, 'یادداشت آزمون');
+
+      const body = await readNoShow(booked.bookingId, seller.owner);
+
+      // Exact sets, not "does not contain": a field added later is caught here.
+      expect(Object.keys(body).sort()).toEqual([...STATE_KEYS].sort());
+      expect(Object.keys(body.declaration).sort()).toEqual([...DECLARATION_KEYS].sort());
+
+      // `declared_by_user_id` is in the row and is deliberately not in the
+      // projection -- `BookingSubjectDataContract`'s own rule for this table.
+      expect(await declarationFor(booked.bookingId)).toMatchObject({ declared_by_user_id: seller.owner.id });
+      expect(JSON.stringify(body)).not.toContain(seller.owner.id);
+
+      // No instant a client could count down to: the only timestamps are the
+      // declaration's own past instant and the window's end.
+      const booking = await bookingRow(booked.bookingId);
+      expect(JSON.stringify(body)).not.toContain(new Date(booking.slot_start as Date).toISOString());
+    });
+
+    it('refuses a booking that does not exist exactly as it refuses a foreign one', async () => {
+      const seller = await governedSeller();
+      const other = await governedSeller();
+      const booked = await confirmedBooking(seller);
+
+      await request_(uuidv7(), seller.owner).expect(404);
+      await request_(booked.bookingId, other.owner).expect(404);
+    });
+  });
+
+  describe('GET /bookings/:id/remedy — the resolution read', () => {
+    const REMEDY_KEYS = ['chosen', 'resolvedBy', 'rescheduleStillAvailable', 'refundToman', 'executionStatus'];
+
+    const remedyRequest = (bookingId: string, user: SeededUser) =>
+      request(server()).get(`/api/v1/bookings/${bookingId}/remedy`).set(auth(user));
+
+    /** The route's own payload, unwrapped from the `{ data, error, meta }` envelope every route shares. */
+    const readRemedy = async (bookingId: string, user: SeededUser) => (await remedyRequest(bookingId, user).expect(200)).body.data;
+
+    async function sellerCancelledAndDecided(options: GovernedOptions = {}): Promise<Booked & { seller: Seller }> {
+      const seller = await governedSeller(options);
+      const booked = await confirmedBooking(seller);
+      await bookings.cancel(booked.bookingId, { type: 'professional', id: seller.owner.id }, 'مشکل پیش‌بینی‌نشده');
+      await orchestrator.decideCancellation(booked.bookingId, (m, cutoffHours) => bookings.cancellationFacts(m, booked.bookingId, cutoffHours));
+      return { ...booked, seller };
+    }
+
+    it('is customer-only, refusing the professional who caused the cancellation', async () => {
+      const booked = await sellerCancelledAndDecided();
+
+      await remedyRequest(booked.bookingId, booked.seller.owner).expect(404);
+      await remedyRequest(booked.bookingId, booked.customer).expect(200);
+    });
+
+    it('shows the default already applied, with the reschedule escape still open while the refund is pending', async () => {
+      const booked = await sellerCancelledAndDecided();
+      expect((await decisionsFor(booked.bookingId))[0]).toMatchObject({ execution_status: 'pending' });
+
+      const body = await readRemedy(booked.bookingId, booked.customer);
+      expect(body).toEqual({
+        chosen: null,
+        resolvedBy: 'default',
+        rescheduleStillAvailable: true,
+        refundToman: String(PRICE),
+        executionStatus: 'pending',
+      });
+      expect(Object.keys(body).sort()).toEqual([...REMEDY_KEYS].sort());
+    });
+
+    it('closes the escape once the refund has executed — and the POST agrees at that same moment', async () => {
+      const seller = await governedSeller();
+      const placed = await confirmedBooking(seller);
+      await bookings.cancel(placed.bookingId, { type: 'professional', id: seller.owner.id }, 'مشکل پیش‌بینی‌نشده');
+      const booked = { ...placed, seller };
+      await deliver(booked); // decide + execute, synchronously in the sandbox
+      expect((await decisionsFor(booked.bookingId))[0]).toMatchObject({ execution_status: 'executed' });
+
+      const body = await readRemedy(booked.bookingId, booked.customer);
+      expect(body).toMatchObject({ resolvedBy: 'default', rescheduleStillAvailable: false, executionStatus: 'executed' });
+
+      // The read is not merely consistent-looking: the write refuses now.
+      const newSlotId = await seedSlot(dataSource, booked.seller.professionalId, booked.seller.serviceId, futureSlotTime(520));
+      await expect(remedyResolution.resolve(booked.bookingId, booked.customer.id, 'reschedule', newSlotId)).rejects.toMatchObject({
+        response: { code: 'REMEDY_REFUND_ALREADY_EXECUTED' },
+      });
+    });
+
+    it('reports a customer-chosen reschedule as closed, and offers no second escape', async () => {
+      const booked = await sellerCancelledAndDecided({ cutoffHours: 999, freeCount: 0 });
+      const newSlotId = await seedSlot(dataSource, booked.seller.professionalId, booked.seller.serviceId, futureSlotTime(540));
+      await remedyResolution.resolve(booked.bookingId, booked.customer.id, 'reschedule', newSlotId);
+
+      const body = await readRemedy(booked.bookingId, booked.customer);
+      expect(body).toMatchObject({ chosen: 'reschedule', resolvedBy: 'customer', rescheduleStillAvailable: false });
+    });
+
+    it('refuses a booking that was never offered a remedy with the same code the POST uses', async () => {
+      const seller = await governedSeller();
+      const booked = await confirmedBooking(seller);
+
+      const { body } = await remedyRequest(booked.bookingId, booked.customer).expect(404);
+      expect(body.error).toMatchObject({ code: 'REMEDY_NOT_OFFERED' });
+      // The POST refuses the same booking, the same way -- a GET that
+      // enumerated more than the POST would undo the POST's discipline.
+      await expect(remedyResolution.resolve(booked.bookingId, booked.customer.id, 'refund', null)).rejects.toMatchObject({
+        response: { code: 'REMEDY_NOT_OFFERED' },
+      });
+    });
+
+    it('refuses a nonexistent booking identically', async () => {
+      const booked = await sellerCancelledAndDecided();
+      await remedyRequest(uuidv7(), booked.customer).expect(404);
+    });
+  });
+
+  // =========================================================================
   // 5. Admin cancellation maps to platform_cancelled (CAUSE_BY_ACTOR, F5)
   // =========================================================================
 
