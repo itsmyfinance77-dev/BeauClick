@@ -120,16 +120,35 @@ function readProductionSources(...directories: string[]): Array<{ file: string; 
   return collected;
 }
 
-function readFinancialMigrations(): Array<{ file: string; source: string }> {
-  const directory = resolve(WORKSPACE_ROOT, 'database/migrations/financial');
+function readMigrations(schemaDirectory: string): Array<{ file: string; source: string }> {
+  const directory = resolve(WORKSPACE_ROOT, `database/migrations/${schemaDirectory}`);
   return readdirSync(directory)
     .filter((name) => name.endsWith('.sql'))
-    .map((name) => ({ file: `database/migrations/financial/${name}`, source: readFileSync(join(directory, name), 'utf8') }));
+    .map((name) => ({
+      file: `database/migrations/${schemaDirectory}/${name}`,
+      source: readFileSync(join(directory, name), 'utf8'),
+    }));
 }
 
 describe('no hard-coded commission rate exists anywhere in the codebase (#43a, ADR-052 §16)', () => {
-  const sources = readProductionSources('services/financial/src', 'apps/api/src', 'libs/event-contracts/src', 'libs/money/src');
-  const migrations = readFinancialMigrations();
+  /*
+   * `#43b-1` (#173) extended the scanned roots. `#43a` removed the commission
+   * constant; `#43b-1` builds the family that replaces it, so the two places a
+   * rate could now reappear are the commission policy plane and its pure
+   * engine. Scanning them here — rather than writing a second scanner beside
+   * them — keeps one answer to "is there a commission number in this
+   * repository", and means the story that could reintroduce one is checked by
+   * the test that exists to forbid it.
+   */
+  const sources = readProductionSources(
+    'services/financial/src',
+    'services/commercial-policy/src/commission-policy',
+    'packages/commercial-policy-contract/src',
+    'apps/api/src',
+    'libs/event-contracts/src',
+    'libs/money/src',
+  );
+  const migrations = [...readMigrations('financial'), ...readMigrations('commercial')];
   const envExample = readFileSync(resolve(WORKSPACE_ROOT, 'apps/api/.env.example'), 'utf8');
   const hermeticEnvSource = readFileSync(resolve(WORKSPACE_ROOT, 'apps/api/test/pg-test-app.factory.ts'), 'utf8');
 

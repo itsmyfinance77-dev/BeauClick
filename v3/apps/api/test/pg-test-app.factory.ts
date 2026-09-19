@@ -475,6 +475,11 @@ export const RESETTABLE_TABLES = [
   // returns them to exactly the state a clean migration leaves.
   'commercial.booking_collection_policy_versions',
   'commercial.booking_collection_policies',
+  // V3.3 #173 (`#43b-1`), ADR-052 §1. Versions before keys: the version's FK
+  // points at the key, and the key's own trigger refuses deletion while any
+  // version survives.
+  'commercial.commission_policy_versions',
+  'commercial.commission_policies',
   // V3.2-C Story #27. Attribution and its claim throttle. Still no outbox --
   // `ReferralAttributed` is deliberately not defined because it has no consumer
   // (ADR-036 §10).

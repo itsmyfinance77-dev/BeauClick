@@ -40,6 +40,7 @@ import { REFERRAL_ENTITIES } from '@beauclick/referral';
 import {
   BOOKING_COLLECTION_POLICY_ENTITIES,
   BOOKING_OUTCOME_POLICY_ENTITIES,
+  COMMISSION_POLICY_ENTITIES,
   COLLECTION_POLICY_ASSIGNMENT_ENTITIES,
   COMMERCIAL_ENTITIES,
   OUTCOME_POLICY_ASSIGNMENT_ENTITIES,
@@ -158,6 +159,8 @@ import { MetricsController } from './observability/metrics.controller';
           // V3.3 #42 (`#42a`), ADR-051: the six outcome-policy, copy and
           // Legal-evidence tables, registered here for the same reason as above.
           ...BOOKING_OUTCOME_POLICY_ENTITIES,
+          // V3.3 #173 (`#43b-1`), ADR-052 §1: the commission publication plane.
+          ...COMMISSION_POLICY_ENTITIES,
           ...COLLECTION_POLICY_ASSIGNMENT_ENTITIES,
           // V3.3 #159 (`#42b`), ADR-051 §3: the seller's outcome-selection history.
           ...OUTCOME_POLICY_ASSIGNMENT_ENTITIES,

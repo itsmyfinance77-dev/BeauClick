@@ -88,6 +88,20 @@ export * from './outcome-policy/customer-policy-copy.service';
 export * from './outcome-policy/booking-outcome-policy.controller';
 export * from './outcome-policy/booking-outcome-policy-subject-data.contract';
 export * from './outcome-policy/booking-outcome-policy.module';
+// V3.3 Story #173 (`#43b-1`), ADR-052 §1. The commission policy family:
+// publication only, read by no order, payment, refund or settlement path, and
+// changing no customer- or seller-facing behaviour. `#43b-2` (#192) is the
+// first reader.
+export * from './commission-policy/commission-policy.entities';
+// Narrow on purpose: the SQLSTATE helpers beside these are this plane's own
+// copies (see the file's own note) and would collide with `#42a`'s at the
+// package boundary. Only the audit vocabulary is part of the surface.
+export { COMMISSION_AUDIT_ACTIONS, COMMISSION_AUDIT_TARGETS } from './commission-policy/commission-policy.constants';
+export * from './commission-policy/commission-policy.dto';
+export * from './commission-policy/commission-policy.service';
+export * from './commission-policy/commission-policy.controller';
+export * from './commission-policy/commission-policy-subject-data.contract';
+export * from './commission-policy/commission-policy.module';
 // V3.3 Story #159 (`#42b`). The seller's selection inside the published ranges,
 // and the READ-ONLY resolver the order path binds (ADR-051 §3). Selection and
 // resolution only: no evaluator, no refund, no no-show, no dispute.
