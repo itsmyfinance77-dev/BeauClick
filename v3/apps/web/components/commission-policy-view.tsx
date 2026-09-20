@@ -2,7 +2,7 @@
 
 import { formatToman, toPersianDigits } from '@beauclick/persian-utils';
 import { Card, ErrorState, LoadingState } from '@/components/ui';
-import { Badge } from '@/components/kit';
+import { Badge, DataCell, DataRow, DataTable } from '@/components/kit';
 import type { ReactNode } from 'react';
 import type {
   CommissionBase,
@@ -217,6 +217,8 @@ export function ComponentCard({
   );
 }
 
+const TIMELINE_HEAD = ['نسخه', 'وضعیت', 'قاعده', 'انتشار'] as const;
+
 /** Every version of one policy, newest first, with no edit affordance on any row. */
 export function VersionTimeline({
   policy,
@@ -249,46 +251,35 @@ export function VersionTimeline({
       <p id={descriptionId} style={{ margin: '0 0 8px', fontSize: 12, lineHeight: 1.85, color: 'var(--bc-color-ink-soft)' }}>
         نسخهٔ منتشرشده تغییرناپذیر است؛ تغییرِ یک قاعدهٔ زنده یعنی انتشارِ نسخه‌ای تازه.
       </p>
-      <div style={{ overflowX: 'auto' }}>
-        <table
-          aria-labelledby={headingId}
-          aria-describedby={descriptionId}
-          style={{ width: '100%', minWidth: 520, borderCollapse: 'collapse', fontSize: 13 }}
-        >
-          <thead>
-            <tr style={{ borderBottom: '1px solid var(--bc-color-line)' }}>
-              <th style={{ textAlign: 'start', padding: '8px 10px', fontWeight: 700 }}>نسخه</th>
-              <th style={{ textAlign: 'start', padding: '8px 10px', fontWeight: 700 }}>وضعیت</th>
-              <th style={{ textAlign: 'start', padding: '8px 10px', fontWeight: 700 }}>قاعده</th>
-              <th style={{ textAlign: 'start', padding: '8px 10px', fontWeight: 700 }}>انتشار</th>
-              {rowActions ? <th style={{ textAlign: 'start', padding: '8px 10px', fontWeight: 700 }}>اقدام</th> : null}
-            </tr>
-          </thead>
-          <tbody>
-            {[...versions]
-              .sort((a, b) => b.version - a.version)
-              .map((version) => (
-                <tr key={version.version} data-version={version.version} style={{ borderBottom: '1px solid var(--bc-color-line)' }}>
-                  <td style={{ padding: '10px', fontVariantNumeric: 'tabular-nums' }}>{toPersianDigits(version.version)}</td>
-                  <td style={{ padding: '10px' }}>
-                    <LifecycleBadge state={version.lifecycleState} />
-                  </td>
-                  <td style={{ padding: '10px' }}>
-                    <RuleStatement version={version} />
-                  </td>
-                  <td style={{ padding: '10px', fontSize: 12, color: 'var(--bc-color-ink-soft)' }}>
-                    {version.publishedAt ? new Date(version.publishedAt).toLocaleDateString('fa-IR') : '—'}
-                  </td>
-                  {rowActions ? (
-                    <td style={{ padding: '10px' }}>
-                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{rowActions(version)}</div>
-                    </td>
-                  ) : null}
-                </tr>
-              ))}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        head={rowActions ? [...TIMELINE_HEAD, 'اقدام'] : TIMELINE_HEAD}
+        aria-labelledby={headingId}
+        aria-describedby={descriptionId}
+      >
+        {[...versions]
+          .sort((a, b) => b.version - a.version)
+          .map((version) => (
+            <DataRow key={version.version} data-version={version.version}>
+              <DataCell label="نسخه" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                {toPersianDigits(version.version)}
+              </DataCell>
+              <DataCell label="وضعیت">
+                <LifecycleBadge state={version.lifecycleState} />
+              </DataCell>
+              <DataCell label="قاعده">
+                <RuleStatement version={version} />
+              </DataCell>
+              <DataCell label="انتشار" style={{ fontSize: 12, color: 'var(--bc-color-ink-soft)' }}>
+                {version.publishedAt ? new Date(version.publishedAt).toLocaleDateString('fa-IR') : '—'}
+              </DataCell>
+              {rowActions ? (
+                <DataCell label="اقدام">
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{rowActions(version)}</div>
+                </DataCell>
+              ) : null}
+            </DataRow>
+          ))}
+      </DataTable>
     </section>
   );
 }

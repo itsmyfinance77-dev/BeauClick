@@ -12,7 +12,7 @@ import {
   zonedIsoDate,
 } from '@beauclick/persian-utils';
 import { Alert, Button, Card, ErrorState, Input, LoadingState } from '@/components/ui';
-import { Badge, ConfirmDialog, EmptyState, PageHeader, SegmentedControl, Select } from '@/components/kit';
+import { Badge, ConfirmDialog, EmptyState, FormFullRow, FormGrid, PageHeader, SegmentedControl, Select } from '@/components/kit';
 import { ProGuard } from '@/components/pro-guard';
 import { useAuth } from '@/lib/auth-context';
 import {
@@ -291,25 +291,36 @@ function Availability({ profile }: { profile: MyProviderProfile }) {
             </div>
           </fieldset>
 
-          <Input label="از تاریخ" type="date" value={bulkFrom} onChange={(e) => setBulkFrom(e.target.value)} required />
-          <Input label="تا تاریخ" type="date" value={bulkTo} onChange={(e) => setBulkTo(e.target.value)} required />
-          <Input label="از ساعت" type="time" value={bulkStart} onChange={(e) => setBulkStart(e.target.value)} required />
-          <Input label="تا ساعت" type="time" value={bulkEnd} onChange={(e) => setBulkEnd(e.target.value)} required />
-          <Input
-            label="مدت هر نوبت (دقیقه)"
-            value={bulkMinutes}
-            onChange={(e) => setBulkMinutes(e.target.value)}
-            inputMode="numeric"
-            required
-          />
-          <Select label="خدمت" value={bulkService} onChange={(e) => setBulkService(e.target.value)} hint="اختیاری. اگر خالی بماند، برای همه خدمات قابل رزرو است.">
-            <option value="">همه خدمات</option>
-            {services.map((service) => (
-              <option key={service.id} value={service.id}>
-                {service.name}
-              </option>
-            ))}
-          </Select>
+          <FormGrid>
+            <Input label="از تاریخ" type="date" value={bulkFrom} onChange={(e) => setBulkFrom(e.target.value)} required />
+            <Input label="تا تاریخ" type="date" value={bulkTo} onChange={(e) => setBulkTo(e.target.value)} required />
+            <Input label="از ساعت" type="time" value={bulkStart} onChange={(e) => setBulkStart(e.target.value)} required />
+            <Input label="تا ساعت" type="time" value={bulkEnd} onChange={(e) => setBulkEnd(e.target.value)} required />
+            <FormFullRow>
+              <Input
+                label="مدت هر نوبت (دقیقه)"
+                value={bulkMinutes}
+                onChange={(e) => setBulkMinutes(e.target.value)}
+                inputMode="numeric"
+                required
+              />
+            </FormFullRow>
+            <FormFullRow>
+              <Select
+                label="خدمت"
+                value={bulkService}
+                onChange={(e) => setBulkService(e.target.value)}
+                hint="اختیاری. اگر خالی بماند، برای همه خدمات قابل رزرو است."
+              >
+                <option value="">همه خدمات</option>
+                {services.map((service) => (
+                  <option key={service.id} value={service.id}>
+                    {service.name}
+                  </option>
+                ))}
+              </Select>
+            </FormFullRow>
+          </FormGrid>
 
           <Button type="submit" loading={bulkBusy} disabled={bulkWeekdays.length === 0}>
             ساخت زمان‌های آزاد
@@ -322,17 +333,23 @@ function Availability({ profile }: { profile: MyProviderProfile }) {
           <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 16px' }}>افزودن یک زمان</h2>
           <form onSubmit={submitSingle} noValidate>
             {singleError ? <Alert>{singleError}</Alert> : null}
-            <Input label="تاریخ" type="date" value={singleDate} onChange={(e) => setSingleDate(e.target.value)} required />
-            <Input label="از ساعت" type="time" value={singleStart} onChange={(e) => setSingleStart(e.target.value)} required />
-            <Input label="تا ساعت" type="time" value={singleEnd} onChange={(e) => setSingleEnd(e.target.value)} required />
-            <Select label="خدمت" value={singleService} onChange={(e) => setSingleService(e.target.value)}>
-              <option value="">همه خدمات</option>
-              {services.map((service) => (
-                <option key={service.id} value={service.id}>
-                  {service.name}
-                </option>
-              ))}
-            </Select>
+            <FormGrid>
+              <FormFullRow>
+                <Input label="تاریخ" type="date" value={singleDate} onChange={(e) => setSingleDate(e.target.value)} required />
+              </FormFullRow>
+              <Input label="از ساعت" type="time" value={singleStart} onChange={(e) => setSingleStart(e.target.value)} required />
+              <Input label="تا ساعت" type="time" value={singleEnd} onChange={(e) => setSingleEnd(e.target.value)} required />
+              <FormFullRow>
+                <Select label="خدمت" value={singleService} onChange={(e) => setSingleService(e.target.value)}>
+                  <option value="">همه خدمات</option>
+                  {services.map((service) => (
+                    <option key={service.id} value={service.id}>
+                      {service.name}
+                    </option>
+                  ))}
+                </Select>
+              </FormFullRow>
+            </FormGrid>
             <Button type="submit" loading={singleBusy}>
               افزودن
             </Button>

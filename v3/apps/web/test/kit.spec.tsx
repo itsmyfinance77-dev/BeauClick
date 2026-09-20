@@ -2,6 +2,11 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
   Badge,
+  DataCell,
+  DataRow,
+  DataTable,
+  FormFullRow,
+  FormGrid,
   SegmentedControl,
   StatCard,
   StatGrid,
@@ -163,5 +168,61 @@ describe('StatCard / StatGrid', () => {
   it('omits the footer row entirely when there is no footer', () => {
     const { container } = render(<StatCard label="خدمات" value="۳" />);
     expect(container.querySelectorAll('div')).toHaveLength(1); // the Card itself
+  });
+});
+
+describe('DataTable — a table at every width, a card list on mobile', () => {
+  function renderTable() {
+    return render(
+      <>
+        <h3 id="t-head">نسخه‌ها</h3>
+        <DataTable head={['نسخه', 'وضعیت']} aria-labelledby="t-head">
+          <DataRow data-version={2}>
+            <DataCell label="نسخه">۲</DataCell>
+            <DataCell label="وضعیت">منتشرشده</DataCell>
+          </DataRow>
+        </DataTable>
+      </>,
+    );
+  }
+
+  it('stays a named table with column headers, so block display below 640px cannot strip the semantics', () => {
+    renderTable();
+    const table = screen.getByRole('table', { name: 'نسخه‌ها' });
+    expect(within(table).getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['نسخه', 'وضعیت']);
+    expect(within(table).getAllByRole('row')).toHaveLength(2); // header + one body row
+  });
+
+  it('gives every body cell the label the card layout prints above its value', () => {
+    renderTable();
+    const cells = within(screen.getByRole('table')).getAllByRole('cell');
+    expect(cells.map((c) => c.getAttribute('data-label'))).toEqual(['نسخه', 'وضعیت']);
+  });
+
+  it('wraps the table in a focusable, named region so a keyboard user can scroll it at tablet width', () => {
+    renderTable();
+    const region = screen.getByRole('region', { name: 'نسخه‌ها' });
+    expect(region).toHaveAttribute('tabindex', '0');
+    expect(within(region).getByRole('table')).toBeInTheDocument();
+  });
+
+  it('passes row attributes through', () => {
+    const { container } = renderTable();
+    expect(container.querySelector('tr[data-version="2"]')).not.toBeNull();
+  });
+});
+
+describe('FormGrid', () => {
+  it('renders every field in order, with a full-row escape for anything that is not half of a pair', () => {
+    render(
+      <FormGrid>
+        <input aria-label="از ساعت" />
+        <input aria-label="تا ساعت" />
+        <FormFullRow>
+          <input aria-label="خدمت" />
+        </FormFullRow>
+      </FormGrid>,
+    );
+    expect(screen.getAllByRole('textbox').map((i) => i.getAttribute('aria-label'))).toEqual(['از ساعت', 'تا ساعت', 'خدمت']);
   });
 });
