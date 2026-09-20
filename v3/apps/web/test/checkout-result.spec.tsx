@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor, within, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import CheckoutResultPage from '@/app/checkout/result/page';
 import { ApiRequestError } from '@/lib/api-client';
@@ -41,9 +41,18 @@ function renderResult(query: Record<string, string>) {
   return render(<CheckoutResultPage />);
 }
 
-/** The result banner, which is the first `role="alert"` on the page. */
+/**
+ * The result banner, located structurally rather than by role.
+ *
+ * `Alert` no longer renders one role: a refusal is `alert` (assertive, it
+ * interrupts) and a confirmation is `status` (polite). The role is therefore
+ * the thing under test, not a way to find the element -- finding the banner
+ * by role would make every assertion below tautological.
+ */
 function banner(): HTMLElement {
-  return screen.getAllByRole('alert')[0];
+  const found = document.querySelectorAll<HTMLElement>('[data-bc-alert]');
+  if (found.length === 0) throw new Error('no Alert is rendered');
+  return found[0];
 }
 
 const ORDER = {
@@ -567,7 +576,22 @@ describe('preserved behaviour', () => {
   it('announces loading politely rather than as an alert', async () => {
     getOrder.mockImplementation(() => new Promise(() => undefined));
     renderResult({ status: 'succeeded', orderId: 'o1' });
-    expect(await screen.findByRole('status')).toBeInTheDocument();
+    const loading = await screen.findByText('در حال دریافت رسید…');
+    expect(loading).toHaveAttribute('role', 'status');
+  });
+
+  it('announces a SUCCESSFUL payment politely too, and a refusal assertively', async () => {
+    // A confirmation that interrupts the screen reader is the same defect as
+    // a refusal that does not. Both banners are live regions; only one of
+    // them is urgent.
+    renderResult({ status: 'succeeded', orderId: 'o1' });
+    await waitFor(() => expect(banner()).toHaveAttribute('data-bc-alert', 'success'));
+    expect(banner()).toHaveAttribute('role', 'status');
+
+    cleanup();
+    renderResult({ status: 'failed', orderId: 'o1' });
+    await waitFor(() => expect(banner()).toHaveAttribute('data-bc-alert', 'error'));
+    expect(banner()).toHaveAttribute('role', 'alert');
   });
 
   it('renders the receipt from server figures', async () => {

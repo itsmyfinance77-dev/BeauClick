@@ -138,6 +138,19 @@ async function invite(phone: string) {
 
 const SUCCESS_COPY = 'درخواست دعوت دریافت شد و در حال بررسی است.';
 
+/**
+ * The confirmation banner, located structurally rather than by role.
+ *
+ * A confirmation is `role="status"` and a refusal is `role="alert"`, and the
+ * page can hold a second polite live region while a request is in flight --
+ * so neither role identifies this banner on its own.
+ */
+function confirmationBanner(): HTMLElement {
+  const found = document.querySelector<HTMLElement>('[data-bc-alert]');
+  if (!found) throw new Error('no Alert is rendered');
+  return found;
+}
+
 beforeEach(() => {
   global.fetch = jest.fn() as unknown as typeof fetch;
   tokenStorage.clear();
@@ -210,8 +223,8 @@ describe('a 202 is success, and every 202 looks the same', () => {
     }
     // And the CONFIRMATION itself claims nothing the response cannot support:
     // no membership created, no SMS delivered, no invitee named. Scoped to the
-    // alert because the surrounding roster copy legitimately says "عضو".
-    const confirmation = screen.getByRole('alert').textContent ?? '';
+    // banner because the surrounding roster copy legitimately says "عضو".
+    const confirmation = confirmationBanner().textContent ?? '';
     expect(confirmation).toBe(SUCCESS_COPY);
     expect(confirmation).not.toMatch(/عضو|پیامک|ارسال شد به|حساب|ثبت شد/);
   });
@@ -237,8 +250,8 @@ describe('a 202 is success, and every 202 looks the same', () => {
       );
       await waitFor(() => expect(screen.getByLabelText('شماره موبایل همکار')).toBeInTheDocument());
       await invite('09121234567');
-      await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
-      rendered.push(screen.getByRole('alert').textContent ?? '');
+      await waitFor(() => expect(confirmationBanner()).toBeInTheDocument());
+      rendered.push(confirmationBanner().textContent ?? '');
       view.unmount();
     }
 

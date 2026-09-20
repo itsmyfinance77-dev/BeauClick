@@ -227,12 +227,15 @@ export default function ProviderBookingPage() {
         {days.length === 0 ? (
           <div>
             <p style={{ color: 'var(--bc-color-ink-soft)', marginBlockEnd: 12 }}>در حال حاضر زمان آزادی برای رزرو وجود ندارد.</p>
-            {waitlistState === 'joined' || waitlistState === 'already' ? (
+            {waitlistState === 'joined' ? (
               <Alert tone="success">
-                {waitlistState === 'already'
-                  ? 'شما قبلاً در لیست انتظار این متخصص ثبت‌نام کرده‌اید.'
-                  : 'به لیست انتظار اضافه شدید. به محض آزاد شدن یک نوبت، به شما اطلاع می‌دهیم.'}
+                به لیست انتظار اضافه شدید. به محض آزاد شدن یک نوبت، به شما اطلاع می‌دهیم.
               </Alert>
+            ) : waitlistState === 'already' ? (
+              /* `info`, not `success`: nothing happened just now. "You were
+                 already on the list" is a fact about the past, and green
+                 claimed the button had done something. */
+              <Alert tone="info">شما قبلاً در لیست انتظار این متخصص ثبت‌نام کرده‌اید.</Alert>
             ) : (
               <Button variant="ghost" onClick={() => void joinTheWaitlist()} loading={waitlistState === 'joining'}>
                 عضویت در لیست انتظار

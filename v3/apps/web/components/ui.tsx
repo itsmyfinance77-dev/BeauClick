@@ -139,24 +139,54 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input({ l
  * `packages/design-tokens/src/contrast.spec.ts`, so this variant inherits a
  * recorded ratio instead of introducing an unmeasured one.
  */
-type AlertTone = 'error' | 'success' | 'warning';
+/**
+ * Four tones, not three — `V3_DESIGN_SYSTEM.md` §2.
+ *
+ * `info` was missing, and its absence was not cosmetic: the verification
+ * notice was rendered with `success` and the search-limit notice with
+ * `error`, so the colour told the reader "this went well" and "something
+ * failed" about two messages that mean neither. A colour that carries the
+ * wrong meaning is worse than no colour.
+ */
+type AlertTone = 'error' | 'success' | 'warning' | 'info';
 
 const ALERT_TONE_TOKENS: Record<AlertTone, { fg: string; bg: string }> = {
   error: { fg: 'var(--bc-color-error)', bg: 'var(--bc-color-error-soft)' },
   success: { fg: 'var(--bc-color-success)', bg: 'var(--bc-color-success-soft)' },
   warning: { fg: 'var(--bc-color-warning)', bg: 'var(--bc-color-warning-soft)' },
+  info: { fg: 'var(--bc-color-info)', bg: 'var(--bc-color-info-soft)' },
+};
+
+/**
+ * Only a failure interrupts.
+ *
+ * `role="alert"` is assertive: a screen reader cuts off whatever it is
+ * reading to announce it. That is right for a refusal and wrong for a
+ * confirmation or a note, which should be announced when the reader reaches
+ * a natural break. Every tone stays a live region; the two that are not
+ * failures are polite ones.
+ */
+const ALERT_TONE_ROLE: Record<AlertTone, 'alert' | 'status'> = {
+  error: 'alert',
+  warning: 'alert',
+  success: 'status',
+  info: 'status',
 };
 
 export function Alert({ tone = 'error', children }: { tone?: AlertTone; children: ReactNode }) {
   const { fg, bg } = ALERT_TONE_TOKENS[tone];
   return (
     <div
-      role="alert"
+      role={ALERT_TONE_ROLE[tone]}
+      /* A structural hook, because the ROLE is no longer a stable locator:
+         it now varies by tone, and that variation is the thing under test. */
+      data-bc-alert={tone}
       style={{
         padding: '12px 14px',
-        borderRadius: 'var(--bc-radius-row)',
+        borderRadius: 'var(--bc-radius-control)',
         marginBlockEnd: 16,
-        fontSize: 14,
+        fontSize: 'var(--bc-text-compact-size)',
+        lineHeight: 'var(--bc-text-compact-leading)',
         background: bg,
         color: fg,
       }}
