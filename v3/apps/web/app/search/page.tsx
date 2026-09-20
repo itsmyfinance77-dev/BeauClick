@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { formatToman, toPersianDigits } from '@beauclick/persian-utils';
 import { useAuth } from '@/lib/auth-context';
@@ -31,8 +32,20 @@ const PRICE_BAND_LABELS: Record<string, string> = {
 
 export default function SearchPage() {
   const { api } = useAuth();
-  const [query, setQuery] = useState('');
-  const [params, setParams] = useState<SearchParams>({ sort: 'relevance', page: 1 });
+  /*
+    The home page's hero field and its specialty shortcuts both navigate to
+    `/search?q=…`, so the term has to survive the navigation. Read once, as
+    the INITIAL state rather than as a synchronised value: after the page is
+    open the input is the user's, and re-seeding it from a stale URL on a
+    later render would overwrite what they are typing.
+  */
+  const initialQuery = useSearchParams()?.get('q')?.trim() ?? '';
+  const [query, setQuery] = useState(initialQuery);
+  const [params, setParams] = useState<SearchParams>({
+    q: initialQuery || undefined,
+    sort: 'relevance',
+    page: 1,
+  });
   const [result, setResult] = useState<SearchResponse | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);

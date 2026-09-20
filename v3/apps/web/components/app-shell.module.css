@@ -1,0 +1,408 @@
+/*
+ * The customer shell — `V3_INFORMATION_ARCHITECTURE.md` §1–§2 and the header
+ * of every artboard in `Prototype - Customer.dc.html`.
+ *
+ * ## Why this is a stylesheet and not inline styles
+ *
+ * The design's navigation is two different structures, not one structure at
+ * two sizes: a horizontal bar with an avatar menu on desktop, and a header
+ * plus a five-destination bottom bar on mobile. An inline style object cannot
+ * express "only below 640px", which is why the responsive handoff calls the
+ * styling mechanism a standing prerequisite. This file is that mechanism,
+ * introduced where it is first needed rather than as a separate migration.
+ *
+ * Breakpoints are the design's own: mobile < 640, tablet 640–1023,
+ * desktop >= 1024. They are literals here because a media query cannot read
+ * a custom property.
+ */
+
+.shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ------------------------------------------------------------------ header */
+
+.header {
+  background: var(--bc-color-surface);
+  border-block-end: 1px solid var(--bc-color-border);
+}
+
+.headerInner {
+  max-width: var(--bc-spacing-content-max-width);
+  margin: 0 auto;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+@media (min-width: 640px) {
+  .headerInner {
+    padding: 14px var(--bc-spacing-gutter-customer);
+    gap: 32px;
+    justify-content: flex-start;
+  }
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  text-decoration: none;
+}
+
+.brandMark {
+  display: block;
+  border-radius: var(--bc-radius-chip);
+}
+
+.brandName {
+  font-family: var(--bc-font-display);
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--bc-color-text);
+}
+
+@media (min-width: 640px) {
+  .brandName {
+    font-size: 21px;
+  }
+}
+
+/*
+ * Three destinations, not eleven. The eleven-link bar measured about 606px at
+ * 1280 and broke onto three rows on a phone; everything low-frequency moved
+ * into the avatar menu, and the five daily destinations into the bottom bar.
+ */
+.primaryNav {
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .primaryNav {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    flex: 1;
+  }
+}
+
+.primaryLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--bc-color-text);
+  text-decoration: none;
+}
+
+.primaryLink:hover {
+  color: var(--bc-color-primary);
+}
+
+.primaryLink[aria-current="page"] {
+  color: var(--bc-color-primary);
+  font-weight: 700;
+}
+
+.headerEnd {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.proMode {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .proMode {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40px;
+    padding: 0 14px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--bc-color-text-muted);
+    text-decoration: none;
+  }
+
+  .proMode:hover {
+    color: var(--bc-color-primary);
+  }
+}
+
+/* The notification bell keeps its own destination at every width. */
+.bell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: var(--bc-radius-chip);
+  color: var(--bc-color-text-muted);
+  text-decoration: none;
+}
+
+.bell:hover {
+  background: var(--bc-color-surface-muted);
+  color: var(--bc-color-primary);
+}
+
+.bellGlyph {
+  width: 18px;
+  height: 18px;
+  border: 2px solid currentColor;
+  border-radius: 6px 6px 999px 999px;
+}
+
+.bellCount {
+  position: absolute;
+  inset-block-start: 4px;
+  inset-inline-end: 4px;
+  min-width: 18px;
+  padding: 0 4px;
+  border-radius: var(--bc-radius-chip);
+  background: var(--bc-color-primary);
+  color: var(--bc-color-surface);
+  font-size: var(--bc-text-badge-size);
+  font-weight: var(--bc-text-badge-weight);
+  line-height: 18px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------- avatar menu */
+
+.avatarWrap {
+  position: relative;
+}
+
+.avatarButton {
+  font: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 8px;
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-chip);
+  background: transparent;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--bc-color-text);
+  cursor: pointer;
+}
+
+@media (min-width: 640px) {
+  .avatarButton {
+    padding-inline-start: 14px;
+  }
+}
+
+.avatarButton:hover {
+  border-color: var(--bc-color-border-strong);
+}
+
+/* The name is the affordance on desktop; on a phone the avatar alone is. */
+.avatarName {
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .avatarName {
+    display: inline;
+  }
+}
+
+/*
+ * A striped placeholder, not a photo: the media pipeline is phase C, and the
+ * design shows a placeholder rather than an invented face.
+ */
+.avatarChip {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--bc-radius-chip);
+  background: repeating-linear-gradient(
+    135deg,
+    oklch(0.963 0.012 340) 0 4px,
+    oklch(0.945 0.026 340) 4px 8px
+  );
+  flex-shrink: 0;
+}
+
+.menu {
+  position: absolute;
+  inset-block-start: calc(100% + 8px);
+  inset-inline-end: 0;
+  z-index: 40;
+  min-width: 220px;
+  padding: 6px;
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-card);
+  box-shadow: var(--bc-shadow-float);
+  display: flex;
+  flex-direction: column;
+}
+
+.menuItem {
+  font: inherit;
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 12px;
+  border: none;
+  border-radius: var(--bc-radius-control);
+  background: transparent;
+  font-size: 14px;
+  color: var(--bc-color-text);
+  text-align: start;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.menuItem:hover {
+  background: var(--bc-color-surface-muted);
+}
+
+.menuSeparator {
+  height: 1px;
+  margin: 6px 8px;
+  background: var(--bc-color-border);
+}
+
+.menuIdentity {
+  padding: 8px 12px 10px;
+  font-size: var(--bc-text-small-size);
+  color: var(--bc-color-text-faint);
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: start;
+}
+
+/* -------------------------------------------------------------------- main */
+
+.main {
+  flex: 1;
+  width: 100%;
+}
+
+/*
+ * A page that draws its own full-bleed sections (the home hero, the dark
+ * footer) opts out of the shell's gutter; every other page keeps it.
+ */
+.mainContained {
+  max-width: var(--bc-spacing-content-max-width);
+  margin: 0 auto;
+  padding: var(--bc-spacing-section-mobile) 16px;
+}
+
+@media (min-width: 640px) {
+  .mainContained {
+    padding: var(--bc-spacing-section-desktop) var(--bc-spacing-gutter-customer);
+  }
+}
+
+/* Room for the bottom bar, so the last control is never underneath it. */
+.mainBottomBarGap {
+  padding-block-end: 84px;
+}
+
+@media (min-width: 640px) {
+  .mainBottomBarGap {
+    padding-block-end: 0;
+  }
+}
+
+/* ---------------------------------------------------------- mobile tab bar */
+
+/*
+ * Five destinations at 56px, fixed to the bottom edge. The five are the ones
+ * a customer does several times a month; everything else lives under
+ * «حساب». Hidden from 640 up, where the header carries navigation.
+ */
+.tabBar {
+  position: fixed;
+  inset-inline: 0;
+  inset-block-end: 0;
+  z-index: 30;
+  background: var(--bc-color-surface);
+  border-block-start: 1px solid var(--bc-color-border);
+  box-shadow: var(--bc-shadow-bar);
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  padding: 6px 4px calc(10px + env(safe-area-inset-bottom, 0px));
+}
+
+@media (min-width: 640px) {
+  .tabBar {
+    display: none;
+  }
+}
+
+.tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 56px;
+  font-size: var(--bc-text-badge-size);
+  font-weight: 500;
+  color: var(--bc-color-text-muted);
+  text-decoration: none;
+}
+
+.tab[aria-current="page"] {
+  color: var(--bc-color-primary);
+  font-weight: 700;
+}
+
+/*
+ * Each destination has a distinct SHAPE as well as a colour, so the current
+ * tab is never signalled by colour alone.
+ */
+.tabGlyph {
+  width: 20px;
+  height: 20px;
+  border: 2px solid currentColor;
+}
+
+.tabGlyphHome {
+  border-radius: 6px;
+}
+
+.tabGlyphSearch {
+  border-radius: var(--bc-radius-chip);
+}
+
+.tabGlyphBookings {
+  border-radius: 5px;
+}
+
+.tabGlyphLoyalty {
+  border-radius: var(--bc-radius-chip);
+  border-style: dashed;
+}
+
+.tabGlyphAccount {
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-chip);
+  background: repeating-linear-gradient(
+    135deg,
+    oklch(0.963 0.012 340) 0 3px,
+    oklch(0.945 0.026 340) 3px 6px
+  );
+}
+
+.tab[aria-current="page"] .tabGlyphHome {
+  background: currentColor;
+}

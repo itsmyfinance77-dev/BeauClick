@@ -1,227 +1,172 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { toPersianDigits } from '@beauclick/persian-utils';
-import { NavLink } from './kit';
 import { useAuth } from '@/lib/auth-context';
 import { useUnread } from '@/lib/unread-context';
 import { ErrorBoundary } from './error-boundary';
+import { AvatarMenu, type AvatarMenuEntry } from './avatar-menu';
+import { MobileTabBar } from './mobile-tab-bar';
+import { SiteFooter } from './site-footer';
+import styles from './app-shell.module.css';
 
 /**
- * The application shell: header + main region, wrapped in an error
- * boundary. Deliberately minimal -- this is the foundation future phases
- * mount real product surfaces into, not a finished chrome.
+ * The customer shell — `V3_INFORMATION_ARCHITECTURE.md` §1–§2, and the header
+ * of every artboard in `Prototype - Customer.dc.html`.
  *
- * Responsive baseline: a single fluid column bounded by the design
- * system's own content-max-width token, with section padding that steps up
- * at the token-defined breakpoint (see the clamp below). Mobile-first --
- * the base rules ARE the mobile rules.
+ * ## What changed, and why it is not a cosmetic change
+ *
+ * The signed-in header carried ELEVEN equally weighted destinations. The
+ * information-architecture document measured that bar at about 606px at 1280
+ * and recorded three faults: two roles in one bar (professional mode and the
+ * business are seller destinations, not customer ones), four destinations for
+ * one idea (bookings, journey, loyalty and dashboard are all "my history with
+ * this product"), and no hierarchy at all — «خروج» sat at the same weight as
+ * «جست‌وجو».
+ *
+ * Three levels replace it. The header keeps what a customer uses weekly; the
+ * avatar menu holds what they use occasionally; and below 640px a
+ * five-destination bottom bar replaces header navigation entirely, because
+ * mobile is not a narrowed desktop.
+ *
+ * ## Two deviations from the design, both deliberate
+ *
+ *  1. **«خدمات» points at `/search`.** The design's first destination is
+ *     `/services`, a specialty index it marks «جدید — نما». That route does
+ *     not exist, and a header link to a 404 is worse than one to the surface
+ *     that answers the same question today. Recorded as a gap; the link moves
+ *     when the route lands.
+ *  2. **The journey and loyalty pages stay in the avatar menu.** The design
+ *     folds them under a redesigned `/dashboard` that gathers bookings,
+ *     loyalty, journey and notifications into one page. That dashboard is its
+ *     own artboard and is not built, so removing the links now would leave
+ *     two live surfaces reachable only from the mobile bar.
+ *
+ * ## The footer is not global
+ *
+ * Only the home artboard carries one; search, the profile and the dashboard
+ * do not. So it renders on `/` and nowhere else, rather than being assumed to
+ * be site chrome.
  */
+
+/** `/` matches only itself; every other destination also owns its subtree. */
+function isCurrent(pathname: string, href: string): boolean {
+  return href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`);
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   const { status, user, logout } = useAuth();
   // Shared with the notification centre, so marking everything read updates
   // the badge immediately rather than at the next full page load.
   const { unreadCount: unread } = useUnread();
+  const pathname = usePathname() ?? '/';
+
+  const authenticated = status === 'authenticated';
+  const isHome = pathname === '/';
+
+  const primary = [
+    { href: '/search', label: 'خدمات' },
+    { href: '/providers', label: 'متخصص‌ها' },
+    ...(authenticated ? [{ href: '/bookings', label: 'رزروهای من' }] : []),
+  ];
+
+  /*
+    Everything a customer reaches occasionally. `/finance` is here for every
+    authenticated session and not conditioned on a role, for the reason
+    Story #152 gives: a finance-only staff member has no professional profile
+    and no business ownership, so any condition would hide the one destination
+    that is theirs. `/admin` is the exception — it is shown only to a session
+    that actually holds the capability, resolved live by `/v1/me` rather than
+    echoed from the token, and hiding it is a courtesy while `CapabilityGuard`
+    remains the control.
+  */
+  const menuEntries: AvatarMenuEntry[] = authenticated
+    ? [
+        { href: '/dashboard', label: 'حساب من' },
+        { href: '/journey', label: 'مسیر من' },
+        { href: '/loyalty', label: 'باشگاه' },
+        { href: '/waitlist', label: 'لیست انتظار' },
+        { href: '/finance', label: 'امور مالی' },
+        { href: '/business', label: 'کسب‌وکار من' },
+        { href: '/pro', label: 'حالت متخصص' },
+        ...(user?.capabilities?.includes('bc_manage_platform') ? [{ href: '/admin', label: 'مدیریت' }] : []),
+      ]
+    : [];
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <header
-        style={{
-          borderBlockEnd: '1px solid var(--bc-color-line)',
-          background: 'var(--bc-color-surface)',
-        }}
-      >
-        <div
-          style={{
-            maxWidth: 'var(--bc-spacing-content-max-width)',
-            margin: '0 auto',
-            padding: 'clamp(12px, 2vw, 16px) clamp(var(--bc-spacing-section-mobile), 4vw, var(--bc-spacing-section-desktop))',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 'var(--bc-spacing-card-gap)',
-            // The header must be allowed to wrap onto a second line.
-            // Phase 3 added four nav destinations (search, journey, loyalty,
-            // notifications) to a bar that was already near capacity, and a
-            // signed-in nav measured 606px against a 375px viewport -- real
-            // horizontal overflow, and a regression against the no-overflow
-            // property Phase 2 verified. It went unnoticed at first because
-            // the earlier measurement was taken SIGNED OUT, where the nav
-            // holds three links instead of seven.
-            flexWrap: 'wrap',
-          }}
-        >
-          <Link
-            href="/"
-            style={{
-              fontWeight: 800,
-              fontSize: 20,
-              textDecoration: 'none',
-              color: 'var(--bc-color-ink)',
-              display: 'inline-flex',
-              alignItems: 'center',
-              minHeight: 44,
-            }}
-          >
-            BeauClick
+    <div className={styles.shell}>
+      <header className={styles.header}>
+        <div className={styles.headerInner}>
+          <Link href="/" className={styles.brand}>
+            {/* A static brand mark from `public/`. `next/image` does not
+                optimise SVG, so it would add a wrapper and no benefit. */}
+            <img src="/brand/icon-circle.svg" alt="" width={26} height={26} className={styles.brandMark} />
+            <span className={styles.brandName}>BeauClick</span>
           </Link>
 
-          <nav
-            aria-label="ناوبری اصلی"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              // Wrap rather than overflow, and use the smaller chip gap: seven
-              // destinations at the large gap do not fit a phone even wrapped.
-              flexWrap: 'wrap',
-              gap: 'var(--bc-spacing-chip-gap)',
-              rowGap: 4,
-              justifyContent: 'flex-end',
-              // Never force the header wider than its container.
-              minWidth: 0,
-            }}
-          >
-            <NavLink href="/search">
-              جست‌وجو
-            </NavLink>
-            <NavLink href="/providers">
-              متخصص‌ها
-            </NavLink>
-            {status === 'authenticated' ? (
+          <nav aria-label="ناوبری اصلی" className={styles.primaryNav}>
+            {primary.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={styles.primaryLink}
+                aria-current={isCurrent(pathname, link.href) ? 'page' : undefined}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </nav>
+
+          <div className={styles.headerEnd}>
+            {authenticated ? (
               <>
-                <NavLink href="/bookings">
-                  رزروهای من
-                </NavLink>
-                <NavLink href="/journey">
-                  مسیر من
-                </NavLink>
-                <NavLink href="/loyalty">
-                  باشگاه
-                </NavLink>
-                <NavLink href="/waitlist">
-                  لیست انتظار
-                </NavLink>
-                <NavLink href="/business">
-                  کسب‌وکار
-                </NavLink>
-                {/*
-                  V3.3 Story #152 (`#149b`) -- persona-neutral, shown to every
-                  authenticated user exactly like `/business` and `/pro`
-                  above: a finance-only staff member has no professional
-                  profile and no business ownership, so conditioning this link
-                  on either would hide the one destination that IS theirs. The
-                  page itself answers truthfully with an empty state for a
-                  session that reaches no finance workspace at all.
-                */}
-                <NavLink href="/finance">
-                  امور مالی
-                </NavLink>
-                {/*
-                  Shown to every authenticated user, and that is deliberate
-                  rather than an oversight: becoming a professional in V3 is
-                  self-service (`POST /v1/providers`, any session), so this is
-                  the entry point to a mode anyone may enter, not a link to
-                  something only some users have. `/pro` itself distinguishes
-                  "you have no professional profile" from "the request failed"
-                  and offers to create one.
-
-                  It is NOT the same situation as QA-25's business link, which
-                  is shown to everyone because no signal exists to condition it
-                  on. Here no condition is wanted.
-                */}
-                <NavLink href="/pro">
+                <Link href="/pro" className={styles.proMode}>
                   حالت متخصص
-                </NavLink>
-                {/*
-                  Shown ONLY to a session that actually holds the platform
-                  capability -- unlike the two links above, which are entry
-                  points to modes anyone may enter.
-
-                  The capability list on `user` is resolved LIVE by `/v1/me`
-                  from `identity.user_roles`, not echoed from the token, so a
-                  revoked operator loses the link at the next page load rather
-                  than at the next token. And hiding it is a courtesy, never the
-                  control: `CapabilityGuard` refuses the request regardless of
-                  what the nav shows.
-                */}
-                {user?.capabilities?.includes('bc_manage_platform') ? (
-                  <NavLink href="/admin">
-                    مدیریت
-                  </NavLink>
-                ) : null}
-                <NavLink
+                </Link>
+                <Link
                   href="/notifications"
+                  className={styles.bell}
                   // The count is in the accessible name, so a screen reader
                   // announces "اعلان‌ها، ۳ خوانده‌نشده" rather than reading a
-                  // bare number next to a link.
+                  // bare number beside a link.
                   aria-label={unread > 0 ? `اعلان‌ها، ${toPersianDigits(unread)} خوانده‌نشده` : 'اعلان‌ها'}
+                  aria-current={isCurrent(pathname, '/notifications') ? 'page' : undefined}
                 >
-                  اعلان‌ها
-                  {unread > 0 && (
-                    <span
-                      aria-hidden="true"
-                      style={{
-                        marginInlineStart: 4,
-                        fontSize: 12,
-                        fontWeight: 700,
-                        padding: '1px 7px',
-                        borderRadius: 999,
-                        background: 'var(--bc-color-primary)',
-                        color: 'var(--bc-color-surface)',
-                      }}
-                    >
+                  <span className={styles.bellGlyph} aria-hidden="true" />
+                  {unread > 0 ? (
+                    <span className={styles.bellCount} aria-hidden="true">
                       {toPersianDigits(unread)}
                     </span>
-                  )}
-                </NavLink>
-                <NavLink href="/dashboard">
-                  داشبورد
-                </NavLink>
-                <span style={{ fontSize: 13, color: 'var(--bc-color-ink-faint)' }}>{user?.displayName ?? user?.phone}</span>
-                <button
-                  type="button"
-                  onClick={() => void logout()}
-                  style={{
-                    font: 'inherit',
-                    fontSize: 14,
-                    padding: '8px 14px',
-                    borderRadius: 'var(--bc-radius-button)',
-                    border: '1px solid var(--bc-color-line)',
-                    background: 'transparent',
-                    color: 'var(--bc-color-ink)',
-                    cursor: 'pointer',
-                    // 44, not 40. Measured at 43px in a real browser during
-                    // Phase 3 live QA -- a hair under the touch baseline this
-                    // project set for itself, and the same class of finding as
-                    // Phase 2's 25px nav links.
-                    minHeight: 44,
-                  }}
-                >
-                  خروج
-                </button>
+                  ) : null}
+                </Link>
+                <AvatarMenu
+                  displayName={user?.displayName ?? 'حساب من'}
+                  identity={user?.phone ?? null}
+                  entries={menuEntries}
+                  onSignOut={() => void logout()}
+                />
               </>
             ) : (
-              <NavLink href="/auth">
+              <Link href="/auth" className={styles.primaryLink} style={{ fontWeight: 600 }}>
                 ورود
-              </NavLink>
+              </Link>
             )}
-          </nav>
+          </div>
         </div>
       </header>
 
       <main
         id="main"
-        style={{
-          flex: 1,
-          width: '100%',
-          maxWidth: 'var(--bc-spacing-content-max-width)',
-          margin: '0 auto',
-          padding: 'clamp(var(--bc-spacing-section-mobile), 4vw, var(--bc-spacing-section-desktop))',
-        }}
+        className={`${styles.main} ${isHome ? '' : styles.mainContained} ${styles.mainBottomBarGap}`}
       >
         <ErrorBoundary>{children}</ErrorBoundary>
       </main>
+
+      {isHome ? <SiteFooter /> : null}
+
+      <MobileTabBar />
     </div>
   );
 }

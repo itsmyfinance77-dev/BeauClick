@@ -1,0 +1,836 @@
+/*
+ * The home page — `Prototype - Customer.dc.html` §01, desktop 1280 and
+ * mobile 390.
+ *
+ * Mobile-first: the base rules ARE the 390 artboard, and each breakpoint
+ * adds what the wider artboard shows. The design's breakpoints: mobile
+ * < 640, tablet 640–1023, desktop >= 1024.
+ */
+
+/* -------------------------------------------------------------------- hero */
+
+.hero {
+  background: var(--bc-color-surface);
+  border-block-end: 1px solid var(--bc-color-border);
+  padding: 24px 16px 28px;
+}
+
+@media (min-width: 640px) {
+  .hero {
+    padding: 48px var(--bc-spacing-gutter-customer) 44px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .hero {
+    padding: 64px var(--bc-spacing-gutter-customer) 56px;
+  }
+}
+
+.heroInner {
+  max-width: 1184px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 32px;
+  align-items: center;
+}
+
+@media (min-width: 1024px) {
+  .heroInner {
+    grid-template-columns: 1.05fr 0.95fr;
+    gap: 56px;
+  }
+}
+
+/* The bronze locality badge: a soft accent ground with accent-safe ink. */
+.localityBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 11px;
+  border-radius: var(--bc-radius-chip);
+  background: var(--bc-color-accent-soft);
+  font-size: var(--bc-text-small-size);
+  font-weight: 600;
+  color: var(--bc-color-accent-on-soft);
+  margin-block-end: 14px;
+}
+
+@media (min-width: 640px) {
+  .localityBadge {
+    gap: 7px;
+    padding: 5px 13px;
+    margin-block-end: 20px;
+  }
+}
+
+.localityDot {
+  width: 5px;
+  height: 5px;
+  border-radius: var(--bc-radius-chip);
+  background: var(--bc-color-accent);
+}
+
+@media (min-width: 640px) {
+  .localityDot {
+    width: 6px;
+    height: 6px;
+  }
+}
+
+/*
+ * The one place Peyda appears on this page, and the largest words in the
+ * product. 1.6 line height at 32px and 1.65 at 52px: Persian ascenders at
+ * display size need more room than the 1.45 the scale uses for a page title.
+ */
+.heroTitle {
+  margin: 0 0 10px;
+  font-family: var(--bc-font-hero);
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1.6;
+}
+
+@media (min-width: 1024px) {
+  .heroTitle {
+    margin-block-end: 16px;
+    font-size: 52px;
+    line-height: 1.65;
+    letter-spacing: -0.01em;
+  }
+}
+
+.heroLead {
+  margin: 0 0 18px;
+  font-size: 15px;
+  line-height: 1.75;
+  color: var(--bc-color-text-muted);
+}
+
+@media (min-width: 1024px) {
+  .heroLead {
+    margin-block-end: 28px;
+    font-size: 17px;
+    line-height: 1.8;
+    max-width: 46ch;
+  }
+}
+
+/* ------------------------------------------------------------ search block */
+
+/*
+ * One field stacked above the button on a phone; one row with a city
+ * selector and a divider from 1024 up. Two structures, which is why this is
+ * a stylesheet rather than a style object.
+ */
+.searchBox {
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border-strong);
+  border-radius: 14px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 10px 28px oklch(0.3 0.04 340 / 0.07);
+}
+
+@media (min-width: 1024px) {
+  .searchBox {
+    border-radius: var(--bc-radius-card);
+    padding: 10px;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 8px;
+  }
+}
+
+.searchField {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px;
+}
+
+@media (min-width: 1024px) {
+  .searchField {
+    flex: 1;
+    padding: 0 12px;
+  }
+}
+
+.searchGlyph {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--bc-color-text-faint);
+  border-radius: var(--bc-radius-chip);
+  flex-shrink: 0;
+}
+
+@media (min-width: 1024px) {
+  .searchGlyph {
+    width: 18px;
+    height: 18px;
+  }
+}
+
+.searchInput {
+  width: 100%;
+  font: inherit;
+  font-size: 16px;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--bc-color-text);
+  min-height: 48px;
+}
+
+@media (min-width: 1024px) {
+  .searchInput {
+    min-height: 52px;
+  }
+}
+
+.searchDivider {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .searchDivider {
+    display: block;
+    width: 1px;
+    background: var(--bc-color-border);
+    margin: 8px 0;
+  }
+}
+
+/* The city selector is desktop-only; on a phone the city is in the button. */
+.cityButton {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .cityButton {
+    font: inherit;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 16px;
+    font-weight: 500;
+    min-height: 52px;
+    padding: 0 16px;
+    border: none;
+    background: transparent;
+    color: var(--bc-color-text-muted);
+    cursor: pointer;
+  }
+}
+
+.cityChevron {
+  width: 7px;
+  height: 7px;
+  border-inline-start: 2px solid var(--bc-color-text-faint);
+  border-block-end: 2px solid var(--bc-color-text-faint);
+  transform: rotate(-45deg);
+  margin-block-end: 3px;
+}
+
+.searchSubmit {
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  min-height: 50px;
+  border: none;
+  border-radius: var(--bc-radius-control);
+  background: var(--bc-color-primary);
+  color: var(--bc-color-surface);
+  cursor: pointer;
+}
+
+.searchSubmit:hover {
+  background: var(--bc-color-primary-hover);
+}
+
+@media (min-width: 1024px) {
+  .searchSubmit {
+    min-height: 52px;
+    padding: 0 30px;
+  }
+}
+
+/* The popular-term row slides horizontally on a phone and wraps above it. */
+.termRow {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  margin-block-start: 14px;
+  padding-block-end: 4px;
+  align-items: center;
+}
+
+@media (min-width: 1024px) {
+  .termRow {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    margin-block-start: 16px;
+  }
+}
+
+.termLabel {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .termLabel {
+    display: inline;
+    font-size: var(--bc-text-small-size);
+    color: var(--bc-color-text-faint);
+    margin-inline-end: 4px;
+  }
+}
+
+.term {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 13px;
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-chip);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--bc-color-text-muted);
+  text-decoration: none;
+}
+
+.term:hover {
+  border-color: var(--bc-color-primary);
+  color: var(--bc-color-primary);
+}
+
+/* ------------------------------------------------------------- hero images */
+
+/*
+ * Striped placeholders, labelled. The media pipeline is phase C, and the
+ * design shows placeholders rather than stock photography; an invented photo
+ * would be a claim about work nobody did.
+ */
+.heroArt {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .heroArt {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 200px 140px;
+    gap: 12px;
+  }
+}
+
+.artTile {
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-card);
+  background: repeating-linear-gradient(
+    135deg,
+    oklch(0.963 0.012 340) 0 10px,
+    oklch(0.945 0.026 340) 10px 20px
+  );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.artTileWide {
+  grid-column: span 2;
+  border-radius: 20px;
+}
+
+.artTileBronze {
+  background: repeating-linear-gradient(
+    135deg,
+    oklch(0.955 0.028 70) 0 10px,
+    oklch(0.94 0.04 70) 10px 20px
+  );
+}
+
+.artLabel {
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--bc-color-text-muted);
+  background: oklch(1 0 0 / 0.82);
+  padding: 5px 10px;
+  border-radius: var(--bc-radius-chip);
+}
+
+.artTileWide .artLabel {
+  font-size: var(--bc-text-badge-size);
+  padding: 6px 12px;
+}
+
+/* ---------------------------------------------------------------- sections */
+
+.section {
+  padding: 24px 16px;
+}
+
+@media (min-width: 640px) {
+  .section {
+    padding: 40px var(--bc-spacing-gutter-customer);
+  }
+}
+
+@media (min-width: 1024px) {
+  .section {
+    padding: 56px var(--bc-spacing-gutter-customer);
+  }
+}
+
+.sectionOnSurface {
+  background: var(--bc-color-surface);
+  border-block: 1px solid var(--bc-color-border);
+}
+
+.sectionInner {
+  max-width: 1184px;
+  margin: 0 auto;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-block-end: 16px;
+}
+
+@media (min-width: 640px) {
+  .sectionHead {
+    margin-block-end: 24px;
+  }
+}
+
+.sectionTitle {
+  margin: 0 0 4px;
+  font-family: var(--bc-font-display);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+@media (min-width: 1024px) {
+  .sectionTitle {
+    font-size: 32px;
+    line-height: 1.3;
+  }
+}
+
+.sectionLead {
+  margin: 0;
+  font-size: 14px;
+  color: var(--bc-color-text-muted);
+}
+
+@media (min-width: 1024px) {
+  .sectionLead {
+    font-size: 15px;
+  }
+}
+
+.sectionLink {
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .sectionLink {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    min-height: 44px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--bc-color-primary);
+    text-decoration: none;
+  }
+}
+
+/* ------------------------------------------------------- specialty cards */
+
+.categoryGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 1024px) {
+  .categoryGrid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+}
+
+.categoryCard {
+  border: 1px solid var(--bc-color-border);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--bc-color-surface);
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+
+.categoryCard:hover {
+  border-color: var(--bc-color-border-strong);
+  box-shadow: var(--bc-shadow-card);
+}
+
+@media (min-width: 1024px) {
+  .categoryCard {
+    border-radius: var(--bc-radius-card);
+  }
+}
+
+.categoryArt {
+  height: 92px;
+  background: repeating-linear-gradient(
+    135deg,
+    oklch(0.963 0.012 340) 0 8px,
+    oklch(0.945 0.026 340) 8px 16px
+  );
+}
+
+.categoryArtBronze {
+  background: repeating-linear-gradient(
+    135deg,
+    oklch(0.955 0.028 70) 0 8px,
+    oklch(0.94 0.04 70) 8px 16px
+  );
+}
+
+@media (min-width: 1024px) {
+  .categoryArt {
+    height: 132px;
+  }
+}
+
+.categoryBody {
+  padding: 10px 12px;
+}
+
+@media (min-width: 1024px) {
+  .categoryBody {
+    padding: 14px 16px;
+  }
+}
+
+.categoryName {
+  font-family: var(--bc-font-display);
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--bc-color-text);
+  line-height: 1.4;
+}
+
+@media (min-width: 1024px) {
+  .categoryName {
+    font-size: 20px;
+  }
+}
+
+.categoryMeta {
+  font-size: var(--bc-text-small-size);
+  color: var(--bc-color-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (min-width: 1024px) {
+  .categoryMeta {
+    font-size: 14px;
+  }
+}
+
+/* -------------------------------------------------------- provider cards */
+
+.providerGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+@media (min-width: 640px) {
+  .providerGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+  }
+}
+
+.providerCard {
+  border: 1px solid var(--bc-color-border);
+  border-radius: 14px;
+  background: var(--bc-color-surface);
+  overflow: hidden;
+}
+
+.providerCard:hover {
+  border-color: var(--bc-color-border-strong);
+  box-shadow: var(--bc-shadow-card);
+}
+
+@media (min-width: 640px) {
+  .providerCard {
+    border-radius: var(--bc-radius-card);
+  }
+}
+
+.providerArt {
+  height: 150px;
+  background: repeating-linear-gradient(
+    135deg,
+    oklch(0.963 0.012 340) 0 9px,
+    oklch(0.945 0.026 340) 9px 18px
+  );
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.providerArtBronze {
+  background: repeating-linear-gradient(
+    135deg,
+    oklch(0.955 0.028 70) 0 9px,
+    oklch(0.94 0.04 70) 9px 18px
+  );
+}
+
+@media (min-width: 640px) {
+  .providerArt {
+    height: 168px;
+  }
+}
+
+.verifiedBadge {
+  position: absolute;
+  inset-block-start: 10px;
+  inset-inline-start: 10px;
+  font-size: var(--bc-text-small-size);
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: var(--bc-radius-chip);
+  background: var(--bc-color-success-soft);
+  color: var(--bc-color-success);
+}
+
+@media (min-width: 640px) {
+  .verifiedBadge {
+    inset-block-start: 12px;
+    inset-inline-start: 12px;
+    padding: 4px 11px;
+  }
+}
+
+.providerBody {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+@media (min-width: 640px) {
+  .providerBody {
+    padding: 16px;
+    gap: 12px;
+  }
+}
+
+.providerName {
+  font-family: var(--bc-font-display);
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+@media (min-width: 640px) {
+  .providerName {
+    font-size: 23px;
+  }
+}
+
+.providerPlace {
+  font-size: 14px;
+  color: var(--bc-color-text-faint);
+}
+
+.providerSpecialties {
+  font-size: 14px;
+  color: var(--bc-color-text-muted);
+}
+
+.providerFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-block-start: 12px;
+  border-block-start: 1px solid var(--bc-color-border);
+}
+
+.priceLabel {
+  font-size: var(--bc-text-small-size);
+  color: var(--bc-color-text-faint);
+  line-height: 1.4;
+}
+
+.priceValue {
+  font-size: 20px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+}
+
+.priceUnit {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--bc-color-text-muted);
+}
+
+.providerAction {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: var(--bc-radius-control);
+  background: var(--bc-color-primary);
+  color: var(--bc-color-surface);
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.providerAction:hover {
+  background: var(--bc-color-primary-hover);
+  color: var(--bc-color-surface);
+}
+
+/* ------------------------------------------------------------ three steps */
+
+.stepGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 640px) {
+  .stepGrid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+}
+
+.step {
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-card);
+  padding: 20px;
+}
+
+@media (min-width: 640px) {
+  .step {
+    padding: 24px;
+  }
+}
+
+.stepNumber {
+  font-family: var(--bc-font-display);
+  font-size: 40px;
+  font-weight: 900;
+  color: var(--bc-color-primary-soft);
+  line-height: 1;
+  margin-block-end: 12px;
+}
+
+.stepTitle {
+  margin: 0 0 6px;
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.stepText {
+  margin: 0;
+  font-size: 15px;
+  color: var(--bc-color-text-muted);
+}
+
+/* ----------------------------------------------------------------- states */
+
+.stateBlock {
+  padding: 32px 0;
+  text-align: center;
+  color: var(--bc-color-text-muted);
+  font-size: 15px;
+}
+
+/*
+ * A skeleton, not a spinner: the design asks for a placeholder in the shape
+ * of the thing that is coming, so the page does not jump when it arrives.
+ */
+.skeletonCard {
+  border: 1px solid var(--bc-color-border);
+  border-radius: 14px;
+  background: var(--bc-color-surface);
+  overflow: hidden;
+}
+
+.skeletonArt {
+  height: 150px;
+  background: var(--bc-color-surface-muted);
+  animation: bcPulse var(--bc-motion-skeleton) ease-in-out infinite;
+}
+
+@media (min-width: 640px) {
+  .skeletonArt {
+    height: 168px;
+  }
+}
+
+.skeletonLines {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.skeletonLine {
+  height: 12px;
+  border-radius: var(--bc-radius-chip);
+  background: var(--bc-color-surface-muted);
+  animation: bcPulse var(--bc-motion-skeleton) ease-in-out infinite;
+}
+
+.skeletonLineShort {
+  width: 45%;
+}
+
+@keyframes bcPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/*
+ * `prefers-reduced-motion` turns the skeleton into a still surface rather
+ * than removing it — the placeholder still has a job when it does not move.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .skeletonArt,
+  .skeletonLine {
+    animation: none;
+  }
+}

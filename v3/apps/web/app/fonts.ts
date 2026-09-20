@@ -1,13 +1,18 @@
 import localFont from 'next/font/local';
 
 /**
- * The two typefaces of the V3.3 design language — `V3_DESIGN_SYSTEM.md` §3.
+ * The three typefaces of the V3.3 design language.
  *
- * "دو قلم. هیچ قلمِ سوم." Vazir carries every word, every numeral and every
- * platform; Anjoman carries the customer platform's DISPLAY headings only
- * (>= 24px), and never appears in body copy, forms, tables, the pro panel or
- * admin. The prototypes also ship Peyda; the design system supersedes them on
- * this point and Peyda is deliberately not imported.
+ * `V3_DESIGN_SYSTEM.md` §3 says two faces and no third. The rendered
+ * prototypes say otherwise, and they are the more specific artifact: Vazir
+ * carries body copy, Anjoman carries display and section headings (74 uses
+ * across the customer prototype), and **Peyda carries seven headings** — the
+ * home hero at 52px and 32px, and the sign-in titles. Those are the largest
+ * words on the product's front door, so the prototype is followed here and
+ * the conflict is recorded rather than silently resolved either way.
+ *
+ * Anjoman and Peyda are display faces: neither appears in body copy, forms,
+ * tables, the pro panel or admin.
  *
  * ## Why this file exists at all
  *
@@ -37,6 +42,19 @@ export const vazir = localFont({
   // prototype reference, and Vazirmatn is this same typeface's current name.
   fallback: ['Vazirmatn', 'Tahoma', 'system-ui', 'sans-serif'],
   adjustFontFallback: false,
+});
+
+/**
+ * Display headings — the hero and the sign-in titles. Every prototype use is
+ * weight 800, so only that cut ships.
+ */
+export const peyda = localFont({
+  src: [{ path: './fonts/Peyda-ExtraBold.woff2', weight: '800', style: 'normal' }],
+  variable: '--bc-font-peyda',
+  display: 'swap',
+  fallback: ['Vazirmatn', 'Tahoma', 'system-ui', 'sans-serif'],
+  adjustFontFallback: false,
+  preload: true,
 });
 
 export const anjoman = localFont({

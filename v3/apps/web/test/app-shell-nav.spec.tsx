@@ -1,0 +1,250 @@
+import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { AppShell } from '@/components/app-shell';
+import { AuthProvider } from '@/lib/auth-context';
+import { UnreadProvider } from '@/lib/unread-context';
+import { tokenStorage } from '@/lib/token-storage';
+
+let pathname = '/';
+
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ replace: jest.fn(), push: jest.fn() }),
+  usePathname: () => pathname,
+}));
+
+/**
+ * The customer shell — `V3_INFORMATION_ARCHITECTURE.md` §1–§2.
+ *
+ * ## The fault this replaces
+ *
+ * Eleven equally weighted destinations in one bar, about 606px wide at 1280
+ * and three rows on a phone, with «خروج» at the same weight as «جست‌وجو» and
+ * two seller destinations sitting in a customer's navigation.
+ *
+ * Three levels replace it, and what these cases pin is the SEPARATION rather
+ * than the list: a destination that has moved into the avatar menu must not
+ * still be in the header, or the reorganisation has changed nothing and only
+ * added a menu. So the header assertions are mostly negative.
+ *
+ * ## What jsdom can and cannot say here
+ *
+ * The bottom bar is hidden above 640px by a media query, and jsdom computes
+ * no styles, so every element is "present" to these cases regardless of
+ * width. Structure, destinations, `aria-current`, focus and the menu's
+ * keyboard behaviour are asserted here; which of the two navigations is
+ * VISIBLE at a given width is a browser claim and is not made here.
+ */
+
+function ok(data: unknown) {
+  return Promise.resolve({ ok: true, status: 200, json: async () => ({ data, meta: null, error: null }) });
+}
+
+function mockApi(options: { capabilities?: string[]; displayName?: string | null; unread?: number } = {}) {
+  (global.fetch as jest.Mock).mockImplementation((url: string) => {
+    if (url.includes('/v1/auth/refresh')) return ok({ accessToken: 'a', csrfToken: 'c' });
+    if (/\/v1\/me(\?|$)/.test(url)) {
+      return ok({
+        id: 'u1',
+        phone: '+989123456789',
+        // `in`, not `??`: an explicit null is the case under test, and
+        // nullish-coalescing would quietly restore the default name.
+        displayName: 'displayName' in options ? options.displayName : 'مینا رضایی',
+        roles: [],
+        capabilities: options.capabilities ?? [],
+      });
+    }
+    if (url.includes('/v1/me/notifications')) {
+      return ok({ items: [], unreadCount: options.unread ?? 0 });
+    }
+    return ok([]);
+  });
+}
+
+function renderShell() {
+  return render(
+    <AuthProvider>
+      <UnreadProvider>
+        <AppShell>
+          <p>محتوا</p>
+        </AppShell>
+      </UnreadProvider>
+    </AuthProvider>,
+  );
+}
+
+/** The primary bar, addressed by its accessible name rather than by position. */
+function header(): HTMLElement {
+  return screen.getByRole('navigation', { name: 'ناوبری اصلی' });
+}
+
+async function signedIn(options?: Parameters<typeof mockApi>[0]) {
+  tokenStorage.set({ accessToken: 'test-access-token', csrfToken: 'test-csrf-token' });
+  mockApi(options);
+  renderShell();
+  await screen.findByTestId('avatar-menu');
+}
+
+beforeEach(() => {
+  pathname = '/';
+  global.fetch = jest.fn() as unknown as typeof fetch;
+  tokenStorage.clear();
+});
+
+describe('the header holds three destinations, not eleven', () => {
+  it('offers only search, professionals and sign-in when signed out', async () => {
+    mockApi();
+    renderShell();
+
+    await waitFor(() => expect(within(header()).getAllByRole('link')).toHaveLength(2));
+    expect(within(header()).getByRole('link', { name: 'خدمات' })).toHaveAttribute('href', '/search');
+    expect(within(header()).getByRole('link', { name: 'متخصص‌ها' })).toHaveAttribute('href', '/providers');
+    expect(screen.getByRole('link', { name: 'ورود' })).toHaveAttribute('href', '/auth');
+    // Nothing to sign out of, and no account to open.
+    expect(screen.queryByTestId('avatar-menu')).toBeNull();
+  });
+
+  it('adds exactly one destination when signed in, and no more', async () => {
+    await signedIn();
+
+    const links = within(header()).getAllByRole('link').map((a) => a.getAttribute('href'));
+    expect(links).toEqual(['/search', '/providers', '/bookings']);
+  });
+
+  it('keeps the eight low-frequency destinations OUT of the header', async () => {
+    await signedIn({ capabilities: ['bc_manage_platform'] });
+
+    // The reorganisation only means something if these left. A menu that
+    // duplicates the bar is a longer bar.
+    const inHeader = within(header()).getAllByRole('link').map((a) => a.getAttribute('href'));
+    for (const moved of ['/journey', '/loyalty', '/waitlist', '/finance', '/business', '/admin', '/dashboard']) {
+      expect(inHeader).not.toContain(moved);
+    }
+    // And «خروج» is no longer a peer of «جست‌وجو».
+    expect(within(header()).queryByText('خروج')).toBeNull();
+  });
+
+  it('marks the current destination for assistive technology, not only in colour', async () => {
+    pathname = '/providers';
+    await signedIn();
+
+    expect(within(header()).getByRole('link', { name: 'متخصص‌ها' })).toHaveAttribute('aria-current', 'page');
+    expect(within(header()).getByRole('link', { name: 'خدمات' })).not.toHaveAttribute('aria-current');
+  });
+
+  it('puts the unread count in the bell’s accessible name rather than beside it', async () => {
+    await signedIn({ unread: 3 });
+
+    await waitFor(() => expect(screen.getByRole('link', { name: /اعلان‌ها/ })).toBeInTheDocument());
+    const bell = screen.getByRole('link', { name: /اعلان‌ها/ });
+    // "اعلان‌ها، ۳ خوانده‌نشده" rather than a bare digit read out next to a link.
+    expect(bell.getAttribute('aria-label')).toBe('اعلان‌ها، ۳ خوانده‌نشده');
+    expect(bell).toHaveAttribute('href', '/notifications');
+  });
+});
+
+describe('the avatar menu', () => {
+  it('is closed until asked, and then holds what left the header', async () => {
+    await signedIn();
+
+    const trigger = screen.getByRole('button', { name: /حساب کاربری/ });
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByTestId('avatar-menu-items')).toBeNull();
+
+    await userEvent.click(trigger);
+    const menu = screen.getByTestId('avatar-menu-items');
+    const hrefs = within(menu).getAllByRole('link').map((a) => a.getAttribute('href'));
+    expect(hrefs).toEqual(['/dashboard', '/journey', '/loyalty', '/waitlist', '/finance', '/business', '/pro']);
+    expect(within(menu).getByRole('button', { name: 'خروج' })).toBeInTheDocument();
+  });
+
+  it('shows the platform destination only to a session that holds the capability', async () => {
+    await signedIn();
+    await userEvent.click(screen.getByRole('button', { name: /حساب کاربری/ }));
+    expect(within(screen.getByTestId('avatar-menu-items')).queryByRole('link', { name: 'مدیریت' })).toBeNull();
+  });
+
+  it('shows it to one that does', async () => {
+    await signedIn({ capabilities: ['bc_manage_platform'] });
+    await userEvent.click(screen.getByRole('button', { name: /حساب کاربری/ }));
+    expect(within(screen.getByTestId('avatar-menu-items')).getByRole('link', { name: 'مدیریت' })).toHaveAttribute(
+      'href',
+      '/admin',
+    );
+  });
+
+  it('closes on Escape and gives focus back to the control that opened it', async () => {
+    await signedIn();
+    const trigger = screen.getByRole('button', { name: /حساب کاربری/ });
+
+    await userEvent.click(trigger);
+    expect(screen.getByTestId('avatar-menu-items')).toBeInTheDocument();
+
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByTestId('avatar-menu-items')).toBeNull());
+    // Focus left somewhere reachable, not on a removed node.
+    expect(trigger).toHaveFocus();
+  });
+
+  it('names the account without putting a phone number in the trigger', async () => {
+    await signedIn({ displayName: null });
+
+    const trigger = screen.getByRole('button', { name: /حساب کاربری/ });
+    // A nameless account falls back to a neutral word. The number belongs
+    // inside the menu, in its own LTR run, not on the page chrome.
+    expect(trigger.textContent).toContain('حساب من');
+    expect(trigger.textContent).not.toContain('989123456789');
+
+    await userEvent.click(trigger);
+    expect(screen.getByTestId('avatar-menu-items').textContent).toContain('+989123456789');
+  });
+});
+
+describe('the mobile bar and the footer', () => {
+  it('carries five destinations, each with its own glyph shape', async () => {
+    await signedIn();
+
+    const bar = screen.getByTestId('mobile-tab-bar');
+    const tabs = [...bar.querySelectorAll('[data-tab]')].map((a) => a.getAttribute('data-tab'));
+    expect(tabs).toEqual(['/', '/search', '/bookings', '/loyalty', '/dashboard']);
+
+    // Shape as well as colour: the current tab must be identifiable without
+    // relying on colour alone.
+    const glyphClasses = [...bar.querySelectorAll('[data-tab] span')].map((s) => s.className);
+    expect(new Set(glyphClasses).size).toBe(5);
+  });
+
+  it('marks the current tab and matches a subtree without matching the root', async () => {
+    pathname = '/bookings/b1';
+    await signedIn();
+
+    const bar = screen.getByTestId('mobile-tab-bar');
+    expect(bar.querySelector('[data-tab="/bookings"]')).toHaveAttribute('aria-current', 'page');
+    // `/` is a prefix of every path; it must match only itself.
+    expect(bar.querySelector('[data-tab="/"]')).not.toHaveAttribute('aria-current');
+  });
+
+  it('renders the footer on the landing page only', async () => {
+    await signedIn();
+    expect(screen.getByRole('contentinfo')).toBeInTheDocument();
+  });
+
+  it('and not on any other page, because no other artboard carries one', async () => {
+    pathname = '/search';
+    await signedIn();
+    expect(screen.queryByRole('contentinfo')).toBeNull();
+  });
+
+  it('gives the footer no link that leads nowhere', async () => {
+    await signedIn();
+
+    const footer = screen.getByRole('contentinfo');
+    const built = new Set(['/search', '/bookings', '/loyalty', '/journey', '/pro', '/pro/profile', '/business']);
+    for (const link of within(footer).getAllByRole('link')) {
+      // The prototype draws every footer link as `href="#"`. The legal and
+      // support column has no routes at all, so it is not rendered rather
+      // than rendered dead.
+      expect(built).toContain(link.getAttribute('href'));
+    }
+    expect(footer.textContent).not.toContain('قوانین و مقررات');
+  });
+});

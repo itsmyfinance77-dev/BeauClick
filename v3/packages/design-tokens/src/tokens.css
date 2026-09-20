@@ -83,7 +83,10 @@
      from `apps/web/app/fonts.ts`. The fallbacks here keep this stylesheet
      usable on its own (tests, Storybook, the packages' own consumers). */
   --bc-font-family: var(--bc-font-vazir, 'Vazirmatn'), Tahoma, system-ui, sans-serif;
+  /* Two display faces, not one: Peyda for the hero and the sign-in titles,
+     Anjoman everywhere else a heading is set. Neither is ever body copy. */
   --bc-font-display: var(--bc-font-anjoman, 'Anjoman'), var(--bc-font-family);
+  --bc-font-hero: var(--bc-font-peyda, 'Peyda'), var(--bc-font-display);
 
   /* The ten text roles, each with the line height Persian actually needs:
      ascenders and dots want more vertical room than Latin, so body copy sits
