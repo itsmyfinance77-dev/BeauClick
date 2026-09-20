@@ -14,5 +14,10 @@ module.exports = {
     '^@beauclick/persian-utils$': '<rootDir>/../../packages/persian-utils/src/index.ts',
     '^@beauclick/design-tokens$': '<rootDir>/../../packages/design-tokens/src/index.ts',
     '^@beauclick/payment-contract$': '<rootDir>/../../packages/payment-contract/src/index.ts',
+    // V3.3 `#43b-1` / #173. The admin commission surface re-declares this
+    // package's closed vocabularies as literal unions rather than importing
+    // them into the browser bundle; one test asserts the two still agree,
+    // and that test needs the real contract.
+    '^@beauclick/commercial-policy-contract$': '<rootDir>/../../packages/commercial-policy-contract/src/index.ts',
   },
 };

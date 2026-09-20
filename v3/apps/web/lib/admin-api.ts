@@ -320,3 +320,67 @@ export function platformMetrics(api: ApiClient, range: { from?: string; to?: str
   const suffix = query.toString();
   return api.get<PlatformMetrics>(`/v1/admin/analytics${suffix ? `?${suffix}` : ''}`);
 }
+
+// ------------------------------------------- commercial: commission policy
+
+/**
+ * The administrator's commission policy surface — V3.3 `#43b-1` / #173,
+ * ADR-052 §1.
+ *
+ * Read off `CommissionPolicyController` field for field, per this file's own
+ * rule at the top. Note what the controller deliberately does NOT return, and
+ * what therefore has no type here: no `createdByUserId`, `publishedByUserId`
+ * or `retiredByUserId`, no audit id, no row id.
+ *
+ * The three components and the four shapes are closed vocabularies owned by
+ * `@beauclick/commercial-policy-contract`. They are re-declared as literal
+ * unions rather than imported so the web bundle does not pull a server package
+ * in for three strings — but they must stay identical to
+ * `COMMISSION_COMPONENTS`, `COMMISSION_RULE_KINDS` and `COMMISSION_BASES`, and
+ * a test asserts exactly that against the contract.
+ */
+export type CommissionComponent = 'booking_commission' | 'acquisition' | 'processing_recovery';
+export type CommissionRuleKind = 'zero' | 'percentage' | 'fixed' | 'hybrid';
+export type CommissionBase = 'platform_collected_amount' | 'service_total';
+export type CommissionLifecycleState = 'draft' | 'published' | 'retired';
+
+export interface CommissionPolicySummary {
+  policyKey: string;
+  component: CommissionComponent;
+  displayName: string;
+  createdAt: string;
+}
+
+/**
+ * One version.
+ *
+ * `basisPoints`, `fixedToman` and `base` are null for the shapes that do not
+ * carry them — `zero` carries none of the three, `fixed` carries no base. A
+ * renderer must read `ruleKind` and show only that shape's fields; a null is
+ * absence, never a zero the platform decided.
+ */
+export interface CommissionPolicyVersion {
+  policyKey: string;
+  version: number;
+  lifecycleState: CommissionLifecycleState;
+  ruleKind: CommissionRuleKind;
+  basisPoints: number | null;
+  fixedToman: number | null;
+  base: CommissionBase | null;
+  arithmeticVersion: number;
+  activationStartsAt: string | null;
+  activationEndsAt: string | null;
+  publishedAt: string | null;
+  retiredAt: string | null;
+  createdAt: string;
+}
+
+export function commissionPolicies(api: ApiClient) {
+  return api.get<{ items: CommissionPolicySummary[] }>('/v1/admin/commercial/commission-policies');
+}
+
+export function commissionPolicyVersions(api: ApiClient, policyKey: string) {
+  return api.get<{ items: CommissionPolicyVersion[] }>(
+    `/v1/admin/commercial/commission-policies/${encodeURIComponent(policyKey)}/versions`,
+  );
+}
