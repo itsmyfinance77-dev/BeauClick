@@ -1,0 +1,51 @@
+/*
+ * The design's loading state: shapes where the content will be, not text and
+ * not a spinner (`V3_COMPONENT_INVENTORY.md` — `Skeleton`, "replaces the
+ * absence of a loading state"). `LoadingState` used to be a centred sentence,
+ * which reads as a page that has finished and has nothing to say.
+ *
+ * The sweep is a background-position animation, so it has no direction to get
+ * wrong in RTL. Under `prefers-reduced-motion` the global rule in
+ * `globals.css` cuts every animation to one frame, which leaves the resting
+ * shape: still a skeleton, no motion.
+ */
+
+.bar {
+  display: block;
+  block-size: var(--sk-h, 14px);
+  inline-size: var(--sk-w, 100%);
+  border-radius: var(--bc-radius-cell);
+  background: linear-gradient(
+    90deg,
+    var(--bc-color-surface-tint) 25%,
+    var(--bc-color-line) 50%,
+    var(--bc-color-surface-tint) 75%
+  );
+  background-size: 200% 100%;
+  animation: sweep var(--bc-motion-skeleton) ease-in-out infinite;
+}
+
+@keyframes sweep {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+.stack {
+  display: grid;
+  gap: 12px;
+  padding: 16px 0;
+}
+
+/* Announced to assistive technology, never drawn. */
+.label {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

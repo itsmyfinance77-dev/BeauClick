@@ -1,7 +1,8 @@
 'use client';
 
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from 'react';
+import type { ButtonHTMLAttributes, CSSProperties, InputHTMLAttributes, ReactNode } from 'react';
 import { forwardRef, useId } from 'react';
+import skeletonStyles from './skeleton.module.css';
 
 /**
  * Minimal shared UI primitives for the Phase 1 foundation -- deliberately
@@ -241,11 +242,36 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
   );
 }
 
-/** Loading state primitive -- announced to assistive tech rather than a silent spinner. */
-export function LoadingState({ label = 'در حال بارگذاری…' }: { label?: string }) {
+/**
+ * One placeholder shape. `width` and `height` take any CSS length; a caller
+ * that knows what is loading (an avatar, a card, a price) draws that shape,
+ * and `LoadingState` below is the generic stack for a caller that does not.
+ * Decorative: `aria-hidden`, because the status message is the announcement.
+ */
+export function Skeleton({ width, height }: { width?: string | number; height?: string | number }) {
+  const px = (v: string | number | undefined) => (typeof v === 'number' ? `${v}px` : v);
   return (
-    <p role="status" aria-live="polite" style={{ color: 'var(--bc-color-ink-soft)', textAlign: 'center', padding: 24 }}>
-      {label}
-    </p>
+    <span
+      className={skeletonStyles.bar}
+      aria-hidden='true'
+      style={{ '--sk-w': px(width), '--sk-h': px(height) } as CSSProperties}
+    />
+  );
+}
+
+/**
+ * Loading state primitive -- a skeleton on screen and a polite status message
+ * for assistive tech. The label is still in the DOM (visually hidden), so the
+ * announcement and every test that looks for it are unchanged.
+ */
+export function LoadingState({ label = 'در حال بارگذاری…', lines = 3 }: { label?: string; lines?: number }) {
+  return (
+    <div role='status' aria-live='polite' className={skeletonStyles.stack}>
+      <span className={skeletonStyles.label}>{label}</span>
+      {Array.from({ length: lines }, (_, i) => (
+        // The last line is shorter, the way a paragraph ends.
+        <Skeleton key={i} width={i === lines - 1 && lines > 1 ? '60%' : '100%'} />
+      ))}
+    </div>
   );
 }
