@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
-import { useEffect, useId, useRef } from 'react';
+import { forwardRef, useEffect, useId, useRef } from 'react';
 import { Button, Card } from './ui';
 
 /**
@@ -204,7 +204,8 @@ type TextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
   hint?: string;
 };
 
-export function Textarea({ label, error, hint, id, ...rest }: TextareaProps) {
+/** `forwardRef` for the same reason `Input` carries one — V3.3 `#43b-1` / #173. Additive. */
+export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function Textarea({ label, error, hint, id, ...rest }, ref) {
   const generatedId = useId();
   const areaId = id ?? generatedId;
   const errorId = `${areaId}-error`;
@@ -217,6 +218,7 @@ export function Textarea({ label, error, hint, id, ...rest }: TextareaProps) {
       </label>
       <textarea
         {...rest}
+        ref={ref}
         id={areaId}
         aria-invalid={error ? true : undefined}
         aria-describedby={[error ? errorId : null, hint ? hintId : null].filter(Boolean).join(' ') || undefined}
@@ -243,7 +245,7 @@ export function Textarea({ label, error, hint, id, ...rest }: TextareaProps) {
       ) : null}
     </div>
   );
-}
+});
 
 /**
  * The first modal dialog in V3, so it establishes the focus contract rather

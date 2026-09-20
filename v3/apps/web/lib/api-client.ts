@@ -168,7 +168,24 @@ export class ApiClient {
     return this.request<T>('PATCH', path, body);
   }
 
-  delete<T>(path: string): Promise<ApiResponse<T>> {
-    return this.request<T>('DELETE', path);
+  /**
+   * Full replacement — V3.3 `#43b-1` / #173.
+   *
+   * Distinct from `patch` because the commercial publication routes genuinely
+   * PUT: `replaceVersionDraft` replaces a draft's terms wholesale, and sending
+   * PATCH would be refused by the route rather than merged.
+   */
+  put<T>(path: string, body: unknown): Promise<ApiResponse<T>> {
+    return this.request<T>('PUT', path, body);
+  }
+
+  /**
+   * `body` is optional because most DELETE routes take none, and load-bearing
+   * where a route does: every commercial mutation carries a mandatory
+   * `reason`, and discarding a draft is a mutation like any other. Omitting it
+   * sends no body and no content-type, exactly as before.
+   */
+  delete<T>(path: string, body?: unknown): Promise<ApiResponse<T>> {
+    return this.request<T>('DELETE', path, body);
   }
 }

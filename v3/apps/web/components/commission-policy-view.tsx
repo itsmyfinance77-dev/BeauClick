@@ -3,6 +3,7 @@
 import { formatToman, toPersianDigits } from '@beauclick/persian-utils';
 import { Card, ErrorState, LoadingState } from '@/components/ui';
 import { Badge } from '@/components/kit';
+import type { ReactNode } from 'react';
 import type {
   CommissionBase,
   CommissionComponent,
@@ -34,7 +35,7 @@ import type {
 /** Mirrors `COMMISSION_COMPONENTS` — order included, because the order binds. */
 export const COMPONENTS: readonly CommissionComponent[] = ['booking_commission', 'acquisition', 'processing_recovery'];
 
-const COMPONENT_LABEL: Record<CommissionComponent, string> = {
+export const COMPONENT_LABEL: Record<CommissionComponent, string> = {
   booking_commission: 'کارمزدِ نوبت',
   acquisition: 'جذبِ مشتری',
   processing_recovery: 'بازیافتِ هزینهٔ پرداخت',
@@ -115,6 +116,7 @@ export function ComponentCard({
   versionsError,
   versionsLoading,
   onRetry,
+  actions,
 }: {
   component: CommissionComponent;
   policy: CommissionPolicySummary | undefined;
@@ -122,6 +124,12 @@ export function ComponentCard({
   versionsError: string | undefined;
   versionsLoading: boolean;
   onRetry: (policyKey: string) => void;
+  /**
+   * Write controls, supplied by the page — V3.3 #207. A slot rather than
+   * props per action: this file stays presentational, and the read-only
+   * caller simply passes nothing.
+   */
+  actions?: ReactNode;
 }) {
   const effective = versions?.find((v) => v.lifecycleState === 'published') ?? null;
 
@@ -170,13 +178,27 @@ export function ComponentCard({
             سیاستی ساخته شده، اما هیچ نسخه‌ای از آن منتشر نشده است.
           </p>
         )}
+        {actions ? <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBlockStart: 4 }}>{actions}</div> : null}
       </div>
     </Card>
   );
 }
 
 /** Every version of one policy, newest first, with no edit affordance on any row. */
-export function VersionTimeline({ policy, versions }: { policy: CommissionPolicySummary; versions: CommissionPolicyVersion[] }) {
+export function VersionTimeline({
+  policy,
+  versions,
+  rowActions,
+}: {
+  policy: CommissionPolicySummary;
+  versions: CommissionPolicyVersion[];
+  /**
+   * Controls for one row — V3.3 #207. Returning `null` for a published or
+   * retired version is how "no edit affordance at all, not even a disabled
+   * one" is expressed: the cell is empty, not greyed.
+   */
+  rowActions?: (version: CommissionPolicyVersion) => ReactNode;
+}) {
   const headingId = `commission-timeline-${policy.component}`;
   const descriptionId = `${headingId}-description`;
 
@@ -206,6 +228,7 @@ export function VersionTimeline({ policy, versions }: { policy: CommissionPolicy
               <th style={{ textAlign: 'start', padding: '8px 10px', fontWeight: 700 }}>وضعیت</th>
               <th style={{ textAlign: 'start', padding: '8px 10px', fontWeight: 700 }}>قاعده</th>
               <th style={{ textAlign: 'start', padding: '8px 10px', fontWeight: 700 }}>انتشار</th>
+              {rowActions ? <th style={{ textAlign: 'start', padding: '8px 10px', fontWeight: 700 }}>اقدام</th> : null}
             </tr>
           </thead>
           <tbody>
@@ -223,6 +246,11 @@ export function VersionTimeline({ policy, versions }: { policy: CommissionPolicy
                   <td style={{ padding: '10px', fontSize: 12, color: 'var(--bc-color-ink-soft)' }}>
                     {version.publishedAt ? new Date(version.publishedAt).toLocaleDateString('fa-IR') : '—'}
                   </td>
+                  {rowActions ? (
+                    <td style={{ padding: '10px' }}>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{rowActions(version)}</div>
+                    </td>
+                  ) : null}
                 </tr>
               ))}
           </tbody>

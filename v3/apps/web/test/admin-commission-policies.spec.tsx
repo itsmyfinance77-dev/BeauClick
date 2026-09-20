@@ -181,11 +181,13 @@ describe('screen 50a — the admin commission policy read surface', () => {
     // The two claims the failure must NOT make.
     expect(booking.querySelector('[data-state="none-published"]')).toBeNull();
     expect(booking.textContent).not.toContain('چیزی دریافت نمی‌شود');
-    expect(within(booking).getByRole('button')).toBeInTheDocument();
+    // By name: the card also carries a write control since #207.
+    const retry = within(booking).getByRole('button', { name: /تلاش/ });
+    expect(retry).toBeInTheDocument();
 
     // Retry succeeds and the card becomes the real answer.
     mockApi({ policies: [POLICIES.booking], versionsByKey: { [POLICIES.booking.policyKey]: [version()] } });
-    await userEvent.click(within(booking).getByRole('button'));
+    await userEvent.click(retry);
     await waitFor(() => expect(booking.querySelector('[data-state="effective"]')).not.toBeNull());
   });
 
@@ -235,20 +237,28 @@ describe('screen 50a — the admin commission policy read surface', () => {
     }
   });
 
-  it('offers no edit affordance on a published version, not even a disabled one', async () => {
+  it('carries the lifecycle of every version as text, not only as a coloured chip', async () => {
     mockApi({
       policies: [POLICIES.booking],
-      versionsByKey: { [POLICIES.booking.policyKey]: [version(), version({ version: 2, lifecycleState: 'draft', publishedAt: null })] },
+      versionsByKey: {
+        [POLICIES.booking.policyKey]: [
+          version(),
+          version({ version: 2, lifecycleState: 'draft', publishedAt: null }),
+          version({ version: 3, lifecycleState: 'retired', retiredAt: '2026-09-12T08:00:00.000Z' }),
+        ],
+      },
     });
     renderPage();
 
     const timeline = await screen.findByRole('table');
-    // The read half mutates nothing: no control of any kind in the timeline.
-    expect(within(timeline).queryAllByRole('button')).toHaveLength(0);
-    expect(within(timeline).queryAllByRole('textbox')).toHaveLength(0);
-    // Lifecycle is carried by text, not only by a coloured chip.
-    expect(timeline.textContent).toContain('منتشرشده');
-    expect(timeline.textContent).toContain('پیش‌نویس');
+    for (const state of ['منتشرشده', 'پیش‌نویس', 'بازنشسته']) {
+      expect(timeline.textContent).toContain(state);
+    }
+    // Newest first, so the row order is a deliberate claim rather than the
+    // server's arrival order. (Which controls each state carries is asserted
+    // per lifecycle state in `admin-commission-write.spec.tsx`.)
+    const order = [...timeline.querySelectorAll('[data-version]')].map((r) => r.getAttribute('data-version'));
+    expect(order).toEqual(['3', '2', '1']);
   });
 
   it('shows the whole page failing as one retryable error, not as three empty components', async () => {

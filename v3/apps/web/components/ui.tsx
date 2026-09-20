@@ -1,7 +1,7 @@
 'use client';
 
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from 'react';
-import { useId } from 'react';
+import { forwardRef, useId } from 'react';
 
 /**
  * Minimal shared UI primitives for the Phase 1 foundation -- deliberately
@@ -73,7 +73,15 @@ type InputProps = InputHTMLAttributes<HTMLInputElement> & {
   hint?: string;
 };
 
-export function Input({ label, error, hint, id, ...rest }: InputProps) {
+/**
+ * `forwardRef` so a caller can move focus to the field — V3.3 `#43b-1` / #173.
+ *
+ * Additive: every existing caller passes no ref and renders identically. The
+ * commission rule editor needs it because changing a rule's shape REMOVES
+ * inputs, and a removed input that held focus drops focus to `<body>`, which
+ * loses a keyboard user's place silently.
+ */
+export const Input = forwardRef<HTMLInputElement, InputProps>(function Input({ label, error, hint, id, ...rest }, ref) {
   const generatedId = useId();
   const inputId = id ?? generatedId;
   const errorId = `${inputId}-error`;
@@ -86,6 +94,7 @@ export function Input({ label, error, hint, id, ...rest }: InputProps) {
       </label>
       <input
         {...rest}
+        ref={ref}
         id={inputId}
         aria-invalid={error ? true : undefined}
         // Ties the message to the field for screen readers -- an error a
@@ -117,7 +126,7 @@ export function Input({ label, error, hint, id, ...rest }: InputProps) {
       ) : null}
     </div>
   );
-}
+});
 
 /**
  * `warning` was added for the payment result page's `unresolved` state
