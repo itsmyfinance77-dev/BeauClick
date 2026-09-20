@@ -1,10 +1,51 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
+import { formatFullJalaliDate, formatIranianPhone, formatToman, toPersianDigits } from '@beauclick/persian-utils';
 import { useAuth } from '@/lib/auth-context';
 import { ProtectedRoute } from '@/components/protected-route';
-import { Card, ErrorState, LoadingState } from '@/components/ui';
-import { formatFullJalaliDate } from '@beauclick/persian-utils';
+import { ErrorState, LoadingState } from '@/components/ui';
+import { bookingApi, slotTimeLabel, type BookingSummary, type ProviderSummary } from '@/lib/booking-api';
+import {
+  journeyGoals,
+  journeyProfile,
+  listNotifications,
+  loyaltySummary,
+  type BeautyGoal,
+  type BeautyProfile,
+  type LoyaltySummary,
+  type NotificationItem,
+} from '@/lib/phase3-api';
+import styles from './dashboard.module.css';
+
+/**
+ * The customer's account page — `Prototype - Customer.dc.html` §07.
+ *
+ * ## Why this page changed shape entirely
+ *
+ * It was a 75-line proof that `GET /v1/me` worked end to end, written in
+ * Phase 1 and never replaced. `V3_INFORMATION_ARCHITECTURE.md` §2 makes it
+ * the level-two page that gathers "my history with this product" — bookings,
+ * loyalty, the beauty journey, notifications — which is what let the header
+ * drop from eleven destinations to three. The four separate pages keep
+ * working and are linked from here; nothing was taken away.
+ *
+ * ## The professional's name is not on a booking
+ *
+ * `BookingSummary` carries `professionalId` and `serviceId` and no names, so
+ * a booking row would read as two uuids. The names are resolved by reading
+ * the professionals the visible bookings actually reference — a handful, not
+ * a page — and each read is allowed to fail on its own. A row whose name
+ * could not be resolved shows the service time and omits the name, rather
+ * than showing an identifier or inventing a label.
+ *
+ * ## Two things the design shows that have no data
+ *
+ * The amount paid on the upcoming booking: `BookingSummary` carries no order
+ * id, so there is nothing to read a total from. And «عضویت از تیر ۱۴۰۴»:
+ * `/v1/me` has no `createdAt`. Neither is guessed; both are simply absent.
+ */
 
 interface MeResponse {
   id: string;
@@ -14,55 +55,349 @@ interface MeResponse {
   capabilities: string[];
 }
 
-/**
- * A protected page that makes a real authenticated API call (GET /v1/me)
- * -- the smallest thing that proves the whole chain end to end: token
- * storage -> Authorization header -> API JwtAuthGuard -> real database ->
- * rendered in RTL Persian. Product dashboards are later-phase scope.
- */
-function DashboardContent() {
-  const { api } = useAuth();
-  const [me, setMe] = useState<MeResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+/** How many past bookings the summary list shows before deferring to `/bookings`. */
+const PAST_LIMIT = 3;
 
-  // Extracted from an inline effect so the error state has something to
-  // retry. The cancelled-flag guard is kept: it stops a response that
-  // arrives after unmount from setting state.
-  const load = useCallback(() => {
-    let cancelled = false;
+const STATUS_LABEL: Record<BookingSummary['status'], { label: string; tone: string }> = {
+  pending: { label: 'در انتظار پرداخت', tone: 'statusWarn' },
+  confirmed: { label: 'تأیید شده', tone: 'statusDone' },
+  completed: { label: 'انجام شده', tone: 'statusDone' },
+  cancelled: { label: 'لغو شده', tone: 'statusError' },
+  expired: { label: 'منقضی شده', tone: 'statusNeutral' },
+  no_show: { label: 'عدم مراجعه', tone: 'statusError' },
+};
+
+/** Upcoming means confirmed or awaiting payment, and in the future. */
+function isUpcoming(booking: BookingSummary): boolean {
+  if (booking.status !== 'confirmed' && booking.status !== 'pending') return false;
+  return new Date(booking.startAt).getTime() > Date.now();
+}
+
+function DashboardContent() {
+  const { api, logout } = useAuth();
+
+  const [me, setMe] = useState<MeResponse | null>(null);
+  const [bookings, setBookings] = useState<BookingSummary[]>([]);
+  const [providers, setProviders] = useState<Map<string, ProviderSummary>>(new Map());
+  const [loyalty, setLoyalty] = useState<LoyaltySummary | null>(null);
+  const [notices, setNotices] = useState<NotificationItem[]>([]);
+  const [goals, setGoals] = useState<BeautyGoal[]>([]);
+  const [profile, setProfile] = useState<BeautyProfile | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  const load = useCallback(async () => {
     setError(null);
-    api
-      .get<MeResponse>('/v1/me')
-      .then((res) => {
-        if (!cancelled) setMe(res.data);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'خطایی رخ داد.');
-      });
-    return () => {
-      cancelled = true;
-    };
+    try {
+      /*
+        `/v1/me` and the bookings are what the page is FOR, so a failure in
+        either fails the page. Loyalty, notifications and the journey are
+        sections of it: a dashboard missing its loyalty card is still a
+        dashboard, and blanking the whole page for one of them would be a
+        worse answer than rendering the rest.
+      */
+      const [meRes, bookingsRes, loyaltyRes, noticesRes, goalsRes, profileRes] = await Promise.all([
+        api.get<MeResponse>('/v1/me'),
+        bookingApi.myBookings(api),
+        loyaltySummary(api).catch(() => null),
+        listNotifications(api, 1).catch(() => null),
+        journeyGoals(api).catch(() => null),
+        journeyProfile(api).catch(() => null),
+      ]);
+
+      const mine = bookingsRes.data ?? [];
+      setMe(meRes.data);
+      setBookings(mine);
+      setLoyalty(loyaltyRes?.data ?? null);
+      setNotices(noticesRes?.data?.items ?? []);
+      setGoals(goalsRes?.data ?? []);
+      setProfile(profileRes?.data ?? null);
+
+      /*
+        One read per DISTINCT professional the visible bookings reference,
+        and never one per row: the same salon appearing four times is one
+        request. Each is allowed to fail alone — a missing name is a missing
+        name, not a broken page.
+      */
+      const shown = [...mine.filter(isUpcoming).slice(0, 1), ...mine.filter((b) => !isUpcoming(b)).slice(0, PAST_LIMIT)];
+      const ids = [...new Set(shown.map((b) => b.professionalId))];
+      const resolved = await Promise.all(
+        ids.map((id) => bookingApi.getProvider(api, id).then((r) => r.data).catch(() => null)),
+      );
+      setProviders(new Map(resolved.filter((p): p is ProviderSummary => p !== null).map((p) => [p.id, p])));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'خطایی رخ داد.');
+    } finally {
+      setLoaded(true);
+    }
   }, [api]);
 
-  useEffect(() => load(), [load]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
-  if (error) return <ErrorState message={error} onRetry={() => void load()} />;
-  if (!me) return <LoadingState />;
+  if (!loaded) return <LoadingState label="در حال بارگذاری…" />;
+  if (error && !me) return <ErrorState message={error} onRetry={() => void load()} />;
+
+  const upcoming = bookings.filter(isUpcoming).sort((a, b) => a.startAt.localeCompare(b.startAt))[0] ?? null;
+  const past = bookings
+    .filter((b) => !isUpcoming(b))
+    .sort((a, b) => b.startAt.localeCompare(a.startAt));
+  const unread = notices.filter((n) => !n.read).length;
+  const activeGoals = goals.filter((g) => g.status !== 'abandoned');
+
+  /** The professional's display name, or null when the read did not resolve. */
+  const nameOf = (booking: BookingSummary) => providers.get(booking.professionalId)?.displayName ?? null;
 
   return (
-    <Card>
-      <h1 style={{ fontSize: 24 }}>داشبورد</h1>
-      <dl style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '8px 16px', fontSize: 14 }}>
-        <dt style={{ color: 'var(--bc-color-ink-faint)' }}>شماره موبایل</dt>
-        <dd style={{ margin: 0 }}>{me.phone}</dd>
+    <section>
+      <div className={styles.head}>
+        <div>
+          <h1 className={styles.greeting}>
+            {me?.displayName ? `سلام ${me.displayName}` : 'حساب من'}
+          </h1>
+          <p className={styles.subtitle}>
+            {upcoming
+              ? 'یک نوبت پیش‌رو دارید.'
+              : 'نوبت پیش‌رویی ندارید.'}
+            {loyalty?.pointsToNextTier && loyalty.nextTier
+              ? ` ${toPersianDigits(loyalty.pointsToNextTier)} امتیاز تا ${loyalty.nextTier.name}.`
+              : ''}
+          </p>
+        </div>
+        <Link href="/search" className={styles.headAction}>
+          رزرو نوبت تازه
+        </Link>
+      </div>
 
-        <dt style={{ color: 'var(--bc-color-ink-faint)' }}>نقش‌ها</dt>
-        <dd style={{ margin: 0 }}>{me.roles.join('، ')}</dd>
+      <div className={styles.columns}>
+        <div className={styles.main}>
+          <section>
+            <h2 className={styles.sectionTitle} style={{ marginBlockEnd: 12 }}>
+              نوبت پیش‌رو
+            </h2>
+            {upcoming ? (
+              <div className={styles.next} data-testid="upcoming-booking">
+                <div className={styles.nextBar}>
+                  <span className={styles.nextWhen}>
+                    {formatFullJalaliDate(new Date(upcoming.startAt))}، {slotTimeLabel(upcoming.startAt)}
+                  </span>
+                  <span className={styles.nextStatus}>{STATUS_LABEL[upcoming.status].label}</span>
+                </div>
+                <div className={styles.nextBody}>
+                  <span className={styles.thumb} aria-hidden="true" />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className={styles.nextTitle}>{nameOf(upcoming) ?? 'نوبت شما'}</div>
+                    <div className={styles.nextTime}>
+                      {slotTimeLabel(upcoming.startAt)} تا {slotTimeLabel(upcoming.endAt)}
+                    </div>
+                  </div>
+                </div>
+                <div className={styles.nextActions}>
+                  <Link href="/bookings" className={styles.action}>
+                    جزئیات و رسید
+                  </Link>
+                  <Link href="/bookings" className={`${styles.action} ${styles.actionDanger}`}>
+                    مدیریت رزرو
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <p className={styles.empty}>
+                هنوز نوبتی رزرو نکرده‌اید. از <Link href="/search">جست‌وجو</Link> شروع کنید.
+              </p>
+            )}
+          </section>
 
-        <dt style={{ color: 'var(--bc-color-ink-faint)' }}>امروز</dt>
-        <dd style={{ margin: 0 }}>{formatFullJalaliDate(new Date())}</dd>
-      </dl>
-    </Card>
+          <section>
+            <div className={styles.sectionHead}>
+              <h2 className={styles.sectionTitle}>نوبت‌های گذشته</h2>
+              {past.length > 0 ? (
+                <Link href="/bookings" className={styles.sectionLink}>
+                  همه ({toPersianDigits(past.length)})
+                </Link>
+              ) : null}
+            </div>
+            {past.length === 0 ? (
+              <p className={styles.empty}>نوبت گذشته‌ای ندارید.</p>
+            ) : (
+              <div className={styles.pastList} data-testid="past-bookings">
+                {past.slice(0, PAST_LIMIT).map((booking, index) => {
+                  const status = STATUS_LABEL[booking.status];
+                  const name = nameOf(booking);
+                  return (
+                    <div key={booking.id} className={styles.pastRow} data-booking={booking.id}>
+                      <span
+                        className={`${styles.pastThumb} ${index % 2 === 1 ? styles.pastThumbBronze : ''}`}
+                        aria-hidden="true"
+                      />
+                      <div className={styles.pastBody}>
+                        {name ? <div className={styles.pastTitle}>{name}</div> : null}
+                        <div className={styles.pastWhen}>
+                          {formatFullJalaliDate(new Date(booking.startAt))}، {slotTimeLabel(booking.startAt)}
+                        </div>
+                      </div>
+                      <span className={`${styles.status} ${styles[status.tone]}`}>{status.label}</span>
+                      <Link href={`/providers/${booking.professionalId}`} className={styles.rebook}>
+                        رزرو دوباره
+                      </Link>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
+          {activeGoals.length > 0 || profile ? (
+            <section>
+              <div className={styles.sectionHead}>
+                <h2 className={styles.sectionTitle}>مسیر زیبایی من</h2>
+                <Link href="/journey" className={styles.sectionLink}>
+                  ویرایش
+                </Link>
+              </div>
+              <div className={styles.journey} data-testid="journey">
+                <div>
+                  <div className={styles.journeyTitle}>اهداف فعال</div>
+                  {activeGoals.length === 0 ? (
+                    <p className={styles.empty}>هدفی ثبت نشده است.</p>
+                  ) : (
+                    activeGoals.slice(0, 4).map((goal) => (
+                      <div
+                        key={goal.id}
+                        className={`${styles.goal} ${goal.status === 'achieved' ? styles.goalDone : ''}`}
+                      >
+                        {goal.title}
+                      </div>
+                    ))
+                  )}
+                </div>
+                <div>
+                  <div className={styles.journeyTitle}>ترجیح‌های من</div>
+                  {profile?.budgetMaxToman === null && profile?.notes === null ? (
+                    <p className={styles.empty}>ترجیحی ثبت نشده است.</p>
+                  ) : (
+                    <dl className={styles.prefs}>
+                      {profile?.budgetMaxToman !== null && profile?.budgetMaxToman !== undefined ? (
+                        <>
+                          <dt>حداکثر بودجه</dt>
+                          <dd>{formatToman(profile.budgetMaxToman)} تومان</dd>
+                        </>
+                      ) : null}
+                      {profile?.notes ? (
+                        <>
+                          <dt>یادداشت</dt>
+                          <dd>{profile.notes}</dd>
+                        </>
+                      ) : null}
+                    </dl>
+                  )}
+                </div>
+              </div>
+            </section>
+          ) : null}
+        </div>
+
+        <aside className={styles.sidebar}>
+          {loyalty ? (
+            <div className={styles.loyalty} data-testid="loyalty-card">
+              <div className={styles.loyaltyHead}>
+                <span className={styles.loyaltyLabel}>باشگاه مشتریان</span>
+                {loyalty.tier ? <span className={styles.tierChip}>{loyalty.tier.name}</span> : null}
+              </div>
+              <div className={styles.balanceRow}>
+                <span className={styles.balance}>{toPersianDigits(loyalty.balance)}</span>
+                <span className={styles.balanceUnit}>امتیاز قابل استفاده</span>
+              </div>
+              <div className={styles.lifetime}>مجموع کسب‌شده: {toPersianDigits(loyalty.lifetimeEarned)}</div>
+
+              {loyalty.nextTier && loyalty.pointsToNextTier !== null && loyalty.percentToNextTier !== null ? (
+                <>
+                  <div className={styles.progressLabel}>
+                    <span>
+                      {toPersianDigits(loyalty.pointsToNextTier)} امتیاز تا {loyalty.nextTier.name}
+                    </span>
+                    <span>{toPersianDigits(loyalty.percentToNextTier)}٪</span>
+                  </div>
+                  <div
+                    className={styles.progressTrack}
+                    role="progressbar"
+                    aria-valuenow={loyalty.percentToNextTier}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-label={`پیشرفت تا ${loyalty.nextTier.name}`}
+                  >
+                    <div className={styles.progressFill} style={{ width: `${loyalty.percentToNextTier}%` }} />
+                  </div>
+                </>
+              ) : null}
+
+              {loyalty.benefits.length > 0 ? (
+                <div className={styles.benefits}>
+                  <div className={styles.benefitsTitle}>مزایای فعال شما</div>
+                  {loyalty.benefits.map((benefit) => (
+                    <div key={benefit.type} className={styles.benefit}>
+                      <span className={styles.benefitDot} aria-hidden="true" />
+                      {benefit.label}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div className={styles.card}>
+            <div className={styles.cardHead}>
+              <h2 className={styles.cardTitle}>اعلان‌ها</h2>
+              {unread > 0 ? <span className={styles.unreadCount}>{toPersianDigits(unread)}</span> : null}
+            </div>
+            {notices.length === 0 ? (
+              <p className={styles.empty}>اعلانی ندارید.</p>
+            ) : (
+              <div data-testid="notifications">
+                {notices.slice(0, 3).map((notice) => (
+                  <Link key={notice.id} href="/notifications" className={styles.notice}>
+                    <span
+                      className={`${styles.noticeDot} ${notice.read ? styles.noticeDotRead : ''}`}
+                      aria-hidden="true"
+                    />
+                    <span>
+                      <span className={styles.noticeText}>{notice.title}</span>
+                      <span className={styles.noticeWhen}>{formatFullJalaliDate(new Date(notice.createdAt))}</span>
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className={styles.card}>
+            <h2 className={styles.cardTitle} style={{ marginBlockEnd: 12 }}>
+              حساب من
+            </h2>
+            <dl className={styles.prefs}>
+              <dt>شماره موبایل</dt>
+              <dd className={styles.ltr}>{formatIranianPhone(me?.phone ?? '')}</dd>
+            </dl>
+            <div className={styles.accountList}>
+              <Link href="/waitlist" className={styles.accountLink}>
+                لیست انتظار من
+              </Link>
+              <Link href="/pro" className={styles.accountLink}>
+                ثبت‌نام به‌عنوان متخصص
+              </Link>
+              <button
+                type="button"
+                className={`${styles.accountLink} ${styles.accountLinkDanger}`}
+                onClick={() => void logout()}
+              >
+                خروج از حساب
+              </button>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
   );
 }
 

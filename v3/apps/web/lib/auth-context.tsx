@@ -26,10 +26,24 @@ interface RefreshResponse {
   csrfToken: string;
 }
 
+/**
+ * What `POST /v1/auth/request-otp` answers — QA-19.
+ *
+ * `cooldownRemaining` is how long until a RESEND would be accepted;
+ * `expiresInSeconds` is how long the code itself stays valid. They are
+ * different numbers (60 and 120 today), and a countdown built on the wrong
+ * one tells the user to wait twice as long as they must.
+ */
+export interface OtpRequestResult {
+  requested: true;
+  cooldownRemaining: number;
+  expiresInSeconds: number;
+}
+
 interface AuthContextValue {
   user: AuthenticatedUser | null;
   status: 'loading' | 'authenticated' | 'unauthenticated';
-  requestOtp: (phone: string) => Promise<void>;
+  requestOtp: (phone: string) => Promise<OtpRequestResult>;
   verifyOtp: (phone: string, code: string) => Promise<void>;
   logout: () => Promise<void>;
   /**
@@ -187,7 +201,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const requestOtp = useCallback(
     async (phone: string) => {
-      await api.post('/v1/auth/request-otp', { phone, purpose: 'login' });
+      const res = await api.post<OtpRequestResult>('/v1/auth/request-otp', { phone, purpose: 'login' });
+      /*
+        The two numbers are returned and BOTH are needed, for different
+        things. They are also identical whether or not the number has an
+        account: the server answers the same way either way, deliberately,
+        so that nothing here can be used to discover whether somebody is
+        registered. Nothing in this app may branch on the difference.
+      */
+      return res.data ?? { requested: true, cooldownRemaining: 0, expiresInSeconds: 0 };
     },
     [api],
   );

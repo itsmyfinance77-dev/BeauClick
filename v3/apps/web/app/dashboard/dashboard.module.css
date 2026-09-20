@@ -1,0 +1,645 @@
+/*
+ * The customer dashboard — `Prototype - Customer.dc.html` §07.
+ *
+ * The design's information architecture folds bookings, loyalty, the beauty
+ * journey and notifications into one page under «حساب من». This is that
+ * page: a main column of sections and a sidebar of three cards, stacking to
+ * one column below 1024.
+ */
+
+.head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-block-end: 24px;
+  flex-wrap: wrap;
+}
+
+.greeting {
+  margin: 0 0 4px;
+  font-family: var(--bc-font-display);
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+@media (min-width: 1024px) {
+  .greeting {
+    font-size: 36px;
+  }
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 16px;
+  color: var(--bc-color-text-muted);
+}
+
+.headAction {
+  display: inline-flex;
+  align-items: center;
+  min-height: 46px;
+  padding: 0 22px;
+  border-radius: 11px;
+  background: var(--bc-color-primary);
+  color: var(--bc-color-surface);
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.headAction:hover {
+  background: var(--bc-color-primary-hover);
+  color: var(--bc-color-surface);
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (min-width: 1024px) {
+  .columns {
+    grid-template-columns: 1fr 344px;
+  }
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  .main {
+    gap: 28px;
+  }
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-block-end: 12px;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-family: var(--bc-font-display);
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.sectionLink {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--bc-color-primary);
+  text-decoration: none;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ------------------------------------------------------- the next booking */
+
+.next {
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border-strong);
+  border-radius: var(--bc-radius-card-lg);
+  overflow: hidden;
+  box-shadow: 0 4px 16px oklch(0.3 0.04 340 / 0.06);
+}
+
+.nextBar {
+  background: var(--bc-color-primary-soft);
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+@media (min-width: 640px) {
+  .nextBar {
+    padding: 10px 20px;
+  }
+}
+
+.nextWhen {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--bc-color-primary-on-soft);
+}
+
+.nextStatus {
+  font-size: var(--bc-text-small-size);
+  font-weight: 700;
+  padding: 3px 11px;
+  border-radius: var(--bc-radius-chip);
+  background: var(--bc-color-surface);
+  color: var(--bc-color-primary-on-soft);
+}
+
+.nextBody {
+  padding: 16px;
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+@media (min-width: 640px) {
+  .nextBody {
+    padding: 20px;
+    gap: 18px;
+  }
+}
+
+.thumb {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: repeating-linear-gradient(
+    135deg,
+    oklch(0.963 0.012 340) 0 6px,
+    oklch(0.945 0.026 340) 6px 12px
+  );
+  flex-shrink: 0;
+}
+
+@media (min-width: 640px) {
+  .thumb {
+    width: 66px;
+    height: 66px;
+  }
+}
+
+.nextTitle {
+  font-family: var(--bc-font-display);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+@media (min-width: 640px) {
+  .nextTitle {
+    font-size: 23px;
+  }
+}
+
+.nextMeta {
+  font-size: 15px;
+  color: var(--bc-color-text-muted);
+}
+
+.nextTime {
+  font-size: 15px;
+  color: var(--bc-color-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.nextActions {
+  padding: 0 16px 16px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+@media (min-width: 640px) {
+  .nextActions {
+    padding: 0 20px 20px;
+  }
+}
+
+.action {
+  font: inherit;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: var(--bc-radius-control);
+  border: 1px solid var(--bc-color-border);
+  background: var(--bc-color-surface);
+  color: var(--bc-color-text);
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.action:hover {
+  border-color: var(--bc-color-border-strong);
+}
+
+.actionDanger {
+  border-color: oklch(0.9 0.03 25);
+  color: var(--bc-color-error);
+  margin-inline-start: auto;
+}
+
+/* ------------------------------------------------------------- past list */
+
+.pastList {
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-card);
+  overflow: hidden;
+}
+
+.pastRow {
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pastRow + .pastRow {
+  border-block-start: 1px solid oklch(0.94 0.006 60);
+}
+
+@media (min-width: 640px) {
+  .pastRow {
+    padding: 16px 20px;
+    gap: 16px;
+    flex-wrap: nowrap;
+  }
+}
+
+.pastThumb {
+  width: 46px;
+  height: 46px;
+  border-radius: 11px;
+  background: repeating-linear-gradient(
+    135deg,
+    oklch(0.963 0.012 340) 0 5px,
+    oklch(0.945 0.026 340) 5px 10px
+  );
+  flex-shrink: 0;
+}
+
+.pastThumbBronze {
+  background: repeating-linear-gradient(
+    135deg,
+    oklch(0.955 0.028 70) 0 5px,
+    oklch(0.94 0.04 70) 5px 10px
+  );
+}
+
+.pastBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.pastTitle {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.pastWhen {
+  font-size: 14px;
+  color: var(--bc-color-text-faint);
+}
+
+/* Status by text and by its own ground — never by colour alone. */
+.status {
+  font-size: var(--bc-text-small-size);
+  font-weight: 700;
+  padding: 3px 11px;
+  border-radius: var(--bc-radius-chip);
+  flex-shrink: 0;
+}
+
+.statusDone {
+  background: var(--bc-color-success-soft);
+  color: var(--bc-color-success);
+}
+
+.statusNeutral {
+  background: oklch(0.955 0.01 60);
+  color: var(--bc-color-text-faint);
+}
+
+.statusWarn {
+  background: var(--bc-color-warning-soft);
+  color: var(--bc-color-warning);
+}
+
+.statusError {
+  background: var(--bc-color-error-soft);
+  color: var(--bc-color-error);
+}
+
+.rebook {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--bc-color-primary);
+  text-decoration: none;
+  flex-shrink: 0;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ----------------------------------------------------------- the journey */
+
+.journey {
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-card);
+  padding: 20px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+
+@media (min-width: 640px) {
+  .journey {
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+}
+
+.journeyTitle {
+  font-size: 15px;
+  font-weight: 700;
+  margin-block-end: 10px;
+}
+
+.goal {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  min-height: 38px;
+}
+
+.goalDone {
+  color: var(--bc-color-text-disabled);
+  text-decoration: line-through;
+}
+
+.prefs {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 14px;
+  font-size: 15px;
+}
+
+.prefs dt {
+  color: var(--bc-color-text-faint);
+}
+
+.prefs dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --------------------------------------------------------------- sidebar */
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/*
+ * The loyalty card is the one inverted surface on this page. Its ink pairs
+ * are chosen against the dark ground rather than against white, so the
+ * palette suite's assertions do not cover them.
+ */
+.loyalty {
+  background: var(--bc-color-text);
+  border-radius: var(--bc-radius-card-lg);
+  padding: 22px;
+  color: var(--bc-color-surface);
+}
+
+.loyaltyHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-block-end: 18px;
+}
+
+.loyaltyLabel {
+  font-size: 15px;
+  font-weight: 600;
+  color: oklch(0.86 0.012 330);
+}
+
+.tierChip {
+  font-size: var(--bc-text-small-size);
+  font-weight: 700;
+  padding: 3px 11px;
+  border-radius: var(--bc-radius-chip);
+  background: var(--bc-color-accent);
+  color: oklch(0.18 0.03 65);
+}
+
+.balanceRow {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-block-end: 4px;
+}
+
+.balance {
+  font-size: 40px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.balanceUnit {
+  font-size: 15px;
+  color: oklch(0.8 0.012 330);
+}
+
+.lifetime {
+  font-size: 14px;
+  color: oklch(0.72 0.015 330);
+  margin-block-end: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.progressLabel {
+  margin-block-end: 8px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+  color: oklch(0.86 0.012 330);
+  font-variant-numeric: tabular-nums;
+}
+
+.progressTrack {
+  height: 8px;
+  border-radius: var(--bc-radius-chip);
+  background: oklch(0.34 0.02 330);
+  overflow: hidden;
+  margin-block-end: 18px;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: var(--bc-radius-chip);
+  background: var(--bc-color-accent);
+}
+
+.benefits {
+  border-block-start: 1px solid oklch(0.34 0.02 330);
+  padding-block-start: 16px;
+}
+
+.benefitsTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: oklch(0.86 0.012 330);
+  margin-block-end: 8px;
+}
+
+.benefit {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  font-size: 14px;
+  color: oklch(0.8 0.012 330);
+  padding-block: 3px;
+}
+
+.benefitDot {
+  width: 5px;
+  height: 5px;
+  border-radius: var(--bc-radius-chip);
+  background: var(--bc-color-accent);
+  flex-shrink: 0;
+}
+
+/* --------------------------------------------------------- sidebar cards */
+
+.card {
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-card);
+  padding: 20px;
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-block-end: 14px;
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: var(--bc-text-card-title-size);
+  font-weight: 700;
+}
+
+.unreadCount {
+  font-size: var(--bc-text-badge-size);
+  font-weight: 700;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--bc-radius-chip);
+  background: var(--bc-color-primary);
+  color: var(--bc-color-surface);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.notice {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  padding: 12px 0;
+  color: var(--bc-color-text);
+  text-decoration: none;
+}
+
+.notice + .notice {
+  border-block-start: 1px solid oklch(0.94 0.006 60);
+}
+
+.noticeDot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--bc-radius-chip);
+  background: var(--bc-color-primary);
+  flex-shrink: 0;
+  margin-block-start: 8px;
+}
+
+/* An already-read notice keeps its row and loses its marker. */
+.noticeDotRead {
+  background: var(--bc-color-border);
+}
+
+.noticeText {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.noticeWhen {
+  display: block;
+  font-size: var(--bc-text-small-size);
+  color: var(--bc-color-text-faint);
+}
+
+.accountList {
+  margin-block-start: 14px;
+  padding-block-start: 14px;
+  border-block-start: 1px solid oklch(0.94 0.006 60);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.accountLink {
+  font: inherit;
+  font-size: 15px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--bc-color-primary);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: start;
+  text-decoration: none;
+}
+
+.accountLinkDanger {
+  color: var(--bc-color-error);
+}
+
+/* A phone number is an LTR run inside an RTL line. */
+.ltr {
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: start;
+}
+
+.empty {
+  font-size: 15px;
+  color: var(--bc-color-text-muted);
+  line-height: 1.8;
+  margin: 0;
+}

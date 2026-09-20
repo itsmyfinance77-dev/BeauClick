@@ -50,9 +50,9 @@ describe('Auth flow (OTP request -> verify -> session)', () => {
     mockFetchOnce(200, { data: { requested: true }, meta: null, error: null });
 
     await user.type(screen.getByLabelText('شماره موبایل'), '09123456789');
-    await user.click(screen.getByRole('button', { name: 'دریافت کد تأیید' }));
+    await user.click(screen.getByRole('button', { name: 'ارسال کد یک‌بارمصرف' }));
 
-    await waitFor(() => expect(screen.getByLabelText('کد تأیید')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByLabelText('کد یک‌بارمصرف')).toBeInTheDocument());
 
     const calls = (global.fetch as jest.Mock).mock.calls as Array<[string, RequestInit]>;
 
@@ -77,8 +77,8 @@ describe('Auth flow (OTP request -> verify -> session)', () => {
 
     mockFetchOnce(200, { data: { requested: true }, meta: null, error: null });
     await user.type(screen.getByLabelText('شماره موبایل'), '09123456789');
-    await user.click(screen.getByRole('button', { name: 'دریافت کد تأیید' }));
-    await waitFor(() => expect(screen.getByLabelText('کد تأیید')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'ارسال کد یک‌بارمصرف' }));
+    await waitFor(() => expect(screen.getByLabelText('کد یک‌بارمصرف')).toBeInTheDocument());
 
     mockFetchOnce(200, {
       data: {
@@ -90,7 +90,7 @@ describe('Auth flow (OTP request -> verify -> session)', () => {
       error: null,
     });
 
-    await user.type(screen.getByLabelText('کد تأیید'), '123456');
+    await user.type(screen.getByLabelText('کد یک‌بارمصرف'), '123456');
     await user.click(screen.getByRole('button', { name: 'تأیید و ورود' }));
 
     await waitFor(() => expect(replace).toHaveBeenCalledWith('/dashboard'));
@@ -104,8 +104,8 @@ describe('Auth flow (OTP request -> verify -> session)', () => {
 
     mockFetchOnce(200, { data: { requested: true }, meta: null, error: null });
     await user.type(screen.getByLabelText('شماره موبایل'), '09123456789');
-    await user.click(screen.getByRole('button', { name: 'دریافت کد تأیید' }));
-    await waitFor(() => expect(screen.getByLabelText('کد تأیید')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'ارسال کد یک‌بارمصرف' }));
+    await waitFor(() => expect(screen.getByLabelText('کد یک‌بارمصرف')).toBeInTheDocument());
 
     mockFetchOnce(400, {
       data: null,
@@ -113,7 +113,7 @@ describe('Auth flow (OTP request -> verify -> session)', () => {
       error: { code: 'VALIDATION_ERROR', message: 'کد وارد شده نامعتبر یا منقضی شده است.' },
     });
 
-    await user.type(screen.getByLabelText('کد تأیید'), '000000');
+    await user.type(screen.getByLabelText('کد یک‌بارمصرف'), '000000');
     await user.click(screen.getByRole('button', { name: 'تأیید و ورود' }));
 
     const alert = await screen.findByRole('alert');
@@ -133,7 +133,7 @@ describe('Auth flow (OTP request -> verify -> session)', () => {
     });
 
     await user.type(screen.getByLabelText('شماره موبایل'), '09123456789');
-    await user.click(screen.getByRole('button', { name: 'دریافت کد تأیید' }));
+    await user.click(screen.getByRole('button', { name: 'ارسال کد یک‌بارمصرف' }));
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('تعداد درخواست‌ها بیش از حد مجاز است. کمی بعد دوباره تلاش کنید.');
@@ -146,8 +146,8 @@ describe('Auth flow (OTP request -> verify -> session)', () => {
 
     mockFetchOnce(200, { data: { requested: true }, meta: null, error: null });
     await user.type(screen.getByLabelText('شماره موبایل'), '09123456789');
-    await user.click(screen.getByRole('button', { name: 'دریافت کد تأیید' }));
-    await waitFor(() => expect(screen.getByLabelText('کد تأیید')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'ارسال کد یک‌بارمصرف' }));
+    await waitFor(() => expect(screen.getByLabelText('کد یک‌بارمصرف')).toBeInTheDocument());
 
     await user.click(screen.getByRole('button', { name: 'تغییر شماره موبایل' }));
     expect(screen.getByLabelText('شماره موبایل')).toBeInTheDocument();
