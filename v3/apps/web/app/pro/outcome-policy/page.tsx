@@ -95,6 +95,19 @@ export default function ProOutcomePolicyPage() {
   const [assignmentLoaded, setAssignmentLoaded] = useState(false);
   const [assignmentError, setAssignmentError] = useState<string | null>(null);
 
+  /**
+   * Which published key the seller is choosing INSIDE.
+   *
+   * `null` until it is known, and never guessed. An administrator may publish
+   * more than one key -- screen 50's own sample identifiers are
+   * `standard-outcome` and `strict-outcome` -- and picking `items[0]` for the
+   * seller is exactly the defect `V33-DEC-020` names, applied to a policy key
+   * instead of a workspace. It is set without asking only when there is
+   * nothing to ask about: one published key, or a key the seller has already
+   * chosen before.
+   */
+  const [activePolicyKey, setActivePolicyKey] = useState<string | null>(null);
+
   const [draft, setDraft] = useState<DraftSelection>(draftFrom(null));
   const [reason, setReason] = useState('');
   const [attempted, setAttempted] = useState(false);
@@ -150,12 +163,23 @@ export default function ProOutcomePolicyPage() {
     setSaveError(null);
     setReason('');
     setAttempted(false);
+    setActivePolicyKey(null);
     void loadAssignment(activeRef);
   }, [activeRef, loadAssignment]);
 
-  // The policy a seller is choosing inside. With exactly one published key
-  // there is nothing to choose between; with none, the screen says so.
-  const policy = policies && policies.length > 0 ? (assignment ? policies.find((p) => p.policyKey === assignment.policyKey) ?? policies[0] : policies[0]) : null;
+  useEffect(() => {
+    if (!policies || !assignmentLoaded || activePolicyKey !== null) return;
+    // The key the seller already chose -- not a guess, a fact.
+    if (assignment && policies.some((p) => p.policyKey === assignment.policyKey)) {
+      setActivePolicyKey(assignment.policyKey);
+      return;
+    }
+    // One published key: nothing to choose between.
+    if (policies.length === 1) setActivePolicyKey(policies[0].policyKey);
+  }, [policies, assignment, assignmentLoaded, activePolicyKey]);
+
+  const policy = policies?.find((p) => p.policyKey === activePolicyKey) ?? null;
+  const mustChoosePolicy = !!policies && policies.length > 1 && activePolicyKey === null;
 
   const complete =
     draft.cutoffHours !== null &&
@@ -249,13 +273,42 @@ export default function ProOutcomePolicyPage() {
             <ErrorState message={assignmentError} onRetry={() => void loadAssignment(activeRef)} />
           ) : policies === null || !assignmentLoaded ? (
             <LoadingState label="در حال بارگذاری شرایط…" />
-          ) : !policy ? (
-            /* Nothing published to choose from — its own state, not a failure. */
+          ) : policies.length === 0 ? (
+            /*
+              Nothing published to choose from — its own state, not a failure.
+              Keyed on the LIST being empty, not on `policy` being null: with
+              two keys published and none chosen yet `policy` is also null,
+              and telling that seller nothing is published would be a worse
+              lie than the `items[0]` guess this branch order replaced.
+            */
             <Card>
               <p data-state="nothing-published" style={{ margin: 0, fontSize: 14, lineHeight: 1.9 }}>
                 هنوز هیچ سیاستی برای انتخاب منتشر نشده است. رزروهای شما مثل گذشته ادامه دارند.
               </p>
             </Card>
+          ) : mustChoosePolicy ? (
+            /*
+              More than one key is published and this seller has never chosen.
+              Nothing below renders until they do -- the same rule the
+              workspace chooser follows, for the same reason.
+            */
+            <section data-testid="policy-chooser">
+              <h2 style={{ fontSize: 15, fontWeight: 800, margin: '0 0 10px' }}>کدام مجموعه شرایط؟</h2>
+              <div style={{ display: 'grid', gap: 'var(--bc-spacing-card-gap)', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+                {policies!.map((option) => (
+                  <Card key={option.policyKey}>
+                    <div data-policy={option.policyKey} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <span style={{ fontSize: 14, fontWeight: 700 }}>{option.displayName}</span>
+                      <Button inline variant="ghost" onClick={() => setActivePolicyKey(option.policyKey)}>
+                        انتخاب
+                      </Button>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </section>
+          ) : !policy ? (
+            <LoadingState label="در حال بارگذاری شرایط…" />
           ) : (
             <section data-testid="outcome-selection">
               {/* Fail-closed: a narrowed range no longer contains this selection. */}

@@ -295,6 +295,48 @@ describe('screen 48 — seller outcome-policy selection', () => {
     expect(consequence.textContent).toContain('متنِ دقیقی که مشتری می‌بیند را مدیر منتشر می‌کند');
   });
 
+  describe('more than one published key', () => {
+    const STRICT = { ...POLICY, policyKey: 'strict-outcome', displayName: 'شرایط سخت‌گیرانه' };
+
+    it('never picks a key for the seller, and renders nothing below until they choose', async () => {
+      mockApi({ policies: [POLICY, STRICT], assignment: null });
+      renderPage();
+
+      const chooser = await screen.findByTestId('workspace-chooser');
+      await userEvent.click(within(chooser.querySelector(`[data-workspace="${OWNED.workspaceRef}"]`) as HTMLElement).getByRole('button'));
+
+      // `items[0]` is exactly the defect V33-DEC-020 names, and it applies to
+      // a policy key as much as to a workspace.
+      const policyChooser = await screen.findByTestId('policy-chooser');
+      expect(policyChooser.querySelector('[data-policy="standard-outcome"]')).not.toBeNull();
+      expect(policyChooser.querySelector('[data-policy="strict-outcome"]')).not.toBeNull();
+      expect(screen.queryByTestId('outcome-selection')).toBeNull();
+
+      await userEvent.click(
+        within(policyChooser.querySelector('[data-policy="strict-outcome"]') as HTMLElement).getByRole('button'),
+      );
+      await screen.findByTestId('outcome-selection');
+      expect(screen.queryByTestId('policy-chooser')).toBeNull();
+    });
+
+    it('does not ask when the seller has already chosen a key', async () => {
+      mockApi({ policies: [POLICY, STRICT], assignment: assignment() });
+      renderPage();
+
+      // Their own earlier choice is a fact, not a guess — no question to ask.
+      await chooseWorkspace();
+      expect(screen.queryByTestId('policy-chooser')).toBeNull();
+    });
+
+    it('does not ask when exactly one key is published', async () => {
+      mockApi({ policies: [POLICY], assignment: null });
+      renderPage();
+
+      await chooseWorkspace();
+      expect(screen.queryByTestId('policy-chooser')).toBeNull();
+    });
+  });
+
   it('states that bookings already taken keep their own terms', async () => {
     mockApi({ assignment: assignment() });
     renderPage();
