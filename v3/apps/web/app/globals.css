@@ -87,3 +87,51 @@ a {
     transition-duration: 0.01ms !important;
   }
 }
+
+/*
+ * Screen 46's per-state funds cards — V3.3 `#43a` / #185.
+ *
+ * Mobile-first, because the narrow layout is the one the amendment specifies:
+ * a labelled ROW with the amount aligned in its own column, so twelve figures
+ * read as a list rather than as twelve full-height blocks. From 560px up the
+ * card becomes the stacked block the desktop grid expects.
+ */
+/*
+ * Explicit column counts rather than `auto-fit`: the groups hold exactly six
+ * and exactly three fields, and both divide evenly by three. `auto-fit` with a
+ * min width lands on five-plus-one for the six, which reads as a card that
+ * failed to load rather than as a deliberate row.
+ */
+.bc-fund-grid {
+  display: grid;
+  gap: var(--bc-spacing-card-gap);
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 560px) {
+  .bc-fund-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 900px) {
+  .bc-fund-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.bc-fund-card {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+@media (min-width: 560px) {
+  .bc-fund-card {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+  }
+}

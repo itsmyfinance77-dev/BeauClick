@@ -120,6 +120,9 @@ function mockApi(options: {
       if (forBusiness) return ok(BUSINESS_SUMMARY);
       return refused(404, 'NOT_FOUND_OR_NOT_YOURS');
     }
+    // V3.3 `#43a` / #185. The real twelve-field shape, so this suite exercises
+    // what the server actually returns rather than a fall-through stub.
+    if (url.includes('/funds')) return ok({ pending: 0, disputed: 0, available: 0, reserve: 0, settled: 0, refunded: 0, platformEarned: 0, providerFee: 0, recoveryOut: 0, collected: 0, platformAdvance: 0, recoveredIn: 0, currency: 'IRT' });
     if (url.includes('/outstanding-orders')) return ok([]);
     if (url.includes('/settlements')) return ok({ items: [], nextCursor: null });
     if (url.includes('/ledger')) return ok([]);
@@ -245,6 +248,7 @@ describe('a workspace whose sections are still loading', () => {
       if (url.includes('/v1/me/provider')) return ok({ id: 'prof-1', displayName: 'نمایه', verificationStatus: 'verified' });
       if (url.includes('/v1/me/finance/workspaces')) return ok({ items: [PROFESSIONAL_WORKSPACE] });
       if (url.includes('/summary')) return ok(PROFESSIONAL_SUMMARY);
+      if (url.includes('/funds')) return ok({ pending: 0, disputed: 0, available: 0, reserve: 0, settled: 0, refunded: 0, platformEarned: 0, providerFee: 0, recoveryOut: 0, collected: 0, platformAdvance: 0, recoveredIn: 0, currency: 'IRT' });
       if (url.includes('/outstanding-orders')) return ordersHeld.then(() => ok([]));
       if (url.includes('/settlements')) return settlementsHeld.then(() => ok({ items: [], nextCursor: null }));
       return ok([]);
