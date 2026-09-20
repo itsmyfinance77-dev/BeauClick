@@ -1834,3 +1834,75 @@ reads **no data-quality warnings**.
   is fail-safe but points the wrong way architecturally. It blocks the seller commercial family,
   not one screen.
 - **Screen 47**, the largest remaining — 22 routes across three families.
+
+## 2026-09-20 → 21 — the design conformance work
+
+`#216` and `#222`. Two merges, ten surfaces, and an audit that explains why they were
+needed.
+
+### What the audit found
+
+Everything built on 2026-09-20 had been verified **against the code** — contracts, DTOs,
+services, 2,521 tests, CI — and **nothing against the design**. That split is not random
+and its consequence was predictable: wherever the reference of truth is code, the work
+holds up and a second person can check it; wherever the reference is the design, nothing
+had been checked at all. UI is the one place the design is the authority, which is why it
+surfaced there and nowhere else.
+
+The corpus is **5,407 lines across 60 documents**, not the 2,871 across 13 first
+reported — the first count missed the 46 screen specs. `V3.3_DESIGN_CONFORMANCE_AUDIT.md`
+records nine findings, each with a reproducing command. The largest: **no font was
+loaded at all**, so every Persian glyph rendered in an OS substitute.
+
+### What landed
+
+`#216` — the design language: three faces loaded, both token vocabularies defined with
+legacy names as aliases, the ten text roles as tokens, the `info` alert tone, and the two
+tokens that were read in seven places and defined nowhere.
+
+`#222` — the landing page, search results, the professional's profile, the customer
+dashboard, sign-in, the professional's «امروز», and all three shells. 466 web tests, 115
+token tests, 45 persian-utils tests.
+
+### The design is evidence, not an oracle
+
+Three claims in the design did not survive measurement, and each correction is pinned by
+a test so a future re-sync cannot undo it:
+
+- Its palette claims every pair was checked for contrast. **Seven were below AA and
+  three colours fell outside sRGB** — where the browser clips, so the published ratio
+  describes a colour nobody sees.
+- Its accessibility section requires 44px touch targets "without exception"; its own
+  mobile artboards draw a 22px control.
+- Three figures it calls "derivable from existing routes with no new API route" are not
+  derivable. The specialty facet buckets on a NAME while the filter takes an ID (`#223`);
+  a month-over-month comparison needs a series and `FinanceSummary` is a position
+  (`#227`); "soonest free slot" needs a bulk read that does not exist (`#228`).
+
+### Eight backend gaps, all recorded
+
+`#223` `#224` `#225` `#226` `#227` `#228`, plus the font decisions `#217` `#218`.
+Where a gap exists the UI renders **nothing** and a test asserts the absence — never a
+plausible-looking number on a customer's or a seller's screen.
+
+### Where verification actually caught things
+
+Worth recording, because it changes how the remaining screens should be built:
+
+- **Three touch-target defects and two layout defects appeared only in a browser.** Tests
+  have no geometry and jsdom computes no styles. One was a hit area silently clipped by a
+  scrolling row — half of it worked.
+- **Two ordering defects appeared only on re-reading the code.** The worst put one
+  appointment's date beside a different appointment's salon.
+- **One defect appeared only in a production build.** `useSearchParams` without a Suspense
+  boundary: `next dev` was perfect, types silent, lint silent, 405 tests green.
+
+So a screen is finished when it has been **measured in a browser at two widths** and
+`nx build web` passes — not when the suite is green.
+
+### Still open
+
+`V3.3_FRONTEND_OPEN_ITEMS.md` carries the full list. The headline: **7 of 41 screens**,
+the professional and admin platforms are half-migrated (new shells, old page layouts),
+and the styling layer (`#219`) still blocks the component work (`#220`) and the
+screen-by-screen pass (`#221`).
