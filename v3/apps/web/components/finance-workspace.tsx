@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { formatToman, formatZonedFullDate, toPersianDigits } from '@beauclick/persian-utils';
 import { Button, Card, ErrorState, LoadingState } from '@/components/ui';
 import { Badge, EmptyState, PageHeader } from '@/components/kit';
+import { FundsByState } from '@/components/funds-by-state';
 import { useAuth } from '@/lib/auth-context';
 import { ApiRequestError } from '@/lib/api-client';
 import {
@@ -12,12 +13,14 @@ import {
   orderLedger,
   outstandingOrders,
   settlements,
+  workspaceFunds,
   type FinanceAccessMode,
   type FinanceSummary,
   type FinanceWorkspace,
   type LedgerEntry,
   type OutstandingOrder,
   type SettlementBatch,
+  type WorkspaceFunds,
 } from '@/lib/pro-api';
 
 /**
@@ -105,6 +108,18 @@ export function FinanceWorkspaceSurface() {
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
 
+  /**
+   * V3.3 `#43a` / #185. A FOURTH independent section, under the same rule as
+   * the three above: this read failing must not blank the others, and it
+   * retries on its own. `fundsLoadedFor` mirrors `ordersLoadedFor` -- until it
+   * matches the active workspace the section is loading, never "all zero",
+   * which would be a claim about a request that has not been answered.
+   */
+  const [funds, setFunds] = useState<WorkspaceFunds | null>(null);
+  const [fundsLoading, setFundsLoading] = useState(false);
+  const [fundsError, setFundsError] = useState<string | null>(null);
+  const [fundsLoadedFor, setFundsLoadedFor] = useState<string | null>(null);
+
   const [orders, setOrders] = useState<OutstandingOrder[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [ordersError, setOrdersError] = useState<string | null>(null);
@@ -133,6 +148,9 @@ export function FinanceWorkspaceSurface() {
   const clearContent = useCallback(() => {
     setSummary(null);
     setSummaryError(null);
+    setFunds(null);
+    setFundsError(null);
+    setFundsLoadedFor(null);
     setOrders([]);
     setOrdersError(null);
     setOrdersLoadedFor(null);
@@ -204,6 +222,27 @@ export function FinanceWorkspaceSurface() {
     [api, handleAuthorityLoss],
   );
 
+  const loadFunds = useCallback(
+    async (workspaceRef: string) => {
+      setFundsLoading(true);
+      setFundsError(null);
+      try {
+        const res = await workspaceFunds(api, workspaceRef);
+        setFunds(res.data ?? null);
+        setFundsLoadedFor(workspaceRef);
+      } catch (err) {
+        if (isRecoverableRefusal(err)) {
+          handleAuthorityLoss(workspaceRef);
+          return;
+        }
+        setFundsError(errorMessage(err, 'وجوهِ این فضا بارگذاری نشد.'));
+      } finally {
+        setFundsLoading(false);
+      }
+    },
+    [api, handleAuthorityLoss],
+  );
+
   const loadOrders = useCallback(
     async (workspaceRef: string) => {
       setOrdersLoading(true);
@@ -258,8 +297,9 @@ export function FinanceWorkspaceSurface() {
     if (!activeRef) return;
     authorityLossHandledForRef.current = null;
     // Independent calls, not `Promise.all` -- one section's rejection must
-    // never keep the other two from ever settling.
+    // never keep the others from ever settling.
     void loadSummary(activeRef);
+    void loadFunds(activeRef);
     void loadOrders(activeRef);
     void loadSettlements(activeRef);
   }, [activeRef]);
@@ -422,6 +462,7 @@ export function FinanceWorkspaceSurface() {
             </div>
           ) : null}
 
+          <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 6px' }}>ارقامِ سامانهٔ پیشین</h2>
           {summaryLoading ? (
             <LoadingState label="در حال بارگذاری خلاصهٔ مالی…" />
           ) : summaryError ? (
@@ -441,6 +482,19 @@ export function FinanceWorkspaceSurface() {
                 <p style={{ margin: '6px 0 0', fontSize: 22, fontWeight: 800 }}>{formatToman(summary.outstandingToman)}</p>
               </Card>
             </div>
+          ) : null}
+
+          {/*
+            V3.3 `#43a` / #185. Its own loading and error state, scoped to this
+            section: a funds read that fails leaves the legacy figures, the
+            orders and the settlement history exactly where they are.
+          */}
+          {fundsError ? (
+            <ErrorState message={fundsError} onRetry={() => void loadFunds(active.workspaceRef)} />
+          ) : fundsLoading || fundsLoadedFor !== active.workspaceRef ? (
+            <LoadingState label="در حال بارگذاری وجوه…" />
+          ) : funds ? (
+            <FundsByState funds={funds} />
           ) : null}
 
           <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 12px' }}>سفارش‌های در انتظار تسویه</h2>

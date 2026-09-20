@@ -291,6 +291,42 @@ export function financeSummary(api: ApiClient, workspaceRef: string) {
   return api.get<FinanceSummary>(`/v1/me/finance/${workspaceRef}/summary`);
 }
 
+/**
+ * The twelve per-state fund figures — V3.3 `#43a` / #185, ADR-052 §14 and §16.
+ *
+ * EXACTLY `toFundsResponse`'s twelve fields plus `currency`, in the server's
+ * own order. They are **three** kinds of fact, not two, and the grouping in
+ * `finance-workspace.tsx` is the one place that says which is which:
+ *
+ *  - `pending` … `refunded` are this workspace's money;
+ *  - `collected`, `platformAdvance`, `recoveredIn` are custody and
+ *    cash-position facts (ADR-052 §12's M1) — **not** a payable figure;
+ *  - `platformEarned`, `providerFee`, `recoveryOut` are the platform's.
+ *
+ * Nothing here is summed. The six seller states are states, not shares of one
+ * whole, so even a within-group total would be a figure the server never
+ * produced.
+ */
+export interface WorkspaceFunds {
+  pending: number;
+  disputed: number;
+  available: number;
+  reserve: number;
+  settled: number;
+  refunded: number;
+  platformEarned: number;
+  providerFee: number;
+  recoveryOut: number;
+  collected: number;
+  platformAdvance: number;
+  recoveredIn: number;
+  currency: string;
+}
+
+export function workspaceFunds(api: ApiClient, workspaceRef: string) {
+  return api.get<WorkspaceFunds>(`/v1/me/finance/${workspaceRef}/funds`);
+}
+
 export function outstandingOrders(api: ApiClient, workspaceRef: string) {
   return api.get<OutstandingOrder[]>(`/v1/me/finance/${workspaceRef}/outstanding-orders`);
 }
