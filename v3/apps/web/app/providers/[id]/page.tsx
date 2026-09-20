@@ -1,39 +1,73 @@
 'use client';
 
+import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { formatFullJalaliDate, formatToman, toPersianDigits } from '@beauclick/persian-utils';
+import { formatFullJalaliDate, formatShortDate, formatToman, toPersianDigits } from '@beauclick/persian-utils';
 
 import { useAuth } from '@/lib/auth-context';
-import { Alert, Button, Card, LoadingState } from '@/components/ui';
+import { Alert, Button, ErrorState, LoadingState } from '@/components/ui';
 import {
   bookingApi,
   groupSlotsByDay,
   slotTimeLabel,
   type AvailableSlot,
+  type CityRef,
+  type PortfolioItem,
   type ProviderSummary,
   type ServiceOffering,
 } from '@/lib/booking-api';
 import { joinWaitlist } from '@/lib/phase4-api';
+import { removeFromWishlist, saveToWishlist } from '@/lib/phase3-api';
 import { ApiRequestError } from '@/lib/api-client';
+import styles from './provider.module.css';
 
 /**
- * The booking screen: choose a service, choose a time, confirm.
+ * The professional's profile and booking panel —
+ * `Prototype - Customer.dc.html` §05 and §06, `02_PROVIDER_PROFILE.md`.
  *
- * Two things about it are load-bearing rather than cosmetic.
+ * Two things about the booking half are load-bearing rather than cosmetic,
+ * and both are carried over unchanged:
  *
  * **No price is ever sent.** The customer sees the catalogue price, but the
  * confirm request carries only ids. The server prices the order from its own
- * catalogue through the pricing engine, so what is charged cannot be
- * influenced by anything the browser holds.
+ * catalogue, so what is charged cannot be influenced by anything the browser
+ * holds.
  *
  * **One idempotency key per checkout attempt.** Generated when the customer
- * commits, and reused for every retry of THAT attempt (including the API
- * client's post-refresh retry). A double-tapped confirm button therefore
- * converges on one booking rather than claiming a second slot -- which is
- * exactly the failure a mobile customer on a flaky connection would
- * otherwise cause.
+ * commits and reused for every retry of THAT attempt, so a double-tapped
+ * confirm converges on one booking rather than claiming a second slot.
+ *
+ * ## Four fields the server always returned and no surface could use
+ *
+ * `ProviderSummary` in this app named six fields. The server's shape has
+ * ten: `images` (avatar and cover), `rating` (average null until somebody
+ * reviews), `saved`, and `createdAt`. There is also a public
+ * `GET /v1/providers/:id/portfolio`. So the design's gallery, the join date
+ * and both save controls are real data, not placeholders — and the page
+ * renders a placeholder only where a picture genuinely does not exist.
+ *
+ * ## The city needed a second read
+ *
+ * The professional shape carries `cityId` and not a name. `GET
+ * /v1/providers/cities` is public and small, so the name comes from there.
+ * A page that shows a customer a raw uuid is showing them nothing.
+ *
+ * ## What the design shows and this does not
+ *
+ * «۴۸ نوبت انجام‌شده» twice — as a stat card and as a credibility card. The
+ * design's data note calls it countable from the professional's completed
+ * bookings, and no public route exposes that count. Neither card is rendered
+ * with a guessed number; the credibility section keeps its other three.
+ *
+ * The reviews card IS rendered, as the dashed placeholder the design draws,
+ * because the design is explicit that its place in the layout is held on
+ * purpose so the page does not rearrange when reviews arrive.
  */
+
+/** How many gallery tiles the desktop artboard holds: one large, two small. */
+const GALLERY_TILES = 3;
+
 export default function ProviderBookingPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -42,24 +76,46 @@ export default function ProviderBookingPage() {
   const professionalId = params.id;
   const [provider, setProvider] = useState<ProviderSummary | null>(null);
   const [services, setServices] = useState<ServiceOffering[]>([]);
+  const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
+  const [cities, setCities] = useState<CityRef[]>([]);
   const [slots, setSlots] = useState<AvailableSlot[]>([]);
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
+  const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [savingTarget, setSavingTarget] = useState<string | null>(null);
   const [waitlistState, setWaitlistState] = useState<'idle' | 'joining' | 'joined' | 'already'>('idle');
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [providerRes, servicesRes] = await Promise.all([
+      /*
+        Four reads in parallel. The portfolio and the city list are not
+        allowed to fail the page: a profile with no pictures and a profile
+        whose city cannot be named are both still a usable profile, and
+        failing the whole screen for either would be a worse answer than
+        rendering what did arrive.
+      */
+      const [providerRes, servicesRes, portfolioRes, citiesRes] = await Promise.all([
         bookingApi.getProvider(api, professionalId),
         bookingApi.listServices(api, professionalId),
+        bookingApi.listPortfolio(api, professionalId).catch(() => null),
+        bookingApi.listCities(api).catch(() => null),
       ]);
       setProvider(providerRes.data);
       setServices(servicesRes.data ?? []);
+      setPortfolio(portfolioRes?.data ?? []);
+      setCities(citiesRes?.data ?? []);
+      /*
+        The first service is pre-selected so the panel has a price and a
+        list of times to show. That IS a choice made for the caller, so it
+        is made VISIBLE: the chosen row carries a «انتخاب شد» chip and a
+        2px border, and one tap changes it. `V33-DEC-020` forbids choosing
+        silently, not choosing at all.
+      */
       setSelectedServiceId((current) => current ?? servicesRes.data?.[0]?.id ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'خطایی رخ داد.');
@@ -83,6 +139,7 @@ export default function ProviderBookingPage() {
         if (cancelled) return;
         setSlots(res.data ?? []);
         setSelectedSlotId(null);
+        setSelectedDayKey(null);
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : 'خطایی رخ داد.');
@@ -94,6 +151,35 @@ export default function ProviderBookingPage() {
 
   const days = useMemo(() => groupSlotsByDay(slots), [slots]);
   const selectedService = services.find((s) => s.id === selectedServiceId) ?? null;
+  // The first day that actually has times, until the customer picks another.
+  const activeDay = days.find((d) => d.dayKey === selectedDayKey) ?? days[0] ?? null;
+  const selectedSlot = slots.find((s) => s.id === selectedSlotId) ?? null;
+  const cityName = provider?.cityId ? (cities.find((c) => c.id === provider.cityId)?.name ?? null) : null;
+
+  /** The gallery's pictures: real media first, placeholders for the rest. */
+  const tiles = useMemo(() => {
+    const withUrl = portfolio.filter((item) => item.media?.url);
+    return Array.from({ length: GALLERY_TILES }, (_, i) => withUrl[i] ?? null);
+  }, [portfolio]);
+
+  async function toggleSaved(targetType: 'professional' | 'service', targetId: string, currentlySaved: boolean) {
+    if (savingTarget) return;
+    setSavingTarget(targetId);
+    try {
+      if (currentlySaved) await removeFromWishlist(api, targetType, targetId);
+      else await saveToWishlist(api, targetType, targetId);
+      if (targetType === 'professional') {
+        setProvider((p) => (p ? { ...p, saved: !currentlySaved } : p));
+      } else {
+        setServices((list) => list.map((s) => (s.id === targetId ? { ...s, saved: !currentlySaved } : s)));
+      }
+    } catch {
+      // Left exactly as it was: a control must never claim a state the
+      // server does not hold.
+    } finally {
+      setSavingTarget(null);
+    }
+  }
 
   async function joinTheWaitlist() {
     if (status !== 'authenticated') {
@@ -165,154 +251,338 @@ export default function ProviderBookingPage() {
   }
 
   if (loading) return <LoadingState label="در حال بارگذاری…" />;
-  if (!provider) return <Alert tone="error">{error ?? 'این متخصص یافت نشد.'}</Alert>;
+  if (!provider) return <ErrorState message={error ?? 'این متخصص یافت نشد.'} onRetry={() => void load()} />;
+
+  const isVerified = provider.verificationStatus === 'verified';
+  const savedProfessional = provider.saved;
 
   return (
-    <section style={{ display: 'grid', gap: 'var(--bc-spacing-card-gap)' }}>
-      <Card>
-        <h1 style={{ fontSize: 24, marginBlockEnd: 4 }}>{provider.displayName}</h1>
-        {provider.bio ? <p style={{ color: 'var(--bc-color-ink-soft)', margin: 0 }}>{provider.bio}</p> : null}
-      </Card>
+    <section>
+      <nav aria-label="مسیر" className={styles.breadcrumb}>
+        <Link href="/">خانه</Link>
+        <span aria-hidden="true">/</span>
+        <Link href="/search">جست‌وجو</Link>
+        <span aria-hidden="true">/</span>
+        <span className={styles.breadcrumbCurrent}>{provider.displayName}</span>
+      </nav>
+
+      <div className={styles.gallery} data-testid="gallery">
+        <div className={styles.galleryMain}>
+          {tiles[0]?.media?.url ? (
+            /* A media-pipeline URL, whose dimensions are the uploader's and
+               not ours; `next/image` would need a configured remote pattern
+               for a host that is deployment-dependent. */
+            <img src={tiles[0].media.url} alt={tiles[0].caption ?? ''} className={styles.galleryImage} />
+          ) : (
+            <span className={styles.galleryLabel}>نمونه کار اصلی</span>
+          )}
+        </div>
+        <div className={styles.gallerySide}>
+          {[1, 2].map((index) => {
+            const item = tiles[index];
+            return (
+              <div
+                key={index}
+                className={`${styles.galleryTile} ${index === 1 ? styles.galleryTileBronze : ''}`}
+              >
+                {item?.media?.url ? (
+                  <img src={item.media.url} alt={item.caption ?? ''} className={styles.galleryImage} />
+                ) : (
+                  <span className={styles.galleryLabel}>نمونه کار</span>
+                )}
+                {/* Only offered when there are genuinely more than the tiles show. */}
+                {index === 2 && portfolio.length > GALLERY_TILES ? (
+                  <button type="button" className={styles.galleryMore}>
+                    دیدن همه {toPersianDigits(portfolio.length)} نمونه
+                  </button>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
       {error ? <Alert tone="error">{error}</Alert> : null}
 
-      <Card>
-        <h2 style={{ fontSize: 18, marginBlockEnd: 12 }}>انتخاب خدمت</h2>
-        {services.length === 0 ? (
-          <p style={{ color: 'var(--bc-color-ink-soft)' }}>این متخصص هنوز خدمتی ثبت نکرده است.</p>
-        ) : (
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 8 }}>
-            {services.map((service) => {
-              const selected = service.id === selectedServiceId;
-              return (
-                <li key={service.id}>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedServiceId(service.id)}
-                    aria-pressed={selected}
-                    style={{
-                      font: 'inherit',
-                      width: '100%',
-                      minHeight: 44,
-                      textAlign: 'start',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      gap: 12,
-                      padding: '12px 14px',
-                      borderRadius: 'var(--bc-radius-row)',
-                      border: `1px solid ${selected ? 'var(--bc-color-primary)' : 'var(--bc-color-line)'}`,
-                      background: selected ? 'var(--bc-color-primary-soft)' : 'transparent',
-                      color: 'var(--bc-color-ink)',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <span>
-                      {service.name}
-                      <span style={{ display: 'block', fontSize: 12, color: 'var(--bc-color-ink-faint)' }}>
-                        {toPersianDigits(service.durationMinutes)} دقیقه
-                      </span>
-                    </span>
-                    <strong style={{ whiteSpace: 'nowrap' }}>{formatToman(service.priceToman)} تومان</strong>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </Card>
-
-      <Card>
-        <h2 style={{ fontSize: 18, marginBlockEnd: 12 }}>انتخاب زمان</h2>
-        {days.length === 0 ? (
+      <div className={styles.columns}>
+        <div className={styles.profile}>
           <div>
-            <p style={{ color: 'var(--bc-color-ink-soft)', marginBlockEnd: 12 }}>در حال حاضر زمان آزادی برای رزرو وجود ندارد.</p>
-            {waitlistState === 'joined' ? (
-              <Alert tone="success">
-                به لیست انتظار اضافه شدید. به محض آزاد شدن یک نوبت، به شما اطلاع می‌دهیم.
-              </Alert>
-            ) : waitlistState === 'already' ? (
-              /* `info`, not `success`: nothing happened just now. "You were
-                 already on the list" is a fact about the past, and green
-                 claimed the button had done something. */
-              <Alert tone="info">شما قبلاً در لیست انتظار این متخصص ثبت‌نام کرده‌اید.</Alert>
-            ) : (
-              <Button variant="ghost" onClick={() => void joinTheWaitlist()} loading={waitlistState === 'joining'}>
-                عضویت در لیست انتظار
-              </Button>
-            )}
-          </div>
-        ) : (
-          <div style={{ display: 'grid', gap: 20 }}>
-            {days.map((day) => (
-              <div key={day.dayKey}>
-                <h3 style={{ fontSize: 14, fontWeight: 700, marginBlockEnd: 8, color: 'var(--bc-color-ink-soft)' }}>
-                  {formatFullJalaliDate(day.date)}
-                </h3>
-                <ul
-                  style={{
-                    listStyle: 'none',
-                    padding: 0,
-                    margin: 0,
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: 'var(--bc-spacing-chip-gap)',
-                  }}
+            <div className={styles.identity}>
+              <h1 className={styles.name}>{provider.displayName}</h1>
+              {isVerified ? (
+                <span className={styles.verified}>
+                  <span className={styles.verifiedDot} aria-hidden="true" />
+                  هویت تأیید شده
+                </span>
+              ) : null}
+              {savedProfessional === null ? (
+                /* `null` is not "unsaved" — it means there is no caller to
+                   answer for, so there is no state to render as pressed. */
+                <Link href="/auth" className={styles.save} aria-label={`برای ذخیرهٔ ${provider.displayName} وارد شوید`}>
+                  ذخیره در علاقه‌مندی‌ها
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  className={`${styles.save} ${savedProfessional ? styles.saveOn : ''}`}
+                  aria-pressed={savedProfessional}
+                  disabled={savingTarget === provider.id}
+                  aria-label={
+                    savedProfessional
+                      ? `حذف ${provider.displayName} از علاقه‌مندی‌ها`
+                      : `افزودن ${provider.displayName} به علاقه‌مندی‌ها`
+                  }
+                  onClick={() => void toggleSaved('professional', provider.id, savedProfessional)}
                 >
-                  {day.slots.map((slot) => {
-                    const selected = slot.id === selectedSlotId;
+                  {savedProfessional ? 'در علاقه‌مندی‌ها' : 'ذخیره در علاقه‌مندی‌ها'}
+                </button>
+              )}
+            </div>
+            <p className={styles.place}>
+              {[cityName, provider.specialties.map((s) => s.name).join('، ')].filter(Boolean).join(' · ')}
+            </p>
+            {provider.bio ? <p className={styles.bio}>{provider.bio}</p> : null}
+          </div>
+
+          <div className={styles.stats}>
+            <div className={styles.stat}>
+              <div className={styles.statLabel}>عضو بیوکلیک از</div>
+              <div className={styles.statValue}>{formatFullJalaliDate(new Date(provider.createdAt))}</div>
+            </div>
+            <div className={styles.stat}>
+              <div className={styles.statLabel}>خدمات فعال</div>
+              <div className={styles.statValue}>{toPersianDigits(services.length)} خدمت</div>
+            </div>
+          </div>
+
+          <div>
+            <h2 className={styles.sectionTitle}>خدمات و قیمت‌ها</h2>
+            {services.length === 0 ? (
+              <p className={styles.emptyPanel}>این متخصص هنوز خدمتی ثبت نکرده است.</p>
+            ) : (
+              <>
+                <div className={styles.serviceList} data-testid="services">
+                  {services.map((service) => {
+                    const chosen = service.id === selectedServiceId;
+                    const savedService = service.saved ?? null;
                     return (
-                      <li key={slot.id}>
+                      <div
+                        key={service.id}
+                        className={`${styles.service} ${chosen ? styles.serviceChosen : ''}`}
+                        data-service={service.id}
+                        data-chosen={chosen ? 'true' : undefined}
+                      >
                         <button
                           type="button"
-                          onClick={() => setSelectedSlotId(slot.id)}
-                          aria-pressed={selected}
-                          style={{
-                            font: 'inherit',
-                            minHeight: 44,
-                            minWidth: 76,
-                            padding: '10px 14px',
-                            borderRadius: 'var(--bc-radius-pill)',
-                            border: `1px solid ${selected ? 'var(--bc-color-primary)' : 'var(--bc-color-line)'}`,
-                            background: selected ? 'var(--bc-color-primary)' : 'transparent',
-                            color: selected ? 'var(--bc-color-surface)' : 'var(--bc-color-ink)',
-                            cursor: 'pointer',
-                            // Times read left-to-right even in an RTL
-                            // document, so "09:30" does not visually reverse.
-                            direction: 'ltr',
-                          }}
+                          onClick={() => setSelectedServiceId(service.id)}
+                          aria-pressed={chosen}
+                          style={{ font: 'inherit', border: 'none', background: 'transparent', textAlign: 'start', cursor: 'pointer', padding: 0, color: 'inherit', flex: 1, minWidth: 0 }}
                         >
-                          {toPersianDigits(slotTimeLabel(slot.startAt))}
+                          <span className={styles.serviceHead}>
+                            <span className={styles.serviceName}>{service.name}</span>
+                            {chosen ? <span className={styles.chosenChip}>انتخاب شد</span> : null}
+                          </span>
+                          <span className={styles.serviceMeta} style={{ display: 'block' }}>
+                            {toPersianDigits(service.durationMinutes)} دقیقه
+                          </span>
                         </button>
-                      </li>
+                        <div className={styles.servicePrice}>
+                          <div>
+                            <div className={styles.priceValue}>{formatToman(service.priceToman)}</div>
+                            <div className={styles.priceUnit}>تومان</div>
+                          </div>
+                          {savedService === null ? (
+                            <Link
+                              href="/auth"
+                              className={styles.serviceSave}
+                              aria-label={`برای ذخیرهٔ ${service.name} وارد شوید`}
+                            >
+                              ذخیره
+                            </Link>
+                          ) : (
+                            <button
+                              type="button"
+                              className={`${styles.serviceSave} ${savedService ? styles.serviceSaveOn : ''}`}
+                              aria-pressed={savedService}
+                              disabled={savingTarget === service.id}
+                              aria-label={
+                                savedService ? `حذف ${service.name} از علاقه‌مندی‌ها` : `افزودن ${service.name} به علاقه‌مندی‌ها`
+                              }
+                              onClick={() => void toggleSaved('service', service.id, savedService)}
+                            >
+                              {savedService ? 'ذخیره‌شده' : 'ذخیره'}
+                            </button>
+                          )}
+                        </div>
+                      </div>
                     );
                   })}
-                </ul>
-              </div>
-            ))}
+                </div>
+                <p className={styles.note}>
+                  ذخیرهٔ هر خدمت مستقل از ذخیرهٔ خودِ متخصص است و سطر جداگانه‌ای در فهرست علاقه‌مندی‌ها می‌سازد.
+                </p>
+              </>
+            )}
           </div>
-        )}
-      </Card>
 
-      <Card>
-        <h2 style={{ fontSize: 18, marginBlockEnd: 12 }}>تأیید و پرداخت</h2>
-        <dl style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '8px 16px', fontSize: 14, margin: 0 }}>
-          <dt style={{ color: 'var(--bc-color-ink-faint)' }}>خدمت</dt>
-          <dd style={{ margin: 0 }}>{selectedService?.name ?? '—'}</dd>
-          <dt style={{ color: 'var(--bc-color-ink-faint)' }}>مبلغ</dt>
-          <dd style={{ margin: 0 }}>
-            {selectedService ? `${formatToman(selectedService.priceToman)} تومان` : '—'}
-          </dd>
-        </dl>
-        <p style={{ fontSize: 12, color: 'var(--bc-color-ink-faint)', marginBlockStart: 12 }}>
-          مبلغ نهایی توسط سرور محاسبه می‌شود و در صفحه‌ی رسید نمایش داده خواهد شد.
-        </p>
-        <div style={{ marginBlockStart: 16 }}>
-          <Button onClick={() => void confirm()} loading={submitting} disabled={!selectedSlotId || !selectedServiceId}>
-            {status === 'authenticated' ? 'رزرو و پرداخت' : 'ورود و ادامه'}
-          </Button>
+          <div className={styles.credibility}>
+            <h2 className={styles.sectionTitle}>اعتبار این متخصص</h2>
+            <div className={styles.credGrid}>
+              {isVerified ? (
+                <div className={styles.cred}>
+                  <span className={styles.credDot} aria-hidden="true" />
+                  <div>
+                    <div className={styles.credTitle}>هویت بررسی شده</div>
+                    <div className={styles.credText}>
+                      مدارک هویتی و مجوز صنفی توسط تیم بیوکلیک تأیید شده است.
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+              <div className={styles.cred}>
+                <span className={`${styles.credDot} ${styles.credDotPrimary}`} aria-hidden="true" />
+                <div>
+                  <div className={styles.credTitle}>پرداخت با پشتوانه</div>
+                  <div className={styles.credText}>
+                    مبلغ تا پس از انجام نوبت نزد پلتفرم می‌ماند و در صورت لغو بازگردانده می‌شود.
+                  </div>
+                </div>
+              </div>
+              {/*
+                Kept as the design's dashed placeholder rather than dropped:
+                the design holds this card's place in the layout on purpose,
+                so the page does not rearrange when reviews arrive.
+              */}
+              <div className={`${styles.cred} ${styles.credPending}`} data-testid="reviews-placeholder">
+                <span className={styles.credDot} aria-hidden="true" />
+                <div>
+                  <div className={styles.credTitle}>دیدگاه مشتریان</div>
+                  <div className={styles.credText}>به‌زودی. جای این بخش در چیدمان از حالا نگه داشته شده است.</div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-      </Card>
+
+        <aside className={styles.panel} aria-label="رزرو نوبت">
+          {selectedService ? (
+            <div>
+              <div className={styles.serviceMeta}>
+                {selectedService.name} · {toPersianDigits(selectedService.durationMinutes)} دقیقه
+              </div>
+              <div className={styles.panelPrice}>
+                <span className={styles.panelPriceValue}>{formatToman(selectedService.priceToman)}</span>
+                <span className={styles.panelPriceUnit}>تومان</span>
+              </div>
+            </div>
+          ) : (
+            <p className={styles.emptyPanel}>برای دیدن زمان‌ها، یک خدمت انتخاب کنید.</p>
+          )}
+
+          <div className={styles.panelSection}>
+            <div className={styles.panelSectionHead}>
+              <div className={styles.panelSectionTitle}>زمان‌های آزاد</div>
+            </div>
+
+            {days.length === 0 ? (
+              <div>
+                <p className={styles.emptyPanel} style={{ marginBlockEnd: 12 }}>
+                  در حال حاضر زمان آزادی برای رزرو وجود ندارد.
+                </p>
+                {waitlistState === 'joined' ? (
+                  <Alert tone="success">
+                    به لیست انتظار اضافه شدید. به محض آزاد شدن یک نوبت، به شما اطلاع می‌دهیم.
+                  </Alert>
+                ) : waitlistState === 'already' ? (
+                  /* `info`, not `success`: nothing happened just now. */
+                  <Alert tone="info">شما قبلاً در لیست انتظار این متخصص ثبت‌نام کرده‌اید.</Alert>
+                ) : (
+                  <Button variant="ghost" onClick={() => void joinTheWaitlist()} loading={waitlistState === 'joining'}>
+                    عضویت در لیست انتظار
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <>
+                <div className={styles.dayStrip} data-testid="day-strip">
+                  {days.slice(0, 4).map((day) => {
+                    const chosen = activeDay?.dayKey === day.dayKey;
+                    const parts = formatShortDate(day.date);
+                    return (
+                      <button
+                        key={day.dayKey}
+                        type="button"
+                        className={`${styles.day} ${chosen ? styles.dayChosen : ''}`}
+                        aria-pressed={chosen}
+                        data-day={day.dayKey}
+                        onClick={() => {
+                          setSelectedDayKey(day.dayKey);
+                          setSelectedSlotId(null);
+                        }}
+                      >
+                        <span className={styles.dayWeekday}>{parts.weekday}</span>
+                        <span className={styles.dayNumber}>{parts.day}</span>
+                        {/* The count is a fact from the same response, not a promise. */}
+                        <span className={styles.dayCount}>{toPersianDigits(day.slots.length)} زمان</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className={styles.slotGrid} data-testid="slot-grid">
+                  {(activeDay?.slots ?? []).map((slot) => {
+                    const chosen = slot.id === selectedSlotId;
+                    return (
+                      <button
+                        key={slot.id}
+                        type="button"
+                        className={`${styles.slot} ${chosen ? styles.slotChosen : ''}`}
+                        aria-pressed={chosen}
+                        data-slot={slot.id}
+                        onClick={() => setSelectedSlotId(slot.id)}
+                      >
+                        {slotTimeLabel(slot.startAt)}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+
+          {selectedSlot ? (
+            <div className={styles.summary} data-testid="booking-summary">
+              <div className={styles.summaryRow}>
+                <span className={styles.summaryLabel}>زمان انتخابی</span>
+                <span className={styles.summaryValue}>
+                  {formatFullJalaliDate(new Date(selectedSlot.startAt))}، {slotTimeLabel(selectedSlot.startAt)}
+                </span>
+              </div>
+              <div className={styles.summaryRow}>
+                <span className={styles.summaryLabel}>پایان تقریبی</span>
+                {/* The server's own end instant, not a duration added here. */}
+                <span className={styles.summaryValue}>{slotTimeLabel(selectedSlot.endAt)}</span>
+              </div>
+            </div>
+          ) : null}
+
+          {days.length > 0 ? (
+            <>
+              <button
+                type="button"
+                className={styles.confirm}
+                disabled={!selectedSlotId || !selectedServiceId || submitting}
+                onClick={() => void confirm()}
+              >
+                {submitting ? 'در حال ثبت…' : 'ادامه به پرداخت'}
+              </button>
+              <p className={styles.panelNote}>
+                مبلغ نهایی را سرور محاسبه می‌کند. تا پرداخت نشود، زمان قطعی نیست.
+              </p>
+            </>
+          ) : null}
+        </aside>
+      </div>
     </section>
   );
 }

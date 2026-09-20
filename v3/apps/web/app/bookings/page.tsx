@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { formatFullJalaliDate, toPersianDigits } from '@beauclick/persian-utils';
+import { formatFullJalaliDate } from '@beauclick/persian-utils';
 
 import { useAuth } from '@/lib/auth-context';
 import { ProtectedRoute } from '@/components/protected-route';
@@ -107,7 +107,7 @@ function BookingsContent() {
                     <p style={{ margin: '4px 0 0', color: 'var(--bc-color-ink-soft)', fontSize: 14 }}>
                       ساعت{' '}
                       <span style={{ direction: 'ltr', display: 'inline-block' }}>
-                        {toPersianDigits(slotTimeLabel(booking.startAt))}
+                        {slotTimeLabel(booking.startAt)}
                       </span>
                     </p>
                   </div>
@@ -153,7 +153,7 @@ function BookingsContent() {
             <>
               <p style={{ margin: '0 0 8px' }}>
                 رزرو {formatFullJalaliDate(new Date(pendingCancel.startAt))} ساعت{' '}
-                {toPersianDigits(slotTimeLabel(pendingCancel.startAt))} لغو می‌شود.
+                {slotTimeLabel(pendingCancel.startAt)} لغو می‌شود.
               </p>
               <p style={{ margin: 0 }}>این زمان دوباره برای دیگران آزاد می‌شود و این عملیات برگشت‌پذیر نیست.</p>
             </>
