@@ -2,11 +2,67 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { formatToman, toPersianDigits } from '@beauclick/persian-utils';
 import { useAuth } from '@/lib/auth-context';
-import { Alert, Button, Card, LoadingState } from '@/components/ui';
-import { autocomplete, searchProviders, type SearchParams, type SearchResponse } from '@/lib/phase3-api';
+import { Alert, ErrorState } from '@/components/ui';
+import {
+  autocomplete,
+  removeFromWishlist,
+  saveToWishlist,
+  searchProviders,
+  type SearchParams,
+  type SearchResponse,
+  type SearchResultItem,
+} from '@/lib/phase3-api';
+import styles from './search.module.css';
+
+/**
+ * Search results — `Prototype - Customer.dc.html` §03 / §04 and
+ * `docs/design/screens/01_SEARCH.md`.
+ *
+ * ## The change this screen is really about
+ *
+ * Seven identical pills in one row, where three of them were a multi-select
+ * filter and four were a one-of-many sort. `V3_DESIGN_SYSTEM.md` §7 calls the
+ * separation necessary, and the spec repeats it: "filter is multi-select with
+ * checkboxes in a column; order is one-of-many in a dropdown; in today's code
+ * the two are the same shape and must be separated."
+ *
+ * So: a filter column at 1024 and up, a bottom sheet below it, and a real
+ * `<select>` for order. The shape of a control now tells you what it does.
+ *
+ * ## Two design claims that do not hold at this baseline
+ *
+ *  1. **The specialty filter cannot be wired.** The design's column has a
+ *     specialty checkbox group. `facets.specialties` buckets on
+ *     `specialtyNames.keyword` — so a facet key is a NAME — while the filter
+ *     parameter `specialtyIds` matches `doc.specialtyIds`. There is no way to
+ *     turn a facet the server returned into a filter the server accepts. The
+ *     group is not rendered; a group whose boxes do nothing is worse than an
+ *     absent one. Recorded as a gap.
+ *  2. **`avatarUrl` and `portfolioCount` are not in the response.** The spec
+ *     calls both "IMPLEMENTABLE NOW (phase C)", and `PublicProviderResult`
+ *     carries neither. The card keeps the design's placeholder artwork and
+ *     shows no «۳ نمونه» count.
+ *
+ * ## And one deliberate departure from the drawing
+ *
+ * The design draws price bands as CHECKBOXES. The server takes `minPrice` and
+ * `maxPrice` — one range, not a set of bands — so multi-select would either
+ * silently over-include a non-contiguous choice or quietly behave like a
+ * single range. Bands are radios here. That is the same principle the design
+ * is arguing for, applied to what the server can actually answer: the shape
+ * of a control must match its semantics.
+ *
+ * ## The ARIA repair the spec makes a prerequisite
+ *
+ * "Fix the current violation: add onKeyDown (ArrowUp/Down/Enter/Escape),
+ * `aria-activedescendant`, remove `<button>` from inside `role=option`
+ * (an ARIA violation)." A button inside an option makes the option's own name
+ * unreliable and leaves the listbox unusable from the keyboard. Done below,
+ * before the visual work rather than after it.
+ */
 
 const SORTS = [
   { key: 'relevance', label: 'مرتبط‌ترین' },
@@ -15,20 +71,26 @@ const SORTS = [
   { key: 'price_desc', label: 'گران‌ترین' },
 ] as const;
 
-const BADGE_LABELS: Record<string, string> = {
-  verified: 'تأییدشده',
-  high_rating: 'امتیاز بالا',
-  reliable: 'قابل اعتماد',
-  recent_activity: 'فعال',
-  complete_profile: 'پروفایل کامل',
+/**
+ * The server's own band boundaries (`opensearch.adapter.ts`), mapped to the
+ * `minPrice`/`maxPrice` pair it filters on. Duplicated deliberately and
+ * pinned by a test: the facet keys are a public contract, and a silent change
+ * to a boundary would make a label say one thing and the filter do another.
+ */
+const PRICE_BANDS: Record<string, { label: string; minPrice?: number; maxPrice?: number }> = {
+  under_500k: { label: 'تا ۵۰۰ هزار تومان', maxPrice: 500_000 },
+  '500k_1m': { label: '۵۰۰ هزار تا ۱ میلیون', minPrice: 500_000, maxPrice: 1_000_000 },
+  '1m_2m': { label: '۱ تا ۲ میلیون', minPrice: 1_000_000, maxPrice: 2_000_000 },
+  over_2m: { label: 'بیش از ۲ میلیون', minPrice: 2_000_000 },
 };
 
-const PRICE_BAND_LABELS: Record<string, string> = {
-  under_500k: 'تا ۵۰۰ هزار تومان',
-  '500k_1m': '۵۰۰ هزار تا ۱ میلیون',
-  '1m_2m': '۱ تا ۲ میلیون',
-  over_2m: 'بیش از ۲ میلیون',
-};
+/** Which band, if any, the current range corresponds to. */
+function activeBand(params: SearchParams): string | null {
+  for (const [key, band] of Object.entries(PRICE_BANDS)) {
+    if (band.minPrice === params.minPrice && band.maxPrice === params.maxPrice) return key;
+  }
+  return null;
+}
 
 export default function SearchPage() {
   const { api } = useAuth();
@@ -48,8 +110,14 @@ export default function SearchPage() {
   });
   const [result, setResult] = useState<SearchResponse | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [highlighted, setHighlighted] = useState(-1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  /** Ids whose save request is in flight, so a control cannot be double-fired. */
+  const [savingIds, setSavingIds] = useState<ReadonlySet<string>>(new Set());
+
+  const listboxId = useId();
 
   // Guards against an out-of-order response overwriting a newer one: a slow
   // request for "می" must not replace the results for "میکاپ" typed after it.
@@ -83,317 +151,505 @@ export default function SearchPage() {
   useEffect(() => {
     if (query.trim().length < 2) {
       setSuggestions([]);
+      setHighlighted(-1);
       return;
     }
     const timer = setTimeout(() => {
       void autocomplete(api, query.trim())
-        .then((res) => setSuggestions((res.data?.suggestions ?? []).map((s) => s.text)))
+        .then((res) => {
+          setSuggestions((res.data?.suggestions ?? []).map((s) => s.text));
+          setHighlighted(-1);
+        })
         .catch(() => setSuggestions([]));
     }, 250);
     return () => clearTimeout(timer);
   }, [query, api]);
 
-  const submit = (event: React.FormEvent) => {
-    event.preventDefault();
+  function search(term: string) {
     setSuggestions([]);
-    setParams((p) => ({ ...p, q: query, page: 1 }));
-  };
+    setHighlighted(-1);
+    setParams((p) => ({ ...p, q: term.trim() || undefined, page: 1 }));
+  }
 
-  const toggleVerified = () => setParams((p) => ({ ...p, verifiedOnly: !p.verifiedOnly, page: 1 }));
+  /**
+   * The combobox's keyboard contract, which did not exist.
+   *
+   * Arrow keys move the highlight, Enter takes the highlighted suggestion or
+   * submits what is typed, and Escape dismisses the list without clearing the
+   * field — the sequence a listbox owes anyone who is not using a mouse.
+   */
+  function onFieldKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (suggestions.length === 0) return;
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      setHighlighted((i) => (i + 1) % suggestions.length);
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      setHighlighted((i) => (i <= 0 ? suggestions.length - 1 : i - 1));
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      setSuggestions([]);
+      setHighlighted(-1);
+    } else if (event.key === 'Enter' && highlighted >= 0) {
+      event.preventDefault();
+      const chosen = suggestions[highlighted];
+      setQuery(chosen);
+      search(chosen);
+    }
+  }
+
+  function setBand(key: string | null) {
+    const band = key ? PRICE_BANDS[key] : undefined;
+    setParams((p) => ({ ...p, minPrice: band?.minPrice, maxPrice: band?.maxPrice, page: 1 }));
+  }
+
+  /**
+   * Save and unsave, against the caller's own wishlist.
+   *
+   * `saved` is a tri-state and `null` is not "not saved" — it means there is
+   * no caller to answer for. An anonymous visitor is sent to sign in rather
+   * than having a save attempted and refused.
+   */
+  async function toggleSaved(item: SearchResultItem) {
+    if (item.saved === null || savingIds.has(item.id)) return;
+    const next = !item.saved;
+    setSavingIds((ids) => new Set(ids).add(item.id));
+    try {
+      if (next) await saveToWishlist(api, 'professional', item.id);
+      else await removeFromWishlist(api, 'professional', item.id);
+      // Patched in place rather than by re-running the search: a full re-read
+      // would reorder the list under the reader's cursor for a change that
+      // affects exactly one card.
+      setResult((current) =>
+        current ? { ...current, items: current.items.map((i) => (i.id === item.id ? { ...i, saved: next } : i)) } : current,
+      );
+    } catch {
+      // The list is unchanged, so the control simply stays as it was. A
+      // failed save must not leave a card claiming a state the server
+      // does not hold.
+    } finally {
+      setSavingIds((ids) => {
+        const rest = new Set(ids);
+        rest.delete(item.id);
+        return rest;
+      });
+    }
+  }
+
+  const band = activeBand(params);
+  const activeFilters = [
+    ...(params.verifiedOnly ? [{ key: 'verified', label: 'فقط تأییدشده', clear: () => setParams((p) => ({ ...p, verifiedOnly: undefined, page: 1 })) }] : []),
+    ...(band ? [{ key: 'band', label: PRICE_BANDS[band].label, clear: () => setBand(null) }] : []),
+    ...(params.q ? [{ key: 'q', label: `«${params.q}»`, clear: () => { setQuery(''); search(''); } }] : []),
+  ];
+
+  const verifiedCount = result?.facets.verification.find((b) => b.key === 'verified')?.count ?? null;
 
   return (
     <section>
-      <h1 style={{ fontSize: 24, marginBlockEnd: 4 }}>جست‌وجوی متخصص</h1>
-      <p style={{ color: 'var(--bc-color-ink-faint)', marginBlockEnd: 20, fontSize: 14 }}>
-        نام متخصص، خدمت یا شهر را بنویسید.
-      </p>
+      <h1 className="bc-visually-hidden">جست‌وجوی متخصص</h1>
 
-      <form onSubmit={submit} role="search" style={{ marginBlockEnd: 20 }}>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <div style={{ flex: '1 1 240px', minWidth: 0, position: 'relative' }}>
-            <label htmlFor="search-q" style={{ display: 'block', fontWeight: 600, fontSize: 14, marginBlockEnd: 6 }}>
-              جست‌وجو
-            </label>
-            <input
-              id="search-q"
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="مثلاً میکاپ عروس"
-              autoComplete="off"
-              // The listbox relationship is what makes the suggestions
-              // reachable by a screen reader rather than purely visual.
-              role="combobox"
-              aria-expanded={suggestions.length > 0}
-              aria-controls="search-suggestions"
-              aria-autocomplete="list"
-              style={{
-                width: '100%',
-                font: 'inherit',
-                padding: '12px 14px',
-                minHeight: 44,
-                borderRadius: 'var(--bc-radius-input)',
-                border: '1px solid var(--bc-color-line)',
-                background: 'var(--bc-color-surface)',
-                color: 'var(--bc-color-ink)',
-              }}
-            />
-            {suggestions.length > 0 && (
-              <ul
-                id="search-suggestions"
-                role="listbox"
-                aria-label="پیشنهادها"
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          search(query);
+        }}
+        role="search"
+        style={{ marginBlockEnd: 16, position: 'relative', maxWidth: 560 }}
+      >
+        <label htmlFor="search-q" className="bc-visually-hidden">
+          نام متخصص، خدمت یا شهر
+        </label>
+        <input
+          id="search-q"
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={onFieldKeyDown}
+          placeholder="مثلاً میکاپ عروس"
+          autoComplete="off"
+          role="combobox"
+          aria-expanded={suggestions.length > 0}
+          aria-controls={listboxId}
+          aria-autocomplete="list"
+          aria-activedescendant={highlighted >= 0 ? `${listboxId}-${highlighted}` : undefined}
+          style={{
+            width: '100%',
+            font: 'inherit',
+            fontSize: 16,
+            minHeight: 48,
+            padding: '0 14px',
+            border: '1px solid var(--bc-color-border)',
+            borderRadius: 'var(--bc-radius-input)',
+            background: 'var(--bc-color-surface)',
+            color: 'var(--bc-color-text)',
+          }}
+        />
+        {suggestions.length > 0 && (
+          /*
+            The option IS the interactive element. It used to contain a
+            `<button>`, which is an ARIA violation: an option's accessible
+            name becomes the button's, and the listbox stops being operable
+            as a listbox. Click and keyboard both land here now.
+          */
+          <ul
+            id={listboxId}
+            role="listbox"
+            aria-label="پیشنهادها"
+            style={{
+              listStyle: 'none',
+              margin: '6px 0 0',
+              padding: 6,
+              position: 'absolute',
+              insetInline: 0,
+              zIndex: 20,
+              background: 'var(--bc-color-surface)',
+              border: '1px solid var(--bc-color-border)',
+              borderRadius: 'var(--bc-radius-card)',
+              boxShadow: 'var(--bc-shadow-float)',
+            }}
+          >
+            {suggestions.map((text, index) => (
+              <li
+                key={text}
+                id={`${listboxId}-${index}`}
+                role="option"
+                aria-selected={index === highlighted}
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                  setQuery(text);
+                  search(text);
+                }}
+                onMouseEnter={() => setHighlighted(index)}
                 style={{
-                  listStyle: 'none',
-                  margin: 0,
-                  padding: 4,
-                  position: 'absolute',
-                  insetInlineStart: 0,
-                  insetInlineEnd: 0,
-                  zIndex: 10,
-                  background: 'var(--bc-color-surface)',
-                  border: '1px solid var(--bc-color-line)',
-                  borderRadius: 'var(--bc-radius-input)',
+                  padding: '10px 12px',
+                  minHeight: 44,
+                  display: 'flex',
+                  alignItems: 'center',
+                  cursor: 'pointer',
+                  borderRadius: 'var(--bc-radius-control)',
+                  background: index === highlighted ? 'var(--bc-color-surface-muted)' : 'transparent',
                 }}
               >
-                {suggestions.map((text) => (
-                  <li key={text} role="option" aria-selected={false}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setQuery(text);
-                        setSuggestions([]);
-                        setParams((p) => ({ ...p, q: text, page: 1 }));
-                      }}
-                      style={{
-                        font: 'inherit',
-                        width: '100%',
-                        textAlign: 'start',
-                        padding: '10px 12px',
-                        minHeight: 44,
-                        border: 'none',
-                        background: 'transparent',
-                        color: 'var(--bc-color-ink)',
-                        cursor: 'pointer',
-                        borderRadius: 'var(--bc-radius-input)',
-                      }}
-                    >
-                      {text}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-          <div style={{ alignSelf: 'flex-end', minWidth: 120 }}>
-            <Button type="submit">جست‌وجو</Button>
-          </div>
-        </div>
+                {text}
+              </li>
+            ))}
+          </ul>
+        )}
       </form>
 
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBlockEnd: 16 }}>
-        <button
-          type="button"
-          onClick={toggleVerified}
-          aria-pressed={Boolean(params.verifiedOnly)}
-          style={chipStyle(Boolean(params.verifiedOnly))}
+      <div className={styles.layout}>
+        {/* The scrim exists only while the panel is a sheet. */}
+        <div
+          className={sheetOpen ? styles.scrimOpen : styles.scrim}
+          onClick={() => setSheetOpen(false)}
+          aria-hidden="true"
+        />
+
+        <aside
+          id="filter-panel"
+          aria-label="فیلترها"
+          className={`${styles.filters} ${sheetOpen ? '' : styles.filtersClosed}`}
+          data-testid="filter-panel"
         >
-          فقط تأییدشده
-        </button>
-        {SORTS.map((sort) => (
-          <button
-            key={sort.key}
-            type="button"
-            onClick={() => setParams((p) => ({ ...p, sort: sort.key, page: 1 }))}
-            aria-pressed={params.sort === sort.key}
-            style={chipStyle(params.sort === sort.key)}
-          >
-            {sort.label}
+          <div className={styles.filtersHead}>
+            <h2 className={styles.filtersTitle}>فیلترها</h2>
+            <button
+              type="button"
+              className={styles.clearAll}
+              disabled={activeFilters.length === 0}
+              onClick={() => {
+                setQuery('');
+                setParams({ sort: params.sort, page: 1 });
+              }}
+            >
+              پاک کردن
+            </button>
+          </div>
+
+          <fieldset className={`${styles.group} ${styles.groupFirst}`}>
+            <legend className={styles.groupLegend}>اعتبار</legend>
+            <label className={styles.option}>
+              <input
+                type="checkbox"
+                className={styles.checkbox}
+                checked={Boolean(params.verifiedOnly)}
+                onChange={() => setParams((p) => ({ ...p, verifiedOnly: p.verifiedOnly ? undefined : true, page: 1 }))}
+              />
+              <span>فقط متخصص‌های تأییدشده</span>
+              {verifiedCount !== null ? <span className={styles.optionCount}>{toPersianDigits(verifiedCount)}</span> : null}
+            </label>
+          </fieldset>
+
+          <fieldset className={styles.group}>
+            <legend className={styles.groupLegend}>محدوده قیمت</legend>
+            <label className={styles.option}>
+              <input
+                type="radio"
+                name="price-band"
+                className={styles.checkbox}
+                checked={band === null}
+                onChange={() => setBand(null)}
+              />
+              <span>همه</span>
+            </label>
+            {Object.entries(PRICE_BANDS).map(([key, definition]) => {
+              const count = result?.facets.priceRanges.find((b) => b.key === key)?.count ?? 0;
+              return (
+                <label key={key} className={`${styles.option} ${count === 0 ? styles.optionEmpty : ''}`} data-band={key}>
+                  <input
+                    type="radio"
+                    name="price-band"
+                    className={styles.checkbox}
+                    checked={band === key}
+                    onChange={() => setBand(key)}
+                  />
+                  <span>{definition.label}</span>
+                  <span className={styles.optionCount}>{toPersianDigits(count)}</span>
+                </label>
+              );
+            })}
+          </fieldset>
+
+          <button type="button" className={styles.sheetDone} onClick={() => setSheetOpen(false)}>
+            نمایش نتایج
           </button>
-        ))}
-      </div>
+        </aside>
 
-      {result?.degraded && (
-        // Told, not hidden: a degraded result set has no fuzzy matching and no
-        // relevance ordering, and silently presenting it as normal would make
-        // "search got worse" indistinguishable from "there is nothing here".
-        // `info`, not `error`: nothing failed. A degraded result set is a
-        // narrower answer, and red told the reader their search had broken.
-        <Alert tone="info">
-          نتایج به‌صورت موقت محدود است؛ ممکن است برخی موارد نمایش داده نشود. لطفاً بعداً دوباره تلاش کنید.
-        </Alert>
-      )}
+        <div>
+          <div className={styles.controlBar}>
+            <button
+              type="button"
+              className={styles.filterToggle}
+              onClick={() => setSheetOpen(true)}
+              aria-expanded={sheetOpen}
+              aria-controls="filter-panel"
+            >
+              <span className={styles.filterToggleGlyph} aria-hidden="true" />
+              فیلترها
+              {activeFilters.length > 0 ? (
+                <span className={styles.filterToggleCount}>{toPersianDigits(activeFilters.length)}</span>
+              ) : null}
+            </button>
 
-      {error && <Alert tone="error">{error}</Alert>}
+            <label className={styles.sortLabel} htmlFor="search-sort">
+              ترتیب:
+            </label>
+            <select
+              id="search-sort"
+              className={styles.sortSelect}
+              value={params.sort ?? 'relevance'}
+              onChange={(event) => setParams((p) => ({ ...p, sort: event.target.value, page: 1 }))}
+              aria-label="ترتیب نتایج"
+            >
+              {SORTS.map((sort) => (
+                <option key={sort.key} value={sort.key}>
+                  {sort.label}
+                </option>
+              ))}
+            </select>
+          </div>
 
-      {loading && !result ? (
-        <LoadingState label="در حال جست‌وجو…" />
-      ) : (
-        <>
+          {activeFilters.length > 0 ? (
+            <div className={styles.chipRow} data-testid="active-filters">
+              {activeFilters.map((filter) => (
+                <span key={filter.key} className={styles.chip} data-filter={filter.key}>
+                  {filter.label}
+                  <button
+                    type="button"
+                    className={styles.chipRemove}
+                    aria-label={`حذف فیلتر ${filter.label}`}
+                    onClick={filter.clear}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          ) : null}
+
+          {result?.degraded && (
+            // Told, not hidden: a degraded result set has no fuzzy matching and no
+            // relevance ordering, and silently presenting it as normal would make
+            // "search got worse" indistinguishable from "there is nothing here".
+            // `info`, not `error`: nothing failed.
+            <Alert tone="info">
+              نتایج به‌صورت موقت محدود است؛ ممکن است برخی موارد نمایش داده نشود. لطفاً بعداً دوباره تلاش کنید.
+            </Alert>
+          )}
+
           {/*
             The status line reports exactly one of three distinct states, and
             never conflates them. It used to collapse "the request failed" and
-            "the server answered, with nothing" into the same sentence, because
-            a null `result` fell through the ternary's else branch -- so a
-            failed search told the user "نتیجه‌ای یافت نشد", and, being inside
-            this aria-live region, announced it to a screen reader too. That
-            sends the user off rewording a perfectly good query to fix a
-            problem that was never theirs.
-
-            While a search is in flight the line reports THAT, instead of
-            leaving the previous count standing as though it still described
-            what is on screen. Only the very first search used to get any
-            loading feedback (`loading && !result` above); every filter
-            change, sort change, and page step after it appeared to do nothing.
+            "the server answered, with nothing" into the same sentence, so a
+            failed search told the user "نتیجه‌ای یافت نشد" -- and, being in
+            this live region, announced it. That sends someone off rewording a
+            perfectly good query to fix a problem that was never theirs.
           */}
-          <p aria-live="polite" style={{ fontSize: 14, color: 'var(--bc-color-ink-faint)', marginBlockEnd: 12 }}>
+          <p aria-live="polite" className={styles.count}>
             {loading
               ? 'در حال جست‌وجو…'
               : error
-                ? '' // The Alert above is already saying it; don't say it twice.
+                ? ''
                 : result
                   ? result.pagination.total > 0
-                    ? `${toPersianDigits(result.pagination.total)} نتیجه یافت شد`
-                    : 'نتیجه‌ای یافت نشد'
+                    ? `${toPersianDigits(result.pagination.total)} متخصص یافت شد`
+                    : ''
                   : ''}
           </p>
 
           {/*
-            Results from the last search that DID succeed are kept on screen
-            rather than blanked -- but they are no longer an answer to the
-            query the user just ran, so they are labelled instead of left to
-            look current.
+            A failed read gets a retry, not a bare message. `01_SEARCH.md`:
+            "error: ErrorState with retry (today an Alert with no retry --
+            must be corrected)."
           */}
-          {error && result && result.items.length > 0 && (
-            <p style={{ fontSize: 13, color: 'var(--bc-color-ink-faint)', marginBlockEnd: 12 }}>
+          {error && !result ? <ErrorState message={error} onRetry={() => void run(params)} /> : null}
+
+          {error && result && result.items.length > 0 ? (
+            <p style={{ fontSize: 13, color: 'var(--bc-color-text-faint)', marginBlockEnd: 12 }}>
               نتایج زیر مربوط به جست‌وجوی قبلی است و ممکن است به‌روز نباشد.
             </p>
-          )}
+          ) : null}
 
-          {!error && result && result.items.length === 0 && (
-            <Card>
-              <p style={{ margin: 0 }}>
-                جست‌وجوی شما نتیجه‌ای نداشت. می‌توانید فیلترها را بردارید یا عبارت دیگری امتحان کنید.
-              </p>
-            </Card>
-          )}
-
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 'var(--bc-spacing-card-gap)' }}>
-            {(result?.items ?? []).map((item) => (
-              <li key={item.id}>
-                <Card>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                    <div style={{ minWidth: 0 }}>
-                      <h2 style={{ fontSize: 18, margin: 0 }}>
-                        <Link
-                          href={`/providers/${item.id}?from=search`}
-                          style={{
-                            color: 'var(--bc-color-ink)',
-                            textDecoration: 'none',
-                            // The primary way into a provider from a result
-                            // list, so it gets a real touch target. Measured at
-                            // 24px in a 375px viewport during live QA -- the
-                            // same class of finding as Phase 2's 25px nav links,
-                            // and below the 44px baseline this project set.
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            minHeight: 44,
-                          }}
-                        >
-                          {item.displayName}
-                        </Link>
-                      </h2>
-                      {item.city && (
-                        <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--bc-color-ink-faint)' }}>
-                          {item.city.name}
-                        </p>
-                      )}
-                      {item.specialties.length > 0 && (
-                        <p style={{ margin: '6px 0 0', fontSize: 13 }}>{item.specialties.join('، ')}</p>
-                      )}
-                    </div>
-                    {item.priceFromToman !== null && (
-                      <p style={{ margin: 0, fontWeight: 700, whiteSpace: 'nowrap' }}>
-                        از {formatToman(item.priceFromToman)} تومان
-                      </p>
-                    )}
+          {loading && !result ? (
+            <div className={styles.cardList}>
+              {Array.from({ length: 3 }, (_, i) => (
+                <div key={i} className={styles.skeletonCard} data-testid="result-skeleton">
+                  <div className={styles.skeletonArt} />
+                  <div className={styles.skeletonLines}>
+                    <div className={styles.skeletonLine} />
+                    <div className={`${styles.skeletonLine} ${styles.skeletonLineShort}`} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : !error && result && result.items.length === 0 ? (
+            <p className={styles.stateBlock}>
+              جست‌وجوی شما نتیجه‌ای نداشت. می‌توانید فیلترها را بردارید یا عبارت دیگری امتحان کنید.
+            </p>
+          ) : (
+            <div className={styles.cardList} data-testid="results">
+              {(result?.items ?? []).map((item, index) => (
+                <article key={item.id} className={styles.card} data-provider={item.id}>
+                  {/* Placeholder artwork: `avatarUrl` and `portfolioCount` are
+                      not in the public search result at this baseline. */}
+                  <div
+                    className={`${styles.cardArt} ${index % 2 === 1 ? styles.cardArtBronze : ''}`}
+                    aria-hidden="true"
+                  >
+                    <span className={styles.cardArtLabel}>نمونه کار</span>
                   </div>
 
-                  {item.badges.length > 0 && (
-                    <ul style={{ listStyle: 'none', display: 'flex', gap: 6, flexWrap: 'wrap', padding: 0, margin: '10px 0 0' }}>
-                      {item.badges.map((badge) => (
-                        <li
-                          key={badge}
-                          style={{
-                            fontSize: 12,
-                            padding: '4px 10px',
-                            borderRadius: 999,
-                            background: 'var(--bc-color-surface-muted)',
-                            color: 'var(--bc-color-ink-faint)',
-                          }}
-                        >
-                          {BADGE_LABELS[badge] ?? badge}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </Card>
-              </li>
-            ))}
-          </ul>
+                  <div className={styles.cardBody}>
+                    <div>
+                      <div className={styles.nameRow}>
+                        <h2 className={styles.cardName}>
+                          <Link href={`/providers/${item.id}?from=search`}>{item.displayName}</Link>
+                        </h2>
+                        {item.isVerified ? (
+                          <span className={styles.verified}>
+                            <span className={styles.verifiedDot} aria-hidden="true" />
+                            تأیید شده
+                          </span>
+                        ) : null}
+                        {item.saved === null ? (
+                          /* Anonymous: `null` is not "not saved". Sending
+                             them to sign in is honest; rendering an unsaved
+                             control would claim something about someone the
+                             server cannot identify. */
+                          <Link
+                            href="/auth"
+                            className={styles.save}
+                            aria-label={`برای ذخیرهٔ ${item.displayName} وارد شوید`}
+                          >
+                            ذخیره<span className={styles.saveSuffix}> در علاقه‌مندی‌ها</span>
+                          </Link>
+                        ) : (
+                          <button
+                            type="button"
+                            className={`${styles.save} ${item.saved ? styles.saveOn : ''}`}
+                            aria-pressed={item.saved}
+                            disabled={savingIds.has(item.id)}
+                            aria-label={
+                              item.saved
+                                ? `حذف ${item.displayName} از علاقه‌مندی‌ها`
+                                : `افزودن ${item.displayName} به علاقه‌مندی‌ها`
+                            }
+                            onClick={() => void toggleSaved(item)}
+                          >
+                            {item.saved ? (
+                              'در علاقه‌مندی‌ها'
+                            ) : (
+                              <>
+                                ذخیره<span className={styles.saveSuffix}> در علاقه‌مندی‌ها</span>
+                              </>
+                            )}
+                          </button>
+                        )}
+                      </div>
+                      {item.city ? <div className={styles.cardPlace}>{item.city.name}</div> : null}
+                    </div>
 
-          {result && result.facets.priceRanges.length > 0 && (
-            <section style={{ marginBlockStart: 24 }}>
-              <h2 style={{ fontSize: 16 }}>محدوده قیمت</h2>
-              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {result.facets.priceRanges.map((band) => (
-                  <li key={band.key} style={{ fontSize: 13, color: 'var(--bc-color-ink-faint)' }}>
-                    {PRICE_BAND_LABELS[band.key] ?? band.key}: {toPersianDigits(band.count)}
-                  </li>
-                ))}
-              </ul>
-            </section>
+                    {item.bio ? <p className={styles.cardBio}>{item.bio}</p> : null}
+
+                    {item.specialties.length > 0 ? (
+                      <div className={styles.tagRow}>
+                        {item.specialties.map((specialty) => (
+                          <span key={specialty} className={styles.tag}>
+                            {specialty}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className={styles.cardFoot}>
+                    <div>
+                      {item.priceFromToman === null ? (
+                        <div className={styles.priceLabel}>قیمت هنوز اعلام نشده</div>
+                      ) : (
+                        <>
+                          <div className={styles.priceLabel}>شروع از</div>
+                          <div className={styles.priceValue}>
+                            {formatToman(item.priceFromToman)} <span className={styles.priceUnit}>تومان</span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                    <Link href={`/providers/${item.id}?from=search`} className={styles.cardAction}>
+                      دیدن زمان‌ها
+                    </Link>
+                  </div>
+                </article>
+              ))}
+            </div>
           )}
 
-          {result && result.pagination.totalPages > 1 && (
-            <nav aria-label="صفحه‌بندی" style={{ display: 'flex', gap: 8, marginBlockStart: 20, justifyContent: 'center' }}>
+          {result && result.pagination.totalPages > 1 ? (
+            <nav aria-label="صفحه‌بندی" className={styles.pager} style={{ gap: 8, display: 'flex' }}>
               <button
                 type="button"
+                className={styles.sortSelect}
                 disabled={result.pagination.page <= 1}
                 onClick={() => setParams((p) => ({ ...p, page: (p.page ?? 1) - 1 }))}
-                style={chipStyle(false)}
               >
                 قبلی
               </button>
-              <span style={{ alignSelf: 'center', fontSize: 14 }}>
+              <span style={{ alignSelf: 'center', fontSize: 14, fontVariantNumeric: 'tabular-nums' }}>
                 صفحه {toPersianDigits(result.pagination.page)} از {toPersianDigits(result.pagination.totalPages)}
               </span>
               <button
                 type="button"
+                className={styles.sortSelect}
                 disabled={result.pagination.page >= result.pagination.totalPages}
                 onClick={() => setParams((p) => ({ ...p, page: (p.page ?? 1) + 1 }))}
-                style={chipStyle(false)}
               >
                 بعدی
               </button>
             </nav>
-          )}
-        </>
-      )}
+          ) : null}
+        </div>
+      </div>
     </section>
   );
-}
-
-function chipStyle(active: boolean): React.CSSProperties {
-  return {
-    font: 'inherit',
-    fontSize: 14,
-    padding: '10px 16px',
-    minHeight: 44,
-    borderRadius: 999,
-    border: `1px solid ${active ? 'var(--bc-color-primary)' : 'var(--bc-color-line)'}`,
-    background: active ? 'var(--bc-color-primary)' : 'transparent',
-    color: active ? 'var(--bc-color-surface)' : 'var(--bc-color-ink)',
-    cursor: 'pointer',
-  };
 }
