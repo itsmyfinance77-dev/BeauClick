@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { formatToman, formatZonedFullDate, formatZonedTime, toPersianDigits } from '@beauclick/persian-utils';
-import { Card, ErrorState, LoadingState } from '@/components/ui';
-import { Badge, EmptyState, PageHeader, StatCard, StatGrid, TextLink } from '@/components/kit';
+import Link from 'next/link';
+import { ErrorState, LoadingState } from '@/components/ui';
+import { Badge, EmptyState, PageHeader, TextLink } from '@/components/kit';
+import styles from './pro-today.module.css';
 import { useProProfile } from '@/lib/pro-context';
 import { useAuth } from '@/lib/auth-context';
 import {
@@ -144,101 +146,220 @@ export default function ProOverviewPage() {
     { done: profile.cityId !== null, label: 'انتخاب شهر', href: '/pro/profile' },
   ];
   const remaining = setupSteps.filter((step) => !step.done);
+  /*
+    Today's schedule as one timeline, from the two reads the page already
+    makes. The design's data note calls it "derivable by combining the same
+    two responses, with no new route" — and unlike two of its other claims,
+    that one is true.
+
+    Bookings and open slots are merged and sorted by start, so a free hour
+    and a booked one read in the order the day happens rather than in two
+    separate lists a seller has to interleave in their head.
+  */
+  const now = Date.now();
+  const endOfDay = now + 24 * 3_600_000;
+  const schedule = [
+    ...today.map((booking) => ({ kind: 'booking' as const, at: booking.startAt, booking })),
+    ...openSlots
+      .filter((slot) => {
+        const start = new Date(slot.startAt).getTime();
+        return start >= now && start <= endOfDay;
+      })
+      .map((slot) => ({ kind: 'free' as const, at: slot.startAt, slot })),
+  ].sort((a, b) => a.at.localeCompare(b.at));
+
+  const weekSlots = openSlots.filter((slot) => {
+    const start = new Date(slot.startAt).getTime();
+    return start >= now && start <= now + 7 * 86_400_000;
+  }).length;
+  const weekBookings = bookings.filter((b) => {
+    const start = new Date(b.startAt).getTime();
+    return start >= now && start <= now + 7 * 86_400_000 && b.status === 'confirmed';
+  }).length;
+  const weekTotal = weekSlots + weekBookings;
+  const weekPercent = weekTotal > 0 ? Math.round((weekBookings / weekTotal) * 100) : 0;
 
   return (
     <>
-      <PageHeader title={`سلام، ${profile.displayName}`} subtitle="نمای کلی کسب‌وکار شما." />
+      <div className={styles.head}>
+        <div>
+          <h1 className={styles.title}>امروز، {formatZonedFullDate(new Date())}</h1>
+          <p className={styles.subtitle}>
+            {toPersianDigits(today.length)} نوبت پیش‌رو
+            {awaitingAction.length > 0 ? ` · ${toPersianDigits(awaitingAction.length)} نوبت در انتظار ثبت وضعیت` : ''}
+          </p>
+        </div>
+        <Link href="/pro/availability" className={styles.headAction}>
+          افزودن زمان آزاد
+        </Link>
+      </div>
 
       {loadError ? <ErrorState message={loadError} onRetry={() => void load()} /> : null}
       {loading && !loaded ? <LoadingState label="در حال بارگذاری نمای کلی…" /> : null}
 
+      {/*
+        The one banner on this surface. It is not a notice: until a finished
+        booking's outcome is recorded the seller is not paid for it and the
+        customer earns no points, so this is money sitting still.
+      */}
+      {loaded && awaitingAction.length > 0 ? (
+        <div className={styles.blocker} data-testid="awaiting-action">
+          <span className={styles.blockerDot} aria-hidden="true" />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className={styles.blockerTitle}>
+              {toPersianDigits(awaitingAction.length)} نوبت گذشته منتظر ثبت وضعیت است
+            </div>
+            <div className={styles.blockerText}>
+              تا وضعیت ثبت نشود، درآمد این نوبت‌ها به مالی شما و امتیاز به مشتری اضافه نمی‌شود.
+            </div>
+          </div>
+          <Link href="/pro/bookings" className={styles.blockerAction}>
+            ثبت وضعیت
+          </Link>
+        </div>
+      ) : null}
+
       {loaded && remaining.length > 0 ? (
-        <Card>
-          <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 4px' }}>تکمیل راه‌اندازی</h2>
-          <p style={{ fontSize: 13, color: 'var(--bc-color-ink-soft)', margin: '0 0 12px' }}>
+        <div className={styles.setup} data-testid="setup-checklist">
+          <h2 className={styles.setupTitle}>تکمیل راه‌اندازی</h2>
+          <p className={styles.subtitle}>
             تا این موارد کامل نشود، مشتری‌ها نمی‌توانند شما را پیدا کنند یا رزرو کنند.
           </p>
-          <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 8 }}>
+          <div className={styles.setupList}>
             {setupSteps.map((step) => (
-              <li key={step.label} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <div
+                key={step.label}
+                className={`${styles.setupStep} ${step.done ? styles.setupStepDone : ''}`}
+                data-step-done={step.done ? 'true' : 'false'}
+              >
                 <Badge tone={step.done ? 'success' : 'warning'}>{step.done ? 'انجام شد' : 'باقی مانده'}</Badge>
-                <span style={{ fontSize: 14 }}>{step.label}</span>
+                <span style={{ flex: 1, minWidth: 0 }}>{step.label}</span>
                 {!step.done ? <TextLink href={step.href}>انجام بده</TextLink> : null}
-              </li>
+              </div>
             ))}
-          </ul>
-        </Card>
+          </div>
+        </div>
       ) : null}
 
       {loaded ? (
-        <div style={{ marginBlockStart: remaining.length > 0 ? 20 : 0 }}>
-          <StatGrid min={160}>
-            <StatCard label="نوبت‌های ۲۴ ساعت آینده" value={toPersianDigits(today.length)} />
-            <StatCard label="زمان‌های آزاد" value={toPersianDigits(openSlots.length)} />
-            <StatCard label="خدمات" value={toPersianDigits(services.length)} />
+        <div className={styles.tiles} data-testid="pro-tiles">
+          {/*
+            The artboard's «درآمد این ماه» is a month-over-month comparison,
+            and no route answers it: `FinanceSummary` is a position, not a
+            series. The tile shows the net receivable it DOES have and no
+            trend — an «۱۸٪ بیشتر» nobody computed is the worst kind of
+            number to put on a seller's dashboard.
+          */}
+          <div className={styles.tile}>
+            <div className={styles.tileLabel}>خالص قابل دریافت</div>
             {finance ? (
-              <StatCard label="خالص قابل دریافت" value={formatToman(finance.receivableNetToman)} />
-            ) : null}
-            {multipleWorkspaces ? (
-              // Two workspaces, two positions, and no honest way to add them
-              // into one figure. The tile says where the answer is instead of
-              // inventing one.
-              <StatCard label="خالص قابل دریافت" value="در صفحه مالی" />
-            ) : null}
-          </StatGrid>
-        </div>
-      ) : null}
-
-      {loaded && awaitingAction.length > 0 ? (
-        <div style={{ marginBlockStart: 20 }}>
-          <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 4px' }}>در انتظار ثبت وضعیت</h2>
-          <p style={{ fontSize: 13, color: 'var(--bc-color-ink-soft)', margin: '0 0 12px' }}>
-            زمان این نوبت‌ها گذشته است. تا وضعیت آن‌ها را ثبت نکنید، امتیاز باشگاه مشتری و آمار شما به‌روز نمی‌شود.
-          </p>
-          <div style={{ display: 'grid', gap: 'var(--bc-spacing-card-gap)' }}>
-            {awaitingAction.slice(0, 5).map((booking) => (
-              <Card key={booking.id}>
-                <div
-                  style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 'var(--bc-spacing-chip-gap)',
-                  }}
-                >
-                  <div style={{ minWidth: 0 }}>
-                    <p style={{ margin: 0, fontSize: 14, fontWeight: 700 }}>
-                      {formatZonedFullDate(new Date(booking.startAt))}
-                    </p>
-                    <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--bc-color-ink-soft)' }}>
-                      ساعت {formatZonedTime(new Date(booking.startAt))}
-                    </p>
-                  </div>
-                  <TextLink href="/pro/bookings">ثبت وضعیت</TextLink>
+              <div className={styles.tileValueRow}>
+                <span className={styles.tileValue}>{formatToman(finance.receivableNetToman)}</span>
+                <span className={styles.tileUnit}>تومان</span>
+              </div>
+            ) : multipleWorkspaces ? (
+              <>
+                <div className={styles.tileNote}>چند فضای کاری دارید.</div>
+                <div className={styles.tileNote}>
+                  <TextLink href="/finance">انتخاب فضا در صفحهٔ مالی</TextLink>
                 </div>
-              </Card>
-            ))}
+              </>
+            ) : (
+              <div className={styles.tileNote}>فضای مالی‌ای در دسترس نیست.</div>
+            )}
+          </div>
+
+          <div className={styles.tile}>
+            <div className={styles.tileLabel}>نوبت‌های این هفته</div>
+            <div className={styles.tileValueRow}>
+              <span className={styles.tileValue}>{toPersianDigits(weekBookings)}</span>
+              <span className={styles.tileUnit}>از {toPersianDigits(weekTotal)} زمان</span>
+            </div>
+            {weekTotal > 0 ? (
+              <div
+                className={styles.tileBar}
+                role="progressbar"
+                aria-valuenow={weekPercent}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label="سهم زمان‌های رزروشده از کل زمان‌های این هفته"
+              >
+                <div className={styles.tileBarFill} style={{ width: `${weekPercent}%` }} />
+              </div>
+            ) : null}
+          </div>
+
+          <div className={styles.tile}>
+            <div className={styles.tileLabel}>خدمات فعال</div>
+            <div className={styles.tileValueRow}>
+              <span className={styles.tileValue}>{toPersianDigits(services.length)}</span>
+              <span className={styles.tileUnit}>خدمت</span>
+            </div>
+            <div className={styles.tileNote}>
+              <TextLink href="/pro/services">مدیریت خدمات</TextLink>
+            </div>
           </div>
         </div>
       ) : null}
 
-      {loaded && today.length > 0 ? (
-        <div style={{ marginBlockStart: 20 }}>
-          <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 12px' }}>نوبت‌های پیش‌رو</h2>
-          <div style={{ display: 'grid', gap: 'var(--bc-spacing-card-gap)' }}>
-            {today.map((booking) => (
-              <Card key={booking.id}>
-                <p style={{ margin: 0, fontSize: 14, fontWeight: 700 }}>
-                  {formatZonedFullDate(new Date(booking.startAt))} — ساعت {formatZonedTime(new Date(booking.startAt))}
-                </p>
-                <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--bc-color-ink-soft)' }}>
-                  {services.find((s) => s.id === booking.serviceId)?.name ?? 'خدمت نامشخص'}
-                </p>
-              </Card>
-            ))}
+      {loaded ? (
+        <section>
+          <div className={styles.sectionHead}>
+            <h2 className={styles.sectionTitle}>برنامه امروز</h2>
+            <TextLink href="/pro/availability">دیدن هفته</TextLink>
           </div>
-        </div>
+          <div className={styles.timeline} data-testid="today-timeline">
+            {schedule.length === 0 ? (
+              <p className={styles.empty}>برای امروز نه نوبتی ثبت شده و نه زمان آزادی باز است.</p>
+            ) : (
+              schedule.map((entry) => (
+                <div
+                  key={entry.kind === 'booking' ? entry.booking.id : entry.slot.id}
+                  className={`${styles.row} ${entry.kind === 'booking' ? styles.rowBooked : ''}`}
+                  data-entry={entry.kind}
+                >
+                  <div className={styles.hour}>{formatZonedTime(new Date(entry.at))}</div>
+                  <div className={styles.cell}>
+                    {entry.kind === 'free' ? (
+                      <div className={styles.free}>
+                        <span>آزاد</span>
+                        {/*
+                          The design draws «مسدود کردن». In the API that is
+                          DELETING the slot, and a control whose word is
+                          softer than its effect is the wrong word. Named for
+                          what it does, and it lives where it is done.
+                        */}
+                        <TextLink href="/pro/availability">حذف این زمان</TextLink>
+                      </div>
+                    ) : (
+                      <div className={styles.bookingRow}>
+                        <div style={{ minWidth: 0 }}>
+                          <div className={styles.bookingHead}>
+                            <span className={styles.bookingName}>
+                              {services.find((s) => s.id === entry.booking.serviceId)?.name ?? 'خدمت نامشخص'}
+                            </span>
+                            <span className={styles.statusChip}>تأیید شده</span>
+                          </div>
+                          {/*
+                            No customer name. `BookingSummary` carries
+                            `customerId` and nothing else about them, and the
+                            design's own note calls this the single data
+                            change this screen needs.
+                          */}
+                          <div className={styles.bookingMeta}>
+                            {formatZonedTime(new Date(entry.booking.startAt))} تا{' '}
+                            {formatZonedTime(new Date(entry.booking.endAt))}
+                          </div>
+                        </div>
+                        <TextLink href="/pro/bookings">جزئیات</TextLink>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
       ) : null}
     </>
   );
