@@ -38,3 +38,33 @@ amendment for the per-state funds read that `#43a` and #185 added.
 It carries a self-contained Claude Design prompt for each, written against the constraints the
 server actually enforces, so a design cannot be produced that the backend would refuse to
 support.
+
+## V3.3 design conformance (2026-09-21)
+
+The design corpus was measured against `v3/apps/web` and the result is two documents
+that live beside this one:
+
+- **`V3.3_DESIGN_CONFORMANCE_AUDIT.md`** — what was found and how big it was. Nine
+  findings, each with the command that reproduces it. The corpus is **5,407 lines across
+  60 documents**, of which the 46 screen specs and the ten rendered `.dc.html` prototypes
+  are the normative artifacts.
+- **`V3.3_FRONTEND_OPEN_ITEMS.md`** — what is still open: unresolved defects, deliberate
+  debt, and the remaining screens. Kept current as screens land.
+
+Three things learned that change how this directory should be read.
+
+**The prototypes are the design; the specs describe it.** The `.dc.html` files are
+fully-styled artboards with exact values, and reading only the markdown produces a
+product that matches no drawing. Implementation reads the prototype and uses the spec
+for the rules the drawing cannot express.
+
+**A prototype is evidence, not an oracle.** Measured against the code, the design's own
+palette had seven pairs below WCAG AA and three colours outside sRGB; its touch-target
+rule and its mobile artboards contradict each other; and three claims of "derivable from
+existing routes" turned out not to be derivable. Every correction is recorded at the
+point of use and pinned by a test, so a future re-sync cannot quietly undo it.
+
+**A design that describes a field the API does not return is a backend gap, not a UI
+task.** Eight such gaps are listed in the open-items document with their issue numbers.
+Where one exists, the UI renders nothing and a test asserts the absence — never a
+plausible-looking number.
