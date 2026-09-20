@@ -108,6 +108,39 @@ export function LifecycleBadge({ state }: { state: CommissionLifecycleState }) {
   );
 }
 
+/**
+ * The version in force right now, by the SERVER's rule — V3.3 #213.
+ *
+ * `CommissionPolicyResolutionService` requires three conditions, and this
+ * applies the same three:
+ *
+ * ```sql
+ * WHERE v.lifecycle_state = 'published'
+ *   AND v.activation_starts_at <= now()
+ *   AND (v.activation_ends_at IS NULL OR now() < v.activation_ends_at)
+ * ```
+ *
+ * Matching on `lifecycle_state` alone was wrong: the lifecycle is a
+ * transition an administrator makes, not something a clock does, so a version
+ * whose `activationEndsAt` has passed is still `published`. Rendering it as
+ * effective would have told an administrator the platform charges a rate the
+ * platform is not charging.
+ *
+ * The general rule this is an instance of: when the UI re-derives a fact the
+ * server also derives, it must use the server's rule or ask the server.
+ */
+export function effectiveVersion(versions: readonly CommissionPolicyVersion[]): CommissionPolicyVersion | null {
+  const now = Date.now();
+  return (
+    versions.find((version) => {
+      if (version.lifecycleState !== 'published') return false;
+      // A published version always has a start; a missing one is not yet in force.
+      if (!version.activationStartsAt || new Date(version.activationStartsAt).getTime() > now) return false;
+      return version.activationEndsAt === null || now < new Date(version.activationEndsAt).getTime();
+    }) ?? null
+  );
+}
+
 /** The effective version of one component, or the plain statement that none is published. */
 export function ComponentCard({
   component,
@@ -131,7 +164,7 @@ export function ComponentCard({
    */
   actions?: ReactNode;
 }) {
-  const effective = versions?.find((v) => v.lifecycleState === 'published') ?? null;
+  const effective = versions ? effectiveVersion(versions) : null;
 
   return (
     <Card>
