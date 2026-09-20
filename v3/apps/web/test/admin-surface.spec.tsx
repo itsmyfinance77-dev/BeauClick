@@ -139,7 +139,7 @@ describe('admin access', () => {
       </AdminLayout>,
     );
 
-    await waitFor(() => expect(screen.getByText('پنل مدیریت')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('بیوکلیک — مدیریت')).toBeInTheDocument());
     expect(screen.getByRole('link', { name: 'گزارش عملیات' })).toBeInTheDocument();
     // No moderation capability -> no verification link. The API refuses it
     // regardless; this only avoids offering a door that does not open.
@@ -154,7 +154,7 @@ describe('admin access', () => {
       </AdminLayout>,
     );
 
-    await waitFor(() => expect(screen.getByText('پنل مدیریت')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('بیوکلیک — مدیریت')).toBeInTheDocument());
     // Who you are acting as, what you may do, and the way out -- all present.
     expect(screen.getByText('اپراتور')).toBeInTheDocument();
     expect(screen.getByText('مدیریت پلتفرم')).toBeInTheDocument();

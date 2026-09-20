@@ -1,0 +1,234 @@
+/*
+ * Sign in — `Prototype - Customer.dc.html` §08 and §11 (the real countdown,
+ * QA-19).
+ *
+ * One centred card at every width. The artboards differ only in scale, so
+ * this has no structural breakpoint — the card is fluid and capped.
+ */
+
+.wrap {
+  display: flex;
+  justify-content: center;
+  padding-block: 24px;
+}
+
+.card {
+  width: min(460px, 100%);
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border-strong);
+  border-radius: var(--bc-radius-card-lg);
+  padding: 32px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-shadow: var(--bc-shadow-card);
+}
+
+@media (min-width: 640px) {
+  .card {
+    padding: 48px 40px;
+  }
+}
+
+.mark {
+  display: block;
+  border-radius: var(--bc-radius-chip);
+  margin-block-end: 18px;
+}
+
+.title {
+  margin: 0 0 6px;
+  font-family: var(--bc-font-hero);
+  font-size: 19px;
+  font-weight: 800;
+  text-align: center;
+}
+
+@media (min-width: 640px) {
+  .title {
+    font-size: 22px;
+  }
+}
+
+.titleAlone {
+  margin-block-end: 24px;
+}
+
+.lead {
+  margin: 0 0 22px;
+  font-size: 14px;
+  color: var(--bc-color-text-faint);
+  text-align: center;
+}
+
+.form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  margin-block-end: 7px;
+}
+
+/*
+ * A phone number is an LTR run. `text-align: right` keeps the caret where a
+ * Persian reader expects it while the digits themselves stay in order.
+ */
+.phoneInput {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 46px;
+  padding: 0 14px;
+  border: 1px solid var(--bc-color-border-strong);
+  border-radius: var(--bc-radius-input);
+  font: inherit;
+  font-size: 15px;
+  direction: ltr;
+  text-align: right;
+  background: var(--bc-color-surface);
+  color: var(--bc-color-text);
+}
+
+.phoneInputInvalid {
+  border-color: var(--bc-color-error);
+}
+
+.submit {
+  font: inherit;
+  min-height: 46px;
+  border: none;
+  border-radius: var(--bc-radius-control);
+  background: var(--bc-color-primary);
+  color: var(--bc-color-surface);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.submit:hover:not(:disabled) {
+  background: var(--bc-color-primary-hover);
+}
+
+.submit:disabled {
+  background: var(--bc-color-surface-muted);
+  color: var(--bc-color-text-disabled);
+  cursor: not-allowed;
+}
+
+.terms {
+  margin: 20px 0 0;
+  font-size: var(--bc-text-small-size);
+  color: var(--bc-color-text-faint);
+  text-align: center;
+}
+
+/* ----------------------------------------------------------- the code step */
+
+/*
+ * Six boxes over one real input.
+ *
+ * The boxes are the design's; the input underneath is why the code can be
+ * pasted, autofilled from an SMS, and typed by anyone using a screen reader.
+ * Six separate inputs would look the same and break all three.
+ */
+.codeField {
+  position: relative;
+  width: fit-content;
+  margin-block-end: 18px;
+}
+
+.codeBoxes {
+  display: flex;
+  gap: 8px;
+  direction: ltr;
+  pointer-events: none;
+}
+
+@media (min-width: 640px) {
+  .codeBoxes {
+    gap: 10px;
+  }
+}
+
+.codeBox {
+  width: 42px;
+  height: 52px;
+  border: 1px solid var(--bc-color-border-strong);
+  border-radius: var(--bc-radius-control);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  background: var(--bc-color-surface);
+}
+
+@media (min-width: 640px) {
+  .codeBox {
+    width: 48px;
+  }
+}
+
+.codeBoxFilled {
+  border: 2px solid var(--bc-color-primary);
+}
+
+/* The box the next digit will land in. */
+.codeBoxActive {
+  border: 2px solid var(--bc-color-primary);
+}
+
+.codeInput {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  font: inherit;
+  letter-spacing: 2em;
+  cursor: text;
+}
+
+.codeInput:focus-visible + .codeBoxes .codeBoxActive {
+  box-shadow: 0 0 0 3px var(--bc-color-primary-soft);
+}
+
+.resend {
+  font: inherit;
+  font-size: var(--bc-text-small-size);
+  font-weight: 600;
+  color: var(--bc-color-primary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  min-height: 44px;
+}
+
+.resendWaiting {
+  color: var(--bc-color-text-disabled);
+  cursor: default;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+.back {
+  font: inherit;
+  font-size: var(--bc-text-small-size);
+  color: var(--bc-color-text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  min-height: 44px;
+  margin-block-start: 4px;
+}
+
+.ltr {
+  direction: ltr;
+  unicode-bidi: isolate;
+}

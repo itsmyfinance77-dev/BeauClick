@@ -24,10 +24,17 @@ const TOKENS_CSS = join(WEB, '../../packages/design-tokens/src/tokens.css');
 
 /**
  * Emitted onto `<html>` by `next/font` at runtime (see `app/fonts.ts`), so
- * they are legitimately absent from the stylesheet. `tokens.css` reads both
+ * they are legitimately absent from the stylesheet. `tokens.css` reads them
  * through `var(…, fallback)` and never depends on them resolving.
+ *
+ * Derived from `fonts.ts` rather than listed, so a face added there is
+ * covered by the round trip below without anyone remembering to add it here.
  */
-const RUNTIME_PROVIDED = new Set(['--bc-font-vazir', '--bc-font-anjoman']);
+const FONTS_TS = readFileSync(join(WEB, 'app/fonts.ts'), 'utf8');
+const LAYOUT_TSX = readFileSync(join(WEB, 'app/layout.tsx'), 'utf8');
+const RUNTIME_PROVIDED = new Set(
+  [...FONTS_TS.matchAll(/variable:\s*'(--bc-font-[a-z0-9-]+)'/g)].map((m) => m[1]),
+);
 
 function sourceFiles(dir: string, found: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
@@ -69,5 +76,35 @@ describe('design tokens — every token a screen reads is defined', () => {
     }
     // Listed rather than counted: a failure has to name what to go and fix.
     expect(undefinedUses.sort()).toEqual([]);
+  });
+});
+
+/**
+ * A font declared in `fonts.ts` but never applied to `<html>` is invisible.
+ *
+ * `next/font` only emits `--bc-font-x` inside the class it generates, so a
+ * face whose `.variable` is missing from the root element silently falls
+ * through to the next family in the stack. That happened to Peyda: it was
+ * declared, converted, shipped, and the hero still rendered in Anjoman,
+ * because the export was never added to the `className`. Nothing failed —
+ * not the build, not the types, not a single test.
+ *
+ * This is the round trip: declared -> applied -> consumed.
+ */
+describe('design tokens — every declared font reaches the document', () => {
+  const declared = [...FONTS_TS.matchAll(/^export const (\w+) = localFont\(/gm)].map((m) => m[1]);
+
+  it('declares more than one face, so this suite has something to check', () => {
+    expect(declared.length).toBeGreaterThan(1);
+  });
+
+  it.each(declared)('applies %s.variable to the <html> element in layout.tsx', (name) => {
+    expect(LAYOUT_TSX).toContain(`${name}.variable`);
+  });
+
+  it.each([...RUNTIME_PROVIDED])('has a token in tokens.css that reads %s', (variable) => {
+    // The other half: a face that is loaded but that no token consumes is
+    // bytes on the wire that nothing can ever render.
+    expect(readFileSync(TOKENS_CSS, 'utf8')).toContain(`var(${variable}`);
   });
 });

@@ -83,3 +83,23 @@ export function formatFullJalaliDate( date: Date, timeZone?: string ): string {
 export function formatTime( date: Date, timeZone?: string ): string {
 	return formatZonedTime( date, timeZone );
 }
+
+/**
+ * An Iranian mobile number as its owner writes it: `+989131234567` becomes
+ * `۰۹۱۳۱۲۳۴۵۶۷`.
+ *
+ * The platform stores E.164 because that is the unambiguous form for
+ * sending, and `+98…` is not what an Iranian customer recognises as their
+ * own number. This converts the presentation and nothing else — the same
+ * number, written the way the country writes it.
+ *
+ * Anything that is not an Iranian number is returned with its digits
+ * localised and its shape untouched: guessing a national format for a
+ * country whose conventions we have not encoded would be worse than showing
+ * the international one.
+ */
+export function formatIranianPhone( phone: string ): string {
+	const trimmed = phone.trim();
+	const national = trimmed.startsWith( '+98' ) ? `0${ trimmed.slice( 3 ) }` : trimmed;
+	return toPersianDigits( national );
+}

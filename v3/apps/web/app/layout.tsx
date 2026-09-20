@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { AuthProvider } from '@/lib/auth-context';
 import { UnreadProvider } from '@/lib/unread-context';
 import { AppShell } from '@/components/app-shell';
-import { anjoman, vazir } from './fonts';
+import { anjoman, peyda, vazir } from './fonts';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -26,7 +26,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       inherits them too. `--bc-font-family` in tokens.css resolves against
       `--bc-font-vazir`, so nothing below this line needs to know a font name.
     */
-    <html lang="fa" dir="rtl" className={`${vazir.variable} ${anjoman.variable}`}>
+    <html lang="fa" dir="rtl" className={`${vazir.variable} ${anjoman.variable} ${peyda.variable}`}>
       <body>
         <a className="bc-visually-hidden bc-skip-link" href="#main">
           پرش به محتوای اصلی

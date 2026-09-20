@@ -1,0 +1,711 @@
+/*
+ * Search results — `Prototype - Customer.dc.html` §03 (1280) and §04 (390).
+ *
+ * ## The structural change this file exists for
+ *
+ * `V3_DESIGN_SYSTEM.md` §7 names it: "filter (multi-select, checkboxes in a
+ * column) is separated from ORDER (one-of-many, a dropdown). Today in search
+ * all seven are the same shape." Seven identical pills in one row said
+ * nothing about which choices were exclusive and which combined.
+ *
+ * Desktop gets a 268px filter column beside the results. Mobile gets a dark
+ * «فیلترها» button carrying the active count, which opens a bottom sheet,
+ * with order and city as separate chips in a scrolling row beside it.
+ */
+
+.layout {
+  display: block;
+}
+
+@media (min-width: 1024px) {
+  .layout {
+    display: grid;
+    grid-template-columns: 268px 1fr;
+    gap: 32px;
+    align-items: start;
+  }
+}
+
+/* ------------------------------------------------------------ filter panel */
+
+/*
+ * One element, two presentations: a static column from 1024 up, and a
+ * bottom sheet below it. Rendering it twice would mean two sources of truth
+ * for which filters are on.
+ */
+.filters {
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-card);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+@media (max-width: 1023px) {
+  .filters {
+    position: fixed;
+    inset-inline: 0;
+    inset-block-end: 0;
+    z-index: 50;
+    max-height: 82vh;
+    overflow-y: auto;
+    border-radius: var(--bc-radius-card-lg) var(--bc-radius-card-lg) 0 0;
+    border-block-end: none;
+    box-shadow: var(--bc-shadow-float);
+    padding-block-end: calc(20px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .filtersClosed {
+    display: none;
+  }
+}
+
+/* The scrim only exists while the sheet is a sheet. */
+.scrim {
+  display: none;
+}
+
+@media (max-width: 1023px) {
+  .scrimOpen {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 45;
+    background: oklch(0.22 0.02 330 / 0.38);
+  }
+}
+
+.filtersHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.filtersTitle {
+  margin: 0;
+  font-size: var(--bc-text-card-title-size);
+  font-weight: var(--bc-text-card-title-weight);
+}
+
+.clearAll {
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  background: transparent;
+  color: var(--bc-color-primary);
+  cursor: pointer;
+  padding: 0;
+  min-height: 32px;
+}
+
+.clearAll:disabled {
+  color: var(--bc-color-text-disabled);
+  cursor: default;
+}
+
+.group {
+  border-block-start: 1px solid var(--bc-color-border);
+  padding-block-start: 20px;
+  margin: 0;
+  border-inline: none;
+  border-block-end: none;
+  padding-inline: 0;
+  padding-block-end: 0;
+}
+
+/* The first group sits directly under the heading, with no rule above it. */
+.groupFirst {
+  border-block-start: none;
+  padding-block-start: 0;
+}
+
+.groupLegend {
+  padding: 0;
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  cursor: pointer;
+  font-size: 15px;
+}
+
+/*
+ * A bucket the current result set cannot fill is dimmed and still operable.
+ * Removing it would make the filter list change shape as the user narrows,
+ * and disabling it would hide that the count is zero rather than unknown.
+ */
+.optionEmpty {
+  color: var(--bc-color-text-disabled);
+}
+
+.checkbox {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--bc-color-primary);
+  flex-shrink: 0;
+}
+
+.optionCount {
+  margin-inline-start: auto;
+  font-size: 14px;
+  color: var(--bc-color-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.optionEmpty .optionCount {
+  color: var(--bc-color-text-disabled);
+}
+
+.sheetDone {
+  font: inherit;
+  display: none;
+}
+
+@media (max-width: 1023px) {
+  .sheetDone {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 48px;
+    border: none;
+    border-radius: var(--bc-radius-control);
+    background: var(--bc-color-primary);
+    color: var(--bc-color-surface);
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+}
+
+/* ------------------------------------------------------------ results head */
+
+.resultsHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 24px;
+  margin-block-end: 8px;
+  flex-wrap: wrap;
+}
+
+.resultsTitle {
+  margin: 0;
+  font-family: var(--bc-font-display);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+@media (min-width: 1024px) {
+  .resultsTitle {
+    font-size: 30px;
+    line-height: 1.5;
+  }
+}
+
+.count {
+  margin: 0 0 18px;
+  font-size: 15px;
+  color: var(--bc-color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------- the controls */
+
+/*
+ * Below 1024 the filter button, the order control and the city sit in one
+ * scrolling row; from 1024 up the filter button disappears into the column
+ * and only the order control remains, beside the heading.
+ */
+.controlBar {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-block-end: 2px;
+  margin-block-end: 14px;
+  align-items: center;
+}
+
+@media (min-width: 1024px) {
+  .controlBar {
+    overflow-x: visible;
+    margin-block-end: 0;
+  }
+}
+
+.filterToggle {
+  font: inherit;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  /* The control bar scrolls, so this height is real rather than an overlay. */
+  min-height: 44px;
+  padding: 0 13px;
+  border-radius: var(--bc-radius-chip);
+  border: none;
+  background: var(--bc-color-text);
+  color: var(--bc-color-surface);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@media (min-width: 1024px) {
+  .filterToggle {
+    display: none;
+  }
+}
+
+.filterToggleGlyph {
+  width: 12px;
+  height: 2px;
+  background: currentColor;
+  box-shadow: 0 4px 0 currentColor, 0 -4px 0 currentColor;
+}
+
+.filterToggleCount {
+  font-variant-numeric: tabular-nums;
+}
+
+.sortLabel {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .sortLabel {
+    display: inline;
+    font-size: 14px;
+    color: var(--bc-color-text-faint);
+  }
+}
+
+/*
+ * A real `<select>`, not a chip row. Order is one-of-many and a native
+ * select says so — it also gives keyboard and screen-reader behaviour that
+ * a row of buttons would have to reimplement.
+ */
+.sortSelect {
+  font: inherit;
+  flex-shrink: 0;
+  font-size: 15px;
+  font-weight: 500;
+  /* Same row, same reason. */
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-control);
+  background: var(--bc-color-surface);
+  color: var(--bc-color-text);
+  cursor: pointer;
+}
+
+/* ------------------------------------------------------- active-filter chips */
+
+.chipRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-block-end: 20px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding-inline: 13px 8px;
+  border-radius: var(--bc-radius-chip);
+  background: var(--bc-color-primary-soft);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--bc-color-primary-on-soft);
+}
+
+.chipRemove {
+  font: inherit;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: var(--bc-radius-chip);
+  background: oklch(0.9 0.04 340);
+  color: var(--bc-color-primary-on-soft);
+  cursor: pointer;
+  line-height: 1;
+  font-size: 14px;
+}
+
+/* ---------------------------------------------------------------- the card */
+
+.cardList {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+@media (min-width: 1024px) {
+  .cardList {
+    gap: 16px;
+  }
+}
+
+/*
+ * Stacked on a phone, three columns from 1024 up — artwork, body, and the
+ * price with its action. The price column keeps a floor width so a long
+ * figure never squeezes the button onto a second line.
+ */
+.card {
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.card:hover {
+  border-color: var(--bc-color-border-strong);
+  box-shadow: var(--bc-shadow-card);
+}
+
+@media (min-width: 1024px) {
+  .card {
+    border-radius: var(--bc-radius-card);
+    overflow: visible;
+    padding: 18px;
+    display: grid;
+    grid-template-columns: 188px 1fr auto;
+    gap: 20px;
+    align-items: start;
+  }
+}
+
+.cardArt {
+  height: 160px;
+  background: repeating-linear-gradient(
+    135deg,
+    oklch(0.963 0.012 340) 0 9px,
+    oklch(0.945 0.026 340) 9px 18px
+  );
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cardArtBronze {
+  background: repeating-linear-gradient(
+    135deg,
+    oklch(0.955 0.028 70) 0 9px,
+    oklch(0.94 0.04 70) 9px 18px
+  );
+}
+
+@media (min-width: 1024px) {
+  .cardArt {
+    height: 148px;
+    border-radius: 12px;
+  }
+}
+
+.cardArtLabel {
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--bc-color-text-muted);
+}
+
+.cardBody {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  .cardBody {
+    padding: 0;
+  }
+}
+
+.nameRow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.cardName {
+  margin: 0;
+  font-family: var(--bc-font-display);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+@media (min-width: 1024px) {
+  .cardName {
+    font-size: 25px;
+  }
+}
+
+.cardName a {
+  color: var(--bc-color-text);
+  text-decoration: none;
+}
+
+.cardName a:hover {
+  color: var(--bc-color-primary);
+}
+
+/*
+ * Verification carries a dot as well as its colour and its word, so the
+ * state survives both a greyscale rendering and a colour-blind reader.
+ */
+.verified {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--bc-text-small-size);
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: var(--bc-radius-chip);
+  background: var(--bc-color-success-soft);
+  color: var(--bc-color-success);
+}
+
+.verifiedDot {
+  width: 5px;
+  height: 5px;
+  border-radius: var(--bc-radius-chip);
+  background: currentColor;
+}
+
+.cardPlace {
+  font-size: 14px;
+  color: var(--bc-color-text-faint);
+}
+
+.cardBio {
+  margin: 0;
+  font-size: 15px;
+  color: var(--bc-color-text-muted);
+  line-height: 1.75;
+}
+
+.tagRow {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tag {
+  font-size: var(--bc-text-small-size);
+  padding: 3px 10px;
+  border-radius: var(--bc-radius-chip);
+  border: 1px solid var(--bc-color-border);
+  color: var(--bc-color-text-muted);
+}
+
+.cardFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 14px 14px;
+}
+
+@media (min-width: 1024px) {
+  .cardFoot {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 12px;
+    text-align: end;
+    min-width: 168px;
+    padding: 0;
+  }
+}
+
+.priceLabel {
+  font-size: var(--bc-text-small-size);
+  color: var(--bc-color-text-faint);
+  line-height: 1.5;
+}
+
+.priceValue {
+  font-size: 20px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+}
+
+@media (min-width: 1024px) {
+  .priceValue {
+    font-size: 24px;
+  }
+}
+
+.priceUnit {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--bc-color-text-muted);
+}
+
+.cardAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-height: 46px;
+  padding: 0 18px;
+  border-radius: var(--bc-radius-control);
+  background: var(--bc-color-primary);
+  color: var(--bc-color-surface);
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.cardAction:hover {
+  background: var(--bc-color-primary-hover);
+  color: var(--bc-color-surface);
+}
+
+@media (min-width: 1024px) {
+  .cardAction {
+    width: 100%;
+    padding: 0 20px;
+  }
+}
+
+/* ------------------------------------------------------------ save control */
+
+.save {
+  font: inherit;
+  align-self: flex-start;
+  font-size: var(--bc-text-small-size);
+  font-weight: 600;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-chip);
+  background: var(--bc-color-surface);
+  color: var(--bc-color-text-muted);
+  cursor: pointer;
+}
+
+.save:hover {
+  border-color: var(--bc-color-primary);
+  color: var(--bc-color-primary);
+}
+
+.saveOn {
+  border-color: transparent;
+  background: var(--bc-color-primary-soft);
+  color: var(--bc-color-primary-on-soft);
+}
+
+.save:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+@media (min-width: 1024px) {
+  .save {
+    margin-inline-start: auto;
+    align-self: auto;
+    min-height: 32px;
+    padding: 0 13px;
+  }
+}
+
+/* ----------------------------------------------------------------- states */
+
+.stateBlock {
+  padding: 40px 16px;
+  text-align: center;
+  color: var(--bc-color-text-muted);
+  font-size: 15px;
+}
+
+.skeletonCard {
+  border: 1px solid var(--bc-color-border);
+  border-radius: 14px;
+  background: var(--bc-color-surface);
+  overflow: hidden;
+}
+
+.skeletonArt {
+  height: 160px;
+  background: var(--bc-color-surface-muted);
+  animation: bcSearchPulse var(--bc-motion-skeleton) ease-in-out infinite;
+}
+
+@media (min-width: 1024px) {
+  .skeletonArt {
+    height: 148px;
+  }
+}
+
+.skeletonLines {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.skeletonLine {
+  height: 12px;
+  border-radius: var(--bc-radius-chip);
+  background: var(--bc-color-surface-muted);
+  animation: bcSearchPulse var(--bc-motion-skeleton) ease-in-out infinite;
+}
+
+.skeletonLineShort {
+  width: 45%;
+}
+
+@keyframes bcSearchPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeletonArt,
+  .skeletonLine {
+    animation: none;
+  }
+}
+
+/* --------------------------------------------------------------- paging */
+
+.pager {
+  display: flex;
+  justify-content: center;
+  padding-block-start: 20px;
+}
+
+/*
+ * The mobile artboard's save control reads «ذخیره در علاقه‌مندی‌ها» in full;
+ * the desktop one sits in the name row and reads «ذخیره». One control, one
+ * accessible name — only the visible suffix changes.
+ */
+@media (min-width: 1024px) {
+  .saveSuffix {
+    display: none;
+  }
+}

@@ -1,4 +1,4 @@
-import { zonedIsoDate, zonedIsoTime } from '@beauclick/persian-utils';
+import { formatZonedTime, zonedIsoDate } from '@beauclick/persian-utils';
 
 import type { ApiClient } from './api-client';
 
@@ -12,6 +12,20 @@ import type { ApiClient } from './api-client';
  * send is a price an attacker can choose.
  */
 
+/**
+ * A stored image, as the media pipeline describes it.
+ *
+ * `url` is null for a protected object by construction, not by omission —
+ * so a null url is "no picture to show", never "the field is missing".
+ */
+export interface MediaDescriptor {
+  id: string;
+  url: string | null;
+  contentType: string | null;
+  width: number | null;
+  height: number | null;
+}
+
 export interface ProviderSummary {
   id: string;
   displayName: string;
@@ -19,6 +33,34 @@ export interface ProviderSummary {
   cityId: string | null;
   specialties: { id: string; name: string }[];
   verificationStatus: string;
+  /**
+   * Four fields the server has returned all along and this type did not
+   * name, so no surface could use them: the profile imagery, the rating
+   * aggregate, the caller's own saved state, and when the professional
+   * joined. Each is always present with an explicit null rather than
+   * optional, which is how the server defines them.
+   */
+  images: { avatar: MediaDescriptor | null; cover: MediaDescriptor | null };
+  /** `average` is null when `count` is 0 — never 0, which would be a rating. */
+  rating: { average: number | null; count: number };
+  /** `null` for an anonymous visitor: not "unsaved", but "no caller to answer for". */
+  saved: boolean | null;
+  createdAt: string;
+}
+
+/** One picture of this professional's work. */
+export interface PortfolioItem {
+  id: string;
+  caption: string | null;
+  position: number;
+  media: MediaDescriptor | null;
+  createdAt: string;
+}
+
+/** A launched city, from the public reference list. */
+export interface CityRef {
+  id: string;
+  name: string;
 }
 
 export interface ServiceOffering {
@@ -27,6 +69,8 @@ export interface ServiceOffering {
   name: string;
   durationMinutes: number;
   priceToman: number;
+  /** The caller's own saved state for THIS service — independent of the professional's. */
+  saved?: boolean | null;
 }
 
 export interface AvailableSlot {
@@ -139,6 +183,16 @@ export const bookingApi = {
 
   listServices: (api: ApiClient, id: string) => api.get<ServiceOffering[]>(`/v1/providers/${id}/services`),
 
+  /** This professional's own pictures of their work. Public, like the profile. */
+  listPortfolio: (api: ApiClient, id: string) => api.get<PortfolioItem[]>(`/v1/providers/${id}/portfolio`),
+
+  /**
+   * The launched cities, so a profile can name the one its `cityId` points
+   * at. The professional shape carries the id and not the name, and a page
+   * that shows a raw uuid to a customer is showing them nothing.
+   */
+  listCities: (api: ApiClient) => api.get<CityRef[]>('/v1/providers/cities'),
+
   listAvailability: (api: ApiClient, id: string, serviceId?: string | null) =>
     api.get<AvailableSlot[]>(`/v1/providers/${id}/availability${serviceId ? `?serviceId=${serviceId}` : ''}`),
 
@@ -209,9 +263,23 @@ export function groupSlotsByDay(slots: AvailableSlot[]): { dayKey: string; date:
     else buckets.set(dayKey, { date: at, slots: [slot] });
   }
 
+  /*
+    Days ascending, and the SLOTS INSIDE each day ascending too.
+
+    The day sort was here and the slot sort was not, which nothing noticed
+    while the old screen rendered slots as a flat list per day in whatever
+    order they arrived. The redesigned booking panel renders them as a grid
+    a customer reads left to right, and an unsorted grid puts 16:30 before
+    09:30. `startAt` is an ISO instant, so a lexical compare is a
+    chronological one.
+  */
   return [...buckets.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([dayKey, value]) => ({ dayKey, ...value }));
+    .map(([dayKey, value]) => ({
+      dayKey,
+      ...value,
+      slots: [...value.slots].sort((a, b) => a.startAt.localeCompare(b.startAt)),
+    }));
 }
 
 /**
@@ -225,7 +293,16 @@ export function groupSlotsByDay(slots: AvailableSlot[]): { dayKey: string; date:
  * Three copies is how two of them end up disagreeing after a change only one of
  * them hears about -- and this one hardcoded the zone rather than reading
  * `PLATFORM_TIMEZONE`, so it would not have heard.
+ *
+ * It returns PERSIAN digits, which it did not.
+ *
+ * The function is named for display and was returning `09:30`; every caller
+ * was expected to remember `toPersianDigits` around it. Two did, the third
+ * did not, and Latin digits appeared in the middle of a Persian sentence on
+ * the booking panel — the same defect class live QA found once before. A
+ * display helper that needs a wrapper to be correct is a helper that will be
+ * used without one.
  */
 export function slotTimeLabel(iso: string): string {
-  return zonedIsoTime(new Date(iso));
+  return formatZonedTime(new Date(iso));
 }

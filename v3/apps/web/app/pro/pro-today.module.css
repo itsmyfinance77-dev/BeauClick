@@ -1,0 +1,390 @@
+/*
+ * The professional's «امروز» — `Prototype - Pro and Admin.dc.html` §01.
+ *
+ * The page already read everything it needed; what it lacked was a shape.
+ * Three things the artboard puts in order, in this order:
+ *
+ *  1. the work that is BLOCKED and costs the seller money until they act,
+ *  2. three figures they check daily,
+ *  3. today's schedule as a timeline rather than a list of cards.
+ */
+
+.head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-block-end: 20px;
+  flex-wrap: wrap;
+}
+
+@media (min-width: 640px) {
+  .head {
+    gap: 24px;
+    margin-block-end: 24px;
+  }
+}
+
+.title {
+  margin: 0 0 2px;
+  font-family: var(--bc-font-display);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+@media (min-width: 1024px) {
+  .title {
+    font-size: 32px;
+  }
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 15px;
+  color: var(--bc-color-text-muted);
+}
+
+.headAction {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: var(--bc-radius-control);
+  border: 1px solid var(--bc-color-border);
+  background: var(--bc-color-surface);
+  color: var(--bc-color-text);
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.headAction:hover {
+  border-color: var(--bc-color-border-strong);
+}
+
+/* ------------------------------------------------------------- the blocker */
+
+/*
+ * The one banner on this surface, and it earns the weight: until a finished
+ * booking's outcome is recorded, the seller is not paid for it and the
+ * customer earns no points. That is money sitting still, not a notice.
+ */
+.blocker {
+  background: var(--bc-color-error-soft);
+  border: 1px solid oklch(0.86 0.075 25);
+  border-radius: 14px;
+  padding: 16px;
+  margin-block-end: 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+@media (min-width: 640px) {
+  .blocker {
+    padding: 16px 18px;
+    margin-block-end: 24px;
+    flex-wrap: nowrap;
+  }
+}
+
+.blockerDot {
+  width: 20px;
+  height: 20px;
+  border-radius: var(--bc-radius-chip);
+  background: oklch(0.55 0.17 25);
+  flex-shrink: 0;
+}
+
+.blockerTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: oklch(0.4 0.13 25);
+}
+
+.blockerText {
+  font-size: 14px;
+  color: oklch(0.42 0.09 25);
+}
+
+.blockerAction {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: var(--bc-radius-control);
+  background: var(--bc-color-error);
+  color: var(--bc-color-surface);
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.blockerAction:hover {
+  background: oklch(0.43 0.15 25);
+  color: var(--bc-color-surface);
+}
+
+/* --------------------------------------------------------------- the tiles */
+
+.tiles {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-block-end: 24px;
+}
+
+@media (min-width: 640px) {
+  .tiles {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 14px;
+    margin-block-end: 28px;
+  }
+}
+
+.tile {
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border);
+  border-radius: 14px;
+  padding: 18px;
+}
+
+.tileLabel {
+  font-size: 14px;
+  color: var(--bc-color-text-faint);
+  margin-block-end: 6px;
+}
+
+.tileValueRow {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.tileValue {
+  font-size: 24px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.35;
+}
+
+@media (min-width: 640px) {
+  .tileValue {
+    font-size: 27px;
+  }
+}
+
+.tileUnit {
+  font-size: 14px;
+  color: var(--bc-color-text-muted);
+}
+
+.tileNote {
+  font-size: 14px;
+  color: var(--bc-color-text-faint);
+  margin-block-start: 4px;
+}
+
+.tileBar {
+  margin-block-start: 8px;
+  height: 6px;
+  border-radius: var(--bc-radius-chip);
+  background: oklch(0.955 0.01 60);
+  overflow: hidden;
+}
+
+.tileBarFill {
+  height: 100%;
+  border-radius: var(--bc-radius-chip);
+  background: var(--bc-color-primary);
+}
+
+/* ------------------------------------------------------------ the timeline */
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-block-end: 12px;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.sectionLink {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--bc-color-primary);
+  text-decoration: none;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.timeline {
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-card);
+  overflow: hidden;
+}
+
+/*
+ * Hour column, then the row's content. The hour is what a seller scans,
+ * so it gets its own column rather than being the first word of a sentence.
+ */
+.row {
+  display: grid;
+  grid-template-columns: 62px 1fr;
+}
+
+@media (min-width: 640px) {
+  .row {
+    grid-template-columns: 74px 1fr;
+  }
+}
+
+.row + .row {
+  border-block-start: 1px solid oklch(0.94 0.006 60);
+}
+
+/* A booked hour is tinted AND carries a status word — never tint alone. */
+.rowBooked {
+  background: var(--bc-color-surface-tint);
+}
+
+.hour {
+  padding: 14px 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--bc-color-text-faint);
+  font-variant-numeric: tabular-nums;
+  border-inline-end: 1px solid oklch(0.94 0.006 60);
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: center;
+}
+
+.rowBooked .hour {
+  font-weight: 700;
+  color: var(--bc-color-primary-on-soft);
+}
+
+.cell {
+  padding: 10px 14px;
+  min-width: 0;
+}
+
+.free {
+  border: 1px dashed var(--bc-color-border);
+  border-radius: var(--bc-radius-control);
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+  color: var(--bc-color-text-disabled);
+}
+
+.bookingRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.bookingHead {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.bookingName {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.bookingMeta {
+  font-size: 14px;
+  color: var(--bc-color-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.statusChip {
+  font-size: var(--bc-text-badge-size);
+  font-weight: 700;
+  padding: 2px 9px;
+  border-radius: var(--bc-radius-chip);
+  background: var(--bc-color-primary-soft);
+  color: var(--bc-color-primary-on-soft);
+}
+
+.statusChipDue {
+  background: var(--bc-color-error-soft);
+  color: var(--bc-color-error);
+}
+
+.rowAction {
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--bc-color-primary);
+  text-decoration: none;
+  flex-shrink: 0;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.empty {
+  padding: 28px 16px;
+  text-align: center;
+  font-size: 15px;
+  color: var(--bc-color-text-muted);
+}
+
+/* ------------------------------------------------------------- the setup */
+
+.setup {
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-card);
+  padding: 18px;
+  margin-block-end: 24px;
+}
+
+.setupTitle {
+  margin: 0 0 4px;
+  font-size: var(--bc-text-card-title-size);
+  font-weight: 700;
+}
+
+.setupList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-block-start: 10px;
+}
+
+.setupStep {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  font-size: 15px;
+  flex-wrap: wrap;
+}
+
+.setupStepDone {
+  color: var(--bc-color-text-disabled);
+}

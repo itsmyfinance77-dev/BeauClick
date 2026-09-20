@@ -21,6 +21,18 @@ export interface SearchResultItem {
   rating: { average: number; count: number };
   /** Explainability keys -- `verified`, `reliable`, `high_rating`. V2 rendered these too. */
   badges: string[];
+  /**
+   * Whether the AUTHENTICATED caller has saved this professional, and `null`
+   * when there is no caller -- V3.2-C Story #9, `WishlistSavedState`.
+   *
+   * `null` is not "not saved". It means the server could not identify anyone
+   * to answer for, and rendering it as an unsaved state would claim something
+   * about an anonymous visitor. The control has three states, not two.
+   *
+   * This field was in the server's `PublicProviderResult` and missing from
+   * this type, so no surface could use it.
+   */
+  saved: boolean | null;
 }
 
 export interface FacetBucket {
@@ -68,6 +80,22 @@ export function buildSearchQuery(params: SearchParams): string {
 
 export function searchProviders(api: ApiClient, params: SearchParams) {
   return api.get<SearchResponse>(`/v1/search/providers${buildSearchQuery(params)}`);
+}
+
+/** The two things a customer can save. Services are saved from the provider page, not from search. */
+export type WishlistTargetType = 'professional' | 'service';
+
+/**
+ * Saves a target. 200 whether it was just written or was already there --
+ * idempotency is a property of the response, not a 201-vs-200 signal.
+ */
+export function saveToWishlist(api: ApiClient, targetType: WishlistTargetType, targetId: string) {
+  return api.post<{ id: string }>('/v1/me/wishlist/items', { targetType, targetId });
+}
+
+/** Removes a saved target, addressed by the natural key the caller already has. */
+export function removeFromWishlist(api: ApiClient, targetType: WishlistTargetType, targetId: string) {
+  return api.delete<void>(`/v1/me/wishlist/items/${targetType}/${encodeURIComponent(targetId)}`);
 }
 
 export function autocomplete(api: ApiClient, prefix: string) {

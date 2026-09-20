@@ -1,4 +1,4 @@
-import { formatCount, formatFullJalaliDate, formatRating, formatShortDate, formatTime, formatToman, normalizeDigits, toPersianDigits } from './format';
+import { formatCount, formatFullJalaliDate, formatIranianPhone, formatRating, formatShortDate, formatTime, formatToman, normalizeDigits, toPersianDigits } from './format';
 
 describe( 'toPersianDigits', () => {
 	it( 'converts every ASCII digit to its Persian equivalent', () => {
@@ -143,5 +143,23 @@ describe( 'normalizeDigits (Phase 3 — the input direction)', () => {
 	it( 'is asymmetric on purpose: output is always Persian, input accepts anything', () => {
 		// A user must never have to know which numeral system the system prefers.
 		expect( toPersianDigits( normalizeDigits( '٤٥٦' ) ) ).toBe( '۴۵۶' );
+	} );
+} );
+
+describe( 'formatIranianPhone', () => {
+	it( 'writes an Iranian mobile the way its owner writes it', () => {
+		// The platform stores E.164 for sending; `+98…` is not what somebody
+		// recognises as their own number.
+		expect( formatIranianPhone( '+989131234567' ) ).toBe( '۰۹۱۳۱۲۳۴۵۶۷' );
+	} );
+
+	it( 'leaves a number it does not recognise alone, apart from the digits', () => {
+		// Inventing a national format for a country whose conventions are not
+		// encoded here would be worse than showing the international one.
+		expect( formatIranianPhone( '+441234567890' ) ).toBe( '+۴۴۱۲۳۴۵۶۷۸۹۰' );
+	} );
+
+	it( 'passes through a number already written nationally', () => {
+		expect( formatIranianPhone( '09131234567' ) ).toBe( '۰۹۱۳۱۲۳۴۵۶۷' );
 	} );
 } );

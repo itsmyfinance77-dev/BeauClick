@@ -1,0 +1,253 @@
+/*
+ * The professional's fixed sidebar — `Prototype - Pro and Admin.dc.html` §01
+ * and `V3_INFORMATION_ARCHITECTURE.md` §3.
+ *
+ * "Navigation moves from `pro-shell.tsx`'s seven-item horizontal bar to a
+ * FIXED SIDE COLUMN. Reason: seven destinations do not fit a horizontal bar
+ * and break on mobile; in a side column all seven are always visible and
+ * there is room for a counter too."
+ *
+ * The column also carries the professional's own identity and verification
+ * at its head — the job `ContextBand` was doing in a worse place.
+ *
+ * Below 1024 the column becomes a horizontal scroller. The design puts it in
+ * a drawer, and a drawer is a bigger change than this pass: a scroller keeps
+ * every destination reachable and honest about there being more, and the
+ * drawer is recorded rather than half-built.
+ */
+
+.shell {
+  display: block;
+}
+
+@media (min-width: 1024px) {
+  .shell {
+    display: grid;
+    grid-template-columns: 248px 1fr;
+    gap: 0;
+    align-items: start;
+    /* Cancels the app shell's own gutter: the column meets the header. */
+    margin-inline: calc(-1 * var(--bc-spacing-gutter-customer));
+    margin-block: calc(-1 * var(--bc-spacing-section-desktop));
+  }
+}
+
+.sidebar {
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-card);
+  padding: 14px;
+  margin-block-end: 20px;
+}
+
+@media (min-width: 1024px) {
+  /*
+    Sticky, so a long page does not scroll the navigation away.
+    
+    Two earlier attempts were wrong. `min-height: calc(100vh - 72px)` guessed
+    the app header's height, and that header is content-sized and wraps, so
+    the guess is wrong at some widths. `align-self: stretch` then cancelled
+    the stickiness outright: an item as tall as its container has nothing to
+    stick to.
+    
+    The dividing rule therefore lives on the CONTENT's leading edge rather
+    than on this column's trailing one, so it spans the full height of the
+    row while the column itself stays only as tall as it needs to be.
+  */
+  .sidebar {
+    position: sticky;
+    inset-block-start: 0;
+    align-self: start;
+    max-height: 100vh;
+    overflow-y: auto;
+    border: none;
+    border-radius: 0;
+    padding: 18px 0;
+    margin-block-end: 0;
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+.identity {
+  padding-block-end: 14px;
+  border-block-end: 1px solid oklch(0.94 0.006 60);
+}
+
+@media (min-width: 1024px) {
+  .identity {
+    padding: 0 18px 18px;
+  }
+}
+
+.brand {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  /* The app header is above, but the column needs its own anchor. */
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    min-height: 44px;
+    margin-block-end: 12px;
+    text-decoration: none;
+  }
+}
+
+.brandName {
+  font-family: var(--bc-font-display);
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--bc-color-text);
+}
+
+.who {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--bc-color-surface-tint);
+}
+
+.avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--bc-radius-chip);
+  background: repeating-linear-gradient(
+    135deg,
+    oklch(0.963 0.012 340) 0 4px,
+    oklch(0.945 0.026 340) 4px 8px
+  );
+  flex-shrink: 0;
+}
+
+.whoName {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.nav {
+  padding-block: 12px;
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+}
+
+@media (min-width: 1024px) {
+  .nav {
+    padding: 12px 10px;
+    flex-direction: column;
+    overflow-x: visible;
+    flex: 1;
+  }
+}
+
+.link {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  flex-shrink: 0;
+  min-height: 46px;
+  padding: 0 12px;
+  border-radius: var(--bc-radius-control);
+  color: var(--bc-color-text);
+  font-size: 15px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.link:hover {
+  background: var(--bc-color-surface-tint);
+  color: var(--bc-color-text);
+}
+
+/* The current destination is filled AND bold — not colour alone. */
+.link[aria-current='page'] {
+  background: var(--bc-color-primary);
+  color: var(--bc-color-surface);
+  font-weight: 700;
+}
+
+.count {
+  margin-inline-start: auto;
+  font-size: var(--bc-text-badge-size);
+  font-weight: 700;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--bc-radius-chip);
+  background: var(--bc-color-primary-soft);
+  color: var(--bc-color-primary-on-soft);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.link[aria-current='page'] .count {
+  background: var(--bc-color-surface);
+  color: var(--bc-color-primary);
+}
+
+.separator {
+  flex-shrink: 0;
+  width: 1px;
+  margin-inline: 8px;
+  background: oklch(0.94 0.006 60);
+}
+
+@media (min-width: 1024px) {
+  .separator {
+    width: auto;
+    height: 1px;
+    margin: 12px 0;
+  }
+}
+
+.exit {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .exit {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 12px 18px 0;
+    border-block-start: 1px solid oklch(0.94 0.006 60);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--bc-color-text-muted);
+    text-decoration: none;
+  }
+
+  .exit:hover {
+    color: var(--bc-color-primary);
+  }
+}
+
+.exitChevron {
+  width: 7px;
+  height: 7px;
+  border-block-start: 2px solid currentColor;
+  border-inline-end: 2px solid currentColor;
+  transform: rotate(45deg);
+}
+
+.content {
+  min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  .content {
+    /* The column's dividing rule — see `.sidebar`. */
+    border-inline-start: 1px solid var(--bc-color-border);
+    padding: var(--bc-spacing-section-desktop) var(--bc-spacing-gutter-pro);
+  }
+}

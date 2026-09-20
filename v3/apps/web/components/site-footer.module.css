@@ -1,0 +1,115 @@
+/*
+ * The dark footer — `Prototype - Customer.dc.html` §01, desktop artboard.
+ *
+ * This is the one surface in the customer platform with an inverted ground.
+ * Its ink pairs are chosen against `--bc-color-text` as the background rather
+ * than against white, so the contrast assertions in the palette suite do not
+ * cover them; the values here are the prototype's own and are measured in
+ * `site-footer.spec.tsx`.
+ */
+
+.footer {
+  background: var(--bc-color-text);
+  color: oklch(0.9 0.01 330);
+  padding: 32px 16px 24px;
+}
+
+@media (min-width: 640px) {
+  .footer {
+    padding: 48px var(--bc-spacing-gutter-customer) 32px;
+  }
+}
+
+.inner {
+  max-width: 1184px;
+  margin: 0 auto;
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 28px;
+  padding-block-end: 28px;
+  border-block-end: 1px solid oklch(0.34 0.02 330);
+}
+
+@media (min-width: 640px) {
+  .columns {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 32px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .columns {
+    grid-template-columns: 1.4fr 1fr 1fr 1fr;
+    gap: 40px;
+    padding-block-end: 32px;
+  }
+}
+
+.brandRow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-block-end: 12px;
+}
+
+.brandDot {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--bc-radius-chip);
+  background: var(--bc-color-accent);
+}
+
+.brandName {
+  font-family: var(--bc-font-display);
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--bc-color-surface);
+}
+
+.blurb {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.8;
+  color: oklch(0.72 0.015 330);
+  max-width: 38ch;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.columnTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--bc-color-surface);
+  margin-block-end: 6px;
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  font-size: 14px;
+  color: oklch(0.8 0.012 330);
+  text-decoration: none;
+}
+
+.link:hover {
+  color: var(--bc-color-surface);
+  text-decoration: underline;
+}
+
+.legal {
+  padding-block-start: 20px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: var(--bc-text-small-size);
+  color: oklch(0.66 0.015 330);
+}
