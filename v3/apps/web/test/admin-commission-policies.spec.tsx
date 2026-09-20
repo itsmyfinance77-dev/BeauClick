@@ -237,6 +237,66 @@ describe('screen 50a — the admin commission policy read surface', () => {
     }
   });
 
+  describe('the effective version follows the server’s rule, not `lifecycleState` alone', () => {
+    // `CommissionPolicyResolutionService` requires published AND started AND
+    // not ended. The lifecycle is a transition an administrator makes, never
+    // something a clock does, so a time-expired version is still `published`.
+    const PAST = '2026-09-01T00:00:00.000Z';
+    const FUTURE = '2099-01-01T00:00:00.000Z';
+
+    it('does not show a published-but-expired version as effective', async () => {
+      mockApi({
+        policies: [POLICIES.booking],
+        versionsByKey: {
+          [POLICIES.booking.policyKey]: [
+            version({ version: 1, lifecycleState: 'published', activationStartsAt: PAST, activationEndsAt: PAST }),
+          ],
+        },
+      });
+      renderPage();
+
+      const booking = await componentCard('booking_commission');
+      // The server reports this component `absent`; the screen must agree.
+      await waitFor(() => expect(booking.querySelector('[data-state="none-published"]')).not.toBeNull());
+      expect(booking.querySelector('[data-state="effective"]')).toBeNull();
+      expect(booking.textContent).not.toContain('۷۵۰ bp');
+    });
+
+    it('does not show a version whose activation has not started yet', async () => {
+      mockApi({
+        policies: [POLICIES.booking],
+        versionsByKey: {
+          [POLICIES.booking.policyKey]: [
+            version({ version: 1, lifecycleState: 'published', activationStartsAt: FUTURE, activationEndsAt: null }),
+          ],
+        },
+      });
+      renderPage();
+
+      const booking = await componentCard('booking_commission');
+      await waitFor(() => expect(booking.querySelector('[data-state="none-published"]')).not.toBeNull());
+    });
+
+    it('picks the one in force when an expired version sits beside a live one', async () => {
+      mockApi({
+        policies: [POLICIES.booking],
+        versionsByKey: {
+          [POLICIES.booking.policyKey]: [
+            version({ version: 1, lifecycleState: 'published', basisPoints: 300, activationStartsAt: PAST, activationEndsAt: PAST }),
+            version({ version: 2, lifecycleState: 'published', basisPoints: 750, activationStartsAt: PAST, activationEndsAt: FUTURE }),
+          ],
+        },
+      });
+      renderPage();
+
+      const booking = await componentCard('booking_commission');
+      await waitFor(() => expect(booking.querySelector('[data-state="effective"]')).not.toBeNull());
+      expect(booking.textContent).toContain('۷۵۰ bp');
+      // The expired one is in the timeline, never on the card.
+      expect(booking.textContent).not.toContain('۳۰۰ bp');
+    });
+  });
+
   it('carries the lifecycle of every version as text, not only as a coloured chip', async () => {
     mockApi({
       policies: [POLICIES.booking],
