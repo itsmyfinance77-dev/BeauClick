@@ -384,3 +384,61 @@ export function commissionPolicyVersions(api: ApiClient, policyKey: string) {
     `/v1/admin/commercial/commission-policies/${encodeURIComponent(policyKey)}/versions`,
   );
 }
+
+/**
+ * The commission policy MUTATIONS — V3.3 `#43b-1` / #173, story #207.
+ *
+ * Every one carries a mandatory `reason` (1–500 characters, `ReasonDto`), and
+ * none accepts an activation instant, an actor, a lifecycle state or an
+ * arithmetic version: the server owns all four, and a request carrying any of
+ * them is refused outright by `forbidNonWhitelisted`.
+ *
+ * `basisPoints`, `fixedToman` and `base` are OMITTED rather than nulled for
+ * the shapes that do not carry them. `WriteCommissionVersionDto` says it
+ * plainly — "left out is the only way to say absent; there is no sentinel" —
+ * and the service's shape check and the database's CHECK matrix both refuse
+ * any combination the four kinds do not name.
+ */
+export interface CommissionRuleDraft {
+  ruleKind: CommissionRuleKind;
+  basisPoints?: number;
+  fixedToman?: number;
+  base?: CommissionBase;
+}
+
+const COMMISSION_ROOT = '/v1/admin/commercial/commission-policies';
+
+const versionPath = (policyKey: string, version: number) =>
+  `${COMMISSION_ROOT}/${encodeURIComponent(policyKey)}/versions/${version}`;
+
+export function createCommissionPolicy(
+  api: ApiClient,
+  body: { policyKey: string; component: CommissionComponent; displayName: string; reason: string },
+) {
+  return api.post<CommissionPolicySummary>(COMMISSION_ROOT, body);
+}
+
+export function draftCommissionVersion(api: ApiClient, policyKey: string, body: CommissionRuleDraft & { reason: string }) {
+  return api.post<CommissionPolicyVersion>(`${COMMISSION_ROOT}/${encodeURIComponent(policyKey)}/versions`, body);
+}
+
+export function replaceCommissionVersion(
+  api: ApiClient,
+  policyKey: string,
+  version: number,
+  body: CommissionRuleDraft & { reason: string },
+) {
+  return api.put<CommissionPolicyVersion>(versionPath(policyKey, version), body);
+}
+
+export function discardCommissionVersion(api: ApiClient, policyKey: string, version: number, reason: string) {
+  return api.delete<{ discarded: boolean }>(versionPath(policyKey, version), { reason });
+}
+
+export function publishCommissionVersion(api: ApiClient, policyKey: string, version: number, reason: string) {
+  return api.post<CommissionPolicyVersion>(`${versionPath(policyKey, version)}/publish`, { reason });
+}
+
+export function retireCommissionVersion(api: ApiClient, policyKey: string, version: number, reason: string) {
+  return api.post<CommissionPolicyVersion>(`${versionPath(policyKey, version)}/retire`, { reason });
+}
