@@ -357,3 +357,25 @@ describe('the two properties the booking half must not lose', () => {
     expect(screen.getByRole('button', { name: 'ادامه به پرداخت' })).toBeDisabled();
   });
 });
+
+describe('slot ordering', () => {
+  it('reads left to right in time, whatever order availability arrived in', async () => {
+    /*
+     * `groupSlotsByDay` sorted the DAYS and not the slots inside them, which
+     * nothing noticed while slots rendered as a flat list. The redesigned
+     * panel renders a grid a customer reads across, and an unsorted grid
+     * puts 16:30 before 09:30.
+     */
+    mockApi({
+      slots: [
+        { id: 'late', serviceId: 'svc-1', startAt: '2099-09-15T13:00:00.000Z', endAt: '2099-09-15T16:00:00.000Z' },
+        { id: 'early', serviceId: 'svc-1', startAt: '2099-09-15T06:00:00.000Z', endAt: '2099-09-15T09:00:00.000Z' },
+        { id: 'middle', serviceId: 'svc-1', startAt: '2099-09-15T09:30:00.000Z', endAt: '2099-09-15T12:30:00.000Z' },
+      ],
+    });
+    renderProfile();
+
+    const grid = await screen.findByTestId('slot-grid');
+    expect([...grid.querySelectorAll('[data-slot]')].map((b) => b.textContent)).toEqual(['۰۹:۳۰', '۱۳:۰۰', '۱۶:۳۰']);
+  });
+});

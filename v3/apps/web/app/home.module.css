@@ -293,7 +293,11 @@
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
-  min-height: 36px;
+  /*
+    44 below 640 and the artboard's 36 above it. This row scrolls, so the
+    `bc-tap` overlay is clipped here and the height has to be real.
+  */
+  min-height: 44px;
   padding: 0 13px;
   border: 1px solid var(--bc-color-border);
   border-radius: var(--bc-radius-chip);
@@ -306,6 +310,19 @@
 .term:hover {
   border-color: var(--bc-color-primary);
   color: var(--bc-color-primary);
+}
+
+/*
+ * AFTER the base rule, not before it.
+ *
+ * A media query adds no specificity, so the later declaration wins. Written
+ * above `.term` this override did nothing at all, and nothing would have
+ * said so: the chip would simply have stayed 44px at every width.
+ */
+@media (min-width: 640px) {
+  .term {
+    min-height: 36px;
+  }
 }
 
 /* ------------------------------------------------------------- hero images */

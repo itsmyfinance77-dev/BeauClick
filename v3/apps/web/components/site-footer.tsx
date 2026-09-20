@@ -49,7 +49,7 @@ export function SiteFooter() {
           <nav className={styles.column} aria-label="پیوندهای مشتریان">
             <div className={styles.columnTitle}>مشتری‌ها</div>
             {CUSTOMER_LINKS.map((link) => (
-              <Link key={link.href} href={link.href} className={styles.link}>
+              <Link key={link.href} href={link.href} className={`${styles.link} bc-tap`}>
                 {link.label}
               </Link>
             ))}
@@ -58,7 +58,7 @@ export function SiteFooter() {
           <nav className={styles.column} aria-label="پیوندهای متخصص‌ها">
             <div className={styles.columnTitle}>متخصص‌ها</div>
             {PROFESSIONAL_LINKS.map((link) => (
-              <Link key={link.href} href={link.href} className={styles.link}>
+              <Link key={link.href} href={link.href} className={`${styles.link} bc-tap`}>
                 {link.label}
               </Link>
             ))}

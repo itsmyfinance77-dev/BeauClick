@@ -249,7 +249,8 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  min-height: 38px;
+  /* The control bar scrolls, so this height is real rather than an overlay. */
+  min-height: 44px;
   padding: 0 13px;
   border-radius: var(--bc-radius-chip);
   border: none;
@@ -299,7 +300,8 @@
   flex-shrink: 0;
   font-size: 15px;
   font-weight: 500;
-  min-height: 42px;
+  /* Same row, same reason. */
+  min-height: 44px;
   padding: 0 14px;
   border: 1px solid var(--bc-color-border);
   border-radius: var(--bc-radius-control);

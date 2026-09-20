@@ -175,7 +175,11 @@ export default function HomePage() {
               <div className={styles.termRow} data-testid="popular-specialties">
                 <span className={styles.termLabel}>تخصص‌های پرتکرار:</span>
                 {data.specialties.map((specialty) => (
-                  <Link key={specialty.key} href={searchHref(specialty.label ?? specialty.key)} className={styles.term}>
+                  <Link
+                    key={specialty.key}
+                    href={searchHref(specialty.label ?? specialty.key)}
+                    className={styles.term}
+                  >
                     {specialty.label ?? specialty.key}
                   </Link>
                 ))}

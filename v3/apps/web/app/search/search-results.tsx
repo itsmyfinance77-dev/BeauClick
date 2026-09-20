@@ -356,7 +356,7 @@ export function SearchResults() {
             <h2 className={styles.filtersTitle}>فیلترها</h2>
             <button
               type="button"
-              className={styles.clearAll}
+              className={`${styles.clearAll} bc-tap`}
               disabled={activeFilters.length === 0}
               onClick={() => {
                 setQuery('');
@@ -457,7 +457,7 @@ export function SearchResults() {
                   {filter.label}
                   <button
                     type="button"
-                    className={styles.chipRemove}
+                    className={`${styles.chipRemove} bc-tap`}
                     aria-label={`حذف فیلتر ${filter.label}`}
                     onClick={filter.clear}
                   >
@@ -559,7 +559,7 @@ export function SearchResults() {
                              server cannot identify. */
                           <Link
                             href="/auth"
-                            className={styles.save}
+                            className={`${styles.save} bc-tap`}
                             aria-label={`برای ذخیرهٔ ${item.displayName} وارد شوید`}
                           >
                             ذخیره<span className={styles.saveSuffix}> در علاقه‌مندی‌ها</span>
@@ -567,7 +567,7 @@ export function SearchResults() {
                         ) : (
                           <button
                             type="button"
-                            className={`${styles.save} ${item.saved ? styles.saveOn : ''}`}
+                            className={`${styles.save} ${item.saved ? styles.saveOn : ''} bc-tap`}
                             aria-pressed={item.saved}
                             disabled={savingIds.has(item.id)}
                             aria-label={

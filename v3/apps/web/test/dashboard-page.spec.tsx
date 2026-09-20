@@ -301,3 +301,49 @@ describe('claims the page does not make', () => {
     expect(screen.getByText('نوبت گذشته‌ای ندارید.')).toBeInTheDocument();
   });
 });
+
+describe('the order the page shows and the order it resolves names from', () => {
+  it('names the EARLIEST upcoming booking, whatever order the server returned', async () => {
+    /*
+     * The defect this pins. `load()` resolved the professional for the first
+     * upcoming booking in ARRIVAL order while the render showed the earliest
+     * by TIME, so any server ordering other than chronological put one
+     * appointment's date beside a different appointment's salon.
+     *
+     * The list below arrives LATEST FIRST, which is a perfectly ordinary
+     * thing for a bookings endpoint to do.
+     */
+    mockApi({
+      bookings: [
+        booking({ id: 'later', professionalId: 'prof-2', startAt: '2099-10-20T06:30:00.000Z', endAt: '2099-10-20T09:30:00.000Z' }),
+        booking({ id: 'sooner', professionalId: 'prof-1', startAt: '2099-09-15T06:30:00.000Z', endAt: '2099-09-15T09:30:00.000Z' }),
+      ],
+    });
+    renderDashboard();
+
+    const upcoming = await screen.findByTestId('upcoming-booking');
+    await waitFor(() => expect(providerReads.length).toBeGreaterThan(0));
+    // The card is the September one, so the name must be September's salon.
+    await waitFor(() => expect(upcoming.textContent).toContain('آتلیه سارا محمدی'));
+    expect(upcoming.textContent).not.toContain('استودیو مهسا');
+  });
+
+  it('resolves names for the past rows it actually shows, not the first three that arrived', async () => {
+    const past = (id: string, professionalId: string, startAt: string) =>
+      booking({ id, professionalId, startAt, endAt: startAt, status: 'completed' as const });
+    mockApi({
+      bookings: [
+        // Oldest first — the opposite of the newest-first order rendered.
+        past('p1', 'prof-2', '2019-01-01T06:30:00.000Z'),
+        past('p2', 'prof-2', '2019-02-01T06:30:00.000Z'),
+        past('p3', 'prof-2', '2019-03-01T06:30:00.000Z'),
+        past('p4', 'prof-1', '2020-03-01T06:30:00.000Z'),
+      ],
+    });
+    renderDashboard();
+
+    await screen.findByTestId('past-bookings');
+    // `prof-1` owns the newest booking, so it must be among the names read.
+    await waitFor(() => expect(providerReads).toContain('prof-1'));
+  });
+});

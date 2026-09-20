@@ -29,7 +29,6 @@
     /* Cancels the app shell's own gutter: the column meets the header. */
     margin-inline: calc(-1 * var(--bc-spacing-gutter-customer));
     margin-block: calc(-1 * var(--bc-spacing-section-desktop));
-    min-height: calc(100vh - 72px);
   }
 }
 
@@ -42,17 +41,31 @@
 }
 
 @media (min-width: 1024px) {
+  /*
+    Sticky, so a long page does not scroll the navigation away.
+    
+    Two earlier attempts were wrong. `min-height: calc(100vh - 72px)` guessed
+    the app header's height, and that header is content-sized and wraps, so
+    the guess is wrong at some widths. `align-self: stretch` then cancelled
+    the stickiness outright: an item as tall as its container has nothing to
+    stick to.
+    
+    The dividing rule therefore lives on the CONTENT's leading edge rather
+    than on this column's trailing one, so it spans the full height of the
+    row while the column itself stays only as tall as it needs to be.
+  */
   .sidebar {
     position: sticky;
     inset-block-start: 0;
+    align-self: start;
+    max-height: 100vh;
+    overflow-y: auto;
     border: none;
-    border-inline-end: 1px solid var(--bc-color-border);
     border-radius: 0;
     padding: 18px 0;
     margin-block-end: 0;
     display: flex;
     flex-direction: column;
-    min-height: calc(100vh - 72px);
   }
 }
 
@@ -233,6 +246,8 @@
 
 @media (min-width: 1024px) {
   .content {
+    /* The column's dividing rule — see `.sidebar`. */
+    border-inline-start: 1px solid var(--bc-color-border);
     padding: var(--bc-spacing-section-desktop) var(--bc-spacing-gutter-pro);
   }
 }

@@ -23,8 +23,9 @@ import styles from './pro-shell.module.css';
  * visible and there is room for a counter."
  *
  * Everything the band did, the column's head still does: identity,
- * verification status, and the exit. `ContextBand` stays in the kit for the
- * admin and business surfaces, which have not moved yet.
+ * verification status, and the exit. `ContextBand` and `NavLink` had no
+ * users left once the operator's bar moved too, so both were deleted rather
+ * than kept as a kit nobody imports.
  *
  * The shell still sits INSIDE `AppShell` rather than replacing it: a separate
  * chrome would mean a second header, a second skip-link target and a second

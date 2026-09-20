@@ -242,3 +242,68 @@ describe('tokens.css', () => {
     if (entry.soft) expect(css).toContain(`--bc-color-${kebab}-soft: ${entry.soft};`);
   });
 });
+
+/**
+ * The three surfaces that invert the palette.
+ *
+ * The dark footer, the loyalty card and the operator's bar choose their ink
+ * against a dark ground, so none of their pairs appear in
+ * `RENDERED_TEXT_PAIRS` above — which asserts against white and the tinted
+ * surfaces. Three separate stylesheets said as much in a comment, and a
+ * comment is not a check: the pairs were measured once by hand and nothing
+ * kept them measured.
+ *
+ * The grounds and inks are literals in those stylesheets rather than tokens,
+ * because they exist on three surfaces and a token implies a system. They
+ * are duplicated here on purpose, and the duplication is the point: if a
+ * stylesheet's value changes and this list does not, the two disagree and
+ * somebody has to look.
+ */
+describe('design tokens — the inverted surfaces', () => {
+  /** `--bc-color-text` is the ground for the footer and the loyalty card. */
+  const onText = (fg: Oklch): number => contrastRatio(fg, parseOklch(COLOR.text.value));
+  const ADMIN_BAR: Oklch = [0.14, 0.015, 330];
+  const ADMIN_CHIP: Oklch = [0.24, 0.015, 330];
+  const WHITE: Oklch = [1, 0, 0];
+
+  it.each([
+    ['site-footer.module.css .footer colour', [0.9, 0.01, 330] as Oklch],
+    ['site-footer.module.css .blurb', [0.72, 0.015, 330] as Oklch],
+    ['site-footer.module.css .link', [0.8, 0.012, 330] as Oklch],
+    ['site-footer.module.css .legal', [0.66, 0.015, 330] as Oklch],
+    ['dashboard.module.css .loyaltyLabel', [0.86, 0.012, 330] as Oklch],
+    ['dashboard.module.css .balanceUnit', [0.8, 0.012, 330] as Oklch],
+    ['dashboard.module.css .lifetime', [0.72, 0.015, 330] as Oklch],
+  ])('%s reads on the dark ground', (_where, fg) => {
+    expect(onText(fg as Oklch)).toBeGreaterThanOrEqual(WCAG_AA_NORMAL_TEXT);
+  });
+
+  it.each([
+    ['admin-shell.module.css .mode', WHITE, ADMIN_BAR],
+    ['admin-shell.module.css .link', [0.8, 0.012, 330] as Oklch, ADMIN_BAR],
+    ['admin-shell.module.css .exit', [0.72, 0.015, 330] as Oklch, ADMIN_BAR],
+    ['admin-shell.module.css .scope ink on its chip', [0.8, 0.012, 330] as Oklch, ADMIN_CHIP],
+    ['admin-shell.module.css .count amber', WHITE, [0.55, 0.11, 75] as Oklch],
+    ['admin-shell.module.css .countSystem blue', WHITE, [0.5, 0.1, 245] as Oklch],
+  ])('%s reads on the operator bar', (_where, fg, bg) => {
+    expect(contrastRatio(fg as Oklch, bg as Oklch)).toBeGreaterThanOrEqual(WCAG_AA_NORMAL_TEXT);
+  });
+
+  it('the loyalty tier chip reads on the bronze accent', () => {
+    // The one chip whose ground is a TOKEN rather than a literal, so a
+    // change to bronze is caught here as well as by the light-ground pairs.
+    expect(contrastRatio([0.18, 0.03, 65], parseOklch(COLOR.accent.value))).toBeGreaterThanOrEqual(
+      WCAG_AA_NORMAL_TEXT,
+    );
+  });
+
+  it.each([
+    ['the operator bar', ADMIN_BAR],
+    ['its chip ground', ADMIN_CHIP],
+    ['the footer rule', [0.34, 0.02, 330] as Oklch],
+    ['the amber counter', [0.55, 0.11, 75] as Oklch],
+    ['the blue counter', [0.5, 0.1, 245] as Oklch],
+  ])('%s renders in sRGB without clipping', (_where, colour) => {
+    expect(isInSrgbGamut(colour as Oklch)).toBe(true);
+  });
+});

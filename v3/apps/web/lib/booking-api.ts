@@ -263,9 +263,23 @@ export function groupSlotsByDay(slots: AvailableSlot[]): { dayKey: string; date:
     else buckets.set(dayKey, { date: at, slots: [slot] });
   }
 
+  /*
+    Days ascending, and the SLOTS INSIDE each day ascending too.
+
+    The day sort was here and the slot sort was not, which nothing noticed
+    while the old screen rendered slots as a flat list per day in whatever
+    order they arrived. The redesigned booking panel renders them as a grid
+    a customer reads left to right, and an unsorted grid puts 16:30 before
+    09:30. `startAt` is an ISO instant, so a lexical compare is a
+    chronological one.
+  */
   return [...buckets.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([dayKey, value]) => ({ dayKey, ...value }));
+    .map(([dayKey, value]) => ({
+      dayKey,
+      ...value,
+      slots: [...value.slots].sort((a, b) => a.startAt.localeCompare(b.startAt)),
+    }));
 }
 
 /**

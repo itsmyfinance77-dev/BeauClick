@@ -160,6 +160,10 @@ a {
  * a labelled ROW with the amount aligned in its own column, so twelve figures
  * read as a list rather than as twelve full-height blocks. From 560px up the
  * card becomes the stacked block the desktop grid expects.
+ *
+ * The two steps were at 560 and 900 — numbers chosen before the design
+ * language had breakpoints. They are now its own 640 and 1024, so this grid
+ * no longer changes shape at a width where nothing around it does.
  */
 /*
  * Explicit column counts rather than `auto-fit`: the groups hold exactly six
@@ -173,13 +177,13 @@ a {
   grid-template-columns: 1fr;
 }
 
-@media (min-width: 560px) {
+@media (min-width: 640px) {
   .bc-fund-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 }
 
-@media (min-width: 900px) {
+@media (min-width: 1024px) {
   .bc-fund-grid {
     grid-template-columns: repeat(3, 1fr);
   }
@@ -193,10 +197,65 @@ a {
   flex-wrap: wrap;
 }
 
-@media (min-width: 560px) {
+@media (min-width: 640px) {
   .bc-fund-card {
     flex-direction: column;
     align-items: stretch;
     gap: 4px;
   }
 }
+
+/*
+ * The 44px touch baseline, as a hit area rather than a visual size.
+ *
+ * `V3_DESIGN_SYSTEM.md` §10 says "touch target: 44px on mobile, without
+ * exception". Its own mobile artboards then draw chips at 36, a save control
+ * at 30 and a filter-removal × at 22. Both cannot be followed literally, and
+ * the rule is the one with a reason attached — `TOUCH-CLASS` in the UI/UX
+ * backlog records five separate occasions when this baseline was re-fixed
+ * one surface at a time.
+ *
+ * So: the drawing keeps its size and the target gets its area. An
+ * `::after` centred on the control extends the tappable region to 44px
+ * without moving a pixel of what is rendered, which is the only way to
+ * honour a 22px × inside a 36px chip.
+ *
+ * Applied only below 640px. Above it the input is a mouse, the artboards are
+ * drawn for it, and 24px is the applicable floor.
+ */
+@media (max-width: 639px) {
+  .bc-tap {
+    position: relative;
+  }
+
+  .bc-tap::after {
+    content: '';
+    position: absolute;
+    inset-block-start: 50%;
+    inset-inline-start: 50%;
+    width: 44px;
+    height: 44px;
+    /*
+      Logical offsets rather than a `translate`, so the overlay centres
+      correctly in RTL as well: `translate` takes physical axes and would
+      push the hit area to the wrong side of a right-to-left control.
+    */
+    margin-block-start: -22px;
+    margin-inline-start: -22px;
+  }
+}
+
+/*
+ * NOT usable inside a scrolling row.
+ *
+ * `overflow-x: auto` makes a scroll container on BOTH axes, so an overlay
+ * that extends above the control is clipped. Measured in a browser: a point
+ * 3px above a 36px chip in the home page's scrolling shortcut row hit the
+ * row, not the chip, while the same point below it hit the chip — the
+ * overlay was half-eaten and the failure was invisible to jsdom and to the
+ * eye alike.
+ *
+ * A control in such a row therefore takes the 44px as a real height below
+ * 640px instead, which changes the drawing by 8px and is the honest trade.
+ * A control already at least 44px needs neither.
+ */

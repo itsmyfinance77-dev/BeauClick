@@ -73,6 +73,22 @@ function isUpcoming(booking: BookingSummary): boolean {
   return new Date(booking.startAt).getTime() > Date.now();
 }
 
+/**
+ * The bookings this page will actually show, in the order it will show them.
+ *
+ * One function, used by BOTH the render and the name resolution, because
+ * having two was a real defect: `load()` took the first upcoming booking in
+ * ARRIVAL order to decide which professional to look up, while the render
+ * took the earliest by TIME. Whenever the server returned them in any other
+ * order, the upcoming card showed one appointment's date beside a different
+ * appointment's salon.
+ */
+function visible(bookings: BookingSummary[]): { upcoming: BookingSummary | null; past: BookingSummary[] } {
+  const upcoming = bookings.filter(isUpcoming).sort((a, b) => a.startAt.localeCompare(b.startAt));
+  const past = bookings.filter((b) => !isUpcoming(b)).sort((a, b) => b.startAt.localeCompare(a.startAt));
+  return { upcoming: upcoming[0] ?? null, past };
+}
+
 function DashboardContent() {
   const { api, logout } = useAuth();
 
@@ -118,8 +134,13 @@ function DashboardContent() {
         and never one per row: the same salon appearing four times is one
         request. Each is allowed to fail alone — a missing name is a missing
         name, not a broken page.
+
+        `visible()` decides which bookings those are, and the render calls
+        the same function: two orderings here is how a card ends up showing
+        one appointment's time beside another one's salon.
       */
-      const shown = [...mine.filter(isUpcoming).slice(0, 1), ...mine.filter((b) => !isUpcoming(b)).slice(0, PAST_LIMIT)];
+      const shape = visible(mine);
+      const shown = [...(shape.upcoming ? [shape.upcoming] : []), ...shape.past.slice(0, PAST_LIMIT)];
       const ids = [...new Set(shown.map((b) => b.professionalId))];
       const resolved = await Promise.all(
         ids.map((id) => bookingApi.getProvider(api, id).then((r) => r.data).catch(() => null)),
@@ -139,10 +160,7 @@ function DashboardContent() {
   if (!loaded) return <LoadingState label="در حال بارگذاری…" />;
   if (error && !me) return <ErrorState message={error} onRetry={() => void load()} />;
 
-  const upcoming = bookings.filter(isUpcoming).sort((a, b) => a.startAt.localeCompare(b.startAt))[0] ?? null;
-  const past = bookings
-    .filter((b) => !isUpcoming(b))
-    .sort((a, b) => b.startAt.localeCompare(a.startAt));
+  const { upcoming, past } = visible(bookings);
   const unread = notices.filter((n) => !n.read).length;
   const activeGoals = goals.filter((g) => g.status !== 'abandoned');
 

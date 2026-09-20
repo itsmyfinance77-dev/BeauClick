@@ -292,7 +292,7 @@ export default function ProviderBookingPage() {
                 )}
                 {/* Only offered when there are genuinely more than the tiles show. */}
                 {index === 2 && portfolio.length > GALLERY_TILES ? (
-                  <button type="button" className={styles.galleryMore}>
+                  <button type="button" className={`${styles.galleryMore} bc-tap`}>
                     دیدن همه {toPersianDigits(portfolio.length)} نمونه
                   </button>
                 ) : null}
@@ -318,13 +318,17 @@ export default function ProviderBookingPage() {
               {savedProfessional === null ? (
                 /* `null` is not "unsaved" — it means there is no caller to
                    answer for, so there is no state to render as pressed. */
-                <Link href="/auth" className={styles.save} aria-label={`برای ذخیرهٔ ${provider.displayName} وارد شوید`}>
+                <Link
+                  href="/auth"
+                  className={`${styles.save} bc-tap`}
+                  aria-label={`برای ذخیرهٔ ${provider.displayName} وارد شوید`}
+                >
                   ذخیره در علاقه‌مندی‌ها
                 </Link>
               ) : (
                 <button
                   type="button"
-                  className={`${styles.save} ${savedProfessional ? styles.saveOn : ''}`}
+                  className={`${styles.save} ${savedProfessional ? styles.saveOn : ''} bc-tap`}
                   aria-pressed={savedProfessional}
                   disabled={savingTarget === provider.id}
                   aria-label={
@@ -394,7 +398,7 @@ export default function ProviderBookingPage() {
                           {savedService === null ? (
                             <Link
                               href="/auth"
-                              className={styles.serviceSave}
+                              className={`${styles.serviceSave} bc-tap`}
                               aria-label={`برای ذخیرهٔ ${service.name} وارد شوید`}
                             >
                               ذخیره
@@ -402,7 +406,7 @@ export default function ProviderBookingPage() {
                           ) : (
                             <button
                               type="button"
-                              className={`${styles.serviceSave} ${savedService ? styles.serviceSaveOn : ''}`}
+                              className={`${styles.serviceSave} ${savedService ? styles.serviceSaveOn : ''} bc-tap`}
                               aria-pressed={savedService}
                               disabled={savingTarget === service.id}
                               aria-label={
