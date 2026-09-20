@@ -2,7 +2,7 @@ import { Body, Controller, Get, Inject, Param, Post, Query } from '@nestjs/commo
 import { AuthenticatedUser, CurrentUser, PageQueryDto, PaginatedResult } from '@beauclick/http';
 import { NotFoundOrNotYoursException, ResolveOwner } from '@beauclick/ownership';
 
-import { BookingService } from './booking.service';
+import { BookingNoShowState, BookingService } from './booking.service';
 import { BookingPartyResolver, BookingProfessionalResolver } from './booking-party.resolver';
 import { BookingEntity } from '../entities/booking.entity';
 import { BookingHistoryEntity } from '../entities/booking-history.entity';
@@ -140,6 +140,24 @@ export class BookingController {
     const booking = await this.bookings.findById(id);
     if (!booking) throw new NotFoundOrNotYoursException();
     return toBookingShape(booking);
+  }
+
+  /**
+   * The read half of the declaration — V3.3 `#42d-read` (#201).
+   *
+   * `BookingProfessionalResolver`, the same guard the POST carries: a
+   * customer holding a valid session for their own booking is refused here
+   * exactly as they are refused the declaration itself. What a customer may
+   * eventually see of a declaration made against them belongs to `#42e`
+   * (#162), which owns the objection they would act on; until that route
+   * exists there is nothing for them to do with it, so nothing is disclosed.
+   */
+  @ResolveOwner(BookingProfessionalResolver)
+  @Get('bookings/:id/no-show')
+  async noShowState(@Param('id') id: string): Promise<BookingNoShowState> {
+    const state = await this.bookings.noShowStateFor(id);
+    if (!state) throw new NotFoundOrNotYoursException();
+    return state;
   }
 
   @ResolveOwner(BookingProfessionalResolver)

@@ -1,9 +1,9 @@
-import { Body, Controller, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { AuthenticatedUser, CurrentUser } from '@beauclick/http';
 import { ResolveOwner } from '@beauclick/ownership';
 import { BookingCustomerResolver } from '@beauclick/booking';
 
-import { CustomerRemedyResolutionService } from './customer-remedy-resolution.service';
+import { CustomerRemedyResolutionService, CustomerRemedyView } from './customer-remedy-resolution.service';
 import { RemedyChoiceDto } from './remedy-choice.dto';
 
 /**
@@ -23,6 +23,19 @@ import { RemedyChoiceDto } from './remedy-choice.dto';
 @Controller('v1')
 export class BookingRemedyController {
   constructor(private readonly resolution: CustomerRemedyResolutionService) {}
+
+  /**
+   * The read half — V3.3 `#42d-read` (#201).
+   *
+   * `BookingCustomerResolver`, the same guard the POST carries: the remedy
+   * is the customer's alone (ADR-051 §8), so the professional who caused the
+   * cancellation does not get to watch which way it resolved.
+   */
+  @ResolveOwner(BookingCustomerResolver)
+  @Get('bookings/:id/remedy')
+  async remedyState(@Param('id') id: string): Promise<CustomerRemedyView> {
+    return this.resolution.read(id);
+  }
 
   @ResolveOwner(BookingCustomerResolver)
   @Post('bookings/:id/remedy')
