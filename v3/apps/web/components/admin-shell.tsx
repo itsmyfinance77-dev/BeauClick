@@ -35,6 +35,9 @@ const ADMIN_NAV: { href: string; label: string; capability?: string }[] = [
   { href: '/admin/notifications', label: 'اعلان‌ها' },
   { href: '/admin/phone-conflicts', label: 'تعارض شماره' },
   { href: '/admin/loyalty', label: 'باشگاه' },
+  // V3.3 `#43b-1` / #173. The first commercial entry; capability-gated so an
+  // operator without it is never offered a route they cannot open.
+  { href: '/admin/commercial/commission-policies', label: 'سیاست کمیسیون', capability: 'bc_manage_commercial_plans' },
 ];
 
 export function AdminShell({ children }: { children: ReactNode }) {
