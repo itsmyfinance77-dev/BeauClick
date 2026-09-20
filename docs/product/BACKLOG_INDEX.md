@@ -1693,3 +1693,144 @@ several complete, tested server surfaces (`#42a`'s outcome-policy publication, `
 selection, `#42d`'s no-show declaration and customer remedy, `#43b-1`'s commission publication,
 and the per-state funds read) have no screen, and four of the five have no design either. Closing
 that gap is the next work, and it starts in design rather than in this repository.
+
+
+## The design pack returned, and the frontend started — 2026-09-20
+
+Five deliveries in one record, because they are one arc: the design gap closed, a backend gap it
+revealed closed with it, and the first three screens built against the result.
+
+**#201 (`#42d-read`), 5. #203 (screen 46 funds), 3. #205 (screen 50a), 5. #207 (screen 50b), 8.
+#209 (screen 48), 5.**
+
+### The pack, and what checking it found
+
+Claude Design delivered all five prompts. Every factual claim was matched against the code it
+describes rather than read for plausibility: the twelve funds field names, the 22 admin
+outcome-policy routes, the 9 commission-policy routes, the three components, the four shapes, the
+two bases and the 1–2000 statement bound are **all exact**, and no prototype invents a rate, a
+cadence or a cap.
+
+Three corrections were written into the specs **and** the prototypes rather than sent back for a
+second pass — all three mechanical, and screen 49 needed a revision anyway once its missing read
+route existed:
+
+- **Screen 46** — `collected`, `platformAdvance` and `recoveredIn` are custody facts (ADR-052 §12's
+  M1), not the seller's money. Inside the seller group, `collected` — routinely the largest number
+  on the screen — reads as "owed to me", the exact misreading the no-total rule prevents.
+- **Screen 49** — the no-show statement is REQUIRED for a governed booking
+  (`NoShowStatementRequiredException`), not optional.
+- **Screen 48** — `AssignOutcomePolicyDto.reason` is a required free-text field.
+
+### #201 — the gap the review opened, and it was ours
+
+`POST …/no-show` and `POST …/remedy` were the only routes in the `#42d` family. Nothing read back
+a declaration, its grace snapshot, the objection window, the remedy resolution or the refund's
+execution status, and eight of screen 49's twelve states had no data source.
+
+A backend gap, not a design defect: the design correctly refused to compute the permitted instant
+client-side, and that refusal is what made the absence visible. It carried **no gate label**, so
+"the executable backend is exhausted", written in this file the day before, was true only of what
+was then visible.
+
+Two routes, each carrying its write route's guard exactly. **Two clocks, deliberately** — a
+governed booking on the database clock by the same expression `markNoShow`'s guard uses, an
+ungoverned one on the application clock against `slot_end`, which is V2's rule preserved verbatim.
+**The permitted instant never crosses the wire**; only the boolean, because a client given
+`slot_start + grace` renders a countdown ADR-051 forbids. **`declared_by_user_id` is never
+exported** — `BookingSubjectDataContract` had already settled what this table discloses.
+
+59/59 in its own suite; the whole real-Postgres battery **74/74 suites, 2,521 tests, 0 failures**.
+
+### #203, #205, #207, #209 — the first four screens
+
+| Screen | What it makes reachable |
+|---|---|
+| 46 funds section | Twelve per-state figures that had no reader at all |
+| 50a + 50b | The platform's commission rate, **settable through a UI for the first time** |
+| 48 | The seller's own cancellation and no-show terms |
+
+Screen 50 mattered beyond itself: `apps/web` had **no `/admin/commercial` route group**, no
+commercial namespace in `admin-api.ts`, and a grep for "commercial" across the web app returned
+nothing. Screen 40, which screen 50's spec says to be consistent with, does not exist in code
+either. It is the first commercial admin surface, and it establishes patterns rather than
+following them — which is why #173's surface was split in two rather than built as one 13-point
+page.
+
+Three decisions worth recording:
+
+- **"Absent, not disabled" is a correctness rule.** `WriteCommissionVersionDto` says "left out is
+  the only way to say absent -- there is no sentinel", and the database's CHECK matrix refuses
+  anything the four shapes do not name. A greyed input that still submits produces a request the
+  server refuses; an absent one cannot. The test asserts the REQUEST BODY's keys, not the DOM.
+- **All twelve fund states render, including the nine that are structurally zero today.** Hiding a
+  field because it is always zero *now* bakes a temporal assumption into the UI that breaks
+  silently when `#43b`–`#43g` land.
+- **Latin field names became `data-field`, not rendered text.** In the prototypes they are
+  design-review annotations; a salon owner gains nothing from the word `platformAdvance`.
+
+### What the browser caught that green tests did not
+
+Four times, and every one invisible to jsdom:
+
+- screen 46's cards wrapped five-plus-one at desktop, and stacked into twelve full-height blocks
+  at 390px instead of the labelled rows the amendment specifies;
+- screen 50's timeline `<caption>` inherited the table's `min-width` and was clipped by its own
+  scroll container, leaving a sentence only finishable by scrolling sideways;
+- the commission editor's refusal text used `--bc-color-danger`, **a token that does not exist**,
+  so a refusal rendered in plain grey;
+- two hints printed their bounds in Latin digits mid-Persian-sentence.
+
+Browser verification is now a step taken, not one considered.
+
+### What the preflights found, three times, each a different kind
+
+| Screen | Finding | Kind |
+|---|---|---|
+| 49 | no read route exists at all | **backend gap** — the design was right |
+| 50 | "absent not disabled" is load-bearing | **hidden rule** in a DTO |
+| 48 | non-selectable terms are deliberately withheld | **design defect** |
+
+Screen 48's is the sharpest: `assignablePolicies()` states its own boundary — "No version number,
+administrator window, cap, evidence reference, lifecycle, actor or activation instant leaves this
+method." Its §3 and §4 have no data behind them and were dropped, with the open question recorded
+rather than quietly resolved: a seller commits to a policy whose dispute and appeal windows bind
+their own bookings, and at selection time cannot see them.
+
+| Item | Before | After | Outcome it owns |
+|---|---|---|---|
+| #201 (`#42d-read`) | new, 5 | **Closed, 5** | The no-show and remedy read routes |
+| #203 (screen 46) | new, 3 | **Closed, 3** | The per-state funds section |
+| #205 (screen 50a) | new, 5 | **Closed, 5** | The commission policy read surface |
+| #207 (screen 50b) | new, 8 | **Closed, 8** | The commission policy write surface |
+| #209 (screen 48) | new, 5 | **Closed, 5** | The seller's outcome-policy selection |
+
+**What moved.** `scripts/backlog-report.mjs` reports V3.3 at **361 / 477, 76%**, with 9 points in
+progress (#212 and #213) and **no data-quality warnings**.
+
+Done moved **335 → 361** and scope **439 → 477** in the same pass. The percentage is unchanged,
+and that is the honest reading: 38 points of real V3.3 work that had never been in the backlog —
+a read route, four screens, and two debts recorded rather than discovered again — entered the
+denominator at the same time as they were delivered. Yesterday's 76% counted none of it.
+
+Two governance slips of this session's own, both caught by the backlog report rather than by
+review: stories created without a milestone, so they landed in `Unscheduled` and V3.3's numbers
+did not move; and closed stories still carrying `status:ready`. Both fixed, and the report now
+reads **no data-quality warnings**.
+
+### Open, and recorded rather than forgotten
+
+- **#213** — a bug this session found by auditing its own work: the commission admin screen
+  resolved the effective version on `lifecycleState` alone, while the server requires published
+  AND started AND not ended. Latent (nothing can set an end bound through the product today) but
+  wrong, and the second instance in one day of the UI re-deriving a server fact with a weaker
+  rule. The first was picking `policies[0]` among several published outcome-policy keys, caught in
+  self-review before #211 merged. **The rule, stated once: when the UI re-derives a fact the
+  server also derives, it must use the server's rule or ask the server.**
+- **#212** — screen 49, now unblocked. Its read routes are per-booking and both screens are lists,
+  so each row gets a panel that fetches when opened rather than an N+1 on load.
+- **#210** — no ownership-scoped workspace list exists. Every seller workspace route takes a
+  `workspaceRef` and nothing lists them; screen 48 uses the finance list filtered to `owner`, which
+  is fail-safe but points the wrong way architecturally. It blocks the seller commercial family,
+  not one screen.
+- **Screen 47**, the largest remaining — 22 routes across three families.
