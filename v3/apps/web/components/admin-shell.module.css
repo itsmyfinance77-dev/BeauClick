@@ -1,0 +1,187 @@
+/*
+ * The operator's bar — `V3_COMPONENT_INVENTORY.md` ("AdminShell: redesign —
+ * dark bar; queue counter on the destination") and
+ * `Prototype - Pro and Admin.dc.html` §20.
+ *
+ * ## Why a dark bar and not a tinted one
+ *
+ * Every other context in the product is light. The admin surface is the one
+ * place where an action is taken ON somebody else's account, and the bar is
+ * what makes that impossible to forget — the UI/UX audit's §4 finding was
+ * that V3 had "no visual distinction between contexts" at all.
+ *
+ * The artboard also inverts the whole admin PAGE. That is the admin overview
+ * SCREEN's design, not this component's: the inventory's verdict for
+ * `AdminShell` is the bar and the counters, and inverting eleven pages whose
+ * content is styled against light tokens is its own piece of work. Recorded
+ * rather than half-done.
+ *
+ * ## The counter belongs on the destination
+ *
+ * A queue depth shown only on the overview is a number an operator has to go
+ * and look for. On the destination it is the reason to go there.
+ */
+
+.bar {
+  background: oklch(0.14 0.015 330);
+  border-block-end: 1px solid oklch(0.24 0.015 330);
+  /* Cancels the app shell's gutter so the bar spans the viewport. */
+  margin-inline: calc(-1 * 16px);
+  margin-block-start: calc(-1 * var(--bc-spacing-section-mobile));
+  margin-block-end: var(--bc-spacing-section-mobile);
+  padding: 8px 16px;
+}
+
+@media (min-width: 640px) {
+  .bar {
+    margin-inline: calc(-1 * var(--bc-spacing-gutter-customer));
+    margin-block-start: calc(-1 * var(--bc-spacing-section-desktop));
+    margin-block-end: var(--bc-spacing-section-desktop);
+    padding: 0 var(--bc-spacing-gutter-admin);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    min-height: 56px;
+  }
+}
+
+.barStart {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  .barStart {
+    gap: 24px;
+  }
+}
+
+.mode {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--bc-color-surface);
+  white-space: nowrap;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: var(--bc-text-small-size);
+  overflow-x: auto;
+  padding-block: 6px;
+}
+
+@media (min-width: 1024px) {
+  .nav {
+    gap: 18px;
+  }
+}
+
+.link {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  min-height: 44px;
+  color: oklch(0.8 0.012 330);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.link:hover {
+  color: var(--bc-color-surface);
+}
+
+/* Current by weight and by colour, so weight alone still distinguishes it. */
+.link[aria-current='page'] {
+  color: var(--bc-color-surface);
+  font-weight: 700;
+}
+
+/*
+ * A queue counter, on the destination that owns the queue. Amber for work
+ * waiting on a person, blue for work waiting on the system — the two the
+ * artboard distinguishes.
+ */
+.count {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: var(--bc-radius-chip);
+  background: oklch(0.55 0.11 75);
+  color: var(--bc-color-surface);
+  font-variant-numeric: tabular-nums;
+}
+
+.countSystem {
+  background: oklch(0.5 0.1 245);
+}
+
+.scope {
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .scope {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    font-size: var(--bc-text-badge-size);
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: var(--bc-radius-chip);
+    background: oklch(0.24 0.015 330);
+    color: oklch(0.8 0.012 330);
+  }
+}
+
+.exit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  min-height: 44px;
+  font-size: var(--bc-text-small-size);
+  color: oklch(0.72 0.015 330);
+  text-decoration: none;
+}
+
+.exit:hover {
+  color: var(--bc-color-surface);
+}
+
+.barEnd {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.scopes {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .scopes {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+}
+
+.operator {
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .operator {
+    display: inline;
+    font-size: var(--bc-text-small-size);
+    color: oklch(0.72 0.015 330);
+    white-space: nowrap;
+  }
+}

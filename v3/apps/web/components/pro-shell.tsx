@@ -1,30 +1,48 @@
 'use client';
 
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
-import { Badge, ContextBand, NavLink } from './kit';
+import { Badge } from './kit';
 import { useProProfile } from '@/lib/pro-context';
 import type { MyProviderProfile } from '@/lib/pro-api';
+import styles from './pro-shell.module.css';
 
 /**
- * The professional context bar.
+ * The professional's shell — `Prototype - Pro and Admin.dc.html` §01 and
+ * `V3_INFORMATION_ARCHITECTURE.md` §3.
  *
- * The UI/UX audit's §4 finding was that V3 has "no visual distinction between
- * customer, business, and (absent) professional contexts". Task 1 added the
- * third context here and established the pattern: a tinted band, directly under
- * the app header, that names the mode, shows who you are operating as, carries
- * the mode's own navigation, and always offers the way back out.
+ * ## From a horizontal band to a fixed column
  *
- * Phase A then copied that pattern into `AdminShell`. Phase G moved the
- * pattern itself into `ContextBand` in the kit, so this file is now the
- * professional context's CONTENT and nothing else -- which is what it always
- * should have been. The band still sits INSIDE the existing `AppShell` rather
- * than replacing it: a separate chrome would mean a second header, a second
- * nav, a second skip-link target and a second place for the notification badge
- * to drift out of sync.
+ * The context band was the right IDEA in the wrong shape. It named the mode,
+ * showed who you were operating as and offered the way out — and it carried
+ * eight destinations in a row that does not hold eight. The information
+ * architecture is explicit: "navigation moves from `pro-shell.tsx`'s
+ * seven-item horizontal bar to a FIXED SIDE COLUMN, because seven do not fit
+ * a horizontal bar and break on mobile; in a column all seven are always
+ * visible and there is room for a counter."
+ *
+ * Everything the band did, the column's head still does: identity,
+ * verification status, and the exit. `ContextBand` stays in the kit for the
+ * admin and business surfaces, which have not moved yet.
+ *
+ * The shell still sits INSIDE `AppShell` rather than replacing it: a separate
+ * chrome would mean a second header, a second skip-link target and a second
+ * place for the notification badge to drift out of sync.
+ *
+ * Below 1024 the column becomes a horizontal scroller. The design puts it in
+ * a drawer; a scroller keeps every destination reachable and is honest about
+ * there being more, and the drawer is recorded rather than half-built.
  */
 
-const PRO_NAV: { href: string; label: string }[] = [
-  { href: '/pro', label: 'نمای کلی' },
+/**
+ * `separator: true` marks where the design's rule falls — the daily work
+ * above it, the occasional destinations below.
+ */
+const PRO_NAV: { href: string; label: string; separatorBefore?: boolean }[] = [
+  // Renamed per the information architecture: this page is today's work,
+  // and «نمای کلی» described a summary it is not.
+  { href: '/pro', label: 'امروز' },
   { href: '/pro/bookings', label: 'رزروها' },
   { href: '/pro/availability', label: 'زمان‌های آزاد' },
   { href: '/pro/services', label: 'خدمات' },
@@ -34,8 +52,14 @@ const PRO_NAV: { href: string; label: string }[] = [
   // decide what a cancellation COSTS, which is an operating decision the
   // seller makes once, not a figure they read.
   { href: '/pro/outcome-policy', label: 'شرایط لغو' },
-  { href: '/pro/profile', label: 'پروفایل' },
+  { href: '/pro/profile', label: 'پروفایل عمومی', separatorBefore: true },
+  { href: '/business', label: 'کسب‌وکار' },
 ];
+
+/** `/pro` matches only itself; every other destination owns its subtree. */
+function isCurrent(pathname: string, href: string): boolean {
+  return href === '/pro' ? pathname === '/pro' : pathname === href || pathname.startsWith(`${href}/`);
+}
 
 const VERIFICATION_LABELS: Record<MyProviderProfile['verificationStatus'], string> = {
   unverified: 'تأیید نشده',
@@ -70,27 +94,52 @@ export function VerificationBadge({ status }: { status: MyProviderProfile['verif
 
 export function ProShell({ children }: { children: ReactNode }) {
   const { profile, state } = useProProfile();
+  const pathname = usePathname() ?? '/pro';
   const ready = state === 'ready' && profile;
 
   return (
-    <div>
-      <ContextBand
-        tone="primary"
-        modeLabel="حالت متخصص"
-        identity={ready ? profile.displayName : undefined}
-        status={ready ? <VerificationBadge status={profile.verificationStatus} /> : undefined}
-        exitHref="/"
-        exitLabel="بازگشت به نمای مشتری"
-        navLabel="ناوبری متخصص"
-      >
-        {PRO_NAV.map((item) => (
-          <NavLink key={item.href} href={item.href} underline>
-            {item.label}
-          </NavLink>
-        ))}
-      </ContextBand>
+    <div className={styles.shell}>
+      <aside className={styles.sidebar}>
+        <div className={styles.identity}>
+          <Link href="/pro" className={styles.brand}>
+            {/* The static brand mark from `public/`. */}
+            <img src="/brand/icon-circle.svg" alt="" width={24} height={24} style={{ borderRadius: 999 }} />
+            <span className={styles.brandName}>BeauClick</span>
+          </Link>
+          {ready ? (
+            <div className={styles.who} data-testid="pro-identity">
+              <span className={styles.avatar} aria-hidden="true" />
+              <div style={{ minWidth: 0 }}>
+                <div className={styles.whoName}>{profile.displayName}</div>
+                <VerificationBadge status={profile.verificationStatus} />
+              </div>
+            </div>
+          ) : null}
+        </div>
 
-      {children}
+        <nav aria-label="ناوبری متخصص" className={styles.nav}>
+          {PRO_NAV.map((item) => (
+            <span key={item.href} style={{ display: 'contents' }}>
+              {item.separatorBefore ? <span className={styles.separator} aria-hidden="true" /> : null}
+              <Link
+                href={item.href}
+                className={styles.link}
+                aria-current={isCurrent(pathname, item.href) ? 'page' : undefined}
+                data-pro-nav={item.href}
+              >
+                {item.label}
+              </Link>
+            </span>
+          ))}
+        </nav>
+
+        <Link href="/" className={styles.exit}>
+          <span className={styles.exitChevron} aria-hidden="true" />
+          بازگشت به نمای مشتری
+        </Link>
+      </aside>
+
+      <div className={styles.content}>{children}</div>
     </div>
   );
 }
