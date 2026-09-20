@@ -20,3 +20,14 @@ export const FONT_FAMILY = tokens.typography.fontFamily;
 export function cssVar(group: string, name: string): string {
   return `var(--bc-${group}-${name})`;
 }
+
+/**
+ * The design's three ranges (`V3.3_RESPONSIVE_AND_A11Y_HANDOFF.md` §1):
+ * mobile < 640, tablet 640–1023, desktop >= 1024. `tokens.json` is the one
+ * place they are written. CSS cannot read JSON, so a stylesheet retypes them
+ * in its `@media` queries — `apps/web/test/breakpoints.spec.ts` compares every
+ * such query with these values so a retyped number that drifts fails a test
+ * rather than shipping as a layout that changes at a width nobody chose.
+ */
+export const BREAKPOINT_TABLET = tokens.breakpoint.tablet;
+export const BREAKPOINT_DESKTOP = tokens.breakpoint.desktop;

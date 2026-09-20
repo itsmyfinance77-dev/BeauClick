@@ -1,0 +1,101 @@
+/*
+ * A table that is a table on wide screens and a list of cards on narrow ones.
+ *
+ * `V3.3_RESPONSIVE_AND_A11Y_HANDOFF.md` §3, "Wide tables":
+ *
+ *   Desktop  full table, every column.
+ *   Tablet   the table keeps its columns; the wrapper scrolls sideways, and
+ *            takes `tabindex="0"` plus a name so a keyboard user can scroll it.
+ *   Mobile   one card per row, label above value, in row order. "Never a
+ *            horizontally scrolling table on mobile."
+ *
+ * The breakpoint is 640px — `tokens.json` `breakpoint.tablet`. CSS cannot
+ * read a JSON token, so `breakpoints.spec.ts` compares every `@media` width in
+ * the app with that file instead of trusting anyone to retype it correctly.
+ *
+ * Markup contract (see `DataTable` in `components/kit.tsx`): each body cell
+ * carries `data-label`, which is what the card layout shows above the value.
+ * Turning table elements into `display: block` makes some screen readers drop
+ * the table semantics, which is why the component also writes the explicit
+ * ARIA roles — the accessibility tree stays a table at every width.
+ */
+
+.scroller {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  min-width: 520px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.table th,
+.table td {
+  text-align: start;
+  padding: 10px;
+}
+
+.table thead th {
+  padding-block: 8px;
+  font-weight: 700;
+}
+
+.table thead tr,
+.table tbody tr {
+  border-block-end: 1px solid var(--bc-color-line);
+}
+
+@media (max-width: 639px) {
+  .scroller {
+    overflow-x: visible;
+  }
+
+  .table,
+  .table tbody,
+  .table tr,
+  .table td {
+    display: block;
+  }
+
+  .table {
+    min-width: 0;
+  }
+
+  /*
+   * The header row is removed visually, not from the tree: each cell's label
+   * is repeated by `td::before`, and the roles keep the columns announced.
+   */
+  .table thead {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .table tbody tr {
+    padding-block: 12px;
+  }
+
+  .table td {
+    padding: 4px 0;
+  }
+
+  .table td::before {
+    content: attr(data-label);
+    display: block;
+    margin-block-end: 2px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--bc-color-ink-soft);
+  }
+
+  /* A row with no controls renders an empty cell; a label over nothing is noise. */
+  .table td:has(> div:empty),
+  .table td:empty {
+    display: none;
+  }
+}

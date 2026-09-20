@@ -1,0 +1,51 @@
+/*
+ * Forms — `V3.3_RESPONSIVE_AND_A11Y_HANDOFF.md` §3.
+ *
+ *   Desktop  two columns, only where the fields are genuinely a pair
+ *            (from/to, start/end).
+ *   Tablet   "the same pairs while each column stays >= 240px, otherwise
+ *            single column".
+ *   Mobile   one column, always. Labels stay above inputs.
+ *
+ * "While each column stays >= 240px" is a statement about the form's own
+ * width, not the viewport's: a form in a card beside a sidebar is narrower
+ * than the same form on a phone in landscape. So the rule is a CONTAINER
+ * query on the form, which the handoff explicitly allows in place of media
+ * queries. Two 240px columns and the 16px gap between them are 496px; below
+ * that the grid stays single-column. On a phone the card is always under
+ * 496px, so mobile is single-column without a separate rule.
+ *
+ * (A container query cannot read `var(--bc-spacing-card-gap)`; 16px is that
+ * token's value. `breakpoints.spec.ts` covers `@media` only, because 496 is
+ * derived from a column width, not from a viewport breakpoint.)
+ *
+ * A bound pair — from/to, min/max — must break together, never leaving one
+ * half on a different row from its sibling. That is structural: the two halves
+ * are adjacent grid cells and the grid has one or two columns, so they are
+ * side by side or stacked in order. Nothing wraps on its own, which is what a
+ * `flex-wrap` layout would do at an awkward width.
+ *
+ * `fullRow` is for a field that is not half of a pair — a fieldset, a long
+ * hint, the submit button.
+ */
+
+.container {
+  container-type: inline-size;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  column-gap: 16px;
+  align-items: start;
+}
+
+@container (min-width: 496px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.fullRow {
+  grid-column: 1 / -1;
+}

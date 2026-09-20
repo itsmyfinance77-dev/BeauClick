@@ -1,9 +1,17 @@
 'use client';
 
 import Link from 'next/link';
-import type { ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
+import type {
+  HTMLAttributes,
+  ReactNode,
+  SelectHTMLAttributes,
+  TdHTMLAttributes,
+  TextareaHTMLAttributes,
+} from 'react';
 import { forwardRef, useEffect, useId, useRef } from 'react';
 import { Button, Card } from './ui';
+import tableStyles from './data-table.module.css';
+import formStyles from './form-grid.module.css';
 
 /**
  * The shared component kit.
@@ -552,4 +560,86 @@ export function StatCard({
       ) : null}
     </Card>
   );
+}
+
+/**
+ * A table on wide screens, a card list on narrow ones — the pattern
+ * `V3.3_RESPONSIVE_AND_A11Y_HANDOFF.md` §3 gives for "wide tables". The
+ * layout lives in `data-table.module.css`; this component is the markup
+ * contract it depends on.
+ *
+ * - `head` is the column labels. Each `DataCell` repeats its own label in
+ *   `data-label`, which the card layout shows above the value, so the two
+ *   lists must agree — a cell without a label is a card row without a name.
+ * - The wrapper is a focusable named region, so a keyboard user can scroll the
+ *   table at tablet widths where it keeps its columns and scrolls sideways.
+ * - Every element also carries its ARIA role. Below 640px the table elements
+ *   are `display: block`, and some screen readers stop treating a block-display
+ *   table as a table; the explicit roles keep the tree a table at every width.
+ */
+export function DataTable({
+  head,
+  'aria-labelledby': labelledBy,
+  'aria-describedby': describedBy,
+  children,
+}: {
+  head: readonly string[];
+  'aria-labelledby': string;
+  'aria-describedby'?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className={tableStyles.scroller} role="region" aria-labelledby={labelledBy} tabIndex={0}>
+      <table className={tableStyles.table} role="table" aria-labelledby={labelledBy} aria-describedby={describedBy}>
+        <thead role="rowgroup">
+          <tr role="row">
+            {head.map((label) => (
+              <th key={label} role="columnheader" scope="col">
+                {label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody role="rowgroup">{children}</tbody>
+      </table>
+    </div>
+  );
+}
+
+export function DataRow({ children, ...rest }: { children: ReactNode } & HTMLAttributes<HTMLTableRowElement>) {
+  return (
+    <tr role="row" {...rest}>
+      {children}
+    </tr>
+  );
+}
+
+export function DataCell({
+  label,
+  children,
+  ...rest
+}: { label: string; children: ReactNode } & TdHTMLAttributes<HTMLTableCellElement>) {
+  return (
+    <td role="cell" data-label={label} {...rest}>
+      {children}
+    </td>
+  );
+}
+
+/**
+ * Two columns while each stays at least 240px wide, one below — for a form whose fields are genuinely
+ * pairs (from/to, start/end). A pair breaks together by construction: see
+ * `form-grid.module.css`. Wrap anything that is not half of a pair in
+ * `FormFullRow`.
+ */
+export function FormGrid({ children }: { children: ReactNode }) {
+  return (
+    <div className={formStyles.container}>
+      <div className={formStyles.grid}>{children}</div>
+    </div>
+  );
+}
+
+export function FormFullRow({ children }: { children: ReactNode }) {
+  return <div className={formStyles.fullRow}>{children}</div>;
 }
