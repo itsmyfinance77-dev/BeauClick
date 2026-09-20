@@ -418,3 +418,65 @@ export function mySeries(api: ApiClient, eventType: SeriesEvent, range: { from?:
   if (range.to) query.set('to', range.to);
   return api.get<SeriesResponse>(`/v1/me/analytics/series?${query.toString()}`);
 }
+
+// -------------------------------------------- seller outcome-policy (#42b)
+
+/**
+ * The seller's cancellation and no-show terms — V3.3 `#42b` / #159,
+ * ADR-051 §3.
+ *
+ * The types come from `@beauclick/commercial-policy-contract` rather than
+ * being re-declared. That is the opposite of the choice the commission admin
+ * surface makes, and deliberately so: there the duplication is three string
+ * unions, here it would be a four-member discriminated union PLUS
+ * `retentionRuleIdentity`, whose "one option per meaning" rule is the thing
+ * that makes two `none`s or two identical percentages the same option. A
+ * duplicated function drifts; three string literals with a test against the
+ * contract do not. The package imports nothing and is browser-safe by its
+ * own charter.
+ *
+ * ## What the seller does NOT get from these routes
+ *
+ * `assignablePolicies()` states its own boundary: "No version number,
+ * administrator window, cap, evidence reference, lifecycle, actor or
+ * activation instant leaves this method." So the free-reschedule count, the
+ * dispute, bodily-harm and appeal windows and the legal cap are absent by
+ * DESIGN, and screen 48's non-selectable terms section cannot be built. See
+ * #209.
+ *
+ * There is also no history route: the assignment read answers with the
+ * CURRENT selection or `null`, never a list.
+ */
+export type {
+  AllowedOutcomeMembersV1,
+  AssignableOutcomePolicyV1,
+  BookingOutcomeRetentionRule,
+  BookingOutcomeSelectionV1,
+  CurrentOutcomePolicyAssignmentV1,
+} from '@beauclick/commercial-policy-contract';
+
+export { retentionRuleIdentity } from '@beauclick/commercial-policy-contract';
+
+import type { AssignableOutcomePolicyV1, BookingOutcomeSelectionV1, CurrentOutcomePolicyAssignmentV1 } from '@beauclick/commercial-policy-contract';
+
+export function assignableOutcomePolicies(api: ApiClient) {
+  return api.get<{ items: AssignableOutcomePolicyV1[] }>('/v1/me/outcome-policies');
+}
+
+export function outcomePolicyAssignment(api: ApiClient, workspaceRef: string) {
+  return api.get<{ assignment: CurrentOutcomePolicyAssignmentV1 | null }>(
+    `/v1/me/outcome-policy-assignments/${encodeURIComponent(workspaceRef)}`,
+  );
+}
+
+/** Idempotent on the same key and members — re-submitting an unchanged selection is not an error. */
+export function assignOutcomePolicy(
+  api: ApiClient,
+  workspaceRef: string,
+  body: BookingOutcomeSelectionV1 & { policyKey: string; reason: string },
+) {
+  return api.put<{ assignment: CurrentOutcomePolicyAssignmentV1 | null }>(
+    `/v1/me/outcome-policy-assignments/${encodeURIComponent(workspaceRef)}`,
+    body,
+  );
+}
