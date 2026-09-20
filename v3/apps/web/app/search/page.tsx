@@ -204,7 +204,9 @@ export default function SearchPage() {
         // Told, not hidden: a degraded result set has no fuzzy matching and no
         // relevance ordering, and silently presenting it as normal would make
         // "search got worse" indistinguishable from "there is nothing here".
-        <Alert tone="error">
+        // `info`, not `error`: nothing failed. A degraded result set is a
+        // narrower answer, and red told the reader their search had broken.
+        <Alert tone="info">
           نتایج به‌صورت موقت محدود است؛ ممکن است برخی موارد نمایش داده نشود. لطفاً بعداً دوباره تلاش کنید.
         </Alert>
       )}

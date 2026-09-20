@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { AuthProvider } from '@/lib/auth-context';
 import { UnreadProvider } from '@/lib/unread-context';
 import { AppShell } from '@/components/app-shell';
+import { anjoman, vazir } from './fonts';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -19,7 +20,13 @@ export const metadata: Metadata = {
  */
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="fa" dir="rtl">
+    /*
+      The two font variables are declared on <html> rather than on <body> so
+      that anything rendered into a portal -- a dialog, the mobile sheet --
+      inherits them too. `--bc-font-family` in tokens.css resolves against
+      `--bc-font-vazir`, so nothing below this line needs to know a font name.
+    */
+    <html lang="fa" dir="rtl" className={`${vazir.variable} ${anjoman.variable}`}>
       <body>
         <a className="bc-visually-hidden bc-skip-link" href="#main">
           پرش به محتوای اصلی

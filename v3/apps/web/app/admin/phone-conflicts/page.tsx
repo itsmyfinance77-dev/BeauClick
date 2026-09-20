@@ -83,7 +83,9 @@ export default function AdminPhoneConflictsPage() {
 
       {error ? <ErrorState message={error} onRetry={() => void load()} /> : null}
 
-      <Alert tone="success">
+      {/* `info`, not `success`: a standing explanation of what the control
+          does. Green read as "it worked" before the operator had acted. */}
+      <Alert tone="info">
         «بررسی شد» فقط ثبت می‌کند که یک نفر این مورد را دیده است. هیچ حسابی ادغام یا تغییر داده نمی‌شود.
       </Alert>
 

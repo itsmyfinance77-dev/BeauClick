@@ -36,20 +36,27 @@ function softToken(name: string): Oklch {
 }
 
 const T: Record<string, Oklch> = {
-  ink: token('ink'),
-  inkSoft: token('inkSoft'),
-  inkFaint: token('inkFaint'),
-  background: token('background'),
+  text: token('text'),
+  textMuted: token('textMuted'),
+  textFaint: token('textFaint'),
   surface: token('surface'),
+  surfacePage: token('surfacePage'),
+  surfaceMuted: token('surfaceMuted'),
   surfaceTint: token('surfaceTint'),
   primary: token('primary'),
   primarySoft: token('primarySoft'),
+  primaryOnSoft: token('primaryOnSoft'),
+  accent: token('accent'),
+  accentSoft: softToken('accent'),
+  accentOnSoft: token('accentOnSoft'),
   success: token('success'),
   successSoft: softToken('success'),
   warning: token('warning'),
   warningSoft: softToken('warning'),
   error: token('error'),
   errorSoft: softToken('error'),
+  info: token('info'),
+  infoSoft: softToken('info'),
 };
 
 /**
@@ -64,27 +71,34 @@ const T: Record<string, Oklch> = {
  * say) and would push the palette toward a uniformity that serves nothing.
  */
 const RENDERED_TEXT_PAIRS: [fg: string, bg: string, where: string][] = [
-  ['ink', 'surface', 'body text in Card'],
-  ['ink', 'background', 'body text on the page'],
-  ['ink', 'surfaceTint', 'body text on a tinted panel'],
-  ['ink', 'primarySoft', 'ProShell context band'],
-  ['ink', 'warningSoft', 'AdminShell context band'],
+  ['text', 'surface', 'body text in Card'],
+  ['text', 'surfacePage', 'body text on the page'],
+  ['text', 'surfaceMuted', 'body text in a table head or readable block'],
+  ['text', 'surfaceTint', 'body text on a tinted panel'],
+  ['text', 'primarySoft', 'ProShell context band'],
+  ['text', 'warningSoft', 'AdminShell context band'],
+  ['text', 'accentSoft', 'business context band — the bronze platform'],
 
-  ['inkSoft', 'surface', 'secondary text in Card'],
-  ['inkSoft', 'background', 'PageHeader subtitle'],
-  ['inkSoft', 'surfaceTint', 'neutral Badge'],
-  ['inkSoft', 'primarySoft', 'ProShell exit link'],
-  ['inkSoft', 'warningSoft', 'AdminShell exit link'],
+  ['textMuted', 'surface', 'secondary text in Card'],
+  ['textMuted', 'surfacePage', 'PageHeader subtitle'],
+  ['textMuted', 'surfaceMuted', 'secondary text in a readable block'],
+  ['textMuted', 'surfaceTint', 'neutral Badge'],
+  ['textMuted', 'primarySoft', 'ProShell exit link'],
+  ['textMuted', 'warningSoft', 'AdminShell exit link'],
 
-  ['inkFaint', 'surface', '12px metadata in Card — ids, timestamps'],
-  ['inkFaint', 'background', '12px metadata on the page'],
-  ['inkFaint', 'surfaceTint', '12px metadata on a tinted panel'],
+  ['textFaint', 'surface', '13px label or caption in Card'],
+  ['textFaint', 'surfacePage', '13px label or caption on the page'],
+  ['textFaint', 'surfaceMuted', '13px label in a readable block'],
+  ['textFaint', 'surfaceTint', '13px label on a tinted panel'],
 
   ['primary', 'surface', 'TextLink, primary Badge foreground'],
-  ['primary', 'background', 'nav link, current page'],
-  ['primary', 'primarySoft', 'primary Badge, active tab'],
+  ['primary', 'surfacePage', 'nav link, current page'],
   ['primary', 'surfaceTint', 'link on a tinted panel'],
+  ['primaryOnSoft', 'primarySoft', 'primary Badge, active tab'],
   ['surface', 'primary', 'primary Button label'],
+
+  ['accentOnSoft', 'surface', 'bronze text on a card'],
+  ['accentOnSoft', 'accentSoft', 'bronze Badge, loyalty tier label'],
 
   ['success', 'surface', 'confirmed booking status'],
   ['success', 'successSoft', 'success Badge, success Alert'],
@@ -93,8 +107,11 @@ const RENDERED_TEXT_PAIRS: [fg: string, bg: string, where: string][] = [
   ['warning', 'warningSoft', 'warning Badge, AdminShell current nav link'],
 
   ['error', 'surface', 'field error text, danger Button label'],
-  ['error', 'background', 'error text outside a Card'],
+  ['error', 'surfacePage', 'error text outside a Card'],
   ['error', 'errorSoft', 'error Alert, error Badge'],
+
+  ['info', 'surface', 'informational text on a card'],
+  ['info', 'infoSoft', 'info Alert — the fourth status role, new in V3.3'],
 ];
 
 describe('design tokens — WCAG AA contrast', () => {
@@ -119,10 +136,35 @@ describe('design tokens — WCAG AA contrast', () => {
   it.each([
     ['error', 'errorSoft', 4.36],
     ['warning', 'warningSoft', 4.29],
-    ['inkFaint', 'surface', 3.98],
-    ['inkFaint', 'surfaceTint', 3.58],
+    ['textFaint', 'surface', 3.98],
+    ['textFaint', 'surfaceTint', 3.58],
   ])('R31-11: %s on %s is above its pre-correction ratio of %s', (fg, bg, before) => {
     expect(contrastRatio(T[fg], T[bg])).toBeGreaterThan(before as number);
+  });
+
+  /**
+   * The V3.3 palette's own corrections.
+   *
+   * `V3_DESIGN_SYSTEM.md` §10 states "همهٔ جفت‌های این سند بررسی شده‌اند" --
+   * every pair in the sheet has been checked. Measured here against the same
+   * maths the rest of this file uses, seven pairs were below AA and three
+   * colours fell outside sRGB. The sheet's values were adopted with the
+   * smallest corrections that fix both, and these cases pin the corrections
+   * so the original values cannot be restored by a later "sync with design".
+   */
+  it.each([
+    ['textFaint', 'oklch(0.55 0.015 330)', 'the sheet says 0.58, which is 4.32:1 on white'],
+    ['success', 'oklch(0.4 0.098 155)', 'the sheet says chroma 0.1, which clips outside sRGB'],
+    ['accentOnSoft', 'oklch(0.46 0.09 65)', 'the sheet has no text-safe bronze; 0.62 is 3.70:1'],
+  ])('%s is the corrected value %s — %s', (name, value) => {
+    expect(COLOR[name].value).toBe(value);
+  });
+
+  it.each([
+    ['error', 'oklch(0.929 0.035 25)', 'the sheet says L 0.965 at this chroma, which clips'],
+    ['info', 'oklch(0.964 0.018 245)', 'the sheet says L 0.968 at this chroma, which clips'],
+  ])('%s-soft is the corrected value %s — %s', (name, value) => {
+    expect(COLOR[name].soft).toBe(value);
   });
 });
 
@@ -174,7 +216,7 @@ describe('contrast maths', () => {
   );
 
   it('is order-independent', () => {
-    expect(contrastRatio(T.ink, T.surface)).toBeCloseTo(contrastRatio(T.surface, T.ink), 10);
+    expect(contrastRatio(T.text, T.surface)).toBeCloseTo(contrastRatio(T.surface, T.text), 10);
   });
 
   it('rejects a colour that is not oklch()', () => {

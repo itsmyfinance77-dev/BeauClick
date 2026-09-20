@@ -23,19 +23,84 @@ body {
 
 body {
   font-family: var(--bc-font-family);
-  background: var(--bc-color-background);
-  color: var(--bc-color-ink);
-  line-height: 1.8;
+  background: var(--bc-color-surface-page);
+  color: var(--bc-color-text);
+  font-size: var(--bc-text-body-size);
+  font-weight: var(--bc-text-body-weight);
+  line-height: var(--bc-text-body-leading);
   /* Persian digits render with consistent width in tabular contexts (prices, counts, OTP inputs). */
   font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
 }
 
-h1,
-h2,
+/*
+ * The type scale — `V3_DESIGN_SYSTEM.md` §3.
+ *
+ * The line heights are the point of this block, not the sizes. Persian
+ * ascenders and the dots under ب پ ج need more vertical room than Latin:
+ * headings were set at 1.25, which clips them, and body copy at 1.8 rather
+ * than 1.85. Every value below is a token, so a screen that wants the "page
+ * title" role asks for the role and cannot invent a sixth heading size.
+ */
+h1 {
+  margin: 0 0 12px;
+  font-size: var(--bc-text-page-title-size);
+  font-weight: var(--bc-text-page-title-weight);
+  line-height: var(--bc-text-page-title-leading);
+}
+
+h2 {
+  margin: 0 0 12px;
+  font-size: var(--bc-text-section-size);
+  font-weight: var(--bc-text-section-weight);
+  line-height: var(--bc-text-section-leading);
+}
+
 h3 {
   margin: 0 0 12px;
-  line-height: 1.25;
+  font-size: var(--bc-text-subhead-size);
+  font-weight: var(--bc-text-subhead-weight);
+  line-height: var(--bc-text-subhead-leading);
+}
+
+h4 {
+  margin: 0 0 8px;
+  font-size: var(--bc-text-card-title-size);
+  font-weight: var(--bc-text-card-title-weight);
+  line-height: var(--bc-text-card-title-leading);
+}
+
+/*
+ * Anjoman is the CUSTOMER platform's display face and nothing else: never in
+ * body copy, forms, tables, the pro panel or admin. It is opt-in by class for
+ * exactly that reason -- a face applied by element would leak into all four.
+ */
+.bc-display-1,
+.bc-display-2 {
+  font-family: var(--bc-font-display);
+  margin: 0 0 16px;
+}
+
+.bc-display-1 {
+  font-size: var(--bc-text-display1-size);
+  font-weight: var(--bc-text-display1-weight);
+  line-height: var(--bc-text-display1-leading);
+}
+
+.bc-display-2 {
+  font-size: var(--bc-text-display2-size);
+  font-weight: var(--bc-text-display2-weight);
+  line-height: var(--bc-text-display2-leading);
+}
+
+/*
+ * Times and technical references stay left-to-right inside an RTL line, so
+ * ۱۲:۰۰ is not reversed and an order hex is not reordered. `isolate` is what
+ * stops the surrounding Persian from being re-ordered around them.
+ */
+.bc-ltr {
+  direction: ltr;
+  unicode-bidi: isolate;
 }
 
 a {
@@ -74,7 +139,7 @@ a {
   padding: 10px 16px;
   background: var(--bc-color-surface);
   border: 2px solid var(--bc-color-primary);
-  border-radius: var(--bc-radius-button);
+  border-radius: var(--bc-radius-control);
   z-index: 100;
 }
 

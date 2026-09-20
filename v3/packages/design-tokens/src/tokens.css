@@ -1,40 +1,141 @@
 /**
- * CSS custom properties generated from tokens.json (V2's canonical
- * shared/design-tokens.json, carried forward verbatim). Every V3 surface
- * styles against these variables -- never a hardcoded literal.
+ * The V3.3 design language as CSS custom properties — `V3_DESIGN_SYSTEM.md`.
  *
- * Kept in sync with tokens.json by hand for Phase 1's small token set; a
- * generator script is the natural next step once tokens start changing
- * (V2 had one: app/scripts/generate-tokens-css.mjs).
+ * ## Two vocabularies, one set of values
+ *
+ * The design system names colours `--bc-color-text`, `--bc-color-border`,
+ * `--bc-color-surface-page`; the product was built against `--bc-color-ink`,
+ * `--bc-color-line`, `--bc-color-background`. Six hundred and seventy-one
+ * inline style objects reference the second set, so BOTH names are defined
+ * here and the legacy name is an alias of the design name rather than a
+ * second copy of the value. A copy would drift; an alias cannot.
+ *
+ * New work uses the design vocabulary. The legacy names stay until the
+ * surfaces that use them are rebuilt, and are marked below.
+ *
+ * Values are `oklch` throughout, as the design system writes them.
  */
 :root {
-  /* color */
-  --bc-color-ink: oklch(0.2 0.02 290);
-  --bc-color-ink-soft: oklch(0.48 0.02 290);
-  --bc-color-ink-faint: oklch(0.535 0.02 290);
-  --bc-color-line: oklch(0.9 0.012 290);
-  --bc-color-background: oklch(0.985 0.006 280);
+  /* ---------------------------------------------------------------- colour
+     Surfaces. The page ground is WARM (hue 75), not the cool 280 it was:
+     the warm ground is what makes the magenta read as considered rather
+     than as a stock purple. */
   --bc-color-surface: oklch(1 0 0);
-  --bc-color-surface-tint: oklch(0.965 0.014 290);
-  --bc-color-primary: oklch(0.4 0.16 290);
-  --bc-color-primary-hover: oklch(0.34 0.16 290);
-  --bc-color-primary-soft: oklch(0.94 0.03 290);
-  --bc-color-accent: oklch(0.66 0.16 335);
-  --bc-color-accent-soft: oklch(0.95 0.035 335);
-  --bc-color-success: oklch(0.5 0.13 150);
-  --bc-color-success-soft: oklch(0.94 0.04 150);
-  --bc-color-warning: oklch(0.53 0.115 70);
-  --bc-color-warning-soft: oklch(0.95 0.045 80);
-  --bc-color-error: oklch(0.535 0.19 25);
-  --bc-color-error-soft: oklch(0.935 0.032 26);
+  --bc-color-surface-page: oklch(0.985 0.008 75);
+  --bc-color-surface-muted: oklch(0.978 0.006 75);
+  --bc-color-surface-tint: oklch(0.978 0.008 340);
 
-  /* gradient */
+  --bc-color-border: oklch(0.9 0.008 60);
+  --bc-color-border-strong: oklch(0.82 0.014 60);
+
+  --bc-color-text: oklch(0.22 0.02 330);
+  --bc-color-text-muted: oklch(0.46 0.02 330);
+  /* 0.55, not the design sheet's 0.58: measured against tokens.json, 0.58
+     gives 4.32:1 on white and 4.04:1 on the muted ground -- below AA for the
+     13px labels this token exists for. Seven of the sheet's pairs failed that
+     way and three of its colours fell outside sRGB; each value here is the
+     smallest correction that clears 4.5:1 and renders without clipping. */
+  --bc-color-text-faint: oklch(0.55 0.015 330);
+  --bc-color-text-disabled: oklch(0.68 0.012 330);
+
+  /* Primary is magenta at hue 340, not purple at 290. Against white it
+     clears 7:1, so white text on a filled primary control is safe at every
+     size (the R31-11 contrast problem does not return). */
+  --bc-color-primary: oklch(0.42 0.13 340);
+  --bc-color-primary-hover: oklch(0.34 0.12 340);
+  --bc-color-primary-soft: oklch(0.945 0.026 340);
+  --bc-color-primary-on-soft: oklch(0.36 0.11 340);
+
+  /* The accent is BRONZE (hue 65). It was a second pink, which made it
+     indistinguishable from primary and left the loyalty, business and admin
+     surfaces without an accent of their own. */
+  /* Bronze at 3.70:1 on white: correct for a surface, a border or an icon,
+     which need 3:1, and not usable as text. Bronze TEXT uses the -on-soft
+     value, exactly as primary does. */
+  --bc-color-accent: oklch(0.62 0.095 65);
+  --bc-color-accent-on-soft: oklch(0.46 0.09 65);
+  --bc-color-accent-soft: oklch(0.955 0.028 70);
+
+  /* Status. Four roles, not three: `info` did not exist, which is why the
+     verification notice rendered green and the search-limit notice rendered
+     red. Colour is never the only carrier -- every status also has text. */
+  --bc-color-success: oklch(0.4 0.098 155);
+  --bc-color-success-soft: oklch(0.945 0.036 155);
+  --bc-color-warning: oklch(0.46 0.09 75);
+  --bc-color-warning-soft: oklch(0.955 0.028 70);
+  --bc-color-error: oklch(0.5 0.16 25);
+  --bc-color-error-soft: oklch(0.929 0.035 25);
+  --bc-color-info: oklch(0.52 0.11 245);
+  --bc-color-info-soft: oklch(0.964 0.018 245);
+
+  /* Legacy colour names -- aliases, not copies. */
+  --bc-color-ink: var(--bc-color-text);
+  --bc-color-ink-soft: var(--bc-color-text-muted);
+  --bc-color-ink-faint: var(--bc-color-text-faint);
+  --bc-color-line: var(--bc-color-border);
+  --bc-color-background: var(--bc-color-surface-page);
+
+  /* -------------------------------------------------------------- gradient */
   --bc-gradient-brand: linear-gradient(135deg, var(--bc-color-primary), var(--bc-color-accent));
 
-  /* typography */
-  --bc-font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, sans-serif;
+  /* ------------------------------------------------------------ typography
+     `--bc-font-vazir` and `--bc-font-anjoman` are emitted by `next/font`
+     from `apps/web/app/fonts.ts`. The fallbacks here keep this stylesheet
+     usable on its own (tests, Storybook, the packages' own consumers). */
+  --bc-font-family: var(--bc-font-vazir, 'Vazirmatn'), Tahoma, system-ui, sans-serif;
+  --bc-font-display: var(--bc-font-anjoman, 'Anjoman'), var(--bc-font-family);
 
-  /* spacing */
+  /* The ten text roles, each with the line height Persian actually needs:
+     ascenders and dots want more vertical room than Latin, so body copy sits
+     at 1.85 and headings never go below 1.45. 13px is the readability floor
+     on every platform; 12px is permitted only for a badge or a short label. */
+  --bc-text-display1-size: 52px;
+  --bc-text-display1-weight: 900;
+  --bc-text-display1-leading: 1.45;
+
+  --bc-text-display2-size: 38px;
+  --bc-text-display2-weight: 800;
+  --bc-text-display2-leading: 1.45;
+
+  --bc-text-page-title-size: 32px;
+  --bc-text-page-title-weight: 800;
+  --bc-text-page-title-leading: 1.45;
+
+  --bc-text-section-size: 24px;
+  --bc-text-section-weight: 800;
+  --bc-text-section-leading: 1.45;
+
+  --bc-text-subhead-size: 20px;
+  --bc-text-subhead-weight: 700;
+  --bc-text-subhead-leading: 1.5;
+
+  --bc-text-card-title-size: 17px;
+  --bc-text-card-title-weight: 700;
+  --bc-text-card-title-leading: 1.5;
+
+  --bc-text-body-size: 16px;
+  --bc-text-body-weight: 400;
+  --bc-text-body-leading: 1.85;
+
+  --bc-text-compact-size: 14px;
+  --bc-text-compact-weight: 400;
+  --bc-text-compact-leading: 1.75;
+
+  --bc-text-label-size: 13px;
+  --bc-text-label-weight: 500;
+  --bc-text-label-leading: 1.7;
+
+  --bc-text-small-size: 13px;
+  --bc-text-small-weight: 400;
+  --bc-text-small-leading: 1.7;
+
+  /* Badges and short chips only -- never a sentence. */
+  --bc-text-badge-size: 12px;
+  --bc-text-badge-weight: 700;
+
+  /* --------------------------------------------------------------- spacing
+     The eight-base scale is unchanged; the design system adopts it as it
+     stands. Page gutters differ per platform density. */
   --bc-spacing-section-mobile: 24px;
   --bc-spacing-section-desktop: 40px;
   --bc-spacing-content-max-width: 1280px;
@@ -43,18 +144,50 @@
   --bc-spacing-chip-gap: 8px;
   --bc-spacing-chip-gap-large: 10px;
 
-  /* radius */
-  --bc-radius-card: 18px;
-  --bc-radius-row: 14px;
-  --bc-radius-row-large: 16px;
-  --bc-radius-avatar: 20px;
-  --bc-radius-hero: 28px;
-  --bc-radius-pill: 999px;
-  --bc-radius-button: 12px;
+  --bc-spacing-gutter-customer: 48px;
+  --bc-spacing-gutter-pro: 32px;
+  --bc-spacing-gutter-admin: 24px;
 
-  /* shadow */
-  --bc-shadow-card-hover: 0 14px 34px oklch(0.3 0.06 290 / 0.14);
-  --bc-shadow-floating-min: 0 8px 30px oklch(0.2 0.05 290 / 0.1);
-  --bc-shadow-floating-max: 0 10px 40px oklch(0.2 0.05 290 / 0.2);
-  --bc-shadow-ai-fab: 0 10px 26px oklch(0.4 0.14 300 / 0.35);
+  /* ---------------------------------------------------------------- radius
+     18 is the ceiling. Nothing is rounder than a card except a chip and an
+     avatar -- which is why the 28px hero radius is gone. */
+  --bc-radius-card: 16px;
+  --bc-radius-card-lg: 18px;
+  --bc-radius-control: 10px;
+  --bc-radius-input: 10px;
+  --bc-radius-chip: 999px;
+  --bc-radius-cell: 7px;
+
+  /* Legacy radius names -- aliases. */
+  --bc-radius-row: var(--bc-radius-control);
+  --bc-radius-row-large: var(--bc-radius-card);
+  --bc-radius-button: var(--bc-radius-control);
+  --bc-radius-pill: var(--bc-radius-chip);
+  --bc-radius-avatar: var(--bc-radius-chip);
+  --bc-radius-hero: var(--bc-radius-card-lg);
+
+  /* ---------------------------------------------------------------- shadow
+     Three steps and a bar. Shadow means ELEVATION only; separating two
+     surfaces is a border's job. */
+  --bc-shadow-subtle: 0 1px 3px oklch(0.3 0.04 340 / 0.1);
+  --bc-shadow-card: 0 2px 8px oklch(0.3 0.04 340 / 0.06);
+  --bc-shadow-float: 0 10px 32px oklch(0.3 0.04 340 / 0.08);
+  --bc-shadow-bar: 0 -6px 20px oklch(0.3 0.04 340 / 0.08);
+
+  /* Legacy shadow names -- aliases. The old values were three to five times
+     heavier than the scale allows. */
+  --bc-shadow-card-hover: var(--bc-shadow-card);
+  --bc-shadow-floating-min: var(--bc-shadow-float);
+  --bc-shadow-floating-max: var(--bc-shadow-float);
+  --bc-shadow-ai-fab: var(--bc-shadow-float);
+
+  /* ---------------------------------------------------------------- motion
+     Elevation and colour move; pages do not. No entrance animation, no
+     scroll animation, no decoration. */
+  --bc-motion-hover: 120ms;
+  --bc-motion-hover-ease: ease-out;
+  --bc-motion-panel: 200ms;
+  --bc-motion-panel-ease: cubic-bezier(0.2, 0, 0, 1);
+  --bc-motion-sheet: 240ms;
+  --bc-motion-skeleton: 1.2s;
 }

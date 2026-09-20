@@ -85,7 +85,9 @@ function VerificationQueue() {
           any kind today, so there are no documents to show and inventing a
           placeholder for them would misrepresent what an operator is deciding
           on. */}
-      <Alert tone="success">
+      {/* `info`, not `success`: this is a standing note about what the
+          release does, not the outcome of anything the operator just did. */}
+      <Alert tone="info">
         در این نسخه، درخواست‌ها بدون بارگذاری مدرک ارسال می‌شوند. امکان پیوست مدارک در فاز بعدی اضافه خواهد شد.
       </Alert>
 
