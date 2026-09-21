@@ -14,7 +14,8 @@
     "@beauclick/design-tokens": "workspace:*",
     "@beauclick/persian-utils": "workspace:*",
     "@beauclick/payment-contract": "workspace:*",
-    "@beauclick/referral-contract": "workspace:*"
+    "@beauclick/referral-contract": "workspace:*",
+    "@beauclick/wishlist-contract": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "^18.3.11",

@@ -78,7 +78,16 @@ let searched: string[];
 /** Every mutating wishlist request. */
 let mutations: Array<{ method: string; url: string }>;
 
-function mockApi(options: { body?: unknown; fail?: boolean; suggestions?: string[]; saveFails?: boolean } = {}) {
+function mockApi(
+  options: {
+    body?: unknown;
+    fail?: boolean;
+    suggestions?: string[];
+    saveFails?: boolean;
+    /** A refused save with the server's own status, code and Persian message. */
+    saveRefusal?: { status: number; code: string; message: string };
+  } = {},
+) {
   searched = [];
   mutations = [];
   (global.fetch as jest.Mock).mockImplementation((url: string, init?: RequestInit) => {
@@ -89,6 +98,10 @@ function mockApi(options: { body?: unknown; fail?: boolean; suggestions?: string
     }
     if (url.includes('/v1/me/wishlist/items')) {
       mutations.push({ method, url });
+      if (options.saveRefusal) {
+        const { status, code, message } = options.saveRefusal;
+        return Promise.resolve({ ok: false, status, json: async () => ({ data: null, meta: null, error: { code, message } }) });
+      }
       if (options.saveFails) {
         return Promise.resolve({
           ok: false,
@@ -336,6 +349,35 @@ describe('saving a professional', () => {
     await userEvent.click(screen.getByRole('button', { name: /حذف آتلیه سارا محمدی/ }));
     await waitFor(() => expect(mutations[0].method).toBe('DELETE'));
     expect(mutations[0].url).toContain('/v1/me/wishlist/items/professional/p1');
+  });
+
+  it('tells the customer their list is full, in the server’s own words, and leaves the card unsaved', async () => {
+    mockApi({ saveRefusal: {"status":409,"code":"WISHLIST_LIMIT_REACHED","message":"فهرست علاقه‌مندی‌های شما پر است. حداکثر ۵۰۰ مورد می‌توانید ذخیره کنید."} });
+    renderSearch();
+    await screen.findByTestId('results');
+
+    await userEvent.click(screen.getByRole('button', { name: /افزودن/ }));
+    expect(await screen.findByText("فهرست علاقه‌مندی‌های شما پر است. حداکثر ۵۰۰ مورد می‌توانید ذخیره کنید.")).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /افزودن/ })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('says a target is no longer available without saying why', async () => {
+    mockApi({ saveRefusal: { status: 404, code: 'NOT_FOUND_OR_NOT_YOURS', message: 'این مورد یافت نشد.' } });
+    renderSearch();
+    await screen.findByTestId('results');
+    await userEvent.click(screen.getByRole('button', { name: /افزودن/ }));
+    expect(await screen.findByText('این مورد دیگر در دسترس نیست.')).toBeInTheDocument();
+  });
+
+  it('clears a refusal when the customer tries again', async () => {
+    mockApi({ saveRefusal: {"status":409,"code":"WISHLIST_LIMIT_REACHED","message":"فهرست علاقه‌مندی‌های شما پر است. حداکثر ۵۰۰ مورد می‌توانید ذخیره کنید."} });
+    renderSearch();
+    await screen.findByTestId('results');
+    await userEvent.click(screen.getByRole('button', { name: /افزودن/ }));
+    await screen.findByText("فهرست علاقه‌مندی‌های شما پر است. حداکثر ۵۰۰ مورد می‌توانید ذخیره کنید.");
+    mockApi({ body: response({ items: [provider({ saved: false })] }) });
+    await userEvent.click(screen.getByRole('button', { name: /افزودن/ }));
+    await waitFor(() => expect(screen.queryByText("فهرست علاقه‌مندی‌های شما پر است. حداکثر ۵۰۰ مورد می‌توانید ذخیره کنید.")).toBeNull());
   });
 
   it('leaves the control as it was when the save fails', async () => {

@@ -1,0 +1,119 @@
+/*
+ * The wishlist — `38_WISHLIST.md`.
+ *
+ *   390   a card per saved item, the remove control under it.
+ *   640   the item and its remove control on one line.
+ *
+ * Nothing here is a count: not how many items, not how many people saved a
+ * professional. `V32-DEC-021` refuses even the caller's own tally.
+ *
+ * Breakpoints are the design's 640 and 1024 (`breakpoints.spec.ts`).
+ */
+
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--bc-spacing-card-gap);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-card);
+  padding: 14px 16px;
+}
+
+@media (min-width: 640px) {
+  .item {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+}
+
+.what {
+  min-inline-size: 0;
+}
+
+.kind {
+  margin: 0 0 2px;
+  font-size: 12px;
+  color: var(--bc-color-ink-faint);
+}
+
+.name {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.nameLink {
+  color: inherit;
+  text-decoration: none;
+}
+
+.nameLink:hover,
+.nameLink:focus-visible {
+  text-decoration: underline;
+}
+
+.savedAt {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--bc-color-ink-soft);
+}
+
+/* A neutral tombstone: no name, no picture, and — deliberately — no cause. */
+.gone {
+  background: var(--bc-color-surface-tint);
+}
+
+.goneText {
+  margin: 0;
+  font-size: 14px;
+  color: var(--bc-color-ink-soft);
+}
+
+.remove {
+  flex-shrink: 0;
+}
+
+.rowError {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--bc-color-error);
+}
+
+.more {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+@media (min-width: 640px) {
+  .more {
+    align-items: center;
+  }
+}
+
+.moreError {
+  margin: 0;
+  font-size: 13px;
+  color: var(--bc-color-error);
+  text-align: center;
+}
