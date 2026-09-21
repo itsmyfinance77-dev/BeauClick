@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { normalizeDigits, toPersianDigits } from '@beauclick/persian-utils';
-import { Alert, Button, Card, Input, LoadingState } from '@/components/ui';
+import { Alert, Button, ErrorState, Input, LoadingState } from '@/components/ui';
 import { Badge, ConfirmDialog, EmptyState, PageHeader, Textarea } from '@/components/kit';
 import { useAuth } from '@/lib/auth-context';
 import {
@@ -12,6 +12,10 @@ import {
   type AdminRole,
   type AdminUserSummary,
 } from '@/lib/admin-api';
+import styles from './users.module.css';
+
+/** The server requires 4–500 characters of reason. */
+const MIN_REASON = 4;
 
 /**
  * Role administration.
@@ -35,18 +39,20 @@ export default function AdminUsersPage() {
 
   const [roles, setRoles] = useState<AdminRole[]>([]);
   const [catalogueLoaded, setCatalogueLoaded] = useState(false);
+  const [catalogueError, setCatalogueError] = useState<string | null>(null);
 
   const [pending, setPending] = useState<{ role: AdminRole; operation: 'grant' | 'revoke' } | null>(null);
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
 
   const loadCatalogue = useCallback(async () => {
+    setCatalogueError(null);
     try {
       const res = await roleCatalogue(api);
       setRoles(res.data?.roles ?? []);
       setCatalogueLoaded(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'فهرست نقش‌ها بارگذاری نشد.');
+      setCatalogueError(err instanceof Error ? err.message : 'فهرست نقش‌ها بارگذاری نشد.');
     }
   }, [api]);
 
@@ -56,15 +62,24 @@ export default function AdminUsersPage() {
 
   async function search(event: React.FormEvent) {
     event.preventDefault();
-    setSearching(true);
     setError(null);
     setSuccess(null);
+    const normalized = normalizeDigits(phone.trim());
+    if (!normalized) {
+      setError('شماره موبایل کاربر را وارد کنید.');
+      return;
+    }
+    setSearching(true);
     setSearched(false);
+    // Cleared BEFORE the request: the card is one account's, and if this search
+    // fails the operator must not be left looking at the PREVIOUS account under
+    // a field that now holds a different number.
+    setResult(null);
     try {
       // Digits folded before the request: an operator typing a Persian-keyboard
       // number would otherwise get "no such user" for an account that exists.
       // Same root cause as QA-01/02, one surface later.
-      const res = await findUserByPhone(api, normalizeDigits(phone.trim()));
+      const res = await findUserByPhone(api, normalized);
       setResult(res.data?.[0] ?? null);
       setSearched(true);
     } catch (err) {
@@ -102,9 +117,15 @@ export default function AdminUsersPage() {
   }
 
   const isSelf = result?.id === me?.id;
+  const reasonLength = reason.trim().length;
+
+  /** The catalogue's name for a role — never the raw slug, which is a database key an operator cannot read. */
+  function roleName(slug: string): string {
+    return roles.find((r) => r.slug === slug)?.name ?? (catalogueLoaded ? 'نقش ناشناخته' : 'نقش');
+  }
 
   return (
-    <>
+    <div className={styles.page}>
       <PageHeader
         title="کاربران و نقش‌ها"
         subtitle="اعطا و لغو نقش. هر تغییر با نام شما و دلیل آن به‌صورت دائمی ثبت می‌شود."
@@ -113,7 +134,7 @@ export default function AdminUsersPage() {
       {error ? <Alert>{error}</Alert> : null}
       {success ? <Alert tone="success">{success}</Alert> : null}
 
-      <Card>
+      <section className={styles.panel} aria-label="جست‌وجوی کاربر">
         <form onSubmit={search} noValidate>
           <Input
             label="شماره موبایل کاربر"
@@ -130,109 +151,76 @@ export default function AdminUsersPage() {
             جست‌وجو
           </Button>
         </form>
-      </Card>
+      </section>
 
-      <div style={{ marginBlockStart: 20 }}>
-        {searched && !result ? (
-          <EmptyState message="کاربری با این شماره یافت نشد. کاربر باید ابتدا از مسیر عادی وارد شده باشد." />
-        ) : null}
+      {searched && !result ? (
+        <EmptyState message="کاربری با این شماره یافت نشد. کاربر باید ابتدا از مسیر عادی وارد شده باشد." />
+      ) : null}
 
-        {result ? (
-          <Card>
-            <div
-              style={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: 'var(--bc-spacing-chip-gap)',
-              }}
-            >
-              <div style={{ minWidth: 0 }}>
-                <p style={{ margin: 0, fontWeight: 700 }}>{result.displayName ?? 'بدون نام'}</p>
-                <p
-                  style={{
-                    margin: '4px 0 0',
-                    fontSize: 13,
-                    color: 'var(--bc-color-ink-soft)',
-                    direction: 'ltr',
-                    textAlign: 'start',
-                  }}
-                >
-                  {toPersianDigits(result.phone)}
-                </p>
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {result.roles.length === 0 ? (
-                  <Badge tone="neutral">بدون نقش</Badge>
-                ) : (
-                  result.roles.map((r) => (
-                    <Badge key={r} tone={roles.find((x) => x.slug === r)?.isPrivileged ? 'warning' : 'neutral'}>
-                      {roles.find((x) => x.slug === r)?.name ?? r}
-                    </Badge>
-                  ))
-                )}
-              </div>
+      {result ? (
+        <section className={styles.panel} aria-label="حساب یافت‌شده">
+          <div className={styles.head}>
+            <div className={styles.who}>
+              <p className={styles.name}>{result.displayName ?? 'بدون نام'}</p>
+              <p className={styles.phone}>{toPersianDigits(result.phone)}</p>
             </div>
-
-            {isSelf ? (
-              <p style={{ margin: '16px 0 0', fontSize: 13, color: 'var(--bc-color-ink-faint)' }}>
-                این حساب خود شماست. اعطای نقش مدیریتی به حساب خودتان مجاز نیست.
-              </p>
-            ) : null}
-
-            <div style={{ marginBlockStart: 20 }}>
-              <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 12px' }}>تغییر نقش</h2>
-              {!catalogueLoaded ? (
-                <LoadingState label="در حال بارگذاری فهرست نقش‌ها…" />
+            <div className={styles.badges}>
+              {result.roles.length === 0 ? (
+                <Badge tone="neutral">بدون نقش</Badge>
               ) : (
-                <div style={{ display: 'grid', gap: 'var(--bc-spacing-card-gap)' }}>
-                  {roles.map((role) => {
-                    const held = result.roles.includes(role.slug);
-                    return (
-                      <div
-                        key={role.slug}
-                        style={{
-                          display: 'flex',
-                          flexWrap: 'wrap',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: 'var(--bc-spacing-chip-gap)',
-                          borderBlockEnd: '1px solid var(--bc-color-line)',
-                          paddingBlockEnd: 12,
-                        }}
-                      >
-                        <div style={{ minWidth: 0 }}>
-                          <p style={{ margin: 0, fontWeight: 600, fontSize: 14 }}>
-                            {role.name}
-                            {role.isPrivileged ? (
-                              <span style={{ marginInlineStart: 8 }}>
-                                <Badge tone="warning">مدیریتی</Badge>
-                              </span>
-                            ) : null}
-                          </p>
-                          <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--bc-color-ink-soft)' }}>
-                            {role.description}
-                          </p>
-                        </div>
-                        <Button
-                          type="button"
-                          inline
-                          variant={held ? 'danger' : 'ghost'}
-                          disabled={isSelf && role.isPrivileged}
-                          onClick={() => setPending({ role, operation: held ? 'revoke' : 'grant' })}
-                        >
-                          {held ? 'لغو' : 'اعطا'}
-                        </Button>
-                      </div>
-                    );
-                  })}
-                </div>
+                result.roles.map((r) => (
+                  <Badge key={r} tone={roles.find((x) => x.slug === r)?.isPrivileged ? 'warning' : 'neutral'}>
+                    {roleName(r)}
+                  </Badge>
+                ))
               )}
             </div>
-          </Card>
-        ) : null}
-      </div>
+          </div>
+
+          {isSelf ? (
+            <p className={styles.self}>این حساب خود شماست. اعطای نقش مدیریتی به حساب خودتان مجاز نیست.</p>
+          ) : null}
+
+          <div className={styles.roles}>
+            <h2 className={styles.sectionTitle}>تغییر نقش</h2>
+            {catalogueError ? (
+              <ErrorState message={catalogueError} onRetry={() => void loadCatalogue()} />
+            ) : !catalogueLoaded ? (
+              <LoadingState label="در حال بارگذاری فهرست نقش‌ها…" lines={3} />
+            ) : (
+              <ul className={styles.roleList}>
+                {roles.map((role) => {
+                  const held = result.roles.includes(role.slug);
+                  return (
+                    <li key={role.slug} className={styles.role}>
+                      <div className={styles.roleText}>
+                        <p className={styles.roleName}>
+                          {role.name}
+                          {role.isPrivileged ? (
+                            <span className={styles.privileged}>
+                              <Badge tone="warning">مدیریتی</Badge>
+                            </span>
+                          ) : null}
+                        </p>
+                        <p className={styles.roleDescription}>{role.description}</p>
+                      </div>
+                      <Button
+                        type="button"
+                        inline
+                        variant={held ? 'danger' : 'ghost'}
+                        disabled={isSelf && role.isPrivileged}
+                        onClick={() => setPending({ role, operation: held ? 'revoke' : 'grant' })}
+                      >
+                        {held ? 'لغو' : 'اعطا'}
+                      </Button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </section>
+      ) : null}
 
       <ConfirmDialog
         open={pending !== null}
@@ -240,6 +228,7 @@ export default function AdminUsersPage() {
         tone={pending?.operation === 'grant' ? 'primary' : 'danger'}
         confirmLabel={pending?.operation === 'grant' ? 'اعطا کن' : 'لغو کن'}
         busy={busy}
+        confirmDisabled={reasonLength < MIN_REASON}
         onConfirm={() => void confirm()}
         onCancel={() => {
           setPending(null);
@@ -247,13 +236,13 @@ export default function AdminUsersPage() {
         }}
         body={
           <>
-            <p style={{ margin: '0 0 12px' }}>
+            <p className={styles.dialogText}>
               {pending?.operation === 'grant'
                 ? `نقش «${pending?.role.name}» به این کاربر اعطا می‌شود.`
                 : `نقش «${pending?.role.name}» از این کاربر گرفته می‌شود.`}
             </p>
             {pending?.role.isPrivileged ? (
-              <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--bc-color-ink-soft)' }}>
+              <p className={styles.dialogNote}>
                 {pending.operation === 'grant'
                   ? 'این یک نقش مدیریتی است. کاربر پس از ورود مجدد به دسترسی‌های آن خواهد رسید.'
                   : 'دسترسی‌های مدیریتی بلافاصله لغو می‌شود، حتی اگر کاربر هنوز نشست باز داشته باشد.'}
@@ -266,14 +255,12 @@ export default function AdminUsersPage() {
               maxLength={500}
               hint="این متن به‌صورت دائمی در گزارش عملیات ثبت می‌شود."
             />
-            {reason.trim().length > 0 && reason.trim().length < 4 ? (
-              <p style={{ fontSize: 12, color: 'var(--bc-color-error)', margin: 0 }}>
-                دلیل باید حداقل ۴ نویسه باشد.
-              </p>
+            {reasonLength > 0 && reasonLength < MIN_REASON ? (
+              <p className={styles.reasonError}>دلیل باید حداقل ۴ نویسه باشد.</p>
             ) : null}
           </>
         }
       />
-    </>
+    </div>
   );
 }

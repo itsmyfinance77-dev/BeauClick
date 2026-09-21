@@ -1,0 +1,136 @@
+/*
+ * Users and roles — `22_ADMIN_USERS.md`.
+ *
+ * A phone-number search, the one account it finds, and a role list with a
+ * grant/revoke button each. Nothing here decides what may be granted: that is
+ * the server's rule, and the screen only explains a refusal.
+ *
+ *   390   the account's roles under its name; each role's button under its text.
+ *   640   the name beside the roles; the button beside the role's description.
+ *
+ * Breakpoints are the design's 640 and 1024 (`breakpoints.spec.ts`).
+ */
+
+.page {
+  display: grid;
+  gap: var(--bc-spacing-card-gap);
+}
+
+.panel {
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-card);
+  padding: 16px;
+}
+
+@media (min-width: 640px) {
+  .panel {
+    padding: 20px;
+  }
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--bc-spacing-chip-gap);
+}
+
+.who {
+  min-inline-size: 0;
+}
+
+.name {
+  margin: 0;
+  font-weight: 700;
+}
+
+/* A phone number is never reordered inside a right-to-left line. */
+.phone {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--bc-color-ink-soft);
+  direction: ltr;
+  text-align: start;
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.self {
+  margin: 16px 0 0;
+  font-size: 13px;
+  color: var(--bc-color-ink-faint);
+}
+
+/* ----------------------------------------------------------- role list */
+
+.roles {
+  margin-block-start: 20px;
+}
+
+.sectionTitle {
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.roleList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--bc-spacing-card-gap);
+}
+
+.role {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--bc-spacing-chip-gap);
+  border-block-end: 1px solid var(--bc-color-line);
+  padding-block-end: 12px;
+}
+
+.roleText {
+  min-inline-size: 0;
+}
+
+.roleName {
+  margin: 0;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.privileged {
+  margin-inline-start: 8px;
+}
+
+.roleDescription {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--bc-color-ink-soft);
+}
+
+/* --------------------------------------------------------------- dialogue */
+
+.dialogText {
+  margin: 0 0 12px;
+}
+
+.dialogNote {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--bc-color-ink-soft);
+}
+
+.reasonError {
+  margin: 0;
+  font-size: 12px;
+  color: var(--bc-color-error);
+}
