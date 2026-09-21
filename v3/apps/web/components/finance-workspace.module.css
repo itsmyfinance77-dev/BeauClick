@@ -1,0 +1,297 @@
+/*
+ * The persona-neutral finance workspace — `46_FINANCE_WORKSPACE.md` and
+ * `13_PRO_FINANCE.md`.
+ *
+ *   390   the workspace choices stacked, the three figures in a row that wraps,
+ *         the settlement history as a card list (via `DataTable`).
+ *   1024  the settlement history as a table, all columns.
+ *
+ * "Status never by colour alone": the access mode is a shape (a filled circle
+ * for the owner, a hollow square for a delegated read-only grant) plus its
+ * words. Amounts use tabular figures. Breakpoints are the design's 640 and
+ * 1024 (`breakpoints.spec.ts`).
+ *
+ * A four-month trend chart (spec 13) is NOT drawn: the workspace routes return
+ * only a summary, the outstanding orders, a cursor-paged settlement history
+ * and a per-order ledger. A trend from the first page of a paged history would
+ * be a partial series presented as a whole.
+ */
+
+.section {
+  margin-block-end: 20px;
+}
+
+.sectionTitle {
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.sectionTitleSpaced {
+  margin: 24px 0 12px;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.legacyTitle {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.panel {
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-card);
+  padding: 16px;
+}
+
+@media (min-width: 640px) {
+  .panel {
+    padding: 20px;
+  }
+}
+
+/* ------------------------------------------------------------- selector */
+
+.selector {
+  margin: 0 0 20px;
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-card);
+  padding: 16px 18px;
+  min-inline-size: 0;
+}
+
+.selectorLegend {
+  padding: 0 6px;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.selectorLead {
+  margin: 0 0 12px;
+  font-size: 12.5px;
+  color: var(--bc-color-text-muted);
+  line-height: 1.8;
+}
+
+.choices {
+  display: grid;
+  gap: 10px;
+}
+
+.choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-block-size: 44px;
+  padding: 12px 14px;
+  border-radius: var(--bc-radius-control);
+  border: 1px solid var(--bc-color-border);
+  cursor: pointer;
+}
+
+.choiceOn {
+  border-color: var(--bc-color-primary);
+  background: var(--bc-color-primary-soft);
+}
+
+.choice input {
+  margin-block-start: 3px;
+  inline-size: 20px;
+  block-size: 20px;
+  flex-shrink: 0;
+}
+
+.choiceText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-inline-size: 0;
+}
+
+/* A long Persian name wraps rather than pushing the access mark off the card. */
+.choiceLabel {
+  font-size: 14px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.choiceMeta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.choiceType {
+  font-size: 12px;
+  color: var(--bc-color-text-muted);
+}
+
+.single {
+  margin-block-end: 20px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* ---------------------------------------------------------- access mark */
+
+.mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.markShape {
+  inline-size: 9px;
+  block-size: 9px;
+  flex-shrink: 0;
+}
+
+.markOwner {
+  border-radius: 50%;
+  background: var(--bc-color-primary);
+}
+
+.markRead {
+  border-radius: 2px;
+  border: 2px solid var(--bc-color-text-muted);
+}
+
+.readOnly {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  margin-block-end: 16px;
+  border-radius: var(--bc-radius-control);
+  background: var(--bc-color-surface-tint);
+  border: 1px solid var(--bc-color-border);
+}
+
+.readOnlyShape {
+  inline-size: 10px;
+  block-size: 10px;
+  flex-shrink: 0;
+  border-radius: 2px;
+  border: 2px solid var(--bc-color-text-muted);
+}
+
+.readOnlyTitle {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.readOnlyText {
+  font-size: 12.5px;
+  color: var(--bc-color-text-muted);
+}
+
+/* --------------------------------------------------------------- orders */
+
+.orders {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--bc-spacing-card-gap);
+}
+
+.order {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--bc-spacing-chip-gap);
+}
+
+.orderText {
+  min-inline-size: 0;
+}
+
+.orderAmount {
+  margin: 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.orderRef {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--bc-color-text-faint);
+}
+
+/* A truncated order reference is set left-to-right so the hex does not reverse. */
+.ref {
+  direction: ltr;
+  unicode-bidi: isolate;
+  display: inline-block;
+  font-family: monospace;
+}
+
+.ledger {
+  flex-basis: 100%;
+  margin-block-start: 4px;
+  padding-block-start: 16px;
+  border-block-start: 1px solid var(--bc-color-border);
+}
+
+.ledgerEmpty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--bc-color-text-muted);
+}
+
+.ledgerTable {
+  inline-size: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.ledgerTable caption {
+  text-align: start;
+  font-weight: 700;
+  margin-block-end: 8px;
+}
+
+.ledgerTable th,
+.ledgerTable td {
+  padding-block: 4px;
+}
+
+.ledgerTable th {
+  text-align: start;
+  font-weight: 600;
+}
+
+.ledgerTable td {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.ledgerRate {
+  color: var(--bc-color-text-faint);
+}
+
+/* ---------------------------------------------------------- settlements */
+
+.method {
+  direction: ltr;
+  unicode-bidi: isolate;
+  display: inline-block;
+}
+
+.amount {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.more {
+  margin-block-start: 12px;
+}
