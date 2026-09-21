@@ -5,7 +5,7 @@ import { formatFullJalaliDate, normalizeDigits } from '@beauclick/persian-utils'
 import { useAuth } from '@/lib/auth-context';
 import { ApiRequestError } from '@/lib/api-client';
 import { ProtectedRoute } from '@/components/protected-route';
-import { Alert, Button, Card, ErrorState, Input, LoadingState } from '@/components/ui';
+import { Alert, Button, ErrorState, Input, LoadingState } from '@/components/ui';
 import { Badge, ConfirmDialog, PageHeader, SegmentedControl } from '@/components/kit';
 import {
   acceptStaffInvite,
@@ -22,9 +22,10 @@ import {
   revokeStaffRole,
   type Business,
   type BusinessStaffMember,
-  type BusinessStaffStatus,
   type StaffManagementMember,
 } from '@/lib/phase4-api';
+import { staffRoleLabel, staffStatusLabel, staffStatusTone } from '@/lib/business-labels';
+import styles from './business.module.css';
 
 /**
  * Shown when the business was created but the session could not be rotated.
@@ -34,8 +35,6 @@ import {
  */
 const SESSION_STALE_MESSAGE =
   'کسب‌وکار شما ثبت شد. برای فعال شدن دسترسی‌های فروشنده، یک‌بار از حساب خود خارج و دوباره وارد شوید.';
-
-const ROLE_LABELS: Record<string, string> = { manager: 'مدیر', staff: 'کارمند' };
 
 const ROLE_OPTIONS = [
   { value: 'staff' as const, label: 'کارمند' },
@@ -76,34 +75,6 @@ const PENDING_COPY: Record<Exclude<PendingAction['kind'], 'revokeFinance'>, { ti
     body: 'عضویت شما در این کسب‌وکار پایان می‌یابد. برای بازگشت، باید دوباره دعوت شوید.',
   },
 };
-/*
- * V3.3 Story #123. `removed` is the membership status V3.3 Story #109 (`#44c`)
- * added to the vocabulary -- privacy erasure had always written it while neither
- * the type system nor the database knew it. Without an entry here the badge for
- * an erased member rendered blank, which reads as a broken row rather than as a
- * real state.
- *
- * The copy is deliberately neutral and factual: the membership ended, and the
- * screen says nothing about the person or why.
- */
-const STATUS_LABELS: Record<BusinessStaffStatus, string> = {
-  invited: 'دعوت‌شده',
-  active: 'فعال',
-  inactive: 'غیرفعال',
-  declined: 'رد شده',
-  removed: 'حذف‌شده',
-};
-
-const STATUS_TONE: Record<BusinessStaffStatus, 'neutral' | 'success' | 'warning' | 'error'> = {
-  invited: 'warning',
-  active: 'success',
-  inactive: 'neutral',
-  declined: 'error',
-  // Terminal and not an error the owner can act on -- the same quiet tone
-  // `inactive` carries, for the same reason.
-  removed: 'neutral',
-};
-
 /**
  * A row's identity, in the ONE plain-text form used everywhere it must be
  * spoken rather than shown: an action's accessible name, a dialog title, a
@@ -124,7 +95,7 @@ function memberIdentityText(member: StaffManagementMember): string {
 /** The four-digit hint, LTR-isolated so it is never reordered inside an RTL line -- screen 45 §6. */
 function HintDigits({ value }: { value: string }) {
   return (
-    <span dir="ltr" style={{ unicodeBidi: 'isolate', fontVariantNumeric: 'tabular-nums' }}>
+    <span dir="ltr" className={styles.hintDigits}>
       {value}
     </span>
   );
@@ -133,11 +104,11 @@ function HintDigits({ value }: { value: string }) {
 /** The row's primary identity line -- screen 45 §1-b: a phone-labelled row is framed, never left as bare digits. */
 function MemberIdentityLine({ member }: { member: StaffManagementMember }) {
   return member.labelSource === 'phone' ? (
-    <span style={{ fontSize: 14, fontWeight: 700 }}>
+    <span className={styles.identity}>
       شمارهٔ منتهی به <HintDigits value={member.identificationHint} />
     </span>
   ) : (
-    <span style={{ fontSize: 14, fontWeight: 700 }}>{member.displayLabel}</span>
+    <span className={styles.identity}>{member.displayLabel}</span>
   );
 }
 
@@ -442,14 +413,14 @@ function BusinessDashboard() {
     }
   }
 
-  if (loading) return <LoadingState label="در حال بارگذاری…" />;
+  if (loading) return <LoadingState label="در حال بارگذاری…" lines={5} />;
   if (!loaded) return <ErrorState message={error ?? 'اطلاعات کسب‌وکار بارگذاری نشد.'} onRetry={() => void load()} />;
 
   const pendingInvites = memberships.filter((m) => m.status === 'invited');
   const activeMembership = memberships.find((m) => m.status === 'active');
 
   return (
-    <section style={{ display: 'grid', gap: 'var(--bc-spacing-card-gap)' }}>
+    <section className={styles.page}>
       {/* `PageHeader` rather than a bare `<h1>`, and a subtitle that says what
           this screen is FOR. The UI/UX backlog's item 17 records that this page
           "mixes three concerns in one undifferentiated stack" -- your
@@ -461,15 +432,15 @@ function BusinessDashboard() {
       {error ? <Alert tone="error">{error}</Alert> : null}
 
       {pendingInvites.length > 0 && (
-        <Card>
-          <h2 style={{ fontSize: 16, marginBlockStart: 0 }}>دعوت‌های شما</h2>
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 8 }}>
+        <div className={styles.panel}>
+          <h2 className={styles.sectionTitle}>دعوت‌های شما</h2>
+          <ul className={styles.invites}>
             {pendingInvites.map((invite) => (
-              <li key={invite.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 14 }}>دعوت به عنوان {ROLE_LABELS[invite.role]}</span>
+              <li key={invite.id} className={styles.invite}>
+                <span className={styles.inviteText}>دعوت به عنوان {staffRoleLabel(invite.role)}</span>
                 {/* `inline`, so two buttons in one row are two buttons rather
                     than two full-width blocks stacked by flex. */}
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <div className={styles.buttons}>
                   <Button inline onClick={() => void handleAccept(invite.id)} loading={busy}>
                     پذیرفتن
                   </Button>
@@ -487,21 +458,19 @@ function BusinessDashboard() {
               </li>
             ))}
           </ul>
-        </Card>
+        </div>
       )}
 
       {owned ? (
-        <>
-          <Card>
-            <h2 style={{ fontSize: 18, marginBlockStart: 0 }}>{owned.displayName}</h2>
-            {owned.bio ? <p style={{ color: 'var(--bc-color-ink-soft)' }}>{owned.bio}</p> : null}
-            <p style={{ fontSize: 13, color: 'var(--bc-color-ink-faint)', margin: 0 }}>
-              ثبت‌شده در {formatFullJalaliDate(new Date(owned.createdAt))}
-            </p>
-          </Card>
+        <div className={styles.columns}>
+          <div className={styles.panel}>
+            <h2 className={styles.businessName}>{owned.displayName}</h2>
+            {owned.bio ? <p className={styles.bio}>{owned.bio}</p> : null}
+            <p className={styles.meta}>ثبت‌شده در {formatFullJalaliDate(new Date(owned.createdAt))}</p>
+          </div>
 
-          <Card>
-            <h2 style={{ fontSize: 16, marginBlockStart: 0 }}>اعضای کسب‌وکار</h2>
+          <div className={styles.panel}>
+            <h2 className={styles.sectionTitle}>اعضای کسب‌وکار</h2>
 
             {/*
               V3.3 Story #149 (`#149a`) §3 -- standing informational copy above
@@ -513,17 +482,7 @@ function BusinessDashboard() {
               booking credit, assign a collection policy, or manage staff
               authority).
             */}
-            <div
-              style={{
-                marginBlockEnd: 16,
-                padding: '12px 14px',
-                borderRadius: 'var(--bc-radius-row)',
-                background: 'var(--bc-color-surface-tint)',
-                fontSize: 12.5,
-                lineHeight: 1.8,
-                color: 'var(--bc-color-ink-soft)',
-              }}
-            >
+            <div className={styles.info}>
               «دسترسیِ فقط‌خواندنیِ مالی» به عضو اجازه می‌دهد خلاصهٔ مالی، سفارش‌های در انتظارِ تسویه، تاریخچهٔ تسویه و ریزِ
               تراکنشِ هر سفارشِ همین کسب‌وکار را بخواند. او نمی‌تواند تسویه، پرداخت، بازگشتِ وجه یا هیچ ردیفِ دفترِ مالی را
               تغییر دهد، اشتراک را انتخاب یا لغو کند، اعتبار بخرد، سیاستِ دریافت را انتساب دهد یا اختیارِ کارکنان را مدیریت کند.
@@ -533,16 +492,18 @@ function BusinessDashboard() {
                 naming the member each time -- screen 45 §3-a/§6. The node
                 stays mounted so a live region's text-only changes keep
                 announcing on every transition. */}
-            <div role="status" aria-live="polite" style={{ fontSize: 12.5, color: 'var(--bc-color-ink-soft)', minHeight: financeAnnouncement ? undefined : 0, marginBlockEnd: financeAnnouncement ? 12 : 0 }}>
+            <div
+              role="status"
+              aria-live="polite"
+              className={`${styles.announce} ${financeAnnouncement ? styles.announceOn : styles.announceOff}`}
+            >
               {financeAnnouncement}
             </div>
 
             {staffManagement.length === 0 ? (
-              <p style={{ margin: '0 0 16px', color: 'var(--bc-color-ink-soft)', fontSize: 14 }}>
-                هنوز عضوی اضافه نکرده‌اید.
-              </p>
+              <p className={styles.emptyRoster}>هنوز عضوی اضافه نکرده‌اید.</p>
             ) : (
-              <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 16px', display: 'grid', gap: 0 }}>
+              <ul className={styles.roster}>
                 {staffManagement.map((member) => {
                   const grant = grantState[member.id];
                   const isGranting = grant === 'pending';
@@ -553,30 +514,13 @@ function BusinessDashboard() {
                   const grantErrorId = `finance-grant-error-${member.id}`;
 
                   return (
-                    <li
-                      key={member.id}
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 10,
-                        padding: '14px 0',
-                        borderBlockEnd: '1px solid var(--bc-color-line)',
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          gap: 12,
-                          flexWrap: 'wrap',
-                        }}
-                      >
-                        <span style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 240 }}>
+                    <li key={member.id} className={styles.member} data-member={member.id}>
+                      <div className={styles.memberTop}>
+                        <span className={styles.memberId}>
                           <MemberIdentityLine member={member} />
-                          <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 12, color: 'var(--bc-color-ink-faint)' }}>
-                            {ROLE_LABELS[member.role]}
-                            <Badge tone={STATUS_TONE[member.status] ?? 'neutral'}>{STATUS_LABELS[member.status]}</Badge>
+                          <span className={styles.memberMeta}>
+                            {staffRoleLabel(member.role)}
+                            <Badge tone={staffStatusTone(member.status)}>{staffStatusLabel(member.status)}</Badge>
                             {member.labelSource === 'professional' ? (
                               <span>
                                 شمارهٔ منتهی به <HintDigits value={member.identificationHint} />
@@ -585,7 +529,7 @@ function BusinessDashboard() {
                           </span>
                         </span>
 
-                        <span style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                        <span className={styles.memberActions}>
                           {hasPractitioner ? <Badge tone="neutral">اختیارِ گفتگوی متخصص</Badge> : null}
 
                           {member.status === 'active' ? (
@@ -626,16 +570,14 @@ function BusinessDashboard() {
                               </>
                             )
                           ) : member.status === 'invited' ? (
-                            <span style={{ fontSize: 12, color: 'var(--bc-color-ink-faint)' }}>
-                              تا پیش از پذیرشِ دعوت، اعطا ممکن نیست
-                            </span>
+                            <span className={styles.note}>تا پیش از پذیرشِ دعوت، اعطا ممکن نیست</span>
                           ) : null}
                         </span>
                       </div>
 
                       {grantError ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                          <span id={grantErrorId} role="alert" style={{ fontSize: 12.5, color: 'var(--bc-color-error)' }}>
+                        <div className={styles.grantError}>
+                          <span id={grantErrorId} role="alert" className={styles.grantErrorText}>
                             {grantError}
                           </span>
                           <Button
@@ -667,13 +609,13 @@ function BusinessDashboard() {
               </ul>
             )}
             <InviteForm onInvite={handleInvite} busy={busy} />
-          </Card>
-        </>
+          </div>
+        </div>
       ) : staffBusiness ? (
-        <Card>
-          <h2 style={{ fontSize: 18, marginBlockStart: 0 }}>{staffBusiness.displayName}</h2>
-          {staffBusiness.bio ? <p style={{ color: 'var(--bc-color-ink-soft)' }}>{staffBusiness.bio}</p> : null}
-          <p style={{ fontSize: 13, color: 'var(--bc-color-ink-faint)' }}>شما به عنوان عضو این کسب‌وکار فعالیت می‌کنید.</p>
+        <div className={styles.panel}>
+          <h2 className={styles.businessName}>{staffBusiness.displayName}</h2>
+          {staffBusiness.bio ? <p className={styles.bio}>{staffBusiness.bio}</p> : null}
+          <p className={styles.meta}>شما به عنوان عضو این کسب‌وکار فعالیت می‌کنید.</p>
           {activeMembership && (
             <Button
               variant="danger"
@@ -686,15 +628,15 @@ function BusinessDashboard() {
               خروج از کسب‌وکار
             </Button>
           )}
-        </Card>
+        </div>
       ) : (
-        <Card>
-          <h2 style={{ fontSize: 16, marginBlockStart: 0 }}>ثبت کسب‌وکار جدید</h2>
-          <p style={{ color: 'var(--bc-color-ink-soft)' }}>
+        <div className={styles.panel}>
+          <h2 className={styles.sectionTitle}>ثبت کسب‌وکار جدید</h2>
+          <p className={styles.lead}>
             {user?.displayName ?? user?.phone} عزیز، برای مدیریت کارکنان و مالی کسب‌وکار خود، ابتدا آن را ثبت کنید.
           </p>
           <CreateBusinessForm onCreate={handleCreate} busy={busy} />
-        </Card>
+        </div>
       )}
 
       {(() => {
@@ -720,24 +662,23 @@ function BusinessDashboard() {
                 setRevokeAcknowledged(false);
               }}
               body={
-                <div id={revokeDescriptionId} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <p style={{ margin: 0 }}>
+                <div id={revokeDescriptionId} className={styles.dialogBody}>
+                  <p className={styles.dialogText}>
                     از درخواستِ بعدیِ این عضو، دسترسی‌اش به اطلاعاتِ مالیِ این کسب‌وکار قطع می‌شود. اگر همین حالا صفحهٔ مالی را
                     باز داشته باشد، داده‌های نمایش‌داده‌شده پاک می‌شوند و به فهرستِ فضاهای باقی‌مانده بازمی‌گردد.
                   </p>
-                  <p style={{ margin: 0 }}>عضویتِ او در کسب‌وکار دست‌نخورده می‌ماند؛ فقط این اختیار برداشته می‌شود.</p>
-                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 13 }}>
+                  <p className={styles.dialogText}>عضویتِ او در کسب‌وکار دست‌نخورده می‌ماند؛ فقط این اختیار برداشته می‌شود.</p>
+                  <label className={styles.acknowledge}>
                     <input
                       type="checkbox"
                       checked={revokeAcknowledged}
                       disabled={revokePending}
                       onChange={(event) => setRevokeAcknowledged(event.target.checked)}
-                      style={{ marginTop: 3, width: 18, height: 18, flexShrink: 0 }}
                     />
                     <span>می‌دانم که این کار دسترسیِ مالیِ {revokeIdentity} را قطع می‌کند.</span>
                   </label>
                   {revokeError ? (
-                    <span role="alert" style={{ fontSize: 12.5, color: 'var(--bc-color-error)' }}>
+                    <span role="alert" className={styles.dialogError}>
                       {revokeError}
                     </span>
                   ) : null}
@@ -756,7 +697,7 @@ function BusinessDashboard() {
             busy={busy}
             onConfirm={() => void confirmPending()}
             onCancel={() => setPending(null)}
-            body={pending ? <p style={{ margin: 0 }}>{PENDING_COPY[pending.kind].body}</p> : null}
+            body={pending ? <p className={styles.dialogText}>{PENDING_COPY[pending.kind].body}</p> : null}
           />
         );
       })()}
@@ -878,7 +819,7 @@ function InviteForm({
           that: `SegmentedControl` is the component for it, already carries the
           baseline, and is what the analytics range and availability horizon
           use. */}
-      <div style={{ marginBlockEnd: 16 }}>
+      <div className={styles.roleRow}>
         <SegmentedControl label="نقش" value={role} options={ROLE_OPTIONS} onChange={setRole} disabled={pending} />
       </div>
       <Button type="submit" loading={pending}>
