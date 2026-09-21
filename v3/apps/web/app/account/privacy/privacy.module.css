@@ -1,0 +1,201 @@
+/*
+ * Privacy and my data — `29_PRIVACY_ACCOUNT.md`.
+ *
+ * Two cards, one under the other, in a narrow column at every width: an export
+ * and a deletion are two different decisions with two different weights, and
+ * putting them side by side would invite comparing them. So there is no grid
+ * here, on purpose, at 1280 as at 390.
+ *
+ * Breakpoints are the design's 640 and 1024 (`breakpoints.spec.ts`).
+ */
+
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--bc-spacing-card-gap);
+  max-inline-size: 640px;
+}
+
+.card {
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-card);
+  padding: 16px;
+}
+
+@media (min-width: 640px) {
+  .card {
+    padding: 20px;
+  }
+}
+
+/* The deletion card carries its own weight: a heavier edge, not a different layout. */
+.cardDanger {
+  border-inline-start: 4px solid var(--bc-color-error);
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-block-end: 12px;
+}
+
+.title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.text {
+  margin: 0 0 12px;
+  font-size: 14px;
+  line-height: 1.9;
+  color: var(--bc-color-ink-soft);
+}
+
+.strong {
+  color: var(--bc-color-ink);
+  font-weight: 700;
+}
+
+.status {
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border-radius: var(--bc-radius-control);
+  border: 1px solid var(--bc-color-border);
+  background: var(--bc-color-surface-tint);
+  font-size: 14px;
+  line-height: 1.9;
+}
+
+.statusReady {
+  border-color: var(--bc-color-success);
+  background: var(--bc-color-success-soft);
+}
+
+.statusFailed {
+  border-color: var(--bc-color-error);
+  background: var(--bc-color-error-soft);
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+@media (min-width: 640px) {
+  .actions {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+}
+
+.error {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: var(--bc-color-error);
+}
+
+.announce {
+  margin: 12px 0 0;
+  min-block-size: 1.5em;
+  font-size: 13px;
+  color: var(--bc-color-ink-soft);
+}
+
+/* ---------------------------------------------- what the file holds, and keeps */
+
+.disclosure {
+  margin-block-start: 16px;
+  padding-block-start: 16px;
+  border-block-start: 1px solid var(--bc-color-border);
+}
+
+.subtitle {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.plain {
+  margin: 0 0 12px;
+  padding-inline-start: 20px;
+  font-size: 13px;
+  line-height: 1.9;
+  color: var(--bc-color-ink-soft);
+}
+
+.retained {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.retainedItem {
+  font-size: 13px;
+  line-height: 1.9;
+}
+
+.retainedItem summary {
+  cursor: pointer;
+  min-block-size: 44px;
+  display: flex;
+  align-items: center;
+}
+
+/* The server's own words, in its own language, and never reordered inside RTL. */
+.technical {
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: start;
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--bc-color-ink-soft);
+  overflow-wrap: anywhere;
+  margin: 0 0 8px;
+}
+
+/* -------------------------------------------------------------- the dialog */
+
+.dialogText {
+  margin: 0 0 12px;
+}
+
+.confirmField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.confirmLabel {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+/* The word to type is Latin on purpose: it is typed exactly as shown. */
+.confirmInput {
+  font: inherit;
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: start;
+  font-family: monospace;
+  min-block-size: 44px;
+  padding: 12px 14px;
+  border-radius: var(--bc-radius-button);
+  border: 1px solid var(--bc-color-line);
+  background: var(--bc-color-surface);
+  color: var(--bc-color-ink);
+}
+
+.confirmWord {
+  direction: ltr;
+  unicode-bidi: isolate;
+  display: inline-block;
+  font-family: monospace;
+  font-weight: 800;
+}
