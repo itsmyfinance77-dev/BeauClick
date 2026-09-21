@@ -1,0 +1,198 @@
+/*
+ * The bar chart — `24_MONEYCHART_DECISION.md`.
+ *
+ *   390   the bars keep a fixed width and the plot scrolls sideways; squeezing
+ *         thirty bars into a phone's width would make them indistinguishable.
+ *   1024  every bar of the range fits in one row.
+ *
+ * The plot is `direction: ltr` — time runs left to right, newest on the right —
+ * while everything around it (labels, dates, the tooltip's text) stays
+ * right-to-left Persian. That is the design's one explicit exception.
+ */
+
+.chart {
+  display: grid;
+  gap: 12px;
+}
+
+.scroller {
+  --bar-min: 24px;
+  overflow-x: auto;
+  padding-block-start: 22px; /* room for the tallest bar's label */
+}
+
+.plot {
+  position: relative;
+  direction: ltr;
+  block-size: 160px;
+  min-inline-size: calc(var(--n) * var(--bar-min));
+  inline-size: 100%;
+}
+
+@media (min-width: 1024px) {
+  .scroller {
+    --bar-min: 8px;
+  }
+}
+
+.svg {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  overflow: visible;
+}
+
+.bar {
+  fill: var(--bc-color-primary);
+}
+
+.barActive {
+  fill: var(--bc-color-primary-on-soft);
+}
+
+.maxLabel {
+  position: absolute;
+  inset-block-start: -20px;
+  transform: translateX(-50%);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--bc-color-text);
+}
+
+.tooltip {
+  position: absolute;
+  inset-block-start: -18px;
+  transform: translateX(-50%);
+  z-index: 2;
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: var(--bc-radius-control);
+  background: var(--bc-color-text);
+  color: var(--bc-color-surface);
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+  direction: rtl;
+  text-align: start;
+}
+
+.tipStart {
+  transform: translateX(-10%);
+}
+
+.tipEnd {
+  transform: translateX(-90%);
+}
+
+.tipDate {
+  opacity: 0.85;
+}
+
+.tipValue {
+  font-size: 14px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.tipDetail {
+  opacity: 0.85;
+}
+
+.axis {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-block-start: 6px;
+  font-size: 12px;
+  color: var(--bc-color-text-faint);
+  direction: ltr;
+  min-inline-size: calc(var(--n) * var(--bar-min));
+}
+
+.toggle {
+  justify-self: start;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  min-block-size: 44px;
+  padding: 0 14px;
+  border-radius: var(--bc-radius-control);
+  border: 1px solid var(--bc-color-border);
+  background: transparent;
+  color: var(--bc-color-text);
+  cursor: pointer;
+}
+
+.table {
+  inline-size: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.table th,
+.table td {
+  padding: 6px 8px;
+  text-align: start;
+}
+
+.table td {
+  font-variant-numeric: tabular-nums;
+}
+
+.table tbody tr + tr {
+  border-block-start: 1px solid var(--bc-color-border);
+}
+
+/* Visually hidden, still in the accessibility tree. */
+.srOnly {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--bc-color-text-muted);
+  line-height: 1.8;
+}
+
+/* -------------------------------------------------------------- loading */
+
+.skeleton {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  block-size: 160px;
+  direction: ltr;
+}
+
+/* Equal-height bars: the loading state must not suggest a shape for the data. */
+.skeletonBar {
+  flex: 1 1 0;
+  block-size: 60%;
+  border-radius: 3px 3px 0 0;
+  background: linear-gradient(
+    90deg,
+    var(--bc-color-surface-tint) 25%,
+    var(--bc-color-border) 50%,
+    var(--bc-color-surface-tint) 75%
+  );
+  background-size: 200% 100%;
+  animation: sweep var(--bc-motion-skeleton) ease-in-out infinite;
+}
+
+@keyframes sweep {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}

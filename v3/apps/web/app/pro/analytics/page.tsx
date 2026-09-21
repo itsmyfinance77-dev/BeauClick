@@ -1,11 +1,20 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { formatToman, toPersianDigits, zonedIsoDate } from '@beauclick/persian-utils';
-import { Card, ErrorState, LoadingState } from '@/components/ui';
-import { EmptyState, PageHeader, SegmentedControl, Select, StatCard, StatGrid } from '@/components/kit';
+import { formatToman, formatZonedFullDate, toPersianDigits, zonedIsoDate } from '@beauclick/persian-utils';
+import { ErrorState, LoadingState } from '@/components/ui';
+import { Badge, EmptyState, PageHeader, SegmentedControl, Select, StatCard, StatGrid } from '@/components/kit';
+import { MoneyChart, type ChartPoint } from '@/components/money-chart';
 import { ProGuard } from '@/components/pro-guard';
 import { useAuth } from '@/lib/auth-context';
+import {
+  FUNNEL_LABEL,
+  NOT_RECORDED_YET,
+  SERIES_EVENT_LABEL,
+  revenueIsMoney,
+  revenueLabel,
+  seriesMeasure,
+} from '@/lib/analytics-labels';
 import {
   myMetrics,
   mySeries,
@@ -14,28 +23,11 @@ import {
   type SeriesEvent,
   type SeriesResponse,
 } from '@/lib/pro-api';
+import styles from './analytics.module.css';
 
 export default function ProAnalyticsPage() {
   return <ProGuard>{() => <Analytics />}</ProGuard>;
 }
-
-const EVENT_LABELS: Record<SeriesEvent, string> = {
-  BookingCreated: 'رزروهای ثبت‌شده',
-  BookingCompleted: 'نوبت‌های انجام‌شده',
-  BookingCancelled: 'رزروهای لغوشده',
-  ProviderProfileViewed: 'بازدید از پروفایل',
-  OrderPaid: 'پرداخت‌های موفق',
-  SearchPerformed: 'جست‌وجوها',
-};
-
-const FUNNEL_LABELS: Record<string, string> = {
-  created: 'رزرو ثبت‌شده',
-  confirmed: 'تأیید شده',
-  completed: 'انجام شده',
-  cancelled: 'لغو شده',
-  expired: 'منقضی شده',
-  profileViews: 'بازدید پروفایل',
-};
 
 /**
  * The professional's own analytics.
@@ -91,17 +83,29 @@ function Analytics() {
     void load();
   }, [load]);
 
-  if (loading && !loaded) return <LoadingState label="در حال بارگذاری آمار…" />;
+  if (loading && !loaded) return <LoadingState label="در حال بارگذاری آمار…" lines={5} />;
   if (error) return <ErrorState message={error} onRetry={() => void load()} />;
 
   const funnel = metrics?.funnel;
-  const totalActivity = funnel
-    ? funnel.created.value + funnel.completed.value + funnel.cancelled.value + funnel.profileViews.value
-    : 0;
+  // `profileViews` is not counted: nothing records it yet (see NOT_RECORDED_YET),
+  // and it is always zero, so it would never be what makes a screen "active".
+  const totalActivity = funnel ? funnel.created.value + funnel.completed.value + funnel.cancelled.value : 0;
   // `loaded` is load-succeeded, not merely load-attempted, so this can never be
   // true because a request failed -- that path returned above.
   const isEmpty = loaded && totalActivity === 0;
-  const maxPoint = series?.points.reduce((max, p) => Math.max(max, p.count), 0) ?? 0;
+
+  // What one bar measures depends on the event: a paid order's metric is its
+  // total in Toman, so its daily sum is gross sales; every other event is a
+  // count, and its sum is zero (which would draw a flat chart).
+  const measure = seriesMeasure(event);
+  const points: ChartPoint[] = (series?.points ?? []).map((point) => ({
+    key: point.day,
+    // The day is a PLATFORM day (Asia/Tehran); noon UTC-ish keeps the date
+    // stable in the platform zone whatever the browser's zone is.
+    label: formatZonedFullDate(new Date(`${point.day}T08:30:00.000Z`)),
+    value: point[measure.field],
+    detail: measure.money ? `${toPersianDigits(point.count)} سفارش` : undefined,
+  }));
 
   return (
     <>
@@ -126,21 +130,31 @@ function Analytics() {
           That is a real fact about a new professional, not a failure, and it
           is deliberately not dressed up with placeholder numbers.
 
-          It is EXCLUSIVE with the figures below, which it previously was not:
-          the message "there is no activity to show" rendered directly above a
-          grid of cards showing activity, all of them zero. Saying nothing and
-          then showing something is a contradiction whichever half the reader
-          believes. */}
+          It is EXCLUSIVE with the figures below: saying "there is no activity
+          to show" directly above a grid of cards showing activity, all of them
+          zero, is a contradiction whichever half the reader believes. */}
       {isEmpty ? (
         <EmptyState message="هنوز فعالیتی برای نمایش نیست. با ثبت زمان‌های آزاد و دریافت اولین رزرو، آمار شما اینجا ظاهر می‌شود." />
       ) : (
         <>
           {funnel ? (
-            <div style={{ marginBlockEnd: 20 }}>
+            <div className={styles.section}>
               <StatGrid min={150}>
-                {Object.entries(FUNNEL_LABELS).map(([key, label]) => {
+                {Object.entries(FUNNEL_LABEL).map(([key, label]) => {
                   const metric = funnel[key as keyof typeof funnel];
                   if (!metric) return null;
+                  // A counter nothing records is not a zero, it is unknown:
+                  // a dash and «به‌زودی», never a number that reads as a fact.
+                  if (NOT_RECORDED_YET.has(key)) {
+                    return (
+                      <StatCard
+                        key={key}
+                        label={label}
+                        value="—"
+                        footer={<span className={styles.soon}>به‌زودی</span>}
+                      />
+                    );
+                  }
                   return <StatCard key={key} label={label} value={toPersianDigits(metric.value)} />;
                 })}
                 <StatCard
@@ -152,18 +166,14 @@ function Analytics() {
           ) : null}
 
           {metrics && Object.keys(metrics.revenue ?? {}).length > 0 ? (
-            <div style={{ marginBlockEnd: 20 }}>
-              <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 12px' }}>درآمد</h2>
+            <div className={styles.section}>
+              <h2 className={styles.sectionTitle}>درآمد</h2>
               <StatGrid>
                 {Object.entries(metrics.revenue).map(([key, metric]) => (
                   <StatCard
                     key={key}
                     label={revenueLabel(key)}
-                    value={
-                      key.toLowerCase().includes('toman') || metric.key.includes('toman')
-                        ? formatToman(metric.value)
-                        : toPersianDigits(metric.value)
-                    }
+                    value={revenueIsMoney(key) ? formatToman(metric.value) : toPersianDigits(metric.value)}
                   />
                 ))}
               </StatGrid>
@@ -172,54 +182,39 @@ function Analytics() {
         </>
       )}
 
-      <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 12px' }}>روند روزانه</h2>
-      <Card>
-        <Select label="رویداد" value={event} onChange={(e) => setEvent(e.target.value as SeriesEvent)}>
-          {SERIES_EVENTS.map((key) => (
-            <option key={key} value={key}>
-              {EVENT_LABELS[key]}
-            </option>
-          ))}
-        </Select>
+      <h2 className={styles.sectionTitle}>روند روزانه</h2>
+      <div className={styles.panel}>
+        <div className={styles.picker}>
+          <Select label="رویداد" value={event} onChange={(e) => setEvent(e.target.value as SeriesEvent)}>
+            {SERIES_EVENTS.map((key) => {
+              const soon = NOT_RECORDED_YET.has(key);
+              return (
+                <option key={key} value={key} disabled={soon}>
+                  {SERIES_EVENT_LABEL[key]}
+                  {soon ? ' (به‌زودی)' : ''}
+                </option>
+              );
+            })}
+          </Select>
+        </div>
 
-        {!series || series.points.length === 0 ? (
-          <p style={{ fontSize: 13, color: 'var(--bc-color-ink-soft)', margin: 0 }}>
-            در این بازه رویدادی ثبت نشده است.
-          </p>
-        ) : (
-          <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 6 }}>
-            {series.points.map((point) => (
-              <li key={point.day} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
-                <span style={{ minWidth: 96, color: 'var(--bc-color-ink-soft)', direction: 'ltr', textAlign: 'start' }}>
-                  {toPersianDigits(point.day)}
-                </span>
-                {/* A proportional bar, not a charting library: one dependency
-                    is not worth adding for six rows, and `aria-hidden` keeps
-                    the decoration out of the accessible name -- the number
-                    beside it is the real content. */}
-                <span
-                  aria-hidden="true"
-                  style={{
-                    display: 'inline-block',
-                    height: 8,
-                    borderRadius: 999,
-                    background: 'var(--bc-color-primary)',
-                    width: maxPoint > 0 ? `${Math.max(4, (point.count / maxPoint) * 100)}%` : 4,
-                  }}
-                />
-                {/* `count`, not `sum`: the series is "how many of this event
-                    happened that day". `sum` aggregates metric VALUES and is
-                    zero for count-only events, which would render every bar
-                    label as ۰. */}
-                <span style={{ fontWeight: 700 }}>{toPersianDigits(point.count)}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
+        <MoneyChart
+          points={points}
+          loading={loading}
+          title={`روند روزانهٔ ${SERIES_EVENT_LABEL[event]}`}
+          formatValue={measure.money ? formatMoney : toPersianDigits}
+          valueHeading={measure.money ? 'فروش' : 'تعداد'}
+          detailHeading="سفارش"
+          emptyMessage="هنوز داده‌ای برای این بازه نیست."
+        />
+        {points.length > 0 && !loading && measure.money ? <Badge tone="neutral">ارتفاع هر میله، فروش همان روز است</Badge> : null}
+      </div>
     </>
   );
 }
+
+/** A Toman amount with its unit: the chart's tooltip and summary name the currency, as the design asks. */
+const formatMoney = (value: number) => `${formatToman(value)} تومان`;
 
 /**
  * The reporting window, in platform-local days.
@@ -238,16 +233,3 @@ const RANGE_OPTIONS = [
 ] as const;
 
 type RangeDays = (typeof RANGE_OPTIONS)[number]['value'];
-
-const REVENUE_LABELS: Record<string, string> = {
-  grossToman: 'فروش ناخالص',
-  refundedToman: 'بازگشت وجه',
-  netToman: 'فروش خالص',
-  paidOrders: 'سفارش‌های پرداخت‌شده',
-  averageOrderToman: 'میانگین هر سفارش',
-};
-
-/** Persian label, falling back to a generic Persian phrase rather than the raw English key (QA-22's class). */
-function revenueLabel(key: string): string {
-  return REVENUE_LABELS[key] ?? 'شاخص مالی';
-}
