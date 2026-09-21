@@ -42,7 +42,7 @@
 
 @media (min-width: 1024px) {
   .columns {
-    grid-template-columns: 1.4fr 1fr 1fr 1fr;
+    grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr;
     gap: 40px;
     padding-block-end: 32px;
   }

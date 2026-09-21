@@ -1,5 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { AppShell } from '@/components/app-shell';
 import { AuthProvider } from '@/lib/auth-context';
 import { UnreadProvider } from '@/lib/unread-context';
@@ -223,28 +225,54 @@ describe('the mobile bar and the footer', () => {
     expect(bar.querySelector('[data-tab="/"]')).not.toHaveAttribute('aria-current');
   });
 
-  it('renders the footer on the landing page only', async () => {
+  it('renders the footer on the landing page', async () => {
     await signedIn();
     expect(screen.getByRole('contentinfo')).toBeInTheDocument();
   });
 
-  it('and not on any other page, because no other artboard carries one', async () => {
-    pathname = '/search';
-    await signedIn();
-    expect(screen.queryByRole('contentinfo')).toBeNull();
-  });
+  it.each(['/terms', '/privacy-policy', '/contact', '/support'])(
+    'and on %s, which the footer links to and the spec draws it on',
+    async (route) => {
+      pathname = route;
+      await signedIn();
+      expect(screen.getByRole('contentinfo')).toBeInTheDocument();
+    },
+  );
+
+  it.each(['/search', '/bookings', '/account/privacy', '/terms/extra'])(
+    'and not on %s, because no other artboard carries one',
+    async (route) => {
+      pathname = route;
+      await signedIn();
+      expect(screen.queryByRole('contentinfo')).toBeNull();
+    },
+  );
 
   it('gives the footer no link that leads nowhere', async () => {
     await signedIn();
 
     const footer = screen.getByRole('contentinfo');
-    const built = new Set(['/search', '/bookings', '/loyalty', '/journey', '/pro', '/pro/profile', '/business']);
     for (const link of within(footer).getAllByRole('link')) {
-      // The prototype draws every footer link as `href="#"`. The legal and
-      // support column has no routes at all, so it is not rendered rather
-      // than rendered dead.
-      expect(built).toContain(link.getAttribute('href'));
+      // The prototype draws every footer link as `href="#"`. Each one here is
+      // a route with a page behind it: checked against `app/` itself, not
+      // against a list kept beside the test that could drift from it.
+      const href = link.getAttribute('href') ?? '';
+      expect(existsSync(join(__dirname, '..', 'app', href.slice(1), 'page.tsx'))).toBe(true);
     }
-    expect(footer.textContent).not.toContain('قوانین و مقررات');
+    // «درباره ما» is still drawn in the prototype and still has no route.
+    expect(footer.textContent).not.toContain('درباره ما');
+  });
+
+  it('links the four legal and support pages, under the prototype\'s own column title', async () => {
+    await signedIn();
+
+    const nav = within(screen.getByRole('contentinfo')).getByRole('navigation', { name: 'پیوندهای بیوکلیک' });
+    expect(nav).toHaveTextContent('بیوکلیک');
+    expect(within(nav).getAllByRole('link').map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
+      ['قوانین و مقررات', '/terms'],
+      ['حریم خصوصی', '/privacy-policy'],
+      ['تماس', '/contact'],
+      ['پشتیبانی', '/support'],
+    ]);
   });
 });
