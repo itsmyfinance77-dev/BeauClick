@@ -306,3 +306,14 @@ export function groupSlotsByDay(slots: AvailableSlot[]): { dayKey: string; date:
 export function slotTimeLabel(iso: string): string {
   return formatZonedTime(new Date(iso));
 }
+
+/**
+ * Upcoming means confirmed or awaiting payment, and in the future.
+ *
+ * One definition for the dashboard and the bookings list: two copies would
+ * eventually disagree about which tab a booking belongs in.
+ */
+export function isUpcomingBooking(booking: BookingSummary): boolean {
+  if (booking.status !== 'confirmed' && booking.status !== 'pending') return false;
+  return new Date(booking.startAt).getTime() > Date.now();
+}

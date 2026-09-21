@@ -1,0 +1,138 @@
+/*
+ * The customer's bookings — `08_BOOKINGS_LIST.md` and `Prototype - Customer`.
+ *
+ *   390   one full-width card per row, single column.
+ *   1280  two columns, capped by the content width.
+ *
+ * A card is a tinted bar (the date and the status) over a body (the time, and
+ * a slot for the professional's name that stays empty until the API returns
+ * one — the spec's "accept the name field without changing the layout"),
+ * then the actions. It mirrors the dashboard's next-appointment card so the
+ * two pages read as one product; that card is not reused because it is a
+ * hero with a photo slot, and this is a list.
+ *
+ * Breakpoints are the design's 640 and 1024 (`breakpoints.spec.ts`).
+ */
+
+.tabs {
+  margin-block-end: var(--bc-spacing-card-gap);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--bc-spacing-card-gap);
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 1024px) {
+  .list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+}
+
+.card {
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-card);
+  overflow: hidden;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  background: var(--bc-color-surface-tint);
+}
+
+@media (min-width: 640px) {
+  .bar {
+    padding: 10px 20px;
+  }
+}
+
+.when {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/*
+ * The status is a word in a pill, never a colour on its own:
+ * `V3.3_RESPONSIVE_AND_A11Y_HANDOFF.md` §4. The tint carries tone for those
+ * who can see it and the text carries the meaning for everyone else.
+ */
+.status {
+  font-size: var(--bc-text-small-size);
+  font-weight: 700;
+  padding: 3px 11px;
+  border-radius: var(--bc-radius-chip);
+  white-space: nowrap;
+}
+
+.statusDone {
+  background: var(--bc-color-success-soft);
+  color: var(--bc-color-success);
+}
+
+.statusWarn {
+  background: var(--bc-color-warning-soft);
+  color: var(--bc-color-warning);
+}
+
+.statusError {
+  background: var(--bc-color-error-soft);
+  color: var(--bc-color-error);
+}
+
+.statusNeutral {
+  background: var(--bc-color-surface);
+  color: var(--bc-color-text-faint);
+  border: 1px solid var(--bc-color-border);
+}
+
+.body {
+  padding: 14px 16px;
+}
+
+@media (min-width: 640px) {
+  .body {
+    padding: 16px 20px;
+  }
+}
+
+.time {
+  margin: 0;
+  font-size: 15px;
+  color: var(--bc-color-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The clock stays left-to-right inside a right-to-left line. */
+.clock {
+  direction: ltr;
+  unicode-bidi: isolate;
+  display: inline-block;
+}
+
+.note {
+  margin: 8px 0 0;
+  font-size: var(--bc-text-small-size);
+  color: var(--bc-color-text-muted);
+}
+
+.actions {
+  padding: 0 16px 16px;
+}
+
+@media (min-width: 640px) {
+  .actions {
+    padding: 0 20px 20px;
+  }
+}
