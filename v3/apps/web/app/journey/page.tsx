@@ -4,7 +4,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { formatFullJalaliDate, toPersianDigits } from '@beauclick/persian-utils';
 import { useAuth } from '@/lib/auth-context';
 import { ProtectedRoute } from '@/components/protected-route';
-import { Alert, Button, Card, ErrorState, Input, LoadingState } from '@/components/ui';
+import { Alert, Button, ErrorState, Input, LoadingState } from '@/components/ui';
+import { Badge, PageHeader, Textarea, type BadgeTone } from '@/components/kit';
+import { TIMELINE_KIND_LABEL, timelineKind, timelineLabel } from '@/lib/journey-timeline';
 import {
   createJourneyGoal,
   journeyGoals,
@@ -16,6 +18,13 @@ import {
   type BeautyProfile,
   type TimelineEntry,
 } from '@/lib/phase3-api';
+import styles from './journey.module.css';
+
+const GOAL_STATUS: Record<BeautyGoal['status'], { label: string; tone: BadgeTone }> = {
+  active: { label: 'در حال پیگیری', tone: 'primary' },
+  achieved: { label: 'محقق شد', tone: 'success' },
+  abandoned: { label: 'رها شد', tone: 'neutral' },
+};
 
 export default function JourneyPage() {
   return (
@@ -33,6 +42,11 @@ function Journey() {
   const [, setProfile] = useState<BeautyProfile | null>(null);
   const [goals, setGoals] = useState<BeautyGoal[]>([]);
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
+  // The timeline is paginated by the server; only the first page used to be
+  // reachable. `timelinePage` is the last page fetched.
+  const [timelinePage, setTimelinePage] = useState(1);
+  const [timelinePages, setTimelinePages] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [notes, setNotes] = useState('');
   const [budget, setBudget] = useState('');
   const [newGoal, setNewGoal] = useState('');
@@ -57,6 +71,8 @@ function Journey() {
       setBudget(p.data?.budgetMaxToman ? String(p.data.budgetMaxToman) : '');
       setGoals(g.data ?? []);
       setTimeline(t.data?.items ?? []);
+      setTimelinePage(1);
+      setTimelinePages(t.data?.pagination?.totalPages ?? 1);
       setLoaded(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'مسیر زیبایی بارگذاری نشد.');
@@ -101,6 +117,8 @@ function Journey() {
       // timeline is refetched rather than left stale.
       const t = await journeyTimeline(api);
       setTimeline(t.data?.items ?? []);
+      setTimelinePage(1);
+      setTimelinePages(t.data?.pagination?.totalPages ?? 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'هدف ثبت نشد.');
     }
@@ -115,165 +133,157 @@ function Journey() {
     }
   };
 
-  if (loading) return <LoadingState label="در حال بارگذاری…" />;
+  const loadMore = async () => {
+    setLoadingMore(true);
+    setError(null);
+    try {
+      const next = timelinePage + 1;
+      const t = await journeyTimeline(api, next);
+      // Appended, keyed by the entry itself, so a page that overlaps the last
+      // one (an entry written between the two requests) cannot duplicate a row.
+      setTimeline((current) => {
+        const seen = new Set(current.map((e) => `${e.type}-${e.sourceId}`));
+        return [...current, ...(t.data?.items ?? []).filter((e) => !seen.has(`${e.type}-${e.sourceId}`))];
+      });
+      setTimelinePage(next);
+      setTimelinePages(t.data?.pagination?.totalPages ?? next);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'بارگذاری بیشتر انجام نشد.');
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  if (loading) return <LoadingState label="در حال بارگذاری…" lines={5} />;
   if (!loaded) return <ErrorState message={error ?? 'مسیر زیبایی بارگذاری نشد.'} onRetry={() => void load()} />;
 
   return (
     <section>
-      <h1 style={{ fontSize: 24, marginBlockEnd: 4 }}>مسیر زیبایی من</h1>
-      <p style={{ color: 'var(--bc-color-ink-faint)', fontSize: 14, marginBlockEnd: 20 }}>
-        ترجیح‌ها و اهداف شما، فقط برای خودتان.
-      </p>
+      <PageHeader title="مسیر زیبایی من" subtitle="ترجیح‌ها و اهداف شما، فقط برای خودتان." />
 
       {error && <Alert tone="error">{error}</Alert>}
       {saved && <Alert tone="success">ذخیره شد.</Alert>}
 
-      <Card>
-        <h2 style={{ fontSize: 18, marginBlockStart: 0 }}>ترجیح‌های من</h2>
-        <form onSubmit={saveProfile}>
-          <Input
-            label="حداکثر بودجه (تومان)"
-            type="text"
-            inputMode="numeric"
-            value={budget}
-            onChange={(e) => setBudget(e.target.value)}
-            hint="می‌توانید عدد را با ارقام فارسی هم بنویسید."
-          />
+      <div className={styles.columns}>
+        <div className={styles.stack}>
+          <div className={styles.panel}>
+            <h2 className={styles.panelTitle}>ترجیح‌های من</h2>
+            <form onSubmit={saveProfile}>
+              <Input
+                label="حداکثر بودجه (تومان)"
+                type="text"
+                inputMode="numeric"
+                value={budget}
+                onChange={(e) => setBudget(e.target.value)}
+                hint="می‌توانید عدد را با ارقام فارسی هم بنویسید."
+              />
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBlockEnd: 16 }}>
-            <label htmlFor="journey-notes" style={{ fontWeight: 600, fontSize: 14 }}>
-              یادداشت‌های شخصی
-            </label>
-            <textarea
-              id="journey-notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              maxLength={500}
-              rows={4}
-              aria-describedby="journey-notes-hint"
-              style={{
-                font: 'inherit',
-                padding: '12px 14px',
-                borderRadius: 'var(--bc-radius-input)',
-                border: '1px solid var(--bc-color-line)',
-                background: 'var(--bc-color-surface)',
-                color: 'var(--bc-color-ink)',
-                resize: 'vertical',
-              }}
-            />
-            <p id="journey-notes-hint" style={{ margin: 0, fontSize: 12, color: 'var(--bc-color-ink-faint)' }}>
-              {/* Stated to the customer, because it is a real and deliberate
-                  guarantee (ADR-019) rather than an implementation detail:
-                  these notes never enter the AI assistant's context. */}
-              این یادداشت‌ها خصوصی است و هرگز به دستیار هوشمند ارسال نمی‌شود.{' '}
-              {toPersianDigits(notes.length)} از {toPersianDigits(500)}
-            </p>
+              <Textarea
+                id="journey-notes"
+                label="یادداشت‌های شخصی"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                maxLength={500}
+                rows={4}
+                // Stated to the customer, because it is a real and deliberate
+                // guarantee (ADR-019) rather than an implementation detail:
+                // these notes never enter the AI assistant's context.
+                hint={`این یادداشت‌ها خصوصی است و هرگز به دستیار هوشمند ارسال نمی‌شود. ${toPersianDigits(notes.length)} از ${toPersianDigits(500)}`}
+              />
+
+              <Button type="submit" loading={saving}>
+                ذخیره
+              </Button>
+            </form>
           </div>
 
-          <Button type="submit" loading={saving}>
-            ذخیره
-          </Button>
-        </form>
-      </Card>
+          <div className={styles.panel}>
+            <h2 className={styles.panelTitle}>اهداف من</h2>
+            <form onSubmit={addGoal} className={styles.addGoal}>
+              <div className={styles.addGoalField}>
+                <label htmlFor="new-goal" className={styles.fieldLabel}>
+                  هدف تازه
+                </label>
+                <input
+                  id="new-goal"
+                  className={styles.textInput}
+                  value={newGoal}
+                  onChange={(e) => setNewGoal(e.target.value)}
+                  maxLength={191}
+                  placeholder="مثلاً آماده شدن برای عروسی"
+                />
+              </div>
+              <Button type="submit" inline>
+                افزودن
+              </Button>
+            </form>
 
-      <Card>
-        <h2 style={{ fontSize: 18, marginBlockStart: 0 }}>اهداف من</h2>
-        <form onSubmit={addGoal} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBlockEnd: 16 }}>
-          <div style={{ flex: '1 1 220px', minWidth: 0 }}>
-            <label htmlFor="new-goal" style={{ display: 'block', fontWeight: 600, fontSize: 14, marginBlockEnd: 6 }}>
-              هدف تازه
-            </label>
-            <input
-              id="new-goal"
-              value={newGoal}
-              onChange={(e) => setNewGoal(e.target.value)}
-              maxLength={191}
-              placeholder="مثلاً آماده شدن برای عروسی"
-              style={{
-                width: '100%',
-                font: 'inherit',
-                padding: '12px 14px',
-                minHeight: 44,
-                borderRadius: 'var(--bc-radius-input)',
-                border: '1px solid var(--bc-color-line)',
-                background: 'var(--bc-color-surface)',
-                color: 'var(--bc-color-ink)',
-              }}
-            />
+            {goals.length === 0 ? (
+              <p className={styles.empty}>هنوز هدفی ثبت نکرده‌اید.</p>
+            ) : (
+              <ul className={styles.goals}>
+                {goals.map((goal) => {
+                  const status = GOAL_STATUS[goal.status];
+                  return (
+                    <li key={goal.id} className={styles.goal} data-goal={goal.id}>
+                      <div className={styles.goalText}>
+                        <span className={`${styles.goalTitle} ${goal.status === 'achieved' ? styles.goalDone : ''}`}>
+                          {goal.title}
+                        </span>
+                        {goal.targetDate ? (
+                          <span className={styles.goalDate}>
+                            تا {formatFullJalaliDate(new Date(goal.targetDate))}
+                          </span>
+                        ) : null}
+                      </div>
+                      {goal.status === 'active' ? (
+                        <button type="button" className={styles.control} onClick={() => void achieve(goal)}>
+                          محقق شد
+                        </button>
+                      ) : (
+                        <Badge tone={status.tone}>{status.label}</Badge>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </div>
-          <div style={{ alignSelf: 'flex-end', minWidth: 120 }}>
-            <Button type="submit">افزودن</Button>
-          </div>
-        </form>
+        </div>
 
-        {goals.length === 0 ? (
-          <p style={{ margin: 0, fontSize: 14, color: 'var(--bc-color-ink-faint)' }}>هنوز هدفی ثبت نکرده‌اید.</p>
-        ) : (
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 8 }}>
-            {goals.map((goal) => (
-              <li
-                key={goal.id}
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  gap: 12,
-                  flexWrap: 'wrap',
-                  padding: '10px 0',
-                  borderBlockEnd: '1px solid var(--bc-color-line)',
-                }}
-              >
-                <span style={{ fontSize: 15, textDecoration: goal.status === 'achieved' ? 'line-through' : 'none' }}>
-                  {goal.title}
-                </span>
-                {goal.status === 'active' ? (
-                  <button
-                    type="button"
-                    onClick={() => void achieve(goal)}
-                    style={{
-                      font: 'inherit',
-                      fontSize: 14,
-                      padding: '10px 14px',
-                      minHeight: 44,
-                      borderRadius: 'var(--bc-radius-button)',
-                      border: '1px solid var(--bc-color-line)',
-                      background: 'transparent',
-                      color: 'var(--bc-color-ink)',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    محقق شد
-                  </button>
-                ) : (
-                  <span style={{ fontSize: 13, color: 'var(--bc-color-ink-faint)' }}>محقق شد</span>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
-
-      <h2 style={{ fontSize: 18, marginBlockStart: 24 }}>تاریخچه</h2>
-      {timeline.length === 0 ? (
-        <Card>
-          <p style={{ margin: 0 }}>هنوز رویدادی ثبت نشده است.</p>
-        </Card>
-      ) : (
-        <ol style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 8 }}>
-          {timeline.map((entry) => (
-            <li key={`${entry.type}-${entry.sourceId}`}>
-              <Card>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 15 }}>{entry.label}</span>
-                  <span style={{ fontSize: 12, color: 'var(--bc-color-ink-faint)' }}>
-                    {formatFullJalaliDate(new Date(entry.occurredAt))}
-                  </span>
+        <div className={styles.panel}>
+          <h2 className={styles.panelTitle}>تاریخچه</h2>
+          {timeline.length === 0 ? (
+            <p className={styles.empty}>هنوز رویدادی ثبت نشده است.</p>
+          ) : (
+            <>
+              <ol className={styles.timeline} aria-label="تاریخچهٔ فعالیت‌ها">
+                {timeline.map((entry) => {
+                  const kind = timelineKind(entry.type);
+                  return (
+                    <li key={`${entry.type}-${entry.sourceId}`} className={styles.entry}>
+                      <span className={styles.marker} aria-hidden="true" />
+                      <div className={styles.entryHead}>
+                        {/* The kind is spoken, not implied by a marker: "رزرو: رزرو ثبت شد". */}
+                        {kind ? <Badge tone="neutral">{TIMELINE_KIND_LABEL[kind]}</Badge> : null}
+                        <span className={styles.entryLabel}>{timelineLabel(entry)}</span>
+                      </div>
+                      <span className={styles.entryDate}>{formatFullJalaliDate(new Date(entry.occurredAt))}</span>
+                    </li>
+                  );
+                })}
+              </ol>
+              {timelinePage < timelinePages ? (
+                <div className={styles.more}>
+                  <Button variant="ghost" inline onClick={() => void loadMore()} loading={loadingMore}>
+                    نمایش بیشتر
+                  </Button>
                 </div>
-              </Card>
-            </li>
-          ))}
-        </ol>
-      )}
+              ) : null}
+            </>
+          )}
+        </div>
+      </div>
     </section>
   );
 }

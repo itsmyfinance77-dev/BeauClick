@@ -1,0 +1,213 @@
+/*
+ * The beauty journey — `09_JOURNEY.md`.
+ *
+ *   390   one column: profile, goals, then the timeline.
+ *   1024  two columns: profile and goals beside the timeline.
+ *
+ * Breakpoints are the design's 640 and 1024 (`breakpoints.spec.ts`).
+ */
+
+.columns {
+  display: grid;
+  gap: var(--bc-spacing-card-gap-large);
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+
+@media (min-width: 1024px) {
+  .columns {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  }
+}
+
+.stack {
+  display: grid;
+  gap: var(--bc-spacing-card-gap);
+  align-content: start;
+}
+
+.panel {
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-card);
+  padding: 16px;
+}
+
+@media (min-width: 640px) {
+  .panel {
+    padding: 20px;
+  }
+}
+
+.panelTitle {
+  margin: 0 0 14px;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+/* ----------------------------------------------------------------- goals */
+
+.addGoal {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  margin-block-end: 16px;
+}
+
+.addGoalField {
+  flex: 1 1 220px;
+  min-inline-size: 0;
+}
+
+.fieldLabel {
+  display: block;
+  margin-block-end: 6px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.textInput {
+  inline-size: 100%;
+  min-block-size: 44px;
+  font: inherit;
+  padding: 12px 14px;
+  border-radius: var(--bc-radius-input);
+  border: 1px solid var(--bc-color-border);
+  background: var(--bc-color-surface);
+  color: var(--bc-color-text);
+}
+
+.goals {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.goal {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 0;
+}
+
+.goal + .goal {
+  border-block-start: 1px solid var(--bc-color-border);
+}
+
+.goalText {
+  min-inline-size: 0;
+}
+
+.goalTitle {
+  font-size: 15px;
+}
+
+.goalDone {
+  text-decoration: line-through;
+  color: var(--bc-color-text-muted);
+}
+
+.goalDate {
+  display: block;
+  margin-block-start: 2px;
+  font-size: 12px;
+  color: var(--bc-color-text-faint);
+}
+
+.control {
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  min-block-size: 44px;
+  padding: 0 14px;
+  border-radius: var(--bc-radius-control);
+  border: 1px solid var(--bc-color-border);
+  background: transparent;
+  color: var(--bc-color-text);
+  cursor: pointer;
+}
+
+.control:hover {
+  border-color: var(--bc-color-border-strong);
+}
+
+.empty {
+  margin: 0;
+  font-size: 14px;
+  color: var(--bc-color-text-muted);
+  line-height: 1.8;
+}
+
+/* -------------------------------------------------------------- timeline */
+
+/*
+ * A vertical line with a marker per entry. The marker is decoration
+ * (`aria-hidden`); what a screen reader gets is the kind and the label, in
+ * words, on the entry itself.
+ */
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  position: relative;
+}
+
+.entry {
+  position: relative;
+  padding-inline-start: 28px;
+  padding-block-end: 18px;
+}
+
+.entry:last-child {
+  padding-block-end: 0;
+}
+
+.entry::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: 5px;
+  inset-block: 14px -4px;
+  inline-size: 2px;
+  background: var(--bc-color-border);
+}
+
+.entry:last-child::before {
+  display: none;
+}
+
+.marker {
+  position: absolute;
+  inset-inline-start: 0;
+  inset-block-start: 5px;
+  inline-size: 12px;
+  block-size: 12px;
+  border-radius: 50%;
+  background: var(--bc-color-primary);
+  border: 2px solid var(--bc-color-surface);
+  box-shadow: 0 0 0 1px var(--bc-color-primary);
+}
+
+.entryHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.entryLabel {
+  font-size: 15px;
+}
+
+.entryDate {
+  display: block;
+  margin-block-start: 2px;
+  font-size: 12px;
+  color: var(--bc-color-text-faint);
+}
+
+.more {
+  margin-block-start: 16px;
+}
