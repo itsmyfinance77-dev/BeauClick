@@ -1,0 +1,216 @@
+/*
+ * The referral page — `39_REFERRAL.md`.
+ *
+ *   390   the share panel, then the claim box under it, one column; the share
+ *         actions stacked full-width.
+ *   1024  the share panel beside the claim box.
+ *
+ * Nothing here is a status: the server has no route that reads one, so the
+ * page is a share screen and a claim box and says nothing about anyone else.
+ *
+ * Breakpoints are the design's 640 and 1024 (`breakpoints.spec.ts`).
+ */
+
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--bc-spacing-card-gap);
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--bc-spacing-card-gap);
+  align-items: start;
+}
+
+@media (min-width: 1024px) {
+  .columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.panel {
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-card);
+  padding: 16px;
+}
+
+@media (min-width: 640px) {
+  .panel {
+    padding: 20px;
+  }
+}
+
+.title {
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.lead {
+  margin: 0 0 16px;
+  font-size: 14px;
+  line-height: 1.9;
+  color: var(--bc-color-ink-soft);
+}
+
+/* ------------------------------------------------------------- share panel */
+
+.field {
+  margin: 0 0 16px;
+}
+
+.fieldLabel {
+  display: block;
+  margin-block-end: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--bc-color-ink-soft);
+}
+
+/* The code and the link are ASCII bearer strings: never reordered inside RTL. */
+.value {
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: start;
+  font-family: monospace;
+  overflow-wrap: anywhere;
+  background: var(--bc-color-surface-tint);
+  border-radius: var(--bc-radius-control);
+  padding: 10px 12px;
+  margin: 0;
+}
+
+.code {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.link {
+  font-size: 13px;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+@media (min-width: 640px) {
+  .actions {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  }
+}
+
+/* Always in the tree, so a text-only change keeps announcing. */
+.announce {
+  margin: 12px 0 0;
+  min-block-size: 1.5em;
+  font-size: 13px;
+  color: var(--bc-color-ink-soft);
+}
+
+.disclosure {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border-radius: var(--bc-radius-control);
+  background: var(--bc-color-surface-tint);
+  font-size: 13px;
+  line-height: 1.9;
+  color: var(--bc-color-ink-soft);
+}
+
+/* -------------------------------------------------------------- claim box */
+
+.claimField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-block-end: 16px;
+}
+
+.claimLabel {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.claimInput {
+  font: inherit;
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: start;
+  font-family: monospace;
+  letter-spacing: 0.08em;
+  min-block-size: 44px;
+  padding: 12px 14px;
+  border-radius: var(--bc-radius-button);
+  border: 1px solid var(--bc-color-line);
+  background: var(--bc-color-surface);
+  color: var(--bc-color-ink);
+}
+
+.claimHint {
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--bc-color-ink-faint);
+}
+
+/* ---------------------------------------------------------------- results */
+
+/* Each result carries its own border and background as well as its words. */
+.result {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border-radius: var(--bc-radius-control);
+  border: 1px solid var(--bc-color-border);
+  font-size: 14px;
+  line-height: 1.9;
+}
+
+.resultTitle {
+  margin: 0 0 4px;
+  font-weight: 800;
+}
+
+.resultText {
+  margin: 0;
+}
+
+.success {
+  background: var(--bc-color-success-soft);
+  border-color: var(--bc-color-success);
+}
+
+.problem {
+  background: var(--bc-color-error-soft);
+  border-color: var(--bc-color-error);
+}
+
+.notice {
+  background: var(--bc-color-warning-soft);
+  border-color: var(--bc-color-warning);
+}
+
+.facts {
+  margin: 8px 0;
+  display: grid;
+  gap: 4px;
+}
+
+.fact {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+
+.fact dt {
+  font-weight: 700;
+}
+
+.fact dd {
+  margin: 0;
+}

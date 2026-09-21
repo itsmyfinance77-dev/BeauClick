@@ -25,18 +25,18 @@ function templateDestinations(): string[] {
 const NOT_BUILT_YET: Record<string, string> = {
   '/chat': 'spec 36, story #237',
   '/privacy': 'spec 29 (/account/privacy), story #236',
-  '/referral': 'spec 39, story #235',
 };
 
 describe('notificationHref', () => {
   it('follows a link to a page that exists, keeping its query and fragment', () => {
     expect(notificationHref('/bookings')).toBe('/bookings');
     expect(notificationHref('/waitlist?offer=1#top')).toBe('/waitlist?offer=1#top');
+    // The referral notifications' deep link, now that the page exists.
+    expect(notificationHref('/referral')).toBe('/referral');
   });
 
   it('renders no link for a page that does not exist yet, rather than a link that 404s', () => {
     expect(notificationHref('/chat')).toBeNull();
-    expect(notificationHref('/referral')).toBeNull();
     expect(notificationHref('/privacy')).toBeNull();
   });
 

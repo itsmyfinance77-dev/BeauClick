@@ -18,6 +18,7 @@
       "@beauclick/design-tokens": ["../../packages/design-tokens/src/index.ts"],
       "@beauclick/persian-utils": ["../../packages/persian-utils/src/index.ts"],
       "@beauclick/payment-contract": ["../../packages/payment-contract/src/index.ts"],
+      "@beauclick/referral-contract": ["../../packages/referral-contract/src/index.ts"],
       "@beauclick/commercial-policy-contract": ["../../packages/commercial-policy-contract/src/index.ts"]
     },
     "plugins": [{ "name": "next" }]

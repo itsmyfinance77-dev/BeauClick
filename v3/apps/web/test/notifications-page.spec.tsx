@@ -93,7 +93,7 @@ describe('notification centre', () => {
   });
 
   it.each([
-    ['a page not built yet', '/referral'],
+    ['a page not built yet', '/chat'],
     ['an off-site address', 'https://evil.example/bookings'],
     ['a protocol-relative address', '//evil.example'],
     ['no link at all', null],

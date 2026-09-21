@@ -4,8 +4,8 @@ import { safeReturnPath } from './safe-return';
  * Where a notification's `deepLink` may actually take the customer.
  *
  * The server names a destination per template (`template.registry.ts`), and
- * nine of its eighteen templates name one this app does not have yet:
- * `/chat`, `/privacy`, `/referral`. Rendering those as a link sends a
+ * some of its templates name one this app does not have yet:
+ * `/chat`, `/privacy`. Rendering those as a link sends a
  * customer who tapped «مشاهده» to a 404 — a broken promise on the one screen
  * whose whole job is to send them somewhere.
  *
@@ -18,7 +18,7 @@ import { safeReturnPath } from './safe-return';
  * `notification-link.spec.ts` fails if an entry has no page, and lists every
  * template destination that is still waiting for one.
  */
-export const NOTIFICATION_ROUTES: readonly string[] = ['/bookings', '/dashboard', '/loyalty', '/waitlist'];
+export const NOTIFICATION_ROUTES: readonly string[] = ['/bookings', '/dashboard', '/loyalty', '/referral', '/waitlist'];
 
 export function notificationHref(deepLink: string | null | undefined): string | null {
   const path = safeReturnPath(deepLink);
