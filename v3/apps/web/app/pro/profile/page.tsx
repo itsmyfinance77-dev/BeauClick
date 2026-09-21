@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Button, ErrorState, Input, LoadingState } from '@/components/ui';
-import { PageHeader, Select, Textarea } from '@/components/kit';
+import { CheckChip, CheckChipGroup, PageHeader, Select, Textarea } from '@/components/kit';
 import { VerificationBadge } from '@/components/pro-shell';
 import { useAuth } from '@/lib/auth-context';
 import { useProProfile } from '@/lib/pro-context';
@@ -248,17 +248,16 @@ export default function ProProfilePage() {
                 {!refLoaded ? (
                   <p className={styles.loadingNote}>در حال بارگذاری فهرست تخصص‌ها…</p>
                 ) : (
-                  <div className={styles.chips}>
-                    {specialties.map((specialty) => {
-                      const on = specialtyIds.includes(specialty.id);
-                      return (
-                        <label key={specialty.id} className={`${styles.chip} ${on ? styles.chipOn : ''}`}>
-                          <input type="checkbox" checked={on} onChange={() => toggleSpecialty(specialty.id)} />
-                          {specialty.name}
-                        </label>
-                      );
-                    })}
-                  </div>
+                  <CheckChipGroup>
+                    {specialties.map((specialty) => (
+                      <CheckChip
+                        key={specialty.id}
+                        label={specialty.name}
+                        checked={specialtyIds.includes(specialty.id)}
+                        onChange={() => toggleSpecialty(specialty.id)}
+                      />
+                    ))}
+                  </CheckChipGroup>
                 )}
               </fieldset>
             </div>
