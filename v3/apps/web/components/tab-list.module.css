@@ -1,0 +1,44 @@
+/*
+ * The tab list: pills, as `SegmentedControl` draws them, but a real tablist.
+ * The selected tab is heavier as well as tinted, so the selection survives a
+ * reader who cannot tell the two colours apart.
+ */
+
+.list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--bc-spacing-chip-gap);
+  margin-block-end: 16px;
+}
+
+.tab {
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  min-block-size: 44px;
+  padding: 0 16px;
+  border-radius: var(--bc-radius-chip);
+  border: 1px solid var(--bc-color-border);
+  background: transparent;
+  color: var(--bc-color-text);
+  cursor: pointer;
+}
+
+.selected {
+  font-weight: 800;
+  border-color: var(--bc-color-primary);
+  background: var(--bc-color-primary-soft);
+  color: var(--bc-color-primary);
+}
+
+/* The panel is focusable so a keyboard user can reach its content from the
+   tab list; it needs no ring of its own while nothing inside is focused. */
+.panel:focus {
+  outline: none;
+}
+
+.panel:focus-visible {
+  outline: 2px solid var(--bc-color-primary);
+  outline-offset: 4px;
+  border-radius: var(--bc-radius-card);
+}
