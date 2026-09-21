@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { formatToman, toPersianDigits, zonedIsoDate } from '@beauclick/persian-utils';
-import { ErrorState, LoadingState } from '@/components/ui';
+import { Button, ErrorState, LoadingState } from '@/components/ui';
 import { Badge, PageHeader, StatCard, StatGrid, TextLink } from '@/components/kit';
 import { useAuth } from '@/lib/auth-context';
 import {
@@ -13,6 +13,7 @@ import {
   verificationQueue,
   type PlatformMetrics,
 } from '@/lib/admin-api';
+import styles from './overview.module.css';
 
 /**
  * The operator's landing screen.
@@ -20,7 +21,8 @@ import {
  * Its job is to answer one question -- "is anything waiting for me?" -- before
  * anything else. An overview that leads with totals looks impressive and tells
  * an operator nothing they need to act on; the queues come first here, and the
- * platform figures come second.
+ * platform figures come second, under their own heading, because one is work
+ * and the other is information (`20_ADMIN_OVERVIEW.md`).
  */
 export default function AdminOverviewPage() {
   const { api, user } = useAuth();
@@ -74,53 +76,63 @@ export default function AdminOverviewPage() {
     void load();
   }, [load]);
 
-  const queues: Array<{ label: string; count: number | null; href: string; urgentAbove: number }> = [
-    ...(canModerate
-      ? [{ label: 'درخواست احراز هویت', count: pendingVerifications, href: '/admin/verification', urgentAbove: 0 }]
-      : []),
-    { label: 'تعارض شماره بررسی‌نشده', count: openConflicts, href: '/admin/phone-conflicts', urgentAbove: 0 },
-    { label: 'اعلان ناموفق نهایی', count: deadLetters, href: '/admin/notifications', urgentAbove: 0 },
-    { label: 'سند معطل در نمایه', count: stalePending, href: '/admin/search', urgentAbove: 0 },
+  const queues: Array<{ label: string; count: number | null; href: string }> = [
+    ...(canModerate ? [{ label: 'درخواست احراز هویت', count: pendingVerifications, href: '/admin/verification' }] : []),
+    { label: 'تعارض شماره بررسی‌نشده', count: openConflicts, href: '/admin/phone-conflicts' },
+    { label: 'اعلان ناموفق نهایی', count: deadLetters, href: '/admin/notifications' },
+    { label: 'سند معطل در نمایه', count: stalePending, href: '/admin/search' },
   ];
 
   return (
-    <>
+    <div className={styles.page}>
       <PageHeader title="نمای کلی" subtitle="کارهایی که در انتظار بررسی شماست." />
 
       {error ? <ErrorState message={error} onRetry={() => void load()} /> : null}
 
       {loading && !loaded ? (
-        <LoadingState label="در حال بارگذاری…" />
+        <LoadingState label="در حال بارگذاری…" lines={4} />
       ) : (
         <>
-          <StatGrid min={190}>
+          <section className={styles.section} aria-labelledby="admin-queues-heading">
+            <h2 id="admin-queues-heading" className={styles.sectionTitle}>
+              در انتظار بررسی شما
+            </h2>
             {/* `null` means the request FAILED -- not zero. Showing a confident
                 "۰" for a queue we could not read would tell an operator there
                 is no work when there may be plenty. */}
-            {queues.map((queue) => (
-              <StatCard
-                key={queue.href}
-                label={queue.label}
-                value={queue.count === null ? '—' : toPersianDigits(queue.count)}
-                footer={
-                  <>
+            <ul className={styles.queues}>
+              {queues.map((queue) => (
+                <li
+                  key={queue.href}
+                  data-queue={queue.href}
+                  className={`${styles.queue} ${
+                    queue.count === null ? styles.queueUnknown : queue.count > 0 ? styles.queueBusy : styles.queueClear
+                  }`}
+                >
+                  <span className={styles.queueLabel}>{queue.label}</span>
+                  <span className={styles.queueCount}>{queue.count === null ? '—' : toPersianDigits(queue.count)}</span>
+                  <span className={styles.queueMeta}>
                     {queue.count === null ? (
                       <Badge tone="neutral">خوانده نشد</Badge>
-                    ) : queue.count > queue.urgentAbove ? (
+                    ) : queue.count > 0 ? (
                       <Badge tone="warning">نیازمند بررسی</Badge>
                     ) : (
                       <Badge tone="success">بدون مورد</Badge>
                     )}
-                    <TextLink href={queue.href}>مشاهده</TextLink>
-                  </>
-                }
-              />
-            ))}
-          </StatGrid>
+                    <TextLink href={queue.href} aria-label={`مشاهدهٔ ${queue.label}`}>
+                      مشاهده
+                    </TextLink>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
 
-          {metrics ? (
-            <div style={{ marginBlockStart: 24 }}>
-              <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 12px' }}>پلتفرم در ۳۰ روز گذشته</h2>
+          <section className={styles.section} aria-labelledby="admin-metrics-heading">
+            <h2 id="admin-metrics-heading" className={styles.sectionTitle}>
+              پلتفرم در ۳۰ روز گذشته
+            </h2>
+            {metrics ? (
               <StatGrid min={170}>
                 <StatCard label="رزروهای ثبت‌شده" value={toPersianDigits(metrics.bookings.created.value)} />
                 <StatCard label="نوبت‌های انجام‌شده" value={toPersianDigits(metrics.bookings.completed.value)} />
@@ -130,10 +142,19 @@ export default function AdminOverviewPage() {
                   value={`${toPersianDigits(Math.round(metrics.search.emptyResultRate.value * 100))}٪`}
                 />
               </StatGrid>
-            </div>
-          ) : null}
+            ) : (
+              /* The figures are the one source that used to disappear without a
+                 word when it failed: the heading stood over nothing. */
+              <div className={styles.unavailable}>
+                <span>آمار پلتفرم بارگذاری نشد.</span>
+                <Button type="button" variant="ghost" inline onClick={() => void load()}>
+                  تلاش دوباره
+                </Button>
+              </div>
+            )}
+          </section>
         </>
       )}
-    </>
+    </div>
   );
 }
