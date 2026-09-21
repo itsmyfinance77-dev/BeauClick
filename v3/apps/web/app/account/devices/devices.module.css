@@ -1,0 +1,152 @@
+/*
+ * Devices and sessions — `30_DEVICE_SESSIONS.md`.
+ *
+ *   390   each device a card of its own, the sign-out control under the details.
+ *   640   a row: the details, then the control at the end.
+ *
+ * Breakpoints are the design's 640 and 1024 (`breakpoints.spec.ts`).
+ */
+
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--bc-spacing-card-gap);
+  max-inline-size: 760px;
+}
+
+.notice {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: var(--bc-radius-control);
+  border: 1px solid var(--bc-color-border);
+  background: var(--bc-color-surface-tint);
+  font-size: 14px;
+  line-height: 1.9;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.device {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-card);
+  padding: 14px 16px;
+}
+
+/* The device in your hand has a stronger edge, before its badge says so. */
+.current {
+  border-inline-start: 4px solid var(--bc-color-primary);
+}
+
+@media (min-width: 640px) {
+  .device {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+}
+
+.what {
+  min-inline-size: 0;
+}
+
+.titleRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Product names are Latin and stay left-to-right inside the RTL line. */
+.title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: start;
+}
+
+.label {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--bc-color-ink-faint);
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: start;
+  font-family: monospace;
+  overflow-wrap: anywhere;
+}
+
+.times {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--bc-color-ink-soft);
+  line-height: 1.8;
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+@media (min-width: 640px) {
+  .controls {
+    align-items: flex-end;
+  }
+}
+
+.confirmText {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.confirmButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.hint {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.8;
+  color: var(--bc-color-ink-soft);
+}
+
+.rowError {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--bc-color-error);
+}
+
+.bulk {
+  display: grid;
+  gap: 8px;
+  padding-block-start: 4px;
+}
+
+.announce {
+  margin: 0;
+  min-block-size: 1.5em;
+  font-size: 13px;
+  color: var(--bc-color-ink-soft);
+}
+
+.dialogText {
+  margin: 0;
+}

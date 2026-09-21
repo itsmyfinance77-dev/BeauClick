@@ -5,7 +5,7 @@ import { safeReturnPath } from './safe-return';
  *
  * The server names a destination per template (`template.registry.ts`), and
  * some of its templates name one this app does not have yet:
- * `/chat`, `/privacy`. Rendering those as a link sends a
+ * `/chat`. Rendering those as a link sends a
  * customer who tapped «مشاهده» to a 404 — a broken promise on the one screen
  * whose whole job is to send them somewhere.
  *
@@ -18,11 +18,21 @@ import { safeReturnPath } from './safe-return';
  * `notification-link.spec.ts` fails if an entry has no page, and lists every
  * template destination that is still waiting for one.
  */
-export const NOTIFICATION_ROUTES: readonly string[] = ['/bookings', '/dashboard', '/loyalty', '/referral', '/waitlist'];
+export const NOTIFICATION_ROUTES: readonly string[] = ['/account/privacy', '/bookings', '/dashboard', '/loyalty', '/referral', '/waitlist'];
+
+/**
+ * Destinations the server names by one path and this app serves at another.
+ * The privacy templates link to `/privacy`; the page is `/account/privacy`
+ * (spec 29). The alias is explicit so a link is followed only when it is BOTH
+ * a known name and a page that exists.
+ */
+export const NOTIFICATION_ALIASES: Readonly<Record<string, string>> = { '/privacy': '/account/privacy' };
 
 export function notificationHref(deepLink: string | null | undefined): string | null {
   const path = safeReturnPath(deepLink);
   if (!path) return null;
   const pathname = path.split(/[?#]/)[0];
-  return NOTIFICATION_ROUTES.includes(pathname) ? path : null;
+  const target = NOTIFICATION_ALIASES[pathname] ?? pathname;
+  if (!NOTIFICATION_ROUTES.includes(target)) return null;
+  return target === pathname ? path : `${target}${path.slice(pathname.length)}`;
 }

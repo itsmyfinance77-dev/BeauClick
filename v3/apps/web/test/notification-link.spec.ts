@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { NOTIFICATION_ROUTES, notificationHref } from '@/lib/notification-link';
+import { NOTIFICATION_ALIASES, NOTIFICATION_ROUTES, notificationHref } from '@/lib/notification-link';
 
 /**
  * A notification's deep link is server data, and it points at pages this app
@@ -24,7 +24,6 @@ function templateDestinations(): string[] {
  */
 const NOT_BUILT_YET: Record<string, string> = {
   '/chat': 'spec 36, story #237',
-  '/privacy': 'spec 29 (/account/privacy), story #236',
 };
 
 describe('notificationHref', () => {
@@ -37,7 +36,11 @@ describe('notificationHref', () => {
 
   it('renders no link for a page that does not exist yet, rather than a link that 404s', () => {
     expect(notificationHref('/chat')).toBeNull();
-    expect(notificationHref('/privacy')).toBeNull();
+  });
+
+  it('follows the server’s /privacy link to the page that serves it, keeping the query and fragment', () => {
+    expect(notificationHref('/privacy')).toBe('/account/privacy');
+    expect(notificationHref('/privacy?x=1#top')).toBe('/account/privacy?x=1#top');
   });
 
   it.each([
@@ -68,6 +71,10 @@ describe('the allow-list against the app and the server', () => {
     expect(templateDestinations().length).toBeGreaterThan(3);
   });
 
+  it('aliases only to routes that are followable', () => {
+    expect(Object.values(NOTIFICATION_ALIASES).filter((target) => !NOTIFICATION_ROUTES.includes(target))).toEqual([]);
+  });
+
   it('lists only routes that have a page', () => {
     const missing = NOTIFICATION_ROUTES.filter((route) => !existsSync(join(WEB, 'app', route, 'page.tsx')));
     expect(missing).toEqual([]);
@@ -75,7 +82,7 @@ describe('the allow-list against the app and the server', () => {
 
   it('accounts for every destination the server names: followable, or on the not-built list — never neither', () => {
     const unaccounted = templateDestinations().filter(
-      (path) => !NOTIFICATION_ROUTES.includes(path) && !(path in NOT_BUILT_YET),
+      (path) => !NOTIFICATION_ROUTES.includes(path) && !(path in NOTIFICATION_ALIASES) && !(path in NOT_BUILT_YET),
     );
     expect(unaccounted).toEqual([]);
   });
