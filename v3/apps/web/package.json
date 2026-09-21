@@ -13,7 +13,8 @@
     "react-dom": "18.3.1",
     "@beauclick/design-tokens": "workspace:*",
     "@beauclick/persian-utils": "workspace:*",
-    "@beauclick/payment-contract": "workspace:*"
+    "@beauclick/payment-contract": "workspace:*",
+    "@beauclick/referral-contract": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "^18.3.11",
