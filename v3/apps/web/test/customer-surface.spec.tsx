@@ -139,6 +139,67 @@ describe('customer bookings', () => {
   });
 });
 
+describe('customer bookings — upcoming and past', () => {
+  const PAST_COMPLETED = {
+    ...CONFIRMED_BOOKING,
+    id: 'b2',
+    startAt: '2020-01-10T06:30:00.000Z',
+    endAt: '2020-01-10T07:30:00.000Z',
+    status: 'completed' as const,
+  };
+  // Confirmed but already over: a booking is only "upcoming" while it is ahead.
+  const PAST_CONFIRMED = { ...CONFIRMED_BOOKING, id: 'b3', startAt: '2020-02-10T06:30:00.000Z', endAt: '2020-02-10T07:30:00.000Z' };
+
+  function renderBookings() {
+    return render(
+      <AuthProvider>
+        <BookingsPage />
+      </AuthProvider>,
+    );
+  }
+
+  it('opens on the upcoming tab and keeps the past ones off it', async () => {
+    mockApi({ '/v1/me/bookings': () => ok([CONFIRMED_BOOKING, PAST_COMPLETED]) });
+    renderBookings();
+    const list = await screen.findByTestId('bookings-upcoming');
+    expect(list.querySelectorAll('[data-booking]')).toHaveLength(1);
+    expect(list.querySelector('[data-booking="b1"]')).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'پیش‌رو' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('shows the past tab on request, newest first, with no cancel control on a booking that is over', async () => {
+    mockApi({ '/v1/me/bookings': () => ok([PAST_COMPLETED, PAST_CONFIRMED]) });
+    const user = userEvent.setup();
+    renderBookings();
+    // Both are over, so the default tab has nothing to show yet.
+    expect(await screen.findByText('نوبت پیش‌رویی ندارید.')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'گذشته' }));
+    const list = await screen.findByTestId('bookings-past');
+    // 2020-02 is more recent than 2020-01.
+    expect([...list.querySelectorAll('[data-booking]')].map((li) => li.getAttribute('data-booking'))).toEqual(['b3', 'b2']);
+    // A confirmed booking whose time has passed is not cancellable.
+    expect(within(list).queryByRole('button', { name: 'لغو رزرو' })).toBeNull();
+  });
+
+  it('gives each tab its own empty sentence', async () => {
+    mockApi({ '/v1/me/bookings': () => ok([CONFIRMED_BOOKING]) });
+    const user = userEvent.setup();
+    renderBookings();
+    await screen.findByTestId('bookings-upcoming');
+    await user.click(screen.getByRole('button', { name: 'گذشته' }));
+    expect(await screen.findByText('هنوز نوبتی در گذشته ثبت نشده است.')).toBeInTheDocument();
+  });
+
+  it('puts the clock in its own left-to-right run', async () => {
+    mockApi();
+    renderBookings();
+    const clock = await screen.findByText('۱۰:۰۰');
+    expect(clock.tagName).toBe('SPAN');
+    expect(clock.className).toContain('clock');
+  });
+});
+
 describe('business surface', () => {
   it('offers the role choice as 44px controls rather than bare radios', async () => {
     mockApi({
