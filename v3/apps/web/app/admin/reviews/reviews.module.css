@@ -1,0 +1,178 @@
+/*
+ * The review queue — `28_ADMIN_REVIEW_MODERATION.md`, the same layout as `/admin/media`.
+ *
+ * A table of unmoderated reviews; a row's «بررسی» opens the decision panel.
+ *
+ *   390    the table is a card list (`data-table.module.css`); the panel is a
+ *          full-screen sheet over the queue.
+ *   640    the panel sits under the table.
+ *   1024   the panel sits beside the table and stays in view while scrolling.
+ *
+ * Breakpoints are the design's 640 and 1024 (`breakpoints.spec.ts`). Every
+ * grid track is `minmax(0, …)`: a long unbroken value (an id, a note with no
+ * spaces) otherwise widens the page past the viewport.
+ */
+
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--bc-spacing-card-gap);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--bc-spacing-card-gap);
+  align-items: start;
+}
+
+@media (min-width: 1024px) {
+  .withPanel {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  }
+}
+
+.queue {
+  min-inline-size: 0;
+}
+
+.sectionTitle {
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.sectionTitle:focus {
+  outline: none;
+}
+
+.sectionTitle:focus-visible {
+  outline: 2px solid var(--bc-color-primary);
+  outline-offset: 2px;
+}
+
+.clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.muted {
+  color: var(--bc-color-ink-faint);
+}
+
+.count {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--bc-color-ink-faint);
+}
+
+.queue [data-selected] {
+  background: var(--bc-color-surface-tint);
+}
+
+/* ------------------------------------------------------------------ panel */
+
+.panel {
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-card);
+  padding: 16px;
+  min-inline-size: 0;
+}
+
+@media (max-width: 639px) {
+  .panel {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    overflow-y: auto;
+    border: 0;
+    border-radius: 0;
+  }
+}
+
+@media (min-width: 1024px) {
+  .panel {
+    position: sticky;
+    inset-block-start: 16px;
+    padding: 20px;
+  }
+}
+
+.panelHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-block-end: 12px;
+}
+
+.panelTitle {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  min-inline-size: 0;
+}
+
+.panelTitle:focus {
+  outline: none;
+}
+
+.panelTitle:focus-visible {
+  outline: 2px solid var(--bc-color-primary);
+  outline-offset: 2px;
+}
+
+.meta {
+  margin: 0 0 16px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  font-size: 14px;
+}
+
+.meta dt {
+  font-size: 12px;
+  color: var(--bc-color-ink-soft);
+}
+
+.meta dd {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.comment {
+  white-space: pre-wrap;
+  line-height: 1.8;
+}
+
+.stars {
+  white-space: nowrap;
+}
+
+.hint {
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--bc-color-ink-soft);
+}
+
+.reasonError {
+  margin: -8px 0 12px;
+  font-size: 12px;
+  color: var(--bc-color-error);
+}
+
+.decisions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Equal weight is also equal size: neither decision is the bigger target. */
+.decisions > button {
+  flex: 1 1 0;
+}

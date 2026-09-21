@@ -11,9 +11,10 @@ import type { ApiClient } from './api-client';
  * against a shape that was wrong, and only a browser caught it.
  *
  * Security note, stated once for the whole file: nothing here is a security
- * boundary. Every route below is gated server-side by
- * `@RequireCapability('bc_manage_platform')` or `'bc_moderate_verification'`,
- * and the privileged ones are re-checked against live role data on every
+ * boundary. Every route below is gated server-side by `@RequireCapability`
+ * — `bc_manage_platform`, or one of the moderation capabilities
+ * (`bc_moderate_verification`, `_media`, `_reviews`, `_chat`) — and the
+ * privileged ones are re-checked against live role data on every
  * request -- so a revoked operator is refused even holding a valid token. The
  * frontend hides what it cannot use; the API refuses it.
  */
@@ -137,6 +138,200 @@ export interface VerificationEvidence {
 
 export function verificationEvidence(api: ApiClient, requestId: string) {
   return api.get<VerificationEvidence[]>(`/v1/admin/verification/${encodeURIComponent(requestId)}/evidence`);
+}
+
+// ------------------------------------------------------ media moderation
+
+/**
+ * One open abuse report on a public image — `AdminMediaController.queue`,
+ * gated on `bc_moderate_media`.
+ *
+ * Note what is NOT here: no URL, storage key or purpose for the image. The
+ * design (`27_ADMIN_MEDIA_MODERATION.md`) draws a thumbnail and a full image,
+ * but the route returns only `mediaObjectId`, so the page cannot show the
+ * picture a moderator is being asked to delete. That is a backend gap, not a
+ * field this file may invent.
+ */
+export interface MediaAbuseReport {
+  id: string;
+  mediaObjectId: string;
+  reason: string;
+  note: string | null;
+  status: string;
+  createdAt: string;
+}
+
+export function mediaReports(api: ApiClient, page = 1, limit = 20) {
+  return api.get<MediaAbuseReport[]>(`/v1/admin/media/reports?page=${page}&limit=${limit}`);
+}
+
+/**
+ * `uphold` deletes the image's bytes and cannot be undone; `reject` leaves the
+ * image up and closes the report. `reason` is 4–500 characters
+ * (`DecideAbuseReportDto`). A report somebody else already decided is refused
+ * with the code `CONFLICT`.
+ */
+export function decideMediaReport(
+  api: ApiClient,
+  reportId: string,
+  input: { decision: 'uphold' | 'reject'; reason: string },
+) {
+  return api.post<{ id: string; status: string; decidedAt: string | null }>(
+    `/v1/admin/media/reports/${encodeURIComponent(reportId)}/decide`,
+    input,
+  );
+}
+
+// ----------------------------------------------------- review moderation
+
+/**
+ * One review nobody has moderated yet — `AdminReviewController.queue`, gated
+ * on `bc_moderate_reviews`, oldest first. `displayName` is the PROFESSIONAL's
+ * public name; nothing about the customer who wrote the review is returned.
+ */
+export interface ReviewQueueItem {
+  id: string;
+  professionalId: string;
+  displayName: string;
+  rating: number;
+  comment: string | null;
+  status: string;
+  createdAt: string;
+}
+
+export function reviewQueue(api: ApiClient, page = 1, limit = 20) {
+  return api.get<ReviewQueueItem[]>(`/v1/admin/reviews/queue?page=${page}&limit=${limit}`);
+}
+
+/**
+ * Reversible in both directions: `publish` on a hidden review restores it and
+ * its rating. `reason` is 4–500 characters either way (`ModerateReviewDto`).
+ * A review somebody else already moderated is refused with 409 `CONFLICT`.
+ */
+export function moderateReview(api: ApiClient, reviewId: string, input: { decision: 'hide' | 'publish'; reason: string }) {
+  return api.post<{ id: string; status: string; moderatedAt: string | null }>(
+    `/v1/admin/reviews/${encodeURIComponent(reviewId)}/moderate`,
+    input,
+  );
+}
+
+// ------------------------------------------------------- privacy monitor
+
+/**
+ * One privacy request as the operator sees it — `AdminPrivacyController.list`,
+ * gated on `bc_manage_platform`. These ten fields and no more: the payload of
+ * an export, a phone number, or anything else the request is ABOUT is not on
+ * the row this route reads, by design (`31_ADMIN_PRIVACY_QUEUE.md`).
+ *
+ * The route is the whole API of this area. There is no download and no cancel
+ * for an operator, so this file declares none.
+ */
+export interface AdminPrivacyRequest {
+  id: string;
+  subjectUserId: string;
+  kind: string;
+  status: string;
+  requestedAt: string;
+  executeAfter: string | null;
+  expiresAt: string | null;
+  completedAt: string | null;
+  cancelledAt: string | null;
+  failureCode: string | null;
+}
+
+/**
+ * `status` is the only filter the route accepts (`PrivacyRequestQueryDto`) —
+ * there is no `kind` filter (#266), so none is sent. Newest first.
+ */
+export function privacyRequests(api: ApiClient, params: { page?: number; limit?: number; status?: string } = {}) {
+  const query = new URLSearchParams();
+  query.set('page', String(params.page ?? 1));
+  query.set('limit', String(params.limit ?? 20));
+  if (params.status) query.set('status', params.status);
+  return api.get<AdminPrivacyRequest[]>(`/v1/admin/privacy/requests?${query.toString()}`);
+}
+
+// -------------------------------------------------------- chat moderation
+
+/**
+ * The chat moderation surface — `ChatModerationController`, gated on
+ * `bc_moderate_chat`, and addressed ONLY by report id (`V32-DEC-015`).
+ *
+ * `conversationId` is returned by both reads and deliberately not declared
+ * here: nothing on the page may address a conversation, so nothing in this
+ * file offers the id to address one with. No function here takes a
+ * conversation, user or professional id, because the API has no such route.
+ */
+export type ChatModerationAction = 'warn_sender' | 'close_conversation' | 'restrict_sender';
+
+/** The queue row — metadata only. No message body and no reporter's note. */
+export interface ChatReportSummary {
+  id: string;
+  reason: string;
+  status: string;
+  createdAt: string;
+  decidedAt: string | null;
+  decisionAction: string | null;
+}
+
+export interface ChatWindowMessage {
+  id: string;
+  /** A raw id. There is no name, avatar or profile on this read. */
+  senderUserId: string;
+  body: string;
+  erased: boolean;
+  sequence: number;
+  createdAt: string;
+}
+
+/** One report and at most `windowLimit` (50) messages around the reported one. Reading it is audited. */
+export interface ChatReportWindow {
+  report: {
+    id: string;
+    messageId: string;
+    reason: string;
+    note: string | null;
+    status: string;
+    createdAt: string;
+  };
+  messages: ChatWindowMessage[];
+  windowLimit: number;
+}
+
+/** Oldest first; `status` defaults to `open` on the server; `limit` 1–100, no pagination. */
+export function chatReports(api: ApiClient, params: { status?: string; limit?: number } = {}) {
+  const query = new URLSearchParams();
+  if (params.status) query.set('status', params.status);
+  if (params.limit) query.set('limit', String(params.limit));
+  const suffix = query.toString();
+  return api.get<{ items: ChatReportSummary[] }>(`/v1/admin/chat/reports${suffix ? `?${suffix}` : ''}`);
+}
+
+/**
+ * Missing, foreign, expired (30 days after a decision) — one 404, the same for
+ * all three, by design.
+ */
+export function chatReport(api: ApiClient, reportId: string) {
+  return api.get<ChatReportWindow>(`/v1/admin/chat/reports/${encodeURIComponent(reportId)}`);
+}
+
+/**
+ * `DecideReportDto`: `reason` 3–500 characters, always. `action` only with
+ * `upheld` (the server defaults it to `warn_sender`, and ignores it on
+ * `rejected`). A report a colleague decided first is refused with the SAME
+ * 404 as a missing one — there is no distinct conflict code.
+ */
+export function decideChatReport(
+  api: ApiClient,
+  reportId: string,
+  input:
+    | { outcome: 'upheld'; action: ChatModerationAction; reason: string }
+    | { outcome: 'rejected'; reason: string },
+) {
+  return api.post<{ id: string; status: string; decisionAction: string | null; decidedAt: string | null }>(
+    `/v1/admin/chat/reports/${encodeURIComponent(reportId)}/decide`,
+    input,
+  );
 }
 
 /** The professional's own side, consumed by `/pro/profile`. */

@@ -1,0 +1,74 @@
+/*
+ * The privacy monitor — `31_ADMIN_PRIVACY_QUEUE.md`.
+ *
+ * A banner, one filter, a table, a pager. No panel and no row action: the
+ * page has nothing to open.
+ *
+ *   390    the table is a card list (`data-table.module.css`); the filter
+ *          full-width above it; the pager's buttons either side of the count.
+ *   640    the filter at a fixed width.
+ *
+ * Breakpoints are the design's 640 and 1024 (`breakpoints.spec.ts`).
+ */
+
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--bc-spacing-card-gap);
+}
+
+/* `role="note"`, and a border as well as a tint: the limit is stated, not coloured. */
+.banner {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--bc-color-border);
+  border-inline-start: 4px solid var(--bc-color-info);
+  border-radius: var(--bc-radius-control);
+  background: var(--bc-color-info-soft);
+  color: var(--bc-color-ink);
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 640px) {
+  .filters {
+    grid-template-columns: minmax(0, 260px);
+  }
+}
+
+.list {
+  min-inline-size: 0;
+}
+
+.sectionTitle {
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+/* A technical identifier: left-to-right and never reordered inside a Persian line. */
+.id {
+  direction: ltr;
+  unicode-bidi: isolate;
+  display: inline-block;
+  font-family: monospace;
+  white-space: nowrap;
+}
+
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pageOf {
+  font-size: 13px;
+  color: var(--bc-color-ink-soft);
+}
