@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { formatToman, formatZonedFullDate, toPersianDigits } from '@beauclick/persian-utils';
-import { Button, Card, ErrorState, LoadingState } from '@/components/ui';
-import { Badge, EmptyState, PageHeader } from '@/components/kit';
+import { Button, ErrorState, LoadingState } from '@/components/ui';
+import { Badge, DataCell, DataRow, DataTable, EmptyState, PageHeader, StatCard, StatGrid } from '@/components/kit';
 import { FundsByState } from '@/components/funds-by-state';
 import { useAuth } from '@/lib/auth-context';
 import { ApiRequestError } from '@/lib/api-client';
@@ -22,6 +22,17 @@ import {
   type SettlementBatch,
   type WorkspaceFunds,
 } from '@/lib/pro-api';
+import {
+  ACCESS_MODE_LABEL,
+  WORKSPACE_TYPE_LABEL,
+  ledgerEntryLabel,
+  settlementKindLabel,
+  settlementKindTone,
+} from '@/lib/finance-labels';
+import styles from './finance-workspace.module.css';
+
+const SETTLEMENTS_HEADING_ID = 'finance-settlements-heading';
+const SETTLEMENT_HEAD = ['تاریخ', 'مبلغ', 'روش', 'نوع'] as const;
 
 /**
  * The persona-neutral finance surface -- V3.3 Story #152 (`#149b`), shared by
@@ -49,16 +60,6 @@ import {
  * never resolve again.
  */
 
-const WORKSPACE_TYPE_LABEL: Record<FinanceWorkspace['workspaceType'], string> = {
-  professional: 'تخصصی',
-  business: 'کسب‌وکار',
-};
-
-const ACCESS_MODE_LABEL: Record<FinanceAccessMode, string> = {
-  owner: 'دسترسیِ مالکانه',
-  finance_read: 'دسترسیِ فقط‌خواندنیِ واگذارشده',
-};
-
 function isRecoverableRefusal(err: unknown): boolean {
   // 404: the server's single non-enumerating refusal for every workspace-aware
   // read. 409 would be `finance_workspace_selection_required`, which only the
@@ -75,15 +76,8 @@ function errorMessage(err: unknown, fallback: string): string {
 /** Shape as well as colour: a filled circle for owner, a hollow square for a delegated read-only grant. */
 function AccessModeMark({ mode }: { mode: FinanceAccessMode }) {
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700 }}>
-      <span
-        aria-hidden="true"
-        style={
-          mode === 'owner'
-            ? { width: 9, height: 9, borderRadius: 999, background: 'var(--bc-color-primary)', flexShrink: 0 }
-            : { width: 9, height: 9, borderRadius: 2, border: '2px solid var(--bc-color-ink-soft)', flexShrink: 0 }
-        }
-      />
+    <span className={styles.mark}>
+      <span aria-hidden="true" className={`${styles.markShape} ${mode === 'owner' ? styles.markOwner : styles.markRead}`} />
       {ACCESS_MODE_LABEL[mode]}
     </span>
   );
@@ -377,52 +371,28 @@ export function FinanceWorkspaceSurface() {
       <PageHeader title="امور مالی" subtitle="خلاصهٔ مالی، سفارش‌های در انتظار تسویه و تاریخچهٔ تسویهٔ فضای انتخاب‌شده." />
 
       {multiple ? (
-        <fieldset
-          aria-labelledby={fieldsetLegendId}
-          style={{
-            margin: '0 0 20px',
-            border: '1px solid var(--bc-color-line)',
-            borderRadius: 'var(--bc-radius-card)',
-            padding: '16px 18px',
-          }}
-        >
-          <legend id={fieldsetLegendId} style={{ padding: '0 6px', fontSize: 14, fontWeight: 800 }}>
+        <fieldset aria-labelledby={fieldsetLegendId} className={styles.selector}>
+          <legend id={fieldsetLegendId} className={styles.selectorLegend}>
             کدام فضای مالی؟
           </legend>
-          <p style={{ margin: '0 0 12px', fontSize: 12.5, color: 'var(--bc-color-ink-soft)' }}>
+          <p className={styles.selectorLead}>
             هیچ فضایی خودبه‌خود انتخاب نمی‌شود. تا وقتی یکی را انتخاب نکنید، هیچ رقمی نمایش داده نمی‌شود.
           </p>
-          <div style={{ display: 'grid', gap: 10 }}>
+          <div className={styles.choices}>
             {list.map((workspace) => {
               const checked = workspace.workspaceRef === active?.workspaceRef;
               return (
-                <label
-                  key={workspace.workspaceRef}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: 12,
-                    minHeight: 44,
-                    padding: '12px 14px',
-                    borderRadius: 'var(--bc-radius-row)',
-                    border: `1px solid ${checked ? 'var(--bc-color-primary)' : 'var(--bc-color-line)'}`,
-                    background: checked ? 'var(--bc-color-primary-soft)' : 'transparent',
-                    cursor: 'pointer',
-                  }}
-                >
+                <label key={workspace.workspaceRef} className={`${styles.choice} ${checked ? styles.choiceOn : ''}`}>
                   <input
                     type="radio"
                     name="finance-workspace"
                     checked={checked}
                     onChange={() => selectWorkspace(workspace.workspaceRef)}
-                    style={{ marginTop: 3, width: 20, height: 20, flexShrink: 0 }}
                   />
-                  <span style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-                    <span style={{ fontSize: 14, fontWeight: 800, overflowWrap: 'anywhere' }}>{workspace.displayLabel}</span>
-                    <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                      <span style={{ fontSize: 12, color: 'var(--bc-color-ink-soft)' }}>
-                        {WORKSPACE_TYPE_LABEL[workspace.workspaceType]}
-                      </span>
+                  <span className={styles.choiceText}>
+                    <span className={styles.choiceLabel}>{workspace.displayLabel}</span>
+                    <span className={styles.choiceMeta}>
+                      <span className={styles.choiceType}>{WORKSPACE_TYPE_LABEL[workspace.workspaceType]}</span>
                       <AccessModeMark mode={workspace.accessMode} />
                     </span>
                   </span>
@@ -432,7 +402,7 @@ export function FinanceWorkspaceSurface() {
           </div>
         </fieldset>
       ) : active ? (
-        <div style={{ marginBlockEnd: 20, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div className={styles.single}>
           <Badge tone={active.workspaceType === 'business' ? 'primary' : 'neutral'}>{active.displayLabel}</Badge>
           <AccessModeMark mode={active.accessMode} />
         </div>
@@ -441,46 +411,27 @@ export function FinanceWorkspaceSurface() {
       {active ? (
         <>
           {active.accessMode === 'finance_read' ? (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-                flexWrap: 'wrap',
-                padding: '12px 16px',
-                marginBlockEnd: 16,
-                borderRadius: 'var(--bc-radius-row)',
-                background: 'var(--bc-color-surface-tint)',
-                border: '1px solid var(--bc-color-line)',
-              }}
-            >
-              <span aria-hidden="true" style={{ width: 10, height: 10, borderRadius: 2, border: '2px solid var(--bc-color-ink-soft)', flexShrink: 0 }} />
-              <span style={{ fontSize: 13, fontWeight: 700 }}>شما این فضا را فقط می‌خوانید</span>
-              <span style={{ fontSize: 12.5, color: 'var(--bc-color-ink-soft)' }}>
+            <div className={styles.readOnly}>
+              <span aria-hidden="true" className={styles.readOnlyShape} />
+              <span className={styles.readOnlyTitle}>شما این فضا را فقط می‌خوانید</span>
+              <span className={styles.readOnlyText}>
                 هیچ تغییری در تسویه، پرداخت، بازگشت وجه یا دفتر مالی از اینجا ممکن نیست.
               </span>
             </div>
           ) : null}
 
-          <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 6px' }}>ارقامِ سامانهٔ پیشین</h2>
+          <h2 className={styles.legacyTitle}>ارقامِ سامانهٔ پیشین</h2>
           {summaryLoading ? (
-            <LoadingState label="در حال بارگذاری خلاصهٔ مالی…" />
+            <LoadingState label="در حال بارگذاری خلاصهٔ مالی…" lines={2} />
           ) : summaryError ? (
             <ErrorState message={summaryError} onRetry={() => void loadSummary(active.workspaceRef)} />
           ) : summary ? (
-            <div style={{ marginBlockEnd: 20, display: 'grid', gap: 'var(--bc-spacing-card-gap)', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
-              <Card>
-                <p style={{ margin: 0, fontSize: 13, color: 'var(--bc-color-ink-soft)' }}>خالص قابل دریافت</p>
-                <p style={{ margin: '6px 0 0', fontSize: 22, fontWeight: 800 }}>{formatToman(summary.receivableNetToman)}</p>
-              </Card>
-              <Card>
-                <p style={{ margin: 0, fontSize: 13, color: 'var(--bc-color-ink-soft)' }}>تسویه‌شده</p>
-                <p style={{ margin: '6px 0 0', fontSize: 22, fontWeight: 800 }}>{formatToman(summary.settledToman)}</p>
-              </Card>
-              <Card>
-                <p style={{ margin: 0, fontSize: 13, color: 'var(--bc-color-ink-soft)' }}>در انتظار تسویه</p>
-                <p style={{ margin: '6px 0 0', fontSize: 22, fontWeight: 800 }}>{formatToman(summary.outstandingToman)}</p>
-              </Card>
+            <div className={styles.section}>
+              <StatGrid min={180}>
+                <StatCard label="خالص قابل دریافت" value={formatToman(summary.receivableNetToman)} />
+                <StatCard label="تسویه‌شده" value={formatToman(summary.settledToman)} />
+                <StatCard label="در انتظار تسویه" value={formatToman(summary.outstandingToman)} />
+              </StatGrid>
             </div>
           ) : null}
 
@@ -492,113 +443,109 @@ export function FinanceWorkspaceSurface() {
           {fundsError ? (
             <ErrorState message={fundsError} onRetry={() => void loadFunds(active.workspaceRef)} />
           ) : fundsLoading || fundsLoadedFor !== active.workspaceRef ? (
-            <LoadingState label="در حال بارگذاری وجوه…" />
+            <LoadingState label="در حال بارگذاری وجوه…" lines={2} />
           ) : funds ? (
             <FundsByState funds={funds} />
           ) : null}
 
-          <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 12px' }}>سفارش‌های در انتظار تسویه</h2>
+          <h2 className={styles.sectionTitle}>سفارش‌های در انتظار تسویه</h2>
           {ordersLoading || ordersLoadedFor !== active.workspaceRef ? (
-            <LoadingState label="در حال بارگذاری سفارش‌ها…" />
+            <LoadingState label="در حال بارگذاری سفارش‌ها…" lines={3} />
           ) : ordersError ? (
             <ErrorState message={ordersError} onRetry={() => void loadOrders(active.workspaceRef)} />
           ) : orders.length === 0 ? (
             <EmptyState message="سفارشی در انتظار تسویه ندارید." />
           ) : (
-            <div style={{ display: 'grid', gap: 'var(--bc-spacing-card-gap)' }}>
+            <ul className={styles.orders}>
               {orders.map((order) => (
-                    <Card key={order.orderId}>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--bc-spacing-chip-gap)' }}>
-                        <div style={{ minWidth: 0 }}>
-                          <p style={{ margin: 0, fontWeight: 700 }}>{formatToman(order.outstandingToman)}</p>
-                          <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--bc-color-ink-faint)' }}>
-                            سفارش{' '}
-                            <span style={{ direction: 'ltr', display: 'inline-block', fontFamily: 'monospace' }}>
-                              {order.orderId.slice(0, 8)}
-                            </span>
-                          </p>
-                        </div>
-                        <Button type="button" variant="ghost" inline onClick={() => void toggleLedger(order.orderId)}>
-                          {ledgerFor === order.orderId ? 'بستن ریز تراکنش' : 'ریز تراکنش'}
-                        </Button>
-                      </div>
+                <li key={order.orderId} className={`${styles.panel} ${styles.order}`} data-order={order.orderId}>
+                  <div className={styles.orderText}>
+                    <p className={styles.orderAmount}>{formatToman(order.outstandingToman)}</p>
+                    <p className={styles.orderRef}>
+                      سفارش <span className={styles.ref}>{order.orderId.slice(0, 8)}</span>
+                    </p>
+                  </div>
+                  <Button type="button" variant="ghost" inline onClick={() => void toggleLedger(order.orderId)}>
+                    {ledgerFor === order.orderId ? 'بستن ریز تراکنش' : 'ریز تراکنش'}
+                  </Button>
 
-                      {ledgerFor === order.orderId ? (
-                        <div style={{ marginBlockStart: 16, paddingBlockStart: 16, borderBlockStart: '1px solid var(--bc-color-line)' }}>
-                          {ledgerLoading ? (
-                            <LoadingState label="در حال بارگذاری ریز تراکنش…" />
-                          ) : ledgerError ? (
-                            <ErrorState message={ledgerError} onRetry={() => void toggleLedger(order.orderId)} />
-                          ) : ledger.length === 0 ? (
-                            <p style={{ fontSize: 13, color: 'var(--bc-color-ink-soft)', margin: 0 }}>
-                              تراکنشی برای این سفارش ثبت نشده است.
-                            </p>
-                          ) : (
-                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                              <caption style={{ textAlign: 'start', fontWeight: 700, marginBlockEnd: 8 }}>
-                                ریز تراکنش سفارش
-                              </caption>
-                              <tbody>
-                                {ledger.map((entry) => (
-                                  <tr key={entry.id}>
-                                    <th scope="row" style={{ textAlign: 'start', fontWeight: 600, padding: '4px 0' }}>
-                                      {entry.entryType === 'commission' ? 'کارمزد پلتفرم' : 'سهم شما'}
-                                    </th>
-                                    <td style={{ textAlign: 'end', padding: '4px 0' }}>{formatToman(entry.amountToman)}</td>
-                                    <td style={{ textAlign: 'end', padding: '4px 0', color: 'var(--bc-color-ink-faint)' }}>
-                                      {toPersianDigits((entry.commissionRateBp / 100).toFixed(1))}٪
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          )}
-                        </div>
-                      ) : null}
-                    </Card>
-                  ))}
-                </div>
-              )}
-
-              <h2 style={{ fontSize: 16, fontWeight: 700, margin: '24px 0 12px' }}>تاریخچه تسویه</h2>
-              {settlementsLoading || settlementsLoadedFor !== active.workspaceRef ? (
-                <LoadingState label="در حال بارگذاری تاریخچهٔ تسویه…" />
-              ) : settlementsError ? (
-                <ErrorState message={settlementsError} onRetry={() => void loadSettlements(active.workspaceRef)} />
-              ) : batches.length === 0 ? (
-                <EmptyState message="هنوز تسویه‌ای انجام نشده است." />
-              ) : (
-                <div style={{ display: 'grid', gap: 'var(--bc-spacing-card-gap)' }}>
-                  {batches.map((batch) => (
-                    <Card key={batch.id}>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--bc-spacing-chip-gap)' }}>
-                        <div style={{ minWidth: 0 }}>
-                          <p style={{ margin: 0, fontWeight: 700 }}>{formatToman(batch.amountToman)}</p>
-                          <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--bc-color-ink-soft)' }}>
-                            {formatZonedFullDate(new Date(batch.createdAt))}
-                            {batch.method ? ` — ${batch.method}` : ''}
-                          </p>
-                        </div>
-                        <Badge tone={batch.kind === 'reversal' ? 'error' : 'success'}>
-                          {batch.kind === 'reversal' ? 'برگشت تسویه' : 'تسویه'}
-                        </Badge>
-                      </div>
-                    </Card>
-                  ))}
-                  {nextCursor ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      inline
-                      busy={loadingMore}
-                      disabled={loadingMore}
-                      onClick={() => void loadMoreSettlements()}
-                    >
-                      {loadingMore ? 'در حال بارگذاری…' : 'صفحهٔ بعد'}
-                    </Button>
+                  {ledgerFor === order.orderId ? (
+                    <div className={styles.ledger}>
+                      {ledgerLoading ? (
+                        <LoadingState label="در حال بارگذاری ریز تراکنش…" lines={2} />
+                      ) : ledgerError ? (
+                        <ErrorState message={ledgerError} onRetry={() => void toggleLedger(order.orderId)} />
+                      ) : ledger.length === 0 ? (
+                        <p className={styles.ledgerEmpty}>تراکنشی برای این سفارش ثبت نشده است.</p>
+                      ) : (
+                        <table className={styles.ledgerTable}>
+                          <caption>ریز تراکنش سفارش</caption>
+                          <tbody>
+                            {ledger.map((entry) => (
+                              <tr key={entry.id}>
+                                <th scope="row">{ledgerEntryLabel(entry.entryType)}</th>
+                                <td>{formatToman(entry.amountToman)}</td>
+                                <td className={styles.ledgerRate}>
+                                  {toPersianDigits((entry.commissionRateBp / 100).toFixed(1))}٪
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
                   ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <h2 id={SETTLEMENTS_HEADING_ID} className={styles.sectionTitleSpaced}>
+            تاریخچه تسویه
+          </h2>
+          {settlementsLoading || settlementsLoadedFor !== active.workspaceRef ? (
+            <LoadingState label="در حال بارگذاری تاریخچهٔ تسویه…" lines={3} />
+          ) : settlementsError ? (
+            <ErrorState message={settlementsError} onRetry={() => void loadSettlements(active.workspaceRef)} />
+          ) : batches.length === 0 ? (
+            <EmptyState message="هنوز تسویه‌ای انجام نشده است." />
+          ) : (
+            <>
+              {/* A real table from 1024, a card list below 640 (`DataTable`): "wide
+                  tables become labelled card rows, never horizontally scrolling
+                  financial tables" (the responsive handoff, §6). */}
+              <DataTable head={SETTLEMENT_HEAD} aria-labelledby={SETTLEMENTS_HEADING_ID}>
+                {batches.map((batch) => (
+                  <DataRow key={batch.id} data-settlement={batch.id}>
+                    <DataCell label="تاریخ">{formatZonedFullDate(new Date(batch.createdAt))}</DataCell>
+                    <DataCell label="مبلغ">
+                      <span className={styles.amount}>{formatToman(batch.amountToman)}</span>
+                    </DataCell>
+                    <DataCell label="روش">
+                      {batch.method ? <span className={styles.method}>{batch.method}</span> : '—'}
+                    </DataCell>
+                    <DataCell label="نوع">
+                      <Badge tone={settlementKindTone(batch.kind)}>{settlementKindLabel(batch.kind)}</Badge>
+                    </DataCell>
+                  </DataRow>
+                ))}
+              </DataTable>
+              {nextCursor ? (
+                <div className={styles.more}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    inline
+                    busy={loadingMore}
+                    disabled={loadingMore}
+                    onClick={() => void loadMoreSettlements()}
+                  >
+                    {loadingMore ? 'در حال بارگذاری…' : 'صفحهٔ بعد'}
+                  </Button>
                 </div>
-              )}
+              ) : null}
+            </>
+          )}
         </>
       ) : null}
     </>
