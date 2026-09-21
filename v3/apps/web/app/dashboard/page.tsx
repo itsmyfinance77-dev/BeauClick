@@ -6,7 +6,7 @@ import { formatFullJalaliDate, formatIranianPhone, formatToman, toPersianDigits 
 import { useAuth } from '@/lib/auth-context';
 import { ProtectedRoute } from '@/components/protected-route';
 import { ErrorState, LoadingState } from '@/components/ui';
-import { bookingApi, slotTimeLabel, type BookingSummary, type ProviderSummary } from '@/lib/booking-api';
+import { bookingApi, isUpcomingBooking, slotTimeLabel, type BookingSummary, type ProviderSummary } from '@/lib/booking-api';
 import {
   journeyGoals,
   journeyProfile,
@@ -67,12 +67,6 @@ const STATUS_LABEL: Record<BookingSummary['status'], { label: string; tone: stri
   no_show: { label: 'عدم مراجعه', tone: 'statusError' },
 };
 
-/** Upcoming means confirmed or awaiting payment, and in the future. */
-function isUpcoming(booking: BookingSummary): boolean {
-  if (booking.status !== 'confirmed' && booking.status !== 'pending') return false;
-  return new Date(booking.startAt).getTime() > Date.now();
-}
-
 /**
  * The bookings this page will actually show, in the order it will show them.
  *
@@ -84,8 +78,8 @@ function isUpcoming(booking: BookingSummary): boolean {
  * appointment's salon.
  */
 function visible(bookings: BookingSummary[]): { upcoming: BookingSummary | null; past: BookingSummary[] } {
-  const upcoming = bookings.filter(isUpcoming).sort((a, b) => a.startAt.localeCompare(b.startAt));
-  const past = bookings.filter((b) => !isUpcoming(b)).sort((a, b) => b.startAt.localeCompare(a.startAt));
+  const upcoming = bookings.filter(isUpcomingBooking).sort((a, b) => a.startAt.localeCompare(b.startAt));
+  const past = bookings.filter((b) => !isUpcomingBooking(b)).sort((a, b) => b.startAt.localeCompare(a.startAt));
   return { upcoming: upcoming[0] ?? null, past };
 }
 
