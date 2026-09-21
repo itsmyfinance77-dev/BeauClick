@@ -139,6 +139,48 @@ export function verificationEvidence(api: ApiClient, requestId: string) {
   return api.get<VerificationEvidence[]>(`/v1/admin/verification/${encodeURIComponent(requestId)}/evidence`);
 }
 
+// ------------------------------------------------------ media moderation
+
+/**
+ * One open abuse report on a public image — `AdminMediaController.queue`,
+ * gated on `bc_moderate_media`.
+ *
+ * Note what is NOT here: no URL, storage key or purpose for the image. The
+ * design (`27_ADMIN_MEDIA_MODERATION.md`) draws a thumbnail and a full image,
+ * but the route returns only `mediaObjectId`, so the page cannot show the
+ * picture a moderator is being asked to delete. That is a backend gap, not a
+ * field this file may invent.
+ */
+export interface MediaAbuseReport {
+  id: string;
+  mediaObjectId: string;
+  reason: string;
+  note: string | null;
+  status: string;
+  createdAt: string;
+}
+
+export function mediaReports(api: ApiClient, page = 1, limit = 20) {
+  return api.get<MediaAbuseReport[]>(`/v1/admin/media/reports?page=${page}&limit=${limit}`);
+}
+
+/**
+ * `uphold` deletes the image's bytes and cannot be undone; `reject` leaves the
+ * image up and closes the report. `reason` is 4–500 characters
+ * (`DecideAbuseReportDto`). A report somebody else already decided is refused
+ * with the code `CONFLICT`.
+ */
+export function decideMediaReport(
+  api: ApiClient,
+  reportId: string,
+  input: { decision: 'uphold' | 'reject'; reason: string },
+) {
+  return api.post<{ id: string; status: string; decidedAt: string | null }>(
+    `/v1/admin/media/reports/${encodeURIComponent(reportId)}/decide`,
+    input,
+  );
+}
+
 /** The professional's own side, consumed by `/pro/profile`. */
 export interface MyVerificationRequest {
   id: string;

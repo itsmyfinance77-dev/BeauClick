@@ -31,6 +31,10 @@ import styles from './admin-shell.module.css';
 const ADMIN_NAV: { href: string; label: string; capability?: string; system?: boolean }[] = [
   { href: '/admin', label: 'نمای کلی' },
   { href: '/admin/verification', label: 'احراز هویت', capability: 'bc_moderate_verification' },
+  // #238. Beside «احراز هویت» because both are one-at-a-time review queues with
+  // a mandatory reason — the placement `27_ADMIN_MEDIA_MODERATION.md` proposes
+  // and leaves as a product decision.
+  { href: '/admin/media', label: 'گزارش تصاویر', capability: 'bc_moderate_media' },
   { href: '/admin/users', label: 'کاربران و نقش‌ها' },
   { href: '/admin/audit-log', label: 'گزارش عملیات' },
   { href: '/admin/settlements', label: 'تسویه‌ها' },
@@ -160,4 +164,5 @@ const CAPABILITY_LABELS: Record<string, string> = {
   bc_manage_platform: 'مدیریت پلتفرم',
   bc_moderate_verification: 'بررسی احراز هویت',
   bc_moderate_reviews: 'بررسی دیدگاه‌ها',
+  bc_moderate_media: 'بررسی تصاویر',
 };
