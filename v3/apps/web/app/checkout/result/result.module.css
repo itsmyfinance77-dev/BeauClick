@@ -1,0 +1,194 @@
+/*
+ * The payment result — `16_CHECKOUT_RESULT.md`.
+ *
+ *   390   the banner and the receipt are full width; the buttons stack.
+ *   640+  a centred column of at most 560px, and the buttons sit on one line.
+ *
+ * "The result banner is not colour alone": an icon in a shaped container, the
+ * heading, and the body. The glyph differs per outcome (✓ ✕ ⚠), so shape
+ * carries the distinction as well as the tint.
+ *
+ * Amounts stay in one aligned column at every width — a receipt is scanned
+ * down its figures — and use tabular numerals.
+ *
+ * Breakpoints are the design's 640 and 1024 (`breakpoints.spec.ts`).
+ */
+
+.page {
+  display: grid;
+  gap: var(--bc-spacing-card-gap);
+}
+
+@media (min-width: 640px) {
+  .page {
+    max-inline-size: 560px;
+    margin-inline: auto;
+  }
+}
+
+.card {
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-card);
+  padding: 16px;
+}
+
+@media (min-width: 640px) {
+  .card {
+    padding: 20px 24px;
+  }
+}
+
+/* --------------------------------------------------------------- banner */
+
+.title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 12px;
+  font-size: 22px;
+  font-weight: 800;
+  /* Focus lands here once on arrival (a full-page navigation from the
+     gateway); the heading is not a control, so it draws no ring of its own. */
+  outline: none;
+}
+
+.icon {
+  flex-shrink: 0;
+  display: inline-grid;
+  place-items: center;
+  inline-size: 36px;
+  block-size: 36px;
+  border-radius: 50%;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.iconSuccess {
+  background: var(--bc-color-success-soft);
+  color: var(--bc-color-success);
+}
+
+.iconError {
+  background: var(--bc-color-error-soft);
+  color: var(--bc-color-error);
+}
+
+.iconWarning {
+  background: var(--bc-color-warning-soft);
+  color: var(--bc-color-warning);
+}
+
+/*
+ * The retry control and the two navigation links. On a phone the retry is a
+ * full-width button (an inline button in a grid cell stretches to it); from
+ * 640 the actions share a line.
+ */
+.actions {
+  display: grid;
+  gap: 8px;
+  margin-block-start: 12px;
+}
+
+@media (min-width: 640px) {
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  margin-block-start: 8px;
+}
+
+.note {
+  margin: 0;
+  color: var(--bc-color-text-muted);
+  line-height: 1.8;
+}
+
+.noteWithAction {
+  margin-block-end: 12px;
+}
+
+/* -------------------------------------------------------------- receipt */
+
+.receiptTitle {
+  margin: 0 0 12px;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.receipt {
+  inline-size: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.receipt th,
+.receipt td {
+  padding-block: 6px;
+}
+
+.receipt th {
+  text-align: start;
+  font-weight: 400;
+}
+
+.receipt td {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.adjustment th,
+.adjustment td {
+  color: var(--bc-color-text-muted);
+}
+
+/*
+ * A discount is a negative amount. In a right-to-left cell the leading minus
+ * sign is a neutral character beside weak digits and drifts to the far end
+ * ("۶۰,۰۰۰-"). The number gets its own left-to-right run, which keeps the sign
+ * in front; the cell keeps its own direction, so the figure still aligns with
+ * every other amount in the column.
+ */
+.signed {
+  direction: ltr;
+  unicode-bidi: isolate;
+  display: inline-block;
+}
+
+.total {
+  border-block-start: 1px solid var(--bc-color-border);
+}
+
+.total th,
+.total td {
+  padding-block: 10px;
+  font-weight: 700;
+}
+
+.refund th,
+.refund td {
+  color: var(--bc-color-error);
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 16px;
+  margin: 16px 0 0;
+  font-size: 13px;
+}
+
+.facts dt {
+  color: var(--bc-color-text-faint);
+}
+
+.facts dd {
+  margin: 0;
+}
