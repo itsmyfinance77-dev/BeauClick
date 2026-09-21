@@ -31,10 +31,11 @@ import styles from './admin-shell.module.css';
 const ADMIN_NAV: { href: string; label: string; capability?: string; system?: boolean }[] = [
   { href: '/admin', label: 'نمای کلی' },
   { href: '/admin/verification', label: 'احراز هویت', capability: 'bc_moderate_verification' },
-  // #238. Beside «احراز هویت» because both are one-at-a-time review queues with
-  // a mandatory reason — the placement `27_ADMIN_MEDIA_MODERATION.md` proposes
-  // and leaves as a product decision.
+  // #238. Beside «احراز هویت» because all three are one-at-a-time review queues
+  // with a mandatory reason — the placement specs 27 and 28 propose and leave
+  // as a product decision.
   { href: '/admin/media', label: 'گزارش تصاویر', capability: 'bc_moderate_media' },
+  { href: '/admin/reviews', label: 'بازبینی دیدگاه‌ها', capability: 'bc_moderate_reviews' },
   { href: '/admin/users', label: 'کاربران و نقش‌ها' },
   { href: '/admin/audit-log', label: 'گزارش عملیات' },
   { href: '/admin/settlements', label: 'تسویه‌ها' },

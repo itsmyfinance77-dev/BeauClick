@@ -14,7 +14,10 @@ jest.mock('next/navigation', () => ({
  * a link to a page that would refuse them.
  */
 
-const QUEUES = [{ href: '/admin/media', capability: 'bc_moderate_media' }];
+const QUEUES = [
+  { href: '/admin/media', capability: 'bc_moderate_media' },
+  { href: '/admin/reviews', capability: 'bc_moderate_reviews' },
+];
 
 const ok = (data: unknown) => Promise.resolve({ ok: true, status: 200, json: async () => ({ data, meta: null, error: null }) });
 

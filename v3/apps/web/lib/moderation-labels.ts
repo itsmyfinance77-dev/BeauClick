@@ -31,3 +31,17 @@ export const UNKNOWN_REASON_LABEL = 'دلیل نامشخص';
 export function mediaReportReasonLabel(reason: string): string {
   return MEDIA_REPORT_REASON_LABEL[reason] ?? UNKNOWN_REASON_LABEL;
 }
+
+export const UNKNOWN_STATUS_LABEL = 'نامشخص';
+
+// ---------------------------------------------------------------- reviews
+
+/** `REVIEW_STATUSES` (`services/provider/src/entities/review.entity.ts`). */
+export const REVIEW_STATUS_LABEL: Record<string, LabelView> = {
+  published: { label: 'منتشرشده', tone: 'success' },
+  hidden: { label: 'پنهان', tone: 'neutral' },
+};
+
+export function reviewStatusView(status: string): LabelView {
+  return REVIEW_STATUS_LABEL[status] ?? { label: UNKNOWN_STATUS_LABEL, tone: 'neutral' };
+}

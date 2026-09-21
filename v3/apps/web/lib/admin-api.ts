@@ -181,6 +181,39 @@ export function decideMediaReport(
   );
 }
 
+// ----------------------------------------------------- review moderation
+
+/**
+ * One review nobody has moderated yet — `AdminReviewController.queue`, gated
+ * on `bc_moderate_reviews`, oldest first. `displayName` is the PROFESSIONAL's
+ * public name; nothing about the customer who wrote the review is returned.
+ */
+export interface ReviewQueueItem {
+  id: string;
+  professionalId: string;
+  displayName: string;
+  rating: number;
+  comment: string | null;
+  status: string;
+  createdAt: string;
+}
+
+export function reviewQueue(api: ApiClient, page = 1, limit = 20) {
+  return api.get<ReviewQueueItem[]>(`/v1/admin/reviews/queue?page=${page}&limit=${limit}`);
+}
+
+/**
+ * Reversible in both directions: `publish` on a hidden review restores it and
+ * its rating. `reason` is 4–500 characters either way (`ModerateReviewDto`).
+ * A review somebody else already moderated is refused with 409 `CONFLICT`.
+ */
+export function moderateReview(api: ApiClient, reviewId: string, input: { decision: 'hide' | 'publish'; reason: string }) {
+  return api.post<{ id: string; status: string; moderatedAt: string | null }>(
+    `/v1/admin/reviews/${encodeURIComponent(reviewId)}/moderate`,
+    input,
+  );
+}
+
 /** The professional's own side, consumed by `/pro/profile`. */
 export interface MyVerificationRequest {
   id: string;

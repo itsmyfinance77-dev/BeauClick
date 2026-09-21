@@ -1,6 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { MEDIA_REPORT_REASON_LABEL, UNKNOWN_REASON_LABEL, mediaReportReasonLabel } from '@/lib/moderation-labels';
+import {
+  MEDIA_REPORT_REASON_LABEL,
+  REVIEW_STATUS_LABEL,
+  UNKNOWN_REASON_LABEL,
+  UNKNOWN_STATUS_LABEL,
+  mediaReportReasonLabel,
+  reviewStatusView,
+} from '@/lib/moderation-labels';
 
 /**
  * The operator queues' label tables against the server lists they name (#238).
@@ -32,5 +39,18 @@ describe('media report reasons', () => {
   it('show a neutral word, never the raw key, for a reason they have never heard of', () => {
     expect(mediaReportReasonLabel('deepfake')).toBe(UNKNOWN_REASON_LABEL);
     expect(mediaReportReasonLabel('explicit')).toBe('محتوای نامناسب');
+  });
+});
+
+describe('review statuses', () => {
+  const server = () => serverList('services/provider/src/entities/review.entity.ts', 'REVIEW_STATUSES');
+
+  it('name exactly the statuses a review can have', () => {
+    expect(server().length).toBeGreaterThanOrEqual(2);
+    expect(Object.keys(REVIEW_STATUS_LABEL).sort()).toEqual(server());
+  });
+
+  it('show a neutral word for a status they have never heard of', () => {
+    expect(reviewStatusView('quarantined')).toEqual({ label: UNKNOWN_STATUS_LABEL, tone: 'neutral' });
   });
 });
