@@ -481,18 +481,9 @@
   font-variant-numeric: tabular-nums;
 }
 
-.progressTrack {
-  height: 8px;
-  border-radius: var(--bc-radius-chip);
-  background: oklch(0.34 0.02 330);
-  overflow: hidden;
+/* Spacing under the shared `ProgressBar` (its track has no margin of its own). */
+.progressWrap {
   margin-block-end: 18px;
-}
-
-.progressFill {
-  height: 100%;
-  border-radius: var(--bc-radius-chip);
-  background: var(--bc-color-accent);
 }
 
 .benefits {

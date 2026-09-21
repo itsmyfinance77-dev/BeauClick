@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import type {
+  CSSProperties,
   HTMLAttributes,
   ReactNode,
   SelectHTMLAttributes,
@@ -12,6 +13,7 @@ import { forwardRef, useEffect, useId, useRef } from 'react';
 import { Button, Card } from './ui';
 import tableStyles from './data-table.module.css';
 import formStyles from './form-grid.module.css';
+import progressStyles from './progress-bar.module.css';
 
 /**
  * The shared component kit.
@@ -642,4 +644,40 @@ export function FormGrid({ children }: { children: ReactNode }) {
 
 export function FormFullRow({ children }: { children: ReactNode }) {
   return <div className={formStyles.fullRow}>{children}</div>;
+}
+
+/**
+ * A determinate progress bar with the semantics a screen reader needs:
+ * `role="progressbar"` with `aria-valuenow/min/max` and a name.
+ *
+ * `value` is a percentage. It is clamped to 0–100 and rounded for
+ * `aria-valuenow`, because the server's `percentToNextTier` is a float and an
+ * announcement of "42.857142 percent" is noise. Extracted from two hand-written
+ * copies (`/loyalty` and the dashboard's loyalty card) — `V3_COMPONENT_INVENTORY.md`,
+ * `ProgressBar`: "استخراج".
+ */
+export function ProgressBar({
+  value,
+  label,
+  tone = 'light',
+}: {
+  value: number;
+  /** The accessible name, e.g. «پیشرفت تا سطح طلایی». Never omitted. */
+  label: string;
+  /** `onDark` for use inside a dark card. */
+  tone?: 'light' | 'onDark';
+}) {
+  const pct = Math.min(100, Math.max(0, Number.isFinite(value) ? value : 0));
+  return (
+    <div
+      role="progressbar"
+      aria-valuenow={Math.round(pct)}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-label={label}
+      className={`${progressStyles.track} ${tone === 'onDark' ? progressStyles.onDark : ''}`}
+    >
+      <div className={progressStyles.fill} style={{ '--pb': `${pct}%` } as CSSProperties} />
+    </div>
+  );
 }

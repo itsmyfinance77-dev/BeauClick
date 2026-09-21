@@ -6,6 +6,7 @@ import { formatFullJalaliDate, formatIranianPhone, formatToman, toPersianDigits 
 import { useAuth } from '@/lib/auth-context';
 import { ProtectedRoute } from '@/components/protected-route';
 import { ErrorState, LoadingState } from '@/components/ui';
+import { ProgressBar } from '@/components/kit';
 import { bookingApi, isUpcomingBooking, slotTimeLabel, type BookingSummary, type ProviderSummary } from '@/lib/booking-api';
 import {
   journeyGoals,
@@ -331,15 +332,12 @@ function DashboardContent() {
                     </span>
                     <span>{toPersianDigits(loyalty.percentToNextTier)}٪</span>
                   </div>
-                  <div
-                    className={styles.progressTrack}
-                    role="progressbar"
-                    aria-valuenow={loyalty.percentToNextTier}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-label={`پیشرفت تا ${loyalty.nextTier.name}`}
-                  >
-                    <div className={styles.progressFill} style={{ width: `${loyalty.percentToNextTier}%` }} />
+                  <div className={styles.progressWrap}>
+                    <ProgressBar
+                      tone="onDark"
+                      value={loyalty.percentToNextTier}
+                      label={`پیشرفت تا ${loyalty.nextTier.name}`}
+                    />
                   </div>
                 </>
               ) : null}

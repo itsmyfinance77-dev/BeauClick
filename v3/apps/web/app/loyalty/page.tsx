@@ -4,16 +4,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { formatFullJalaliDate, toPersianDigits } from '@beauclick/persian-utils';
 import { useAuth } from '@/lib/auth-context';
 import { ProtectedRoute } from '@/components/protected-route';
-import { Alert, Card, LoadingState } from '@/components/ui';
+import { Alert, Button, ErrorState, LoadingState } from '@/components/ui';
+import { Badge, PageHeader, ProgressBar } from '@/components/kit';
+import { loyaltyReasonLabel } from '@/lib/loyalty-reasons';
 import { loyaltyHistory, loyaltySummary, type LoyaltyHistoryEntry, type LoyaltySummary } from '@/lib/phase3-api';
-
-const REASON_LABELS: Record<string, string> = {
-  booking_completed: 'انجام خدمت',
-  review_submitted: 'ثبت نظر',
-  order_completed: 'خرید',
-  referral_qualified: 'معرفی دوستان',
-  manual_adjustment: 'تعدیل دستی',
-};
+import styles from './loyalty.module.css';
 
 export default function LoyaltyPage() {
   return (
@@ -27,8 +22,14 @@ function Loyalty() {
   const { api } = useAuth();
   const [summary, setSummary] = useState<LoyaltySummary | null>(null);
   const [history, setHistory] = useState<LoyaltyHistoryEntry[]>([]);
+  // The history is paginated by the server; only the first page used to be
+  // reachable. `historyPage` is the last page fetched.
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyPages, setHistoryPages] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [moreError, setMoreError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -37,6 +38,8 @@ function Loyalty() {
       const [s, h] = await Promise.all([loyaltySummary(api), loyaltyHistory(api)]);
       setSummary(s.data);
       setHistory(h.data?.items ?? []);
+      setHistoryPage(1);
+      setHistoryPages(h.data?.pagination?.totalPages ?? 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'اطلاعات باشگاه مشتریان بارگذاری نشد.');
     } finally {
@@ -48,136 +51,136 @@ function Loyalty() {
     void load();
   }, [load]);
 
-  if (loading) return <LoadingState label="در حال بارگذاری…" />;
-  if (error) return <Alert tone="error">{error}</Alert>;
-  if (!summary) return null;
+  const loadMore = async () => {
+    setLoadingMore(true);
+    setMoreError(null);
+    try {
+      const next = historyPage + 1;
+      const h = await loyaltyHistory(api, next);
+      // Appended and keyed by the row's own id, so a page that overlaps the
+      // last (a row written between the two requests) cannot show twice.
+      setHistory((current) => {
+        const seen = new Set(current.map((e) => e.id));
+        return [...current, ...(h.data?.items ?? []).filter((e) => !seen.has(e.id))];
+      });
+      setHistoryPage(next);
+      setHistoryPages(h.data?.pagination?.totalPages ?? next);
+    } catch (err) {
+      setMoreError(err instanceof Error ? err.message : 'بارگذاری بیشتر انجام نشد.');
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  if (loading) return <LoadingState label="در حال بارگذاری…" lines={5} />;
+  // An error offers a retry, like the other customer pages: a bare alert left
+  // the customer with no way forward but reloading the tab.
+  if (error || !summary) {
+    return <ErrorState message={error ?? 'اطلاعات باشگاه مشتریان بارگذاری نشد.'} onRetry={() => void load()} />;
+  }
 
   return (
     <section>
-      <h1 style={{ fontSize: 24, marginBlockEnd: 16 }}>باشگاه مشتریان</h1>
+      <PageHeader title="باشگاه مشتریان" />
 
-      <Card>
-        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-          <div>
-            <p style={{ margin: 0, fontSize: 13, color: 'var(--bc-color-ink-faint)' }}>امتیاز قابل استفاده</p>
-            <p style={{ margin: '4px 0 0', fontSize: 28, fontWeight: 800 }}>{toPersianDigits(summary.balance)}</p>
+      <div className={styles.columns}>
+        <div className={styles.stack}>
+          <div className={styles.panel} data-testid="loyalty-summary">
+            <div className={styles.figures}>
+              <div>
+                <p className={styles.figureLabel}>امتیاز قابل استفاده</p>
+                <p className={styles.figure}>{toPersianDigits(summary.balance)}</p>
+              </div>
+              <div>
+                {/* Two different numbers, shown side by side deliberately: spending
+                    points reduces the balance but never the lifetime total, which
+                    is what tier qualification uses. */}
+                <p className={styles.figureLabel}>مجموع امتیاز کسب‌شده</p>
+                <p className={styles.figure}>{toPersianDigits(summary.lifetimeEarned)}</p>
+              </div>
+            </div>
+
+            {summary.tier && (
+              <p className={styles.tier}>
+                سطح فعلی شما: <strong>{summary.tier.name}</strong>
+              </p>
+            )}
+
+            {summary.nextTier && summary.pointsToNextTier !== null && (
+              <div className={styles.progress}>
+                <p className={styles.progressText}>
+                  <span>
+                    {toPersianDigits(summary.pointsToNextTier)} امتیاز تا سطح {summary.nextTier.name}
+                  </span>
+                  <span>{toPersianDigits(Math.round(summary.percentToNextTier ?? 0))}٪</span>
+                </p>
+                <ProgressBar value={summary.percentToNextTier ?? 0} label={`پیشرفت تا سطح ${summary.nextTier.name}`} />
+              </div>
+            )}
           </div>
-          <div>
-            {/* Two different numbers, shown side by side deliberately: spending
-                points reduces the balance but never the lifetime total, which
-                is what tier qualification uses. */}
-            <p style={{ margin: 0, fontSize: 13, color: 'var(--bc-color-ink-faint)' }}>مجموع امتیاز کسب‌شده</p>
-            <p style={{ margin: '4px 0 0', fontSize: 28, fontWeight: 800 }}>{toPersianDigits(summary.lifetimeEarned)}</p>
-          </div>
+
+          {summary.membership && (
+            <div className={styles.panel}>
+              <h2 className={styles.panelTitle}>عضویت</h2>
+              <p className={styles.membershipName}>
+                <strong>{summary.membership.planName}</strong>{' '}
+                {summary.membership.status !== 'active' && <Badge tone="neutral">غیرفعال</Badge>}
+              </p>
+              {summary.membership.expiresAt && (
+                <p className={styles.until}>تا {formatFullJalaliDate(new Date(summary.membership.expiresAt))}</p>
+              )}
+            </div>
+          )}
+
+          {summary.benefits.length > 0 && (
+            <div className={styles.panel}>
+              <h2 className={styles.panelTitle}>مزایای شما</h2>
+              <ul className={styles.benefits}>
+                {summary.benefits.map((benefit, index) => (
+                  <li key={`${benefit.type}-${index}`}>{benefit.label}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
 
-        {summary.tier && (
-          <p style={{ marginBlockStart: 16, marginBlockEnd: 0, fontSize: 15 }}>
-            سطح فعلی شما: <strong>{summary.tier.name}</strong>
-          </p>
-        )}
-
-        {summary.nextTier && summary.pointsToNextTier !== null && (
-          <div style={{ marginBlockStart: 12 }}>
-            <p style={{ margin: '0 0 6px', fontSize: 14 }}>
-              {toPersianDigits(summary.pointsToNextTier)} امتیاز تا سطح {summary.nextTier.name}
-            </p>
-            <div
-              role="progressbar"
-              aria-valuenow={Math.round(summary.percentToNextTier ?? 0)}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-label={`پیشرفت تا سطح ${summary.nextTier.name}`}
-              style={{
-                height: 8,
-                borderRadius: 999,
-                background: 'var(--bc-color-surface-muted)',
-                overflow: 'hidden',
-              }}
-            >
-              <div
-                style={{
-                  width: `${summary.percentToNextTier ?? 0}%`,
-                  height: '100%',
-                  background: 'var(--bc-color-primary)',
-                }}
-              />
-            </div>
-          </div>
-        )}
-      </Card>
-
-      {summary.membership && (
-        <Card>
-          <h2 style={{ fontSize: 16, marginBlockStart: 0 }}>عضویت</h2>
-          <p style={{ margin: 0, fontSize: 15 }}>
-            <strong>{summary.membership.planName}</strong>
-            {summary.membership.status !== 'active' && (
-              <span style={{ color: 'var(--bc-color-ink-faint)' }}> (غیرفعال)</span>
-            )}
-          </p>
-          {summary.membership.expiresAt && (
-            <p style={{ margin: '6px 0 0', fontSize: 13, color: 'var(--bc-color-ink-faint)' }}>
-              تا {formatFullJalaliDate(new Date(summary.membership.expiresAt))}
-            </p>
-          )}
-        </Card>
-      )}
-
-      {summary.benefits.length > 0 && (
-        <Card>
-          <h2 style={{ fontSize: 16, marginBlockStart: 0 }}>مزایای شما</h2>
-          <ul style={{ margin: 0, paddingInlineStart: 20 }}>
-            {summary.benefits.map((benefit, index) => (
-              <li key={`${benefit.type}-${index}`} style={{ fontSize: 14, marginBlockEnd: 4 }}>
-                {benefit.label}
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
-
-      <h2 style={{ fontSize: 18, marginBlockStart: 24 }}>تاریخچه امتیاز</h2>
-      {history.length === 0 ? (
-        <Card>
-          <p style={{ margin: 0 }}>هنوز امتیازی ثبت نشده است.</p>
-        </Card>
-      ) : (
-        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 8 }}>
-          {history.map((entry) => (
-            <li key={entry.id}>
-              <Card>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                  <div>
-                    <p style={{ margin: 0, fontSize: 15 }}>{REASON_LABELS[entry.reason] ?? entry.reason}</p>
-                    <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--bc-color-ink-faint)' }}>
-                      {formatFullJalaliDate(new Date(entry.createdAt))}
+        <div className={styles.panel}>
+          <h2 className={styles.panelTitle}>تاریخچه امتیاز</h2>
+          {history.length === 0 ? (
+            <p className={styles.empty}>هنوز امتیازی ثبت نشده است.</p>
+          ) : (
+            <>
+              <ul className={styles.history}>
+                {history.map((entry) => (
+                  <li key={entry.id} className={styles.row} data-entry={entry.id}>
+                    <div>
+                      <p className={styles.reason}>{loyaltyReasonLabel(entry.reason)}</p>
+                      <p className={styles.when}>{formatFullJalaliDate(new Date(entry.createdAt))}</p>
+                      {entry.multiplierBp > 10000 && (
+                        <p className={styles.boost}>شامل ضریب مزایا (پایه: {toPersianDigits(entry.basePoints)})</p>
+                      )}
+                    </div>
+                    {/* A redemption or a reversal is a negative row; the sign is the
+                        whole meaning, so it is printed rather than only coloured. */}
+                    <p className={`${styles.points} ${entry.points < 0 ? styles.pointsOut : ''}`}>
+                      {entry.points >= 0 ? '+' : '−'}
+                      {toPersianDigits(Math.abs(entry.points))}
                     </p>
-                  </div>
-                  <p
-                    style={{
-                      margin: 0,
-                      fontWeight: 700,
-                      // A redemption is a negative row; the sign is the whole
-                      // meaning, so it is rendered explicitly rather than
-                      // relying on colour alone.
-                      color: entry.points >= 0 ? 'var(--bc-color-ink)' : 'var(--bc-color-ink-faint)',
-                    }}
-                  >
-                    {entry.points >= 0 ? '+' : '−'}
-                    {toPersianDigits(Math.abs(entry.points))}
-                  </p>
+                  </li>
+                ))}
+              </ul>
+              {moreError && <Alert tone="error">{moreError}</Alert>}
+              {historyPage < historyPages ? (
+                <div className={styles.more}>
+                  <Button variant="ghost" inline onClick={() => void loadMore()} loading={loadingMore}>
+                    نمایش بیشتر
+                  </Button>
                 </div>
-                {entry.multiplierBp > 10000 && (
-                  <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--bc-color-ink-faint)' }}>
-                    شامل ضریب مزایا (پایه: {toPersianDigits(entry.basePoints)})
-                  </p>
-                )}
-              </Card>
-            </li>
-          ))}
-        </ul>
-      )}
+              ) : null}
+            </>
+          )}
+        </div>
+      </div>
     </section>
   );
 }
