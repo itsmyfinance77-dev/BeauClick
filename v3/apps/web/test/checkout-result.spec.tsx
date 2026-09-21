@@ -677,3 +677,39 @@ describe('the payment schedule on the receipt', () => {
     expect(within(receipt).getByText('۱۴۰٬۰۰۰ تومان')).toBeInTheDocument();
   });
 });
+
+describe('presentation — the shape of an outcome, and the sign of a discount', () => {
+  it.each([
+    ['succeeded', 'iconSuccess'],
+    ['replayed', 'iconSuccess'],
+    ['failed', 'iconError'],
+    ['refunded', 'iconWarning'],
+    ['unresolved', 'iconWarning'],
+  ])('%s draws its glyph in the %s container', async (status, className) => {
+    renderResult({ status, orderId: 'o1' });
+    const heading = await screen.findByRole('heading', { level: 1 });
+    const icon = heading.querySelector('[aria-hidden="true"]') as HTMLElement;
+    expect(icon.className).toContain(className);
+  });
+
+  it('keeps a discount’s minus sign in front of its number, in its own left-to-right run', async () => {
+    getOrder.mockResolvedValue({
+      data: { ...ORDER, adjustments: [{ ruleKey: 'promo', label: 'کد تخفیف', amountToman: -60000 }] },
+      meta: null,
+      error: null,
+    } as never);
+    renderResult({ status: 'succeeded', orderId: 'o1' });
+    const row = (await screen.findByText('کد تخفیف')).closest('tr') as HTMLElement;
+    // A bare "-۶۰٬۰۰۰" in a right-to-left cell renders as "۶۰٬۰۰۰-".
+    const amount = within(row).getByText(/۶۰٬۰۰۰/);
+    expect(amount.tagName).toBe('SPAN');
+    expect(amount.className).toContain('signed');
+  });
+
+  it('shows a neutral word, never a raw key, for an order status it does not know', async () => {
+    getOrder.mockResolvedValue({ data: { ...ORDER, status: 'brand_new_status' }, meta: null, error: null } as never);
+    renderResult({ status: 'succeeded', orderId: 'o1' });
+    expect(await screen.findByText('نامشخص')).toBeInTheDocument();
+    expect(screen.queryByText('brand_new_status')).not.toBeInTheDocument();
+  });
+});

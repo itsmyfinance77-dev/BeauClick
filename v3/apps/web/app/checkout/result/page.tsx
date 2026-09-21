@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { formatFullJalaliDate, formatToman, toPersianDigits } from '@beauclick/persian-utils';
@@ -13,9 +12,12 @@ import {
 
 import { useAuth } from '@/lib/auth-context';
 import { ApiRequestError } from '@/lib/api-client';
-import { Alert, Button, Card, ErrorState, LoadingState } from '@/components/ui';
+import { Alert, Button, ErrorState, LoadingState } from '@/components/ui';
+import { TextLink } from '@/components/kit';
 import { loginHrefReturningTo } from '@/lib/safe-return';
 import { bookingApi, type OrderDetail } from '@/lib/booking-api';
+import { orderStatusLabel } from '@/lib/order-status';
+import styles from './result.module.css';
 
 type Tone = 'success' | 'error' | 'warning';
 
@@ -31,6 +33,11 @@ type Tone = 'success' | 'error' | 'warning';
  * made.
  */
 const TONE_GLYPH: Record<Tone, string> = { success: '✓', error: '✕', warning: '⚠' };
+const TONE_CLASS: Record<Tone, string> = {
+  success: styles.iconSuccess,
+  error: styles.iconError,
+  warning: styles.iconWarning,
+};
 
 const OUTCOME_COPY: Record<string, { tone: Tone; title: string; body: string }> = {
   succeeded: {
@@ -156,30 +163,6 @@ const RETRY_REFUSAL_COPY: Record<string, string> = {
     'یک پرداخت برای این سفارش هنوز در حال بررسی است. لطفاً چند دقیقه صبر کنید و وضعیت رزرو را از «رزروهای من» بررسی کنید — تا مشخص شدن نتیجه دوباره پرداخت نکنید.',
   no_payment_started: 'پرداختی برای این سفارش آغاز نشده است. لطفاً از «رزروهای من» اقدام کنید.',
   not_retryable: 'امکان تلاش دوباره برای این پرداخت وجود ندارد. لطفاً با پشتیبانی تماس بگیرید.',
-};
-
-const NAV_LINK_STYLE = {
-  fontWeight: 600,
-  display: 'inline-flex',
-  alignItems: 'center',
-  // The 44px baseline this project's own Button enforces. Same class of
-  // finding as the 25px nav links and the 21px homepage CTA before them; this
-  // is the surface a customer lands on straight after paying, on a phone.
-  minHeight: 44,
-} as const;
-
-const ORDER_STATUS_FA: Record<string, string> = {
-  pending: 'در انتظار پرداخت',
-  paid: 'پرداخت‌شده',
-  partially_refunded: 'بازگشت جزئی وجه',
-  refunded: 'بازگشت کامل وجه',
-  cancelled: 'لغو شده',
-  // V3.3 `#41b`. Deliberately not «رایگان» or «پرداخت‌شده»: nothing was
-  // collected online, which is not the same as nothing being owed.
-  online_collection_not_required: 'بدون پرداخت آنلاین',
-  // V3.3 `#41c`. Deliberately not «پرداخت‌شده»: the online part is done,
-  // which is not the same as the service being paid for in full.
-  online_collection_completed: 'پرداخت آنلاین انجام شد',
 };
 
 /**
@@ -323,21 +306,19 @@ function ResultContent() {
   const currentUrl = `${pathname}${query ? `?${query}` : ''}`;
 
   return (
-    <section style={{ display: 'grid', gap: 'var(--bc-spacing-card-gap)' }}>
-      <Card>
-        <h1
-          ref={headingRef}
-          tabIndex={-1}
-          style={{ fontSize: 24, marginBlockEnd: 8, outline: 'none', display: 'flex', alignItems: 'center', gap: 8 }}
-        >
-          <span aria-hidden="true">{TONE_GLYPH[copy.tone]}</span>
+    <section className={styles.page}>
+      <div className={styles.card}>
+        <h1 ref={headingRef} tabIndex={-1} className={styles.title}>
+          <span aria-hidden="true" className={`${styles.icon} ${TONE_CLASS[copy.tone]}`}>
+            {TONE_GLYPH[copy.tone]}
+          </span>
           {copy.title}
         </h1>
 
         <Alert tone={copy.tone}>{body}</Alert>
 
         {canOfferRetry ? (
-          <div style={{ marginBlockEnd: 12 }}>
+          <div className={styles.actions}>
             <Button type="button" onClick={handleRetry} loading={retrying} inline>
               تلاش دوباره
             </Button>
@@ -351,33 +332,30 @@ function ResultContent() {
         */}
         {retryError ? <Alert tone="error">{retryError}</Alert> : null}
 
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBlockStart: 8 }}>
-          <Link href="/bookings" style={NAV_LINK_STYLE}>
-            رزروهای من
-          </Link>
-          <Link href="/providers" style={NAV_LINK_STYLE}>
-            بازگشت به فهرست متخصص‌ها
-          </Link>
+        {/* `TextLink` carries the 44px touch baseline this page's own links once
+            lacked: this is the surface a customer lands on straight after
+            paying, on a phone. */}
+        <div className={styles.links}>
+          <TextLink href="/bookings">رزروهای من</TextLink>
+          <TextLink href="/providers">بازگشت به فهرست متخصص‌ها</TextLink>
         </div>
-      </Card>
+      </div>
 
       {/*
         Two states that previously rendered nothing at all — the receipt
         section simply vanished and the customer was left to guess why.
       */}
       {!orderId ? (
-        <Card>
-          <p style={{ margin: 0, color: 'var(--bc-color-ink-soft)' }}>
+        <div className={styles.card}>
+          <p className={styles.note}>
             شناسهٔ سفارش در این لینک موجود نیست؛ برای دیدن رسید، سفارش را از «رزروهای من» باز کنید.
           </p>
-        </Card>
+        </div>
       ) : null}
 
       {orderId && authStatus === 'unauthenticated' ? (
-        <Card>
-          <p style={{ margin: 0, marginBlockEnd: 12, color: 'var(--bc-color-ink-soft)' }}>
-            برای دیدن رسید کامل وارد شوید.
-          </p>
+        <div className={styles.card}>
+          <p className={`${styles.note} ${styles.noteWithAction}`}>برای دیدن رسید کامل وارد شوید.</p>
           {/*
             Returns to THIS result URL after signing in, so the customer is not
             dropped on the dashboard wondering what happened to their payment.
@@ -385,14 +363,12 @@ function ResultContent() {
             on this origin — a login page is the most valuable place in a
             product to have an open redirect.
           */}
-          <Link href={loginHrefReturningTo(currentUrl)} style={NAV_LINK_STYLE}>
-            ورود
-          </Link>
-        </Card>
+          <TextLink href={loginHrefReturningTo(currentUrl)}>ورود</TextLink>
+        </div>
       ) : null}
 
       {orderId && authStatus === 'authenticated' && !order && !receiptError ? (
-        <LoadingState label="در حال دریافت رسید…" />
+        <LoadingState label="در حال دریافت رسید…" lines={4} />
       ) : null}
 
       {/*
@@ -410,19 +386,19 @@ function ResultContent() {
       ) : null}
 
       {order ? (
-        <Card>
-          <h2 style={{ fontSize: 18, marginBlockEnd: 12 }}>رسید</h2>
+        <div className={styles.card}>
+          <h2 className={styles.receiptTitle}>رسید</h2>
 
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+          <table className={styles.receipt}>
             <caption className="bc-visually-hidden">جزئیات مبلغ سفارش</caption>
             <tbody>
               {order.items.map((item) => (
                 <tr key={item.id}>
-                  <th scope="row" style={{ textAlign: 'start', fontWeight: 400, padding: '6px 0' }}>
+                  <th scope="row">
                     {item.name}
                     {item.quantity > 1 ? ` × ${toPersianDigits(item.quantity)}` : ''}
                   </th>
-                  <td style={{ textAlign: 'end', padding: '6px 0' }}>{formatToman(item.lineTotalToman)}</td>
+                  <td>{formatToman(item.lineTotalToman)}</td>
                 </tr>
               ))}
 
@@ -431,26 +407,17 @@ function ResultContent() {
                   opaque "discount" figure, and never recomputed from today's
                   rules. */}
               {order.adjustments.map((adjustment) => (
-                <tr key={adjustment.ruleKey + adjustment.label}>
-                  <th
-                    scope="row"
-                    style={{ textAlign: 'start', fontWeight: 400, padding: '6px 0', color: 'var(--bc-color-ink-soft)' }}
-                  >
-                    {adjustment.label}
-                  </th>
-                  <td style={{ textAlign: 'end', padding: '6px 0', color: 'var(--bc-color-ink-soft)' }}>
-                    {formatToman(adjustment.amountToman)}
+                <tr key={adjustment.ruleKey + adjustment.label} className={styles.adjustment}>
+                  <th scope="row">{adjustment.label}</th>
+                  <td>
+                    <span className={styles.signed}>{formatToman(adjustment.amountToman)}</span>
                   </td>
                 </tr>
               ))}
 
-              <tr style={{ borderBlockStart: '1px solid var(--bc-color-line)' }}>
-                <th scope="row" style={{ textAlign: 'start', padding: '10px 0', fontWeight: 700 }}>
-                  مبلغ کل
-                </th>
-                <td style={{ textAlign: 'end', padding: '10px 0', fontWeight: 700 }}>
-                  {formatToman(order.totalToman)} تومان
-                </td>
+              <tr className={styles.total}>
+                <th scope="row">مبلغ کل</th>
+                <td>{formatToman(order.totalToman)} تومان</td>
               </tr>
 
               {/*
@@ -466,49 +433,32 @@ function ResultContent() {
               {order.paymentSchedule.venueBalanceToman > 0 ? (
                 <>
                   <tr>
-                    <th scope="row" style={{ textAlign: 'start', padding: '6px 0', fontWeight: 400 }}>
-                      پرداخت‌شده به بیوکلیک
-                    </th>
-                    <td style={{ textAlign: 'end', padding: '6px 0' }}>
-                      {formatToman(order.paymentSchedule.platformCollectibleNowToman)} تومان
-                    </td>
+                    <th scope="row">پرداخت‌شده به بیوکلیک</th>
+                    <td>{formatToman(order.paymentSchedule.platformCollectibleNowToman)} تومان</td>
                   </tr>
                   <tr>
-                    <th scope="row" style={{ textAlign: 'start', padding: '6px 0', fontWeight: 400 }}>
-                      قابل پرداخت در محل
-                    </th>
-                    <td style={{ textAlign: 'end', padding: '6px 0' }}>
-                      {formatToman(order.paymentSchedule.venueBalanceToman)} تومان
-                    </td>
+                    <th scope="row">قابل پرداخت در محل</th>
+                    <td>{formatToman(order.paymentSchedule.venueBalanceToman)} تومان</td>
                   </tr>
                 </>
               ) : null}
 
               {order.refundedTotalToman > 0 ? (
-                <tr>
-                  <th
-                    scope="row"
-                    style={{ textAlign: 'start', padding: '6px 0', fontWeight: 400, color: 'var(--bc-color-error)' }}
-                  >
-                    مبلغ بازگردانده‌شده
-                  </th>
-                  <td style={{ textAlign: 'end', padding: '6px 0', color: 'var(--bc-color-error)' }}>
-                    {formatToman(order.refundedTotalToman)} تومان
-                  </td>
+                <tr className={styles.refund}>
+                  <th scope="row">مبلغ بازگردانده‌شده</th>
+                  <td>{formatToman(order.refundedTotalToman)} تومان</td>
                 </tr>
               ) : null}
             </tbody>
           </table>
 
-          <dl
-            style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '8px 16px', fontSize: 13, marginBlockStart: 16 }}
-          >
-            <dt style={{ color: 'var(--bc-color-ink-faint)' }}>وضعیت سفارش</dt>
-            <dd style={{ margin: 0 }}>{ORDER_STATUS_FA[order.status] ?? order.status}</dd>
-            <dt style={{ color: 'var(--bc-color-ink-faint)' }}>تاریخ ثبت</dt>
-            <dd style={{ margin: 0 }}>{formatFullJalaliDate(new Date(order.createdAt))}</dd>
+          <dl className={styles.facts}>
+            <dt>وضعیت سفارش</dt>
+            <dd>{orderStatusLabel(order.status)}</dd>
+            <dt>تاریخ ثبت</dt>
+            <dd>{formatFullJalaliDate(new Date(order.createdAt))}</dd>
           </dl>
-        </Card>
+        </div>
       ) : null}
     </section>
   );
