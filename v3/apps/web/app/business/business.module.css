@@ -1,0 +1,248 @@
+/*
+ * The business page — `12_BUSINESS.md` and `45_OWNER_FINANCE_ACCESS.md`.
+ *
+ *   390   the sections one under another.
+ *   1024  the business beside its member roster.
+ *
+ * One deliberate departure from the design: the spec puts the invitations
+ * BELOW the business and roster at 1280. They stay first at every width. A
+ * pending invitation is a decision waiting on the user, and moving it below a
+ * long roster on a desktop screen would also put it after the roster in focus
+ * order if done in the DOM, or out of focus order if done with CSS `order`.
+ *
+ * Nothing here changes what the page says or does: every accessible name, live
+ * region and confirmation is the same. Breakpoints are the design's 640 and
+ * 1024 (`breakpoints.spec.ts`).
+ */
+
+.page {
+  display: grid;
+  gap: var(--bc-spacing-card-gap);
+}
+
+.panel {
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-card);
+  padding: 16px;
+}
+
+@media (min-width: 640px) {
+  .panel {
+    padding: 20px;
+  }
+}
+
+.columns {
+  display: grid;
+  gap: var(--bc-spacing-card-gap);
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+
+@media (min-width: 1024px) {
+  .columns {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  }
+}
+
+.sectionTitle {
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.businessName {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.bio {
+  margin: 0 0 8px;
+  color: var(--bc-color-text-muted);
+  line-height: 1.8;
+}
+
+.meta {
+  margin: 0;
+  font-size: 13px;
+  color: var(--bc-color-text-faint);
+}
+
+.lead {
+  margin: 0 0 16px;
+  color: var(--bc-color-text-muted);
+  line-height: 1.8;
+}
+
+/* ---------------------------------------------------------- invitations */
+
+.invites {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.invite {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.inviteText {
+  font-size: 14px;
+}
+
+.buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ---------------------------------------------------------------- roster */
+
+.info {
+  margin-block-end: 16px;
+  padding: 12px 14px;
+  border-radius: var(--bc-radius-control);
+  background: var(--bc-color-surface-tint);
+  font-size: 12.5px;
+  line-height: 1.8;
+  color: var(--bc-color-text-muted);
+}
+
+/* The live region stays mounted so text-only changes keep announcing. */
+.announce {
+  font-size: 12.5px;
+  color: var(--bc-color-text-muted);
+}
+
+.announceOn {
+  margin-block-end: 12px;
+}
+
+.announceOff {
+  min-block-size: 0;
+}
+
+.emptyRoster {
+  margin: 0 0 16px;
+  color: var(--bc-color-text-muted);
+  font-size: 14px;
+}
+
+.roster {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+}
+
+.member {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-block: 14px;
+}
+
+.member + .member {
+  border-block-start: 1px solid var(--bc-color-border);
+}
+
+.memberTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.memberId {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-inline-size: min(240px, 100%);
+}
+
+.identity {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.memberMeta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--bc-color-text-faint);
+}
+
+.memberActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.note {
+  font-size: 12px;
+  color: var(--bc-color-text-faint);
+}
+
+.grantError {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.grantErrorText {
+  font-size: 12.5px;
+  color: var(--bc-color-error);
+}
+
+/* The four-digit hint is never reordered inside a right-to-left line. */
+.hintDigits {
+  direction: ltr;
+  unicode-bidi: isolate;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --------------------------------------------------------------- dialogs */
+
+.dialogBody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dialogText {
+  margin: 0;
+}
+
+.acknowledge {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.acknowledge input {
+  margin-block-start: 3px;
+  inline-size: 18px;
+  block-size: 18px;
+  flex-shrink: 0;
+}
+
+.dialogError {
+  font-size: 12.5px;
+  color: var(--bc-color-error);
+}
+
+.roleRow {
+  margin-block-end: 16px;
+}
