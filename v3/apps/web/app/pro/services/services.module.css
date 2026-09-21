@@ -1,0 +1,84 @@
+/*
+ * The professional's service catalogue — `19_PRO_SERVICES.md`.
+ *
+ * "A limited design: tokens and the base components only." The CRUD, the
+ * confirm-before-delete and the failed-load handling already work; what
+ * changes is layout: the add/edit form is single-column at 390 and pairs its
+ * related fields (duration and price) from 1024 via `FormGrid`, and the
+ * catalogue is a list of cards.
+ *
+ * Breakpoints are the design's 640 and 1024 (`breakpoints.spec.ts`).
+ */
+
+.panel {
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-card);
+  padding: 16px;
+}
+
+@media (min-width: 640px) {
+  .panel {
+    padding: 20px;
+  }
+}
+
+.formTitle {
+  margin: 0 0 16px;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.formActions {
+  display: grid;
+  gap: 10px;
+}
+
+@media (min-width: 640px) {
+  .formActions {
+    display: flex;
+    flex-wrap: wrap;
+  }
+}
+
+.catalogue {
+  margin-block-start: 20px;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--bc-spacing-card-gap);
+}
+
+.service {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--bc-spacing-chip-gap);
+}
+
+.serviceText {
+  min-inline-size: 0;
+}
+
+.serviceName {
+  margin: 0;
+  font-weight: 700;
+}
+
+.serviceMeta {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--bc-color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.serviceActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}

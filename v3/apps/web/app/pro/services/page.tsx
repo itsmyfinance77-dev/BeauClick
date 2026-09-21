@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { formatToman, normalizeDigits, toPersianDigits } from '@beauclick/persian-utils';
-import { Alert, Button, Card, ErrorState, Input, LoadingState } from '@/components/ui';
-import { ConfirmDialog, EmptyState, PageHeader } from '@/components/kit';
+import { Alert, Button, ErrorState, Input, LoadingState } from '@/components/ui';
+import { ConfirmDialog, EmptyState, FormFullRow, FormGrid, PageHeader } from '@/components/kit';
 import { ProGuard } from '@/components/pro-guard';
 import { useAuth } from '@/lib/auth-context';
 import {
@@ -14,6 +14,7 @@ import {
   type MyProviderProfile,
   type ServiceOffering,
 } from '@/lib/pro-api';
+import styles from './services.module.css';
 
 export default function ProServicesPage() {
   return <ProGuard>{(profile) => <Services profile={profile} />}</ProGuard>;
@@ -146,84 +147,78 @@ function Services({ profile }: { profile: MyProviderProfile }) {
 
       {error ? <ErrorState message={error} onRetry={() => void load()} /> : null}
 
-      <Card>
-        <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 16px' }}>
-          {editingId ? 'ویرایش خدمت' : 'افزودن خدمت'}
-        </h2>
+      <div className={styles.panel}>
+        <h2 className={styles.formTitle}>{editingId ? 'ویرایش خدمت' : 'افزودن خدمت'}</h2>
         <form onSubmit={submit} noValidate>
           {formError ? <Alert>{formError}</Alert> : null}
           {saved ? <Alert tone="success">{saved}</Alert> : null}
-          <Input
-            label="نام خدمت"
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            required
-            maxLength={120}
-          />
-          <Input
-            label="مدت (دقیقه)"
-            value={form.durationMinutes}
-            onChange={(e) => setForm({ ...form, durationMinutes: e.target.value })}
-            inputMode="numeric"
-            required
-            hint="حداقل ۵ دقیقه."
-          />
-          <Input
-            label="قیمت (تومان)"
-            value={form.priceToman}
-            onChange={(e) => setForm({ ...form, priceToman: e.target.value })}
-            inputMode="numeric"
-            required
-          />
-          <Button type="submit" loading={saving}>
-            {editingId ? 'ذخیره تغییرات' : 'افزودن خدمت'}
-          </Button>
-          {editingId ? (
-            <div style={{ marginBlockStart: 10 }}>
-              <Button type="button" variant="ghost" onClick={cancelEdit} disabled={saving}>
+          <FormGrid>
+            <FormFullRow>
+              <Input
+                label="نام خدمت"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                required
+                maxLength={120}
+              />
+            </FormFullRow>
+            {/* Duration and price are the one genuine pair: they sit side by side
+                while each column stays wide enough, and stack in order below. */}
+            <Input
+              label="مدت (دقیقه)"
+              value={form.durationMinutes}
+              onChange={(e) => setForm({ ...form, durationMinutes: e.target.value })}
+              inputMode="numeric"
+              required
+              hint="حداقل ۵ دقیقه."
+            />
+            <Input
+              label="قیمت (تومان)"
+              value={form.priceToman}
+              onChange={(e) => setForm({ ...form, priceToman: e.target.value })}
+              inputMode="numeric"
+              required
+            />
+          </FormGrid>
+          <div className={styles.formActions}>
+            <Button type="submit" inline loading={saving}>
+              {editingId ? 'ذخیره تغییرات' : 'افزودن خدمت'}
+            </Button>
+            {editingId ? (
+              <Button type="button" inline variant="ghost" onClick={cancelEdit} disabled={saving}>
                 انصراف از ویرایش
               </Button>
-            </div>
-          ) : null}
+            ) : null}
+          </div>
         </form>
-      </Card>
+      </div>
 
-      <div style={{ marginBlockStart: 20 }}>
+      <div className={styles.catalogue}>
         {loading && !loaded ? (
-          <LoadingState label="در حال بارگذاری خدمات…" />
+          <LoadingState label="در حال بارگذاری خدمات…" lines={4} />
         ) : loaded && services.length === 0 ? (
           <EmptyState message="هنوز هیچ خدمتی ثبت نکرده‌اید. با فرم بالا اولین خدمت خود را اضافه کنید." />
         ) : (
-          <div style={{ display: 'grid', gap: 'var(--bc-spacing-card-gap)' }}>
+          <ul className={styles.list}>
             {services.map((service) => (
-              <Card key={service.id}>
-                <div
-                  style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 'var(--bc-spacing-chip-gap)',
-                  }}
-                >
-                  <div style={{ minWidth: 0 }}>
-                    <p style={{ margin: 0, fontWeight: 700 }}>{service.name}</p>
-                    <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--bc-color-ink-soft)' }}>
-                      {toPersianDigits(service.durationMinutes)} دقیقه — {formatToman(service.priceToman)}
-                    </p>
-                  </div>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    <Button type="button" variant="ghost" inline onClick={() => startEdit(service)}>
-                      ویرایش
-                    </Button>
-                    <Button type="button" variant="danger" inline onClick={() => setPendingDelete(service)}>
-                      حذف
-                    </Button>
-                  </div>
+              <li key={service.id} className={`${styles.panel} ${styles.service}`} data-service={service.id}>
+                <div className={styles.serviceText}>
+                  <p className={styles.serviceName}>{service.name}</p>
+                  <p className={styles.serviceMeta}>
+                    {toPersianDigits(service.durationMinutes)} دقیقه — {formatToman(service.priceToman)}
+                  </p>
                 </div>
-              </Card>
+                <div className={styles.serviceActions}>
+                  <Button type="button" variant="ghost" inline onClick={() => startEdit(service)}>
+                    ویرایش
+                  </Button>
+                  <Button type="button" variant="danger" inline onClick={() => setPendingDelete(service)}>
+                    حذف
+                  </Button>
+                </div>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
       </div>
 
