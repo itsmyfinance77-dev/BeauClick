@@ -6,7 +6,9 @@ import { formatFullJalaliDate, toPersianDigits } from '@beauclick/persian-utils'
 import { useAuth } from '@/lib/auth-context';
 import { useUnread } from '@/lib/unread-context';
 import { ProtectedRoute } from '@/components/protected-route';
-import { Alert, Card, ErrorState, LoadingState } from '@/components/ui';
+import { Alert, ErrorState, LoadingState } from '@/components/ui';
+import { Badge, EmptyState, type BadgeTone } from '@/components/kit';
+import { notificationHref } from '@/lib/notification-link';
 import {
   listNotifications,
   markAllNotificationsRead,
@@ -16,6 +18,7 @@ import {
   type NotificationItem,
   type NotificationPreference,
 } from '@/lib/phase3-api';
+import styles from './notifications.module.css';
 
 const CATEGORY_LABELS: Record<string, string> = {
   booking: 'رزرو',
@@ -26,6 +29,22 @@ const CATEGORY_LABELS: Record<string, string> = {
   retention: 'پیشنهادها',
   referral: 'معرفی دوستان',
   loyalty: 'باشگاه مشتریان',
+};
+
+/**
+ * A soft tint per category, so a list can be scanned by kind. The label is
+ * always printed as well — the tint is for those who can see it, not the only
+ * carrier of the category.
+ */
+const CATEGORY_TONE: Record<string, BadgeTone> = {
+  booking: 'primary',
+  payment: 'success',
+  reminder: 'warning',
+  waitlist: 'warning',
+  rebooking: 'neutral',
+  retention: 'neutral',
+  referral: 'primary',
+  loyalty: 'primary',
 };
 
 export default function NotificationsPage() {
@@ -107,141 +126,124 @@ function NotificationCenter() {
     }
   };
 
-  if (loading) return <LoadingState label="در حال بارگذاری اعلان‌ها…" />;
+  if (loading) return <LoadingState label="در حال بارگذاری اعلان‌ها…" lines={4} />;
   if (!loaded) return <ErrorState message={error ?? 'اعلان‌ها بارگذاری نشد.'} onRetry={() => void load()} />;
 
   return (
     <section>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
-        <h1 style={{ fontSize: 24, marginBlockEnd: 4 }}>
-          اعلان‌ها{' '}
+      <div className={styles.head}>
+        <h1 className={styles.title}>
+          اعلان‌ها
           {unread > 0 && (
-            <span
-              aria-label={`${toPersianDigits(unread)} اعلان خوانده‌نشده`}
-              style={{
-                fontSize: 14,
-                fontWeight: 700,
-                padding: '2px 10px',
-                borderRadius: 999,
-                background: 'var(--bc-color-primary)',
-                color: 'var(--bc-color-surface)',
-              }}
-            >
+            <span className={styles.count} aria-label={`${toPersianDigits(unread)} اعلان خوانده‌نشده`}>
               {toPersianDigits(unread)}
             </span>
           )}
         </h1>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button type="button" onClick={() => setShowPreferences((v) => !v)} aria-expanded={showPreferences} style={linkButton}>
-            تنظیمات
-          </button>
-          {unread > 0 && (
-            <button type="button" onClick={() => void readAll()} style={linkButton}>
-              علامت‌گذاری همه به‌عنوان خوانده‌شده
-            </button>
-          )}
-        </div>
+        <button
+          type="button"
+          className={styles.control}
+          onClick={() => setShowPreferences((v) => !v)}
+          aria-expanded={showPreferences}
+        >
+          تنظیمات
+        </button>
       </div>
 
       {error && <Alert tone="error">{error}</Alert>}
 
       {showPreferences && (
-        <Card>
-          <h2 style={{ fontSize: 16, marginBlockStart: 0 }}>دریافت اعلان‌ها</h2>
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 10 }}>
+        <div className={styles.prefs}>
+          <h2 className={styles.prefsTitle}>دریافت اعلان‌ها</h2>
+          <ul className={styles.prefList}>
             {preferences.map((pref) => (
-              <li key={pref.category} style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 44 }}>
+              <li key={pref.category} className={styles.pref}>
                 <input
                   id={`pref-${pref.category}`}
                   type="checkbox"
                   checked={pref.enabled}
                   disabled={pref.mandatory}
                   onChange={(e) => void togglePreference(pref.category, e.target.checked)}
-                  style={{ width: 20, height: 20 }}
                 />
-                <label htmlFor={`pref-${pref.category}`} style={{ fontSize: 14 }}>
+                <label htmlFor={`pref-${pref.category}`} className={styles.prefLabel}>
                   {CATEGORY_LABELS[pref.category] ?? pref.category}
                   {pref.mandatory && (
                     // Explained, not merely greyed out: a disabled control with
                     // no reason reads as a bug.
-                    <span style={{ color: 'var(--bc-color-ink-faint)', fontSize: 12 }}>
-                      {' '}
-                      — همیشه فعال (پیام‌های ضروری)
-                    </span>
+                    <span className={styles.prefReason}> — همیشه فعال (پیام‌های ضروری)</span>
                   )}
                 </label>
               </li>
             ))}
           </ul>
-        </Card>
+        </div>
       )}
 
       {items.length === 0 ? (
-        <Card>
-          <p style={{ margin: 0 }}>هنوز اعلانی ندارید.</p>
-        </Card>
+        <EmptyState message="هنوز اعلانی ندارید." />
       ) : (
-        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 'var(--bc-spacing-card-gap)' }}>
-          {items.map((item) => (
-            <li key={item.id}>
-              <Card>
-                <article
-                  // The unread state is announced, not only coloured -- a
-                  // colour-only distinction is invisible to a screen reader
-                  // and to anyone who cannot distinguish the two shades.
-                  aria-label={item.read ? undefined : 'خوانده‌نشده'}
-                  style={{
-                    borderInlineStart: item.read ? 'none' : '3px solid var(--bc-color-primary)',
-                    paddingInlineStart: item.read ? 0 : 12,
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                    <h2 style={{ fontSize: 16, margin: 0 }}>
-                      {item.title}
-                      {!item.read && <span style={{ color: 'var(--bc-color-primary)' }}> •</span>}
-                    </h2>
-                    <span style={{ fontSize: 12, color: 'var(--bc-color-ink-faint)' }}>
-                      {formatFullJalaliDate(new Date(item.createdAt))}
-                    </span>
-                  </div>
-                  {item.body && <p style={{ margin: '8px 0 0', fontSize: 14 }}>{item.body}</p>}
-                  <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--bc-color-ink-faint)' }}>
-                    {CATEGORY_LABELS[item.category] ?? item.category}
-                  </p>
+        <>
+          {/* "Read all" directly above the list it acts on (18_NOTIFICATIONS.md). */}
+          <div className={styles.toolbar}>
+            <p className={styles.toolbarText}>
+              {unread > 0 ? `${toPersianDigits(unread)} اعلان خوانده‌نشده` : 'همهٔ اعلان‌ها خوانده شده‌اند.'}
+            </p>
+            {unread > 0 && (
+              <button type="button" className={styles.control} onClick={() => void readAll()}>
+                علامت‌گذاری همه به‌عنوان خوانده‌شده
+              </button>
+            )}
+          </div>
 
-                  <div style={{ display: 'flex', gap: 8, marginBlockStart: 10, flexWrap: 'wrap' }}>
-                    {item.deepLink && (
-                      <Link href={item.deepLink} onClick={() => void readOne(item.id)} style={{ ...linkButton, textDecoration: 'none' }}>
-                        مشاهده
-                      </Link>
+          <ul className={styles.list}>
+            {items.map((item) => {
+              // Only a link to a page that exists. See lib/notification-link.ts.
+              const href = notificationHref(item.deepLink);
+              return (
+                <li key={item.id}>
+                  <article
+                    // The unread state is announced, not only coloured -- a
+                    // colour-only distinction is invisible to a screen reader
+                    // and to anyone who cannot distinguish the two shades.
+                    aria-label={item.read ? undefined : 'خوانده‌نشده'}
+                    className={`${styles.item} ${item.read ? '' : styles.unread}`}
+                    data-notification={item.id}
+                  >
+                    <div className={styles.itemHead}>
+                      <h2 className={styles.itemTitle}>
+                        {!item.read && <span className={styles.dot} aria-hidden="true" />}
+                        {item.title}
+                      </h2>
+                      <span className={styles.when}>{formatFullJalaliDate(new Date(item.createdAt))}</span>
+                    </div>
+                    {item.body && <p className={styles.body}>{item.body}</p>}
+                    <div className={styles.meta}>
+                      <Badge tone={CATEGORY_TONE[item.category] ?? 'neutral'}>
+                        {CATEGORY_LABELS[item.category] ?? item.category}
+                      </Badge>
+                    </div>
+
+                    {(href || !item.read) && (
+                      <div className={styles.actions}>
+                        {href && (
+                          <Link href={href} onClick={() => void readOne(item.id)} className={styles.control}>
+                            مشاهده
+                          </Link>
+                        )}
+                        {!item.read && (
+                          <button type="button" className={styles.control} onClick={() => void readOne(item.id)}>
+                            خوانده شد
+                          </button>
+                        )}
+                      </div>
                     )}
-                    {!item.read && (
-                      <button type="button" onClick={() => void readOne(item.id)} style={linkButton}>
-                        خوانده شد
-                      </button>
-                    )}
-                  </div>
-                </article>
-              </Card>
-            </li>
-          ))}
-        </ul>
+                  </article>
+                </li>
+              );
+            })}
+          </ul>
+        </>
       )}
     </section>
   );
 }
-
-const linkButton: React.CSSProperties = {
-  font: 'inherit',
-  fontSize: 14,
-  fontWeight: 600,
-  padding: '10px 14px',
-  minHeight: 44,
-  display: 'inline-flex',
-  alignItems: 'center',
-  borderRadius: 'var(--bc-radius-button)',
-  border: '1px solid var(--bc-color-line)',
-  background: 'transparent',
-  color: 'var(--bc-color-ink)',
-  cursor: 'pointer',
-};
