@@ -1,0 +1,264 @@
+/*
+ * The chat report queue — `37_ADMIN_CHAT_MODERATION.md`.
+ *
+ * A metadata-only table; a row's «باز کردن» fetches one report and its
+ * bounded message window into the panel.
+ *
+ *   390    the table is a card list (`data-table.module.css`); the panel is a
+ *          full-screen sheet over the queue.
+ *   640    the panel sits under the table.
+ *   1024   the panel sits beside the table and stays in view while scrolling.
+ *
+ * The message window is its own scroll box, so a 50-message thread never
+ * pushes the decision out of reach. Breakpoints are the design's 640 and
+ * 1024 (`breakpoints.spec.ts`); every grid track is `minmax(0, …)` so a long
+ * unbroken message cannot widen the page past the viewport.
+ */
+
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--bc-spacing-card-gap);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--bc-spacing-card-gap);
+  align-items: start;
+}
+
+@media (min-width: 1024px) {
+  .withPanel {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+.queue {
+  min-inline-size: 0;
+}
+
+.sectionTitle {
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.sectionTitle:focus {
+  outline: none;
+}
+
+.sectionTitle:focus-visible {
+  outline: 2px solid var(--bc-color-primary);
+  outline-offset: 2px;
+}
+
+.count {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--bc-color-ink-faint);
+}
+
+.queue [data-selected] {
+  background: var(--bc-color-surface-tint);
+}
+
+/* ------------------------------------------------------------------ panel */
+
+.panel {
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-card);
+  padding: 16px;
+  min-inline-size: 0;
+}
+
+@media (max-width: 639px) {
+  .panel {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    overflow-y: auto;
+    border: 0;
+    border-radius: 0;
+  }
+}
+
+@media (min-width: 1024px) {
+  .panel {
+    position: sticky;
+    inset-block-start: 16px;
+    padding: 20px;
+  }
+}
+
+.panelHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-block-end: 12px;
+}
+
+.panelTitle {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  min-inline-size: 0;
+}
+
+.panelTitle:focus {
+  outline: none;
+}
+
+.panelTitle:focus-visible {
+  outline: 2px solid var(--bc-color-primary);
+  outline-offset: 2px;
+}
+
+.meta {
+  margin: 0 0 16px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  font-size: 14px;
+}
+
+.meta dt {
+  font-size: 12px;
+  color: var(--bc-color-ink-soft);
+}
+
+.meta dd {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.note {
+  white-space: pre-wrap;
+  line-height: 1.8;
+}
+
+/* ----------------------------------------------------------------- window */
+
+.windowTitle {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.hint {
+  margin: 0 0 12px;
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--bc-color-ink-soft);
+}
+
+/* `position: relative` so a message's `offsetTop` is measured from the list. */
+.messages {
+  position: relative;
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 8px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  max-block-size: 420px;
+  overflow-y: auto;
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-control);
+  background: var(--bc-color-surface-tint);
+}
+
+.messages:focus-visible {
+  outline: 2px solid var(--bc-color-primary);
+  outline-offset: 2px;
+}
+
+.message {
+  padding: 8px 10px;
+  border-radius: var(--bc-radius-control);
+  background: var(--bc-color-surface);
+  min-inline-size: 0;
+}
+
+/* Marked by a border and a word, not by colour alone. */
+.reported {
+  border: 2px solid var(--bc-color-warning);
+}
+
+.messageMeta {
+  margin: 0;
+  font-size: 12px;
+  color: var(--bc-color-ink-soft);
+}
+
+/* A raw id fragment: left-to-right, never reordered inside a Persian line. */
+.sender {
+  direction: ltr;
+  unicode-bidi: isolate;
+  font-family: monospace;
+}
+
+.reportedLabel {
+  color: var(--bc-color-warning);
+}
+
+.body {
+  margin: 4px 0 0;
+  font-size: 14px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.erased {
+  margin: 4px 0 0;
+  font-size: 13px;
+  font-style: italic;
+  color: var(--bc-color-ink-faint);
+}
+
+/* --------------------------------------------------------------- decision */
+
+.decision {
+  border-block-start: 1px solid var(--bc-color-border);
+  padding-block-start: 16px;
+}
+
+.outcomes {
+  border: 0;
+  margin: 0 0 16px;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.legend {
+  font-weight: 600;
+  font-size: 14px;
+  margin-block-end: 6px;
+  padding: 0;
+}
+
+.radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-block-size: 44px;
+  padding-inline: 12px;
+  border: 1px solid var(--bc-color-line);
+  border-radius: var(--bc-radius-button);
+  cursor: pointer;
+}
+
+.reasonError {
+  margin: -8px 0 12px;
+  font-size: 12px;
+  color: var(--bc-color-error);
+}
+
+.dialogText {
+  margin: 0;
+}

@@ -31,8 +31,17 @@ import styles from './admin-shell.module.css';
 const ADMIN_NAV: { href: string; label: string; capability?: string; system?: boolean }[] = [
   { href: '/admin', label: 'نمای کلی' },
   { href: '/admin/verification', label: 'احراز هویت', capability: 'bc_moderate_verification' },
+  // #238. Beside «احراز هویت» because all three are one-at-a-time review queues
+  // with a mandatory reason — the placement specs 27 and 28 propose and leave
+  // as a product decision.
+  { href: '/admin/media', label: 'گزارش تصاویر', capability: 'bc_moderate_media' },
+  { href: '/admin/reviews', label: 'بازبینی دیدگاه‌ها', capability: 'bc_moderate_reviews' },
+  { href: '/admin/chat-reports', label: 'گزارش گفتگوها', capability: 'bc_moderate_chat' },
   { href: '/admin/users', label: 'کاربران و نقش‌ها' },
   { href: '/admin/audit-log', label: 'گزارش عملیات' },
+  // #238, spec 31: a read-only monitor, so beside the other operational
+  // records rather than the moderation queues.
+  { href: '/admin/privacy', label: 'حریم خصوصی', capability: 'bc_manage_platform' },
   { href: '/admin/settlements', label: 'تسویه‌ها' },
   { href: '/admin/search', label: 'جست‌وجو' },
   { href: '/admin/notifications', label: 'اعلان‌ها', system: true },
@@ -160,4 +169,6 @@ const CAPABILITY_LABELS: Record<string, string> = {
   bc_manage_platform: 'مدیریت پلتفرم',
   bc_moderate_verification: 'بررسی احراز هویت',
   bc_moderate_reviews: 'بررسی دیدگاه‌ها',
+  bc_moderate_media: 'بررسی تصاویر',
+  bc_moderate_chat: 'بررسی گفتگوها',
 };
