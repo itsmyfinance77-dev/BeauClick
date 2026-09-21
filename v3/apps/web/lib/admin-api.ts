@@ -123,6 +123,22 @@ export function decideVerification(
   return api.post<VerificationQueueItem>(`/v1/admin/verification/${requestId}/decide`, input);
 }
 
+/**
+ * One document attached to a verification request. `downloadUrl` is minted for
+ * THIS operator, valid for about five minutes and re-authorised against their
+ * live capability on every open, so it is never stored or shown as text.
+ */
+export interface VerificationEvidence {
+  id: string;
+  mediaId: string;
+  downloadUrl: string;
+  createdAt: string;
+}
+
+export function verificationEvidence(api: ApiClient, requestId: string) {
+  return api.get<VerificationEvidence[]>(`/v1/admin/verification/${encodeURIComponent(requestId)}/evidence`);
+}
+
 /** The professional's own side, consumed by `/pro/profile`. */
 export interface MyVerificationRequest {
   id: string;
