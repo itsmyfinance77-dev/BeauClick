@@ -1,0 +1,212 @@
+/*
+ * The notification centre — `18_NOTIFICATIONS.md`.
+ *
+ * "A limited design: a partial layout, not a structural redesign." The
+ * structure (list, read one / read all, channel preferences) already works;
+ * what changes is that each item carries a category badge and an unread dot,
+ * "mark all read" sits directly above the list, and a mandatory preference is
+ * shown disabled with its reason, never hidden.
+ *
+ *   390   items full width; the actions wrap.
+ *   1024  the list is capped at a readable measure.
+ *
+ * Breakpoints are the design's 640 and 1024 (`breakpoints.spec.ts`).
+ */
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-block-end: 16px;
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.count {
+  font-size: var(--bc-text-small-size);
+  font-weight: 700;
+  padding: 2px 10px;
+  border-radius: var(--bc-radius-chip);
+  background: var(--bc-color-primary);
+  color: var(--bc-color-surface);
+}
+
+.control {
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  min-height: 44px;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--bc-radius-control);
+  border: 1px solid var(--bc-color-border);
+  background: transparent;
+  color: var(--bc-color-text);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.control:hover {
+  border-color: var(--bc-color-border-strong);
+}
+
+.prefs {
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-card);
+  padding: 16px;
+  margin-block-end: var(--bc-spacing-card-gap);
+}
+
+.prefsTitle {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.prefList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+
+.pref {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+}
+
+.pref input {
+  inline-size: 20px;
+  block-size: 20px;
+  flex-shrink: 0;
+}
+
+.prefLabel {
+  font-size: 14px;
+}
+
+/* The reason a control is disabled, in text beside it — not a tooltip. */
+.prefReason {
+  color: var(--bc-color-text-muted);
+  font-size: 12px;
+}
+
+/* ------------------------------------------------------------------ list */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-block-end: 12px;
+}
+
+.toolbarText {
+  margin: 0;
+  font-size: 14px;
+  color: var(--bc-color-text-muted);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+@media (min-width: 1024px) {
+  .list,
+  .toolbar {
+    max-inline-size: 760px;
+  }
+}
+
+.item {
+  position: relative;
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-card);
+  padding: 14px 16px;
+}
+
+@media (min-width: 640px) {
+  .item {
+    padding: 16px 20px;
+  }
+}
+
+/*
+ * Unread is a dot AND a coloured edge AND an accessible name (`aria-label` on
+ * the article) — never colour alone.
+ */
+.unread {
+  border-inline-start: 3px solid var(--bc-color-primary);
+}
+
+.itemHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.itemTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.dot {
+  inline-size: 8px;
+  block-size: 8px;
+  border-radius: 50%;
+  background: var(--bc-color-primary);
+  flex-shrink: 0;
+}
+
+.when {
+  font-size: 12px;
+  color: var(--bc-color-text-faint);
+}
+
+.body {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.meta {
+  margin-block-start: 10px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-block-start: 10px;
+}
+
+.empty {
+  margin: 0;
+  color: var(--bc-color-text-muted);
+  line-height: 1.8;
+}
