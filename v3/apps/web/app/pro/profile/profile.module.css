@@ -1,0 +1,136 @@
+/*
+ * The professional's public profile — `14_PRO_PROFILE.md`.
+ *
+ *   390   a single column.
+ *   1024  two columns: name, city and specialties beside the bio.
+ *
+ * The verification status is at the top of the page (the badge in the header
+ * action) and again in its own block below the form. Image upload (avatar,
+ * cover, portfolio, evidence) is a separate feature with its own API and is
+ * not part of this layout change.
+ *
+ * Breakpoints are the design's 640 and 1024 (`breakpoints.spec.ts`).
+ */
+
+.panel {
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-card);
+  padding: 16px;
+}
+
+@media (min-width: 640px) {
+  .panel {
+    padding: 20px;
+  }
+}
+
+.columns {
+  display: grid;
+  gap: 0 var(--bc-spacing-card-gap-large);
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+
+@media (min-width: 1024px) {
+  .columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.field {
+  min-inline-size: 0;
+}
+
+.fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0 0 16px;
+  min-inline-size: 0;
+}
+
+.legend {
+  padding: 0;
+  margin-block-end: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--bc-spacing-chip-gap);
+}
+
+/*
+ * A specialty is a checkbox drawn as a chip. The selection is the checkbox's
+ * own checked state (announced), reinforced by the border and the tint.
+ */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-block-size: 44px;
+  padding: 0 12px;
+  border-radius: var(--bc-radius-chip);
+  border: 1px solid var(--bc-color-border);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.chipOn {
+  border-color: var(--bc-color-primary);
+  background: var(--bc-color-primary-soft);
+}
+
+.loadingNote {
+  margin: 0;
+  font-size: 13px;
+  color: var(--bc-color-text-faint);
+}
+
+.actions {
+  display: grid;
+}
+
+@media (min-width: 640px) {
+  .actions {
+    display: flex;
+  }
+}
+
+.verification {
+  margin-block-start: 20px;
+}
+
+.verifyTitle {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.verifyLead {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--bc-color-text-muted);
+  line-height: 1.8;
+}
+
+.verifyText {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.verifyNote {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--bc-color-text-muted);
+  line-height: 1.8;
+}
+
+.footnote {
+  margin-block-start: 16px;
+  font-size: 12px;
+  color: var(--bc-color-text-faint);
+}
