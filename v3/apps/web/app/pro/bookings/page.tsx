@@ -6,9 +6,12 @@ import {
   formatZonedFullDate,
   formatZonedTime,
   toPersianDigits,
+  zonedIsoDate,
 } from '@beauclick/persian-utils';
-import { Alert, Button, Card, ErrorState, LoadingState } from '@/components/ui';
+import { Alert, Button, ErrorState, LoadingState } from '@/components/ui';
 import { Badge, ConfirmDialog, EmptyState, PageHeader, Select } from '@/components/kit';
+import { TabList, TabPanel } from '@/components/tab-list';
+import { bookingHistoryLabel, bookingStatusLabel, bookingStatusTone } from '@/lib/booking-status';
 import { ProGuard } from '@/components/pro-guard';
 import { useAuth } from '@/lib/auth-context';
 import {
@@ -25,28 +28,11 @@ import {
   type MySlot,
   type ServiceOffering,
 } from '@/lib/pro-api';
+import styles from './bookings.module.css';
 
 export default function ProBookingsPage() {
   return <ProGuard>{(profile) => <ProBookings profile={profile} />}</ProGuard>;
 }
-
-const STATUS_LABELS: Record<BookingSummary['status'], string> = {
-  pending: 'در انتظار پرداخت',
-  confirmed: 'تأیید شده',
-  completed: 'انجام شد',
-  cancelled: 'لغو شده',
-  expired: 'منقضی شده',
-  no_show: 'عدم حضور',
-};
-
-const STATUS_TONE = {
-  pending: 'warning',
-  confirmed: 'primary',
-  completed: 'success',
-  cancelled: 'neutral',
-  expired: 'neutral',
-  no_show: 'error',
-} as const;
 
 /** Mirrors `BookingConfig` defaults. Used ONLY to explain why a button is absent, never to authorize. */
 const MAX_RESCHEDULES = 2;
@@ -55,7 +41,14 @@ const RESCHEDULE_MIN_HOURS = 6;
 /** `PageQueryDto` caps `limit` at 100; 50 keeps a comfortable margin under it. */
 const PAGE_SIZE = 50;
 
-type Tab = 'upcoming' | 'past';
+type Tab = 'upcoming' | 'past' | 'cancelled';
+
+/** Each tab's own empty sentence: "nothing ahead", "no history" and "nothing cancelled" are different facts. */
+const EMPTY: Record<Tab, string> = {
+  upcoming: 'رزرو پیش‌رویی ندارید. مطمئن شوید زمان‌های آزاد ثبت کرده‌اید تا مشتری بتواند شما را رزرو کند.',
+  past: 'هنوز رزرو گذشته‌ای ندارید.',
+  cancelled: 'رزرو لغوشده‌ای ندارید.',
+};
 
 function ProBookings({ profile }: { profile: MyProviderProfile }) {
   const { api } = useAuth();
@@ -160,18 +153,27 @@ function ProBookings({ profile }: { profile: MyProviderProfile }) {
     [services],
   );
 
-  const { upcoming, past } = useMemo(() => {
+  const { upcoming, past, cancelled } = useMemo(() => {
     const now = Date.now();
     const up: BookingSummary[] = [];
     const done: BookingSummary[] = [];
+    const called: BookingSummary[] = [];
     for (const booking of bookings) {
+      // A cancelled booking has its own tab (spec 05: it "has data but no
+      // separate filter"). `expired` — an unpaid hold that lapsed — stays with
+      // the past: nobody cancelled it.
+      if (booking.status === 'cancelled') {
+        called.push(booking);
+        continue;
+      }
       const isOver = new Date(booking.endAt).getTime() <= now;
-      const isTerminal = ['completed', 'cancelled', 'expired', 'no_show'].includes(booking.status);
+      const isTerminal = ['completed', 'expired', 'no_show'].includes(booking.status);
       (isOver || isTerminal ? done : up).push(booking);
     }
     up.sort((a, b) => a.startAt.localeCompare(b.startAt));
     done.sort((a, b) => b.startAt.localeCompare(a.startAt));
-    return { upcoming: up, past: done };
+    called.sort((a, b) => b.startAt.localeCompare(a.startAt));
+    return { upcoming: up, past: done, cancelled: called };
   }, [bookings]);
 
   /**
@@ -276,8 +278,32 @@ function ProBookings({ profile }: { profile: MyProviderProfile }) {
     }
   }
 
-  const visible = tab === 'upcoming' ? upcoming : past;
+  const visible = tab === 'upcoming' ? upcoming : tab === 'past' ? past : cancelled;
   const hasMore = total !== null && bookings.length < total;
+
+  // Grouped by the PLATFORM-local day, not the browser's, so a late-evening
+  // Tehran booking is not filed under the wrong date for a viewer elsewhere.
+  const days = useMemo(() => {
+    const map = new Map<string, BookingSummary[]>();
+    for (const booking of visible) {
+      const key = zonedIsoDate(new Date(booking.startAt));
+      const list = map.get(key) ?? [];
+      list.push(booking);
+      map.set(key, list);
+    }
+    return Array.from(map.entries());
+  }, [visible]);
+
+  // These are counts of what is HELD, not of what exists. With more pages
+  // unread the honest suffix is "+", not a total the screen cannot
+  // substantiate for this partition -- the server's `total` counts every
+  // booking, not one tab's share of them.
+  const count = (n: number) => `${toPersianDigits(n)}${hasMore ? '+' : ''}`;
+  const tabs = [
+    { value: 'upcoming', label: `پیش‌رو (${count(upcoming.length)})` },
+    { value: 'past', label: `گذشته (${count(past.length)})` },
+    { value: 'cancelled', label: `لغوشده (${count(cancelled.length)})` },
+  ] as const;
 
   return (
     <>
@@ -289,211 +315,156 @@ function ProBookings({ profile }: { profile: MyProviderProfile }) {
       {error ? <ErrorState message={error} onRetry={() => void load()} /> : null}
       {actionError ? <Alert>{actionError}</Alert> : null}
 
-      <div
-        role="tablist"
-        aria-label="فیلتر رزروها"
-        style={{ display: 'flex', gap: 'var(--bc-spacing-chip-gap)', marginBlockEnd: 16, flexWrap: 'wrap' }}
-      >
-        {(['upcoming', 'past'] as Tab[]).map((key) => (
-          <button
-            key={key}
-            role="tab"
-            type="button"
-            aria-selected={tab === key}
-            onClick={() => setTab(key)}
-            style={{
-              font: 'inherit',
-              fontSize: 14,
-              fontWeight: tab === key ? 800 : 600,
-              minHeight: 44,
-              padding: '0 16px',
-              borderRadius: 999,
-              cursor: 'pointer',
-              border: `1px solid ${tab === key ? 'var(--bc-color-primary)' : 'var(--bc-color-line)'}`,
-              background: tab === key ? 'var(--bc-color-primary-soft)' : 'transparent',
-              color: tab === key ? 'var(--bc-color-primary)' : 'var(--bc-color-ink)',
-            }}
-          >
-            {/* These are counts of what is HELD, not of what exists. With
-                more pages unread the honest suffix is "+", not a total the
-                screen cannot substantiate for this partition -- the server's
-                `total` counts every booking, not the upcoming or past half of
-                them, and printing it here would be a different number
-                answering a different question. */}
-            {key === 'upcoming'
-              ? `پیش‌رو (${toPersianDigits(upcoming.length)}${hasMore ? '+' : ''})`
-              : `گذشته (${toPersianDigits(past.length)}${hasMore ? '+' : ''})`}
-          </button>
-        ))}
-      </div>
+      <TabList label="فیلتر رزروها" idPrefix="pro-bookings" tabs={tabs} value={tab} onChange={setTab} />
 
-      {loading && !loaded ? (
-        <LoadingState label="در حال بارگذاری رزروها…" />
-      ) : loaded && visible.length === 0 ? (
-        <EmptyState
-          message={
-            tab === 'upcoming'
-              ? 'رزرو پیش‌رویی ندارید. مطمئن شوید زمان‌های آزاد ثبت کرده‌اید تا مشتری بتواند شما را رزرو کند.'
-              : 'هنوز رزرو گذشته‌ای ندارید.'
-          }
-        />
-      ) : (
-        <div style={{ display: 'grid', gap: 'var(--bc-spacing-card-gap)' }}>
-          {visible.map((booking) => {
-            const start = new Date(booking.startAt);
-            const ended = new Date(booking.endAt).getTime() <= Date.now();
-            const hoursUntil = (start.getTime() - Date.now()) / 3_600_000;
-            const name = serviceName(booking.serviceId);
-            const service = services.find((s) => s.id === booking.serviceId);
+      <TabPanel idPrefix="pro-bookings" value={tab}>
+        {loading && !loaded ? (
+          <LoadingState label="در حال بارگذاری رزروها…" lines={5} />
+        ) : loaded && visible.length === 0 ? (
+          <EmptyState message={EMPTY[tab]} />
+        ) : (
+          days.map(([day, dayBookings]) => (
+            <section key={day} className={styles.day} data-day={day}>
+              <h2 className={styles.dayTitle}>{formatZonedFullDate(new Date(dayBookings[0].startAt))}</h2>
+              <ul className={styles.rows}>
+                {dayBookings.map((booking) => {
+                  const start = new Date(booking.startAt);
+                  const ended = new Date(booking.endAt).getTime() <= Date.now();
+                  const hoursUntil = (start.getTime() - Date.now()) / 3_600_000;
+                  const name = serviceName(booking.serviceId);
+                  const service = services.find((s) => s.id === booking.serviceId);
 
-            const canComplete = booking.status === 'confirmed';
-            const canNoShow = booking.status === 'confirmed' && ended;
-            const canReschedule =
-              (booking.status === 'confirmed' || booking.status === 'pending') &&
-              booking.rescheduleCount < MAX_RESCHEDULES &&
-              hoursUntil >= RESCHEDULE_MIN_HOURS;
+                  const canComplete = booking.status === 'confirmed';
+                  const canNoShow = booking.status === 'confirmed' && ended;
+                  const canReschedule =
+                    (booking.status === 'confirmed' || booking.status === 'pending') &&
+                    booking.rescheduleCount < MAX_RESCHEDULES &&
+                    hoursUntil >= RESCHEDULE_MIN_HOURS;
 
-            return (
-              <Card key={booking.id}>
-                <div
-                  style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    alignItems: 'flex-start',
-                    justifyContent: 'space-between',
-                    gap: 'var(--bc-spacing-chip-gap)',
-                  }}
-                >
-                  <div style={{ minWidth: 0 }}>
-                    <p style={{ margin: 0, fontWeight: 700, fontSize: 14 }}>{formatZonedFullDate(start)}</p>
-                    <p style={{ margin: '4px 0 0', fontSize: 14 }}>
-                      ساعت {formatZonedTime(start)} تا {formatZonedTime(new Date(booking.endAt))}
-                    </p>
-                    <p style={{ margin: '6px 0 0', fontSize: 13, color: 'var(--bc-color-ink-soft)' }}>
-                      {name ?? 'خدمت نامشخص'}
-                      {service ? ` — ${formatToman(service.priceToman)}` : ''}
-                    </p>
-                    {/* A truncated customer reference, because a raw identity
-                        id is genuinely all the booking API exposes about the
-                        customer -- no name, no phone, deliberately. Inventing
-                        a friendlier identity would mean fabricating one.
-                        Rendered LTR so the hex does not visually reverse
-                        inside the RTL document, the same treatment the sandbox
-                        transaction reference already gets. */}
-                    <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--bc-color-ink-faint)' }}>
-                      مشتری:{' '}
-                      <span style={{ direction: 'ltr', display: 'inline-block', fontFamily: 'monospace' }}>
-                        {booking.customerId.slice(0, 8)}
-                      </span>
-                    </p>
-                    {booking.rescheduleCount > 0 ? (
-                      <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--bc-color-ink-faint)' }}>
-                        {toPersianDigits(booking.rescheduleCount)} بار جابه‌جا شده
-                      </p>
-                    ) : null}
-                  </div>
-                  <Badge tone={STATUS_TONE[booking.status]}>{STATUS_LABELS[booking.status]}</Badge>
-                </div>
+                  const noShowNote = booking.status === 'confirmed' && !ended;
+                  const rescheduleNote = (booking.status === 'confirmed' || booking.status === 'pending') && !canReschedule;
 
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBlockStart: 16 }}>
-                  {canComplete ? (
-                    <Button
-                      type="button"
-                      inline
-                      loading={busyId === booking.id}
-                      onClick={() => setConfirming({ booking, action: 'complete' })}
-                    >
-                      ثبت انجام نوبت
-                    </Button>
-                  ) : null}
-                  {canNoShow ? (
-                    <Button
-                      type="button"
-                      variant="danger"
-                      inline
-                      disabled={busyId === booking.id}
-                      onClick={() => setConfirming({ booking, action: 'no_show' })}
-                    >
-                      عدم حضور مشتری
-                    </Button>
-                  ) : null}
-                  {canReschedule ? (
-                    <Button type="button" variant="ghost" inline onClick={() => void openReschedule(booking)}>
-                      تغییر زمان
-                    </Button>
-                  ) : null}
-                  <Button type="button" variant="ghost" inline onClick={() => void openHistory(booking)}>
-                    {historyFor === booking.id ? 'بستن تاریخچه' : 'تاریخچه'}
-                  </Button>
-                </div>
+                  return (
+                    <li key={booking.id} className={styles.booking} data-booking={booking.id}>
+                      <div className={styles.info}>
+                        <p className={styles.when}>{formatZonedFullDate(start)}</p>
+                        <p className={styles.time}>
+                          ساعت <span className={styles.clock}>{formatZonedTime(start)}</span> تا{' '}
+                          <span className={styles.clock}>{formatZonedTime(new Date(booking.endAt))}</span>
+                        </p>
+                        <p className={styles.service}>
+                          {name ?? 'خدمت نامشخص'}
+                          {service ? ` — ${formatToman(service.priceToman)}` : ''}
+                        </p>
+                        {/* A truncated customer reference, because a raw identity
+                            id is genuinely all the booking API exposes about the
+                            customer -- no name, no phone, deliberately. Inventing
+                            a friendlier identity would mean fabricating one.
+                            Rendered LTR so the hex does not visually reverse
+                            inside the RTL document. */}
+                        <p className={styles.meta}>
+                          مشتری: <span className={styles.ref}>{booking.customerId.slice(0, 8)}</span>
+                        </p>
+                        {booking.rescheduleCount > 0 ? (
+                          <p className={styles.meta}>{toPersianDigits(booking.rescheduleCount)} بار جابه‌جا شده</p>
+                        ) : null}
+                      </div>
+                      <div className={styles.status}>
+                        <Badge tone={bookingStatusTone(booking.status)}>{bookingStatusLabel(booking.status)}</Badge>
+                      </div>
 
-                {/* Why an action is unavailable, rather than a dead button.
-                    The server is the authority in every case; these are
-                    explanations of its rules, not the enforcement of them. */}
-                {booking.status === 'confirmed' && !ended ? (
-                  <p style={{ margin: '10px 0 0', fontSize: 12, color: 'var(--bc-color-ink-faint)' }}>
-                    ثبت عدم حضور تنها پس از پایان زمان نوبت ممکن است.
-                  </p>
-                ) : null}
-                {(booking.status === 'confirmed' || booking.status === 'pending') && !canReschedule ? (
-                  <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--bc-color-ink-faint)' }}>
-                    {booking.rescheduleCount >= MAX_RESCHEDULES
-                      ? `حداکثر ${toPersianDigits(MAX_RESCHEDULES)} بار جابه‌جایی مجاز است.`
-                      : `تغییر زمان تا ${toPersianDigits(RESCHEDULE_MIN_HOURS)} ساعت پیش از نوبت ممکن است.`}
-                  </p>
-                ) : null}
+                      <div className={styles.actions}>
+                        {canComplete ? (
+                          <Button
+                            type="button"
+                            inline
+                            loading={busyId === booking.id}
+                            onClick={() => setConfirming({ booking, action: 'complete' })}
+                          >
+                            ثبت انجام نوبت
+                          </Button>
+                        ) : null}
+                        {canNoShow ? (
+                          <Button
+                            type="button"
+                            variant="danger"
+                            inline
+                            disabled={busyId === booking.id}
+                            onClick={() => setConfirming({ booking, action: 'no_show' })}
+                          >
+                            عدم حضور مشتری
+                          </Button>
+                        ) : null}
+                        {canReschedule ? (
+                          <Button type="button" variant="ghost" inline onClick={() => void openReschedule(booking)}>
+                            تغییر زمان
+                          </Button>
+                        ) : null}
+                        <Button type="button" variant="ghost" inline onClick={() => void openHistory(booking)}>
+                          {historyFor === booking.id ? 'بستن تاریخچه' : 'تاریخچه'}
+                        </Button>
+                      </div>
 
-                {historyFor === booking.id ? (
-                  <div
-                    style={{
-                      marginBlockStart: 16,
-                      paddingBlockStart: 16,
-                      borderBlockStart: '1px solid var(--bc-color-line)',
-                    }}
-                  >
-                    {historyLoading ? (
-                      <LoadingState label="در حال بارگذاری تاریخچه…" />
-                    ) : historyError ? (
-                      <ErrorState message={historyError} onRetry={() => void openHistory(booking)} />
-                    ) : history.length === 0 ? (
-                      <p style={{ fontSize: 13, color: 'var(--bc-color-ink-soft)', margin: 0 }}>
-                        رویدادی برای این رزرو ثبت نشده است.
-                      </p>
-                    ) : (
-                      <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 8 }}>
-                        {history.map((entry) => (
-                          <li key={entry.id} style={{ fontSize: 13 }}>
-                            <span style={{ fontWeight: 600 }}>{historyLabel(entry)}</span>
-                            <span style={{ color: 'var(--bc-color-ink-faint)' }}>
-                              {' — '}
-                              {formatZonedFullDate(new Date(entry.createdAt))} ساعت{' '}
-                              {formatZonedTime(new Date(entry.createdAt))}
-                            </span>
-                            {entry.reason ? (
-                              <span style={{ color: 'var(--bc-color-ink-soft)' }}>{` — ${entry.reason}`}</span>
-                            ) : null}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                ) : null}
-              </Card>
-            );
-          })}
-        </div>
-      )}
+                      {/* Why an action is unavailable, rather than a dead button.
+                          The server is the authority in every case; these are
+                          explanations of its rules, not the enforcement of them. */}
+                      {noShowNote || rescheduleNote ? (
+                        <div className={styles.notes}>
+                          {noShowNote ? <p className={styles.note}>ثبت عدم حضور تنها پس از پایان زمان نوبت ممکن است.</p> : null}
+                          {rescheduleNote ? (
+                            <p className={styles.note}>
+                              {booking.rescheduleCount >= MAX_RESCHEDULES
+                                ? `حداکثر ${toPersianDigits(MAX_RESCHEDULES)} بار جابه‌جایی مجاز است.`
+                                : `تغییر زمان تا ${toPersianDigits(RESCHEDULE_MIN_HOURS)} ساعت پیش از نوبت ممکن است.`}
+                            </p>
+                          ) : null}
+                        </div>
+                      ) : null}
+
+                      {historyFor === booking.id ? (
+                        <div className={styles.history}>
+                          {historyLoading ? (
+                            <LoadingState label="در حال بارگذاری تاریخچه…" lines={2} />
+                          ) : historyError ? (
+                            <ErrorState message={historyError} onRetry={() => void openHistory(booking)} />
+                          ) : history.length === 0 ? (
+                            <p className={styles.emptyHistory}>رویدادی برای این رزرو ثبت نشده است.</p>
+                          ) : (
+                            <ul className={styles.historyList}>
+                              {history.map((entry) => (
+                                <li key={entry.id} className={styles.historyItem}>
+                                  <span className={styles.historyEvent}>{bookingHistoryLabel(entry)}</span>
+                                  <span className={styles.historyWhen}>
+                                    {' — '}
+                                    {formatZonedFullDate(new Date(entry.createdAt))} ساعت{' '}
+                                    <span className={styles.clock}>{formatZonedTime(new Date(entry.createdAt))}</span>
+                                  </span>
+                                  {entry.reason ? <span className={styles.historyReason}>{` — ${entry.reason}`}</span> : null}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ))
+        )}
+      </TabPanel>
 
       {/* Outside the tab partition on purpose: the next page can contain rows
-          for either tab, so hiding this while the past tab is open would leave
-          a professional unable to reach older bookings from the very tab that
+          for any tab, so hiding this while one tab is open would leave a
+          professional unable to reach older bookings from the very tab that
           holds them. */}
       {loaded && hasMore ? (
-        <div style={{ marginBlockStart: 16, display: 'grid', gap: 8, justifyItems: 'center' }}>
+        <div className={styles.more}>
           <Button type="button" variant="ghost" inline loading={loadingMore} onClick={() => void loadMore()}>
             بارگذاری رزروهای بیشتر
           </Button>
-          <p style={{ margin: 0, fontSize: 12, color: 'var(--bc-color-ink-faint)' }}>
+          <p className={styles.moreNote}>
             {toPersianDigits(bookings.length)} از {toPersianDigits(total ?? 0)} رزرو بارگذاری شده است.
           </p>
         </div>
@@ -507,19 +478,22 @@ function ProBookings({ profile }: { profile: MyProviderProfile }) {
         busy={busyId !== null}
         onConfirm={() => confirming && void runAction(confirming.booking, confirming.action)}
         onCancel={() => setConfirming(null)}
+        // The consequence text is the dialog's accessible description: a
+        // screen-reader user hears what confirming does, not just its title.
+        describedById="pro-bookings-confirm-consequence"
         body={
-          confirming?.action === 'complete' ? (
-            <>
-              <p style={{ margin: '0 0 8px' }}>این نوبت به‌عنوان «انجام‌شده» ثبت می‌شود.</p>
-              <p style={{ margin: 0 }}>
-                پس از ثبت، امتیاز باشگاه مشتری، مسیر زیبایی او و آمار شما به‌روزرسانی می‌شود. این عملیات برگشت‌پذیر نیست.
-              </p>
-            </>
-          ) : (
-            <p style={{ margin: 0 }}>
-              این نوبت به‌عنوان «عدم حضور» ثبت می‌شود. این عملیات برگشت‌پذیر نیست.
-            </p>
-          )
+          <div id="pro-bookings-confirm-consequence">
+            {confirming?.action === 'complete' ? (
+              <>
+                <p className={styles.dialogText}>این نوبت به‌عنوان «انجام‌شده» ثبت می‌شود.</p>
+                <p className={styles.dialogLast}>
+                  پس از ثبت، امتیاز باشگاه مشتری، مسیر زیبایی او و آمار شما به‌روزرسانی می‌شود. این عملیات برگشت‌پذیر نیست.
+                </p>
+              </>
+            ) : (
+              <p className={styles.dialogLast}>این نوبت به‌عنوان «عدم حضور» ثبت می‌شود. این عملیات برگشت‌پذیر نیست.</p>
+            )}
+          </div>
         }
       />
 
@@ -533,14 +507,14 @@ function ProBookings({ profile }: { profile: MyProviderProfile }) {
         body={
           <>
             {reschedulingFor ? (
-              <p style={{ margin: '0 0 12px' }}>
+              <p className={styles.dialogText}>
                 زمان فعلی: {formatZonedFullDate(new Date(reschedulingFor.startAt))} ساعت{' '}
                 {formatZonedTime(new Date(reschedulingFor.startAt))}
               </p>
             ) : null}
             {slotsError ? <Alert>{slotsError}</Alert> : null}
             {!slotsError && openSlots.length === 0 ? (
-              <p style={{ margin: 0 }}>
+              <p className={styles.dialogLast}>
                 زمان آزاد دیگری برای این خدمت ندارید. ابتدا در صفحه «زمان‌های آزاد» زمان جدیدی بسازید.
               </p>
             ) : (
@@ -558,31 +532,4 @@ function ProBookings({ profile }: { profile: MyProviderProfile }) {
       />
     </>
   );
-}
-
-const HISTORY_EVENT_LABELS: Record<string, string> = {
-  created: 'ایجاد رزرو',
-  confirmed: 'تأیید رزرو',
-  completed: 'ثبت انجام نوبت',
-  cancelled: 'لغو رزرو',
-  expired: 'انقضای رزرو',
-  no_show: 'ثبت عدم حضور',
-  rescheduled: 'تغییر زمان',
-};
-
-/**
- * A history event's Persian label, falling back to the status transition
- * rather than to the raw English key.
- *
- * QA-22 records that label maps in this codebase fall back to the raw key,
- * which would render `no_show` into a Persian UI the moment the backend adds
- * an event this map does not know. Booking history is written by
- * `booking.service.ts` and its event vocabulary can grow, so this one falls
- * back to something already Persian instead.
- */
-function historyLabel(entry: BookingHistoryEntry): string {
-  const known = HISTORY_EVENT_LABELS[entry.event];
-  if (known) return known;
-  if (entry.toStatus && HISTORY_EVENT_LABELS[entry.toStatus]) return HISTORY_EVENT_LABELS[entry.toStatus];
-  return 'تغییر وضعیت رزرو';
 }

@@ -389,14 +389,16 @@ describe('bookings', () => {
     //
     // (1) The card is now labelled with the SERVER's status. An optimistic
     //     update would have painted "انجام شد" -- a claim the server never made.
-    // (2) It has moved to the "گذشته" tab, because a cancelled booking is
-    //     terminal. That the tabs re-partition off the server's own state,
-    //     rather than off what the user just clicked, is the same property
-    //     seen from the other side.
-    await waitFor(() => expect(screen.getByRole('tab', { name: /گذشته \(۱\)/ })).toBeInTheDocument());
+    // (2) It has moved to the "لغوشده" tab -- a cancelled booking is terminal,
+    //     and spec 05 gives it its own tab rather than leaving it in "گذشته".
+    //     That the tabs re-partition off the server's own state, rather than
+    //     off what the user just clicked, is the same property seen from the
+    //     other side.
+    await waitFor(() => expect(screen.getByRole('tab', { name: /لغوشده \(۱\)/ })).toBeInTheDocument());
+    expect(screen.getByRole('tab', { name: /گذشته \(۰\)/ })).toBeInTheDocument();
     expect(screen.queryByText('انجام شد')).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('tab', { name: /گذشته/ }));
+    await user.click(screen.getByRole('tab', { name: /لغوشده/ }));
     expect(await screen.findByText('لغو شده')).toBeInTheDocument();
   });
 
