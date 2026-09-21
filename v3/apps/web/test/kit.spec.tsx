@@ -2,6 +2,8 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
   Badge,
+  CheckChip,
+  CheckChipGroup,
   DataCell,
   DataRow,
   DataTable,
@@ -252,5 +254,38 @@ describe('LoadingState — a skeleton, announced', () => {
     const bar = container.firstElementChild as HTMLElement;
     expect(bar.style.getPropertyValue('--sk-w')).toBe('48px');
     expect(bar.style.getPropertyValue('--sk-h')).toBe('2rem');
+  });
+});
+
+describe('CheckChip', () => {
+  it('is a real checkbox: its state is the checkbox’s own, named by its label', async () => {
+    const onChange = jest.fn();
+    const user = userEvent.setup();
+    const { rerender } = render(<CheckChip label="شنبه" checked={false} onChange={onChange} />);
+    const box = screen.getByRole('checkbox', { name: 'شنبه' });
+    expect(box).not.toBeChecked();
+
+    await user.click(box);
+    expect(onChange).toHaveBeenCalledTimes(1);
+
+    rerender(<CheckChip label="شنبه" checked onChange={onChange} />);
+    expect(screen.getByRole('checkbox', { name: 'شنبه' })).toBeChecked();
+  });
+
+  it('marks the selected chip visually too, without relying on that for its meaning', () => {
+    const { container, rerender } = render(<CheckChip label="یکشنبه" checked={false} onChange={() => undefined} />);
+    expect(container.querySelector('label')?.className).not.toContain('on');
+    rerender(<CheckChip label="یکشنبه" checked onChange={() => undefined} />);
+    expect(container.querySelector('label')?.className).toContain('on');
+  });
+
+  it('groups chips in one wrapping row', () => {
+    render(
+      <CheckChipGroup>
+        <CheckChip label="الف" checked={false} onChange={() => undefined} />
+        <CheckChip label="ب" checked onChange={() => undefined} />
+      </CheckChipGroup>,
+    );
+    expect(screen.getAllByRole('checkbox')).toHaveLength(2);
   });
 });

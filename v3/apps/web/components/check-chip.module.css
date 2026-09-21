@@ -1,0 +1,35 @@
+/*
+ * A checkbox drawn as a chip: weekdays on the availability form, specialties
+ * on the profile. The selection is the checkbox's own checked state (which
+ * assistive technology announces), reinforced by the border and the tint —
+ * never colour alone. 44px tall, the touch baseline.
+ */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-block-size: 44px;
+  padding: 0 12px;
+  border-radius: var(--bc-radius-chip);
+  border: 1px solid var(--bc-color-border);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.on {
+  border-color: var(--bc-color-primary);
+  background: var(--bc-color-primary-soft);
+}
+
+.chip input {
+  inline-size: 18px;
+  block-size: 18px;
+  flex-shrink: 0;
+}
+
+.group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--bc-spacing-chip-gap);
+}

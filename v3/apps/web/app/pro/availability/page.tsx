@@ -11,8 +11,19 @@ import {
   zonedDateTimeToInstant,
   zonedIsoDate,
 } from '@beauclick/persian-utils';
-import { Alert, Button, Card, ErrorState, Input, LoadingState } from '@/components/ui';
-import { Badge, ConfirmDialog, EmptyState, FormFullRow, FormGrid, PageHeader, SegmentedControl, Select } from '@/components/kit';
+import { Alert, Button, ErrorState, Input, LoadingState } from '@/components/ui';
+import {
+  Badge,
+  CheckChip,
+  CheckChipGroup,
+  ConfirmDialog,
+  EmptyState,
+  FormFullRow,
+  FormGrid,
+  PageHeader,
+  SegmentedControl,
+  Select,
+} from '@/components/kit';
 import { ProGuard } from '@/components/pro-guard';
 import { useAuth } from '@/lib/auth-context';
 import {
@@ -25,24 +36,12 @@ import {
   type MySlot,
   type ServiceOffering,
 } from '@/lib/pro-api';
+import { slotStatusLabel, slotStatusTone } from '@/lib/slot-status';
+import styles from './availability.module.css';
 
 export default function ProAvailabilityPage() {
   return <ProGuard>{(profile) => <Availability profile={profile} />}</ProGuard>;
 }
-
-const STATUS_LABELS: Record<MySlot['status'], string> = {
-  open: 'آزاد',
-  held: 'در حال رزرو',
-  booked: 'رزرو شده',
-  blocked: 'مسدود',
-};
-
-const STATUS_TONE = {
-  open: 'success',
-  held: 'warning',
-  booked: 'primary',
-  blocked: 'neutral',
-} as const;
 
 /**
  * How far ahead the slot list looks. 60 is the default the screen has always
@@ -246,91 +245,76 @@ function Availability({ profile }: { profile: MyProviderProfile }) {
 
       {error ? <ErrorState message={error} onRetry={() => void load()} /> : null}
 
-      <Card>
-        <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 4px' }}>ساخت گروهی</h2>
-        <p style={{ fontSize: 13, color: 'var(--bc-color-ink-soft)', margin: '0 0 16px' }}>
-          یک الگوی هفتگی را روی یک بازه تاریخی اعمال می‌کند. اجرای دوباره همان الگو، زمان‌های تکراری نمی‌سازد.
-        </p>
-        <form onSubmit={submitBulk} noValidate>
-          {bulkError ? <Alert>{bulkError}</Alert> : null}
-          {bulkResult ? (
-            <Alert tone="success">
-              {toPersianDigits(bulkResult.created)} زمان آزاد ساخته شد
-              {bulkResult.skipped > 0 ? ` و ${toPersianDigits(bulkResult.skipped)} مورد تکراری نادیده گرفته شد` : ''}.
-            </Alert>
-          ) : null}
+      <div className={styles.forms}>
+        <div className={styles.panel}>
+          <h2 className={styles.formTitle}>ساخت گروهی</h2>
+          <p className={styles.formLead}>
+            یک الگوی هفتگی را روی یک بازه تاریخی اعمال می‌کند. اجرای دوباره همان الگو، زمان‌های تکراری نمی‌سازد.
+          </p>
+          <form onSubmit={submitBulk} noValidate>
+            {bulkError ? <Alert>{bulkError}</Alert> : null}
+            {bulkResult ? (
+              <Alert tone="success">
+                {toPersianDigits(bulkResult.created)} زمان آزاد ساخته شد
+                {bulkResult.skipped > 0 ? ` و ${toPersianDigits(bulkResult.skipped)} مورد تکراری نادیده گرفته شد` : ''}.
+              </Alert>
+            ) : null}
 
-          <fieldset style={{ border: 0, padding: 0, margin: '0 0 16px' }}>
-            <legend style={{ fontWeight: 600, fontSize: 14, padding: 0, marginBlockEnd: 8 }}>روزهای هفته</legend>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--bc-spacing-chip-gap)' }}>
-              {PERSIAN_WEEK_ORDER.map((day) => (
-                <label
-                  key={day.index}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    minHeight: 44,
-                    padding: '0 12px',
-                    borderRadius: 999,
-                    border: `1px solid ${
-                      bulkWeekdays.includes(day.index) ? 'var(--bc-color-primary)' : 'var(--bc-color-line)'
-                    }`,
-                    fontSize: 14,
-                    cursor: 'pointer',
-                  }}
-                >
-                  <input
-                    type="checkbox"
+            <fieldset className={styles.fieldset}>
+              <legend className={styles.legend}>روزهای هفته</legend>
+              <CheckChipGroup>
+                {PERSIAN_WEEK_ORDER.map((day) => (
+                  <CheckChip
+                    key={day.index}
+                    label={day.label}
                     checked={bulkWeekdays.includes(day.index)}
                     onChange={() => toggleWeekday(day.index)}
                   />
-                  {day.label}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-
-          <FormGrid>
-            <Input label="از تاریخ" type="date" value={bulkFrom} onChange={(e) => setBulkFrom(e.target.value)} required />
-            <Input label="تا تاریخ" type="date" value={bulkTo} onChange={(e) => setBulkTo(e.target.value)} required />
-            <Input label="از ساعت" type="time" value={bulkStart} onChange={(e) => setBulkStart(e.target.value)} required />
-            <Input label="تا ساعت" type="time" value={bulkEnd} onChange={(e) => setBulkEnd(e.target.value)} required />
-            <FormFullRow>
-              <Input
-                label="مدت هر نوبت (دقیقه)"
-                value={bulkMinutes}
-                onChange={(e) => setBulkMinutes(e.target.value)}
-                inputMode="numeric"
-                required
-              />
-            </FormFullRow>
-            <FormFullRow>
-              <Select
-                label="خدمت"
-                value={bulkService}
-                onChange={(e) => setBulkService(e.target.value)}
-                hint="اختیاری. اگر خالی بماند، برای همه خدمات قابل رزرو است."
-              >
-                <option value="">همه خدمات</option>
-                {services.map((service) => (
-                  <option key={service.id} value={service.id}>
-                    {service.name}
-                  </option>
                 ))}
-              </Select>
-            </FormFullRow>
-          </FormGrid>
+              </CheckChipGroup>
+            </fieldset>
 
-          <Button type="submit" loading={bulkBusy} disabled={bulkWeekdays.length === 0}>
-            ساخت زمان‌های آزاد
-          </Button>
-        </form>
-      </Card>
+            <FormGrid>
+              <Input label="از تاریخ" type="date" value={bulkFrom} onChange={(e) => setBulkFrom(e.target.value)} required />
+              <Input label="تا تاریخ" type="date" value={bulkTo} onChange={(e) => setBulkTo(e.target.value)} required />
+              <Input label="از ساعت" type="time" value={bulkStart} onChange={(e) => setBulkStart(e.target.value)} required />
+              <Input label="تا ساعت" type="time" value={bulkEnd} onChange={(e) => setBulkEnd(e.target.value)} required />
+              <FormFullRow>
+                <Input
+                  label="مدت هر نوبت (دقیقه)"
+                  value={bulkMinutes}
+                  onChange={(e) => setBulkMinutes(e.target.value)}
+                  inputMode="numeric"
+                  required
+                />
+              </FormFullRow>
+              <FormFullRow>
+                <Select
+                  label="خدمت"
+                  value={bulkService}
+                  onChange={(e) => setBulkService(e.target.value)}
+                  hint="اختیاری. اگر خالی بماند، برای همه خدمات قابل رزرو است."
+                >
+                  <option value="">همه خدمات</option>
+                  {services.map((service) => (
+                    <option key={service.id} value={service.id}>
+                      {service.name}
+                    </option>
+                  ))}
+                </Select>
+              </FormFullRow>
+            </FormGrid>
 
-      <div style={{ marginBlockStart: 20 }}>
-        <Card>
-          <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 16px' }}>افزودن یک زمان</h2>
+            <div className={styles.actions}>
+              <Button type="submit" inline loading={bulkBusy} disabled={bulkWeekdays.length === 0}>
+                ساخت زمان‌های آزاد
+              </Button>
+            </div>
+          </form>
+        </div>
+
+        <div className={styles.panel}>
+          <h2 className={styles.formTitleSpaced}>افزودن یک زمان</h2>
           <form onSubmit={submitSingle} noValidate>
             {singleError ? <Alert>{singleError}</Alert> : null}
             <FormGrid>
@@ -350,25 +334,18 @@ function Availability({ profile }: { profile: MyProviderProfile }) {
                 </Select>
               </FormFullRow>
             </FormGrid>
-            <Button type="submit" loading={singleBusy}>
-              افزودن
-            </Button>
+            <div className={styles.actions}>
+              <Button type="submit" inline loading={singleBusy}>
+                افزودن
+              </Button>
+            </div>
           </form>
-        </Card>
+        </div>
       </div>
 
-      <div style={{ marginBlockStart: 20 }}>
-        <div
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 'var(--bc-spacing-chip-gap)',
-            marginBlockEnd: 12,
-          }}
-        >
-          <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>زمان‌های ثبت‌شده</h2>
+      <div className={styles.registered}>
+        <div className={styles.listHead}>
+          <h2 className={styles.listTitle}>زمان‌های ثبت‌شده</h2>
           <SegmentedControl
             label="بازه نمایش"
             value={horizon}
@@ -378,7 +355,7 @@ function Availability({ profile }: { profile: MyProviderProfile }) {
           />
         </div>
         {loading && !loaded ? (
-          <LoadingState label="در حال بارگذاری زمان‌های آزاد…" />
+          <LoadingState label="در حال بارگذاری زمان‌های آزاد…" lines={5} />
         ) : loaded && slots.length === 0 ? (
           // The message names the WINDOW, because "you have no slots" and "you
           // have no slots in the next 30 days" are different facts and only the
@@ -387,37 +364,22 @@ function Availability({ profile }: { profile: MyProviderProfile }) {
             message={`در ${toPersianDigits(horizon)} روز آینده زمان آزادی ثبت نکرده‌اید. تا زمانی که زمان آزادی نداشته باشید، کسی نمی‌تواند شما را رزرو کند.`}
           />
         ) : (
-          <div style={{ display: 'grid', gap: 'var(--bc-spacing-card-gap)' }}>
+          <ul className={styles.days}>
             {grouped.map(([day, daySlots]) => (
-              <Card key={day}>
-                <p style={{ margin: '0 0 12px', fontWeight: 700, fontSize: 14 }}>
-                  {formatZonedFullDate(new Date(daySlots[0].startAt))}
-                </p>
-                <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 8 }}>
+              <li key={day} className={styles.panel} data-day={day}>
+                <p className={styles.dayTitle}>{formatZonedFullDate(new Date(daySlots[0].startAt))}</p>
+                <ul className={styles.slots}>
                   {daySlots.map((slot) => {
                     const name = serviceName(slot.serviceId);
                     const releasable = slot.status === 'open';
                     return (
-                      <li
-                        key={slot.id}
-                        style={{
-                          display: 'flex',
-                          flexWrap: 'wrap',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: 'var(--bc-spacing-chip-gap)',
-                          borderBlockEnd: '1px solid var(--bc-color-line)',
-                          paddingBlockEnd: 8,
-                        }}
-                      >
-                        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                          <span style={{ fontSize: 14, fontWeight: 600 }}>
+                      <li key={slot.id} className={styles.slot} data-slot={slot.id}>
+                        <div className={styles.slotMain}>
+                          <span className={styles.time}>
                             {formatZonedTime(new Date(slot.startAt))} تا {formatZonedTime(new Date(slot.endAt))}
                           </span>
-                          <Badge tone={STATUS_TONE[slot.status]}>{STATUS_LABELS[slot.status]}</Badge>
-                          {name ? (
-                            <span style={{ fontSize: 13, color: 'var(--bc-color-ink-soft)' }}>{name}</span>
-                          ) : null}
+                          <Badge tone={slotStatusTone(slot.status)}>{slotStatusLabel(slot.status)}</Badge>
+                          {name ? <span className={styles.serviceName}>{name}</span> : null}
                         </div>
                         {releasable ? (
                           <Button type="button" variant="danger" inline onClick={() => setPendingDelete(slot)}>
@@ -429,7 +391,7 @@ function Availability({ profile }: { profile: MyProviderProfile }) {
                           // server enforces this too -- deleteSlot only
                           // matches status='open' -- so this is guidance, not
                           // the guarantee.
-                          <span style={{ fontSize: 12, color: 'var(--bc-color-ink-faint)' }}>
+                          <span className={styles.why}>
                             {slot.status === 'booked'
                               ? 'برای آزاد کردن، رزرو را لغو کنید'
                               : 'مشتری در حال تکمیل رزرو است'}
@@ -439,9 +401,9 @@ function Availability({ profile }: { profile: MyProviderProfile }) {
                     );
                   })}
                 </ul>
-              </Card>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
       </div>
 
@@ -455,7 +417,7 @@ function Availability({ profile }: { profile: MyProviderProfile }) {
         onCancel={() => setPendingDelete(null)}
         body={
           pendingDelete ? (
-            <p style={{ margin: 0 }}>
+            <p className={styles.dialogText}>
               زمان {formatZonedTime(new Date(pendingDelete.startAt))} تا{' '}
               {formatZonedTime(new Date(pendingDelete.endAt))} در{' '}
               {formatZonedFullDate(new Date(pendingDelete.startAt))} حذف می‌شود.
