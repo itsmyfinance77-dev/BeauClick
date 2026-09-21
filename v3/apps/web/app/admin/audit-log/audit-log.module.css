@@ -1,0 +1,125 @@
+/*
+ * The audit log — `23_ADMIN_AUDIT_LOG.md`: LEAVE AS IS.
+ *
+ * The paginated, filterable, append-only table already matches the admin
+ * pattern, so the structure is unchanged. What this file does is what the spec
+ * asks of every admin page: the phase-0 tokens (colour, spacing) in a stylesheet
+ * instead of inline.
+ *
+ *   390   the entries one under another; the pager wraps.
+ *   640   the pager in one line.
+ *
+ * Breakpoints are the design's 640 and 1024 (`breakpoints.spec.ts`).
+ */
+
+/* `minmax(0, 1fr)`: a grid item may not be wider than its track, so a long unbroken action code wraps instead of stretching the page. */
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--bc-spacing-card-gap);
+}
+
+.panel {
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-card);
+  padding: 16px;
+}
+
+@media (min-width: 640px) {
+  .panel {
+    padding: 20px;
+  }
+}
+
+.entries {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--bc-spacing-card-gap);
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--bc-spacing-chip-gap);
+}
+
+.what {
+  min-inline-size: 0;
+}
+
+.action {
+  margin: 0;
+  font-weight: 700;
+}
+
+.when {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--bc-color-ink-soft);
+}
+
+/* The exact machine identifier, always shown: on an audit screen it is the record. */
+.code {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--bc-color-ink-faint);
+}
+
+.who {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--bc-color-ink-faint);
+}
+
+/* An identifier is never reordered inside a right-to-left line. */
+.id {
+  direction: ltr;
+  unicode-bidi: isolate;
+  display: inline-block;
+  font-family: monospace;
+  overflow-wrap: anywhere;
+}
+
+.reason {
+  margin: 12px 0 0;
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.snapshots {
+  margin-block-start: 12px;
+  padding-block-start: 12px;
+  border-block-start: 1px solid var(--bc-color-line);
+  font-size: 13px;
+  display: grid;
+  gap: 4px;
+}
+
+.before {
+  margin: 0;
+  color: var(--bc-color-ink-soft);
+}
+
+.after {
+  margin: 0;
+}
+
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--bc-spacing-chip-gap);
+  margin-block-start: 16px;
+}
+
+.pageInfo {
+  font-size: 13px;
+  color: var(--bc-color-ink-soft);
+}

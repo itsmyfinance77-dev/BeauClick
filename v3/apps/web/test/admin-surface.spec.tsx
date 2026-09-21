@@ -198,14 +198,19 @@ describe('verification queue', () => {
     expect(screen.queryByText('درخواست بررسی‌نشده‌ای وجود ندارد.')).not.toBeInTheDocument();
   });
 
-  it('states the evidence-less boundary rather than showing an empty attachment area', async () => {
+  it('no longer tells the operator that requests carry no documents — the evidence endpoint has shipped', async () => {
+    // This case used to assert the opposite: a standing note that requests are
+    // "submitted without documents". `GET /v1/admin/verification/:id/evidence`
+    // made that untrue, and `21_ADMIN_VERIFICATION.md` retires it. The
+    // evidence itself is covered in `admin-verification-evidence.spec.tsx`.
     mockApi(['bc_moderate_verification'], {
       '/v1/admin/verification/queue': () => ok([request], { pagination: { page: 1, limit: 20, total: 1 } }),
     });
     renderAdmin(<AdminVerificationPage />);
 
     await waitFor(() => expect(screen.getByText('سالن نمونه')).toBeInTheDocument());
-    expect(screen.getByText(/بدون بارگذاری مدرک ارسال می‌شوند/)).toBeInTheDocument();
+    expect(screen.queryByText(/بدون بارگذاری مدرک ارسال می‌شوند/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'مشاهدهٔ مدارک' })).toBeInTheDocument();
   });
 
   it('requires a reason before a decision is sent', async () => {

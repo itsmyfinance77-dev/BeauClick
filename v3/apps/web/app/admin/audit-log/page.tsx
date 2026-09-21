@@ -2,10 +2,12 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { formatZonedDateTime, toPersianDigits } from '@beauclick/persian-utils';
-import { Button, Card, ErrorState, LoadingState } from '@/components/ui';
+import { Button, ErrorState, LoadingState } from '@/components/ui';
 import { Badge, EmptyState, PageHeader, Select } from '@/components/kit';
 import { useAuth } from '@/lib/auth-context';
 import { auditActions, auditLog, type AuditEntry } from '@/lib/admin-api';
+import { SNAPSHOT_LABELS, actionLabel, targetLabel } from '@/lib/audit-labels';
+import styles from './audit-log.module.css';
 
 /**
  * The permanent record of every privileged action.
@@ -59,13 +61,13 @@ export default function AdminAuditLogPage() {
   const pageCount = Math.max(1, Math.ceil(total / 25));
 
   return (
-    <>
+    <div className={styles.page}>
       <PageHeader
         title="گزارش عملیات"
         subtitle="هر عملیات مدیریتی به‌صورت دائمی ثبت می‌شود. این گزارش قابل ویرایش یا حذف نیست."
       />
 
-      <Card>
+      <section className={styles.panel} aria-label="فیلتر">
         <Select
           label="فیلتر بر اساس نوع عملیات"
           value={action}
@@ -77,116 +79,72 @@ export default function AdminAuditLogPage() {
           <option value="">همه عملیات</option>
           {actions.map((a) => (
             <option key={a} value={a}>
-              {ACTION_LABELS[a] ?? a}
+              {actionLabel(a)}
+              {/* The picker lists real actions, and two unlabelled ones would
+                  both read «عملیات مدیریتی»: the code tells them apart. */}
+              {actionLabel(a) === actionLabel('') ? ` (${a})` : ''}
             </option>
           ))}
         </Select>
-      </Card>
+      </section>
 
-      <div style={{ marginBlockStart: 20 }}>
-        {error ? <ErrorState message={error} onRetry={() => void load()} /> : null}
+      {error ? <ErrorState message={error} onRetry={() => void load()} /> : null}
 
-        {loading && !loaded ? (
-          <LoadingState label="در حال بارگذاری گزارش…" />
-        ) : loaded && entries.length === 0 ? (
-          <EmptyState message="عملیاتی با این فیلتر ثبت نشده است." />
-        ) : (
-          <div style={{ display: 'grid', gap: 'var(--bc-spacing-card-gap)' }}>
-            {entries.map((entry) => (
-              <Card key={entry.id}>
-                <div
-                  style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    alignItems: 'flex-start',
-                    justifyContent: 'space-between',
-                    gap: 'var(--bc-spacing-chip-gap)',
-                  }}
-                >
-                  <div style={{ minWidth: 0 }}>
-                    <p style={{ margin: 0, fontWeight: 700 }}>{ACTION_LABELS[entry.action] ?? entry.action}</p>
-                    <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--bc-color-ink-soft)' }}>
-                      {formatZonedDateTime(new Date(entry.createdAt))}
-                    </p>
-                    <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--bc-color-ink-faint)' }}>
-                      عامل:{' '}
-                      <span style={{ direction: 'ltr', display: 'inline-block', fontFamily: 'monospace' }}>
-                        {entry.actorLabel ?? entry.actorUserId?.slice(0, 8) ?? '—'}
-                      </span>
-                      {' · '}
-                      {TARGET_LABELS[entry.targetType] ?? entry.targetType}:{' '}
-                      <span style={{ direction: 'ltr', display: 'inline-block', fontFamily: 'monospace' }}>
-                        {entry.targetId?.slice(0, 8) ?? '—'}
-                      </span>
-                    </p>
-                  </div>
-                  {/* `bootstrap` is the one-time privileged grant with no
-                      session behind it. Marking it visibly means an operator
-                      can tell at a glance which rows predate any accountable
-                      actor. */}
-                  {entry.actorLabel ? <Badge tone="warning">{entry.actorLabel}</Badge> : null}
+      {loading && !loaded ? (
+        <LoadingState label="در حال بارگذاری گزارش…" lines={4} />
+      ) : loaded && entries.length === 0 ? (
+        <EmptyState message="عملیاتی با این فیلتر ثبت نشده است." />
+      ) : (
+        <ul className={styles.entries}>
+          {entries.map((entry) => (
+            <li key={entry.id} className={styles.panel}>
+              <div className={styles.head}>
+                <div className={styles.what}>
+                  <p className={styles.action}>{actionLabel(entry.action)}</p>
+                  <p className={styles.when}>{formatZonedDateTime(new Date(entry.createdAt))}</p>
+                  <p className={styles.code}>
+                    <span className={styles.id}>{entry.action}</span>
+                  </p>
+                  <p className={styles.who}>
+                    عامل: <span className={styles.id}>{entry.actorLabel ?? entry.actorUserId?.slice(0, 8) ?? '—'}</span>
+                    {' · '}
+                    {targetLabel(entry.targetType)}: <span className={styles.id}>{entry.targetId?.slice(0, 8) ?? '—'}</span>
+                  </p>
                 </div>
+                {/* `bootstrap` is the one-time privileged grant with no
+                    session behind it. Marking it visibly means an operator
+                    can tell at a glance which rows predate any accountable
+                    actor. */}
+                {entry.actorLabel ? <Badge tone="warning">{entry.actorLabel}</Badge> : null}
+              </div>
 
-                {entry.reason ? (
-                  <p style={{ margin: '12px 0 0', fontSize: 14 }}>«{entry.reason}»</p>
-                ) : null}
+              {entry.reason ? <p className={styles.reason}>«{entry.reason}»</p> : null}
 
-                {entry.before || entry.after ? (
-                  <div
-                    style={{
-                      marginBlockStart: 12,
-                      paddingBlockStart: 12,
-                      borderBlockStart: '1px solid var(--bc-color-line)',
-                      fontSize: 13,
-                      display: 'grid',
-                      gap: 4,
-                    }}
-                  >
-                    {entry.before ? (
-                      <p style={{ margin: 0, color: 'var(--bc-color-ink-soft)' }}>
-                        پیش از تغییر: {renderSnapshot(entry.before)}
-                      </p>
-                    ) : null}
-                    {entry.after ? (
-                      <p style={{ margin: 0 }}>پس از تغییر: {renderSnapshot(entry.after)}</p>
-                    ) : null}
-                  </div>
-                ) : null}
-              </Card>
-            ))}
-          </div>
-        )}
+              {entry.before || entry.after ? (
+                <div className={styles.snapshots}>
+                  {entry.before ? <p className={styles.before}>پیش از تغییر: {renderSnapshot(entry.before)}</p> : null}
+                  {entry.after ? <p className={styles.after}>پس از تغییر: {renderSnapshot(entry.after)}</p> : null}
+                </div>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
 
-        {loaded && total > 25 ? (
-          <div
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 'var(--bc-spacing-chip-gap)',
-              marginBlockStart: 16,
-            }}
-          >
-            <Button type="button" variant="ghost" inline disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-              صفحه قبل
-            </Button>
-            <span style={{ fontSize: 13, color: 'var(--bc-color-ink-soft)' }}>
-              صفحه {toPersianDigits(page)} از {toPersianDigits(pageCount)} — مجموع {toPersianDigits(total)} مورد
-            </span>
-            <Button
-              type="button"
-              variant="ghost"
-              inline
-              disabled={page >= pageCount}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              صفحه بعد
-            </Button>
-          </div>
-        ) : null}
-      </div>
-    </>
+      {loaded && total > 25 ? (
+        <div className={styles.pager}>
+          <Button type="button" variant="ghost" inline disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+            صفحه قبل
+          </Button>
+          <span className={styles.pageInfo}>
+            صفحه {toPersianDigits(page)} از {toPersianDigits(pageCount)} — مجموع {toPersianDigits(total)} مورد
+          </span>
+          <Button type="button" variant="ghost" inline disabled={page >= pageCount} onClick={() => setPage((p) => p + 1)}>
+            صفحه بعد
+          </Button>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -202,44 +160,3 @@ function renderSnapshot(snapshot: Record<string, string | number | boolean | nul
     .map(([key, value]) => `${SNAPSHOT_LABELS[key] ?? key}: ${value === null ? '—' : toPersianDigits(String(value))}`)
     .join('، ');
 }
-
-const ACTION_LABELS: Record<string, string> = {
-  'identity.role_granted': 'اعطای نقش',
-  'identity.role_revoked': 'لغو نقش',
-  'identity.phone_conflict_resolved': 'رفع تعارض شماره',
-  'provider.verification_approved': 'تأیید احراز هویت',
-  'provider.verification_rejected': 'رد احراز هویت',
-  'financial.settlement_created': 'ثبت تسویه',
-  'financial.settlement_reversed': 'برگشت تسویه',
-  'search.reindex_triggered': 'بازسازی نمایه جست‌وجو',
-  'search.projection_rebuilt': 'بازسازی کامل پروجکشن جست‌وجو',
-  'notification.retry_due_triggered': 'تلاش مجدد ارسال اعلان‌ها',
-};
-
-const TARGET_LABELS: Record<string, string> = {
-  user: 'کاربر',
-  professional: 'متخصص',
-  phone_conflict: 'تعارض شماره',
-  settlement_batch: 'دسته تسویه',
-  search_index: 'نمایه',
-  notification_sweep: 'اعلان‌ها',
-};
-
-const SNAPSHOT_LABELS: Record<string, string> = {
-  roles: 'نقش‌ها',
-  role: 'نقش',
-  verificationStatus: 'وضعیت احراز',
-  requestId: 'شناسه درخواست',
-  resolvedAt: 'زمان رفع',
-  amountToman: 'مبلغ',
-  orderCount: 'تعداد سفارش',
-  partyType: 'نوع طرف',
-  partyId: 'شناسه طرف',
-  method: 'روش',
-  reversalId: 'شناسه برگشت',
-  indexed: 'تعداد نمایه‌شده',
-  projectionRows: 'ردیف پروجکشن',
-  attempted: 'تلاش',
-  sent: 'ارسال‌شده',
-  deadLettered: 'ناموفق نهایی',
-};

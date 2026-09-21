@@ -1,0 +1,168 @@
+/*
+ * The settlements page — `17_ADMIN_SETTLEMENTS.md`.
+ *
+ * The most consequential admin screen: it records money moving between the
+ * platform and a seller. The spec asks for more visual weight than the
+ * read-only admin pages, so the panel that records a settlement carries a
+ * heavier border and its own heading; nothing else on the page does.
+ *
+ *   390   the outstanding orders as cards (`DataTable`), one column.
+ *   640   the orders as a table; the party summary as three columns.
+ *
+ * Breakpoints are the design's 640 and 1024 (`breakpoints.spec.ts`).
+ */
+
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--bc-spacing-card-gap);
+}
+
+.panel {
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-card);
+  padding: 16px;
+}
+
+@media (min-width: 640px) {
+  .panel {
+    padding: 20px;
+  }
+}
+
+/* The one panel on the page that records money. */
+.settle {
+  border: 2px solid var(--bc-color-primary);
+}
+
+.sectionTitle {
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.settleTitle {
+  margin: 0 0 4px;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.note {
+  margin: 0 0 16px;
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--bc-color-ink-soft);
+}
+
+/* ---------------------------------------------------------- party summary */
+
+.party {
+  margin: 0 0 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+  font-size: 14px;
+}
+
+/* An identifier is never reordered inside a right-to-left line. */
+.partyId {
+  direction: ltr;
+  unicode-bidi: isolate;
+  font-family: monospace;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.figures {
+  margin: 0;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 640px) {
+  .figures {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.figure dt {
+  font-size: 12.5px;
+  color: var(--bc-color-ink-soft);
+}
+
+.figure dd {
+  margin: 2px 0 0;
+  font-size: 16px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.figureStrong dd {
+  font-weight: 800;
+}
+
+/* ------------------------------------------------------ outstanding orders */
+
+.orderId {
+  direction: ltr;
+  unicode-bidi: isolate;
+  display: inline-block;
+  font-family: monospace;
+}
+
+.amount {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A 44px target around the box, so the row is easy to tick with a thumb. */
+.pick {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 44px;
+  min-block-size: 44px;
+  margin: -10px;
+  cursor: pointer;
+}
+
+.pick input {
+  inline-size: 20px;
+  block-size: 20px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.selectedRow {
+  background: var(--bc-color-primary-soft);
+}
+
+/* --------------------------------------------------------- the settlement */
+
+.total {
+  margin: 0 0 12px;
+  font-size: 14px;
+}
+
+.total strong {
+  font-variant-numeric: tabular-nums;
+}
+
+/* --------------------------------------------------------------- dialogue */
+
+.dialogBody {
+  display: grid;
+  gap: 8px;
+}
+
+.dialogText {
+  margin: 0;
+}
+
+.dialogWarning {
+  margin: 0;
+  font-weight: 700;
+}
