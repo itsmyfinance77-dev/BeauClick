@@ -36,6 +36,7 @@ const ADMIN_NAV: { href: string; label: string; capability?: string; system?: bo
   // as a product decision.
   { href: '/admin/media', label: 'گزارش تصاویر', capability: 'bc_moderate_media' },
   { href: '/admin/reviews', label: 'بازبینی دیدگاه‌ها', capability: 'bc_moderate_reviews' },
+  { href: '/admin/chat-reports', label: 'گزارش گفتگوها', capability: 'bc_moderate_chat' },
   { href: '/admin/users', label: 'کاربران و نقش‌ها' },
   { href: '/admin/audit-log', label: 'گزارش عملیات' },
   // #238, spec 31: a read-only monitor, so beside the other operational
@@ -169,4 +170,5 @@ const CAPABILITY_LABELS: Record<string, string> = {
   bc_moderate_verification: 'بررسی احراز هویت',
   bc_moderate_reviews: 'بررسی دیدگاه‌ها',
   bc_moderate_media: 'بررسی تصاویر',
+  bc_moderate_chat: 'بررسی گفتگوها',
 };

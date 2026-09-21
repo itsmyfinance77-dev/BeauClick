@@ -11,9 +11,10 @@ import type { ApiClient } from './api-client';
  * against a shape that was wrong, and only a browser caught it.
  *
  * Security note, stated once for the whole file: nothing here is a security
- * boundary. Every route below is gated server-side by
- * `@RequireCapability('bc_manage_platform')` or `'bc_moderate_verification'`,
- * and the privileged ones are re-checked against live role data on every
+ * boundary. Every route below is gated server-side by `@RequireCapability`
+ * — `bc_manage_platform`, or one of the moderation capabilities
+ * (`bc_moderate_verification`, `_media`, `_reviews`, `_chat`) — and the
+ * privileged ones are re-checked against live role data on every
  * request -- so a revoked operator is refused even holding a valid token. The
  * frontend hides what it cannot use; the API refuses it.
  */
@@ -248,6 +249,89 @@ export function privacyRequests(api: ApiClient, params: { page?: number; limit?:
   query.set('limit', String(params.limit ?? 20));
   if (params.status) query.set('status', params.status);
   return api.get<AdminPrivacyRequest[]>(`/v1/admin/privacy/requests?${query.toString()}`);
+}
+
+// -------------------------------------------------------- chat moderation
+
+/**
+ * The chat moderation surface — `ChatModerationController`, gated on
+ * `bc_moderate_chat`, and addressed ONLY by report id (`V32-DEC-015`).
+ *
+ * `conversationId` is returned by both reads and deliberately not declared
+ * here: nothing on the page may address a conversation, so nothing in this
+ * file offers the id to address one with. No function here takes a
+ * conversation, user or professional id, because the API has no such route.
+ */
+export type ChatModerationAction = 'warn_sender' | 'close_conversation' | 'restrict_sender';
+
+/** The queue row — metadata only. No message body and no reporter's note. */
+export interface ChatReportSummary {
+  id: string;
+  reason: string;
+  status: string;
+  createdAt: string;
+  decidedAt: string | null;
+  decisionAction: string | null;
+}
+
+export interface ChatWindowMessage {
+  id: string;
+  /** A raw id. There is no name, avatar or profile on this read. */
+  senderUserId: string;
+  body: string;
+  erased: boolean;
+  sequence: number;
+  createdAt: string;
+}
+
+/** One report and at most `windowLimit` (50) messages around the reported one. Reading it is audited. */
+export interface ChatReportWindow {
+  report: {
+    id: string;
+    messageId: string;
+    reason: string;
+    note: string | null;
+    status: string;
+    createdAt: string;
+  };
+  messages: ChatWindowMessage[];
+  windowLimit: number;
+}
+
+/** Oldest first; `status` defaults to `open` on the server; `limit` 1–100, no pagination. */
+export function chatReports(api: ApiClient, params: { status?: string; limit?: number } = {}) {
+  const query = new URLSearchParams();
+  if (params.status) query.set('status', params.status);
+  if (params.limit) query.set('limit', String(params.limit));
+  const suffix = query.toString();
+  return api.get<{ items: ChatReportSummary[] }>(`/v1/admin/chat/reports${suffix ? `?${suffix}` : ''}`);
+}
+
+/**
+ * Missing, foreign, expired (30 days after a decision) — one 404, the same for
+ * all three, by design.
+ */
+export function chatReport(api: ApiClient, reportId: string) {
+  return api.get<ChatReportWindow>(`/v1/admin/chat/reports/${encodeURIComponent(reportId)}`);
+}
+
+/**
+ * `DecideReportDto`: `reason` 3–500 characters, always. `action` only with
+ * `upheld` (the server defaults it to `warn_sender`, and ignores it on
+ * `rejected`). A report a colleague decided first is refused with the SAME
+ * 404 as a missing one — there is no distinct conflict code.
+ */
+export function decideChatReport(
+  api: ApiClient,
+  reportId: string,
+  input:
+    | { outcome: 'upheld'; action: ChatModerationAction; reason: string }
+    | { outcome: 'rejected'; reason: string },
+) {
+  return api.post<{ id: string; status: string; decisionAction: string | null; decidedAt: string | null }>(
+    `/v1/admin/chat/reports/${encodeURIComponent(reportId)}/decide`,
+    input,
+  );
 }
 
 /** The professional's own side, consumed by `/pro/profile`. */

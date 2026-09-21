@@ -18,6 +18,7 @@ const QUEUES = [
   { href: '/admin/media', capability: 'bc_moderate_media' },
   { href: '/admin/reviews', capability: 'bc_moderate_reviews' },
   { href: '/admin/privacy', capability: 'bc_manage_platform' },
+  { href: '/admin/chat-reports', capability: 'bc_moderate_chat' },
 ];
 
 /** Somebody holding every capability EXCEPT the one under test. */

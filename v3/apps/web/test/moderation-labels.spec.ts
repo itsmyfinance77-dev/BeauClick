@@ -1,6 +1,15 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  CHAT_ACTION_LABEL,
+  CHAT_REPORT_REASON_LABEL,
+  CHAT_REPORT_STATUS_LABEL,
+  CHAT_REPORT_UNAVAILABLE,
+  CHAT_REPORT_UNREADABLE,
+  UNKNOWN_ACTION_LABEL,
+  chatActionLabel,
+  chatReportReasonLabel,
+  chatReportStatusView,
   MEDIA_REPORT_REASON_LABEL,
   PRIVACY_KIND_LABEL,
   PRIVACY_STATUS_LABEL,
@@ -57,6 +66,46 @@ describe('review statuses', () => {
 
   it('show a neutral word for a status they have never heard of', () => {
     expect(reviewStatusView('quarantined')).toEqual({ label: UNKNOWN_STATUS_LABEL, tone: 'neutral' });
+  });
+});
+
+describe('chat reports', () => {
+  const CONTRACT = 'packages/chat-contract/src/chat-contract.ts';
+
+  it('name exactly the reasons, statuses and upheld actions the chat contract declares', () => {
+    const reasons = serverList(CONTRACT, 'CHAT_REPORT_REASONS');
+    expect(reasons.length).toBeGreaterThanOrEqual(5);
+    expect(Object.keys(CHAT_REPORT_REASON_LABEL).sort()).toEqual(reasons);
+    expect(Object.keys(CHAT_REPORT_STATUS_LABEL).sort()).toEqual(serverList(CONTRACT, 'CHAT_REPORT_STATUSES'));
+    expect(Object.keys(CHAT_ACTION_LABEL).sort()).toEqual(serverList(CONTRACT, 'CHAT_MODERATION_ACTIONS'));
+  });
+
+  it('offer the server’s default action first, so the form starts where the server would', () => {
+    const controller = readFileSync(join(V3, 'services/chat/src/chat-moderation.controller.ts'), 'utf8');
+    expect(controller).toContain("dto.action ?? 'warn_sender'");
+    expect(Object.keys(CHAT_ACTION_LABEL)[0]).toBe('warn_sender');
+  });
+
+  it('show a neutral word for a reason, status or action they have never heard of', () => {
+    expect(chatReportReasonLabel('doxxing')).toBe(UNKNOWN_REASON_LABEL);
+    expect(chatReportStatusView('escalated')).toEqual({ label: UNKNOWN_STATUS_LABEL, tone: 'neutral' });
+    expect(chatActionLabel('ban_forever')).toBe(UNKNOWN_ACTION_LABEL);
+  });
+
+  it('refuse with ONE 404 on the server — so one message is honest for missing, foreign, expired and lost-the-race', () => {
+    const controller = readFileSync(join(V3, 'services/chat/src/chat-moderation.controller.ts'), 'utf8');
+    const throws = [...controller.matchAll(/throw new (\w+)/g)].map((m) => m[1]);
+    expect(throws.length).toBeGreaterThanOrEqual(2); // the read and the decide
+    expect(new Set(throws)).toEqual(new Set(['NotFoundOrNotYoursException']));
+    const exception = readFileSync(join(V3, 'libs/ownership/src/not-found-or-not-yours.exception.ts'), 'utf8');
+    expect(exception).toContain('extends NotFoundException');
+  });
+
+  it('never claim, in that one message, that a colleague decided the report', () => {
+    for (const copy of [CHAT_REPORT_UNAVAILABLE, CHAT_REPORT_UNREADABLE]) {
+      expect(copy).not.toMatch(/همکار|اپراتور دیگر|ناظر دیگر|پیش‌تر/);
+    }
+    expect(CHAT_REPORT_UNAVAILABLE).toBe('این گزارش دیگر برای تصمیم‌گیری در دسترس نیست. صف را تازه کنید.');
   });
 });
 

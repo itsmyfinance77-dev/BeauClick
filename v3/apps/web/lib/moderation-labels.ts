@@ -80,3 +80,57 @@ export const UNKNOWN_KIND_LABEL = 'نوع نامشخص';
 export function privacyKindLabel(kind: string): string {
   return PRIVACY_KIND_LABEL[kind] ?? UNKNOWN_KIND_LABEL;
 }
+
+// ------------------------------------------------------------------- chat
+
+/** `CHAT_REPORT_REASONS` (`packages/chat-contract/src/chat-contract.ts`). */
+export const CHAT_REPORT_REASON_LABEL: Record<string, string> = {
+  harassment: 'آزار و مزاحمت',
+  spam: 'هرزنامه',
+  scam_or_fraud: 'کلاهبرداری',
+  explicit: 'محتوای نامناسب',
+  personal_data: 'دادهٔ شخصی',
+  off_platform_payment: 'پرداخت بیرون از پلتفرم',
+  other: 'سایر',
+};
+
+export function chatReportReasonLabel(reason: string): string {
+  return CHAT_REPORT_REASON_LABEL[reason] ?? UNKNOWN_REASON_LABEL;
+}
+
+/** `CHAT_REPORT_STATUSES`. */
+export const CHAT_REPORT_STATUS_LABEL: Record<string, LabelView> = {
+  open: { label: 'باز', tone: 'warning' },
+  upheld: { label: 'تأییدشده', tone: 'error' },
+  rejected: { label: 'ردشده', tone: 'neutral' },
+};
+
+export function chatReportStatusView(status: string): LabelView {
+  return CHAT_REPORT_STATUS_LABEL[status] ?? { label: UNKNOWN_STATUS_LABEL, tone: 'neutral' };
+}
+
+/** `CHAT_MODERATION_ACTIONS` — the three things an upheld report may do. The order is the form's; the first is the server's default. */
+export const CHAT_ACTION_LABEL: Record<string, string> = {
+  warn_sender: 'اخطار به فرستنده',
+  close_conversation: 'بستن گفتگو برای ارسال',
+  restrict_sender: 'محدود کردن ارسالِ فرستنده',
+};
+
+export const UNKNOWN_ACTION_LABEL = 'اقدام نامشخص';
+
+export function chatActionLabel(action: string): string {
+  return CHAT_ACTION_LABEL[action] ?? UNKNOWN_ACTION_LABEL;
+}
+
+/**
+ * The chat routes' ONE refusal (`NOT_FOUND_OR_NOT_YOURS`, 404), in words.
+ *
+ * The same response means a missing report, a foreign one, one whose 30-day
+ * post-decision access has lapsed, and one a colleague decided a moment ago.
+ * The copy claims only what all four share — never that a colleague decided
+ * it (spec 37, "Concurrent-decision conflict").
+ */
+export const CHAT_REPORT_UNAVAILABLE = 'این گزارش دیگر برای تصمیم‌گیری در دسترس نیست. صف را تازه کنید.';
+
+/** The same refusal on OPENING a report. */
+export const CHAT_REPORT_UNREADABLE = 'این گزارش دیگر در دسترس نیست. صف را تازه کنید.';
