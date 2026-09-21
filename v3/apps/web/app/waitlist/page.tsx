@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { formatFullJalaliDate, formatTime, toPersianDigits } from '@beauclick/persian-utils';
 import { useAuth } from '@/lib/auth-context';
 import { ProtectedRoute } from '@/components/protected-route';
-import { Alert, Button, Card, ErrorState, LoadingState } from '@/components/ui';
+import { Alert, Button, ErrorState, LoadingState } from '@/components/ui';
+import { Badge, EmptyState, PageHeader, type BadgeTone } from '@/components/kit';
 import {
   acceptWaitlistOffer,
   declineWaitlistOffer,
@@ -14,6 +15,8 @@ import {
   type WaitlistEntry,
   type WaitlistStatus,
 } from '@/lib/phase4-api';
+import { remainingLabel } from '@/lib/remaining-time';
+import styles from './waitlist.module.css';
 
 const STATUS_LABELS: Record<WaitlistStatus, string> = {
   waiting: 'در صف انتظار',
@@ -25,15 +28,18 @@ const STATUS_LABELS: Record<WaitlistStatus, string> = {
   removed: 'حذف شد',
 };
 
-const STATUS_TONE: Record<WaitlistStatus, 'error' | 'success' | undefined> = {
-  waiting: undefined,
-  offered: 'success',
+// A live offer is the one state that asks for action, so it takes the warning
+// tone (`11_WAITLIST.md`); the rest are informative.
+const STATUS_TONE: Record<WaitlistStatus, BadgeTone> = {
+  waiting: 'neutral',
+  offered: 'warning',
   accepted: 'success',
-  declined: undefined,
+  declined: 'neutral',
   expired: 'error',
   missed: 'error',
-  removed: undefined,
+  removed: 'neutral',
 };
+
 
 export default function WaitlistPage() {
   return (
@@ -115,76 +121,66 @@ function Waitlist() {
     }
   }
 
-  if (loading) return <LoadingState label="در حال بارگذاری…" />;
+  if (loading) return <LoadingState label="در حال بارگذاری…" lines={4} />;
   if (!loaded) return <ErrorState message={error ?? 'لیست انتظار بارگذاری نشد.'} onRetry={() => void load()} />;
+
+  const now = Date.now();
+  const liveOffers = entries.filter((e) => e.status === 'offered').length;
 
   return (
     <section>
-      <h1 style={{ fontSize: 24, marginBlockEnd: 16 }}>لیست انتظار من</h1>
+      <PageHeader title="لیست انتظار من" />
       {error ? <Alert tone="error">{error}</Alert> : null}
 
-      {entries.length === 0 ? (
-        <Card>
-          <p style={{ margin: 0 }}>در حال حاضر در هیچ لیست انتظاری قرار ندارید.</p>
-        </Card>
-      ) : (
-        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 8 }}>
-          {entries.map((entry) => (
-            <li key={entry.id}>
-              <Card>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-                  <div>
-                    <p style={{ margin: 0, fontSize: 15 }}>
-                      وضعیت: <strong>{STATUS_LABELS[entry.status]}</strong>
-                    </p>
-                    <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--bc-color-ink-faint)' }}>
-                      عضویت در {formatFullJalaliDate(new Date(entry.createdAt))}
-                    </p>
-                    {entry.status === 'offered' && entry.offerExpiresAt ? (
-                      <p style={{ margin: '6px 0 0', fontSize: 13 }}>
-                        تا ساعت {toPersianDigits(formatTime(new Date(entry.offerExpiresAt)))} فرصت دارید پاسخ دهید.
-                      </p>
-                    ) : null}
-                  </div>
+      {/* A polite announcement when an offer is waiting, so a screen-reader user
+          is not left to discover a ticking deadline by reading every row. */}
+      <p role="status" aria-live="polite" className={styles.live}>
+        {liveOffers > 0 ? `${toPersianDigits(liveOffers)} پیشنهاد نوبت منتظر پاسخ شماست.` : ''}
+      </p>
 
-                  {STATUS_TONE[entry.status] ? (
-                    <span
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 700,
-                        padding: '4px 10px',
-                        borderRadius: 999,
-                        background:
-                          STATUS_TONE[entry.status] === 'success' ? 'var(--bc-color-success-soft)' : 'var(--bc-color-error-soft)',
-                        color: STATUS_TONE[entry.status] === 'success' ? 'var(--bc-color-success)' : 'var(--bc-color-error)',
-                      }}
-                    >
-                      {STATUS_LABELS[entry.status]}
-                    </span>
-                  ) : null}
+      {entries.length === 0 ? (
+        <EmptyState message="در حال حاضر در هیچ لیست انتظاری قرار ندارید." />
+      ) : (
+        <ul className={styles.list}>
+          {entries.map((entry) => {
+            const offered = entry.status === 'offered';
+            return (
+              <li key={entry.id} className={`${styles.row} ${offered ? styles.offer : ''}`} data-entry={entry.id}>
+                <div className={styles.head}>
+                  <Badge tone={STATUS_TONE[entry.status]}>{STATUS_LABELS[entry.status]}</Badge>
+                  <p className={styles.since}>عضویت در {formatFullJalaliDate(new Date(entry.createdAt))}</p>
                 </div>
 
-                {entry.status === 'offered' ? (
-                  <div style={{ display: 'flex', gap: 8, marginBlockStart: 16 }}>
-                    <Button onClick={() => void accept(entry)} loading={busyId === entry.id}>
+                {offered && entry.offerExpiresAt ? (
+                  <p className={styles.deadline}>
+                    تا ساعت{' '}
+                    <span className={styles.clock}>{toPersianDigits(formatTime(new Date(entry.offerExpiresAt)))}</span> فرصت
+                    دارید پاسخ دهید.
+                    <span className={styles.remaining}>{remainingLabel(entry.offerExpiresAt, now)}</span>
+                  </p>
+                ) : null}
+
+                {offered ? (
+                  <div className={styles.actions}>
+                    <Button inline onClick={() => void accept(entry)} loading={busyId === entry.id}>
                       پذیرفتن و رزرو
                     </Button>
-                    <Button variant="ghost" onClick={() => void decline(entry)} disabled={busyId === entry.id}>
+                    <Button inline variant="ghost" onClick={() => void decline(entry)} disabled={busyId === entry.id}>
                       رد کردن
                     </Button>
                   </div>
                 ) : null}
 
                 {entry.status === 'waiting' ? (
-                  <div style={{ marginBlockStart: 16 }}>
-                    <Button variant="ghost" onClick={() => void remove(entry)} loading={busyId === entry.id}>
+                  <div className={styles.actions}>
+                    <Button inline variant="ghost" onClick={() => void remove(entry)} loading={busyId === entry.id}>
                       خروج از لیست انتظار
                     </Button>
                   </div>
                 ) : null}
-              </Card>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>
