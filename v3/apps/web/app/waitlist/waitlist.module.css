@@ -1,0 +1,118 @@
+/*
+ * The waitlist — `11_WAITLIST.md`.
+ *
+ * "This page is deliberately plain: there is little data, so the layout must
+ * not be padded out with decoration." Rows, one emphasised kind of row (a live
+ * offer, with its deadline), and the three actions the API offers.
+ *
+ *   390   a full-width card; its buttons are full width.
+ *   640+  the actions sit on one line under the text.
+ *
+ * Breakpoints are the design's 640 and 1024 (`breakpoints.spec.ts`).
+ */
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+/* "A tighter row at 1280": with this little data a full-width row is mostly air. */
+@media (min-width: 1024px) {
+  .list {
+    max-inline-size: 760px;
+  }
+}
+
+.row {
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-card);
+  padding: 16px;
+}
+
+@media (min-width: 640px) {
+  .row {
+    padding: 16px 20px;
+  }
+}
+
+/*
+ * A live offer is the only row that asks the customer to do something before a
+ * clock runs out, so it is the only one that is drawn differently: the primary
+ * border and its soft tint. Not colour alone — it also carries the deadline
+ * sentence, which no other row has.
+ */
+.offer {
+  border-color: var(--bc-color-primary);
+  background: var(--bc-color-primary-soft);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.since {
+  margin: 0;
+  font-size: var(--bc-text-small-size);
+  color: var(--bc-color-text-faint);
+}
+
+.deadline {
+  margin: 12px 0 0;
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+.remaining {
+  display: block;
+  font-weight: 700;
+}
+
+/* A time of day stays left-to-right inside a right-to-left sentence. */
+.clock {
+  direction: ltr;
+  unicode-bidi: isolate;
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+}
+
+.actions {
+  display: grid;
+  gap: 8px;
+  margin-block-start: 16px;
+}
+
+/*
+ * The buttons carry `width: auto`, and a grid item with `auto` width and the
+ * default stretch alignment fills its column, which is what "full-width
+ * buttons at 390" needs without overriding an inline style.
+ */
+@media (min-width: 640px) {
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+  }
+}
+
+.empty {
+  margin: 0;
+  color: var(--bc-color-text-muted);
+  line-height: 1.8;
+}
+
+/* Announced to assistive technology, never drawn. */
+.live {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
