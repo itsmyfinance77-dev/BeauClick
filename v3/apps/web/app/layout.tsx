@@ -2,13 +2,23 @@ import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { AuthProvider } from '@/lib/auth-context';
 import { UnreadProvider } from '@/lib/unread-context';
+import { SITE_DESCRIPTION, SITE_NAME, openGraphFor, safeMetadataBase } from '@/lib/seo';
 import { AppShell } from '@/components/app-shell';
 import { anjoman, peyda, vazir } from './fonts';
 import './globals.css';
 
+/**
+ * The site-wide defaults every route inherits. The description is the wording
+ * the app already shipped (`lib/seo.ts`): the final brand sentence is a
+ * business decision, not one this layer writes. Pages that set their own
+ * `title` get the ` | BeauClick` suffix from the template.
+ */
 export const metadata: Metadata = {
-  title: 'BeauClick',
-  description: 'مارکت‌پلیس هوشمند زیبایی',
+  metadataBase: safeMetadataBase(),
+  title: { default: SITE_NAME, template: `%s | ${SITE_NAME}` },
+  description: SITE_DESCRIPTION,
+  openGraph: openGraphFor({ title: SITE_NAME, description: SITE_DESCRIPTION }),
+  twitter: { card: 'summary_large_image', title: SITE_NAME, description: SITE_DESCRIPTION },
 };
 
 /**
