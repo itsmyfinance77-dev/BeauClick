@@ -12,6 +12,7 @@ import {
   StatGrid,
   TextLink,
 } from '@/components/kit';
+import { LoadingState, Skeleton } from '@/components/ui';
 
 /**
  * The shared component kit's contracts.
@@ -224,5 +225,32 @@ describe('FormGrid', () => {
       </FormGrid>,
     );
     expect(screen.getAllByRole('textbox').map((i) => i.getAttribute('aria-label'))).toEqual(['از ساعت', 'تا ساعت', 'خدمت']);
+  });
+});
+
+describe('LoadingState — a skeleton, announced', () => {
+  it('keeps the polite status message in the DOM so the announcement does not depend on the visuals', () => {
+    render(<LoadingState label="در حال بارگذاری زمان‌ها…" />);
+    const status = screen.getByRole('status');
+    expect(status).toHaveAttribute('aria-live', 'polite');
+    expect(status).toHaveTextContent('در حال بارگذاری زمان‌ها…');
+  });
+
+  it('draws the requested number of placeholder lines and hides them from assistive technology', () => {
+    const { container } = render(<LoadingState lines={4} />);
+    const bars = container.querySelectorAll('[aria-hidden="true"]');
+    expect(bars).toHaveLength(4);
+  });
+
+  it('draws a single full-width line rather than a shortened one when asked for one', () => {
+    const { container } = render(<LoadingState lines={1} />);
+    expect((container.querySelector('[aria-hidden="true"]') as HTMLElement).style.getPropertyValue('--sk-w')).toBe('100%');
+  });
+
+  it('takes numeric sizes as pixels and strings as given', () => {
+    const { container } = render(<Skeleton width={48} height="2rem" />);
+    const bar = container.firstElementChild as HTMLElement;
+    expect(bar.style.getPropertyValue('--sk-w')).toBe('48px');
+    expect(bar.style.getPropertyValue('--sk-h')).toBe('2rem');
   });
 });

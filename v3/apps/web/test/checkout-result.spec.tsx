@@ -577,7 +577,12 @@ describe('preserved behaviour', () => {
     getOrder.mockImplementation(() => new Promise(() => undefined));
     renderResult({ status: 'succeeded', orderId: 'o1' });
     const loading = await screen.findByText('در حال دریافت رسید…');
-    expect(loading).toHaveAttribute('role', 'status');
+    // The label lives inside the live region (LoadingState is a skeleton now,
+    // with the sentence visually hidden), so it is the region that is polite.
+    const region = loading.closest('[role="status"]');
+    expect(region).not.toBeNull();
+    expect(region).toHaveAttribute('aria-live', 'polite');
+    expect(region).not.toHaveAttribute('role', 'alert');
   });
 
   it('announces a SUCCESSFUL payment politely too, and a refusal assertively', async () => {
