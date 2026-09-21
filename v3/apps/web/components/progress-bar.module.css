@@ -1,0 +1,33 @@
+/*
+ * One progress bar, two grounds. The loyalty page draws it on the light
+ * surface and the dashboard draws it inside the dark loyalty card; the shape
+ * is identical and only the track and fill colours differ.
+ *
+ * The width comes through `--pb` (a percentage set by the component) rather
+ * than as an inline `width`, so the only inline style is the one genuinely
+ * dynamic value.
+ */
+
+.track {
+  block-size: 8px;
+  border-radius: var(--bc-radius-chip);
+  background: var(--bc-color-surface-tint);
+  border: 1px solid var(--bc-color-border);
+  overflow: hidden;
+}
+
+.fill {
+  block-size: 100%;
+  inline-size: var(--pb, 0%);
+  border-radius: var(--bc-radius-chip);
+  background: var(--bc-color-primary);
+}
+
+.onDark {
+  background: oklch(0.34 0.02 330);
+  border-color: transparent;
+}
+
+.onDark .fill {
+  background: var(--bc-color-accent);
+}
