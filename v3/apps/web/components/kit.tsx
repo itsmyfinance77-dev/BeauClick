@@ -14,6 +14,7 @@ import { Button, Card } from './ui';
 import tableStyles from './data-table.module.css';
 import formStyles from './form-grid.module.css';
 import progressStyles from './progress-bar.module.css';
+import chipStyles from './check-chip.module.css';
 
 /**
  * The shared component kit.
@@ -680,4 +681,34 @@ export function ProgressBar({
       <div className={progressStyles.fill} style={{ '--pb': `${pct}%` } as CSSProperties} />
     </div>
   );
+}
+
+/**
+ * A checkbox drawn as a chip. Extracted from two hand-written copies (the
+ * availability form's weekdays and the profile's specialties), each with the
+ * same eleven lines of inline style — `V3_COMPONENT_INVENTORY.md`, `Chip`.
+ *
+ * The state is the real checkbox's, so it is announced and keyboard-operable
+ * for free; the border and tint only reinforce it.
+ */
+export function CheckChip({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: () => void;
+}) {
+  return (
+    <label className={`${chipStyles.chip} ${checked ? chipStyles.on : ''}`}>
+      <input type="checkbox" checked={checked} onChange={onChange} />
+      {label}
+    </label>
+  );
+}
+
+/** The wrapping row a set of `CheckChip`s sits in. */
+export function CheckChipGroup({ children }: { children: ReactNode }) {
+  return <div className={chipStyles.group}>{children}</div>;
 }

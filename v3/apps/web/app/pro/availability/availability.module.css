@@ -1,0 +1,184 @@
+/*
+ * The professional's availability — `06_PRO_AVAILABILITY.md`.
+ *
+ *   390   the two creation forms stacked, then the days one after another.
+ *   640   the day cards two across.
+ *   1024  the bulk and single forms side by side, and the day cards three across.
+ *
+ * The design's centrepiece is a week grid (day column × hour row) with
+ * click-and-drag creation; that is a new interactive component and is not
+ * built here. This is the same data as a card per day, with each day's slots
+ * in time order. All times are the platform's (`Asia/Tehran`) and are set as a
+ * left-to-right run inside the right-to-left line.
+ *
+ * Breakpoints are the design's 640 and 1024 (`breakpoints.spec.ts`).
+ */
+
+.forms {
+  display: grid;
+  gap: var(--bc-spacing-card-gap-large);
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+
+@media (min-width: 1024px) {
+  .forms {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.panel {
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-card);
+  padding: 16px;
+}
+
+@media (min-width: 640px) {
+  .panel {
+    padding: 20px;
+  }
+}
+
+.formTitle {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.formLead {
+  margin: 0 0 16px;
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--bc-color-text-muted);
+}
+
+.formTitleSpaced {
+  margin: 0 0 16px;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0 0 16px;
+  min-inline-size: 0;
+}
+
+.legend {
+  padding: 0;
+  margin-block-end: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.actions {
+  display: grid;
+}
+
+@media (min-width: 640px) {
+  .actions {
+    display: flex;
+  }
+}
+
+/* ---------------------------------------------------------------- slots */
+
+.registered {
+  margin-block-start: 20px;
+}
+
+.listHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--bc-spacing-chip-gap);
+  margin-block-end: 12px;
+}
+
+.listTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.days {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--bc-spacing-card-gap);
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+
+@media (min-width: 640px) {
+  .days {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .days {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.dayTitle {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.slots {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.slot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--bc-spacing-chip-gap);
+  padding-block: 8px;
+}
+
+.slot + .slot {
+  border-block-start: 1px solid var(--bc-color-border);
+}
+
+.slotMain {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-inline-size: 0;
+}
+
+.time {
+  direction: ltr;
+  unicode-bidi: isolate;
+  display: inline-block;
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.serviceName {
+  font-size: 13px;
+  color: var(--bc-color-text-muted);
+}
+
+/* Why a slot cannot be released, in words — not a disabled button. */
+.why {
+  font-size: 12px;
+  color: var(--bc-color-text-muted);
+}
+
+.dialogText {
+  margin: 0;
+}

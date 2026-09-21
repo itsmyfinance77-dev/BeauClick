@@ -112,7 +112,7 @@ export interface MySlot {
   serviceId: string | null;
   startAt: string;
   endAt: string;
-  status: 'open' | 'held' | 'booked' | 'blocked';
+  status: 'open' | 'held' | 'booked';
 }
 
 /**
