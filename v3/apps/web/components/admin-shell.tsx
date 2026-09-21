@@ -38,6 +38,9 @@ const ADMIN_NAV: { href: string; label: string; capability?: string; system?: bo
   { href: '/admin/reviews', label: 'بازبینی دیدگاه‌ها', capability: 'bc_moderate_reviews' },
   { href: '/admin/users', label: 'کاربران و نقش‌ها' },
   { href: '/admin/audit-log', label: 'گزارش عملیات' },
+  // #238, spec 31: a read-only monitor, so beside the other operational
+  // records rather than the moderation queues.
+  { href: '/admin/privacy', label: 'حریم خصوصی', capability: 'bc_manage_platform' },
   { href: '/admin/settlements', label: 'تسویه‌ها' },
   { href: '/admin/search', label: 'جست‌وجو' },
   { href: '/admin/notifications', label: 'اعلان‌ها', system: true },

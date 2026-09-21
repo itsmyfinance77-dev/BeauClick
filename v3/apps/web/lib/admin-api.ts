@@ -214,6 +214,42 @@ export function moderateReview(api: ApiClient, reviewId: string, input: { decisi
   );
 }
 
+// ------------------------------------------------------- privacy monitor
+
+/**
+ * One privacy request as the operator sees it — `AdminPrivacyController.list`,
+ * gated on `bc_manage_platform`. These ten fields and no more: the payload of
+ * an export, a phone number, or anything else the request is ABOUT is not on
+ * the row this route reads, by design (`31_ADMIN_PRIVACY_QUEUE.md`).
+ *
+ * The route is the whole API of this area. There is no download and no cancel
+ * for an operator, so this file declares none.
+ */
+export interface AdminPrivacyRequest {
+  id: string;
+  subjectUserId: string;
+  kind: string;
+  status: string;
+  requestedAt: string;
+  executeAfter: string | null;
+  expiresAt: string | null;
+  completedAt: string | null;
+  cancelledAt: string | null;
+  failureCode: string | null;
+}
+
+/**
+ * `status` is the only filter the route accepts (`PrivacyRequestQueryDto`) —
+ * there is no `kind` filter (#266), so none is sent. Newest first.
+ */
+export function privacyRequests(api: ApiClient, params: { page?: number; limit?: number; status?: string } = {}) {
+  const query = new URLSearchParams();
+  query.set('page', String(params.page ?? 1));
+  query.set('limit', String(params.limit ?? 20));
+  if (params.status) query.set('status', params.status);
+  return api.get<AdminPrivacyRequest[]>(`/v1/admin/privacy/requests?${query.toString()}`);
+}
+
 /** The professional's own side, consumed by `/pro/profile`. */
 export interface MyVerificationRequest {
   id: string;

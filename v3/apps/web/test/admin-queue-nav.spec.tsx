@@ -17,7 +17,11 @@ jest.mock('next/navigation', () => ({
 const QUEUES = [
   { href: '/admin/media', capability: 'bc_moderate_media' },
   { href: '/admin/reviews', capability: 'bc_moderate_reviews' },
+  { href: '/admin/privacy', capability: 'bc_manage_platform' },
 ];
+
+/** Somebody holding every capability EXCEPT the one under test. */
+const ALL = ['bc_manage_platform', 'bc_moderate_verification', 'bc_moderate_media', 'bc_moderate_reviews', 'bc_moderate_chat'];
 
 const ok = (data: unknown) => Promise.resolve({ ok: true, status: 200, json: async () => ({ data, meta: null, error: null }) });
 
@@ -46,13 +50,13 @@ beforeEach(() => {
 
 describe.each(QUEUES)('$href', ({ href, capability }) => {
   it(`is offered to an operator holding ${capability}`, async () => {
-    renderShell(['bc_manage_platform', capability]);
+    renderShell([capability]);
     await screen.findByText('اپراتور');
     expect(navLink(href)).not.toBeNull();
   });
 
-  it(`is not offered without ${capability}, even to a platform operator`, async () => {
-    renderShell(['bc_manage_platform', 'bc_moderate_verification']);
+  it(`is not offered without ${capability}, whatever else the operator holds`, async () => {
+    renderShell(ALL.filter((c) => c !== capability));
     await screen.findByText('اپراتور');
     expect(navLink(href)).toBeNull();
   });

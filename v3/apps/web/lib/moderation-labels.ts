@@ -45,3 +45,38 @@ export const REVIEW_STATUS_LABEL: Record<string, LabelView> = {
 export function reviewStatusView(status: string): LabelView {
   return REVIEW_STATUS_LABEL[status] ?? { label: UNKNOWN_STATUS_LABEL, tone: 'neutral' };
 }
+
+// ---------------------------------------------------------------- privacy
+
+/**
+ * `DATA_REQUEST_STATUSES` (`services/privacy/src/entities/data-request.entity.ts`),
+ * as an OPERATOR reads them: every status its own word. The customer's page
+ * (`privacy-labels.ts`) folds `pending` and `processing` of an export into one
+ * state because to a person waiting for a file they are one; an operator
+ * watching for a stuck sweep needs them apart. The order is the filter's.
+ */
+export const PRIVACY_STATUS_LABEL: Record<string, LabelView> = {
+  pending: { label: 'در انتظار', tone: 'warning' },
+  processing: { label: 'در حال پردازش', tone: 'primary' },
+  ready: { label: 'آماده', tone: 'success' },
+  completed: { label: 'انجام شد', tone: 'success' },
+  expired: { label: 'منقضی شد', tone: 'neutral' },
+  cancelled: { label: 'لغو شد', tone: 'neutral' },
+  failed: { label: 'ناموفق', tone: 'error' },
+};
+
+export function privacyStatusView(status: string): LabelView {
+  return PRIVACY_STATUS_LABEL[status] ?? { label: UNKNOWN_STATUS_LABEL, tone: 'neutral' };
+}
+
+/** `DATA_REQUEST_KINDS`. */
+export const PRIVACY_KIND_LABEL: Record<string, string> = {
+  export: 'دریافت نسخهٔ داده',
+  erasure: 'حذف حساب',
+};
+
+export const UNKNOWN_KIND_LABEL = 'نوع نامشخص';
+
+export function privacyKindLabel(kind: string): string {
+  return PRIVACY_KIND_LABEL[kind] ?? UNKNOWN_KIND_LABEL;
+}

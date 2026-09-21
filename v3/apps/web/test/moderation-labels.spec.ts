@@ -2,10 +2,15 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   MEDIA_REPORT_REASON_LABEL,
+  PRIVACY_KIND_LABEL,
+  PRIVACY_STATUS_LABEL,
   REVIEW_STATUS_LABEL,
+  UNKNOWN_KIND_LABEL,
   UNKNOWN_REASON_LABEL,
   UNKNOWN_STATUS_LABEL,
   mediaReportReasonLabel,
+  privacyKindLabel,
+  privacyStatusView,
   reviewStatusView,
 } from '@/lib/moderation-labels';
 
@@ -52,5 +57,29 @@ describe('review statuses', () => {
 
   it('show a neutral word for a status they have never heard of', () => {
     expect(reviewStatusView('quarantined')).toEqual({ label: UNKNOWN_STATUS_LABEL, tone: 'neutral' });
+  });
+});
+
+describe('privacy requests', () => {
+  const ENTITY = 'services/privacy/src/entities/data-request.entity.ts';
+
+  it('name exactly the statuses a request can have — which is also every option of the status filter', () => {
+    const server = serverList(ENTITY, 'DATA_REQUEST_STATUSES');
+    expect(server.length).toBeGreaterThanOrEqual(5);
+    expect(Object.keys(PRIVACY_STATUS_LABEL).sort()).toEqual(server);
+  });
+
+  it('give every status its own word — an operator watching a stuck sweep needs pending and processing apart', () => {
+    const labels = Object.values(PRIVACY_STATUS_LABEL).map((view) => view.label);
+    expect(new Set(labels).size).toBe(labels.length);
+  });
+
+  it('name exactly the two kinds', () => {
+    expect(Object.keys(PRIVACY_KIND_LABEL).sort()).toEqual(serverList(ENTITY, 'DATA_REQUEST_KINDS'));
+  });
+
+  it('show a neutral word for a status or kind they have never heard of', () => {
+    expect(privacyStatusView('archived')).toEqual({ label: UNKNOWN_STATUS_LABEL, tone: 'neutral' });
+    expect(privacyKindLabel('rectification')).toBe(UNKNOWN_KIND_LABEL);
   });
 });
