@@ -6,6 +6,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { formatToman, toPersianDigits } from '@beauclick/persian-utils';
 import { useAuth } from '@/lib/auth-context';
 import { Alert, ErrorState } from '@/components/ui';
+import { saveFailureMessage } from '@/lib/wishlist-api';
 import {
   autocomplete,
   removeFromWishlist,
@@ -116,6 +117,9 @@ export function SearchResults() {
   const [sheetOpen, setSheetOpen] = useState(false);
   /** Ids whose save request is in flight, so a control cannot be double-fired. */
   const [savingIds, setSavingIds] = useState<ReadonlySet<string>>(new Set());
+  // Why the last save was refused. A full list (409) is the one refusal the
+  // customer can act on, and it used to vanish silently with the rest.
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const listboxId = useId();
 
@@ -213,6 +217,7 @@ export function SearchResults() {
   async function toggleSaved(item: SearchResultItem) {
     if (item.saved === null || savingIds.has(item.id)) return;
     const next = !item.saved;
+    setSaveError(null);
     setSavingIds((ids) => new Set(ids).add(item.id));
     try {
       if (next) await saveToWishlist(api, 'professional', item.id);
@@ -223,10 +228,11 @@ export function SearchResults() {
       setResult((current) =>
         current ? { ...current, items: current.items.map((i) => (i.id === item.id ? { ...i, saved: next } : i)) } : current,
       );
-    } catch {
-      // The list is unchanged, so the control simply stays as it was. A
-      // failed save must not leave a card claiming a state the server
-      // does not hold.
+    } catch (err) {
+      // The list is unchanged, so the control stays as it was: a failed save
+      // must not leave a card claiming a state the server does not hold. But
+      // the customer is told why, in the server's own words for a full list.
+      setSaveError(saveFailureMessage(err));
     } finally {
       setSavingIds((ids) => {
         const rest = new Set(ids);
@@ -467,6 +473,8 @@ export function SearchResults() {
               ))}
             </div>
           ) : null}
+
+          {saveError ? <Alert tone="error">{saveError}</Alert> : null}
 
           {result?.degraded && (
             // Told, not hidden: a degraded result set has no fuzzy matching and no

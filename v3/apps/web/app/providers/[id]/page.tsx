@@ -19,6 +19,7 @@ import {
 } from '@/lib/booking-api';
 import { joinWaitlist } from '@/lib/phase4-api';
 import { removeFromWishlist, saveToWishlist } from '@/lib/phase3-api';
+import { saveFailureMessage } from '@/lib/wishlist-api';
 import { ApiRequestError } from '@/lib/api-client';
 import styles from './provider.module.css';
 
@@ -86,6 +87,7 @@ export default function ProviderBookingPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savingTarget, setSavingTarget] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [waitlistState, setWaitlistState] = useState<'idle' | 'joining' | 'joined' | 'already'>('idle');
 
   const load = useCallback(async () => {
@@ -164,6 +166,7 @@ export default function ProviderBookingPage() {
 
   async function toggleSaved(targetType: 'professional' | 'service', targetId: string, currentlySaved: boolean) {
     if (savingTarget) return;
+    setSaveError(null);
     setSavingTarget(targetId);
     try {
       if (currentlySaved) await removeFromWishlist(api, targetType, targetId);
@@ -173,9 +176,11 @@ export default function ProviderBookingPage() {
       } else {
         setServices((list) => list.map((s) => (s.id === targetId ? { ...s, saved: !currentlySaved } : s)));
       }
-    } catch {
+    } catch (err) {
       // Left exactly as it was: a control must never claim a state the
-      // server does not hold.
+      // server does not hold. The customer is told why, in the server's own
+      // words when their list is full.
+      setSaveError(saveFailureMessage(err));
     } finally {
       setSavingTarget(null);
     }
@@ -303,6 +308,7 @@ export default function ProviderBookingPage() {
       </div>
 
       {error ? <Alert tone="error">{error}</Alert> : null}
+      {saveError ? <Alert tone="error">{saveError}</Alert> : null}
 
       <div className={styles.columns}>
         <div className={styles.profile}>

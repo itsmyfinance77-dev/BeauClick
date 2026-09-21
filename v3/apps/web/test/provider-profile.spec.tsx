@@ -70,6 +70,8 @@ function mockApi(options: {
   slots?: unknown[];
   portfolioFails?: boolean;
   citiesFail?: boolean;
+  /** A refused save with the server's own status, code and Persian message. */
+  saveRefusal?: { status: number; code: string; message: string };
 } = {}) {
   requests = [];
   (global.fetch as jest.Mock).mockImplementation((url: string, init?: RequestInit) => {
@@ -86,7 +88,13 @@ function mockApi(options: {
     if (/\/v1\/me(\?|$)/.test(url)) {
       return ok({ id: 'u1', phone: '+989123456789', displayName: null, roles: [], capabilities: [] });
     }
-    if (url.includes('/v1/me/wishlist/items')) return method === 'DELETE' ? ok(null) : ok({ id: 'w1' });
+    if (url.includes('/v1/me/wishlist/items')) {
+      if (options.saveRefusal) {
+        const { status, code, message } = options.saveRefusal;
+        return Promise.resolve({ ok: false, status, json: async () => ({ data: null, meta: null, error: { code, message } }) });
+      }
+      return method === 'DELETE' ? ok(null) : ok({ id: 'w1' });
+    }
     if (url.includes('/v1/providers/cities')) {
       if (options.citiesFail) return Promise.resolve({ ok: false, status: 500, json: async () => ({ data: null, meta: null, error: { code: 'X', message: 'x' } }) });
       return ok([{ id: 'city-yazd', name: 'یزد' }]);
@@ -213,6 +221,21 @@ describe('the profile shows what the server said, and no more', () => {
     // And no rating is rendered, because nobody has reviewed: `average` is
     // null, and 0 would be a rating rather than the absence of one.
     expect(document.body.textContent).not.toContain('۰ از ۵');
+  });
+});
+
+describe('a refused save', () => {
+  it('tells the customer their list is full, in the server’s own words, for a professional and for a service', async () => {
+    mockApi({ saveRefusal: {"status":409,"code":"WISHLIST_LIMIT_REACHED","message":"فهرست علاقه‌مندی‌های شما پر است. حداکثر ۵۰۰ مورد می‌توانید ذخیره کنید."} });
+    renderProfile();
+    const list = await screen.findByTestId('services');
+
+    await userEvent.click(screen.getByRole('button', { name: /افزودن آتلیه سارا محمدی به علاقه‌مندی‌ها/ }));
+    expect(await screen.findByText("فهرست علاقه‌مندی‌های شما پر است. حداکثر ۵۰۰ مورد می‌توانید ذخیره کنید.")).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /افزودن آتلیه سارا محمدی/ })).toHaveAttribute('aria-pressed', 'false');
+
+    await userEvent.click(within(list).getByRole('button', { name: /افزودن میکاپ عروس به علاقه‌مندی‌ها/ }));
+    expect(within(list).getByRole('button', { name: /افزودن میکاپ عروس/ })).toHaveAttribute('aria-pressed', 'false');
   });
 });
 
