@@ -9,17 +9,95 @@
  *   390   each queue is a row: label and counter, status and link beneath.
  *   640   one line: label, counter, status, link.
  *
- * Not done here, and recorded: the artboard inverts the whole admin PAGE to a
- * dark surface. `AdminShell` carries the dark bar; inverting the eleven pages
- * whose content is styled against light tokens is its own piece of work.
- *
  * Breakpoints are the design's 640 and 1024 (`breakpoints.spec.ts`).
+ *
+ * ## The whole page inverts to dark — #234
+ *
+ * `AdminShell` already carries the dark bar. This is the artboard the rest of
+ * that statement was recorded against: `Prototype - Pro and Admin.dc.html`
+ * §"نمای کلی مدیریت" at Phase F (commit `4b40b9055e909af5cdf7018183d5a57caeb4f1f6`,
+ * `docs/design/phase-f-workspace-snapshot/`) — not the current design-branch
+ * tip, which narrowed to the commercial-catalogue slice and no longer carries
+ * this artboard. Its literal `oklch()` values are reused below rather than
+ * invented; each is checked against the shared `contrast.ts` utility in
+ * `test/admin-overview-dark-contrast.spec.ts`, mirroring
+ * `packages/design-tokens/src/contrast.spec.ts`'s own pattern.
+ *
+ * `.page` overrides the SAME custom-property names the rest of the app reads
+ * (`--bc-color-surface`, `--bc-color-text`, ...) rather than inventing new
+ * ones. Every shared component this page renders — `Card`, `Badge`, `Alert`,
+ * `Button`, `PageHeader` — already reads these through a CSS module or an
+ * inline `style={{}}`; a custom property cascades to a descendant either way,
+ * so one scoped override reaches all of them without editing any shared
+ * component or touching any other page.
+ *
+ * **The one caveat that override carries:** `--bc-color-surface` is also used
+ * elsewhere in the app as the on-filled-control text colour (`Button`
+ * `variant="primary"`, `ErrorBoundary`'s own retry button) — "white text on a
+ * filled primary control" reads that same token. Nothing under `.page`
+ * renders a primary-variant control today (the retry button here is
+ * `variant="ghost"`, which reads `--bc-color-ink`, not `--bc-color-surface`).
+ * If one is ever added inside `.page`, check its contrast: this override
+ * makes `--bc-color-surface` DARK, and `--bc-color-primary` is also
+ * overridden here to a dark-mode value, so the pairing would need rechecking
+ * against both.
+ *
+ * `--bc-color-primary` is not just decorative here either: `TextLink`'s
+ * default tone reads it directly, and every queue row's «مشاهده» link is one.
+ * The light-mode value, a magenta chosen to sit on WHITE, is too dark to read
+ * against this page's own dark surface, so it gets a lighter dark-mode value
+ * — the one genuinely NEW colour choice here, not sourced from the artboard
+ * (which draws no primary-toned link), contrast-checked the same way.
  */
 
 .page {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 24px;
+  padding: 20px 16px 28px;
+  border-radius: var(--bc-radius-card);
+
+  /* Page ground and card ground — the artboard's own two values. */
+  --bc-color-surface-page: oklch(0.16 0.015 330);
+  --bc-color-surface: oklch(0.2 0.015 330);
+  --bc-color-surface-tint: oklch(0.26 0.016 330);
+  --bc-color-border: oklch(0.24 0.015 330);
+  --bc-color-border-strong: oklch(0.34 0.02 330);
+
+  /* Text -- the artboard's heading (#fff), tile-label (~0.6-0.75) range. */
+  --bc-color-text: oklch(0.96 0.006 330);
+  --bc-color-text-muted: oklch(0.75 0.012 330);
+  --bc-color-text-faint: oklch(0.6 0.012 330);
+
+  /* «مشاهده» links -- not in the artboard; a dark-mode value for the same magenta hue. */
+  --bc-color-primary: oklch(0.72 0.1 340);
+
+  /* Queue-edge / Badge tones. Warning is the artboard's amber tile; success
+     has no artboard example (it drew "healthy" in neutral white-on-grey) and
+     is derived to the same lightness/chroma family; error is Alert's tone
+     for a failed load, also with no artboard example. */
+  --bc-color-warning: oklch(0.75 0.1 70);
+  --bc-color-warning-soft: oklch(0.28 0.05 70);
+  --bc-color-success: oklch(0.7 0.1 155);
+  --bc-color-success-soft: oklch(0.26 0.05 155);
+  --bc-color-error: oklch(0.72 0.15 25);
+  --bc-color-error-soft: oklch(0.28 0.08 25);
+
+  /* Legacy aliases -- kept in step, exactly as `tokens.css` keeps them. */
+  --bc-color-ink: var(--bc-color-text);
+  --bc-color-ink-soft: var(--bc-color-text-muted);
+  --bc-color-ink-faint: var(--bc-color-text-faint);
+  --bc-color-line: var(--bc-color-border);
+  --bc-color-background: var(--bc-color-surface-page);
+
+  background: var(--bc-color-surface-page);
+  color: var(--bc-color-text);
+}
+
+@media (min-width: 640px) {
+  .page {
+    padding: 28px 32px 40px;
+  }
 }
 
 .section {

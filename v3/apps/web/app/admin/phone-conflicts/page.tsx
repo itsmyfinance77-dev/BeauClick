@@ -6,6 +6,7 @@ import { Alert, Button, Card, ErrorState, LoadingState } from '@/components/ui';
 import { Badge, ConfirmDialog, EmptyState, PageHeader, Textarea } from '@/components/kit';
 import { useAuth } from '@/lib/auth-context';
 import { phoneConflicts, resolvePhoneConflict, type PhoneConflict } from '@/lib/admin-api';
+import styles from './phone-conflicts.module.css';
 
 /**
  * Phone-conflict review (GAP-20).
@@ -96,37 +97,20 @@ export default function AdminPhoneConflictsPage() {
           message={includeResolved ? 'هیچ تعارضی ثبت نشده است.' : 'تعارض بررسی‌نشده‌ای وجود ندارد.'}
         />
       ) : (
-        <div style={{ display: 'grid', gap: 'var(--bc-spacing-card-gap)' }}>
+        <div className={styles.list}>
           {items.map((conflict) => (
             <Card key={conflict.id}>
-              <div
-                style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  alignItems: 'flex-start',
-                  justifyContent: 'space-between',
-                  gap: 'var(--bc-spacing-chip-gap)',
-                }}
-              >
-                <div style={{ minWidth: 0 }}>
-                  <p style={{ margin: 0, fontWeight: 700, direction: 'ltr', textAlign: 'start' }}>
-                    {toPersianDigits(conflict.phone)}
-                  </p>
-                  <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--bc-color-ink-soft)' }}>
-                    ثبت: {formatZonedDateTime(new Date(conflict.createdAt))}
-                  </p>
+              <div className={styles.cardHeader}>
+                <div className={styles.cardMain}>
+                  <p className={styles.phone}>{toPersianDigits(conflict.phone)}</p>
+                  <p className={styles.createdAt}>ثبت: {formatZonedDateTime(new Date(conflict.createdAt))}</p>
                   {/* The other account's id and nothing more. Joining the user
                       table here would turn a narrow operational queue into a
                       general-purpose lookup of arbitrary accounts. */}
-                  <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--bc-color-ink-faint)' }}>
-                    حساب موجود:{' '}
-                    <span style={{ direction: 'ltr', display: 'inline-block', fontFamily: 'monospace' }}>
-                      {conflict.existingUserId.slice(0, 8)}
-                    </span>
+                  <p className={styles.existingAccount}>
+                    حساب موجود: <span className={styles.existingAccountId}>{conflict.existingUserId.slice(0, 8)}</span>
                   </p>
-                  {conflict.note ? (
-                    <p style={{ margin: '8px 0 0', fontSize: 13 }}>{conflict.note}</p>
-                  ) : null}
+                  {conflict.note ? <p className={styles.note}>{conflict.note}</p> : null}
                 </div>
                 {conflict.resolvedAt ? (
                   <Badge tone="success">بررسی شده</Badge>
@@ -136,15 +120,13 @@ export default function AdminPhoneConflictsPage() {
               </div>
 
               {!conflict.resolvedAt ? (
-                <div style={{ marginBlockStart: 16 }}>
+                <div className={styles.resolveAction}>
                   <Button type="button" inline onClick={() => setPending(conflict)}>
                     ثبت بررسی
                   </Button>
                 </div>
               ) : (
-                <p style={{ margin: '12px 0 0', fontSize: 12, color: 'var(--bc-color-ink-faint)' }}>
-                  بررسی‌شده در {formatZonedDateTime(new Date(conflict.resolvedAt))}
-                </p>
+                <p className={styles.resolvedNote}>بررسی‌شده در {formatZonedDateTime(new Date(conflict.resolvedAt))}</p>
               )}
             </Card>
           ))}
@@ -163,9 +145,7 @@ export default function AdminPhoneConflictsPage() {
         }}
         body={
           <>
-            <p style={{ margin: '0 0 12px' }}>
-              این مورد به‌عنوان «بررسی‌شده» علامت می‌خورد. هیچ حسابی تغییر نمی‌کند.
-            </p>
+            <p className={styles.dialogIntro}>این مورد به‌عنوان «بررسی‌شده» علامت می‌خورد. هیچ حسابی تغییر نمی‌کند.</p>
             <Textarea
               label="نتیجه بررسی"
               value={reason}
@@ -174,9 +154,7 @@ export default function AdminPhoneConflictsPage() {
               hint="این متن به‌صورت دائمی در گزارش عملیات ثبت می‌شود."
             />
             {reason.trim().length > 0 && reason.trim().length < 4 ? (
-              <p style={{ fontSize: 12, color: 'var(--bc-color-error)', margin: 0 }}>
-                توضیح باید حداقل ۴ نویسه باشد.
-              </p>
+              <p className={styles.dialogError}>توضیح باید حداقل ۴ نویسه باشد.</p>
             ) : null}
           </>
         }

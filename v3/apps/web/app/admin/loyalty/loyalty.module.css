@@ -1,0 +1,63 @@
+/*
+ * The loyalty policy screen -- read-only, and deliberately so (see the page's
+ * own doc comment: GAP-10 asks for a sign-off pass, not an edit form).
+ * #219's inline-style migration: nothing here changes behaviour, only where
+ * the declarations live.
+ */
+
+.cardTitle {
+  margin: 0 0 16px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.tableCaption {
+  margin-block-end: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: start;
+}
+
+.row {
+  border-block-end: 1px solid var(--bc-color-line);
+}
+
+.rowLabel {
+  padding: 10px 0;
+  font-weight: 600;
+  text-align: start;
+}
+
+.rowValue {
+  padding: 10px 0;
+  text-align: end;
+}
+
+/* --------------------------------------------------------- tier basis card */
+
+.tierSection {
+  margin-block-start: 20px;
+}
+
+.tierTitle {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.tierValue {
+  margin: 0;
+  font-size: 14px;
+}
+
+.footnote {
+  margin-block-start: 20px;
+  font-size: 12px;
+  color: var(--bc-color-ink-faint);
+}

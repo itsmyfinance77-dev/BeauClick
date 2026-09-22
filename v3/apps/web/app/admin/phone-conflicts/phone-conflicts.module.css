@@ -1,0 +1,74 @@
+/*
+ * Phone-conflict review (GAP-20). #219's inline-style migration: nothing
+ * here changes behaviour, only where the declarations live.
+ */
+
+.list {
+  display: grid;
+  gap: var(--bc-spacing-card-gap);
+}
+
+.cardHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--bc-spacing-chip-gap);
+}
+
+.cardMain {
+  min-width: 0;
+}
+
+/* A phone number is never reordered inside a right-to-left line. */
+.phone {
+  margin: 0;
+  font-weight: 700;
+  direction: ltr;
+  text-align: start;
+}
+
+.createdAt {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--bc-color-ink-soft);
+}
+
+.existingAccount {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--bc-color-ink-faint);
+}
+
+.existingAccountId {
+  display: inline-block;
+  direction: ltr;
+  font-family: monospace;
+}
+
+.note {
+  margin: 8px 0 0;
+  font-size: 13px;
+}
+
+.resolveAction {
+  margin-block-start: 16px;
+}
+
+.resolvedNote {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: var(--bc-color-ink-faint);
+}
+
+/* --------------------------------------------------- the confirm dialogue */
+
+.dialogIntro {
+  margin: 0 0 12px;
+}
+
+.dialogError {
+  margin: 0;
+  font-size: 12px;
+  color: var(--bc-color-error);
+}

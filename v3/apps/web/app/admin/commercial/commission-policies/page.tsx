@@ -20,6 +20,7 @@ import {
   type CommissionPolicySummary,
   type CommissionPolicyVersion,
 } from '@/lib/admin-api';
+import styles from './commission-policies.module.css';
 
 /**
  * A pending confirmation. `discard` is here beside `publish` and `retire`
@@ -271,10 +272,7 @@ export default function AdminCommissionPoliciesPage() {
         <LoadingState label="در حال بارگذاری سیاست‌ها…" />
       ) : (
         <>
-          <div
-            data-testid="commission-components"
-            style={{ display: 'grid', gap: 'var(--bc-spacing-card-gap)', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}
-          >
+          <div data-testid="commission-components" className={styles.componentsGrid}>
             {COMPONENTS.map((component) => {
               const policy = policyFor(component);
               return (
@@ -322,8 +320,8 @@ export default function AdminCommissionPoliciesPage() {
           })}
 
           {editing ? (
-            <section style={{ marginBlockStart: 24 }}>
-              <h3 style={{ fontSize: 15, fontWeight: 800, margin: '0 0 10px' }}>
+            <section className={styles.editorSection}>
+              <h3 className={styles.editorTitle}>
                 {editing.version === null ? 'پیش‌نویسِ تازه' : `ویرایشِ پیش‌نویس ${editing.version}`}
               </h3>
               <CommissionRuleEditor
@@ -340,9 +338,9 @@ export default function AdminCommissionPoliciesPage() {
           ) : null}
 
           {creating ? (
-            <section style={{ marginBlockStart: 24 }}>
-              <h3 style={{ fontSize: 15, fontWeight: 800, margin: '0 0 10px' }}>ساختِ سیاست برای {COMPONENT_LABEL[creating]}</h3>
-              <p style={{ margin: '0 0 12px', fontSize: 13, lineHeight: 1.9, color: 'var(--bc-color-ink-soft)' }}>
+            <section className={styles.editorSection}>
+              <h3 className={styles.editorTitle}>ساختِ سیاست برای {COMPONENT_LABEL[creating]}</h3>
+              <p className={styles.editorHint}>
                 ساختِ سیاست چیزی را منتشر نمی‌کند. پس از آن می‌توانید پیش‌نویسی بسازید و منتشرش کنید.
               </p>
               <CommissionRuleEditor
@@ -373,8 +371,8 @@ export default function AdminCommissionPoliciesPage() {
             }}
             onConfirm={() => void confirmPending()}
             body={
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <p id="commission-confirm-consequence" style={{ margin: 0, fontSize: 13.5, lineHeight: 1.95 }}>
+              <div className={styles.confirmBody}>
+                <p id="commission-confirm-consequence" className={styles.confirmConsequence}>
                   {confirmation ? CONFIRM_COPY[confirmation.kind].consequence : ''}
                 </p>
                 <Textarea
@@ -387,7 +385,7 @@ export default function AdminCommissionPoliciesPage() {
                   disabled={busy}
                 />
                 {mutationError ? (
-                  <p role="alert" style={{ margin: 0, fontSize: 13, lineHeight: 1.85, color: 'var(--bc-color-error)' }}>
+                  <p role="alert" className={styles.confirmError}>
                     {mutationError}
                   </p>
                 ) : null}

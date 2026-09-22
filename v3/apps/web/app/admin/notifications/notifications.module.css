@@ -1,0 +1,104 @@
+/*
+ * Notification channels and the dead-letter queue (GAP-11: an operator
+ * seeing "sent" counts must know some channels do not actually deliver).
+ * #219's inline-style migration: nothing here changes behaviour, only where
+ * the declarations live.
+ */
+
+.channelsTitle {
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.channelsList {
+  display: grid;
+  gap: 10px;
+}
+
+.channelRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--bc-spacing-chip-gap);
+}
+
+.channelName {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.unverifiedNote {
+  margin: 16px 0 0;
+  font-size: 13px;
+  color: var(--bc-color-ink-soft);
+}
+
+/* ------------------------------------------------------------ dead letters */
+
+.deadLettersSection {
+  margin-block-start: 20px;
+}
+
+.deadLettersHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--bc-spacing-chip-gap);
+  margin-block-end: 12px;
+}
+
+.deadLettersTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.deadLettersList {
+  display: grid;
+  gap: var(--bc-spacing-card-gap);
+}
+
+.deadLetterHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--bc-spacing-chip-gap);
+}
+
+.deadLetterMain {
+  min-width: 0;
+}
+
+.deadLetterTemplate {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.deadLetterMeta {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--bc-color-ink-soft);
+}
+
+.deadLetterTime {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--bc-color-ink-faint);
+}
+
+.deadLetterBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* --------------------------------------------------- the confirm dialogue */
+
+.dialogBody {
+  margin: 0;
+}
