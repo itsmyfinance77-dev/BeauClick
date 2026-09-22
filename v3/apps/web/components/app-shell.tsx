@@ -169,7 +169,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 />
               </>
             ) : (
-              <Link href="/auth" className={styles.primaryLink} style={{ fontWeight: 600 }}>
+              <Link href="/auth" className={`${styles.primaryLink} ${styles.primaryLinkEmphasis}`}>
                 ورود
               </Link>
             )}

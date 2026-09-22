@@ -124,6 +124,15 @@
   flex-shrink: 0;
 }
 
+/* The static brand mark from `public/` -- round, matching the customer header's own. #219. */
+.brandMark {
+  border-radius: 999px;
+}
+
+.whoMain {
+  min-width: 0;
+}
+
 .whoName {
   font-size: 14px;
   font-weight: 700;
@@ -135,6 +144,11 @@
   display: flex;
   gap: 2px;
   overflow-x: auto;
+}
+
+/* Groups a nav item with its own separator so both move together; `display: contents` takes the wrapper out of layout entirely. #219. */
+.navItem {
+  display: contents;
 }
 
 @media (min-width: 1024px) {

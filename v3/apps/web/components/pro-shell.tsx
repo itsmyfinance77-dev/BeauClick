@@ -104,13 +104,13 @@ export function ProShell({ children }: { children: ReactNode }) {
         <div className={styles.identity}>
           <Link href="/pro" className={styles.brand}>
             {/* The static brand mark from `public/`. */}
-            <img src="/brand/icon-circle.svg" alt="" width={24} height={24} style={{ borderRadius: 999 }} />
+            <img src="/brand/icon-circle.svg" alt="" width={24} height={24} className={styles.brandMark} />
             <span className={styles.brandName}>BeauClick</span>
           </Link>
           {ready ? (
             <div className={styles.who} data-testid="pro-identity">
               <span className={styles.avatar} aria-hidden="true" />
-              <div style={{ minWidth: 0 }}>
+              <div className={styles.whoMain}>
                 <div className={styles.whoName}>{profile.displayName}</div>
                 <VerificationBadge status={profile.verificationStatus} />
               </div>
@@ -120,7 +120,7 @@ export function ProShell({ children }: { children: ReactNode }) {
 
         <nav aria-label="ناوبری متخصص" className={styles.nav}>
           {PRO_NAV.map((item) => (
-            <span key={item.href} style={{ display: 'contents' }}>
+            <span key={item.href} className={styles.navItem}>
               {item.separatorBefore ? <span className={styles.separator} aria-hidden="true" /> : null}
               <Link
                 href={item.href}
