@@ -1,0 +1,130 @@
+/*
+ * The legal and contact template — `33_FOOTER_LEGAL.md`.
+ *
+ *   390   one column; the table of contents is removed, the body runs the
+ *         full width.
+ *   1024  the body capped at 72 characters, with the table of contents beside
+ *         it as a sticky sidebar.
+ *
+ * Every grid track is `minmax(0, …)` so a long unbroken value cannot stretch
+ * the page past the viewport. Breakpoints are the design's 640 and 1024
+ * (`breakpoints.spec.ts`).
+ */
+
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--bc-spacing-card-gap);
+  align-content: start;
+}
+
+.updated {
+  margin: 0;
+  font-size: var(--bc-text-small-size);
+  line-height: var(--bc-text-small-leading);
+  color: var(--bc-color-ink-soft);
+}
+
+/* ---------------------------------------------------------- contact block */
+
+.contact {
+  max-width: 72ch;
+}
+
+.contactTitle {
+  margin: 0 0 8px;
+  font-size: var(--bc-text-card-title-size);
+  font-weight: var(--bc-text-card-title-weight);
+  line-height: var(--bc-text-card-title-leading);
+}
+
+.contactBody {
+  margin: 0;
+  font-size: var(--bc-text-compact-size);
+  line-height: var(--bc-text-compact-leading);
+  color: var(--bc-color-ink-soft);
+}
+
+/* ---------------------------------------------------------- body + sidebar */
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--bc-spacing-card-gap);
+  align-items: start;
+}
+
+.body {
+  max-width: 72ch;
+  font-size: var(--bc-text-body-size);
+  line-height: var(--bc-text-body-leading);
+  overflow-wrap: anywhere;
+}
+
+.toc {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .layoutWithToc {
+    grid-template-columns: 240px minmax(0, 72ch);
+    gap: 40px;
+  }
+
+  .toc {
+    display: block;
+    position: sticky;
+    inset-block-start: 24px;
+  }
+}
+
+.tocList,
+.tocSubList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tocSubList {
+  padding-inline-start: 16px;
+}
+
+.tocLink {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: var(--bc-text-compact-size);
+  color: var(--bc-color-ink-soft);
+  text-decoration: none;
+}
+
+.tocLink:hover {
+  color: var(--bc-color-primary);
+  text-decoration: underline;
+}
+
+/* ---------------------------------------------------------------- sections */
+
+.section + .section {
+  margin-block-start: 32px;
+}
+
+.h2 {
+  margin: 0 0 12px;
+  font-size: var(--bc-text-section-size);
+  font-weight: var(--bc-text-section-weight);
+  line-height: var(--bc-text-section-leading);
+  scroll-margin-block-start: 24px;
+}
+
+.subsection {
+  margin-block-start: 20px;
+}
+
+.h3 {
+  margin: 0 0 8px;
+  font-size: var(--bc-text-subhead-size);
+  font-weight: var(--bc-text-subhead-weight);
+  line-height: var(--bc-text-subhead-leading);
+  scroll-margin-block-start: 24px;
+}

@@ -47,9 +47,13 @@ import styles from './app-shell.module.css';
  * ## The footer is not global
  *
  * Only the home artboard carries one; search, the profile and the dashboard
- * do not. So it renders on `/` and nowhere else, rather than being assumed to
- * be site chrome.
+ * do not. So it renders on `/` and on the four pages it links to
+ * (`33_FOOTER_LEGAL.md` puts the site footer on each of them), rather than
+ * being assumed to be site chrome.
  */
+
+/** The routes that carry the footer. The legal pages are content pages that render inside the contained main, like any other. */
+const FOOTER_ROUTES = new Set(['/', '/terms', '/privacy-policy', '/contact', '/support']);
 
 /** `/` matches only itself; every other destination also owns its subtree. */
 function isCurrent(pathname: string, href: string): boolean {
@@ -164,7 +168,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <ErrorBoundary>{children}</ErrorBoundary>
       </main>
 
-      {isHome ? <SiteFooter /> : null}
+      {FOOTER_ROUTES.has(pathname) ? <SiteFooter /> : null}
 
       <MobileTabBar />
     </div>
