@@ -1,0 +1,266 @@
+/*
+ * The shared component kit's own styles (`kit.tsx`) -- #219's app-wide
+ * inline-style migration, the shared-primitives slice. Nothing here changes
+ * behaviour or values; every declaration is moved verbatim from the inline
+ * `style={{}}` object it replaces. A prop that only ever selects between a
+ * fixed, small set of values (a tone, a boolean state) becomes a modifier
+ * class rather than a runtime style object -- `Badge`'s five tones, for
+ * instance, no longer need the `BADGE_TONES` lookup at all.
+ *
+ * Two values stay genuinely dynamic and are NOT here: `ProgressBar`'s fill
+ * percentage and `StatGrid`'s caller-chosen minimum column width are
+ * per-instance numbers, not one of a fixed set, so each keeps a single
+ * inline `style` that sets only a CSS custom property -- the same pattern
+ * `progress-bar.module.css` already documents and this file's `.statGrid`
+ * now follows too.
+ */
+
+/* -------------------------------------------------------------- TextLink */
+
+.textLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--bc-color-primary);
+}
+
+.textLinkMuted {
+  color: var(--bc-color-ink-soft);
+}
+
+/* ------------------------------------------------------------ PageHeader */
+
+.pageHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--bc-spacing-chip-gap);
+  margin-block-end: 20px;
+}
+
+.pageHeaderMain {
+  min-width: 0;
+}
+
+.pageHeaderTitle {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.pageHeaderSubtitle {
+  margin: 6px 0 0;
+  font-size: 14px;
+  color: var(--bc-color-ink-soft);
+}
+
+.pageHeaderAction {
+  flex-shrink: 0;
+}
+
+/* ------------------------------------------------------------- EmptyState */
+
+.emptyState {
+  text-align: center;
+  padding: 16px 0;
+}
+
+.emptyStateMessage {
+  margin: 0;
+  font-size: 14px;
+  color: var(--bc-color-ink-soft);
+}
+
+.emptyStateAction {
+  margin-block-start: 16px;
+}
+
+/* ------------------------------------------------------------------ Badge */
+
+.badge {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.badgeNeutral {
+  background: var(--bc-color-surface-tint);
+  color: var(--bc-color-ink-soft);
+}
+
+.badgeSuccess {
+  background: var(--bc-color-success-soft);
+  color: var(--bc-color-success);
+}
+
+.badgeWarning {
+  background: var(--bc-color-warning-soft);
+  color: var(--bc-color-warning);
+}
+
+.badgeError {
+  background: var(--bc-color-error-soft);
+  color: var(--bc-color-error);
+}
+
+.badgePrimary {
+  background: var(--bc-color-primary-soft);
+  color: var(--bc-color-primary);
+}
+
+/* ------------------------------------------------------- Select/Textarea */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-block-end: 16px;
+}
+
+.fieldLabel {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.select,
+.textarea {
+  font: inherit;
+  padding: 12px 14px;
+  border-radius: var(--bc-radius-button);
+  border: 1px solid var(--bc-color-line);
+  background: var(--bc-color-surface);
+  color: var(--bc-color-ink);
+  min-height: 44px;
+}
+
+.textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+.fieldError {
+  border-color: var(--bc-color-error);
+}
+
+.fieldHint {
+  font-size: 12px;
+  color: var(--bc-color-ink-faint);
+}
+
+.fieldErrorMessage {
+  font-size: 12px;
+  color: var(--bc-color-error);
+}
+
+/* -------------------------------------------------------------- ConfirmDialog */
+
+.dialogBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 50;
+}
+
+.dialogPanel {
+  background: var(--bc-color-surface);
+  border-radius: var(--bc-radius-card);
+  padding: 24px;
+  width: 100%;
+  max-width: 420px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.dialogTitle {
+  margin: 0 0 12px;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.dialogBody {
+  font-size: 14px;
+  color: var(--bc-color-ink-soft);
+  margin-block-end: 20px;
+}
+
+.dialogActions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* -------------------------------------------------------- SegmentedControl */
+
+.segmentGroup {
+  display: flex;
+  gap: var(--bc-spacing-chip-gap);
+  flex-wrap: wrap;
+}
+
+.segment {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  border: 1px solid var(--bc-color-line);
+  background: transparent;
+  color: var(--bc-color-ink);
+}
+
+.segment:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Weight as well as colour, so the selection survives a reader who cannot
+   make the colour distinction. */
+.segmentCurrent {
+  font-weight: 800;
+  border-color: var(--bc-color-primary);
+  background: var(--bc-color-primary-soft);
+  color: var(--bc-color-primary);
+}
+
+/* -------------------------------------------------------------- StatGrid */
+
+.statGrid {
+  display: grid;
+  gap: var(--bc-spacing-card-gap);
+  /* `min` is a caller-chosen pixel value, not one of a fixed set -- the one
+     genuinely dynamic declaration here, set through a custom property. */
+  grid-template-columns: repeat(auto-fit, minmax(var(--stat-min), 1fr));
+}
+
+.statLabel {
+  margin: 0;
+  font-size: 13px;
+  color: var(--bc-color-ink-soft);
+}
+
+.statValue {
+  margin: 6px 0 0;
+  font-size: 22px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.statFooter {
+  margin-block-start: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}

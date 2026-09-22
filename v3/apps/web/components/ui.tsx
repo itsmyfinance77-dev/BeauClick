@@ -3,6 +3,7 @@
 import type { ButtonHTMLAttributes, CSSProperties, InputHTMLAttributes, ReactNode } from 'react';
 import { forwardRef, useId } from 'react';
 import skeletonStyles from './skeleton.module.css';
+import styles from './ui.module.css';
 
 /**
  * Minimal shared UI primitives for the Phase 1 foundation -- deliberately
@@ -36,6 +37,12 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   inline?: boolean;
 };
 
+const BUTTON_VARIANT_CLASS = {
+  primary: 'buttonPrimary',
+  ghost: 'buttonGhost',
+  danger: 'buttonDanger',
+} as const;
+
 export function Button({ variant = 'primary', loading = false, busy = false, inline = false, disabled, children, ...rest }: ButtonProps) {
   const isDisabled = disabled || loading;
   return (
@@ -43,25 +50,7 @@ export function Button({ variant = 'primary', loading = false, busy = false, inl
       {...rest}
       disabled={isDisabled}
       aria-busy={loading || busy || undefined}
-      style={{
-        font: 'inherit',
-        fontWeight: 600,
-        padding: inline ? '10px 16px' : '12px 20px',
-        borderRadius: 'var(--bc-radius-button)',
-        border: variant === 'primary' ? 'none' : '1px solid',
-        borderColor: variant === 'danger' ? 'var(--bc-color-error)' : 'var(--bc-color-line)',
-        background: variant === 'primary' ? 'var(--bc-color-primary)' : 'transparent',
-        color:
-          variant === 'primary'
-            ? 'var(--bc-color-surface)'
-            : variant === 'danger'
-              ? 'var(--bc-color-error)'
-              : 'var(--bc-color-ink)',
-        cursor: isDisabled ? 'not-allowed' : 'pointer',
-        opacity: isDisabled ? 0.6 : 1,
-        width: inline ? 'auto' : '100%',
-        minHeight: 44, // accessibility: comfortable touch target on mobile
-      }}
+      className={`${styles.button} ${styles[BUTTON_VARIANT_CLASS[variant]]} ${inline ? styles.buttonInline : ''}`}
     >
       {loading ? 'در حال انجام…' : children}
     </button>
@@ -88,9 +77,13 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input({ l
   const errorId = `${inputId}-error`;
   const hintId = `${inputId}-hint`;
 
+  // Phone/OTP entry is digits: keep them LTR-ordered inside an RTL document
+  // so "0912..." doesn't visually reverse.
+  const isNumeric = rest.inputMode === 'numeric';
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBlockEnd: 16 }}>
-      <label htmlFor={inputId} style={{ fontWeight: 600, fontSize: 14 }}>
+    <div className={styles.field}>
+      <label htmlFor={inputId} className={styles.fieldLabel}>
         {label}
       </label>
       <input
@@ -101,27 +94,15 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input({ l
         // Ties the message to the field for screen readers -- an error a
         // sighted user sees must also be announced.
         aria-describedby={[error ? errorId : null, hint ? hintId : null].filter(Boolean).join(' ') || undefined}
-        style={{
-          font: 'inherit',
-          padding: '12px 14px',
-          borderRadius: 'var(--bc-radius-button)',
-          border: `1px solid ${error ? 'var(--bc-color-error)' : 'var(--bc-color-line)'}`,
-          background: 'var(--bc-color-surface)',
-          color: 'var(--bc-color-ink)',
-          minHeight: 44,
-          // Phone/OTP entry is digits: keep them LTR-ordered inside an RTL
-          // document so "0912..." doesn't visually reverse.
-          direction: rest.inputMode === 'numeric' ? 'ltr' : undefined,
-          textAlign: rest.inputMode === 'numeric' ? 'center' : undefined,
-        }}
+        className={`${styles.input} ${error ? styles.fieldError : ''} ${isNumeric ? styles.inputNumeric : ''}`}
       />
       {hint ? (
-        <span id={hintId} style={{ fontSize: 12, color: 'var(--bc-color-ink-faint)' }}>
+        <span id={hintId} className={styles.fieldHint}>
           {hint}
         </span>
       ) : null}
       {error ? (
-        <span id={errorId} role="alert" style={{ fontSize: 12, color: 'var(--bc-color-error)' }}>
+        <span id={errorId} role="alert" className={styles.fieldErrorMessage}>
           {error}
         </span>
       ) : null}
@@ -151,11 +132,11 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input({ l
  */
 type AlertTone = 'error' | 'success' | 'warning' | 'info';
 
-const ALERT_TONE_TOKENS: Record<AlertTone, { fg: string; bg: string }> = {
-  error: { fg: 'var(--bc-color-error)', bg: 'var(--bc-color-error-soft)' },
-  success: { fg: 'var(--bc-color-success)', bg: 'var(--bc-color-success-soft)' },
-  warning: { fg: 'var(--bc-color-warning)', bg: 'var(--bc-color-warning-soft)' },
-  info: { fg: 'var(--bc-color-info)', bg: 'var(--bc-color-info-soft)' },
+const ALERT_TONE_CLASS: Record<AlertTone, string> = {
+  error: 'alertError',
+  success: 'alertSuccess',
+  warning: 'alertWarning',
+  info: 'alertInfo',
 };
 
 /**
@@ -175,22 +156,13 @@ const ALERT_TONE_ROLE: Record<AlertTone, 'alert' | 'status'> = {
 };
 
 export function Alert({ tone = 'error', children }: { tone?: AlertTone; children: ReactNode }) {
-  const { fg, bg } = ALERT_TONE_TOKENS[tone];
   return (
     <div
       role={ALERT_TONE_ROLE[tone]}
       /* A structural hook, because the ROLE is no longer a stable locator:
          it now varies by tone, and that variation is the thing under test. */
       data-bc-alert={tone}
-      style={{
-        padding: '12px 14px',
-        borderRadius: 'var(--bc-radius-control)',
-        marginBlockEnd: 16,
-        fontSize: 'var(--bc-text-compact-size)',
-        lineHeight: 'var(--bc-text-compact-leading)',
-        background: bg,
-        color: fg,
-      }}
+      className={`${styles.alert} ${styles[ALERT_TONE_CLASS[tone]]}`}
     >
       {children}
     </div>
@@ -198,18 +170,7 @@ export function Alert({ tone = 'error', children }: { tone?: AlertTone; children
 }
 
 export function Card({ children }: { children: ReactNode }) {
-  return (
-    <div
-      style={{
-        background: 'var(--bc-color-surface)',
-        border: '1px solid var(--bc-color-line)',
-        borderRadius: 'var(--bc-radius-card)',
-        padding: 24,
-      }}
-    >
-      {children}
-    </div>
-  );
+  return <div className={styles.card}>{children}</div>;
 }
 
 /**
