@@ -225,6 +225,27 @@ describe('the mobile bar and the footer', () => {
     expect(bar.querySelector('[data-tab="/"]')).not.toHaveAttribute('aria-current');
   });
 
+  it.each(['/admin', '/admin/verification', '/pro', '/pro/bookings'])(
+    // `25_MOBILE_NAVIGATION.md`: admin gets a dark horizontal scrolling bar
+    // instead of any bottom bar, and pro is meant to get its own two-tab bar.
+    // Either way the customer's five destinations are the wrong ones here.
+    'does not carry the customer bar on %s, which has its own nav chrome',
+    async (route) => {
+      pathname = route;
+      await signedIn();
+      expect(screen.queryByTestId('mobile-tab-bar')).toBeNull();
+    },
+  );
+
+  it.each(['/products', '/prospect'])(
+    'still carries it on %s, which only shares a prefix with a guarded route',
+    async (route) => {
+      pathname = route;
+      await signedIn();
+      expect(screen.getByTestId('mobile-tab-bar')).toBeInTheDocument();
+    },
+  );
+
   it('renders the footer on the landing page', async () => {
     await signedIn();
     expect(screen.getByRole('contentinfo')).toBeInTheDocument();
