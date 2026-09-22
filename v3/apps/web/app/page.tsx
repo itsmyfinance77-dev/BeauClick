@@ -336,9 +336,7 @@ export default function HomePage() {
 
       <section className={styles.section}>
         <div className={styles.sectionInner}>
-          <h2 className={styles.sectionTitle} style={{ marginBlockEnd: 24 }}>
-            رزرو در سه قدم
-          </h2>
+          <h2 className={`${styles.sectionTitle} ${styles.sectionTitleSpaced}`}>رزرو در سه قدم</h2>
           <div className={styles.stepGrid}>
             {STEPS.map((step, index) => (
               <div key={step.title} className={styles.step}>

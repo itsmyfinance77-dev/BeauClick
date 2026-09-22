@@ -388,3 +388,14 @@
 .setupStepDone {
   color: var(--bc-color-text-disabled);
 }
+
+/* #219: a flex child that must shrink and let its own text wrap/ellipsis rather than pushing the row wider. Shared by the blocker banner and each setup step. */
+.flexMain {
+  flex: 1;
+  min-width: 0;
+}
+
+/* #219: same "let this child shrink" rule, without the flex: 1 -- the booking row's leading column already gets its width from the grid/flex parent. */
+.minWidthMain {
+  min-width: 0;
+}

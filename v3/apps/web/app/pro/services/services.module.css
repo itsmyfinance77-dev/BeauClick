@@ -82,3 +82,12 @@
   gap: 8px;
   flex-wrap: wrap;
 }
+
+/* #219: the delete-confirmation dialogue's two paragraphs. */
+.dialogIntro {
+  margin: 0 0 8px;
+}
+
+.dialogNote {
+  margin: 0;
+}

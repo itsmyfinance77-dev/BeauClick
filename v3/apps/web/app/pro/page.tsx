@@ -205,7 +205,7 @@ export default function ProOverviewPage() {
       {loaded && awaitingAction.length > 0 ? (
         <div className={styles.blocker} data-testid="awaiting-action">
           <span className={styles.blockerDot} aria-hidden="true" />
-          <div style={{ flex: 1, minWidth: 0 }}>
+          <div className={styles.flexMain}>
             <div className={styles.blockerTitle}>
               {toPersianDigits(awaitingAction.length)} نوبت گذشته منتظر ثبت وضعیت است
             </div>
@@ -233,7 +233,7 @@ export default function ProOverviewPage() {
                 data-step-done={step.done ? 'true' : 'false'}
               >
                 <Badge tone={step.done ? 'success' : 'warning'}>{step.done ? 'انجام شد' : 'باقی مانده'}</Badge>
-                <span style={{ flex: 1, minWidth: 0 }}>{step.label}</span>
+                <span className={styles.flexMain}>{step.label}</span>
                 {!step.done ? <TextLink href={step.href}>انجام بده</TextLink> : null}
               </div>
             ))}
@@ -333,7 +333,7 @@ export default function ProOverviewPage() {
                       </div>
                     ) : (
                       <div className={styles.bookingRow}>
-                        <div style={{ minWidth: 0 }}>
+                        <div className={styles.minWidthMain}>
                           <div className={styles.bookingHead}>
                             <span className={styles.bookingName}>
                               {services.find((s) => s.id === entry.booking.serviceId)?.name ?? 'خدمت نامشخص'}
