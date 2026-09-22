@@ -6,6 +6,7 @@ import { Alert, Card, ErrorState, LoadingState } from '@/components/ui';
 import { Badge, PageHeader } from '@/components/kit';
 import { useAuth } from '@/lib/auth-context';
 import { loyaltyPolicy, type LoyaltyPolicy } from '@/lib/admin-api';
+import styles from './loyalty.module.css';
 
 const POLICY_LABELS: Record<string, string> = {
   pointsBookingCompleted: 'امتیاز هر نوبت انجام‌شده',
@@ -84,19 +85,17 @@ export default function AdminLoyaltyPage() {
           )}
 
           <Card>
-            <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 16px' }}>مقادیر امتیازدهی</h2>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
-              <caption style={{ textAlign: 'start', fontWeight: 600, marginBlockEnd: 8, fontSize: 13 }}>
-                امتیاز اعطاشده برای هر رویداد
-              </caption>
+            <h2 className={styles.cardTitle}>مقادیر امتیازدهی</h2>
+            <table className={styles.table}>
+              <caption className={styles.tableCaption}>امتیاز اعطاشده برای هر رویداد</caption>
               <tbody>
                 {Object.entries(policy.policy).map(([key, value]) => (
-                  <tr key={key} style={{ borderBlockEnd: '1px solid var(--bc-color-line)' }}>
-                    <th scope="row" style={{ textAlign: 'start', fontWeight: 600, padding: '10px 0' }}>
+                  <tr key={key} className={styles.row}>
+                    <th scope="row" className={styles.rowLabel}>
                       {POLICY_LABELS[key] ?? key}
                     </th>
-                    <td style={{ textAlign: 'end', padding: '10px 0' }}>{toPersianDigits(value)}</td>
-                    <td style={{ textAlign: 'end', padding: '10px 0' }}>
+                    <td className={styles.rowValue}>{toPersianDigits(value)}</td>
+                    <td className={styles.rowValue}>
                       {unresolved.includes(key) ? (
                         <Badge tone="warning">تصمیم‌گیری نشده</Badge>
                       ) : (
@@ -109,16 +108,16 @@ export default function AdminLoyaltyPage() {
             </table>
           </Card>
 
-          <div style={{ marginBlockStart: 20 }}>
+          <div className={styles.tierSection}>
             <Card>
-              <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 8px' }}>مبنای تعیین سطح</h2>
-              <p style={{ margin: 0, fontSize: 14 }}>
+              <h2 className={styles.tierTitle}>مبنای تعیین سطح</h2>
+              <p className={styles.tierValue}>
                 {BASIS_LABELS[policy.tierQualificationBasis] ?? policy.tierQualificationBasis}
               </p>
             </Card>
           </div>
 
-          <p style={{ fontSize: 12, color: 'var(--bc-color-ink-faint)', marginBlockStart: 20 }}>
+          <p className={styles.footnote}>
             تغییر این مقادیر از طریق پیکربندی محیط انجام می‌شود، نه از این صفحه. تعیین سیاست نهایی یک تصمیم
             کسب‌وکار است و نیازمند تأیید رسمی است.
           </p>

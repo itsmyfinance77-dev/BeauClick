@@ -6,6 +6,7 @@ import { Alert, Button, Card, ErrorState, LoadingState } from '@/components/ui';
 import { Badge, ConfirmDialog, EmptyState, PageHeader } from '@/components/kit';
 import { useAuth } from '@/lib/auth-context';
 import { notificationStatus, retryDueNotifications, type NotificationStatus } from '@/lib/admin-api';
+import styles from './notifications.module.css';
 
 const CHANNEL_LABELS: Record<string, string> = {
   in_app: 'درون‌برنامه‌ای',
@@ -79,22 +80,11 @@ export default function AdminNotificationsPage() {
       ) : status ? (
         <>
           <Card>
-            <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 12px' }}>کانال‌ها</h2>
-            <div style={{ display: 'grid', gap: 10 }}>
+            <h2 className={styles.channelsTitle}>کانال‌ها</h2>
+            <div className={styles.channelsList}>
               {status.channels.map((channel) => (
-                <div
-                  key={channel.channel}
-                  style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 'var(--bc-spacing-chip-gap)',
-                  }}
-                >
-                  <span style={{ fontSize: 14, fontWeight: 600 }}>
-                    {CHANNEL_LABELS[channel.channel] ?? channel.channel}
-                  </span>
+                <div key={channel.channel} className={styles.channelRow}>
+                  <span className={styles.channelName}>{CHANNEL_LABELS[channel.channel] ?? channel.channel}</span>
                   {channel.providerVerified ? (
                     <Badge tone="success">ارسال واقعی</Badge>
                   ) : (
@@ -108,7 +98,7 @@ export default function AdminNotificationsPage() {
                 document. An operator seeing "sent" counts must know that some
                 channels do not actually deliver anywhere. */}
             {unverified.length > 0 ? (
-              <p style={{ margin: '16px 0 0', fontSize: 13, color: 'var(--bc-color-ink-soft)' }}>
+              <p className={styles.unverifiedNote}>
                 کانال‌های{' '}
                 {unverified.map((c) => CHANNEL_LABELS[c.channel] ?? c.channel).join('، ')} در این محیط به سرویس
                 واقعی متصل نیستند و پیام‌ها فقط ثبت می‌شوند. اتصال سرویس واقعی خارج از دامنه این نسخه است.
@@ -116,20 +106,9 @@ export default function AdminNotificationsPage() {
             ) : null}
           </Card>
 
-          <div style={{ marginBlockStart: 20 }}>
-            <div
-              style={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: 'var(--bc-spacing-chip-gap)',
-                marginBlockEnd: 12,
-              }}
-            >
-              <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>
-                ناموفق نهایی ({toPersianDigits(status.deadLetters.total)})
-              </h2>
+          <div className={styles.deadLettersSection}>
+            <div className={styles.deadLettersHeader}>
+              <h2 className={styles.deadLettersTitle}>ناموفق نهایی ({toPersianDigits(status.deadLetters.total)})</h2>
               <Button type="button" variant="ghost" inline onClick={() => setPending(true)}>
                 تلاش مجدد برای موارد سررسیدشده
               </Button>
@@ -138,30 +117,20 @@ export default function AdminNotificationsPage() {
             {status.deadLetters.items.length === 0 ? (
               <EmptyState message="اعلان ناموفقی وجود ندارد." />
             ) : (
-              <div style={{ display: 'grid', gap: 'var(--bc-spacing-card-gap)' }}>
+              <div className={styles.deadLettersList}>
                 {status.deadLetters.items.map((item) => (
                   <Card key={item.id}>
-                    <div
-                      style={{
-                        display: 'flex',
-                        flexWrap: 'wrap',
-                        alignItems: 'flex-start',
-                        justifyContent: 'space-between',
-                        gap: 'var(--bc-spacing-chip-gap)',
-                      }}
-                    >
-                      <div style={{ minWidth: 0 }}>
-                        <p style={{ margin: 0, fontWeight: 600, fontSize: 14 }}>{item.templateKey}</p>
-                        <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--bc-color-ink-soft)' }}>
+                    <div className={styles.deadLetterHeader}>
+                      <div className={styles.deadLetterMain}>
+                        <p className={styles.deadLetterTemplate}>{item.templateKey}</p>
+                        <p className={styles.deadLetterMeta}>
                           {CHANNEL_LABELS[item.channel] ?? item.channel} — {item.category}
                         </p>
                         {item.deadLetteredAt ? (
-                          <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--bc-color-ink-faint)' }}>
-                            {formatZonedDateTime(new Date(item.deadLetteredAt))}
-                          </p>
+                          <p className={styles.deadLetterTime}>{formatZonedDateTime(new Date(item.deadLetteredAt))}</p>
                         ) : null}
                       </div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      <div className={styles.deadLetterBadges}>
                         <Badge tone="error">{item.errorCode ?? 'خطای نامشخص'}</Badge>
                         <Badge tone="neutral">{toPersianDigits(item.attempts)} تلاش</Badge>
                       </div>
@@ -182,7 +151,7 @@ export default function AdminNotificationsPage() {
         onConfirm={() => void confirm()}
         onCancel={() => setPending(false)}
         body={
-          <p style={{ margin: 0 }}>
+          <p className={styles.dialogBody}>
             اعلان‌های ناموفقی که زمان تلاش بعدی‌شان فرا رسیده، دوباره ارسال می‌شوند. این عملیات در گزارش عملیات ثبت
             می‌شود.
           </p>
