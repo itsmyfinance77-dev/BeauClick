@@ -141,16 +141,23 @@ describe('a queue', () => {
 
 describe('the platform figures', () => {
   it('say so, with a retry, when they fail — the heading does not stand over nothing', async () => {
-    let attempt = 0;
-    mockApi(['bc_moderate_verification'], { metrics: () => (++attempt === 1 ? fail() : ok(METRICS)) });
+    // A switch, not a count of requests: the page loads once before it knows the
+    // operator's capabilities and again after, so "the first request fails" is
+    // a race between those two loads and the test passed or failed with the load.
+    let failing = true;
+    mockApi(['bc_moderate_verification'], { metrics: () => (failing ? fail() : ok(METRICS)) });
     const user = userEvent.setup();
     renderPage();
     expect(await screen.findByText('آمار پلتفرم بارگذاری نشد.')).toBeInTheDocument();
+    await loaded(); // both loads are over, so the number of requests below is fixed
+    expect(screen.getByText('آمار پلتفرم بارگذاری نشد.')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'پلتفرم در ۳۰ روز گذشته' })).toBeInTheDocument();
 
+    const before = calls('/v1/admin/analytics').length;
+    failing = false;
     await user.click(screen.getByRole('button', { name: 'تلاش دوباره' }));
     expect(await screen.findByText('رزروهای ثبت‌شده')).toBeInTheDocument();
     expect(screen.queryByText('آمار پلتفرم بارگذاری نشد.')).toBeNull();
-    expect(calls('/v1/admin/analytics')).toHaveLength(2);
+    expect(calls('/v1/admin/analytics')).toHaveLength(before + 1);
   });
 });
