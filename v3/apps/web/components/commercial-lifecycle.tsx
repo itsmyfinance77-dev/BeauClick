@@ -148,6 +148,15 @@ export function RefusalNotice({ refusal }: { refusal: Refusal }) {
           {refusal.detail}
         </p>
       ) : null}
+      {refusal.counts ? (
+        <ul className={styles.problems} aria-label="شمار در لحظهٔ رد">
+          {Object.entries(refusal.counts).map(([name, count]) => (
+            <li key={name} dir="ltr">
+              {name}: {count}
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {refusalMeansStale(refusal) ? <p className={styles.refusalHint}>فهرست نسخه‌ها تازه شد. آنچه نوشته‌اید سر جایش است.</p> : null}
     </div>
   );

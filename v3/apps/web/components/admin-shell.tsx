@@ -53,6 +53,9 @@ const ADMIN_NAV: { href: string; label: string; capability?: string; system?: bo
   // #239, spec 47: the administrator's side of the outcome policy family (the
   // seller's is /pro/outcome-policy). Capability-gated the same way.
   { href: '/admin/commercial/outcome-policy', label: 'سیاست پیامد', capability: 'bc_manage_commercial_plans' },
+  // #239, spec 44: collection policies and the booking-credit enforcement
+  // control plane share one destination, as the spec draws them.
+  { href: '/admin/commercial/control-plane', label: 'دریافت و اعمال اعتبار', capability: 'bc_manage_commercial_plans' },
 ];
 
 /** `/admin` matches only itself; every other destination owns its subtree. */
