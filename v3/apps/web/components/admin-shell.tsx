@@ -50,6 +50,9 @@ const ADMIN_NAV: { href: string; label: string; capability?: string; system?: bo
   // V3.3 `#43b-1` / #173. The first commercial entry; capability-gated so an
   // operator without it is never offered a route they cannot open.
   { href: '/admin/commercial/commission-policies', label: 'سیاست کمیسیون', capability: 'bc_manage_commercial_plans' },
+  // #239, spec 47: the administrator's side of the outcome policy family (the
+  // seller's is /pro/outcome-policy). Capability-gated the same way.
+  { href: '/admin/commercial/outcome-policy', label: 'سیاست پیامد', capability: 'bc_manage_commercial_plans' },
 ];
 
 /** `/admin` matches only itself; every other destination owns its subtree. */

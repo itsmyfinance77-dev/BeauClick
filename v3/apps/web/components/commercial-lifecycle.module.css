@@ -1,0 +1,440 @@
+/*
+ * The shared commercial version lifecycle (#239) — badges, the legend, the
+ * reason dialog's body, set editors and one versioned family.
+ *
+ *   390    key cards full width; a family's version table becomes a card list
+ *          (`data-table.module.css`); row actions wrap.
+ *   640    row actions sit on one line.
+ *
+ * Breakpoints are the design's 640 and 1024 (`breakpoints.spec.ts`). Every grid
+ * track is `minmax(0, …)` and every id wraps, so a 64-character key cannot
+ * widen the page.
+ */
+
+/* ------------------------------------------------------------------ badges */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--bc-color-line);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.state_draft {
+  border-style: dashed;
+  color: var(--bc-color-ink-soft);
+}
+
+.state_published {
+  background: var(--bc-color-success-soft);
+  color: var(--bc-color-success);
+  border-color: var(--bc-color-success);
+}
+
+.state_retired {
+  background: var(--bc-color-surface-tint);
+  color: var(--bc-color-ink-faint);
+}
+
+.derived_active {
+  background: var(--bc-color-primary-soft);
+  color: var(--bc-color-primary);
+  border-color: var(--bc-color-primary);
+}
+
+.derived_scheduled {
+  background: var(--bc-color-info-soft);
+  color: var(--bc-color-info);
+}
+
+.derived_superseded {
+  color: var(--bc-color-ink-faint);
+  border-style: dotted;
+}
+
+.badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.window {
+  font-size: 12.5px;
+  line-height: 1.8;
+}
+
+/* ------------------------------------------------------------------ legend */
+
+.legend {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-card);
+  background: var(--bc-color-surface);
+}
+
+@media (min-width: 1024px) {
+  .legend {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.legendGroup {
+  min-inline-size: 0;
+  padding-inline-start: 10px;
+  border-inline-start: 3px solid var(--bc-color-line);
+}
+
+.legendGroup[data-legend-group='derived'] {
+  border-inline-start-style: dotted;
+}
+
+.legendGroup[data-legend-group='gates'] {
+  border-inline-start-style: double;
+  border-inline-start-width: 4px;
+}
+
+.legendTitle {
+  margin: 0 0 4px;
+  font-size: 13.5px;
+  font-weight: 800;
+}
+
+.legendHint {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--bc-color-ink-soft);
+}
+
+.legendRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* ----------------------------------------------------------------- refusal */
+
+.refusal {
+  margin-block: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--bc-color-error);
+  border-radius: var(--bc-radius-control);
+  background: var(--bc-color-error-soft);
+  color: var(--bc-color-error);
+  font-size: 13px;
+  line-height: 1.85;
+}
+
+.refusalMessage {
+  margin: 0;
+  font-weight: 700;
+}
+
+.problems {
+  margin: 6px 0 0;
+  padding-inline-start: 18px;
+  font-family: monospace;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.refusalDetail {
+  margin: 6px 0 0;
+  font-family: monospace;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.refusalHint {
+  margin: 6px 0 0;
+  color: var(--bc-color-ink);
+}
+
+/* ------------------------------------------------------------------ dialog */
+
+.dialogBody {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
+.consequence {
+  font-size: 13.5px;
+  line-height: 1.95;
+  color: var(--bc-color-ink);
+}
+
+.consequence p {
+  margin: 0 0 6px;
+}
+
+.blocked {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--bc-radius-control);
+  background: var(--bc-color-warning-soft);
+  color: var(--bc-color-warning);
+  font-size: 13px;
+  line-height: 1.85;
+}
+
+.fieldError {
+  margin: -8px 0 8px;
+  font-size: 12px;
+  color: var(--bc-color-error);
+}
+
+/* ------------------------------------------------------------- set editor */
+
+.set {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--bc-color-line);
+  border-radius: var(--bc-radius-control);
+  min-inline-size: 0;
+}
+
+.setLegend {
+  padding: 0 6px;
+  font-size: 13.5px;
+  font-weight: 800;
+}
+
+.setEmpty {
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  color: var(--bc-color-ink-faint);
+}
+
+.chips {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding-inline-start: 12px;
+  border: 1px solid var(--bc-color-line);
+  border-radius: 999px;
+  font-size: 13px;
+}
+
+/* 44px even though it is a chip's ×: the target is the size, not the glyph. */
+.chipRemove {
+  min-inline-size: 44px;
+  min-block-size: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--bc-color-ink-soft);
+  font: inherit;
+  font-size: 18px;
+  cursor: pointer;
+  border-radius: 999px;
+}
+
+.chipRemove:focus-visible {
+  outline: 2px solid var(--bc-color-primary);
+}
+
+.setAdd {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+}
+
+.setAddLabel {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.setAddRow {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.setInput {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  min-block-size: 44px;
+  padding: 0 12px;
+  font: inherit;
+  border: 1px solid var(--bc-color-line);
+  border-radius: var(--bc-radius-button);
+  background: var(--bc-color-surface);
+  color: var(--bc-color-ink);
+}
+
+.whole {
+  min-inline-size: 0;
+}
+
+.persianEcho {
+  display: block;
+  margin: -10px 0 12px;
+  font-size: 12px;
+  color: var(--bc-color-ink-soft);
+}
+
+.radioGroup {
+  margin: 0 0 16px;
+  padding: 0;
+  border: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.radio {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-block-size: 44px;
+  padding-block: 10px;
+  font-size: 13.5px;
+  line-height: 1.7;
+  cursor: pointer;
+}
+
+.radio input {
+  margin-block-start: 4px;
+}
+
+/* --------------------------------------------------------------- families */
+
+.family {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  margin-block-start: 24px;
+}
+
+.familyHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.familyTitle {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.familyIntro {
+  font-size: 13px;
+  line-height: 1.9;
+  color: var(--bc-color-ink-soft);
+}
+
+.familyIntro p {
+  margin: 0 0 6px;
+}
+
+.live {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--bc-color-success);
+  min-block-size: 0;
+}
+
+.live:empty {
+  display: none;
+}
+
+.keyCard {
+  min-inline-size: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-card);
+  background: var(--bc-color-surface);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+
+.keyHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.keyName {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+  min-inline-size: 0;
+}
+
+.keyId {
+  font-family: monospace;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  unicode-bidi: isolate;
+}
+
+.keyLabel {
+  font-weight: 700;
+}
+
+.keyMeta {
+  font-size: 12px;
+  color: var(--bc-color-ink-soft);
+}
+
+.noVersions {
+  margin: 0;
+  font-size: 13px;
+  color: var(--bc-color-ink-faint);
+}
+
+.rowActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.noAction {
+  color: var(--bc-color-ink-faint);
+}
+
+.editor {
+  padding-block-start: 12px;
+  border-block-start: 1px solid var(--bc-color-border);
+}
+
+.editorTitle {
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.createForm {
+  padding: 14px 16px;
+  border: 1px dashed var(--bc-color-line);
+  border-radius: var(--bc-radius-card);
+}
+
+.formActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
