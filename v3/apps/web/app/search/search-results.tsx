@@ -261,7 +261,7 @@ export function SearchResults() {
           search(query);
         }}
         role="search"
-        style={{ marginBlockEnd: 16, position: 'relative', maxWidth: 560 }}
+        className={styles.searchForm}
       >
         <label htmlFor="search-q" className="bc-visually-hidden">
           نام متخصص، خدمت یا شهر
@@ -279,17 +279,7 @@ export function SearchResults() {
           aria-controls={listboxId}
           aria-autocomplete="list"
           aria-activedescendant={highlighted >= 0 ? `${listboxId}-${highlighted}` : undefined}
-          style={{
-            width: '100%',
-            font: 'inherit',
-            fontSize: 16,
-            minHeight: 48,
-            padding: '0 14px',
-            border: '1px solid var(--bc-color-border)',
-            borderRadius: 'var(--bc-radius-input)',
-            background: 'var(--bc-color-surface)',
-            color: 'var(--bc-color-text)',
-          }}
+          className={styles.searchInput}
         />
         {suggestions.length > 0 && (
           /*
@@ -298,23 +288,7 @@ export function SearchResults() {
             name becomes the button's, and the listbox stops being operable
             as a listbox. Click and keyboard both land here now.
           */
-          <ul
-            id={listboxId}
-            role="listbox"
-            aria-label="پیشنهادها"
-            style={{
-              listStyle: 'none',
-              margin: '6px 0 0',
-              padding: 6,
-              position: 'absolute',
-              insetInline: 0,
-              zIndex: 20,
-              background: 'var(--bc-color-surface)',
-              border: '1px solid var(--bc-color-border)',
-              borderRadius: 'var(--bc-radius-card)',
-              boxShadow: 'var(--bc-shadow-float)',
-            }}
-          >
+          <ul id={listboxId} role="listbox" aria-label="پیشنهادها" className={styles.suggestions}>
             {suggestions.map((text, index) => (
               <li
                 key={text}
@@ -327,15 +301,7 @@ export function SearchResults() {
                   search(text);
                 }}
                 onMouseEnter={() => setHighlighted(index)}
-                style={{
-                  padding: '10px 12px',
-                  minHeight: 44,
-                  display: 'flex',
-                  alignItems: 'center',
-                  cursor: 'pointer',
-                  borderRadius: 'var(--bc-radius-control)',
-                  background: index === highlighted ? 'var(--bc-color-surface-muted)' : 'transparent',
-                }}
+                className={`${styles.suggestion} ${index === highlighted ? styles.suggestionHighlighted : ''}`}
               >
                 {text}
               </li>
@@ -514,9 +480,7 @@ export function SearchResults() {
           {error && !result ? <ErrorState message={error} onRetry={() => void run(params)} /> : null}
 
           {error && result && result.items.length > 0 ? (
-            <p style={{ fontSize: 13, color: 'var(--bc-color-text-faint)', marginBlockEnd: 12 }}>
-              نتایج زیر مربوط به جست‌وجوی قبلی است و ممکن است به‌روز نباشد.
-            </p>
+            <p className={styles.staleNotice}>نتایج زیر مربوط به جست‌وجوی قبلی است و ممکن است به‌روز نباشد.</p>
           ) : null}
 
           {loading && !result ? (
@@ -634,7 +598,7 @@ export function SearchResults() {
           )}
 
           {result && result.pagination.totalPages > 1 ? (
-            <nav aria-label="صفحه‌بندی" className={styles.pager} style={{ gap: 8, display: 'flex' }}>
+            <nav aria-label="صفحه‌بندی" className={styles.pager}>
               <button
                 type="button"
                 className={styles.sortSelect}
@@ -643,7 +607,7 @@ export function SearchResults() {
               >
                 قبلی
               </button>
-              <span style={{ alignSelf: 'center', fontSize: 14, fontVariantNumeric: 'tabular-nums' }}>
+              <span className={styles.pageIndicator}>
                 صفحه {toPersianDigits(result.pagination.page)} از {toPersianDigits(result.pagination.totalPages)}
               </span>
               <button
