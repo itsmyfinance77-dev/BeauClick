@@ -14,7 +14,7 @@ jest.mock('next/navigation', () => ({
  * so nobody is shown a link to a page that would refuse them.
  */
 
-const ENTRIES = ['/admin/commercial/outcome-policy', '/admin/commercial/control-plane'];
+const ENTRIES = ['/admin/commercial/plans', '/admin/commercial/outcome-policy', '/admin/commercial/control-plane'];
 
 const ok = (data: unknown) => Promise.resolve({ ok: true, status: 200, json: async () => ({ data, meta: null, error: null }) });
 

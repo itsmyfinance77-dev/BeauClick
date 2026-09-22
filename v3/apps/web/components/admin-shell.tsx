@@ -47,6 +47,9 @@ const ADMIN_NAV: { href: string; label: string; capability?: string; system?: bo
   { href: '/admin/notifications', label: 'اعلان‌ها', system: true },
   { href: '/admin/phone-conflicts', label: 'تعارض شماره' },
   { href: '/admin/loyalty', label: 'باشگاه' },
+  // #239, spec 40: the plan and price catalogue — the catalogue the other
+  // commercial screens are consistent with, so it leads them.
+  { href: '/admin/commercial/plans', label: 'طرح‌ها و قیمت', capability: 'bc_manage_commercial_plans' },
   // V3.3 `#43b-1` / #173. The first commercial entry; capability-gated so an
   // operator without it is never offered a route they cannot open.
   { href: '/admin/commercial/commission-policies', label: 'سیاست کمیسیون', capability: 'bc_manage_commercial_plans' },

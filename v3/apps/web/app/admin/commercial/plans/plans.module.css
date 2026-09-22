@@ -1,0 +1,234 @@
+/*
+ * The plan and price catalogue — spec 40.
+ *
+ *   390    every field full width; each tier a stacked card.
+ *   640    the editor's paired fields two per row; a tier's three numbers in a row.
+ *   1024   the editor's fields four per row.
+ *
+ * Breakpoints are the design's 640 and 1024 (`breakpoints.spec.ts`). Every
+ * grid track is `minmax(0, …)`; ids and keys wrap.
+ */
+
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--bc-spacing-card-gap);
+}
+
+.editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
+}
+
+.note {
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  line-height: 1.85;
+  color: var(--bc-color-ink-soft);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  column-gap: 12px;
+}
+
+@media (min-width: 640px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.group {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--bc-color-line);
+  border-radius: var(--bc-radius-control);
+  min-inline-size: 0;
+}
+
+.legend {
+  padding: 0 6px;
+  font-size: 13.5px;
+  font-weight: 800;
+}
+
+.empty {
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  color: var(--bc-color-ink-faint);
+}
+
+.tiers {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.tier {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  column-gap: 10px;
+  align-items: end;
+  padding: 10px 12px;
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-control);
+  min-inline-size: 0;
+}
+
+@media (min-width: 640px) {
+  .tier {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.tierIndex {
+  font-size: 12.5px;
+  font-weight: 800;
+  grid-column: 1 / -1;
+  margin-block-end: 6px;
+}
+
+.problems {
+  margin-block-start: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--bc-color-error);
+  border-radius: var(--bc-radius-control);
+  background: var(--bc-color-error-soft);
+  color: var(--bc-color-error);
+  font-size: 12.5px;
+  line-height: 1.8;
+}
+
+.problems ul {
+  margin: 4px 0 0;
+  padding-inline-start: 18px;
+  font-family: monospace;
+  overflow-wrap: anywhere;
+}
+
+.problemsTitle {
+  margin: 0;
+  font-weight: 700;
+}
+
+.readOnly {
+  margin: 0 0 14px;
+  font-size: 13px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+
+.readOnly span[dir='ltr'] {
+  font-family: monospace;
+}
+
+.readOnlyHint {
+  display: block;
+  font-size: 12px;
+  color: var(--bc-color-ink-soft);
+}
+
+.chips {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding-inline-start: 12px;
+  border: 1px solid var(--bc-color-line);
+  border-radius: 999px;
+  font-size: 13px;
+  font-family: monospace;
+  max-inline-size: 100%;
+  overflow-wrap: anywhere;
+}
+
+.fieldLabel {
+  display: block;
+  margin-block-end: 6px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.addRow {
+  display: flex;
+  gap: 8px;
+}
+
+.textInput {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  min-block-size: 44px;
+  padding: 0 12px;
+  font: inherit;
+  border: 1px solid var(--bc-color-line);
+  border-radius: var(--bc-radius-button);
+  background: var(--bc-color-surface);
+  color: var(--bc-color-ink);
+}
+
+.select {
+  font: inherit;
+  min-block-size: 44px;
+  padding: 0 12px;
+  margin-block-end: 16px;
+  border: 1px solid var(--bc-color-line);
+  border-radius: var(--bc-radius-button);
+  background: var(--bc-color-surface);
+  color: var(--bc-color-ink);
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}
+
+.radio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-block-size: 44px;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.summary {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12.5px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+
+.tierLine {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--bc-color-ink-soft);
+}
+
+.fieldError {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--bc-color-error);
+}
