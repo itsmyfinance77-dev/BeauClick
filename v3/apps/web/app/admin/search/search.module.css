@@ -1,0 +1,72 @@
+/*
+ * Search index health and quality. `#219`'s inline-style migration: nothing
+ * here changes behaviour, only where the declarations live.
+ */
+
+.section {
+  margin-block-start: 20px;
+}
+
+.sectionTitle {
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.paragraph {
+  margin: 0;
+}
+
+/* ------------------------------------------------------------- index status */
+
+.indexStatusList {
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+}
+
+/* An index name is never reordered inside a right-to-left line. */
+.indexName {
+  display: inline-block;
+  direction: ltr;
+  font-family: monospace;
+}
+
+/* ---------------------------------------------------------------- quality */
+
+.statFooter {
+  font-size: 12px;
+  color: var(--bc-color-ink-faint);
+}
+
+.clickThroughNote {
+  margin-block-start: 12px;
+  font-size: 12px;
+  color: var(--bc-color-ink-faint);
+}
+
+/* --------------------------------------------------------------- recovery */
+
+.recoveryTitle {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.recoveryIntro {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--bc-color-ink-soft);
+}
+
+.recoveryActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* --------------------------------------------------- the confirm dialogue */
+
+.dialogIntro {
+  margin: 0 0 8px;
+}

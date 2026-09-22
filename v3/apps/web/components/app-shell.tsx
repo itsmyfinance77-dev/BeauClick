@@ -55,9 +55,25 @@ import styles from './app-shell.module.css';
 /** The routes that carry the footer. The legal pages are content pages that render inside the contained main, like any other. */
 const FOOTER_ROUTES = new Set(['/', '/terms', '/privacy-policy', '/contact', '/support']);
 
+/**
+ * Route groups with their own nav chrome, and so never the customer's bottom
+ * bar -- `25_MOBILE_NAVIGATION.md`'s own table. `/admin` gets a dark
+ * horizontal scrolling bar instead of any bottom bar at all (`AdminShell`);
+ * `/pro` is meant to get its own two-tab bar plus a sheet for the rest,
+ * which is not built yet, but the customer's five destinations (home,
+ * search, bookings, loyalty, account) are still the wrong ones to show over
+ * either shell in the meantime.
+ */
+const NO_TAB_BAR_PREFIXES = ['/admin', '/pro'];
+
 /** `/` matches only itself; every other destination also owns its subtree. */
 function isCurrent(pathname: string, href: string): boolean {
   return href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`);
+}
+
+/** True for `/admin`, `/admin/x`, `/pro`, `/pro/x` -- never for a route that merely starts with the same letters, e.g. `/products`. */
+function hidesTabBar(pathname: string): boolean {
+  return NO_TAB_BAR_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -163,14 +179,14 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <main
         id="main"
-        className={`${styles.main} ${isHome ? '' : styles.mainContained} ${styles.mainBottomBarGap}`}
+        className={`${styles.main} ${isHome ? '' : styles.mainContained} ${hidesTabBar(pathname) ? '' : styles.mainBottomBarGap}`}
       >
         <ErrorBoundary>{children}</ErrorBoundary>
       </main>
 
       {FOOTER_ROUTES.has(pathname) ? <SiteFooter /> : null}
 
-      <MobileTabBar />
+      {hidesTabBar(pathname) ? null : <MobileTabBar />}
     </div>
   );
 }

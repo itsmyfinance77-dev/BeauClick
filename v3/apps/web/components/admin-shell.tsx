@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
+import { useEffect, useRef } from 'react';
 import { toPersianDigits } from '@beauclick/persian-utils';
 import { useAuth } from '@/lib/auth-context';
 import styles from './admin-shell.module.css';
@@ -69,10 +70,12 @@ function isCurrent(pathname: string, href: string): boolean {
  * visual distinction between contexts at all; the tinted band was the first
  * answer to it and this is the one the inventory asks for.
  *
- * The artboard also inverts the whole admin PAGE. That belongs to the admin
- * overview SCREEN, not to this component: inverting eleven pages whose
- * content is styled against light tokens is its own piece of work, and doing
- * half of it would leave dark chrome over light content.
+ * The artboard also inverts the whole admin PAGE. That belongs to each admin
+ * SCREEN, not to this component: `/admin` (the overview) is now dark, in
+ * `overview.module.css`, and its doc comment there records the artboard
+ * source. Inverting the other ten -- whose content is styled against light
+ * tokens -- is still its own piece of work, and doing it a page at a time
+ * beats leaving dark chrome over light content on all eleven at once.
  *
  * ## Counters live on the destination
  *
@@ -86,6 +89,7 @@ export function AdminShell({ children, queues }: { children: ReactNode; queues?:
   const { user } = useAuth();
   const pathname = usePathname() ?? '/admin';
   const capabilities = user?.capabilities ?? [];
+  const navRef = useRef<HTMLElement>(null);
 
   // Hiding a link the operator cannot use is a courtesy, not a control: the
   // API refuses the request regardless of what the nav shows, and the
@@ -96,12 +100,26 @@ export function AdminShell({ children, queues }: { children: ReactNode; queues?:
   );
   const identity = user?.displayName ?? user?.phone ?? null;
 
+  /*
+   * The bar scrolls at narrow widths (`25_MOBILE_NAVIGATION.md`: a dark
+   * horizontal scrolling bar in place of a bottom bar), and «سیاست کمیسیون»
+   * — the last of eleven destinations — sits well past the visible strip at
+   * 390px. Landing on a deep route (e.g. `/admin/loyalty` from a bookmark)
+   * left the operator looking at «نمای کلی» while their actual location was
+   * scrolled off-screen. `inline: 'nearest'` never moves an item that is
+   * already visible, so this does nothing on the common case (landing on
+   * the overview, or on a desktop width with room for all eleven).
+   */
+  useEffect(() => {
+    navRef.current?.querySelector('[aria-current="page"]')?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+  }, [pathname]);
+
   return (
     <div>
       <div className={styles.bar} data-testid="admin-bar">
         <div className={styles.barStart}>
           <span className={styles.mode}>بیوکلیک — مدیریت</span>
-          <nav aria-label="ناوبری مدیریت" className={styles.nav}>
+          <nav aria-label="ناوبری مدیریت" className={styles.nav} ref={navRef}>
             {visible.map((item) => {
               const count = queues?.[item.href];
               return (

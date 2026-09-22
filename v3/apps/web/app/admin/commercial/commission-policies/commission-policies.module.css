@@ -1,0 +1,55 @@
+/*
+ * The commission-policy screen -- V3.3 `#43b-1` / #173, ADR-052 §1.
+ *
+ * A read surface (the component cards and version timelines) with two write
+ * forms that appear inline below it (a new draft, a new policy) and a
+ * confirmation dialog shared by publish/retire/discard. #219's inline-style
+ * migration: nothing here changes behaviour, only where the declarations
+ * live.
+ */
+
+.componentsGrid {
+  display: grid;
+  gap: var(--bc-spacing-card-gap);
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+/* ------------------------------------------------------------- the editors */
+
+.editorSection {
+  margin-block-start: 24px;
+}
+
+.editorTitle {
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.editorHint {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.9;
+  color: var(--bc-color-ink-soft);
+}
+
+/* --------------------------------------------------- the confirm dialogue */
+
+.confirmBody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.confirmConsequence {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.95;
+}
+
+.confirmError {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.85;
+  color: var(--bc-color-error);
+}

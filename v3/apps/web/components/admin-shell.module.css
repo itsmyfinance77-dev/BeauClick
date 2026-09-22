@@ -1,7 +1,10 @@
 /*
  * The operator's bar — `V3_COMPONENT_INVENTORY.md` ("AdminShell: redesign —
- * dark bar; queue counter on the destination") and
- * `Prototype - Pro and Admin.dc.html` §20.
+ * dark bar; queue counter on the destination") and, for the literal dark
+ * `oklch()` values, `Prototype - Pro and Admin.dc.html` §"نمای کلی مدیریت" at
+ * Phase F (commit `4b40b9055e909af5cdf7018183d5a57caeb4f1f6`,
+ * `docs/design/phase-f-workspace-snapshot/`) — the current design-branch tip
+ * no longer carries this artboard.
  *
  * ## Why a dark bar and not a tinted one
  *
@@ -10,11 +13,12 @@
  * what makes that impossible to forget — the UI/UX audit's §4 finding was
  * that V3 had "no visual distinction between contexts" at all.
  *
- * The artboard also inverts the whole admin PAGE. That is the admin overview
- * SCREEN's design, not this component's: the inventory's verdict for
- * `AdminShell` is the bar and the counters, and inverting eleven pages whose
- * content is styled against light tokens is its own piece of work. Recorded
- * rather than half-done.
+ * The artboard also inverts the whole admin PAGE. That is each admin SCREEN's
+ * own design, not this component's: the inventory's verdict for `AdminShell`
+ * is the bar and the counters. `/admin` (the overview) is dark now, in
+ * `overview.module.css`; the other ten pages, whose content is styled against
+ * light tokens, are still their own piece of work — recorded rather than
+ * half-done.
  *
  * ## The counter belongs on the destination
  *
@@ -73,6 +77,17 @@
   font-size: var(--bc-text-small-size);
   overflow-x: auto;
   padding-block: 6px;
+  /*
+   * The scroll AFFORDANCE, not the scrolling itself: a touch scrollbar is
+   * auto-hiding, so nothing on screen said there were more destinations past
+   * the edge. A fade at both physical edges reads correctly regardless of
+   * text direction -- there is no "start" or "end" fade, both sides always
+   * fade the same way, so RTL needs no mirroring here. Harmless when the bar
+   * fits without scrolling: the last visible item still reads, just slightly
+   * softened at its outer few pixels.
+   */
+  -webkit-mask-image: linear-gradient(to right, transparent, black 20px, black calc(100% - 20px), transparent);
+  mask-image: linear-gradient(to right, transparent, black 20px, black calc(100% - 20px), transparent);
 }
 
 @media (min-width: 1024px) {

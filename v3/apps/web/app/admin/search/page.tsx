@@ -13,6 +13,7 @@ import {
   type PlatformMetrics,
   type SearchIndexStatus,
 } from '@/lib/admin-api';
+import styles from './search.module.css';
 
 /**
  * Search index health and quality.
@@ -103,15 +104,12 @@ export default function AdminSearchPage() {
         <>
           {status ? (
             <Card>
-              <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 12px' }}>وضعیت نمایه</h2>
-              <div style={{ display: 'grid', gap: 8, fontSize: 14 }}>
-                <p style={{ margin: 0 }}>
-                  نمایه فعلی:{' '}
-                  <span style={{ direction: 'ltr', display: 'inline-block', fontFamily: 'monospace' }}>
-                    {status.physicalIndex}
-                  </span>
+              <h2 className={styles.sectionTitle}>وضعیت نمایه</h2>
+              <div className={styles.indexStatusList}>
+                <p className={styles.paragraph}>
+                  نمایه فعلی: <span className={styles.indexName}>{status.physicalIndex}</span>
                 </p>
-                <p style={{ margin: 0 }}>
+                <p className={styles.paragraph}>
                   اسناد در انتظار: {toPersianDigits(status.pendingDocuments)}{' '}
                   {status.stalePendingOverFiveMinutes > 0 ? (
                     <Badge tone="error">
@@ -126,15 +124,15 @@ export default function AdminSearchPage() {
           ) : null}
 
           {search ? (
-            <div style={{ marginBlockStart: 20 }}>
-              <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 12px' }}>کیفیت نتایج</h2>
+            <div className={styles.section}>
+              <h2 className={styles.sectionTitle}>کیفیت نتایج</h2>
               <StatGrid min={170}>
                 <StatCard label="جست‌وجوها" value={toPersianDigits(search.searches.value)} />
                 <StatCard
                   label="بدون نتیجه"
                   value={`${toPersianDigits(Math.round(search.emptyResultRate.value * 100))}٪`}
                   footer={
-                    <span style={{ fontSize: 12, color: 'var(--bc-color-ink-faint)' }}>
+                    <span className={styles.statFooter}>
                       {toPersianDigits(search.emptyResultSearches.value)} از {toPersianDigits(search.searches.value)}
                     </span>
                   }
@@ -143,7 +141,7 @@ export default function AdminSearchPage() {
                   label="نرخ کلیک"
                   value={`${toPersianDigits(Math.round(search.clickThroughRate.value * 100))}٪`}
                   footer={
-                    <span style={{ fontSize: 12, color: 'var(--bc-color-ink-faint)' }}>
+                    <span className={styles.statFooter}>
                       {toPersianDigits(search.searchSourcedViews.value)} بازدید با منشأ جست‌وجو
                     </span>
                   }
@@ -151,31 +149,21 @@ export default function AdminSearchPage() {
                 <StatCard
                   label="حالت اضطراری"
                   value={toPersianDigits(search.degradedSearches.value)}
-                  footer={
-                    <span style={{ fontSize: 12, color: 'var(--bc-color-ink-faint)' }}>
-                      نتایج سرو‌شده بدون موتور جست‌وجو
-                    </span>
-                  }
+                  footer={<span className={styles.statFooter}>نتایج سرو‌شده بدون موتور جست‌وجو</span>}
                 />
               </StatGrid>
               {/* The server's own caveat, shown rather than dropped: numerator
                   and denominator are different event types, so one search
                   yielding three views produces a rate above 100%. */}
-              {search.clickThroughRate.note ? (
-                <p style={{ fontSize: 12, color: 'var(--bc-color-ink-faint)', marginBlockStart: 12 }}>
-                  {search.clickThroughRate.note}
-                </p>
-              ) : null}
+              {search.clickThroughRate.note ? <p className={styles.clickThroughNote}>{search.clickThroughRate.note}</p> : null}
             </div>
           ) : null}
 
-          <div style={{ marginBlockStart: 20 }}>
+          <div className={styles.section}>
             <Card>
-              <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 4px' }}>بازیابی</h2>
-              <p style={{ fontSize: 13, color: 'var(--bc-color-ink-soft)', margin: '0 0 16px' }}>
-                این عملیات‌ها پرهزینه هستند و در زمان اجرا بار قابل توجهی به سیستم وارد می‌کنند.
-              </p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              <h2 className={styles.recoveryTitle}>بازیابی</h2>
+              <p className={styles.recoveryIntro}>این عملیات‌ها پرهزینه هستند و در زمان اجرا بار قابل توجهی به سیستم وارد می‌کنند.</p>
+              <div className={styles.recoveryActions}>
                 <Button type="button" variant="ghost" inline onClick={() => setPending('reindex')}>
                   بازسازی نمایه
                 </Button>
@@ -198,15 +186,13 @@ export default function AdminSearchPage() {
         onCancel={() => setPending(null)}
         body={
           pending === 'reindex' ? (
-            <p style={{ margin: 0 }}>
+            <p className={styles.paragraph}>
               همه اسناد از پروجکشن فعلی دوباره در موتور جست‌وجو نمایه می‌شوند. نتایج در حین اجرا ممکن است ناقص باشد.
             </p>
           ) : (
             <>
-              <p style={{ margin: '0 0 8px' }}>
-                پروجکشن از داده اصلی متخصص‌ها بازسازی و سپس کل نمایه ساخته می‌شود.
-              </p>
-              <p style={{ margin: 0 }}>این عملیات سنگین‌تر است و فقط برای بازیابی از خرابی داده استفاده می‌شود.</p>
+              <p className={styles.dialogIntro}>پروجکشن از داده اصلی متخصص‌ها بازسازی و سپس کل نمایه ساخته می‌شود.</p>
+              <p className={styles.paragraph}>این عملیات سنگین‌تر است و فقط برای بازیابی از خرابی داده استفاده می‌شود.</p>
             </>
           )
         }

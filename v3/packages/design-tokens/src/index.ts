@@ -1,6 +1,23 @@
 import tokens from './tokens.json';
 
 /**
+ * The contrast maths (`contrast.ts`), re-exported so a consumer that
+ * introduces its own colour pair — not one of `tokens.json`'s own — can check
+ * it the same way `contrast.spec.ts` checks the palette, instead of
+ * reimplementing the OKLCH conversion or trusting a value by eye. First
+ * consumer: `apps/web/test/admin-overview-dark-contrast.spec.ts`, for the
+ * scoped dark-mode override in `app/admin/overview.module.css`.
+ */
+export {
+  contrastRatio,
+  isInSrgbGamut,
+  parseOklch,
+  WCAG_AA_LARGE_TEXT,
+  WCAG_AA_NORMAL_TEXT,
+  type Oklch,
+} from './contrast';
+
+/**
  * Design tokens, carried forward verbatim from V2's
  * shared/design-tokens.json (V3_MIGRATION_MATRIX.md: DIRECT REUSE, "already
  * backend-agnostic plain JSON with zero WP coupling").
