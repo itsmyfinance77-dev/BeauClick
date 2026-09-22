@@ -1,0 +1,245 @@
+/*
+ * The booking-outcome policy screen — spec 47.
+ *
+ *   390    every group full width; the editor's number fields one per row;
+ *          the evidence register becomes a card list.
+ *   640    the editor's number fields two per row.
+ *   1024   three per row.
+ *
+ * Breakpoints are the design's 640 and 1024 (`breakpoints.spec.ts`). Every
+ * grid track is `minmax(0, …)`, and keys and references wrap.
+ */
+
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--bc-spacing-card-gap);
+}
+
+/* ------------------------------------------------------------------ editor */
+
+.editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
+}
+
+.note {
+  margin: 0 0 12px;
+  font-size: 12.5px;
+  line-height: 1.85;
+  color: var(--bc-color-ink-soft);
+}
+
+.group {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--bc-color-line);
+  border-radius: var(--bc-radius-control);
+  min-inline-size: 0;
+}
+
+.legend {
+  padding: 0 6px;
+  font-size: 13.5px;
+  font-weight: 800;
+}
+
+.empty {
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  line-height: 1.85;
+  color: var(--bc-color-ink-faint);
+}
+
+.options {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.option {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 10px;
+  padding: 4px 4px 4px 12px;
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-control);
+  font-size: 13.5px;
+}
+
+.addOption {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+}
+
+.fieldLabel {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.select {
+  font: inherit;
+  min-block-size: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--bc-color-line);
+  border-radius: var(--bc-radius-button);
+  background: var(--bc-color-surface);
+  color: var(--bc-color-ink);
+  margin-block-end: 12px;
+  min-inline-size: 0;
+}
+
+.fieldError {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--bc-color-error);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  column-gap: 12px;
+}
+
+@media (min-width: 640px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.check,
+.radio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-block-size: 44px;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.summary {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 12.5px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+
+/* ---------------------------------------------------------------- sections */
+
+.block {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  margin-block-start: 24px;
+}
+
+.blockHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.blockTitle {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.hint {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.9;
+  color: var(--bc-color-ink-soft);
+}
+
+.live {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--bc-color-success);
+}
+
+.live:empty {
+  display: none;
+}
+
+.hash {
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+}
+
+.copyCard {
+  padding: 14px 16px;
+  border: 1px solid var(--bc-color-primary);
+  border-radius: var(--bc-radius-card);
+  background: var(--bc-color-surface);
+  min-inline-size: 0;
+}
+
+.copyMeta {
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  color: var(--bc-color-ink-soft);
+  overflow-wrap: anywhere;
+}
+
+.copyBody {
+  white-space: pre-wrap;
+  font-size: 14px;
+  line-height: 1.95;
+  overflow-wrap: anywhere;
+}
+
+.key {
+  font-family: monospace;
+  overflow-wrap: anywhere;
+  unicode-bidi: isolate;
+}
+
+.status {
+  white-space: nowrap;
+  font-weight: 700;
+}
+
+.rowActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.evidenceDetail {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.evidenceDetail dt {
+  font-size: 12px;
+  color: var(--bc-color-ink-soft);
+}
+
+.evidenceDetail dd {
+  margin: 0 0 6px;
+  overflow-wrap: anywhere;
+}
