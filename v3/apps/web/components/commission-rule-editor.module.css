@@ -1,0 +1,101 @@
+/*
+ * The shape-aware commission rule editor (`commission-rule-editor.tsx`) --
+ * #219's inline-style migration. Nothing here changes behaviour or values;
+ * every declaration is moved verbatim from the inline `style={{}}` object it
+ * replaces. The one conditional value -- the base fieldset's border colour on
+ * a validation failure -- becomes a modifier class (`.baseFieldsetError`)
+ * rather than a runtime style object, the same pattern the rest of this
+ * migration uses for a fixed, small set of states.
+ */
+
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.kindFieldset {
+  border: 1px solid var(--bc-color-line);
+  border-radius: var(--bc-radius-row);
+  padding: 12px 14px;
+}
+
+.legend {
+  font-size: 13px;
+  font-weight: 800;
+  padding: 0 6px;
+}
+
+.kindOptions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.radioLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  min-height: 44px;
+}
+
+/* -------------------------------------------------------------------- base */
+
+.baseFieldset {
+  border: 1px solid var(--bc-color-line);
+  border-radius: var(--bc-radius-row);
+  padding: 12px 14px;
+}
+
+.baseFieldsetError {
+  border-color: var(--bc-color-error);
+}
+
+.baseOptions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.baseRadioLabel {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13.5px;
+  min-height: 44px;
+}
+
+.baseRadioInput {
+  margin-block-start: 4px;
+}
+
+.baseOptionTitle {
+  font-weight: 700;
+}
+
+.baseOptionHint {
+  font-size: 12.5px;
+  color: var(--bc-color-ink-soft);
+}
+
+.baseError {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  color: var(--bc-color-error);
+}
+
+/* -------------------------------------------------------------------- misc */
+
+.serverError {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.85;
+  color: var(--bc-color-error);
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
