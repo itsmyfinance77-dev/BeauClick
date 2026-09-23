@@ -1,0 +1,159 @@
+/*
+ * `BookingRow` and `AuditTrail` — extracted out of `pro/bookings`
+ * (`V3_COMPONENT_INVENTORY.md`). Layout and breakpoints are unchanged from
+ * the page they came from; see `bookings.module.css` for the day-grouping
+ * and pagination styles that stayed at the page level.
+ */
+
+.booking {
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-card);
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    'info'
+    'actions'
+    'notes'
+    'history';
+}
+
+@media (min-width: 640px) {
+  .booking {
+    padding: 16px 20px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .booking {
+    align-items: center;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      'info status actions'
+      'notes notes notes'
+      'history history history';
+  }
+}
+
+.info {
+  grid-area: info;
+  min-inline-size: 0;
+}
+
+/* Below 1024 the status sits with the details; from 1024 it has a column. */
+.status {
+  grid-area: info;
+  justify-self: end;
+  align-self: start;
+}
+
+@media (min-width: 1024px) {
+  .status {
+    grid-area: status;
+    justify-self: auto;
+    align-self: center;
+  }
+}
+
+.when {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.time {
+  margin: 4px 0 0;
+  font-size: 14px;
+}
+
+/* A time of day stays left-to-right inside a right-to-left line. */
+.clock {
+  direction: ltr;
+  unicode-bidi: isolate;
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+}
+
+.service {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--bc-color-text-muted);
+}
+
+.meta {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--bc-color-text-faint);
+}
+
+/*
+ * Full-width buttons on a phone: the buttons carry `width: auto`, and a grid
+ * item with `auto` width fills its column.
+ */
+.actions {
+  grid-area: actions;
+  display: grid;
+  gap: 8px;
+}
+
+@media (min-width: 640px) {
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+  }
+}
+
+.notes {
+  grid-area: notes;
+}
+
+.note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--bc-color-text-muted);
+  line-height: 1.8;
+}
+
+.note + .note {
+  margin-block-start: 4px;
+}
+
+/* ------------------------------------------------------------- history */
+
+.history {
+  grid-area: history;
+  padding-block-start: 12px;
+  border-block-start: 1px solid var(--bc-color-border);
+}
+
+.historyList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.historyItem {
+  font-size: 13px;
+}
+
+.historyEvent {
+  font-weight: 600;
+}
+
+.historyWhen {
+  color: var(--bc-color-text-faint);
+}
+
+.historyReason {
+  color: var(--bc-color-text-muted);
+}
+
+.emptyHistory {
+  margin: 0;
+  font-size: 13px;
+  color: var(--bc-color-text-muted);
+}

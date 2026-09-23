@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toPersianDigits } from '@beauclick/persian-utils';
 import { Alert, Card, ErrorState, LoadingState } from '@/components/ui';
-import { Badge, PageHeader } from '@/components/kit';
+import { Badge, DataCell, DataRow, DataTable, PageHeader } from '@/components/kit';
 import { useAuth } from '@/lib/auth-context';
 import { loyaltyPolicy, type LoyaltyPolicy } from '@/lib/admin-api';
 import styles from './loyalty.module.css';
@@ -85,27 +85,24 @@ export default function AdminLoyaltyPage() {
           )}
 
           <Card>
-            <h2 className={styles.cardTitle}>مقادیر امتیازدهی</h2>
-            <table className={styles.table}>
-              <caption className={styles.tableCaption}>امتیاز اعطاشده برای هر رویداد</caption>
-              <tbody>
-                {Object.entries(policy.policy).map(([key, value]) => (
-                  <tr key={key} className={styles.row}>
-                    <th scope="row" className={styles.rowLabel}>
-                      {POLICY_LABELS[key] ?? key}
-                    </th>
-                    <td className={styles.rowValue}>{toPersianDigits(value)}</td>
-                    <td className={styles.rowValue}>
-                      {unresolved.includes(key) ? (
-                        <Badge tone="warning">تصمیم‌گیری نشده</Badge>
-                      ) : (
-                        <Badge tone="success">تعیین‌شده</Badge>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <h2 id="admin-loyalty-policy-heading" className={styles.cardTitle}>
+              مقادیر امتیازدهی
+            </h2>
+            <DataTable head={['رویداد', 'امتیاز', 'وضعیت']} aria-labelledby="admin-loyalty-policy-heading">
+              {Object.entries(policy.policy).map(([key, value]) => (
+                <DataRow key={key} data-policy={key}>
+                  <DataCell label="رویداد">{POLICY_LABELS[key] ?? key}</DataCell>
+                  <DataCell label="امتیاز">{toPersianDigits(value)}</DataCell>
+                  <DataCell label="وضعیت">
+                    {unresolved.includes(key) ? (
+                      <Badge tone="warning">تصمیم‌گیری نشده</Badge>
+                    ) : (
+                      <Badge tone="success">تعیین‌شده</Badge>
+                    )}
+                  </DataCell>
+                </DataRow>
+              ))}
+            </DataTable>
           </Card>
 
           <div className={styles.tierSection}>

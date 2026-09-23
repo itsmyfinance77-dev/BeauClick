@@ -13,7 +13,7 @@ import {
 import { useAuth } from '@/lib/auth-context';
 import { ApiRequestError } from '@/lib/api-client';
 import { Alert, Button, ErrorState, LoadingState } from '@/components/ui';
-import { TextLink } from '@/components/kit';
+import { DataCell, DataRow, DataTable, TextLink } from '@/components/kit';
 import { loginHrefReturningTo } from '@/lib/safe-return';
 import { bookingApi, type OrderDetail } from '@/lib/booking-api';
 import { orderStatusLabel } from '@/lib/order-status';
@@ -387,70 +387,69 @@ function ResultContent() {
 
       {order ? (
         <div className={styles.card}>
-          <h2 className={styles.receiptTitle}>رسید</h2>
+          <h2 id="checkout-receipt-heading" className={styles.receiptTitle}>
+            رسید
+          </h2>
 
-          <table className={styles.receipt}>
-            <caption className="bc-visually-hidden">جزئیات مبلغ سفارش</caption>
-            <tbody>
-              {order.items.map((item) => (
-                <tr key={item.id}>
-                  <th scope="row">
-                    {item.name}
-                    {item.quantity > 1 ? ` × ${toPersianDigits(item.quantity)}` : ''}
-                  </th>
-                  <td>{formatToman(item.lineTotalToman)}</td>
-                </tr>
-              ))}
+          <DataTable head={['ردیف', 'مبلغ']} aria-labelledby="checkout-receipt-heading">
+            {order.items.map((item) => (
+              <DataRow key={item.id}>
+                <DataCell label="ردیف">
+                  {item.name}
+                  {item.quantity > 1 ? ` × ${toPersianDigits(item.quantity)}` : ''}
+                </DataCell>
+                <DataCell label="مبلغ">{formatToman(item.lineTotalToman)}</DataCell>
+              </DataRow>
+            ))}
 
-              {/* Every adjustment listed individually, exactly as the pricing
-                  engine produced it at order time -- never folded into one
-                  opaque "discount" figure, and never recomputed from today's
-                  rules. */}
-              {order.adjustments.map((adjustment) => (
-                <tr key={adjustment.ruleKey + adjustment.label} className={styles.adjustment}>
-                  <th scope="row">{adjustment.label}</th>
-                  <td>
-                    <span className={styles.signed}>{formatToman(adjustment.amountToman)}</span>
-                  </td>
-                </tr>
-              ))}
+            {/* Every adjustment listed individually, exactly as the pricing
+                engine produced it at order time -- never folded into one
+                opaque "discount" figure, and never recomputed from today's
+                rules. */}
+            {order.adjustments.map((adjustment) => (
+              <DataRow key={adjustment.ruleKey + adjustment.label} className={styles.adjustment}>
+                <DataCell label="ردیف">{adjustment.label}</DataCell>
+                <DataCell label="مبلغ">
+                  <span className={styles.signed}>{formatToman(adjustment.amountToman)}</span>
+                </DataCell>
+              </DataRow>
+            ))}
 
-              <tr className={styles.total}>
-                <th scope="row">مبلغ کل</th>
-                <td>{formatToman(order.totalToman)} تومان</td>
-              </tr>
+            <DataRow className={styles.total}>
+              <DataCell label="ردیف">مبلغ کل</DataCell>
+              <DataCell label="مبلغ">{formatToman(order.totalToman)} تومان</DataCell>
+            </DataRow>
 
-              {/*
-                V3.3 `#41a`. Shown ONLY when BeauClick did not collect the whole
-                service price -- today never, because every order is
-                `full_payment_online`. Rendering "پرداخت‌شده به بیوکلیک: X /
-                پرداخت در محل: ۰" on every receipt would be noise that says
-                nothing, so the split appears exactly when it means something.
+            {/*
+              V3.3 `#41a`. Shown ONLY when BeauClick did not collect the whole
+              service price -- today never, because every order is
+              `full_payment_online`. Rendering "پرداخت‌شده به بیوکلیک: X /
+              پرداخت در محل: ۰" on every receipt would be noise that says
+              nothing, so the split appears exactly when it means something.
 
-                Both numbers come from the server's snapshot. Nothing here
-                subtracts, and `مبلغ کل` above is untouched.
-              */}
-              {order.paymentSchedule.venueBalanceToman > 0 ? (
-                <>
-                  <tr>
-                    <th scope="row">پرداخت‌شده به بیوکلیک</th>
-                    <td>{formatToman(order.paymentSchedule.platformCollectibleNowToman)} تومان</td>
-                  </tr>
-                  <tr>
-                    <th scope="row">قابل پرداخت در محل</th>
-                    <td>{formatToman(order.paymentSchedule.venueBalanceToman)} تومان</td>
-                  </tr>
-                </>
-              ) : null}
+              Both numbers come from the server's snapshot. Nothing here
+              subtracts, and `مبلغ کل` above is untouched.
+            */}
+            {order.paymentSchedule.venueBalanceToman > 0 ? (
+              <>
+                <DataRow>
+                  <DataCell label="ردیف">پرداخت‌شده به بیوکلیک</DataCell>
+                  <DataCell label="مبلغ">{formatToman(order.paymentSchedule.platformCollectibleNowToman)} تومان</DataCell>
+                </DataRow>
+                <DataRow>
+                  <DataCell label="ردیف">قابل پرداخت در محل</DataCell>
+                  <DataCell label="مبلغ">{formatToman(order.paymentSchedule.venueBalanceToman)} تومان</DataCell>
+                </DataRow>
+              </>
+            ) : null}
 
-              {order.refundedTotalToman > 0 ? (
-                <tr className={styles.refund}>
-                  <th scope="row">مبلغ بازگردانده‌شده</th>
-                  <td>{formatToman(order.refundedTotalToman)} تومان</td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
+            {order.refundedTotalToman > 0 ? (
+              <DataRow className={styles.refund}>
+                <DataCell label="ردیف">مبلغ بازگردانده‌شده</DataCell>
+                <DataCell label="مبلغ">{formatToman(order.refundedTotalToman)} تومان</DataCell>
+              </DataRow>
+            ) : null}
+          </DataTable>
 
           <dl className={styles.facts}>
             <dt>وضعیت سفارش</dt>
