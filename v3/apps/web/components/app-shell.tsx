@@ -31,18 +31,19 @@ import styles from './app-shell.module.css';
  * five-destination bottom bar replaces header navigation entirely, because
  * mobile is not a narrowed desktop.
  *
- * ## Two deviations from the design, both deliberate
+ * ## One deviation from the design, deliberate
  *
  *  1. **«خدمات» points at `/search`.** The design's first destination is
  *     `/services`, a specialty index it marks «جدید — نما». That route does
  *     not exist, and a header link to a 404 is worse than one to the surface
  *     that answers the same question today. Recorded as a gap; the link moves
  *     when the route lands.
- *  2. **The journey and loyalty pages stay in the avatar menu.** The design
- *     folds them under a redesigned `/dashboard` that gathers bookings,
- *     loyalty, journey and notifications into one page. That dashboard is its
- *     own artboard and is not built, so removing the links now would leave
- *     two live surfaces reachable only from the mobile bar.
+ *
+ * The journey and loyalty links stay in the avatar menu, which the design does
+ * not list there. That is no longer a deviation waiting on an unbuilt
+ * dashboard — `/dashboard` exists and links to both — but removing a live
+ * destination from the menu is a navigation change of its own rather than part
+ * of this conformance pass.
  *
  * ## The footer is not global
  *
@@ -86,10 +87,30 @@ export function AppShell({ children }: { children: ReactNode }) {
   const authenticated = status === 'authenticated';
   const isHome = pathname === '/';
 
+  /**
+   * A seller, resolved from the session's LIVE roles.
+   *
+   * `professional` is granted in the same transaction as the profile row
+   * (`ProviderService.create`, V3.3 #75) and the existing owners were
+   * backfilled (`20260905800001_backfill_seller_owner_roles.sql`), so the role
+   * answers "does this person own a professional profile?" exactly. `/v1/me`
+   * resolves it from `identity.user_roles` on every load rather than echoing
+   * the token, so a revocation takes the entry away at the next page load.
+   *
+   * The information architecture asks for `bc_provider`; no such capability
+   * exists, and `professional` is the role that vocabulary means.
+   */
+  const isSeller = user?.roles?.includes('professional') ?? false;
+
   const primary = [
     { href: '/search', label: 'خدمات' },
     { href: '/providers', label: 'متخصص‌ها' },
-    ...(authenticated ? [{ href: '/bookings', label: 'رزروهای من' }] : []),
+    // `V3_INFORMATION_ARCHITECTURE.md` §2's third level-one destination is the
+    // umbrella page, not the bookings list: `/dashboard` gathers bookings, the
+    // journey, loyalty and notifications, and spec 03 calls it «صفحهٔ مادرِ
+    // حساب من». `/bookings` keeps its own full page and the dashboard links to
+    // it, so nothing breaks — this only changes which one the header names.
+    ...(authenticated ? [{ href: '/dashboard', label: 'حساب من' }] : []),
   ];
 
   /*
@@ -101,16 +122,23 @@ export function AppShell({ children }: { children: ReactNode }) {
     that actually holds the capability, resolved live by `/v1/me` rather than
     echoed from the token, and hiding it is a courtesy while `CapabilityGuard`
     remains the control.
+
+    «حالت متخصص» is now the same kind of exception: §2's level three shows it
+    only to a user who actually owns a professional profile. It was offered to
+    every signed-in customer, and a customer who took it reached `ProGuard`'s
+    "you have no profile yet" state — an invitation to a dead end.
+
+    `/dashboard` is no longer here: it is a level-one destination now, and the
+    same link twice in one header is a menu entry that teaches nothing.
   */
   const menuEntries: AvatarMenuEntry[] = authenticated
     ? [
-        { href: '/dashboard', label: 'حساب من' },
         { href: '/journey', label: 'مسیر من' },
         { href: '/loyalty', label: 'باشگاه' },
         { href: '/waitlist', label: 'لیست انتظار' },
         { href: '/finance', label: 'امور مالی' },
         { href: '/business', label: 'کسب‌وکار من' },
-        { href: '/pro', label: 'حالت متخصص' },
+        ...(isSeller ? [{ href: '/pro', label: 'حالت متخصص' }] : []),
         ...(user?.capabilities?.includes('bc_manage_platform') ? [{ href: '/admin', label: 'مدیریت' }] : []),
       ]
     : [];
@@ -142,9 +170,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className={styles.headerEnd}>
             {authenticated ? (
               <>
-                <Link href="/pro" className={styles.proMode}>
-                  حالت متخصص
-                </Link>
+                {isSeller ? (
+                  <Link href="/pro" className={styles.proMode}>
+                    حالت متخصص
+                  </Link>
+                ) : null}
                 <Link
                   href="/notifications"
                   className={styles.bell}
