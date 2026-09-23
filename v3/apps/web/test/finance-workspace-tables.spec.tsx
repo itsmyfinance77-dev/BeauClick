@@ -126,11 +126,14 @@ describe('the per-order ledger', () => {
     renderFinance();
     await user.click(await screen.findByRole('button', { name: 'ریز تراکنش' }));
     const table = await screen.findByRole('table', { name: 'ریز تراکنش سفارش' });
-    expect(within(table).getByRole('rowheader', { name: 'کارمزد پلتفرم' })).toBeInTheDocument();
-    expect(within(table).getByRole('rowheader', { name: 'سهم شما' })).toBeInTheDocument();
+    // `DataTable`'s cells are all `role="cell"` (`components/kit.tsx`'s
+    // `DataCell` never renders a `<th>`), not `rowheader` — matching the
+    // admin/loyalty and checkout/result migrations in #284.
+    expect(within(table).getByRole('cell', { name: 'کارمزد پلتفرم' })).toBeInTheDocument();
+    expect(within(table).getByRole('cell', { name: 'سهم شما' })).toBeInTheDocument();
     // The unknown one is neither of those, and is not a raw key.
-    expect(within(table).getByRole('rowheader', { name: 'ردیف دفتر مالی' })).toBeInTheDocument();
-    expect(within(table).getAllByRole('rowheader', { name: 'سهم شما' })).toHaveLength(1);
+    expect(within(table).getByRole('cell', { name: 'ردیف دفتر مالی' })).toBeInTheDocument();
+    expect(within(table).getAllByRole('cell', { name: 'سهم شما' })).toHaveLength(1);
     expect(table.textContent).not.toContain('advance');
   });
 });

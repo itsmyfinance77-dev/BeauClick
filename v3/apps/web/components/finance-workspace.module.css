@@ -248,31 +248,10 @@
   color: var(--bc-color-text-muted);
 }
 
-.ledgerTable {
-  inline-size: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-
-.ledgerTable caption {
+.ledgerCaption {
   text-align: start;
   font-weight: 700;
-  margin-block-end: 8px;
-}
-
-.ledgerTable th,
-.ledgerTable td {
-  padding-block: 4px;
-}
-
-.ledgerTable th {
-  text-align: start;
-  font-weight: 600;
-}
-
-.ledgerTable td {
-  text-align: end;
-  font-variant-numeric: tabular-nums;
+  margin: 0 0 8px;
 }
 
 .ledgerRate {

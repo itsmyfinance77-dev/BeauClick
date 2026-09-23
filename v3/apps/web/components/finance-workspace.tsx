@@ -479,20 +479,26 @@ export function FinanceWorkspaceSurface() {
                       ) : ledger.length === 0 ? (
                         <p className={styles.ledgerEmpty}>تراکنشی برای این سفارش ثبت نشده است.</p>
                       ) : (
-                        <table className={styles.ledgerTable}>
-                          <caption>ریز تراکنش سفارش</caption>
-                          <tbody>
+                        <>
+                          <p id={`ledger-heading-${order.orderId}`} className={styles.ledgerCaption}>
+                            ریز تراکنش سفارش
+                          </p>
+                          <DataTable head={['ردیف', 'مبلغ', 'نرخ']} aria-labelledby={`ledger-heading-${order.orderId}`}>
                             {ledger.map((entry) => (
-                              <tr key={entry.id}>
-                                <th scope="row">{ledgerEntryLabel(entry.entryType)}</th>
-                                <td><PriceDisplay amount={entry.amountToman} /></td>
-                                <td className={styles.ledgerRate}>
-                                  {toPersianDigits((entry.commissionRateBp / 100).toFixed(1))}٪
-                                </td>
-                              </tr>
+                              <DataRow key={entry.id}>
+                                <DataCell label="ردیف">{ledgerEntryLabel(entry.entryType)}</DataCell>
+                                <DataCell label="مبلغ">
+                                  <PriceDisplay amount={entry.amountToman} />
+                                </DataCell>
+                                <DataCell label="نرخ">
+                                  <span className={styles.ledgerRate}>
+                                    {toPersianDigits((entry.commissionRateBp / 100).toFixed(1))}٪
+                                  </span>
+                                </DataCell>
+                              </DataRow>
                             ))}
-                          </tbody>
-                        </table>
+                          </DataTable>
+                        </>
                       )}
                     </div>
                   ) : null}
