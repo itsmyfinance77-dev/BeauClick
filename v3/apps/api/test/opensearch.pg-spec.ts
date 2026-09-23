@@ -336,10 +336,14 @@ describeOs('search relevance against REAL OpenSearch', () => {
       expect(cities['تهران']).toBe(3);
       expect(cities['شیراز']).toBe(1);
 
+      // Three میکاپ professionals in the seeded corpus: kimia, roya (renamed
+      // from پوست‌ومو above, for the Persian-normalisation cases) and the
+      // unverified one -- `search({})` carries no verification filter, so
+      // all three count, matching the filtered-ids assertion below.
       expect(result.facets.specialties).toContainEqual({
         key: makeupSpecialty,
         label: 'میکاپ',
-        count: 2,
+        count: 3,
       });
 
       const filtered = await search({ specialtyIds: makeupSpecialty });
