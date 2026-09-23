@@ -421,6 +421,7 @@ describePg('professional operating surface (real PostgreSQL)', () => {
       const proUser = await seedUser(app, dataSource, nextPhone('+9891200001'));
       const professional = await seedProfessional(dataSource, proUser.id, 'متخصص');
       const customer = await seedUser(app, dataSource, nextPhone('+9891200002'));
+      await dataSource.query(`UPDATE identity.users SET display_name = 'مریم احمدی' WHERE id = $1`, [customer.id]);
       const slotId = await seedSlot(
         dataSource,
         professional.id,
@@ -453,6 +454,9 @@ describePg('professional operating surface (real PostgreSQL)', () => {
       const ids = (res.body.data as { id: string }[]).map((x) => x.id);
       expect(ids).toContain(a.booking.id);
       expect(ids).not.toContain(b.booking.id);
+      expect(res.body.data.find((item: { id: string }) => item.id === a.booking.id)).toMatchObject({
+        customerDisplayName: 'مریم احمدی',
+      });
     });
 
     it('refuses completion by the CUSTOMER -- completion is the professional’s statement, not the customer’s', async () => {

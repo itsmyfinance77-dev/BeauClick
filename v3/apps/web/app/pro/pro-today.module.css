@@ -314,6 +314,13 @@
   font-weight: 700;
 }
 
+.bookingCustomer {
+  margin-block-start: 2px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--bc-color-text);
+}
+
 .bookingMeta {
   font-size: 14px;
   color: var(--bc-color-text-faint);

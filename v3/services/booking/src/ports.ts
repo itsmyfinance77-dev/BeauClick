@@ -25,6 +25,19 @@ export interface ProfessionalDirectory {
 export const PROFESSIONAL_DIRECTORY = Symbol('BEAUCLICK_PROFESSIONAL_DIRECTORY');
 
 /**
+ * The identity display fields a professional needs to operate their day.
+ *
+ * Booking owns the question but not identity.users, so the composition root
+ * supplies the answer. The batch shape prevents the professional booking list
+ * from turning into one identity query per card.
+ */
+export interface CustomerDisplayNameDirectory {
+  displayNamesFor(customerIds: readonly string[]): Promise<ReadonlyMap<string, string | null>>;
+}
+
+export const CUSTOMER_DISPLAY_NAME_DIRECTORY = Symbol('BEAUCLICK_CUSTOMER_DISPLAY_NAME_DIRECTORY');
+
+/**
  * The entitlement seam a cancellation passes through -- V3.3 #58 (`#58a`),
  * ADR-046 §8, `V33-DEC-025` Ruling 8.
  *

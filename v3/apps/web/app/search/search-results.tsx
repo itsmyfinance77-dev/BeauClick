@@ -33,16 +33,9 @@ import styles from './search.module.css';
  * So: a filter column at 1024 and up, a bottom sheet below it, and a real
  * `<select>` for order. The shape of a control now tells you what it does.
  *
- * ## Two design claims that do not hold at this baseline
+ * ## One design claim that does not hold at this baseline
  *
- *  1. **The specialty filter cannot be wired.** The design's column has a
- *     specialty checkbox group. `facets.specialties` buckets on
- *     `specialtyNames.keyword` — so a facet key is a NAME — while the filter
- *     parameter `specialtyIds` matches `doc.specialtyIds`. There is no way to
- *     turn a facet the server returned into a filter the server accepts. The
- *     group is not rendered; a group whose boxes do nothing is worse than an
- *     absent one. Recorded as a gap.
- *  2. **`avatarUrl` and `portfolioCount` are not in the response.** The spec
+ * **`avatarUrl` and `portfolioCount` are not in the response.** The spec
  *     calls both "IMPLEMENTABLE NOW (phase C)", and `PublicProviderResult`
  *     carries neither. The card keeps the design's placeholder artwork and
  *     shows no «۳ نمونه» count.
@@ -102,10 +95,13 @@ export function SearchResults() {
     open the input is the user's, and re-seeding it from a stale URL on a
     later render would overwrite what they are typing.
   */
-  const initialQuery = useSearchParams()?.get('q')?.trim() ?? '';
+  const urlParams = useSearchParams();
+  const initialQuery = urlParams?.get('q')?.trim() ?? '';
+  const initialSpecialtyIds = urlParams?.getAll('specialtyIds').filter(Boolean) ?? [];
   const [query, setQuery] = useState(initialQuery);
   const [params, setParams] = useState<SearchParams>({
     q: initialQuery || undefined,
+    specialtyIds: initialSpecialtyIds.length > 0 ? initialSpecialtyIds : undefined,
     sort: 'relevance',
     page: 1,
   });
@@ -207,6 +203,16 @@ export function SearchResults() {
     setParams((p) => ({ ...p, minPrice: band?.minPrice, maxPrice: band?.maxPrice, page: 1 }));
   }
 
+  function toggleSpecialty(specialtyId: string) {
+    setParams((current) => {
+      const selected = new Set(current.specialtyIds ?? []);
+      if (selected.has(specialtyId)) selected.delete(specialtyId);
+      else selected.add(specialtyId);
+      const specialtyIds = Array.from(selected);
+      return { ...current, specialtyIds: specialtyIds.length > 0 ? specialtyIds : undefined, page: 1 };
+    });
+  }
+
   /**
    * Save and unsave, against the caller's own wishlist.
    *
@@ -244,6 +250,15 @@ export function SearchResults() {
 
   const band = activeBand(params);
   const activeFilters = [
+    ...(params.specialtyIds ?? []).map((specialtyId) => {
+      const facet = result?.facets.specialties.find((candidate) => candidate.key === specialtyId);
+      const label = facet?.label ?? 'تخصص انتخاب‌شده';
+      return {
+        key: `specialty:${specialtyId}`,
+        label,
+        clear: () => toggleSpecialty(specialtyId),
+      };
+    }),
     ...(params.verifiedOnly ? [{ key: 'verified', label: 'فقط تأییدشده', clear: () => setParams((p) => ({ ...p, verifiedOnly: undefined, page: 1 })) }] : []),
     ...(band ? [{ key: 'band', label: PRICE_BANDS[band].label, clear: () => setBand(null) }] : []),
     ...(params.q ? [{ key: 'q', label: `«${params.q}»`, clear: () => { setQuery(''); search(''); } }] : []),
@@ -352,6 +367,24 @@ export function SearchResults() {
               {verifiedCount !== null ? <span className={styles.optionCount}>{toPersianDigits(verifiedCount)}</span> : null}
             </label>
           </fieldset>
+
+          {result && result.facets.specialties.length > 0 ? (
+            <fieldset className={styles.group}>
+              <legend className={styles.groupLegend}>تخصص</legend>
+              {result.facets.specialties.map((specialty) => (
+                <label key={specialty.key} className={styles.option} data-specialty={specialty.key}>
+                  <input
+                    type="checkbox"
+                    className={styles.checkbox}
+                    checked={params.specialtyIds?.includes(specialty.key) ?? false}
+                    onChange={() => toggleSpecialty(specialty.key)}
+                  />
+                  <span>{specialty.label ?? 'تخصص'}</span>
+                  <span className={styles.optionCount}>{toPersianDigits(specialty.count)}</span>
+                </label>
+              ))}
+            </fieldset>
+          ) : null}
 
           <fieldset className={styles.group}>
             <legend className={styles.groupLegend}>محدوده قیمت</legend>

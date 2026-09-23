@@ -27,7 +27,16 @@ interface RawSearchResponse {
     total?: number | { value: number; relation?: string };
     hits?: Array<{ _source?: unknown }>;
   };
-  aggregations?: Record<string, { buckets?: Array<{ key: string | number; doc_count: number }> }>;
+  aggregations?: Record<
+    string,
+    {
+      buckets?: Array<{
+        key: string | number;
+        doc_count: number;
+        label?: { hits?: { hits?: Array<{ _source?: unknown }> } };
+      }>;
+    }
+  >;
 }
 
 /** The price buckets the facet surface offers, in Toman. */
@@ -354,7 +363,21 @@ export class OpenSearchAdapter implements SearchEnginePort {
   private buildAggregations(): Record<string, unknown> {
     return {
       cities: { terms: { field: 'cityName.keyword', size: 30 } },
-      specialties: { terms: { field: 'specialtyNames.keyword', size: 30 } },
+      specialties: {
+        terms: { field: 'specialtyIds', size: 30 },
+        // The bucket key must be the exact value accepted by the filter. The
+        // display name is read from one matching source document, where the
+        // index projection keeps specialtyIds/specialtyNames positionally
+        // aligned.
+        aggs: {
+          label: {
+            top_hits: {
+              size: 1,
+              _source: ['specialtyIds', 'specialtyNames'],
+            },
+          },
+        },
+      },
       verification: { terms: { field: 'verificationStatus', size: 10 } },
       priceRanges: {
         range: {
@@ -371,7 +394,18 @@ export class OpenSearchAdapter implements SearchEnginePort {
 
     return {
       cities: read('cities'),
-      specialties: read('specialties'),
+      specialties: (aggs.specialties?.buckets ?? []).map((bucket) => {
+        const key = String(bucket.key);
+        const source = bucket.label?.hits?.hits?.[0]?._source as
+          | Pick<ProviderSearchDocument, 'specialtyIds' | 'specialtyNames'>
+          | undefined;
+        const index = source?.specialtyIds.indexOf(key) ?? -1;
+        return {
+          key,
+          label: index >= 0 ? (source?.specialtyNames[index] ?? null) : null,
+          count: bucket.doc_count,
+        };
+      }),
       verification: read('verification'),
       // Zero-count buckets are kept for price: the UI renders a fixed set of
       // price options, and a disappearing option reads as a broken filter

@@ -26,9 +26,8 @@ jest.mock('next/navigation', () => ({
  * ## And two numbers the page refuses to show
  *
  * «۱۸٪ بیشتر از ماه گذشته» has no route behind it — `FinanceSummary` is a
- * position, not a series — and a customer's name is not on a booking. The
- * design's own note calls the second the single data change this screen
- * needs. Neither is guessed.
+ * position, not a series. Customer names, by contrast, now come from the
+ * professional-only booking response and are rendered without exposing an id.
  */
 
 function ok(data: unknown) {
@@ -41,6 +40,7 @@ function booking(overrides: Record<string, unknown> = {}) {
   return {
     id: 'b1',
     customerId: 'cust-1',
+    customerDisplayName: 'مریم احمدی',
     professionalId: 'prof-1',
     serviceId: 'svc-1',
     slotId: 'slot-1',
@@ -210,12 +210,22 @@ describe('today’s timeline', () => {
     expect(kinds).toEqual(['free', 'booking']);
   });
 
-  it('never shows a customer’s name, because a booking does not carry one', async () => {
+  it('shows the arriving customer’s display name without exposing their id', async () => {
     mockApi();
     renderPro();
     const timeline = await screen.findByTestId('today-timeline');
 
     expect(timeline.textContent).toContain('میکاپ عروس');
+    expect(timeline.textContent).toContain('مریم احمدی');
+    expect(timeline.textContent).not.toContain('cust-1');
+  });
+
+  it('uses a neutral fallback when the customer has no display name', async () => {
+    mockApi({ bookings: [booking({ customerDisplayName: null })] });
+    renderPro();
+    const timeline = await screen.findByTestId('today-timeline');
+
+    expect(timeline.textContent).toContain('نام مشتری ثبت نشده');
     expect(timeline.textContent).not.toContain('cust-1');
   });
 

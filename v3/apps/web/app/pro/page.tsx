@@ -14,7 +14,7 @@ import {
   listMyServices,
   listMySlots,
   listProfessionalBookings,
-  type BookingSummary,
+  type ProfessionalBookingSummary,
   type FinanceSummary,
   type FinanceWorkspace,
   type MySlot,
@@ -35,7 +35,7 @@ export default function ProOverviewPage() {
   const { state, profile, error, reload } = useProProfile();
   const { api } = useAuth();
 
-  const [bookings, setBookings] = useState<BookingSummary[]>([]);
+  const [bookings, setBookings] = useState<ProfessionalBookingSummary[]>([]);
   const [services, setServices] = useState<ServiceOffering[]>([]);
   const [slots, setSlots] = useState<MySlot[]>([]);
   const [finance, setFinance] = useState<FinanceSummary | null>(null);
@@ -340,12 +340,9 @@ export default function ProOverviewPage() {
                             </span>
                             <span className={styles.statusChip}>تأیید شده</span>
                           </div>
-                          {/*
-                            No customer name. `BookingSummary` carries
-                            `customerId` and nothing else about them, and the
-                            design's own note calls this the single data
-                            change this screen needs.
-                          */}
+                          <div className={styles.bookingCustomer}>
+                            {entry.booking.customerDisplayName ?? 'نام مشتری ثبت نشده'}
+                          </div>
                           <div className={styles.bookingMeta}>
                             {formatZonedTime(new Date(entry.booking.startAt))} تا{' '}
                             {formatZonedTime(new Date(entry.booking.endAt))}
