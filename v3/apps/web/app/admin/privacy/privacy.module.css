@@ -1,12 +1,13 @@
 /*
  * The privacy monitor — `31_ADMIN_PRIVACY_QUEUE.md`.
  *
- * A banner, one filter, a table, a pager. No panel and no row action: the
+ * A banner, two filters, a table, a pager. No panel and no row action: the
  * page has nothing to open.
  *
- *   390    the table is a card list (`data-table.module.css`); the filter
- *          full-width above it; the pager's buttons either side of the count.
- *   640    the filter at a fixed width.
+ *   390    the table is a card list (`data-table.module.css`); the filters
+ *          stacked, each full-width above it; the pager's buttons either side
+ *          of the count.
+ *   640    the two filters side by side, each at a fixed width.
  *
  * Breakpoints are the design's 640 and 1024 (`breakpoints.spec.ts`).
  */
@@ -30,14 +31,22 @@
   line-height: 1.8;
 }
 
+/*
+ * One column below 640, where two 260px selects would not fit side by side;
+ * the `column-gap` is inert there and the row spacing comes from each field's
+ * own label. Two columns from 640 up: #266 added the second filter, and a
+ * single-column grid left it stacked under the first with the whole width of
+ * the page unused beside them.
+ */
 .filters {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+  column-gap: 12px;
 }
 
 @media (min-width: 640px) {
   .filters {
-    grid-template-columns: minmax(0, 260px);
+    grid-template-columns: repeat(2, minmax(0, 260px));
   }
 }
 

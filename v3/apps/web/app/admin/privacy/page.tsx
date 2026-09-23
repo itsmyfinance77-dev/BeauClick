@@ -7,7 +7,7 @@ import { Badge, DataCell, DataRow, DataTable, EmptyState, PageHeader, Select } f
 import { AdminGuard } from '@/components/admin-guard';
 import { useAuth } from '@/lib/auth-context';
 import { privacyRequests, type AdminPrivacyRequest } from '@/lib/admin-api';
-import { PRIVACY_STATUS_LABEL, privacyKindLabel, privacyStatusView } from '@/lib/moderation-labels';
+import { PRIVACY_KIND_LABEL, PRIVACY_STATUS_LABEL, privacyKindLabel, privacyStatusView } from '@/lib/moderation-labels';
 import styles from './privacy.module.css';
 
 const PAGE_SIZE = 20;
@@ -21,9 +21,10 @@ const PAGE_SIZE = 20;
  * cancelling somebody's erasure, reading somebody's export) would be a
  * deliberate security breach of Phase E's design rather than a gap.
  *
- * The design also draws a filter by kind. The route does not accept one
- * (#266), and filtering one page in the browser would misstate every count,
- * so there is none until the API offers it.
+ * The design's filter by kind is here now that the route accepts one (#266).
+ * Both filters are sent to the server and neither is applied in the browser:
+ * the count under the table comes from `meta.pagination.total`, so narrowing
+ * one page locally would leave it describing a set the operator cannot see.
  */
 export default function AdminPrivacyPage() {
   // Operational/security surface, not content moderation.
@@ -49,6 +50,7 @@ function PrivacyMonitor() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState('');
+  const [kind, setKind] = useState<'' | 'export' | 'erasure'>('');
   const [loading, setLoading] = useState(true);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +60,7 @@ function PrivacyMonitor() {
     setLoading(true);
     setError(null);
     try {
-      const res = await privacyRequests(api, { page, limit: PAGE_SIZE, status: status || undefined });
+      const res = await privacyRequests(api, { page, limit: PAGE_SIZE, status: status || undefined, kind: kind || undefined });
       setItems(res.data ?? []);
       setTotal(res.meta?.pagination?.total ?? (res.data ?? []).length);
       setLoaded(true);
@@ -67,7 +69,7 @@ function PrivacyMonitor() {
     } finally {
       setLoading(false);
     }
-  }, [api, page, status]);
+  }, [api, page, status, kind]);
 
   useEffect(() => {
     void load();
@@ -96,6 +98,22 @@ function PrivacyMonitor() {
           {Object.entries(PRIVACY_STATUS_LABEL).map(([value, view]) => (
             <option key={value} value={value}>
               {view.label}
+            </option>
+          ))}
+        </Select>
+
+        <Select
+          label="نوع"
+          value={kind}
+          onChange={(e) => {
+            setKind(e.target.value as '' | 'export' | 'erasure');
+            setPage(1);
+          }}
+        >
+          <option value="">همه</option>
+          {Object.entries(PRIVACY_KIND_LABEL).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
             </option>
           ))}
         </Select>

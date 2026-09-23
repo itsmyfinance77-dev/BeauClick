@@ -596,7 +596,7 @@ export class PrivacyService {
    * subject's data contains -- Phase E's security note states the first
    * without qualification, and the other two follow from the same principle.
    */
-  async listForOperator(params: { page: number; limit: number; status?: string }): Promise<{
+  async listForOperator(params: { page: number; limit: number; status?: string; kind?: DataRequestKind }): Promise<{
     items: Array<{
       id: string;
       subjectUserId: string;
@@ -611,7 +611,13 @@ export class PrivacyService {
     }>;
     total: number;
   }> {
-    const where = params.status ? { status: params.status as DataRequestEntity['status'] } : {};
+    // Both filters are applied HERE, in the query, and never in the caller:
+    // a page filtered after the fact would still carry the unfiltered total,
+    // and the operator's queue would lie about its own size (#266).
+    const where = {
+      ...(params.status ? { status: params.status as DataRequestEntity['status'] } : {}),
+      ...(params.kind ? { kind: params.kind } : {}),
+    };
     const [rows, total] = await this.requests.findAndCount({
       where,
       order: { requestedAt: 'DESC' },

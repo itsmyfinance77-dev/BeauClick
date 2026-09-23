@@ -240,14 +240,22 @@ export interface AdminPrivacyRequest {
 }
 
 /**
- * `status` is the only filter the route accepts (`PrivacyRequestQueryDto`) —
- * there is no `kind` filter (#266), so none is sent. Newest first.
+ * Both filters the route accepts (`PrivacyRequestQueryDto`), applied by the
+ * SERVER. Neither is ever narrowed in the browser: the total in `meta` counts
+ * what the query matched, so a page filtered after the fact would leave the
+ * operator reading a count that describes a different set (#266).
+ *
+ * Newest first.
  */
-export function privacyRequests(api: ApiClient, params: { page?: number; limit?: number; status?: string } = {}) {
+export function privacyRequests(
+  api: ApiClient,
+  params: { page?: number; limit?: number; status?: string; kind?: 'export' | 'erasure' } = {},
+) {
   const query = new URLSearchParams();
   query.set('page', String(params.page ?? 1));
   query.set('limit', String(params.limit ?? 20));
   if (params.status) query.set('status', params.status);
+  if (params.kind) query.set('kind', params.kind);
   return api.get<AdminPrivacyRequest[]>(`/v1/admin/privacy/requests?${query.toString()}`);
 }
 

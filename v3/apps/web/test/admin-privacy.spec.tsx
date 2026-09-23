@@ -167,12 +167,54 @@ describe('filter and pages', () => {
     await waitFor(() => expect(listCalls().at(-1)?.has('status')).toBe(false));
   });
 
-  it('has no filter by kind — the route cannot filter by it (#266), and a page filtered in the browser would lie about the totals', async () => {
+  /*
+   * This used to assert the OPPOSITE — that no kind filter existed — because
+   * `PrivacyRequestQueryDto` accepted only `status` (#266). The route accepts
+   * `kind` now, so the control exists; what has not changed is the reason the
+   * old test gave, and that is what these still hold: the filter is the
+   * server's, never the browser's.
+   */
+  it('filters by kind through the route, never in the browser', async () => {
     mockApi();
+    const user = userEvent.setup();
     renderPage();
     await screen.findByRole('table');
-    expect(screen.getAllByRole('combobox')).toHaveLength(1);
-    expect(listCalls().every((params) => !params.has('kind'))).toBe(true);
+    expect(screen.getAllByRole('combobox')).toHaveLength(2);
+
+    await user.selectOptions(screen.getByLabelText('نوع'), 'erasure');
+    await waitFor(() => expect(listCalls().at(-1)?.get('kind')).toBe('erasure'));
+
+    // Back to «همه» drops the parameter rather than sending an empty one.
+    await user.selectOptions(screen.getByLabelText('نوع'), '');
+    await waitFor(() => expect(listCalls().at(-1)?.has('kind')).toBe(false));
+  });
+
+  it('sends both filters together, so one never silently replaces the other', async () => {
+    mockApi();
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByRole('table');
+
+    await user.selectOptions(screen.getByLabelText('وضعیت'), 'pending');
+    await user.selectOptions(screen.getByLabelText('نوع'), 'export');
+    await waitFor(() => {
+      const last = listCalls().at(-1);
+      expect(last?.get('status')).toBe('pending');
+      expect(last?.get('kind')).toBe('export');
+    });
+  });
+
+  it('returns to page one when the kind changes, so the operator is never on a page that no longer exists', async () => {
+    mockApi();
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByRole('table');
+
+    await user.click(screen.getByRole('button', { name: 'صفحهٔ بعد' }));
+    await screen.findByText(/صفحهٔ ۲ از ۳/);
+
+    await user.selectOptions(screen.getByLabelText('نوع'), 'export');
+    await waitFor(() => expect(listCalls().at(-1)?.get('page')).toBe('1'));
   });
 
   it('pages with the server’s total, and stops at either end', async () => {

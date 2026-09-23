@@ -837,6 +837,100 @@ describePg('V3.1 Phase E — privacy (real PostgreSQL)', () => {
       expect(serialized).not.toContain(user.phone);
     });
 
+    /*
+     * #266. The queue had a status filter and no kind filter, so
+     * `/admin/privacy` shipped with one control and a note saying why. What
+     * these assert is not only that the rows are filtered but that the TOTAL
+     * is: a page filtered in the browser would still report the unfiltered
+     * count, and an operator reading "۳ درخواست" over two rows is being
+     * misled by their own tool.
+     */
+    it('filters by kind, and the total counts what the filter left', async () => {
+      const exporter = await seedUser(app, dataSource, '+989125010260');
+      const eraser = await seedUser(app, dataSource, '+989125010261');
+      const operator = await seedUser(app, dataSource, '+989125010262');
+      await bootstrapRole(operator.id, 'platform_operator');
+      const token = await tokenFor(operator.id);
+
+      await request(app.getHttpServer())
+        .post('/api/v1/privacy/export')
+        .set('Authorization', `Bearer ${exporter.accessToken}`)
+        .expect(202);
+      await request(app.getHttpServer())
+        .post('/api/v1/privacy/deletion')
+        .set('Authorization', `Bearer ${eraser.accessToken}`)
+        .send({ confirm: 'DELETE' })
+        .expect(202);
+
+      const all = await request(app.getHttpServer())
+        .get('/api/v1/admin/privacy/requests')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      expect(all.body.data).toHaveLength(2);
+      expect(all.body.meta.pagination.total).toBe(2);
+
+      const exportsOnly = await request(app.getHttpServer())
+        .get('/api/v1/admin/privacy/requests?kind=export')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      expect(exportsOnly.body.data.map((r: { kind: string }) => r.kind)).toEqual(['export']);
+      expect(exportsOnly.body.meta.pagination.total).toBe(1);
+
+      const erasuresOnly = await request(app.getHttpServer())
+        .get('/api/v1/admin/privacy/requests?kind=erasure')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      expect(erasuresOnly.body.data.map((r: { kind: string }) => r.kind)).toEqual(['erasure']);
+      expect(erasuresOnly.body.meta.pagination.total).toBe(1);
+    });
+
+    it('combines kind with status rather than letting one replace the other', async () => {
+      const exporter = await seedUser(app, dataSource, '+989125010263');
+      const eraser = await seedUser(app, dataSource, '+989125010264');
+      const operator = await seedUser(app, dataSource, '+989125010265');
+      await bootstrapRole(operator.id, 'platform_operator');
+      const token = await tokenFor(operator.id);
+
+      await request(app.getHttpServer())
+        .post('/api/v1/privacy/export')
+        .set('Authorization', `Bearer ${exporter.accessToken}`)
+        .expect(202);
+      await request(app.getHttpServer())
+        .post('/api/v1/privacy/deletion')
+        .set('Authorization', `Bearer ${eraser.accessToken}`)
+        .send({ confirm: 'DELETE' })
+        .expect(202);
+      // Moves the export to `ready` and leaves the erasure `pending`.
+      await sweep.runOnce();
+
+      const readyExports = await request(app.getHttpServer())
+        .get('/api/v1/admin/privacy/requests?kind=export&status=ready')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      expect(readyExports.body.data).toHaveLength(1);
+      expect(readyExports.body.data[0].kind).toBe('export');
+      expect(readyExports.body.data[0].status).toBe('ready');
+
+      // The same status against the other kind is genuinely empty, not a
+      // filter that silently ignored one of its two terms.
+      const readyErasures = await request(app.getHttpServer())
+        .get('/api/v1/admin/privacy/requests?kind=erasure&status=ready')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      expect(readyErasures.body.data).toHaveLength(0);
+      expect(readyErasures.body.meta.pagination.total).toBe(0);
+    });
+
+    it('refuses a kind outside the vocabulary rather than answering with an empty page', async () => {
+      const operator = await seedUser(app, dataSource, '+989125010266');
+      await bootstrapRole(operator.id, 'platform_operator');
+
+      await request(app.getHttpServer())
+        .get('/api/v1/admin/privacy/requests?kind=deletion')
+        .set('Authorization', `Bearer ${await tokenFor(operator.id)}`)
+        .expect(400);
+    });
+
     it('a customer reaches no admin privacy route', async () => {
       const user = await seedUser(app, dataSource, '+989125010230');
       await request(app.getHttpServer())
