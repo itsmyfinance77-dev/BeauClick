@@ -232,10 +232,10 @@ function Services({ profile }: { profile: MyProviderProfile }) {
         onCancel={() => setPendingDelete(null)}
         body={
           <>
-            <p style={{ margin: '0 0 8px' }}>
+            <p className={styles.dialogIntro}>
               «{pendingDelete?.name}» از فهرست خدمات شما حذف می‌شود و دیگر قابل رزرو نخواهد بود.
             </p>
-            <p style={{ margin: 0 }}>رزروهای گذشته و صورت‌حساب‌های ثبت‌شده تغییری نمی‌کنند.</p>
+            <p className={styles.dialogNote}>رزروهای گذشته و صورت‌حساب‌های ثبت‌شده تغییری نمی‌کنند.</p>
           </>
         }
       />

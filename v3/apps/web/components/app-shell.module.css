@@ -110,6 +110,11 @@
   font-weight: 700;
 }
 
+/* The signed-out "ورود" link -- heavier than the default nav weight, short of the current-page weight. #219. */
+.primaryLinkEmphasis {
+  font-weight: 600;
+}
+
 .headerEnd {
   display: flex;
   align-items: center;

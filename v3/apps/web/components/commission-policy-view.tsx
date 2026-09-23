@@ -11,6 +11,7 @@ import type {
   CommissionPolicySummary,
   CommissionPolicyVersion,
 } from '@/lib/admin-api';
+import styles from './commission-policy-view.module.css';
 
 /**
  * How the commission policy surface RENDERS — V3.3 `#43b-1` / #173, ADR-052
@@ -78,24 +79,22 @@ function formatBasisPoints(bp: number): string {
  */
 export function RuleStatement({ version }: { version: CommissionPolicyVersion }) {
   if (version.ruleKind === 'zero') {
-    return <p style={{ margin: 0, fontSize: 14, fontWeight: 700 }}>چیزی دریافت نمی‌شود.</p>;
+    return <p className={styles.ruleZero}>چیزی دریافت نمی‌شود.</p>;
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+    <div className={styles.ruleStack}>
       {version.fixedToman !== null ? (
-        <p style={{ margin: 0, fontSize: 14 }}>
-          مبلغ ثابت: <strong style={{ fontVariantNumeric: 'tabular-nums' }}>{formatToman(version.fixedToman)}</strong>
+        <p className={styles.ruleLine}>
+          مبلغ ثابت: <strong className={styles.ruleValue}>{formatToman(version.fixedToman)}</strong>
         </p>
       ) : null}
       {version.basisPoints !== null ? (
-        <p style={{ margin: 0, fontSize: 14 }}>
-          نرخ: <strong dir="ltr" style={{ fontVariantNumeric: 'tabular-nums' }}>{formatBasisPoints(version.basisPoints)}</strong>
+        <p className={styles.ruleLine}>
+          نرخ: <strong dir="ltr" className={styles.ruleValue}>{formatBasisPoints(version.basisPoints)}</strong>
         </p>
       ) : null}
-      {version.base !== null ? (
-        <p style={{ margin: 0, fontSize: 13, color: 'var(--bc-color-ink-soft)' }}>بر مبنای {BASE_LABEL[version.base]}</p>
-      ) : null}
+      {version.base !== null ? <p className={styles.ruleBase}>بر مبنای {BASE_LABEL[version.base]}</p> : null}
     </div>
   );
 }
@@ -168,10 +167,10 @@ export function ComponentCard({
 
   return (
     <Card>
-      <div data-component={component} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-          <h2 style={{ margin: 0, fontSize: 15, fontWeight: 800 }}>{COMPONENT_LABEL[component]}</h2>
-          <span dir="ltr" style={{ fontSize: 11, fontWeight: 700, color: 'var(--bc-color-ink-soft)' }}>
+      <div data-component={component} className={styles.cardBody}>
+        <div className={styles.cardHeader}>
+          <h2 className={styles.cardTitle}>{COMPONENT_LABEL[component]}</h2>
+          <span dir="ltr" className={styles.cardCode}>
             {component}
           </span>
         </div>
@@ -182,7 +181,7 @@ export function ComponentCard({
           different sentences.
         */}
         {!policy ? (
-          <p data-state="no-policy" style={{ margin: 0, fontSize: 13.5, lineHeight: 1.9, color: 'var(--bc-color-ink-soft)' }}>
+          <p data-state="no-policy" className={styles.stateMessage}>
             برای این مؤلفه هنوز هیچ سیاستی ساخته نشده است.
           </p>
         ) : versionsError ? (
@@ -194,10 +193,10 @@ export function ComponentCard({
             <LoadingState label="در حال بارگذاری نسخه‌ها…" />
           </div>
         ) : effective ? (
-          <div data-state="effective" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div data-state="effective" className={styles.effectiveStack}>
             <LifecycleBadge state="published" />
             <RuleStatement version={effective} />
-            <p style={{ margin: 0, fontSize: 12, color: 'var(--bc-color-ink-soft)' }}>
+            <p className={styles.effectiveMeta}>
               نسخهٔ {toPersianDigits(effective.version)}
               {effective.publishedAt ? ` · از ${new Date(effective.publishedAt).toLocaleDateString('fa-IR')}` : ''}
             </p>
@@ -207,11 +206,11 @@ export function ComponentCard({
             A policy exists but nothing of it is live. Still not an incident:
             a fresh platform looks exactly like this.
           */
-          <p data-state="none-published" style={{ margin: 0, fontSize: 13.5, lineHeight: 1.9, color: 'var(--bc-color-ink-soft)' }}>
+          <p data-state="none-published" className={styles.stateMessage}>
             سیاستی ساخته شده، اما هیچ نسخه‌ای از آن منتشر نشده است.
           </p>
         )}
-        {actions ? <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBlockStart: 4 }}>{actions}</div> : null}
+        {actions ? <div className={styles.cardActions}>{actions}</div> : null}
       </div>
     </Card>
   );
@@ -238,8 +237,8 @@ export function VersionTimeline({
   const descriptionId = `${headingId}-description`;
 
   return (
-    <section style={{ marginBlockStart: 20 }}>
-      <h3 id={headingId} style={{ fontSize: 14, fontWeight: 800, margin: '0 0 6px' }}>
+    <section className={styles.timelineSection}>
+      <h3 id={headingId} className={styles.timelineTitle}>
         {COMPONENT_LABEL[policy.component]} — تاریخچهٔ نسخه‌ها
       </h3>
       {/*
@@ -248,7 +247,7 @@ export function VersionTimeline({
         `min-width` and was clipped at the container's edge on a 390px screen
         -- a sentence the reader could only finish by scrolling sideways.
       */}
-      <p id={descriptionId} style={{ margin: '0 0 8px', fontSize: 12, lineHeight: 1.85, color: 'var(--bc-color-ink-soft)' }}>
+      <p id={descriptionId} className={styles.timelineDescription}>
         نسخهٔ منتشرشده تغییرناپذیر است؛ تغییرِ یک قاعدهٔ زنده یعنی انتشارِ نسخه‌ای تازه.
       </p>
       <DataTable
@@ -260,7 +259,7 @@ export function VersionTimeline({
           .sort((a, b) => b.version - a.version)
           .map((version) => (
             <DataRow key={version.version} data-version={version.version}>
-              <DataCell label="نسخه" style={{ fontVariantNumeric: 'tabular-nums' }}>
+              <DataCell label="نسخه" className={styles.cellNumeric}>
                 {toPersianDigits(version.version)}
               </DataCell>
               <DataCell label="وضعیت">
@@ -269,12 +268,12 @@ export function VersionTimeline({
               <DataCell label="قاعده">
                 <RuleStatement version={version} />
               </DataCell>
-              <DataCell label="انتشار" style={{ fontSize: 12, color: 'var(--bc-color-ink-soft)' }}>
+              <DataCell label="انتشار" className={styles.cellMuted}>
                 {version.publishedAt ? new Date(version.publishedAt).toLocaleDateString('fa-IR') : '—'}
               </DataCell>
               {rowActions ? (
                 <DataCell label="اقدام">
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{rowActions(version)}</div>
+                  <div className={styles.rowActions}>{rowActions(version)}</div>
                 </DataCell>
               ) : null}
             </DataRow>

@@ -1,0 +1,96 @@
+/*
+ * The per-state funds section (`funds-by-state.tsx`) -- #219's inline-style
+ * migration. Nothing here changes behaviour or values; every declaration is
+ * moved verbatim from the inline `style={{}}` object it replaces.
+ *
+ * `.bc-fund-card` / `.bc-fund-grid`, referenced by this file as plain string
+ * classes, are global (`app/globals.css`) and untouched -- they were never
+ * inline styles.
+ */
+
+.wrapper {
+  margin-block-end: 20px;
+}
+
+.heading {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+/* Shared by the section's own intro and the all-zero note -- identical wording weight, different sentences. */
+.intro {
+  margin: 0 0 14px;
+  font-size: 12.5px;
+  line-height: 1.85;
+  color: var(--bc-color-ink-soft);
+}
+
+.fundLabel {
+  font-size: 13.5px;
+  color: var(--bc-color-ink-soft);
+}
+
+.fundValue {
+  font-size: 20px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --------------------------------------------------------------- FundGroup */
+
+.groupTitle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  margin-block-end: 10px;
+}
+
+/* Tighter when a note follows directly beneath. */
+.groupTitleWithNote {
+  margin-block-end: 6px;
+}
+
+/* The boundary is carried by shape as well as colour -- a circle or a
+   diamond, never a tint alone, so it survives a monochrome render. */
+.marker {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  border: 2px solid var(--bc-color-ink-soft);
+}
+
+.markerCircle {
+  border-radius: 50%;
+}
+
+.markerDiamond {
+  border-radius: 2px;
+  transform: rotate(45deg);
+}
+
+.groupHeading {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.groupNote {
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  line-height: 1.85;
+  color: var(--bc-color-ink-soft);
+}
+
+.group {
+  margin-block-end: 16px;
+}
+
+.groupBounded {
+  margin-block-end: 16px;
+  padding: 16px 18px;
+  border-radius: var(--bc-radius-row);
+  border: 2px dashed var(--bc-color-ink-soft);
+  background: var(--bc-color-surface-tint);
+}

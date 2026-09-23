@@ -2,6 +2,7 @@
 
 import { toPersianDigits, formatToman } from '@beauclick/persian-utils';
 import { retentionRuleIdentity, type AllowedOutcomeMembersV1, type BookingOutcomeRetentionRule } from '@/lib/pro-api';
+import styles from './outcome-selection-groups.module.css';
 
 /**
  * The four groups a seller chooses inside — V3.3 `#42b` / #159, ADR-051 §3,
@@ -80,26 +81,18 @@ function NumberGroup({
 }) {
   if (members.length === 0) return null;
   return (
-    <fieldset
-      data-group={name}
-      style={{
-        border: `1px solid ${invalid ? 'var(--bc-color-error)' : 'var(--bc-color-line)'}`,
-        borderRadius: 'var(--bc-radius-row)',
-        padding: '12px 14px',
-        marginBlockEnd: 16,
-      }}
-    >
-      <legend style={{ fontSize: 13, fontWeight: 800, padding: '0 6px' }}>{legend}</legend>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }}>
+    <fieldset data-group={name} className={`${styles.fieldset} ${invalid ? styles.fieldsetInvalid : ''}`}>
+      <legend className={styles.legend}>{legend}</legend>
+      <div className={styles.optionsRow}>
         {members.map((member) => (
-          <label key={member} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13.5, minHeight: 44 }}>
+          <label key={member} className={styles.radioLabel}>
             <input type="radio" name={name} checked={value === member} onChange={() => onChange(member)} disabled={disabled} />
             {toPersianDigits(member)} {unit}
           </label>
         ))}
       </div>
       {invalid ? (
-        <p role="alert" style={{ margin: '8px 0 0', fontSize: 12.5, color: 'var(--bc-color-error)' }}>
+        <p role="alert" className={styles.error}>
           یکی از گزینه‌ها را انتخاب کنید.
         </p>
       ) : null}
@@ -126,21 +119,13 @@ function RetentionGroup({
 }) {
   if (members.length === 0) return null;
   return (
-    <fieldset
-      data-group={name}
-      style={{
-        border: `1px solid ${invalid ? 'var(--bc-color-error)' : 'var(--bc-color-line)'}`,
-        borderRadius: 'var(--bc-radius-row)',
-        padding: '12px 14px',
-        marginBlockEnd: 16,
-      }}
-    >
-      <legend style={{ fontSize: 13, fontWeight: 800, padding: '0 6px' }}>{legend}</legend>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <fieldset data-group={name} className={`${styles.fieldset} ${invalid ? styles.fieldsetInvalid : ''}`}>
+      <legend className={styles.legend}>{legend}</legend>
+      <div className={styles.optionsColumn}>
         {members.map((member) => {
           const identity = retentionRuleIdentity(member);
           return (
-            <label key={identity} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, minHeight: 44 }}>
+            <label key={identity} className={styles.radioLabelWide}>
               <input type="radio" name={name} checked={value === identity} onChange={() => onChange(identity)} disabled={disabled} />
               {describeRetention(member)}
             </label>
@@ -148,7 +133,7 @@ function RetentionGroup({
         })}
       </div>
       {invalid ? (
-        <p role="alert" style={{ margin: '8px 0 0', fontSize: 12.5, color: 'var(--bc-color-error)' }}>
+        <p role="alert" className={styles.error}>
           یکی از گزینه‌ها را انتخاب کنید.
         </p>
       ) : null}

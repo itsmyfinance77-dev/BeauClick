@@ -15,6 +15,7 @@ import tableStyles from './data-table.module.css';
 import formStyles from './form-grid.module.css';
 import progressStyles from './progress-bar.module.css';
 import chipStyles from './check-chip.module.css';
+import styles from './kit.module.css';
 
 /**
  * The shared component kit.
@@ -57,18 +58,7 @@ export function TextLink({
   tone?: 'primary' | 'muted';
 } & Record<string, unknown>) {
   return (
-    <Link
-      href={href}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        minHeight: 44,
-        fontWeight: 600,
-        fontSize: 14,
-        color: tone === 'primary' ? 'var(--bc-color-primary)' : 'var(--bc-color-ink-soft)',
-      }}
-      {...rest}
-    >
+    <Link href={href} className={`${styles.textLink} ${tone === 'muted' ? styles.textLinkMuted : ''}`} {...rest}>
       {children}
     </Link>
   );
@@ -85,23 +75,12 @@ export function PageHeader({
   action?: ReactNode;
 }) {
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexWrap: 'wrap',
-        alignItems: 'flex-start',
-        justifyContent: 'space-between',
-        gap: 'var(--bc-spacing-chip-gap)',
-        marginBlockEnd: 20,
-      }}
-    >
-      <div style={{ minWidth: 0 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 800, margin: 0 }}>{title}</h1>
-        {subtitle ? (
-          <p style={{ fontSize: 14, color: 'var(--bc-color-ink-soft)', margin: '6px 0 0' }}>{subtitle}</p>
-        ) : null}
+    <div className={styles.pageHeader}>
+      <div className={styles.pageHeaderMain}>
+        <h1 className={styles.pageHeaderTitle}>{title}</h1>
+        {subtitle ? <p className={styles.pageHeaderSubtitle}>{subtitle}</p> : null}
       </div>
-      {action ? <div style={{ flexShrink: 0 }}>{action}</div> : null}
+      {action ? <div className={styles.pageHeaderAction}>{action}</div> : null}
     </div>
   );
 }
@@ -116,23 +95,23 @@ export function PageHeader({
 export function EmptyState({ message, action }: { message: string; action?: ReactNode }) {
   return (
     <Card>
-      <div style={{ textAlign: 'center', padding: '16px 0' }}>
-        <p style={{ color: 'var(--bc-color-ink-soft)', fontSize: 14, margin: 0 }}>{message}</p>
-        {action ? <div style={{ marginBlockStart: 16 }}>{action}</div> : null}
+      <div className={styles.emptyState}>
+        <p className={styles.emptyStateMessage}>{message}</p>
+        {action ? <div className={styles.emptyStateAction}>{action}</div> : null}
       </div>
     </Card>
   );
 }
 
-const BADGE_TONES = {
-  neutral: { bg: 'var(--bc-color-surface-tint)', fg: 'var(--bc-color-ink-soft)' },
-  success: { bg: 'var(--bc-color-success-soft)', fg: 'var(--bc-color-success)' },
-  warning: { bg: 'var(--bc-color-warning-soft)', fg: 'var(--bc-color-warning)' },
-  error: { bg: 'var(--bc-color-error-soft)', fg: 'var(--bc-color-error)' },
-  primary: { bg: 'var(--bc-color-primary-soft)', fg: 'var(--bc-color-primary)' },
+const BADGE_TONE_CLASS = {
+  neutral: 'badgeNeutral',
+  success: 'badgeSuccess',
+  warning: 'badgeWarning',
+  error: 'badgeError',
+  primary: 'badgePrimary',
 } as const;
 
-export type BadgeTone = keyof typeof BADGE_TONES;
+export type BadgeTone = keyof typeof BADGE_TONE_CLASS;
 
 /**
  * A status chip. Non-interactive by design, so it deliberately does NOT carry
@@ -140,23 +119,7 @@ export type BadgeTone = keyof typeof BADGE_TONES;
  * touch target, and sizing it like one would just add noise.
  */
 export function Badge({ tone = 'neutral', children }: { tone?: BadgeTone; children: ReactNode }) {
-  const palette = BADGE_TONES[tone];
-  return (
-    <span
-      style={{
-        display: 'inline-block',
-        fontSize: 12,
-        fontWeight: 700,
-        padding: '3px 10px',
-        borderRadius: 999,
-        background: palette.bg,
-        color: palette.fg,
-        whiteSpace: 'nowrap',
-      }}
-    >
-      {children}
-    </span>
-  );
+  return <span className={`${styles.badge} ${styles[BADGE_TONE_CLASS[tone]]}`}>{children}</span>;
 }
 
 type SelectProps = SelectHTMLAttributes<HTMLSelectElement> & {
@@ -173,8 +136,8 @@ export function Select({ label, error, hint, id, children, ...rest }: SelectProp
   const hintId = `${selectId}-hint`;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBlockEnd: 16 }}>
-      <label htmlFor={selectId} style={{ fontWeight: 600, fontSize: 14 }}>
+    <div className={styles.field}>
+      <label htmlFor={selectId} className={styles.fieldLabel}>
         {label}
       </label>
       <select
@@ -182,25 +145,17 @@ export function Select({ label, error, hint, id, children, ...rest }: SelectProp
         id={selectId}
         aria-invalid={error ? true : undefined}
         aria-describedby={[error ? errorId : null, hint ? hintId : null].filter(Boolean).join(' ') || undefined}
-        style={{
-          font: 'inherit',
-          padding: '12px 14px',
-          borderRadius: 'var(--bc-radius-button)',
-          border: `1px solid ${error ? 'var(--bc-color-error)' : 'var(--bc-color-line)'}`,
-          background: 'var(--bc-color-surface)',
-          color: 'var(--bc-color-ink)',
-          minHeight: 44,
-        }}
+        className={`${styles.select} ${error ? styles.fieldError : ''}`}
       >
         {children}
       </select>
       {hint ? (
-        <span id={hintId} style={{ fontSize: 12, color: 'var(--bc-color-ink-faint)' }}>
+        <span id={hintId} className={styles.fieldHint}>
           {hint}
         </span>
       ) : null}
       {error ? (
-        <span id={errorId} role="alert" style={{ fontSize: 12, color: 'var(--bc-color-error)' }}>
+        <span id={errorId} role="alert" className={styles.fieldErrorMessage}>
           {error}
         </span>
       ) : null}
@@ -222,8 +177,8 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
   const hintId = `${areaId}-hint`;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBlockEnd: 16 }}>
-      <label htmlFor={areaId} style={{ fontWeight: 600, fontSize: 14 }}>
+    <div className={styles.field}>
+      <label htmlFor={areaId} className={styles.fieldLabel}>
         {label}
       </label>
       <textarea
@@ -232,24 +187,15 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
         id={areaId}
         aria-invalid={error ? true : undefined}
         aria-describedby={[error ? errorId : null, hint ? hintId : null].filter(Boolean).join(' ') || undefined}
-        style={{
-          font: 'inherit',
-          padding: '12px 14px',
-          borderRadius: 'var(--bc-radius-button)',
-          border: `1px solid ${error ? 'var(--bc-color-error)' : 'var(--bc-color-line)'}`,
-          background: 'var(--bc-color-surface)',
-          color: 'var(--bc-color-ink)',
-          minHeight: 96,
-          resize: 'vertical',
-        }}
+        className={`${styles.textarea} ${error ? styles.fieldError : ''}`}
       />
       {hint ? (
-        <span id={hintId} style={{ fontSize: 12, color: 'var(--bc-color-ink-faint)' }}>
+        <span id={hintId} className={styles.fieldHint}>
           {hint}
         </span>
       ) : null}
       {error ? (
-        <span id={errorId} role="alert" style={{ fontSize: 12, color: 'var(--bc-color-error)' }}>
+        <span id={errorId} role="alert" className={styles.fieldErrorMessage}>
           {error}
         </span>
       ) : null}
@@ -382,16 +328,7 @@ export function ConfirmDialog({
         if (event.target === event.currentTarget && !pressStartedInsideRef.current) onCancel();
         pressStartedInsideRef.current = false;
       }}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.45)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 16,
-        zIndex: 50,
-      }}
+      className={styles.dialogBackdrop}
     >
       <div
         ref={panelRef}
@@ -399,21 +336,13 @@ export function ConfirmDialog({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={describedById}
-        style={{
-          background: 'var(--bc-color-surface)',
-          borderRadius: 'var(--bc-radius-card)',
-          padding: 24,
-          width: '100%',
-          maxWidth: 420,
-          maxHeight: '90vh',
-          overflowY: 'auto',
-        }}
+        className={styles.dialogPanel}
       >
-        <h2 id={titleId} style={{ fontSize: 18, fontWeight: 800, margin: '0 0 12px' }}>
+        <h2 id={titleId} className={styles.dialogTitle}>
           {title}
         </h2>
-        <div style={{ fontSize: 14, color: 'var(--bc-color-ink-soft)', marginBlockEnd: 20 }}>{body}</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div className={styles.dialogBody}>{body}</div>
+        <div className={styles.dialogActions}>
           <Button
             type="button"
             onClick={onConfirm}
@@ -471,11 +400,7 @@ export function SegmentedControl<T extends string | number>({
   disabled?: boolean;
 }) {
   return (
-    <div
-      role="group"
-      aria-label={label}
-      style={{ display: 'flex', gap: 'var(--bc-spacing-chip-gap)', flexWrap: 'wrap' }}
-    >
+    <div role="group" aria-label={label} className={styles.segmentGroup}>
       {options.map((option) => {
         const isCurrent = option.value === value;
         return (
@@ -485,21 +410,7 @@ export function SegmentedControl<T extends string | number>({
             aria-pressed={isCurrent}
             disabled={disabled}
             onClick={() => onChange(option.value)}
-            style={{
-              font: 'inherit',
-              fontSize: 13,
-              // Weight as well as colour, so the selection survives a reader
-              // who cannot make the colour distinction.
-              fontWeight: isCurrent ? 800 : 600,
-              minHeight: 44,
-              padding: '0 14px',
-              borderRadius: 999,
-              cursor: disabled ? 'not-allowed' : 'pointer',
-              opacity: disabled ? 0.6 : 1,
-              border: `1px solid ${isCurrent ? 'var(--bc-color-primary)' : 'var(--bc-color-line)'}`,
-              background: isCurrent ? 'var(--bc-color-primary-soft)' : 'transparent',
-              color: isCurrent ? 'var(--bc-color-primary)' : 'var(--bc-color-ink)',
-            }}
+            className={`${styles.segment} ${isCurrent ? styles.segmentCurrent : ''}`}
           >
             {option.label}
           </button>
@@ -521,13 +432,7 @@ export function SegmentedControl<T extends string | number>({
  */
 export function StatGrid({ min = 180, children }: { min?: number; children: ReactNode }) {
   return (
-    <div
-      style={{
-        display: 'grid',
-        gap: 'var(--bc-spacing-card-gap)',
-        gridTemplateColumns: `repeat(auto-fit, minmax(${min}px, 1fr))`,
-      }}
-    >
+    <div className={styles.statGrid} style={{ '--stat-min': `${min}px` } as CSSProperties}>
       {children}
     </div>
   );
@@ -554,13 +459,9 @@ export function StatCard({
 }) {
   return (
     <Card>
-      <p style={{ margin: 0, fontSize: 13, color: 'var(--bc-color-ink-soft)' }}>{label}</p>
-      <p style={{ margin: '6px 0 0', fontSize: 22, fontWeight: 800, overflowWrap: 'anywhere' }}>{value}</p>
-      {footer ? (
-        <div style={{ marginBlockStart: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          {footer}
-        </div>
-      ) : null}
+      <p className={styles.statLabel}>{label}</p>
+      <p className={styles.statValue}>{value}</p>
+      {footer ? <div className={styles.statFooter}>{footer}</div> : null}
     </Card>
   );
 }

@@ -182,11 +182,11 @@ function BookingsContent() {
         body={
           pendingCancel ? (
             <>
-              <p style={{ margin: '0 0 8px' }}>
+              <p className={styles.dialogIntro}>
                 رزرو {formatFullJalaliDate(new Date(pendingCancel.startAt))} ساعت{' '}
                 {slotTimeLabel(pendingCancel.startAt)} لغو می‌شود.
               </p>
-              <p style={{ margin: 0 }}>این زمان دوباره برای دیگران آزاد می‌شود و این عملیات برگشت‌پذیر نیست.</p>
+              <p className={styles.dialogNote}>این زمان دوباره برای دیگران آزاد می‌شود و این عملیات برگشت‌پذیر نیست.</p>
             </>
           ) : null
         }

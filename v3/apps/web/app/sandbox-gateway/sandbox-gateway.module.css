@@ -1,0 +1,41 @@
+/*
+ * The sandbox payment gateway page (`app/sandbox-gateway/page.tsx`) --
+ * #219's inline-style migration. Nothing here changes behaviour or values;
+ * every declaration is moved verbatim from the inline `style={{}}` object it
+ * replaces.
+ */
+
+.banner {
+  background: var(--bc-color-warning-soft);
+  color: var(--bc-color-warning);
+  padding: 10px 14px;
+  border-radius: var(--bc-radius-row);
+  font-size: 13px;
+  font-weight: 700;
+  margin-block-end: 20px;
+}
+
+.title {
+  font-size: 20px;
+  margin-block-end: 8px;
+}
+
+.referenceLine {
+  font-size: 13px;
+  color: var(--bc-color-ink-soft);
+}
+
+/* A gateway reference is an opaque machine identifier read back to support,
+   never converted to Persian digits -- see the page's own comment. */
+.referenceValue {
+  direction: ltr;
+  display: inline-block;
+  font-family: monospace;
+  unicode-bidi: embed;
+}
+
+.actions {
+  display: grid;
+  gap: 10px;
+  margin-block-start: 20px;
+}

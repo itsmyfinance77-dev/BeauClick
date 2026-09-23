@@ -1,0 +1,26 @@
+/*
+ * The render-error fallback -- #219's inline-style migration. Nothing here
+ * changes behaviour, only where the declarations live.
+ */
+
+.wrapper {
+  padding: 24px;
+  text-align: center;
+}
+
+.message {
+  color: var(--bc-color-ink-soft);
+}
+
+.retry {
+  font: inherit;
+  font-weight: 600;
+  padding: 10px 18px;
+  margin-block-start: 12px;
+  border-radius: var(--bc-radius-button);
+  border: none;
+  background: var(--bc-color-primary);
+  color: var(--bc-color-surface);
+  cursor: pointer;
+  min-height: 44px;
+}

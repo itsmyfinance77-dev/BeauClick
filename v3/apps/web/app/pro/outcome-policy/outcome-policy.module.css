@@ -1,0 +1,116 @@
+/*
+ * The seller's cancellation and no-show terms (`app/pro/outcome-policy/page.tsx`)
+ * -- #219's inline-style migration. Nothing here changes behaviour or
+ * values; every declaration is moved verbatim from the inline `style={{}}`
+ * object it replaces. Several blocks repeated an identical style object at
+ * more than one call site (the workspace chooser and the policy chooser
+ * share the same card-grid shape, for instance); those now share one class.
+ */
+
+.simpleCardText {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.9;
+}
+
+.workspaceSection {
+  margin-block-end: 20px;
+}
+
+.sectionTitle {
+  font-size: 15px;
+  font-weight: 800;
+  margin: 0 0 10px;
+}
+
+.cardGrid {
+  display: grid;
+  gap: var(--bc-spacing-card-gap);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.optionCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.optionHeader {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.optionName {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.hintNote {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.9;
+  color: var(--bc-color-ink-soft);
+}
+
+/* The fail-closed warning and the "just saved" success banner, both a spacer above the selection groups. */
+.blockGap {
+  margin-block-end: 16px;
+}
+
+.notEnrolledNote {
+  margin: 0 0 16px;
+  font-size: 13.5px;
+  line-height: 1.9;
+  color: var(--bc-color-ink-soft);
+}
+
+/* ------------------------------------------------------ customer consequence */
+
+.consequenceStack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.consequenceTitle {
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.consequenceText {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.95;
+  color: var(--bc-color-ink-soft);
+}
+
+.consequenceFootnote {
+  margin: 0;
+  font-size: 12px;
+  color: var(--bc-color-ink-soft);
+}
+
+/* ------------------------------------------------------------------- submit */
+
+.saveError {
+  margin: 12px 0 0;
+  font-size: 13px;
+  line-height: 1.85;
+  color: var(--bc-color-error);
+}
+
+.saveActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-block-start: 16px;
+}
+
+.replaceNote {
+  margin: 12px 0 0;
+  font-size: 12.5px;
+  line-height: 1.9;
+  color: var(--bc-color-ink-soft);
+}

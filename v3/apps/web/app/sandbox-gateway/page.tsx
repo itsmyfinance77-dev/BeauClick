@@ -5,6 +5,7 @@ import { Suspense, useState } from 'react';
 import { API_BASE_URL } from '@/lib/config';
 import { isAllowedCallback } from '@/lib/sandbox-callback';
 import { Alert, Button, Card, LoadingState } from '@/components/ui';
+import styles from './sandbox-gateway.module.css';
 
 type Decision = 'success' | 'failure' | 'cancel';
 
@@ -111,22 +112,12 @@ function SandboxGatewayContent() {
 
   return (
     <Card>
-      <div
-        style={{
-          background: 'var(--bc-color-warning-soft)',
-          color: 'var(--bc-color-warning)',
-          padding: '10px 14px',
-          borderRadius: 'var(--bc-radius-row)',
-          fontSize: 13,
-          fontWeight: 700,
-          marginBlockEnd: 20,
-        }}
-      >
+      <div className={styles.banner}>
         درگاه پرداخت آزمایشی (Sandbox) — این صفحه شبیه‌ساز است و هیچ تراکنش واقعی انجام نمی‌شود.
       </div>
 
-      <h1 style={{ fontSize: 20, marginBlockEnd: 8 }}>پرداخت آزمایشی</h1>
-      <p style={{ fontSize: 13, color: 'var(--bc-color-ink-soft)' }}>
+      <h1 className={styles.title}>پرداخت آزمایشی</h1>
+      <p className={styles.referenceLine}>
         شناسه تراکنش:{' '}
         {/* Rendered VERBATIM, never through toPersianDigits. A gateway
             reference is an opaque machine identifier a customer may have to
@@ -135,14 +126,12 @@ function SandboxGatewayContent() {
             makes it materially harder to transcribe, and harder still to
             match against the gateway's own records. Persian digits are for
             QUANTITIES a human reads, not identifiers a human copies. */}
-        <span style={{ direction: 'ltr', display: 'inline-block', fontFamily: 'monospace', unicodeBidi: 'embed' }}>
-          {reference}
-        </span>
+        <span className={styles.referenceValue}>{reference}</span>
       </p>
 
       {error ? <Alert tone="error">{error}</Alert> : null}
 
-      <div style={{ display: 'grid', gap: 10, marginBlockStart: 20 }}>
+      <div className={styles.actions}>
         <Button onClick={() => void decide('success')} loading={busy === 'success'} disabled={busy !== null}>
           پرداخت موفق
         </Button>

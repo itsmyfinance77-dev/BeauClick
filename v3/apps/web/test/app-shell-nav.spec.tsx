@@ -41,7 +41,7 @@ function ok(data: unknown) {
   return Promise.resolve({ ok: true, status: 200, json: async () => ({ data, meta: null, error: null }) });
 }
 
-function mockApi(options: { capabilities?: string[]; displayName?: string | null; unread?: number } = {}) {
+function mockApi(options: { capabilities?: string[]; roles?: string[]; displayName?: string | null; unread?: number } = {}) {
   (global.fetch as jest.Mock).mockImplementation((url: string) => {
     if (url.includes('/v1/auth/refresh')) return ok({ accessToken: 'a', csrfToken: 'c' });
     if (/\/v1\/me(\?|$)/.test(url)) {
@@ -51,7 +51,7 @@ function mockApi(options: { capabilities?: string[]; displayName?: string | null
         // `in`, not `??`: an explicit null is the case under test, and
         // nullish-coalescing would quietly restore the default name.
         displayName: 'displayName' in options ? options.displayName : 'مینا رضایی',
-        roles: [],
+        roles: options.roles ?? [],
         capabilities: options.capabilities ?? [],
       });
     }
@@ -109,7 +109,8 @@ describe('the header holds three destinations, not eleven', () => {
     await signedIn();
 
     const links = within(header()).getAllByRole('link').map((a) => a.getAttribute('href'));
-    expect(links).toEqual(['/search', '/providers', '/bookings']);
+    // The third destination is the umbrella page the information architecture names, not the bookings list underneath it.
+    expect(links).toEqual(['/search', '/providers', '/dashboard']);
   });
 
   it('keeps the eight low-frequency destinations OUT of the header', async () => {
@@ -118,7 +119,7 @@ describe('the header holds three destinations, not eleven', () => {
     // The reorganisation only means something if these left. A menu that
     // duplicates the bar is a longer bar.
     const inHeader = within(header()).getAllByRole('link').map((a) => a.getAttribute('href'));
-    for (const moved of ['/journey', '/loyalty', '/waitlist', '/finance', '/business', '/admin', '/dashboard']) {
+    for (const moved of ['/journey', '/loyalty', '/waitlist', '/finance', '/business', '/admin']) {
       expect(inHeader).not.toContain(moved);
     }
     // And «خروج» is no longer a peer of «جست‌وجو».
@@ -155,8 +156,38 @@ describe('the avatar menu', () => {
     await userEvent.click(trigger);
     const menu = screen.getByTestId('avatar-menu-items');
     const hrefs = within(menu).getAllByRole('link').map((a) => a.getAttribute('href'));
-    expect(hrefs).toEqual(['/dashboard', '/journey', '/loyalty', '/waitlist', '/finance', '/business', '/pro']);
+    // No «حالت متخصص»: this session owns no professional profile. No '/dashboard' either — it is a header destination now.
+    expect(hrefs).toEqual(['/journey', '/loyalty', '/waitlist', '/finance', '/business']);
     expect(within(menu).getByRole('button', { name: 'خروج' })).toBeInTheDocument();
+  });
+
+  /**
+   * `V3_INFORMATION_ARCHITECTURE.md` §2 level three: «حالت متخصص» belongs to a
+   * user who owns a professional profile. It was offered to every signed-in
+   * customer in two places at once, and following it reached `ProGuard`'s
+   * "you have no profile yet" state — an invitation to a dead end.
+   *
+   * The role is the right test: `professional` is granted in the same
+   * transaction as the profile row (#75) and the existing owners were
+   * backfilled, and `/v1/me` resolves it live.
+   */
+  it('offers «حالت متخصص» nowhere to a customer who owns no professional profile', async () => {
+    await signedIn();
+    expect(screen.queryByRole('link', { name: 'حالت متخصص' })).toBeNull();
+
+    await userEvent.click(screen.getByRole('button', { name: /حساب کاربری/ }));
+    const menu = screen.getByTestId('avatar-menu-items');
+    expect(within(menu).queryByRole('link', { name: 'حالت متخصص' })).toBeNull();
+    expect(within(menu).getAllByRole('link').map((a) => a.getAttribute('href'))).not.toContain('/pro');
+  });
+
+  it('offers it in both places to a seller', async () => {
+    await signedIn({ roles: ['customer', 'professional'] });
+    expect(screen.getByRole('link', { name: 'حالت متخصص' })).toHaveAttribute('href', '/pro');
+
+    await userEvent.click(screen.getByRole('button', { name: /حساب کاربری/ }));
+    const menu = screen.getByTestId('avatar-menu-items');
+    expect(within(menu).getByRole('link', { name: 'حالت متخصص' })).toHaveAttribute('href', '/pro');
   });
 
   it('shows the platform destination only to a session that holds the capability', async () => {

@@ -416,8 +416,11 @@ describe('UI primitives', () => {
     render(<TextLink href="/pro">برو</TextLink>);
     const link = screen.getByRole('link', { name: 'برو' });
     // The recurring bug class: 44px lives inside `Button` and nothing enforced
-    // it for links, so five separate surfaces each re-learned it.
-    expect(link).toHaveStyle({ minHeight: '44px' });
+    // it for links, so five separate surfaces each re-learned it. It's
+    // `TextLink`'s `kit.module.css` class now, not an inline style; jsdom
+    // never loads that real stylesheet, so the class itself is what a jsdom
+    // test can assert.
+    expect(link).toHaveClass('textLink');
   });
 
   it('ConfirmDialog is a real modal: labelled, focus moved in, Escape closes', async () => {
