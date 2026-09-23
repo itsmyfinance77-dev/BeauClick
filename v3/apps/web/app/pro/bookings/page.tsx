@@ -1,17 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  formatToman,
-  formatZonedFullDate,
-  formatZonedTime,
-  toPersianDigits,
-  zonedIsoDate,
-} from '@beauclick/persian-utils';
+import { formatZonedFullDate, formatZonedTime, toPersianDigits, zonedIsoDate } from '@beauclick/persian-utils';
 import { Alert, Button, ErrorState, LoadingState } from '@/components/ui';
-import { Badge, ConfirmDialog, EmptyState, PageHeader, Select } from '@/components/kit';
+import { ConfirmDialog, EmptyState, PageHeader, Select } from '@/components/kit';
+import { BookingRow } from '@/components/booking-row';
 import { TabList, TabPanel } from '@/components/tab-list';
-import { bookingHistoryLabel, bookingStatusLabel, bookingStatusTone } from '@/lib/booking-status';
 import { ProGuard } from '@/components/pro-guard';
 import { useAuth } from '@/lib/auth-context';
 import {
@@ -34,10 +28,6 @@ import styles from './bookings.module.css';
 export default function ProBookingsPage() {
   return <ProGuard>{(profile) => <ProBookings profile={profile} />}</ProGuard>;
 }
-
-/** Mirrors `BookingConfig` defaults. Used ONLY to explain why a button is absent, never to authorize. */
-const MAX_RESCHEDULES = 2;
-const RESCHEDULE_MIN_HOURS = 6;
 
 /** `PageQueryDto` caps `limit` at 100; 50 keeps a comfortable margin under it. */
 const PAGE_SIZE = 50;
@@ -219,12 +209,7 @@ function ProBookings({ profile }: { profile: MyProviderProfile }) {
     }
   }
 
-  async function openHistory(booking: ProfessionalBookingSummary) {
-    if (historyFor === booking.id) {
-      setHistoryFor(null);
-      return;
-    }
-    setHistoryFor(booking.id);
+  async function fetchHistory(booking: ProfessionalBookingSummary) {
     setHistory([]);
     setHistoryError(null);
     setHistoryLoading(true);
@@ -236,6 +221,15 @@ function ProBookings({ profile }: { profile: MyProviderProfile }) {
     } finally {
       setHistoryLoading(false);
     }
+  }
+
+  async function openHistory(booking: ProfessionalBookingSummary) {
+    if (historyFor === booking.id) {
+      setHistoryFor(null);
+      return;
+    }
+    setHistoryFor(booking.id);
+    await fetchHistory(booking);
   }
 
   async function openReschedule(booking: ProfessionalBookingSummary) {
@@ -332,122 +326,24 @@ function ProBookings({ profile }: { profile: MyProviderProfile }) {
             <section key={day} className={styles.day} data-day={day}>
               <h2 className={styles.dayTitle}>{formatZonedFullDate(new Date(dayBookings[0].startAt))}</h2>
               <ul className={styles.rows}>
-                {dayBookings.map((booking) => {
-                  const start = new Date(booking.startAt);
-                  const ended = new Date(booking.endAt).getTime() <= Date.now();
-                  const hoursUntil = (start.getTime() - Date.now()) / 3_600_000;
-                  const name = serviceName(booking.serviceId);
-                  const service = services.find((s) => s.id === booking.serviceId);
-
-                  const canComplete = booking.status === 'confirmed';
-                  const canNoShow = booking.status === 'confirmed' && ended;
-                  const canReschedule =
-                    (booking.status === 'confirmed' || booking.status === 'pending') &&
-                    booking.rescheduleCount < MAX_RESCHEDULES &&
-                    hoursUntil >= RESCHEDULE_MIN_HOURS;
-
-                  const noShowNote = booking.status === 'confirmed' && !ended;
-                  const rescheduleNote = (booking.status === 'confirmed' || booking.status === 'pending') && !canReschedule;
-
-                  return (
-                    <li key={booking.id} className={styles.booking} data-booking={booking.id}>
-                      <div className={styles.info}>
-                        <p className={styles.when}>{formatZonedFullDate(start)}</p>
-                        <p className={styles.time}>
-                          ساعت <span className={styles.clock}>{formatZonedTime(start)}</span> تا{' '}
-                          <span className={styles.clock}>{formatZonedTime(new Date(booking.endAt))}</span>
-                        </p>
-                        <p className={styles.service}>
-                          {name ?? 'خدمت نامشخص'}
-                          {service ? ` — ${formatToman(service.priceToman)}` : ''}
-                        </p>
-                        <p className={styles.meta}>
-                          مشتری: {booking.customerDisplayName ?? 'نام مشتری ثبت نشده'}
-                        </p>
-                        {booking.rescheduleCount > 0 ? (
-                          <p className={styles.meta}>{toPersianDigits(booking.rescheduleCount)} بار جابه‌جا شده</p>
-                        ) : null}
-                      </div>
-                      <div className={styles.status}>
-                        <Badge tone={bookingStatusTone(booking.status)}>{bookingStatusLabel(booking.status)}</Badge>
-                      </div>
-
-                      <div className={styles.actions}>
-                        {canComplete ? (
-                          <Button
-                            type="button"
-                            inline
-                            loading={busyId === booking.id}
-                            onClick={() => setConfirming({ booking, action: 'complete' })}
-                          >
-                            ثبت انجام نوبت
-                          </Button>
-                        ) : null}
-                        {canNoShow ? (
-                          <Button
-                            type="button"
-                            variant="danger"
-                            inline
-                            disabled={busyId === booking.id}
-                            onClick={() => setConfirming({ booking, action: 'no_show' })}
-                          >
-                            عدم حضور مشتری
-                          </Button>
-                        ) : null}
-                        {canReschedule ? (
-                          <Button type="button" variant="ghost" inline onClick={() => void openReschedule(booking)}>
-                            تغییر زمان
-                          </Button>
-                        ) : null}
-                        <Button type="button" variant="ghost" inline onClick={() => void openHistory(booking)}>
-                          {historyFor === booking.id ? 'بستن تاریخچه' : 'تاریخچه'}
-                        </Button>
-                      </div>
-
-                      {/* Why an action is unavailable, rather than a dead button.
-                          The server is the authority in every case; these are
-                          explanations of its rules, not the enforcement of them. */}
-                      {noShowNote || rescheduleNote ? (
-                        <div className={styles.notes}>
-                          {noShowNote ? <p className={styles.note}>ثبت عدم حضور تنها پس از پایان زمان نوبت ممکن است.</p> : null}
-                          {rescheduleNote ? (
-                            <p className={styles.note}>
-                              {booking.rescheduleCount >= MAX_RESCHEDULES
-                                ? `حداکثر ${toPersianDigits(MAX_RESCHEDULES)} بار جابه‌جایی مجاز است.`
-                                : `تغییر زمان تا ${toPersianDigits(RESCHEDULE_MIN_HOURS)} ساعت پیش از نوبت ممکن است.`}
-                            </p>
-                          ) : null}
-                        </div>
-                      ) : null}
-
-                      {historyFor === booking.id ? (
-                        <div className={styles.history}>
-                          {historyLoading ? (
-                            <LoadingState label="در حال بارگذاری تاریخچه…" lines={2} />
-                          ) : historyError ? (
-                            <ErrorState message={historyError} onRetry={() => void openHistory(booking)} />
-                          ) : history.length === 0 ? (
-                            <p className={styles.emptyHistory}>رویدادی برای این رزرو ثبت نشده است.</p>
-                          ) : (
-                            <ul className={styles.historyList}>
-                              {history.map((entry) => (
-                                <li key={entry.id} className={styles.historyItem}>
-                                  <span className={styles.historyEvent}>{bookingHistoryLabel(entry)}</span>
-                                  <span className={styles.historyWhen}>
-                                    {' — '}
-                                    {formatZonedFullDate(new Date(entry.createdAt))} ساعت{' '}
-                                    <span className={styles.clock}>{formatZonedTime(new Date(entry.createdAt))}</span>
-                                  </span>
-                                  {entry.reason ? <span className={styles.historyReason}>{` — ${entry.reason}`}</span> : null}
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                        </div>
-                      ) : null}
-                    </li>
-                  );
-                })}
+                {dayBookings.map((booking) => (
+                  <BookingRow
+                    key={booking.id}
+                    booking={booking}
+                    serviceName={serviceName(booking.serviceId)}
+                    service={services.find((s) => s.id === booking.serviceId)}
+                    busy={busyId === booking.id}
+                    onComplete={() => setConfirming({ booking, action: 'complete' })}
+                    onNoShow={() => setConfirming({ booking, action: 'no_show' })}
+                    onReschedule={() => void openReschedule(booking)}
+                    historyOpen={historyFor === booking.id}
+                    historyLoading={historyLoading}
+                    historyError={historyError}
+                    history={history}
+                    onToggleHistory={() => void openHistory(booking)}
+                    onRetryHistory={() => void fetchHistory(booking)}
+                  />
+                ))}
               </ul>
             </section>
           ))
