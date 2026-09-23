@@ -566,10 +566,13 @@ describe('the retry action', () => {
 
 describe('preserved behaviour', () => {
   it('keeps the 44px touch baseline on both navigation links', async () => {
+    // `TextLink`'s `kit.module.css` class carries `min-height: 44px` now, not
+    // an inline style; jsdom never loads that real stylesheet, so the class
+    // itself is what a jsdom test can assert.
     renderResult({ status: 'succeeded', orderId: 'o1' });
     for (const name of ['رزروهای من', 'بازگشت به فهرست متخصص‌ها']) {
       const link = await screen.findByRole('link', { name });
-      expect(link.getAttribute('style')).toContain('min-height: 44px');
+      expect(link).toHaveClass('textLink');
     }
   });
 

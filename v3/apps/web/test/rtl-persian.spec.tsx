@@ -51,9 +51,12 @@ describe('RTL discipline', () => {
   });
 
   it('keeps numeric inputs LTR-ordered inside the RTL document', () => {
+    // `direction: ltr` lives in `ui.module.css`'s `.inputNumeric` class now,
+    // not an inline style; jsdom never loads that real stylesheet, so the
+    // class itself is what a jsdom test can assert.
     render(<Input label="شماره موبایل" inputMode="numeric" />);
     const input = screen.getByLabelText('شماره موبایل');
-    expect(input).toHaveStyle({ direction: 'ltr' });
+    expect(input).toHaveClass('inputNumeric');
   });
 });
 
@@ -82,8 +85,11 @@ describe('Accessibility baseline', () => {
   });
 
   it('gives every button a comfortable touch target (>=44px)', () => {
+    // `min-height: 44px` lives in `ui.module.css`'s `.button` class now, not
+    // an inline style; jsdom never loads that real stylesheet, so the class
+    // itself is what a jsdom test can assert.
     render(<Button>تأیید</Button>);
-    expect(screen.getByRole('button')).toHaveStyle({ minHeight: '44px' });
+    expect(screen.getByRole('button')).toHaveClass('button');
   });
 
   it('exposes alerts and loading states as live regions', () => {

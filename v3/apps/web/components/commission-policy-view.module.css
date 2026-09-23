@@ -1,0 +1,125 @@
+/*
+ * The commission-policy read surface (`commission-policy-view.tsx`) --
+ * #219's inline-style migration. Nothing here changes behaviour or values;
+ * every declaration is moved verbatim from the inline `style={{}}` object it
+ * replaces.
+ */
+
+/* ------------------------------------------------------------ RuleStatement */
+
+.ruleZero {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.ruleStack {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ruleLine {
+  margin: 0;
+  font-size: 14px;
+}
+
+.ruleValue {
+  font-variant-numeric: tabular-nums;
+}
+
+.ruleBase {
+  margin: 0;
+  font-size: 13px;
+  color: var(--bc-color-ink-soft);
+}
+
+/* -------------------------------------------------------------- ComponentCard */
+
+.cardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cardHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.cardCode {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--bc-color-ink-soft);
+}
+
+/* "No policy yet" and "published but nothing live" read the same way -- two
+   different facts, the same visual weight. */
+.stateMessage {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.9;
+  color: var(--bc-color-ink-soft);
+}
+
+.effectiveStack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.effectiveMeta {
+  margin: 0;
+  font-size: 12px;
+  color: var(--bc-color-ink-soft);
+}
+
+.cardActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-block-start: 4px;
+}
+
+/* --------------------------------------------------------------- VersionTimeline */
+
+.timelineSection {
+  margin-block-start: 20px;
+}
+
+.timelineTitle {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.timelineDescription {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.85;
+  color: var(--bc-color-ink-soft);
+}
+
+.cellNumeric {
+  font-variant-numeric: tabular-nums;
+}
+
+.cellMuted {
+  font-size: 12px;
+  color: var(--bc-color-ink-soft);
+}
+
+.rowActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}

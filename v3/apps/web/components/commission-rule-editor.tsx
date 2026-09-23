@@ -5,6 +5,7 @@ import { toPersianDigits } from '@beauclick/persian-utils';
 import { Button, Input } from '@/components/ui';
 import { Textarea } from '@/components/kit';
 import type { CommissionBase, CommissionRuleDraft, CommissionRuleKind } from '@/lib/admin-api';
+import styles from './commission-rule-editor.module.css';
 
 /**
  * The shape-aware commission rule editor — V3.3 `#43b-1` / #173, ADR-052 §1,
@@ -166,12 +167,12 @@ export function CommissionRuleEditor({
   }
 
   return (
-    <div data-testid="commission-rule-editor" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <fieldset style={{ border: '1px solid var(--bc-color-line)', borderRadius: 'var(--bc-radius-row)', padding: '12px 14px' }}>
-        <legend style={{ fontSize: 13, fontWeight: 800, padding: '0 6px' }}>شکلِ قاعده</legend>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }}>
+    <div data-testid="commission-rule-editor" className={styles.editor}>
+      <fieldset className={styles.kindFieldset}>
+        <legend className={styles.legend}>شکلِ قاعده</legend>
+        <div className={styles.kindOptions}>
           {RULE_KINDS.map((option) => (
-            <label key={option} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13.5, minHeight: 44 }}>
+            <label key={option} className={styles.radioLabel}>
               <input
                 type="radio"
                 name="commission-rule-kind"
@@ -225,17 +226,11 @@ export function CommissionRuleEditor({
       ) : null}
 
       {shape.base ? (
-        <fieldset
-          style={{
-            border: attempted && baseMissing ? '1px solid var(--bc-color-error)' : '1px solid var(--bc-color-line)',
-            borderRadius: 'var(--bc-radius-row)',
-            padding: '12px 14px',
-          }}
-        >
-          <legend style={{ fontSize: 13, fontWeight: 800, padding: '0 6px' }}>نرخ بر چه مبنایی؟</legend>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <fieldset className={`${styles.baseFieldset} ${attempted && baseMissing ? styles.baseFieldsetError : ''}`}>
+          <legend className={styles.legend}>نرخ بر چه مبنایی؟</legend>
+          <div className={styles.baseOptions}>
             {BASES.map((option) => (
-              <label key={option} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13.5, minHeight: 44 }}>
+              <label key={option} className={styles.baseRadioLabel}>
                 <input
                   type="radio"
                   name="commission-base"
@@ -243,18 +238,18 @@ export function CommissionRuleEditor({
                   checked={base === option}
                   onChange={() => setBase(option)}
                   disabled={busy}
-                  style={{ marginBlockStart: 4 }}
+                  className={styles.baseRadioInput}
                 />
                 <span>
-                  <span style={{ fontWeight: 700 }}>{BASE_LABEL[option]}</span>
+                  <span className={styles.baseOptionTitle}>{BASE_LABEL[option]}</span>
                   <br />
-                  <span style={{ fontSize: 12.5, color: 'var(--bc-color-ink-soft)' }}>{BASE_HINT[option]}</span>
+                  <span className={styles.baseOptionHint}>{BASE_HINT[option]}</span>
                 </span>
               </label>
             ))}
           </div>
           {attempted && baseMissing ? (
-            <p role="alert" style={{ margin: '8px 0 0', fontSize: 12.5, color: 'var(--bc-color-error)' }}>
+            <p role="alert" className={styles.baseError}>
               یکی از دو مبنا را انتخاب کنید. هیچ‌کدام پیش‌فرض نیست.
             </p>
           ) : null}
@@ -275,12 +270,12 @@ export function CommissionRuleEditor({
       />
 
       {serverError ? (
-        <p id={errorId} role="alert" style={{ margin: 0, fontSize: 13, lineHeight: 1.85, color: 'var(--bc-color-error)' }}>
+        <p id={errorId} role="alert" className={styles.serverError}>
           {serverError}
         </p>
       ) : null}
 
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+      <div className={styles.actions}>
         <Button onClick={submit} loading={busy}>
           {submitLabel}
         </Button>

@@ -1,6 +1,7 @@
 'use client';
 
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import styles from './error-boundary.module.css';
 
 /**
  * Application error boundary. A render error must never blank the page --
@@ -34,25 +35,10 @@ export class ErrorBoundary extends Component<Props, State> {
     if (!this.state.hasError) return this.props.children;
 
     return (
-      <div role="alert" style={{ padding: 24, textAlign: 'center' }}>
+      <div role="alert" className={styles.wrapper}>
         <h2>مشکلی پیش آمد</h2>
-        <p style={{ color: 'var(--bc-color-ink-soft)' }}>لطفاً صفحه را دوباره بارگذاری کنید.</p>
-        <button
-          type="button"
-          onClick={() => this.setState({ hasError: false })}
-          style={{
-            font: 'inherit',
-            fontWeight: 600,
-            padding: '10px 18px',
-            marginBlockStart: 12,
-            borderRadius: 'var(--bc-radius-button)',
-            border: 'none',
-            background: 'var(--bc-color-primary)',
-            color: 'var(--bc-color-surface)',
-            cursor: 'pointer',
-            minHeight: 44,
-          }}
-        >
+        <p className={styles.message}>لطفاً صفحه را دوباره بارگذاری کنید.</p>
+        <button type="button" onClick={() => this.setState({ hasError: false })} className={styles.retry}>
           تلاش دوباره
         </button>
       </div>
