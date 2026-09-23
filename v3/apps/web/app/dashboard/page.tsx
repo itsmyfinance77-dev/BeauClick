@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import { formatFullJalaliDate, formatIranianPhone, formatToman, toPersianDigits } from '@beauclick/persian-utils';
+import { formatFullJalaliDate, formatIranianPhone, toPersianDigits } from '@beauclick/persian-utils';
+import { PriceDisplay } from '@/components/price-display';
 import { useAuth } from '@/lib/auth-context';
 import { ProtectedRoute } from '@/components/protected-route';
 import { ErrorState, LoadingState } from '@/components/ui';
@@ -292,7 +293,7 @@ function DashboardContent() {
                       {profile?.budgetMaxToman !== null && profile?.budgetMaxToman !== undefined ? (
                         <>
                           <dt>حداکثر بودجه</dt>
-                          <dd>{formatToman(profile.budgetMaxToman)} تومان</dd>
+                          <dd><PriceDisplay amount={profile.budgetMaxToman} /> تومان</dd>
                         </>
                       ) : null}
                       {profile?.notes ? (

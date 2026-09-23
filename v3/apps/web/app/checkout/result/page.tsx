@@ -2,7 +2,8 @@
 
 import { usePathname, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { formatFullJalaliDate, formatToman, toPersianDigits } from '@beauclick/persian-utils';
+import { formatFullJalaliDate, toPersianDigits } from '@beauclick/persian-utils';
+import { PriceDisplay } from '@/components/price-display';
 import {
   isPaymentFailureReason,
   isRetryableFailureReason,
@@ -398,7 +399,7 @@ function ResultContent() {
                   {item.name}
                   {item.quantity > 1 ? ` × ${toPersianDigits(item.quantity)}` : ''}
                 </DataCell>
-                <DataCell label="مبلغ">{formatToman(item.lineTotalToman)}</DataCell>
+                <DataCell label="مبلغ"><PriceDisplay amount={item.lineTotalToman} /></DataCell>
               </DataRow>
             ))}
 
@@ -410,14 +411,14 @@ function ResultContent() {
               <DataRow key={adjustment.ruleKey + adjustment.label} className={styles.adjustment}>
                 <DataCell label="ردیف">{adjustment.label}</DataCell>
                 <DataCell label="مبلغ">
-                  <span className={styles.signed}>{formatToman(adjustment.amountToman)}</span>
+                  <span className={styles.signed}><PriceDisplay amount={adjustment.amountToman} /></span>
                 </DataCell>
               </DataRow>
             ))}
 
             <DataRow className={styles.total}>
               <DataCell label="ردیف">مبلغ کل</DataCell>
-              <DataCell label="مبلغ">{formatToman(order.totalToman)} تومان</DataCell>
+              <DataCell label="مبلغ"><PriceDisplay amount={order.totalToman} /> تومان</DataCell>
             </DataRow>
 
             {/*
@@ -434,11 +435,11 @@ function ResultContent() {
               <>
                 <DataRow>
                   <DataCell label="ردیف">پرداخت‌شده به بیوکلیک</DataCell>
-                  <DataCell label="مبلغ">{formatToman(order.paymentSchedule.platformCollectibleNowToman)} تومان</DataCell>
+                  <DataCell label="مبلغ"><PriceDisplay amount={order.paymentSchedule.platformCollectibleNowToman} /> تومان</DataCell>
                 </DataRow>
                 <DataRow>
                   <DataCell label="ردیف">قابل پرداخت در محل</DataCell>
-                  <DataCell label="مبلغ">{formatToman(order.paymentSchedule.venueBalanceToman)} تومان</DataCell>
+                  <DataCell label="مبلغ"><PriceDisplay amount={order.paymentSchedule.venueBalanceToman} /> تومان</DataCell>
                 </DataRow>
               </>
             ) : null}
@@ -446,7 +447,7 @@ function ResultContent() {
             {order.refundedTotalToman > 0 ? (
               <DataRow className={styles.refund}>
                 <DataCell label="ردیف">مبلغ بازگردانده‌شده</DataCell>
-                <DataCell label="مبلغ">{formatToman(order.refundedTotalToman)} تومان</DataCell>
+                <DataCell label="مبلغ"><PriceDisplay amount={order.refundedTotalToman} /> تومان</DataCell>
               </DataRow>
             ) : null}
           </DataTable>

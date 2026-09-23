@@ -1,11 +1,11 @@
 'use client';
 
-import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { formatToman, toPersianDigits } from '@beauclick/persian-utils';
+import { toPersianDigits } from '@beauclick/persian-utils';
 import { useAuth } from '@/lib/auth-context';
 import { Alert, ErrorState } from '@/components/ui';
+import { ProviderCard } from '@/components/provider-card';
 import { saveFailureMessage } from '@/lib/wishlist-api';
 import {
   autocomplete,
@@ -535,97 +535,13 @@ export function SearchResults() {
           ) : (
             <div className={styles.cardList} data-testid="results">
               {(result?.items ?? []).map((item, index) => (
-                <article key={item.id} className={styles.card} data-provider={item.id}>
-                  {/* Placeholder artwork: `avatarUrl` and `portfolioCount` are
-                      not in the public search result at this baseline. */}
-                  <div
-                    className={`${styles.cardArt} ${index % 2 === 1 ? styles.cardArtBronze : ''}`}
-                    aria-hidden="true"
-                  >
-                    <span className={styles.cardArtLabel}>نمونه کار</span>
-                  </div>
-
-                  <div className={styles.cardBody}>
-                    <div>
-                      <div className={styles.nameRow}>
-                        <h2 className={styles.cardName}>
-                          <Link href={`/providers/${item.id}?from=search`}>{item.displayName}</Link>
-                        </h2>
-                        {item.isVerified ? (
-                          <span className={styles.verified}>
-                            <span className={styles.verifiedDot} aria-hidden="true" />
-                            تأیید شده
-                          </span>
-                        ) : null}
-                        {item.saved === null ? (
-                          /* Anonymous: `null` is not "not saved". Sending
-                             them to sign in is honest; rendering an unsaved
-                             control would claim something about someone the
-                             server cannot identify. */
-                          <Link
-                            href="/auth"
-                            className={`${styles.save} bc-tap`}
-                            aria-label={`برای ذخیرهٔ ${item.displayName} وارد شوید`}
-                          >
-                            ذخیره<span className={styles.saveSuffix}> در علاقه‌مندی‌ها</span>
-                          </Link>
-                        ) : (
-                          <button
-                            type="button"
-                            className={`${styles.save} ${item.saved ? styles.saveOn : ''} bc-tap`}
-                            aria-pressed={item.saved}
-                            disabled={savingIds.has(item.id)}
-                            aria-label={
-                              item.saved
-                                ? `حذف ${item.displayName} از علاقه‌مندی‌ها`
-                                : `افزودن ${item.displayName} به علاقه‌مندی‌ها`
-                            }
-                            onClick={() => void toggleSaved(item)}
-                          >
-                            {item.saved ? (
-                              'در علاقه‌مندی‌ها'
-                            ) : (
-                              <>
-                                ذخیره<span className={styles.saveSuffix}> در علاقه‌مندی‌ها</span>
-                              </>
-                            )}
-                          </button>
-                        )}
-                      </div>
-                      {item.city ? <div className={styles.cardPlace}>{item.city.name}</div> : null}
-                    </div>
-
-                    {item.bio ? <p className={styles.cardBio}>{item.bio}</p> : null}
-
-                    {item.specialties.length > 0 ? (
-                      <div className={styles.tagRow}>
-                        {item.specialties.map((specialty) => (
-                          <span key={specialty} className={styles.tag}>
-                            {specialty}
-                          </span>
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
-
-                  <div className={styles.cardFoot}>
-                    <div>
-                      {item.priceFromToman === null ? (
-                        <div className={styles.priceLabel}>قیمت هنوز اعلام نشده</div>
-                      ) : (
-                        <>
-                          <div className={styles.priceLabel}>شروع از</div>
-                          <div className={styles.priceValue}>
-                            {formatToman(item.priceFromToman)} <span className={styles.priceUnit}>تومان</span>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                    <Link href={`/providers/${item.id}?from=search`} className={styles.cardAction}>
-                      دیدن زمان‌ها
-                    </Link>
-                  </div>
-                </article>
+                <ProviderCard
+                  key={item.id}
+                  item={item}
+                  index={index}
+                  saving={savingIds.has(item.id)}
+                  onToggleSaved={() => void toggleSaved(item)}
+                />
               ))}
             </div>
           )}

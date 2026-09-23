@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import { formatToman, toPersianDigits } from '@beauclick/persian-utils';
+import { toPersianDigits } from '@beauclick/persian-utils';
+import { PriceDisplay } from '@/components/price-display';
 import { ErrorState } from '@/components/ui';
 import { useAuth } from '@/lib/auth-context';
 import { searchProviders, type FacetBucket, type SearchResultItem } from '@/lib/phase3-api';
@@ -318,7 +319,7 @@ export default function HomePage() {
                             <>
                               <div className={styles.priceLabel}>شروع از</div>
                               <div className={styles.priceValue}>
-                                {formatToman(provider.priceFromToman)} <span className={styles.priceUnit}>تومان</span>
+                                <PriceDisplay amount={provider.priceFromToman} /> <span className={styles.priceUnit}>تومان</span>
                               </div>
                             </>
                           )}

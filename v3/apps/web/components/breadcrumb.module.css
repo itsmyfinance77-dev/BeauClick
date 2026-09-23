@@ -1,0 +1,29 @@
+/*
+ * The trail above a page's title — moved out of `provider.module.css`
+ * unchanged when the breadcrumb became a component. `V3_COMPONENT_INVENTORY.md`
+ * lists it as a component; it was written in place on the one page that has
+ * one so far.
+ */
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--bc-color-text-faint);
+  min-height: 40px;
+  flex-wrap: wrap;
+}
+
+.breadcrumb a {
+  color: var(--bc-color-text-faint);
+  text-decoration: none;
+}
+
+.breadcrumb a:hover {
+  color: var(--bc-color-primary);
+}
+
+.current {
+  color: var(--bc-color-text);
+  font-weight: 500;
+}

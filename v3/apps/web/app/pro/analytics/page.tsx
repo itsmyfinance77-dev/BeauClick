@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { formatToman, formatZonedFullDate, toPersianDigits, zonedIsoDate } from '@beauclick/persian-utils';
+import { PriceDisplay } from '@/components/price-display';
 import { ErrorState, LoadingState } from '@/components/ui';
 import { Badge, EmptyState, PageHeader, SegmentedControl, Select, StatCard, StatGrid } from '@/components/kit';
 import { MoneyChart, type ChartPoint } from '@/components/money-chart';
@@ -173,7 +174,7 @@ function Analytics() {
                   <StatCard
                     key={key}
                     label={revenueLabel(key)}
-                    value={revenueIsMoney(key) ? formatToman(metric.value) : toPersianDigits(metric.value)}
+                    value={revenueIsMoney(key) ? <PriceDisplay amount={metric.value} /> : toPersianDigits(metric.value)}
                   />
                 ))}
               </StatGrid>

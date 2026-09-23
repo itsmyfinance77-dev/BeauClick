@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { formatToman, formatZonedFullDate, toPersianDigits } from '@beauclick/persian-utils';
+import { formatZonedFullDate, toPersianDigits } from '@beauclick/persian-utils';
+import { PriceDisplay } from './price-display';
 import { Button, ErrorState, LoadingState } from '@/components/ui';
 import { Badge, DataCell, DataRow, DataTable, EmptyState, PageHeader, StatCard, StatGrid } from '@/components/kit';
 import { FundsByState } from '@/components/funds-by-state';
@@ -428,9 +429,9 @@ export function FinanceWorkspaceSurface() {
           ) : summary ? (
             <div className={styles.section}>
               <StatGrid min={180}>
-                <StatCard label="خالص قابل دریافت" value={formatToman(summary.receivableNetToman)} />
-                <StatCard label="تسویه‌شده" value={formatToman(summary.settledToman)} />
-                <StatCard label="در انتظار تسویه" value={formatToman(summary.outstandingToman)} />
+                <StatCard label="خالص قابل دریافت" value={<PriceDisplay amount={summary.receivableNetToman} />} />
+                <StatCard label="تسویه‌شده" value={<PriceDisplay amount={summary.settledToman} />} />
+                <StatCard label="در انتظار تسویه" value={<PriceDisplay amount={summary.outstandingToman} />} />
               </StatGrid>
             </div>
           ) : null}
@@ -460,7 +461,7 @@ export function FinanceWorkspaceSurface() {
               {orders.map((order) => (
                 <li key={order.orderId} className={`${styles.panel} ${styles.order}`} data-order={order.orderId}>
                   <div className={styles.orderText}>
-                    <p className={styles.orderAmount}>{formatToman(order.outstandingToman)}</p>
+                    <p className={styles.orderAmount}><PriceDisplay amount={order.outstandingToman} /></p>
                     <p className={styles.orderRef}>
                       سفارش <span className={styles.ref}>{order.orderId.slice(0, 8)}</span>
                     </p>
@@ -484,7 +485,7 @@ export function FinanceWorkspaceSurface() {
                             {ledger.map((entry) => (
                               <tr key={entry.id}>
                                 <th scope="row">{ledgerEntryLabel(entry.entryType)}</th>
-                                <td>{formatToman(entry.amountToman)}</td>
+                                <td><PriceDisplay amount={entry.amountToman} /></td>
                                 <td className={styles.ledgerRate}>
                                   {toPersianDigits((entry.commissionRateBp / 100).toFixed(1))}٪
                                 </td>
@@ -519,7 +520,7 @@ export function FinanceWorkspaceSurface() {
                   <DataRow key={batch.id} data-settlement={batch.id}>
                     <DataCell label="تاریخ">{formatZonedFullDate(new Date(batch.createdAt))}</DataCell>
                     <DataCell label="مبلغ">
-                      <span className={styles.amount}>{formatToman(batch.amountToman)}</span>
+                      <span className={styles.amount}><PriceDisplay amount={batch.amountToman} /></span>
                     </DataCell>
                     <DataCell label="روش">
                       {batch.method ? <span className={styles.method}>{batch.method}</span> : '—'}

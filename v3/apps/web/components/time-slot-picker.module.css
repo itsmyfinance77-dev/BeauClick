@@ -1,0 +1,99 @@
+/*
+ * The day strip and the times under it — moved out of `provider.module.css`
+ * unchanged when the picker became a component
+ * (`V3_COMPONENT_INVENTORY.md`'s `TimeSlotPicker`).
+ */
+
+/* ------------------------------------------------------------- the day strip */
+
+.dayStrip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-block-end: 16px;
+}
+
+.day {
+  font: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-height: 62px;
+  padding: 8px 0;
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-control);
+  background: var(--bc-color-surface);
+  color: var(--bc-color-text);
+  cursor: pointer;
+}
+
+.dayChosen {
+  border-color: transparent;
+  background: var(--bc-color-primary);
+  color: var(--bc-color-surface);
+}
+
+.dayWeekday {
+  font-size: var(--bc-text-badge-size);
+  color: var(--bc-color-text-faint);
+}
+
+.dayChosen .dayWeekday,
+.dayChosen .dayCount {
+  color: inherit;
+  opacity: 0.85;
+}
+
+.dayNumber {
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.dayCount {
+  font-size: 11px;
+  color: var(--bc-color-success);
+}
+
+/* -------------------------------------------------------------- slot grid */
+
+.slotGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.slot {
+  font: inherit;
+  min-height: 46px;
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-control);
+  background: var(--bc-color-surface);
+  color: var(--bc-color-text);
+  font-size: 16px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  /* A time reads left-to-right inside an RTL line, or ۱۲:۰۰ inverts. */
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+.slot:hover {
+  border-color: var(--bc-color-primary);
+  color: var(--bc-color-primary);
+}
+
+.slotChosen {
+  border-color: transparent;
+  background: var(--bc-color-primary);
+  color: var(--bc-color-surface);
+  font-weight: 700;
+}
+
+.slotChosen:hover {
+  background: var(--bc-color-primary-hover);
+  color: var(--bc-color-surface);
+}
+

@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { formatToman, formatZonedFullDate, formatZonedTime, toPersianDigits } from '@beauclick/persian-utils';
+import { formatZonedFullDate, formatZonedTime, toPersianDigits } from '@beauclick/persian-utils';
+import { PriceDisplay } from '@/components/price-display';
 import Link from 'next/link';
 import { ErrorState, LoadingState } from '@/components/ui';
 import { Badge, EmptyState, PageHeader, TextLink } from '@/components/kit';
@@ -254,7 +255,7 @@ export default function ProOverviewPage() {
             <div className={styles.tileLabel}>خالص قابل دریافت</div>
             {finance ? (
               <div className={styles.tileValueRow}>
-                <span className={styles.tileValue}>{formatToman(finance.receivableNetToman)}</span>
+                <span className={styles.tileValue}><PriceDisplay amount={finance.receivableNetToman} /></span>
                 <span className={styles.tileUnit}>تومان</span>
               </div>
             ) : multipleWorkspaces ? (

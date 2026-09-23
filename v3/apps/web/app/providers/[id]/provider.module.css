@@ -8,32 +8,6 @@
  * eats the viewport the slot grid needs.
  */
 
-/* --------------------------------------------------------------- breadcrumb */
-
-.breadcrumb {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  color: var(--bc-color-text-faint);
-  min-height: 40px;
-  flex-wrap: wrap;
-}
-
-.breadcrumb a {
-  color: var(--bc-color-text-faint);
-  text-decoration: none;
-}
-
-.breadcrumb a:hover {
-  color: var(--bc-color-primary);
-}
-
-.breadcrumbCurrent {
-  color: var(--bc-color-text);
-  font-weight: 500;
-}
-
 /* ------------------------------------------------------------------ gallery */
 
 .gallery {
@@ -300,134 +274,6 @@
   gap: 10px;
 }
 
-/*
- * A whole row is the selection control, so the target is the card and not a
- * word inside it. The chosen row carries a 2px border AND a text chip:
- * a border alone is a colour-only signal.
- */
-.service {
-  background: var(--bc-color-surface);
-  border: 1px solid var(--bc-color-border);
-  border-radius: 14px;
-  padding: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  text-align: start;
-  font: inherit;
-  width: 100%;
-  cursor: pointer;
-  color: inherit;
-}
-
-.service:hover {
-  border-color: var(--bc-color-primary);
-}
-
-.serviceChosen {
-  border: 2px solid var(--bc-color-primary);
-  padding: 15px;
-}
-
-@media (min-width: 1024px) {
-  .service {
-    padding: 18px 20px;
-    gap: 20px;
-  }
-
-  .serviceChosen {
-    padding: 17px 19px;
-  }
-}
-
-.serviceHead {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.serviceName {
-  font-size: 19px;
-  font-weight: 700;
-}
-
-.chosenChip {
-  font-size: var(--bc-text-small-size);
-  font-weight: 600;
-  padding: 2px 9px;
-  border-radius: var(--bc-radius-chip);
-  background: var(--bc-color-primary-soft);
-  color: var(--bc-color-primary-on-soft);
-}
-
-.serviceMeta {
-  font-size: 15px;
-  color: var(--bc-color-text-faint);
-}
-
-/* The clickable area inside `.service`; a plain button reset so it inherits the card's own type styling. #219. */
-.serviceSelectButton {
-  font: inherit;
-  border: none;
-  background: transparent;
-  text-align: start;
-  cursor: pointer;
-  padding: 0;
-  color: inherit;
-  flex: 1;
-  min-width: 0;
-}
-
-/* `.serviceMeta` inline, i.e. the duration next to the price; stacked below the name here. #219. */
-.serviceMetaBlock {
-  display: block;
-}
-
-.servicePrice {
-  text-align: end;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
-}
-
-.priceValue {
-  font-size: 22px;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.4;
-}
-
-.priceUnit {
-  font-size: 14px;
-  color: var(--bc-color-text-muted);
-}
-
-.serviceSave {
-  font: inherit;
-  font-size: var(--bc-text-badge-size);
-  font-weight: 600;
-  min-height: 30px;
-  padding: 0 11px;
-  border: 1px solid var(--bc-color-border);
-  border-radius: var(--bc-radius-chip);
-  background: var(--bc-color-surface);
-  color: var(--bc-color-text-muted);
-  cursor: pointer;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-}
-
-.serviceSaveOn {
-  border-color: transparent;
-  background: var(--bc-color-primary-soft);
-  color: var(--bc-color-primary-on-soft);
-}
-
 .note {
   margin: 10px 0 0;
   font-size: var(--bc-text-small-size);
@@ -530,6 +376,20 @@
   }
 }
 
+/*
+ * The selected service's duration, in the booking panel.
+ *
+ * `ServiceRow` carries a rule of the same name in its own stylesheet. They are
+ * two elements in two components that want the same type, and a CSS module
+ * cannot lend a class to another module — so this is the panel's copy, not a
+ * leftover. It was briefly lost when the row's styles moved out, which showed
+ * up as this line rendering 2px taller.
+ */
+.serviceMeta {
+  font-size: 15px;
+  color: var(--bc-color-text-faint);
+}
+
 .panelPrice {
   display: flex;
   align-items: baseline;
@@ -564,99 +424,6 @@
 .panelSectionTitle {
   font-size: 16px;
   font-weight: 700;
-}
-
-/* ------------------------------------------------------------- the day strip */
-
-.dayStrip {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
-  margin-block-end: 16px;
-}
-
-.day {
-  font: inherit;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  min-height: 62px;
-  padding: 8px 0;
-  border: 1px solid var(--bc-color-border);
-  border-radius: var(--bc-radius-control);
-  background: var(--bc-color-surface);
-  color: var(--bc-color-text);
-  cursor: pointer;
-}
-
-.dayChosen {
-  border-color: transparent;
-  background: var(--bc-color-primary);
-  color: var(--bc-color-surface);
-}
-
-.dayWeekday {
-  font-size: var(--bc-text-badge-size);
-  color: var(--bc-color-text-faint);
-}
-
-.dayChosen .dayWeekday,
-.dayChosen .dayCount {
-  color: inherit;
-  opacity: 0.85;
-}
-
-.dayNumber {
-  font-size: 18px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
-.dayCount {
-  font-size: 11px;
-  color: var(--bc-color-success);
-}
-
-/* -------------------------------------------------------------- slot grid */
-
-.slotGrid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
-
-.slot {
-  font: inherit;
-  min-height: 46px;
-  border: 1px solid var(--bc-color-border);
-  border-radius: var(--bc-radius-control);
-  background: var(--bc-color-surface);
-  color: var(--bc-color-text);
-  font-size: 16px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  cursor: pointer;
-  /* A time reads left-to-right inside an RTL line, or ۱۲:۰۰ inverts. */
-  direction: ltr;
-  unicode-bidi: isolate;
-}
-
-.slot:hover {
-  border-color: var(--bc-color-primary);
-  color: var(--bc-color-primary);
-}
-
-.slotChosen {
-  border-color: transparent;
-  background: var(--bc-color-primary);
-  color: var(--bc-color-surface);
-  font-weight: 700;
-}
-
-.slotChosen:hover {
-  background: var(--bc-color-primary-hover);
-  color: var(--bc-color-surface);
 }
 
 /* ------------------------------------------------------------- the summary */
