@@ -6,7 +6,7 @@ import { formatFullJalaliDate, formatIranianPhone, formatToman, toPersianDigits 
 import { useAuth } from '@/lib/auth-context';
 import { ProtectedRoute } from '@/components/protected-route';
 import { ErrorState, LoadingState } from '@/components/ui';
-import { ProgressBar } from '@/components/kit';
+import { LoyaltyCard } from '@/components/loyalty-card';
 import { bookingApi, isUpcomingBooking, slotTimeLabel, type BookingSummary, type ProviderSummary } from '@/lib/booking-api';
 import {
   journeyGoals,
@@ -310,49 +310,7 @@ function DashboardContent() {
         </div>
 
         <aside className={styles.sidebar}>
-          {loyalty ? (
-            <div className={styles.loyalty} data-testid="loyalty-card">
-              <div className={styles.loyaltyHead}>
-                <span className={styles.loyaltyLabel}>باشگاه مشتریان</span>
-                {loyalty.tier ? <span className={styles.tierChip}>{loyalty.tier.name}</span> : null}
-              </div>
-              <div className={styles.balanceRow}>
-                <span className={styles.balance}>{toPersianDigits(loyalty.balance)}</span>
-                <span className={styles.balanceUnit}>امتیاز قابل استفاده</span>
-              </div>
-              <div className={styles.lifetime}>مجموع کسب‌شده: {toPersianDigits(loyalty.lifetimeEarned)}</div>
-
-              {loyalty.nextTier && loyalty.pointsToNextTier !== null && loyalty.percentToNextTier !== null ? (
-                <>
-                  <div className={styles.progressLabel}>
-                    <span>
-                      {toPersianDigits(loyalty.pointsToNextTier)} امتیاز تا {loyalty.nextTier.name}
-                    </span>
-                    <span>{toPersianDigits(loyalty.percentToNextTier)}٪</span>
-                  </div>
-                  <div className={styles.progressWrap}>
-                    <ProgressBar
-                      tone="onDark"
-                      value={loyalty.percentToNextTier}
-                      label={`پیشرفت تا ${loyalty.nextTier.name}`}
-                    />
-                  </div>
-                </>
-              ) : null}
-
-              {loyalty.benefits.length > 0 ? (
-                <div className={styles.benefits}>
-                  <div className={styles.benefitsTitle}>مزایای فعال شما</div>
-                  {loyalty.benefits.map((benefit) => (
-                    <div key={benefit.type} className={styles.benefit}>
-                      <span className={styles.benefitDot} aria-hidden="true" />
-                      {benefit.label}
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
+          {loyalty ? <LoyaltyCard summary={loyalty} /> : null}
 
           <div className={styles.card}>
             <div className={styles.cardHead}>

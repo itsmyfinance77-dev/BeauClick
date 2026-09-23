@@ -5,7 +5,8 @@ import { formatFullJalaliDate, toPersianDigits } from '@beauclick/persian-utils'
 import { useAuth } from '@/lib/auth-context';
 import { ProtectedRoute } from '@/components/protected-route';
 import { Alert, Button, ErrorState, LoadingState } from '@/components/ui';
-import { Badge, PageHeader, ProgressBar } from '@/components/kit';
+import { Badge, PageHeader } from '@/components/kit';
+import { LoyaltySummaryPanel } from '@/components/loyalty-card';
 import { loyaltyReasonLabel } from '@/lib/loyalty-reasons';
 import { loyaltyHistory, loyaltySummary, type LoyaltyHistoryEntry, type LoyaltySummary } from '@/lib/phase3-api';
 import styles from './loyalty.module.css';
@@ -85,39 +86,7 @@ function Loyalty() {
 
       <div className={styles.columns}>
         <div className={styles.stack}>
-          <div className={styles.panel} data-testid="loyalty-summary">
-            <div className={styles.figures}>
-              <div>
-                <p className={styles.figureLabel}>امتیاز قابل استفاده</p>
-                <p className={styles.figure}>{toPersianDigits(summary.balance)}</p>
-              </div>
-              <div>
-                {/* Two different numbers, shown side by side deliberately: spending
-                    points reduces the balance but never the lifetime total, which
-                    is what tier qualification uses. */}
-                <p className={styles.figureLabel}>مجموع امتیاز کسب‌شده</p>
-                <p className={styles.figure}>{toPersianDigits(summary.lifetimeEarned)}</p>
-              </div>
-            </div>
-
-            {summary.tier && (
-              <p className={styles.tier}>
-                سطح فعلی شما: <strong>{summary.tier.name}</strong>
-              </p>
-            )}
-
-            {summary.nextTier && summary.pointsToNextTier !== null && (
-              <div className={styles.progress}>
-                <p className={styles.progressText}>
-                  <span>
-                    {toPersianDigits(summary.pointsToNextTier)} امتیاز تا سطح {summary.nextTier.name}
-                  </span>
-                  <span>{toPersianDigits(Math.round(summary.percentToNextTier ?? 0))}٪</span>
-                </p>
-                <ProgressBar value={summary.percentToNextTier ?? 0} label={`پیشرفت تا سطح ${summary.nextTier.name}`} />
-              </div>
-            )}
-          </div>
+          <LoyaltySummaryPanel summary={summary} />
 
           {summary.membership && (
             <div className={styles.panel}>

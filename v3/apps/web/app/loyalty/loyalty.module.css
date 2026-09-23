@@ -46,45 +46,6 @@
   font-weight: 800;
 }
 
-/* ------------------------------------------------------------ level card */
-
-.figures {
-  display: flex;
-  gap: 24px;
-  flex-wrap: wrap;
-}
-
-.figureLabel {
-  margin: 0;
-  font-size: 13px;
-  color: var(--bc-color-text-muted);
-}
-
-.figure {
-  margin: 4px 0 0;
-  font-size: 28px;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-}
-
-.tier {
-  margin: 16px 0 0;
-  font-size: 15px;
-}
-
-.progress {
-  margin-block-start: 12px;
-}
-
-.progressText {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 0 0 8px;
-  font-size: 14px;
-  font-variant-numeric: tabular-nums;
-}
-
 .benefits {
   margin: 0;
   padding-inline-start: 20px;
