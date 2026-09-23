@@ -486,11 +486,11 @@ export function FinanceWorkspaceSurface() {
                           <p id={`ledger-heading-${order.orderId}`} className={styles.ledgerCaption}>
                             ریز تراکنش سفارش
                           </p>
-                          <DataTable head={['ردیف', 'مبلغ', 'نرخ']} aria-labelledby={`ledger-heading-${order.orderId}`}>
+                          <DataTable head={['ردیف', 'مبلغ (تومان)', 'نرخ']} aria-labelledby={`ledger-heading-${order.orderId}`}>
                             {ledger.map((entry) => (
                               <DataRow key={entry.id}>
                                 <DataCell label="ردیف">{ledgerEntryLabel(entry.entryType)}</DataCell>
-                                <DataCell label="مبلغ">
+                                <DataCell label="مبلغ (تومان)">
                                   <PriceDisplay amount={entry.amountToman} />
                                 </DataCell>
                                 <DataCell label="نرخ">
