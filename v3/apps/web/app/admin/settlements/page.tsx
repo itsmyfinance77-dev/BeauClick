@@ -38,8 +38,8 @@ interface LookedUpParty {
   id: string;
 }
 
-// the header is not rendered below 640px (the card layout prints each cell's data-label instead), so the DataCell labels must carry the unit too — do not tidy them back to a bare «مبلغ» (#287).
 const ORDERS_HEADING_ID = 'settlement-orders-heading';
+// the header is not rendered below 640px (the card layout prints each cell's data-label instead), so the DataCell labels must carry the unit too — do not tidy them back to a bare «مبلغ» (#287).
 const ORDERS_HEAD = ['انتخاب', 'شمارهٔ سفارش', 'مبلغ در انتظار (تومان)'] as const;
 const SUMMARY_DESCRIPTION_ID = 'settlement-confirm-summary';
 
