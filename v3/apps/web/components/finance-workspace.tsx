@@ -33,6 +33,7 @@ import {
 import styles from './finance-workspace.module.css';
 
 const SETTLEMENTS_HEADING_ID = 'finance-settlements-heading';
+// the header is not rendered below 640px (the card layout prints each cell's data-label instead), so the DataCell labels must carry the unit too — do not tidy them back to a bare «مبلغ» (#287).
 const SETTLEMENT_HEAD = ['تاریخ', 'مبلغ (تومان)', 'روش', 'نوع'] as const;
 
 /**
@@ -459,55 +460,55 @@ export function FinanceWorkspaceSurface() {
             <EmptyState message="سفارشی در انتظار تسویه ندارید." />
           ) : (
             <>
-            <MoneyUnitNote />
-            <ul className={styles.orders}>
-              {orders.map((order) => (
-                <li key={order.orderId} className={`${styles.panel} ${styles.order}`} data-order={order.orderId}>
-                  <div className={styles.orderText}>
-                    <p className={styles.orderAmount}><PriceDisplay amount={order.outstandingToman} /></p>
-                    <p className={styles.orderRef}>
-                      سفارش <span className={styles.ref}>{order.orderId.slice(0, 8)}</span>
-                    </p>
-                  </div>
-                  <Button type="button" variant="ghost" inline onClick={() => void toggleLedger(order.orderId)}>
-                    {ledgerFor === order.orderId ? 'بستن ریز تراکنش' : 'ریز تراکنش'}
-                  </Button>
-
-                  {ledgerFor === order.orderId ? (
-                    <div className={styles.ledger}>
-                      {ledgerLoading ? (
-                        <LoadingState label="در حال بارگذاری ریز تراکنش…" lines={2} />
-                      ) : ledgerError ? (
-                        <ErrorState message={ledgerError} onRetry={() => void toggleLedger(order.orderId)} />
-                      ) : ledger.length === 0 ? (
-                        <p className={styles.ledgerEmpty}>تراکنشی برای این سفارش ثبت نشده است.</p>
-                      ) : (
-                        <>
-                          <p id={`ledger-heading-${order.orderId}`} className={styles.ledgerCaption}>
-                            ریز تراکنش سفارش
-                          </p>
-                          <DataTable head={['ردیف', 'مبلغ (تومان)', 'نرخ']} aria-labelledby={`ledger-heading-${order.orderId}`}>
-                            {ledger.map((entry) => (
-                              <DataRow key={entry.id}>
-                                <DataCell label="ردیف">{ledgerEntryLabel(entry.entryType)}</DataCell>
-                                <DataCell label="مبلغ (تومان)">
-                                  <PriceDisplay amount={entry.amountToman} />
-                                </DataCell>
-                                <DataCell label="نرخ">
-                                  <span className={styles.ledgerRate}>
-                                    {toPersianDigits((entry.commissionRateBp / 100).toFixed(1))}٪
-                                  </span>
-                                </DataCell>
-                              </DataRow>
-                            ))}
-                          </DataTable>
-                        </>
-                      )}
+              <MoneyUnitNote />
+              <ul className={styles.orders}>
+                {orders.map((order) => (
+                  <li key={order.orderId} className={`${styles.panel} ${styles.order}`} data-order={order.orderId}>
+                    <div className={styles.orderText}>
+                      <p className={styles.orderAmount}><PriceDisplay amount={order.outstandingToman} /></p>
+                      <p className={styles.orderRef}>
+                        سفارش <span className={styles.ref}>{order.orderId.slice(0, 8)}</span>
+                      </p>
                     </div>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
+                    <Button type="button" variant="ghost" inline onClick={() => void toggleLedger(order.orderId)}>
+                      {ledgerFor === order.orderId ? 'بستن ریز تراکنش' : 'ریز تراکنش'}
+                    </Button>
+
+                    {ledgerFor === order.orderId ? (
+                      <div className={styles.ledger}>
+                        {ledgerLoading ? (
+                          <LoadingState label="در حال بارگذاری ریز تراکنش…" lines={2} />
+                        ) : ledgerError ? (
+                          <ErrorState message={ledgerError} onRetry={() => void toggleLedger(order.orderId)} />
+                        ) : ledger.length === 0 ? (
+                          <p className={styles.ledgerEmpty}>تراکنشی برای این سفارش ثبت نشده است.</p>
+                        ) : (
+                          <>
+                            <p id={`ledger-heading-${order.orderId}`} className={styles.ledgerCaption}>
+                              ریز تراکنش سفارش
+                            </p>
+                            <DataTable head={['ردیف', 'مبلغ (تومان)', 'نرخ']} aria-labelledby={`ledger-heading-${order.orderId}`}>
+                              {ledger.map((entry) => (
+                                <DataRow key={entry.id}>
+                                  <DataCell label="ردیف">{ledgerEntryLabel(entry.entryType)}</DataCell>
+                                  <DataCell label="مبلغ (تومان)">
+                                    <PriceDisplay amount={entry.amountToman} />
+                                  </DataCell>
+                                  <DataCell label="نرخ">
+                                    <span className={styles.ledgerRate}>
+                                      {toPersianDigits((entry.commissionRateBp / 100).toFixed(1))}٪
+                                    </span>
+                                  </DataCell>
+                                </DataRow>
+                              ))}
+                            </DataTable>
+                          </>
+                        )}
+                      </div>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
             </>
           )}
 

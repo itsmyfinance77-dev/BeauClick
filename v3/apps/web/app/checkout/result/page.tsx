@@ -392,6 +392,7 @@ function ResultContent() {
             رسید
           </h2>
 
+          {/* the header is not rendered below 640px (the card layout prints each cell's data-label instead), so the DataCell labels must carry the unit too — do not tidy them back to a bare «مبلغ» (#287). */}
           <DataTable head={['ردیف', 'مبلغ (تومان)']} aria-labelledby="checkout-receipt-heading">
             {order.items.map((item) => (
               <DataRow key={item.id}>

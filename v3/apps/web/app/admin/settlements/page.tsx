@@ -38,6 +38,7 @@ interface LookedUpParty {
   id: string;
 }
 
+// the header is not rendered below 640px (the card layout prints each cell's data-label instead), so the DataCell labels must carry the unit too — do not tidy them back to a bare «مبلغ» (#287).
 const ORDERS_HEADING_ID = 'settlement-orders-heading';
 const ORDERS_HEAD = ['انتخاب', 'شمارهٔ سفارش', 'مبلغ در انتظار (تومان)'] as const;
 const SUMMARY_DESCRIPTION_ID = 'settlement-confirm-summary';
@@ -201,11 +202,11 @@ export default function AdminSettlementsPage() {
       ) : totals ? (
         <>
           <MoneyUnitNote />
-        <StatGrid>
-          <StatCard label="کارمزد پلتفرم" value={<PriceDisplay amount={totals.commissionToman} />} />
-          <StatCard label="سهم فروشندگان" value={<PriceDisplay amount={totals.receivableToman} />} />
-          <StatCard label="سفارش‌های پرداخت‌شده" value={toPersianDigits(totals.orderCount)} />
-        </StatGrid>
+          <StatGrid>
+            <StatCard label="کارمزد پلتفرم" value={<PriceDisplay amount={totals.commissionToman} />} />
+            <StatCard label="سهم فروشندگان" value={<PriceDisplay amount={totals.receivableToman} />} />
+            <StatCard label="سفارش‌های پرداخت‌شده" value={toPersianDigits(totals.orderCount)} />
+          </StatGrid>
         </>
       ) : null}
 
