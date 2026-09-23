@@ -112,7 +112,7 @@ describeOs('search relevance against REAL OpenSearch', () => {
       cityId: shiraz,
       cityName: 'شیراز',
       specialtyIds: [makeupSpecialty],
-      specialtyNames: ['پوست و مو'],
+      specialtyNames: ['میکاپ'],
       verificationStatus: 'verified',
       isDeleted: false,
       updatedAt: new Date(),
@@ -157,7 +157,7 @@ describeOs('search relevance against REAL OpenSearch', () => {
     expect(res.body.data.degraded).toBe(false);
     return res.body.data as {
       items: Array<{ id: string; displayName: string }>;
-      facets: Record<string, Array<{ key: string; count: number }>>;
+      facets: Record<string, Array<{ key: string; label: string | null; count: number }>>;
       pagination: { total: number };
     };
   };
@@ -336,8 +336,14 @@ describeOs('search relevance against REAL OpenSearch', () => {
       expect(cities['تهران']).toBe(3);
       expect(cities['شیراز']).toBe(1);
 
-      const specialties = Object.fromEntries(result.facets.specialties.map((b) => [b.key, b.count]));
-      expect(specialties['میکاپ']).toBe(2);
+      expect(result.facets.specialties).toContainEqual({
+        key: makeupSpecialty,
+        label: 'میکاپ',
+        count: 2,
+      });
+
+      const filtered = await search({ specialtyIds: makeupSpecialty });
+      expect(idsOf(filtered).sort()).toEqual([ids.kimia, ids.roya, ids.unverified].sort());
     });
 
     it('returns verification counts', async () => {
