@@ -305,6 +305,109 @@ describeIfPg('Booking lifecycle, idempotency and authorization on real PostgreSQ
     });
   });
 
+  /*
+   * #225. The customer dashboard shows what was actually paid on the upcoming
+   * booking. Nothing holding a booking could reach its order, so the card
+   * rendered no amount rather than a guessed one.
+   *
+   * The order id is DERIVED, not stored: `commerce.orders` already carries
+   * `source_type = 'booking'` with `source_id = <bookingId>` under a unique
+   * index, so no column was added to a booking and no backfill exists.
+   */
+  describe('the order a booking produced (#225)', () => {
+    it('names the order on the customer list, and it is the order checkout created', async () => {
+      const { customer, professional, slotId } = await scenario();
+      const result = await checkout.checkout({
+        customerId: customer.id,
+        professionalId: professional.id,
+        slotId,
+        serviceId: professional.serviceId,
+        callbackBaseUrl: 'http://x/cb',
+      });
+
+      const listed = await request(app.getHttpServer())
+        .get('/api/v1/me/bookings')
+        .set('Authorization', `Bearer ${customer.accessToken}`)
+        .expect(200);
+
+      const row = listed.body.data.find((b: { id: string }) => b.id === result.bookingId);
+      expect(row.orderId).toBe(result.order.order.id);
+    });
+
+    it('answers null for a booking that produced no order, rather than omitting the field', async () => {
+      const { customer, professional, slotId } = await scenario();
+      const booking = await bookings.create({
+        customerId: customer.id,
+        professionalId: professional.id,
+        slotId,
+        serviceId: professional.serviceId,
+      });
+
+      const listed = await request(app.getHttpServer())
+        .get('/api/v1/me/bookings')
+        .set('Authorization', `Bearer ${customer.accessToken}`)
+        .expect(200);
+
+      const row = listed.body.data.find((b: { id: string }) => b.id === booking.id);
+      // A held booking predates its order; the receipt surface reads this as
+      // "nothing to show" rather than as a failure.
+      expect(row).toHaveProperty('orderId');
+      expect(row.orderId).toBeNull();
+    });
+
+    it('gives the reference to the customer and NOT to the professional', async () => {
+      const { customer, professional, slotId, owner } = await scenario();
+      const result = await checkout.checkout({
+        customerId: customer.id,
+        professionalId: professional.id,
+        slotId,
+        serviceId: professional.serviceId,
+        callbackBaseUrl: 'http://x/cb',
+      });
+
+      const asCustomer = await request(app.getHttpServer())
+        .get(`/api/v1/bookings/${result.bookingId}`)
+        .set('Authorization', `Bearer ${customer.accessToken}`)
+        .expect(200);
+      expect(asCustomer.body.data.orderId).toBe(result.order.order.id);
+
+      const asProfessional = await request(app.getHttpServer())
+        .get(`/api/v1/bookings/${result.bookingId}`)
+        .set('Authorization', `Bearer ${owner.accessToken}`)
+        .expect(200);
+      // Not withheld out of caution: `OrderOwnerResolver` resolves an order to
+      // its CUSTOMER, so `GET /v1/orders/:id` would answer 404 to this caller.
+      // The professional keeps the field that is theirs.
+      expect(asProfessional.body.data).not.toHaveProperty('orderId');
+      expect(asProfessional.body.data).toHaveProperty('customerDisplayName');
+    });
+
+    it('adds no monetary field to the booking shape, which the order owns', async () => {
+      const { customer, professional, slotId } = await scenario(345_000);
+      await checkout.checkout({
+        customerId: customer.id,
+        professionalId: professional.id,
+        slotId,
+        serviceId: professional.serviceId,
+        callbackBaseUrl: 'http://x/cb',
+      });
+
+      const listed = await request(app.getHttpServer())
+        .get('/api/v1/me/bookings')
+        .set('Authorization', `Bearer ${customer.accessToken}`)
+        .expect(200);
+
+      // #225 is explicit that the order owns every figure: two copies of an
+      // amount is how two of them end up disagreeing. The price is genuinely
+      // 345,000 on the order, so its absence here is a decision.
+      const serialised = JSON.stringify(listed.body.data);
+      expect(serialised).not.toContain('345000');
+      expect(serialised).not.toContain('Toman');
+      expect(serialised).not.toContain('amount');
+      expect(serialised).not.toContain('total');
+    });
+  });
+
   describe('order creation and pricing integrity', () => {
     it('prices the order from the catalogue, never from the client', async () => {
       const { customer, professional, slotId } = await scenario(345_000);

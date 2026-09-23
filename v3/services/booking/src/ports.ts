@@ -38,6 +38,33 @@ export interface CustomerDisplayNameDirectory {
 export const CUSTOMER_DISPLAY_NAME_DIRECTORY = Symbol('BEAUCLICK_CUSTOMER_DISPLAY_NAME_DIRECTORY');
 
 /**
+ * The order a booking produced, which commerce owns and booking must not read
+ * directly (ADR-011, the same rule as the two directories above).
+ *
+ * The link is already in the database and already unique: `commerce.orders`
+ * carries `source_type = 'booking'` with `source_id = <bookingId>` under
+ * `UNIQUE(source_type, source_id)`, which the migration calls the structural
+ * fix for GAP-03. So this port DERIVES a fact the schema guarantees rather
+ * than introducing a second place to store it -- there is no column to add to
+ * a booking and no backfill to run.
+ *
+ * ## Batch, for the same reason `CustomerDisplayNameDirectory` is
+ *
+ * The only consumer today is one card on the customer dashboard, which would
+ * be served perfectly well by a per-booking call -- and that is exactly the
+ * trap. `GET /v1/me/bookings` returns a page of bookings, so a per-row
+ * signature turns one list into one commerce query per row the first time
+ * that list wants the reference. The map omits a booking with no order rather
+ * than mapping it to null: absent and "present but null" would mean the same
+ * thing here, and one of them is cheaper to be wrong about.
+ */
+export interface OrderDirectory {
+  orderIdsFor(bookingIds: readonly string[]): Promise<ReadonlyMap<string, string>>;
+}
+
+export const ORDER_DIRECTORY = Symbol('BEAUCLICK_ORDER_DIRECTORY');
+
+/**
  * The entitlement seam a cancellation passes through -- V3.3 #58 (`#58a`),
  * ADR-046 §8, `V33-DEC-025` Ruling 8.
  *

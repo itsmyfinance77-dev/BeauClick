@@ -105,6 +105,21 @@ export interface ProfessionalBookingSummary extends BookingSummary {
   customerDisplayName: string | null;
 }
 
+/**
+ * The customer's own reads of a booking (#225).
+ *
+ * `orderId` names the order this booking produced, or is null when it produced
+ * none. It is a SEPARATE interface rather than a field on `BookingSummary`
+ * because only the customer's reads carry it: the order is readable through
+ * `GET /v1/orders/:id` only by the customer it belongs to, so putting the id on
+ * the base shape would promise the professional a read they get a 404 from.
+ * The booking itself still carries no monetary field — the amount is the
+ * order's fact, fetched from the order.
+ */
+export interface CustomerBookingSummary extends BookingSummary {
+  orderId: string | null;
+}
+
 export interface OrderAdjustment {
   ruleKey: string;
   kind: 'discount' | 'fee';
@@ -212,7 +227,7 @@ export const bookingApi = {
     idempotencyKey: string,
   ) => api.post<CheckoutResponse>('/v1/bookings', body, { 'Idempotency-Key': idempotencyKey }),
 
-  myBookings: (api: ApiClient) => api.get<BookingSummary[]>('/v1/me/bookings'),
+  myBookings: (api: ApiClient) => api.get<CustomerBookingSummary[]>('/v1/me/bookings'),
 
   getOrder: (api: ApiClient, orderId: string) => api.get<OrderDetail>(`/v1/orders/${orderId}`),
 

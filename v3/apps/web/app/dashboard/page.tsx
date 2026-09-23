@@ -8,7 +8,14 @@ import { useAuth } from '@/lib/auth-context';
 import { ProtectedRoute } from '@/components/protected-route';
 import { ErrorState, LoadingState } from '@/components/ui';
 import { LoyaltyCard } from '@/components/loyalty-card';
-import { bookingApi, isUpcomingBooking, slotTimeLabel, type BookingSummary, type ProviderSummary } from '@/lib/booking-api';
+import {
+  bookingApi,
+  isUpcomingBooking,
+  slotTimeLabel,
+  type BookingSummary,
+  type CustomerBookingSummary,
+  type ProviderSummary,
+} from '@/lib/booking-api';
 import {
   journeyGoals,
   journeyProfile,
@@ -42,11 +49,27 @@ import styles from './dashboard.module.css';
  * could not be resolved shows the service time and omits the name, rather
  * than showing an identifier or inventing a label.
  *
- * ## Two things the design shows that have no data
+ * ## The amount on the upcoming card
  *
- * The amount paid on the upcoming booking: `BookingSummary` carries no order
- * id, so there is nothing to read a total from. And «عضویت از تیر ۱۴۰۴»:
- * `/v1/me` has no `createdAt`. Neither is guessed; both are simply absent.
+ * The design shows «پرداخت‌شده ۸۰۷٬۵۰۰». Since #225 the customer's own read of
+ * a booking names the order it produced, so the figure is read from that order
+ * — `collectedTotalToman`, the server's own record of what BeauClick actually
+ * collected, never a sum computed here. One read, for the one booking the card
+ * shows, and it is allowed to fail alone like the provider names are.
+ *
+ * Its LABEL carries «تومان» and the figure does not — the unit once per block
+ * (`V3_DESIGN_SYSTEM.md` §«پول»), in the shape #287 settled on for a labelled
+ * figure. The prototype draws the label bare; #287 landed after it.
+ *
+ * It is shown only when something WAS collected. An order that is still
+ * pending, or one BeauClick collects nothing online for (`#41b`), reports zero,
+ * and «پرداخت‌شده ۰ تومان» would assert a payment that did not happen. Saying
+ * instead what is still owed would be a new line the design does not have.
+ *
+ * ## One thing the design shows that still has no data
+ *
+ * «عضویت از تیر ۱۴۰۴»: `/v1/me` has no `createdAt`. It is not guessed; it is
+ * simply absent.
  */
 
 interface MeResponse {
@@ -79,7 +102,7 @@ const STATUS_LABEL: Record<BookingSummary['status'], { label: string; tone: stri
  * order, the upcoming card showed one appointment's date beside a different
  * appointment's salon.
  */
-function visible(bookings: BookingSummary[]): { upcoming: BookingSummary | null; past: BookingSummary[] } {
+function visible<T extends BookingSummary>(bookings: T[]): { upcoming: T | null; past: T[] } {
   const upcoming = bookings.filter(isUpcomingBooking).sort((a, b) => a.startAt.localeCompare(b.startAt));
   const past = bookings.filter((b) => !isUpcomingBooking(b)).sort((a, b) => b.startAt.localeCompare(a.startAt));
   return { upcoming: upcoming[0] ?? null, past };
@@ -89,7 +112,9 @@ function DashboardContent() {
   const { api, logout } = useAuth();
 
   const [me, setMe] = useState<MeResponse | null>(null);
-  const [bookings, setBookings] = useState<BookingSummary[]>([]);
+  const [bookings, setBookings] = useState<CustomerBookingSummary[]>([]);
+  /** What the upcoming booking's order collected, or null when there is no order to read or the read failed. */
+  const [collected, setCollected] = useState<number | null>(null);
   const [providers, setProviders] = useState<Map<string, ProviderSummary>>(new Map());
   const [loyalty, setLoyalty] = useState<LoyaltySummary | null>(null);
   const [notices, setNotices] = useState<NotificationItem[]>([]);
@@ -138,10 +163,20 @@ function DashboardContent() {
       const shape = visible(mine);
       const shown = [...(shape.upcoming ? [shape.upcoming] : []), ...shape.past.slice(0, PAST_LIMIT)];
       const ids = [...new Set(shown.map((b) => b.professionalId))];
-      const resolved = await Promise.all(
-        ids.map((id) => bookingApi.getProvider(api, id).then((r) => r.data).catch(() => null)),
-      );
+      const upcomingOrderId = shape.upcoming?.orderId ?? null;
+      const [resolved, order] = await Promise.all([
+        Promise.all(ids.map((id) => bookingApi.getProvider(api, id).then((r) => r.data).catch(() => null))),
+        /*
+          Only the booking the card shows, and only when it produced an order.
+          A booking with no order asks nothing, and a failed read leaves the
+          line off rather than failing the page.
+        */
+        upcomingOrderId === null
+          ? Promise.resolve(null)
+          : bookingApi.getOrder(api, upcomingOrderId).then((r) => r.data).catch(() => null),
+      ]);
       setProviders(new Map(resolved.filter((p): p is ProviderSummary => p !== null).map((p) => [p.id, p])));
+      setCollected(order?.collectedTotalToman ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'خطایی رخ داد.');
     } finally {
@@ -204,6 +239,20 @@ function DashboardContent() {
                       {slotTimeLabel(upcoming.startAt)} تا {slotTimeLabel(upcoming.endAt)}
                     </div>
                   </div>
+                  {/*
+                    The label carries the unit and the figure does not — the unit
+                    once per block (`V3_DESIGN_SYSTEM.md` §«پول»), in the shape
+                    #287 settled for a labelled figure (`StatCard`'s «فروش ناخالص
+                    (تومان)»). Absent entirely when nothing was collected.
+                  */}
+                  {collected !== null && collected > 0 ? (
+                    <div className={styles.nextPaid} data-testid="upcoming-paid">
+                      <div className={styles.nextPaidLabel}>پرداخت‌شده (تومان)</div>
+                      <div className={styles.nextPaidValue}>
+                        <PriceDisplay amount={collected} />
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
                 <div className={styles.nextActions}>
                   <Link href="/bookings" className={styles.action}>
