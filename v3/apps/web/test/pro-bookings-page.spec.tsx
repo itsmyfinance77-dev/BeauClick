@@ -204,4 +204,44 @@ describe('the history', () => {
     expect(screen.getByText('تغییر وضعیت رزرو')).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/auto_released|something_new/);
   });
+
+  /**
+   * Regression for a bug the `BookingRow`/`AuditTrail` extraction surfaced:
+   * the error state's retry button used to call the same toggle function
+   * that opens and closes the panel. Since the panel is already open when
+   * the retry button renders, that call matched the toggle's "already open"
+   * branch and CLOSED the panel instead of retrying the fetch — no second
+   * request ever went out. Pins both halves: a second request must be made,
+   * and the panel must still be open (not fall back to "تاریخچه") when it
+   * succeeds.
+   */
+  it('retries the fetch without closing the panel, after a failed load', async () => {
+    let historyCalls = 0;
+    mockApi([booking('up', 'confirmed', 48)], {
+      '/history': () => {
+        historyCalls += 1;
+        return historyCalls === 1
+          ? Promise.reject(new TypeError('Failed to fetch'))
+          : ok([
+              { id: 'h1', event: 'auto_released', fromStatus: 'confirmed', toStatus: 'expired', actorType: 'system', reason: null, metadata: null, createdAt: new Date().toISOString() },
+            ]);
+      },
+    });
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'تاریخچه' }));
+    const retry = await screen.findByRole('button', { name: 'تلاش دوباره' });
+    expect(historyCalls).toBe(1);
+    // Still open while the first attempt is showing its error.
+    expect(screen.getByRole('button', { name: 'بستن تاریخچه' })).toBeInTheDocument();
+
+    await user.click(retry);
+
+    await waitFor(() => expect(historyCalls).toBe(2));
+    await waitFor(() => expect(screen.getByText('انقضای رزرو')).toBeInTheDocument());
+    // Still open after the retry succeeds — the buggy version closed it and
+    // this button would have reverted to "تاریخچه".
+    expect(screen.getByRole('button', { name: 'بستن تاریخچه' })).toBeInTheDocument();
+  });
 });
