@@ -1,5 +1,5 @@
 import type { ApiClient } from './api-client';
-import type { BookingSummary, ServiceOffering } from './booking-api';
+import type { BookingSummary, ProfessionalBookingSummary, ServiceOffering } from './booking-api';
 
 /**
  * The professional operating surface's API layer.
@@ -163,7 +163,7 @@ export function deleteSlot(api: ApiClient, slotId: string) {
 
 // -------------------------------------------------------------- bookings
 
-export type { BookingSummary };
+export type { BookingSummary, ProfessionalBookingSummary };
 
 export interface BookingHistoryEntry {
   id: string;
@@ -177,7 +177,7 @@ export interface BookingHistoryEntry {
 }
 
 export function listProfessionalBookings(api: ApiClient, page = 1, limit = 20) {
-  return api.get<BookingSummary[]>(`/v1/me/professional-bookings?page=${page}&limit=${limit}`);
+  return api.get<ProfessionalBookingSummary[]>(`/v1/me/professional-bookings?page=${page}&limit=${limit}`);
 }
 
 export function bookingHistory(api: ApiClient, bookingId: string) {

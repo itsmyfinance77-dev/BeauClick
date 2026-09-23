@@ -302,6 +302,10 @@
   flex-wrap: wrap;
 }
 
+.bookingDetails {
+  min-width: 0;
+}
+
 .bookingHead {
   display: flex;
   align-items: center;
@@ -312,6 +316,13 @@
 .bookingName {
   font-size: 17px;
   font-weight: 700;
+}
+
+.bookingCustomer {
+  margin-block-start: 2px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--bc-color-text);
 }
 
 .bookingMeta {

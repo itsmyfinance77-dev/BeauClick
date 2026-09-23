@@ -38,6 +38,7 @@ function booking(id: string, status: string, hours: number) {
   return {
     id,
     customerId: 'cust-abcdef12',
+    customerDisplayName: 'مریم احمدی',
     professionalId: 'prof-1',
     serviceId: null,
     slotId: `slot-${id}`,
@@ -127,6 +128,27 @@ describe('the tabs', () => {
 });
 
 describe('grouping by day', () => {
+  it('shows the customer name and never falls back to a raw identity id', async () => {
+    mockApi([booking('up', 'confirmed', 48)]);
+    renderPage();
+    await screen.findByText('مشتری: مریم احمدی');
+    const bookingRow = row('up');
+
+    expect(bookingRow).not.toBeNull();
+    expect(bookingRow?.textContent).toContain('مشتری: مریم احمدی');
+    expect(bookingRow?.textContent).not.toContain('cust-abcdef12');
+  });
+
+  it('renders a neutral fallback when the customer has no display name', async () => {
+    mockApi([{ ...booking('up', 'confirmed', 48), customerDisplayName: null }]);
+    renderPage();
+    await screen.findByText('مشتری: نام مشتری ثبت نشده');
+    const bookingRow = row('up');
+
+    expect(bookingRow?.textContent).toContain('مشتری: نام مشتری ثبت نشده');
+    expect(bookingRow?.textContent).not.toContain('cust-abcdef12');
+  });
+
   it('puts two bookings on the same platform-local day under one heading, and another day under another', async () => {
     // Two bookings an hour apart that are safely mid-day in Tehran, and one two days later.
     const noon = new Date();

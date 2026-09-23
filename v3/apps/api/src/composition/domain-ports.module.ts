@@ -5,7 +5,11 @@ import { DataSource } from 'typeorm';
 
 import { ProfessionalEntity, ProviderModule, SELLER_GOVERNANCE_INITIALIZATION, SELLER_OWNER_ROLE_GRANT, ServiceOfferingEntity } from '@beauclick/provider';
 import { IdentityModule, UserEntity } from '@beauclick/identity';
-import { BOOKING_CANCELLATION_ENTITLEMENT_HOOK, PROFESSIONAL_DIRECTORY } from '@beauclick/booking';
+import {
+  BOOKING_CANCELLATION_ENTITLEMENT_HOOK,
+  CUSTOMER_DISPLAY_NAME_DIRECTORY,
+  PROFESSIONAL_DIRECTORY,
+} from '@beauclick/booking';
 import {
   BOOKING_COLLECTION_POLICY_RESOLVER,
   BOOKING_CONFIRMATION_ENTITLEMENT_HOOK,
@@ -73,6 +77,7 @@ import {
   BookingBackedResourceAssignmentDirectory,
   PublicNameBackedFinanceWorkspaceLabels,
   IdentityAndProviderBackedStaffDisplayIdentity,
+  IdentityBackedCustomerDisplayNameDirectory,
   SellerPartyLookup,
 } from './port-adapters';
 import {
@@ -157,6 +162,7 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
   providers: [
     SellerPartyLookup,
     ProviderBackedProfessionalDirectory,
+    IdentityBackedCustomerDisplayNameDirectory,
     ProviderBackedServiceCatalog,
     CommercialPolicyBackedCollectionResolver,
     CommercialPolicyBackedCommissionTerms,
@@ -164,6 +170,7 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     ProviderBackedFinancialPartyResolver,
     OwnershipBackedSubscriberPartyResolver,
     { provide: PROFESSIONAL_DIRECTORY, useExisting: ProviderBackedProfessionalDirectory },
+    { provide: CUSTOMER_DISPLAY_NAME_DIRECTORY, useExisting: IdentityBackedCustomerDisplayNameDirectory },
     // waitlist-service's port for the identical question booking-service's
     // PROFESSIONAL_DIRECTORY already answers -- ADR-011 forbids waitlist
     // importing booking's token directly, so the SAME adapter instance is
@@ -434,6 +441,7 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
   ],
   exports: [
     PROFESSIONAL_DIRECTORY,
+    CUSTOMER_DISPLAY_NAME_DIRECTORY,
     PROFESSIONAL_OWNER_LOOKUP,
     SERVICE_CATALOG,
     BOOKING_COLLECTION_POLICY_RESOLVER,
