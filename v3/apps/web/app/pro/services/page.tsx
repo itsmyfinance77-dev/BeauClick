@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { formatToman, normalizeDigits, toPersianDigits } from '@beauclick/persian-utils';
+import { normalizeDigits, toPersianDigits } from '@beauclick/persian-utils';
+import { PriceDisplay } from '@/components/price-display';
 import { Alert, Button, ErrorState, Input, LoadingState } from '@/components/ui';
 import { ConfirmDialog, EmptyState, FormFullRow, FormGrid, PageHeader } from '@/components/kit';
 import { ProGuard } from '@/components/pro-guard';
@@ -205,7 +206,7 @@ function Services({ profile }: { profile: MyProviderProfile }) {
                 <div className={styles.serviceText}>
                   <p className={styles.serviceName}>{service.name}</p>
                   <p className={styles.serviceMeta}>
-                    {toPersianDigits(service.durationMinutes)} دقیقه — {formatToman(service.priceToman)}
+                    {toPersianDigits(service.durationMinutes)} دقیقه — <PriceDisplay amount={service.priceToman} />
                   </p>
                 </div>
                 <div className={styles.serviceActions}>

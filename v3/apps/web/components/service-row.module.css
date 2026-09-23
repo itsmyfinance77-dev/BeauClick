@@ -1,0 +1,137 @@
+/*
+ * One bookable service on a professional's profile — moved out of
+ * `provider.module.css` unchanged when the row became a component
+ * (`V3_COMPONENT_INVENTORY.md`'s `ServiceRow`).
+ *
+ * `.serviceList`, which lays the rows out, and `.note` below them stayed with
+ * the page: they describe the list, not the row.
+ */
+
+/*
+ * A whole row is the selection control, so the target is the card and not a
+ * word inside it. The chosen row carries a 2px border AND a text chip:
+ * a border alone is a colour-only signal.
+ */
+.service {
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border);
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  text-align: start;
+  font: inherit;
+  width: 100%;
+  cursor: pointer;
+  color: inherit;
+}
+
+.service:hover {
+  border-color: var(--bc-color-primary);
+}
+
+.serviceChosen {
+  border: 2px solid var(--bc-color-primary);
+  padding: 15px;
+}
+
+@media (min-width: 1024px) {
+  .service {
+    padding: 18px 20px;
+    gap: 20px;
+  }
+
+  .serviceChosen {
+    padding: 17px 19px;
+  }
+}
+
+.serviceHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.serviceName {
+  font-size: 19px;
+  font-weight: 700;
+}
+
+.chosenChip {
+  font-size: var(--bc-text-small-size);
+  font-weight: 600;
+  padding: 2px 9px;
+  border-radius: var(--bc-radius-chip);
+  background: var(--bc-color-primary-soft);
+  color: var(--bc-color-primary-on-soft);
+}
+
+.serviceMeta {
+  font-size: 15px;
+  color: var(--bc-color-text-faint);
+}
+
+/* The clickable area inside `.service`; a plain button reset so it inherits the card's own type styling. #219. */
+.serviceSelectButton {
+  font: inherit;
+  border: none;
+  background: transparent;
+  text-align: start;
+  cursor: pointer;
+  padding: 0;
+  color: inherit;
+  flex: 1;
+  min-width: 0;
+}
+
+/* `.serviceMeta` inline, i.e. the duration next to the price; stacked below the name here. #219. */
+.serviceMetaBlock {
+  display: block;
+}
+
+.servicePrice {
+  text-align: end;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.priceValue {
+  font-size: 22px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+}
+
+.priceUnit {
+  font-size: 14px;
+  color: var(--bc-color-text-muted);
+}
+
+.serviceSave {
+  font: inherit;
+  font-size: var(--bc-text-badge-size);
+  font-weight: 600;
+  min-height: 30px;
+  padding: 0 11px;
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-chip);
+  background: var(--bc-color-surface);
+  color: var(--bc-color-text-muted);
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.serviceSaveOn {
+  border-color: transparent;
+  background: var(--bc-color-primary-soft);
+  color: var(--bc-color-primary-on-soft);
+}
+

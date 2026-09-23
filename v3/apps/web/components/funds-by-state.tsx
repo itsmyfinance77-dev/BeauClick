@@ -1,6 +1,6 @@
 'use client';
 
-import { formatToman } from '@beauclick/persian-utils';
+import { PriceDisplay } from './price-display';
 import { Card } from '@/components/ui';
 import type { WorkspaceFunds } from '@/lib/pro-api';
 import styles from './funds-by-state.module.css';
@@ -84,7 +84,7 @@ function FundAmount({ field, funds }: { field: FundField; funds: WorkspaceFunds 
   return (
     <div className="bc-fund-card" data-field={field}>
       <span className={styles.fundLabel}>{LABEL[field]}</span>
-      <span className={styles.fundValue}>{formatToman(funds[field])}</span>
+      <span className={styles.fundValue}><PriceDisplay amount={funds[field]} /></span>
     </div>
   );
 }

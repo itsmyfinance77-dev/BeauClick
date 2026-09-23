@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { formatToman, toPersianDigits } from '@beauclick/persian-utils';
+import { PriceDisplay } from '@/components/price-display';
 import { Alert, Button, ErrorState, Input, LoadingState } from '@/components/ui';
 import {
   ConfirmDialog,
@@ -198,8 +199,8 @@ export default function AdminSettlementsPage() {
         <ErrorState message={loadError} onRetry={() => void load()} />
       ) : totals ? (
         <StatGrid>
-          <StatCard label="کارمزد پلتفرم" value={formatToman(totals.commissionToman)} />
-          <StatCard label="سهم فروشندگان" value={formatToman(totals.receivableToman)} />
+          <StatCard label="کارمزد پلتفرم" value={<PriceDisplay amount={totals.commissionToman} />} />
+          <StatCard label="سهم فروشندگان" value={<PriceDisplay amount={totals.receivableToman} />} />
           <StatCard label="سفارش‌های پرداخت‌شده" value={toPersianDigits(totals.orderCount)} />
         </StatGrid>
       ) : null}
@@ -240,15 +241,15 @@ export default function AdminSettlementsPage() {
               <dl className={styles.figures}>
                 <div className={`${styles.figure} ${styles.figureStrong}`}>
                   <dt>خالص قابل پرداخت</dt>
-                  <dd>{formatToman(summary.receivableNetToman)}</dd>
+                  <dd><PriceDisplay amount={summary.receivableNetToman} /></dd>
                 </div>
                 <div className={styles.figure}>
                   <dt>تسویه‌شده تاکنون</dt>
-                  <dd>{formatToman(summary.settledToman)}</dd>
+                  <dd><PriceDisplay amount={summary.settledToman} /></dd>
                 </div>
                 <div className={`${styles.figure} ${styles.figureStrong}`}>
                   <dt>در انتظار تسویه</dt>
-                  <dd>{formatToman(summary.outstandingToman)}</dd>
+                  <dd><PriceDisplay amount={summary.outstandingToman} /></dd>
                 </div>
               </dl>
             </section>
@@ -285,7 +286,7 @@ export default function AdminSettlementsPage() {
                         </span>
                       </DataCell>
                       <DataCell label="مبلغ در انتظار">
-                        <span className={styles.amount}>{formatToman(order.outstandingToman)}</span>
+                        <span className={styles.amount}><PriceDisplay amount={order.outstandingToman} /></span>
                       </DataCell>
                     </DataRow>
                   );
@@ -311,7 +312,7 @@ export default function AdminSettlementsPage() {
               />
               <Textarea label="توضیح" value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} />
               <p className={styles.total} role="status">
-                مبلغ انتخاب‌شده: <strong>{formatToman(selectedTotal)}</strong> ({toPersianDigits(selected.length)} سفارش)
+                مبلغ انتخاب‌شده: <strong><PriceDisplay amount={selectedTotal} /></strong> ({toPersianDigits(selected.length)} سفارش)
               </p>
               <Button type="button" disabled={selected.length === 0} onClick={() => setPending(true)}>
                 ثبت تسویه
@@ -332,7 +333,7 @@ export default function AdminSettlementsPage() {
         body={
           <div id={SUMMARY_DESCRIPTION_ID} className={styles.dialogBody}>
             <p className={styles.dialogText}>
-              تسویه {formatToman(selectedTotal)} برای {toPersianDigits(selected.length)} سفارشِ {looked ? partyTypeLabel(looked.type) : ''}{' '}
+              تسویه <PriceDisplay amount={selectedTotal} /> برای {toPersianDigits(selected.length)} سفارشِ {looked ? partyTypeLabel(looked.type) : ''}{' '}
               <span className={styles.partyId}>{looked?.id}</span> ثبت می‌شود.
             </p>
             <p className={styles.dialogWarning}>

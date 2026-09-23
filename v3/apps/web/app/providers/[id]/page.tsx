@@ -3,10 +3,14 @@
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { formatFullJalaliDate, formatShortDate, formatToman, toPersianDigits } from '@beauclick/persian-utils';
+import { formatFullJalaliDate, toPersianDigits } from '@beauclick/persian-utils';
 
 import { useAuth } from '@/lib/auth-context';
 import { Alert, Button, ErrorState, LoadingState } from '@/components/ui';
+import { Breadcrumb } from '@/components/breadcrumb';
+import { PriceDisplay } from '@/components/price-display';
+import { ServiceRow } from '@/components/service-row';
+import { TimeSlotPicker } from '@/components/time-slot-picker';
 import {
   bookingApi,
   groupSlotsByDay,
@@ -263,13 +267,13 @@ export default function ProviderBookingPage() {
 
   return (
     <section>
-      <nav aria-label="مسیر" className={styles.breadcrumb}>
-        <Link href="/">خانه</Link>
-        <span aria-hidden="true">/</span>
-        <Link href="/search">جست‌وجو</Link>
-        <span aria-hidden="true">/</span>
-        <span className={styles.breadcrumbCurrent}>{provider.displayName}</span>
-      </nav>
+      <Breadcrumb
+        trail={[
+          { label: 'خانه', href: '/' },
+          { label: 'جست‌وجو', href: '/search' },
+          { label: provider.displayName },
+        ]}
+      />
 
       <div className={styles.gallery} data-testid="gallery">
         <div className={styles.galleryMain}>
@@ -372,61 +376,17 @@ export default function ProviderBookingPage() {
             ) : (
               <>
                 <div className={styles.serviceList} data-testid="services">
-                  {services.map((service) => {
-                    const chosen = service.id === selectedServiceId;
-                    const savedService = service.saved ?? null;
-                    return (
-                      <div
-                        key={service.id}
-                        className={`${styles.service} ${chosen ? styles.serviceChosen : ''}`}
-                        data-service={service.id}
-                        data-chosen={chosen ? 'true' : undefined}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => setSelectedServiceId(service.id)}
-                          aria-pressed={chosen}
-                          className={styles.serviceSelectButton}
-                        >
-                          <span className={styles.serviceHead}>
-                            <span className={styles.serviceName}>{service.name}</span>
-                            {chosen ? <span className={styles.chosenChip}>انتخاب شد</span> : null}
-                          </span>
-                          <span className={`${styles.serviceMeta} ${styles.serviceMetaBlock}`}>
-                            {toPersianDigits(service.durationMinutes)} دقیقه
-                          </span>
-                        </button>
-                        <div className={styles.servicePrice}>
-                          <div>
-                            <div className={styles.priceValue}>{formatToman(service.priceToman)}</div>
-                            <div className={styles.priceUnit}>تومان</div>
-                          </div>
-                          {savedService === null ? (
-                            <Link
-                              href="/auth"
-                              className={`${styles.serviceSave} bc-tap`}
-                              aria-label={`برای ذخیرهٔ ${service.name} وارد شوید`}
-                            >
-                              ذخیره
-                            </Link>
-                          ) : (
-                            <button
-                              type="button"
-                              className={`${styles.serviceSave} ${savedService ? styles.serviceSaveOn : ''} bc-tap`}
-                              aria-pressed={savedService}
-                              disabled={savingTarget === service.id}
-                              aria-label={
-                                savedService ? `حذف ${service.name} از علاقه‌مندی‌ها` : `افزودن ${service.name} به علاقه‌مندی‌ها`
-                              }
-                              onClick={() => void toggleSaved('service', service.id, savedService)}
-                            >
-                              {savedService ? 'ذخیره‌شده' : 'ذخیره'}
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {services.map((service) => (
+                    <ServiceRow
+                      key={service.id}
+                      service={service}
+                      chosen={service.id === selectedServiceId}
+                      saved={service.saved ?? null}
+                      busy={savingTarget === service.id}
+                      onSelect={() => setSelectedServiceId(service.id)}
+                      onToggleSaved={(currentlySaved) => void toggleSaved('service', service.id, currentlySaved)}
+                    />
+                  ))}
                 </div>
                 <p className={styles.note}>
                   ذخیرهٔ هر خدمت مستقل از ذخیرهٔ خودِ متخصص است و سطر جداگانه‌ای در فهرست علاقه‌مندی‌ها می‌سازد.
@@ -481,7 +441,9 @@ export default function ProviderBookingPage() {
                 {selectedService.name} · {toPersianDigits(selectedService.durationMinutes)} دقیقه
               </div>
               <div className={styles.panelPrice}>
-                <span className={styles.panelPriceValue}>{formatToman(selectedService.priceToman)}</span>
+                <span className={styles.panelPriceValue}>
+                  <PriceDisplay amount={selectedService.priceToman} />
+                </span>
                 <span className={styles.panelPriceUnit}>تومان</span>
               </div>
             </div>
@@ -514,48 +476,17 @@ export default function ProviderBookingPage() {
               </div>
             ) : (
               <>
-                <div className={styles.dayStrip} data-testid="day-strip">
-                  {days.slice(0, 4).map((day) => {
-                    const chosen = activeDay?.dayKey === day.dayKey;
-                    const parts = formatShortDate(day.date);
-                    return (
-                      <button
-                        key={day.dayKey}
-                        type="button"
-                        className={`${styles.day} ${chosen ? styles.dayChosen : ''}`}
-                        aria-pressed={chosen}
-                        data-day={day.dayKey}
-                        onClick={() => {
-                          setSelectedDayKey(day.dayKey);
-                          setSelectedSlotId(null);
-                        }}
-                      >
-                        <span className={styles.dayWeekday}>{parts.weekday}</span>
-                        <span className={styles.dayNumber}>{parts.day}</span>
-                        {/* The count is a fact from the same response, not a promise. */}
-                        <span className={styles.dayCount}>{toPersianDigits(day.slots.length)} زمان</span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div className={styles.slotGrid} data-testid="slot-grid">
-                  {(activeDay?.slots ?? []).map((slot) => {
-                    const chosen = slot.id === selectedSlotId;
-                    return (
-                      <button
-                        key={slot.id}
-                        type="button"
-                        className={`${styles.slot} ${chosen ? styles.slotChosen : ''}`}
-                        aria-pressed={chosen}
-                        data-slot={slot.id}
-                        onClick={() => setSelectedSlotId(slot.id)}
-                      >
-                        {slotTimeLabel(slot.startAt)}
-                      </button>
-                    );
-                  })}
-                </div>
+                <TimeSlotPicker
+                  days={days}
+                  activeDay={activeDay}
+                  selectedSlotId={selectedSlotId}
+                  onSelectDay={(dayKey) => {
+                    setSelectedDayKey(dayKey);
+                    // A time from the previous day is not on the new one.
+                    setSelectedSlotId(null);
+                  }}
+                  onSelectSlot={setSelectedSlotId}
+                />
               </>
             )}
           </div>
