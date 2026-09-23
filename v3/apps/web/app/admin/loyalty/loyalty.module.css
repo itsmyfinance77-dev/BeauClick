@@ -11,34 +11,6 @@
   font-weight: 700;
 }
 
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 14px;
-}
-
-.tableCaption {
-  margin-block-end: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  text-align: start;
-}
-
-.row {
-  border-block-end: 1px solid var(--bc-color-line);
-}
-
-.rowLabel {
-  padding: 10px 0;
-  font-weight: 600;
-  text-align: start;
-}
-
-.rowValue {
-  padding: 10px 0;
-  text-align: end;
-}
-
 /* --------------------------------------------------------- tier basis card */
 
 .tierSection {

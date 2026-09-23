@@ -123,28 +123,6 @@
   font-weight: 800;
 }
 
-.receipt {
-  inline-size: 100%;
-  border-collapse: collapse;
-  font-size: 14px;
-}
-
-.receipt th,
-.receipt td {
-  padding-block: 6px;
-}
-
-.receipt th {
-  text-align: start;
-  font-weight: 400;
-}
-
-.receipt td {
-  text-align: end;
-  font-variant-numeric: tabular-nums;
-}
-
-.adjustment th,
 .adjustment td {
   color: var(--bc-color-text-muted);
 }
@@ -166,13 +144,10 @@
   border-block-start: 1px solid var(--bc-color-border);
 }
 
-.total th,
 .total td {
-  padding-block: 10px;
   font-weight: 700;
 }
 
-.refund th,
 .refund td {
   color: var(--bc-color-error);
 }
