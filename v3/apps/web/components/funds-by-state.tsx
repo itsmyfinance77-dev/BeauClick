@@ -3,6 +3,7 @@
 import { formatToman } from '@beauclick/persian-utils';
 import { Card } from '@/components/ui';
 import type { WorkspaceFunds } from '@/lib/pro-api';
+import styles from './funds-by-state.module.css';
 
 /**
  * The per-state funds section of screen 46 -- V3.3 `#43a` / #185, ADR-052 §14
@@ -82,8 +83,8 @@ const LABEL: Record<FundField, string> = {
 function FundAmount({ field, funds }: { field: FundField; funds: WorkspaceFunds }) {
   return (
     <div className="bc-fund-card" data-field={field}>
-      <span style={{ fontSize: 13.5, color: 'var(--bc-color-ink-soft)' }}>{LABEL[field]}</span>
-      <span style={{ fontSize: 20, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{formatToman(funds[field])}</span>
+      <span className={styles.fundLabel}>{LABEL[field]}</span>
+      <span className={styles.fundValue}>{formatToman(funds[field])}</span>
     </div>
   );
 }
@@ -119,64 +120,43 @@ function FundGroup({
   );
 
   const title = (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap', marginBlockEnd: note ? 6 : 10 }}>
+    <div className={`${styles.groupTitle} ${note ? styles.groupTitleWithNote : ''}`}>
       {marker ? (
         <span
           aria-hidden="true"
-          style={{
-            width: 10,
-            height: 10,
-            flexShrink: 0,
-            border: '2px solid var(--bc-color-ink-soft)',
-            borderRadius: marker === 'circle' ? '50%' : 2,
-            transform: marker === 'diamond' ? 'rotate(45deg)' : undefined,
-          }}
+          className={`${styles.marker} ${marker === 'circle' ? styles.markerCircle : styles.markerDiamond}`}
         />
       ) : null}
-      <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800 }}>{heading}</h3>
+      <h3 className={styles.groupHeading}>{heading}</h3>
     </div>
   );
 
   const body = (
     <>
       {title}
-      {note ? (
-        <p style={{ margin: '0 0 10px', fontSize: 12.5, lineHeight: 1.85, color: 'var(--bc-color-ink-soft)' }}>{note}</p>
-      ) : null}
+      {note ? <p className={styles.groupNote}>{note}</p> : null}
       {grid}
     </>
   );
 
-  if (!bounded) return <section style={{ marginBlockEnd: 16 }}>{body}</section>;
+  if (!bounded) return <section className={styles.group}>{body}</section>;
 
-  return (
-    <section
-      style={{
-        marginBlockEnd: 16,
-        padding: '16px 18px',
-        borderRadius: 'var(--bc-radius-row)',
-        border: '2px dashed var(--bc-color-ink-soft)',
-        background: 'var(--bc-color-surface-tint)',
-      }}
-    >
-      {body}
-    </section>
-  );
+  return <section className={styles.groupBounded}>{body}</section>;
 }
 
 export function FundsByState({ funds }: { funds: WorkspaceFunds }) {
   const allZero = [...SELLER_STATES, ...CUSTODY_FACTS, ...PLATFORM_FACTS].every((field) => funds[field] === 0);
 
   return (
-    <div data-testid="funds-by-state" style={{ marginBlockEnd: 20 }}>
-      <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 6px' }}>وجوه، وضعیت‌به‌وضعیت</h2>
-      <p style={{ margin: '0 0 14px', fontSize: 12.5, lineHeight: 1.85, color: 'var(--bc-color-ink-soft)' }}>
+    <div data-testid="funds-by-state" className={styles.wrapper}>
+      <h2 className={styles.heading}>وجوه، وضعیت‌به‌وضعیت</h2>
+      <p className={styles.intro}>
         این ارقام و سه رقمِ بالا <strong>به دو پرسشِ متفاوت پاسخ می‌دهند و با هم جمع نمی‌شوند</strong>. هیچ نسبتی میانشان محاسبه نمی‌شود.
       </p>
 
       {/* Not an empty state: the server answered, and the answer is zero. */}
       {allZero ? (
-        <p role="note" style={{ margin: '0 0 14px', fontSize: 12.5, lineHeight: 1.85, color: 'var(--bc-color-ink-soft)' }}>
+        <p role="note" className={styles.intro}>
           در این فضا هنوز هیچ وجهی در هیچ وضعیتی ثبت نشده است. این پاسخِ درستِ سرور است، نه خطا و نه نبودِ اطلاعات.
         </p>
       ) : null}

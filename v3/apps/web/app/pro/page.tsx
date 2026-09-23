@@ -14,7 +14,7 @@ import {
   listMyServices,
   listMySlots,
   listProfessionalBookings,
-  type BookingSummary,
+  type ProfessionalBookingSummary,
   type FinanceSummary,
   type FinanceWorkspace,
   type MySlot,
@@ -35,7 +35,7 @@ export default function ProOverviewPage() {
   const { state, profile, error, reload } = useProProfile();
   const { api } = useAuth();
 
-  const [bookings, setBookings] = useState<BookingSummary[]>([]);
+  const [bookings, setBookings] = useState<ProfessionalBookingSummary[]>([]);
   const [services, setServices] = useState<ServiceOffering[]>([]);
   const [slots, setSlots] = useState<MySlot[]>([]);
   const [finance, setFinance] = useState<FinanceSummary | null>(null);
@@ -205,7 +205,7 @@ export default function ProOverviewPage() {
       {loaded && awaitingAction.length > 0 ? (
         <div className={styles.blocker} data-testid="awaiting-action">
           <span className={styles.blockerDot} aria-hidden="true" />
-          <div style={{ flex: 1, minWidth: 0 }}>
+          <div className={styles.flexMain}>
             <div className={styles.blockerTitle}>
               {toPersianDigits(awaitingAction.length)} نوبت گذشته منتظر ثبت وضعیت است
             </div>
@@ -233,7 +233,7 @@ export default function ProOverviewPage() {
                 data-step-done={step.done ? 'true' : 'false'}
               >
                 <Badge tone={step.done ? 'success' : 'warning'}>{step.done ? 'انجام شد' : 'باقی مانده'}</Badge>
-                <span style={{ flex: 1, minWidth: 0 }}>{step.label}</span>
+                <span className={styles.flexMain}>{step.label}</span>
                 {!step.done ? <TextLink href={step.href}>انجام بده</TextLink> : null}
               </div>
             ))}
@@ -333,19 +333,16 @@ export default function ProOverviewPage() {
                       </div>
                     ) : (
                       <div className={styles.bookingRow}>
-                        <div style={{ minWidth: 0 }}>
+                        <div className={styles.minWidthMain}>
                           <div className={styles.bookingHead}>
                             <span className={styles.bookingName}>
                               {services.find((s) => s.id === entry.booking.serviceId)?.name ?? 'خدمت نامشخص'}
                             </span>
                             <span className={styles.statusChip}>تأیید شده</span>
                           </div>
-                          {/*
-                            No customer name. `BookingSummary` carries
-                            `customerId` and nothing else about them, and the
-                            design's own note calls this the single data
-                            change this screen needs.
-                          */}
+                          <div className={styles.bookingCustomer}>
+                            {entry.booking.customerDisplayName ?? 'نام مشتری ثبت نشده'}
+                          </div>
                           <div className={styles.bookingMeta}>
                             {formatZonedTime(new Date(entry.booking.startAt))} تا{' '}
                             {formatZonedTime(new Date(entry.booking.endAt))}

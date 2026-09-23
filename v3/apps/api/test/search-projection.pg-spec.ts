@@ -387,6 +387,28 @@ describePg('search projection — ordering, idempotency, recovery (real PostgreS
   });
 
   describe('search API', () => {
+    it('returns a specialty id facet key that the specialty filter accepts', async () => {
+      const id = uuidv7();
+      const specialtyId = uuidv7();
+      await indexer.applyProfessional(
+        projection(id, 1, { specialtyIds: [specialtyId], specialtyNames: ['میکاپ'] }),
+      );
+      await indexer.flushDirty();
+
+      const facets = await request(app.getHttpServer()).get('/api/v1/search/providers').expect(200);
+      expect(facets.body.data.facets.specialties).toContainEqual({
+        key: specialtyId,
+        label: 'میکاپ',
+        count: 1,
+      });
+
+      const filtered = await request(app.getHttpServer())
+        .get('/api/v1/search/providers')
+        .query({ specialtyIds: specialtyId })
+        .expect(200);
+      expect(filtered.body.data.items.map((item: { id: string }) => item.id)).toEqual([id]);
+    });
+
     it('serves results and reports when it is NOT degraded', async () => {
       const id = uuidv7();
       await indexer.applyProfessional(projection(id, 1));

@@ -96,6 +96,11 @@
   line-height: 1.45;
 }
 
+/* #219: the one section title directly followed by content with no other spacer between them. */
+.sectionTitleSpaced {
+  margin-block-end: 12px;
+}
+
 .sectionLink {
   font-size: 15px;
   font-weight: 600;
@@ -178,6 +183,12 @@
     width: 66px;
     height: 66px;
   }
+}
+
+/* #219: the text column beside `.thumb`, letting its own content wrap/ellipsis instead of pushing the row wider. */
+.nextMain {
+  flex: 1;
+  min-width: 0;
 }
 
 .nextTitle {
@@ -536,6 +547,11 @@
   margin: 0;
   font-size: var(--bc-text-card-title-size);
   font-weight: 700;
+}
+
+/* #219: the account card's title, directly followed by content with no other spacer between them. */
+.cardTitleSpaced {
+  margin-block-end: 12px;
 }
 
 .unreadCount {

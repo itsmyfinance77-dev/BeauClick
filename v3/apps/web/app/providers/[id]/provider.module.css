@@ -367,6 +367,24 @@
   color: var(--bc-color-text-faint);
 }
 
+/* The clickable area inside `.service`; a plain button reset so it inherits the card's own type styling. #219. */
+.serviceSelectButton {
+  font: inherit;
+  border: none;
+  background: transparent;
+  text-align: start;
+  cursor: pointer;
+  padding: 0;
+  color: inherit;
+  flex: 1;
+  min-width: 0;
+}
+
+/* `.serviceMeta` inline, i.e. the duration next to the price; stacked below the name here. #219. */
+.serviceMetaBlock {
+  display: block;
+}
+
 .servicePrice {
   text-align: end;
   flex-shrink: 0;
@@ -703,4 +721,9 @@
   font-size: 15px;
   color: var(--bc-color-text-muted);
   line-height: 1.8;
+}
+
+/* The no-slots note, which is followed by the waitlist join control. #219. */
+.emptyPanelSpaced {
+  margin-block-end: 12px;
 }

@@ -435,6 +435,11 @@
   line-height: 1.35;
 }
 
+/* #219: the one section title with no subtitle beneath it, so it needs the section's own bottom gap instead of the usual 4px before a subtitle. */
+.sectionTitleSpaced {
+  margin-block-end: 24px;
+}
+
 @media (min-width: 1024px) {
   .sectionTitle {
     font-size: 32px;

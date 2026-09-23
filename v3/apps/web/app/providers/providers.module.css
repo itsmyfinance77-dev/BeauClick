@@ -1,0 +1,74 @@
+/*
+ * The professional list, the entry point to the booking flow
+ * (`app/providers/page.tsx`) -- #219's inline-style migration. Nothing here
+ * changes behaviour or values; every declaration is moved verbatim from the
+ * inline `style={{}}` object it replaces.
+ */
+
+.emptyTitle {
+  font-size: 22px;
+  margin-block-end: 8px;
+}
+
+.emptyText {
+  color: var(--bc-color-ink-soft);
+}
+
+.title {
+  font-size: 24px;
+  margin-block-end: 16px;
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: var(--bc-spacing-card-gap);
+}
+
+.cardLink {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+.cardRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.providerName {
+  font-size: 18px;
+  margin-block-end: 4px;
+}
+
+.providerBio {
+  font-size: 14px;
+  color: var(--bc-color-ink-soft);
+  margin: 0;
+}
+
+.specialtyList {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--bc-spacing-chip-gap);
+}
+
+.specialtyChip {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: var(--bc-radius-pill);
+  background: var(--bc-color-surface-tint);
+  color: var(--bc-color-ink-soft);
+}
+
+.chevron {
+  color: var(--bc-color-ink-faint);
+  font-size: 20px;
+}

@@ -59,7 +59,7 @@ function response(overrides: Record<string, unknown> = {}) {
     pagination: { page: 1, pageSize: 20, total: 1, totalIsApproximate: false, totalPages: 1 },
     facets: {
       cities: [{ key: 'c1', label: 'یزد', count: 3 }],
-      specialties: [{ key: 'میکاپ عروس', label: 'میکاپ عروس', count: 2 }],
+      specialties: [{ key: 'specialty-makeup', label: 'میکاپ عروس', count: 2 }],
       verification: [{ key: 'verified', label: null, count: 2 }],
       priceRanges: [
         { key: 'under_500k', label: null, count: 0 },
@@ -192,6 +192,20 @@ describe('filter and order are different kinds of control', () => {
     await userEvent.click(within(panel).getByRole('radio', { name: /همه/ }));
     await waitFor(() => expect(lastQuery().has('minPrice')).toBe(false));
     expect(lastQuery().has('maxPrice')).toBe(false);
+  });
+
+  it('sends specialty facet keys as the ids accepted by the server filter', async () => {
+    mockApi();
+    renderSearch();
+    const panel = await screen.findByTestId('filter-panel');
+
+    const specialty = await within(panel).findByRole('checkbox', { name: /میکاپ عروس/ });
+    await userEvent.click(specialty);
+    await waitFor(() => expect(lastQuery().getAll('specialtyIds')).toEqual(['specialty-makeup']));
+    expect(specialty).toBeChecked();
+
+    await userEvent.click(specialty);
+    await waitFor(() => expect(lastQuery().has('specialtyIds')).toBe(false));
   });
 
   it('shows each band’s real count and dims a band nothing falls into', async () => {

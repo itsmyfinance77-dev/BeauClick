@@ -55,11 +55,11 @@ function facets(overrides: Record<string, unknown> = {}) {
   return {
     cities: [{ key: 'c1', label: 'یزد', count: 12 }],
     specialties: [
-      { key: 'میکاپ عروس', label: 'میکاپ عروس', count: 9 },
-      { key: 'شینیون', label: 'شینیون', count: 14 },
-      { key: 'رنگ و لایت', label: 'رنگ و لایت', count: 7 },
-      { key: 'اصلاح ابرو', label: 'اصلاح ابرو', count: 21 },
-      { key: 'کراتین', label: 'کراتین', count: 2 },
+      { key: 'specialty-makeup', label: 'میکاپ عروس', count: 9 },
+      { key: 'specialty-hair', label: 'شینیون', count: 14 },
+      { key: 'specialty-color', label: 'رنگ و لایت', count: 7 },
+      { key: 'specialty-brows', label: 'اصلاح ابرو', count: 21 },
+      { key: 'specialty-keratin', label: 'کراتین', count: 2 },
     ],
     verification: [],
     priceRanges: [],
@@ -128,9 +128,13 @@ describe('the landing page — data it has', () => {
     // Ordered by count, descending — and the fifth specialty is left out
     // rather than squeezed in.
     const names = [...grid.querySelectorAll('[data-specialty]')].map((c) => c.getAttribute('data-specialty'));
-    expect(names).toEqual(['اصلاح ابرو', 'شینیون', 'میکاپ عروس', 'رنگ و لایت']);
+    expect(names).toEqual(['specialty-brows', 'specialty-hair', 'specialty-makeup', 'specialty-color']);
     expect(grid.textContent).toContain('۲۱ متخصص');
     expect(grid.textContent).not.toContain('کراتین');
+    expect(within(grid).getByRole('link', { name: /میکاپ عروس/ })).toHaveAttribute(
+      'href',
+      '/search?specialtyIds=specialty-makeup',
+    );
   });
 
   it('renders the verified professionals with the fields the contract carries', async () => {
@@ -156,10 +160,9 @@ describe('the landing page — claims it does NOT make', () => {
     await waitFor(() => expect(grid.querySelectorAll('[data-specialty]').length).toBeGreaterThan(0));
 
     // The design's card reads «از ۸۵۰٬۰۰۰ تومان · ۹ متخصص». The price half
-    // has no data source: the specialty facet is bucketed on the specialty
-    // NAME and the search filter takes specialty IDs, so "the cheapest
-    // professional in this specialty" cannot be asked for. The count ships
-    // and the price does not.
+    // would require an additional filtered search per card (or an extended
+    // facet). This page makes neither claim implicitly. The count ships and
+    // the price does not.
     expect(grid.textContent).not.toContain('تومان');
     expect(grid.textContent).not.toContain('از ۸۵۰');
   });
@@ -298,7 +301,7 @@ describe('the landing page — where it sends people', () => {
 
     const row = await screen.findByTestId('popular-specialties');
     const first = within(row).getByRole('link', { name: 'اصلاح ابرو' });
-    expect(first).toHaveAttribute('href', `/search?q=${encodeURIComponent('اصلاح ابرو')}`);
+    expect(first).toHaveAttribute('href', '/search?specialtyIds=specialty-brows');
 
     // Labelled for what the data is. No search-volume figure exists anywhere
     // in the product, so «پرجست‌وجوترین» would be unsupported.

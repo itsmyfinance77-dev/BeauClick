@@ -386,13 +386,13 @@ export default function ProviderBookingPage() {
                           type="button"
                           onClick={() => setSelectedServiceId(service.id)}
                           aria-pressed={chosen}
-                          style={{ font: 'inherit', border: 'none', background: 'transparent', textAlign: 'start', cursor: 'pointer', padding: 0, color: 'inherit', flex: 1, minWidth: 0 }}
+                          className={styles.serviceSelectButton}
                         >
                           <span className={styles.serviceHead}>
                             <span className={styles.serviceName}>{service.name}</span>
                             {chosen ? <span className={styles.chosenChip}>انتخاب شد</span> : null}
                           </span>
-                          <span className={styles.serviceMeta} style={{ display: 'block' }}>
+                          <span className={`${styles.serviceMeta} ${styles.serviceMetaBlock}`}>
                             {toPersianDigits(service.durationMinutes)} دقیقه
                           </span>
                         </button>
@@ -496,7 +496,7 @@ export default function ProviderBookingPage() {
 
             {days.length === 0 ? (
               <div>
-                <p className={styles.emptyPanel} style={{ marginBlockEnd: 12 }}>
+                <p className={`${styles.emptyPanel} ${styles.emptyPanelSpaced}`}>
                   در حال حاضر زمان آزادی برای رزرو وجود ندارد.
                 </p>
                 {waitlistState === 'joined' ? (

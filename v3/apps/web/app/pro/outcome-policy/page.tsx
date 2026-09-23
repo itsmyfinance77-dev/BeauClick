@@ -22,6 +22,7 @@ import {
   type CurrentOutcomePolicyAssignmentV1,
   type FinanceWorkspace,
 } from '@/lib/pro-api';
+import styles from './outcome-policy.module.css';
 
 /**
  * The seller's cancellation and no-show terms — V3.3 `#42b` / #159,
@@ -235,19 +236,19 @@ export default function ProOutcomePolicyPage() {
         <LoadingState label="در حال بارگذاری فضاها…" />
       ) : workspaces.length === 0 ? (
         <Card>
-          <p style={{ margin: 0, fontSize: 14, lineHeight: 1.9 }}>هیچ فضایی که شما مالک آن باشید پیدا نشد.</p>
+          <p className={styles.simpleCardText}>هیچ فضایی که شما مالک آن باشید پیدا نشد.</p>
         </Card>
       ) : (
         <>
           {/* Never pre-selected — V33-DEC-020. */}
-          <section data-testid="workspace-chooser" style={{ marginBlockEnd: 20 }}>
-            <h2 style={{ fontSize: 15, fontWeight: 800, margin: '0 0 10px' }}>کدام فضا؟</h2>
-            <div style={{ display: 'grid', gap: 'var(--bc-spacing-card-gap)', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+          <section data-testid="workspace-chooser" className={styles.workspaceSection}>
+            <h2 className={styles.sectionTitle}>کدام فضا؟</h2>
+            <div className={styles.cardGrid}>
               {workspaces.map((workspace) => (
                 <Card key={workspace.workspaceRef}>
-                  <div data-workspace={workspace.workspaceRef} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 14, fontWeight: 700 }}>{workspace.displayLabel}</span>
+                  <div data-workspace={workspace.workspaceRef} className={styles.optionCard}>
+                    <div className={styles.optionHeader}>
+                      <span className={styles.optionName}>{workspace.displayLabel}</span>
                       <Badge>{WORKSPACE_TYPE_LABEL[workspace.workspaceType]}</Badge>
                     </div>
                     <Button
@@ -264,9 +265,7 @@ export default function ProOutcomePolicyPage() {
           </section>
 
           {!activeRef ? (
-            <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.9, color: 'var(--bc-color-ink-soft)' }}>
-              تا وقتی فضایی انتخاب نشده، شرایطی نمایش داده نمی‌شود.
-            </p>
+            <p className={styles.hintNote}>تا وقتی فضایی انتخاب نشده، شرایطی نمایش داده نمی‌شود.</p>
           ) : policiesError ? (
             <ErrorState message={policiesError} onRetry={() => void loadPolicies()} />
           ) : assignmentError ? (
@@ -282,7 +281,7 @@ export default function ProOutcomePolicyPage() {
               lie than the `items[0]` guess this branch order replaced.
             */
             <Card>
-              <p data-state="nothing-published" style={{ margin: 0, fontSize: 14, lineHeight: 1.9 }}>
+              <p data-state="nothing-published" className={styles.simpleCardText}>
                 هنوز هیچ سیاستی برای انتخاب منتشر نشده است. رزروهای شما مثل گذشته ادامه دارند.
               </p>
             </Card>
@@ -293,12 +292,12 @@ export default function ProOutcomePolicyPage() {
               workspace chooser follows, for the same reason.
             */
             <section data-testid="policy-chooser">
-              <h2 style={{ fontSize: 15, fontWeight: 800, margin: '0 0 10px' }}>کدام مجموعه شرایط؟</h2>
-              <div style={{ display: 'grid', gap: 'var(--bc-spacing-card-gap)', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+              <h2 className={styles.sectionTitle}>کدام مجموعه شرایط؟</h2>
+              <div className={styles.cardGrid}>
                 {policies!.map((option) => (
                   <Card key={option.policyKey}>
-                    <div data-policy={option.policyKey} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      <span style={{ fontSize: 14, fontWeight: 700 }}>{option.displayName}</span>
+                    <div data-policy={option.policyKey} className={styles.optionCard}>
+                      <span className={styles.optionName}>{option.displayName}</span>
                       <Button inline variant="ghost" onClick={() => setActivePolicyKey(option.policyKey)}>
                         انتخاب
                       </Button>
@@ -313,7 +312,7 @@ export default function ProOutcomePolicyPage() {
             <section data-testid="outcome-selection">
               {/* Fail-closed: a narrowed range no longer contains this selection. */}
               {assignment && !assignment.resolvable ? (
-                <div data-state="fail-closed" style={{ marginBlockEnd: 16 }}>
+                <div data-state="fail-closed" className={styles.blockGap}>
                   <Alert tone="warning">
                     انتخاب فعلی شما دیگر در میان گزینه‌های منتشرشده نیست، بنابراین رزروهای تازه تا انتخاب دوباره پذیرفته نمی‌شوند.{' '}
                     <strong>رزروهایی که تا این لحظه گرفته شده‌اند دست‌نخورده‌اند</strong> و با همان شرایطی که زیر آن گرفته شده‌اند پیش می‌روند.
@@ -323,13 +322,13 @@ export default function ProOutcomePolicyPage() {
 
               {/* Not enrolled is legitimate — no warning icon, no "incomplete setup". */}
               {!assignment ? (
-                <p data-state="not-enrolled" style={{ margin: '0 0 16px', fontSize: 13.5, lineHeight: 1.9, color: 'var(--bc-color-ink-soft)' }}>
+                <p data-state="not-enrolled" className={styles.notEnrolledNote}>
                   هنوز شرایطی انتخاب نکرده‌اید و رزروهای شما مثل گذشته ادامه دارند. انتخاب، اختیاری است.
                 </p>
               ) : null}
 
               {saved ? (
-                <div style={{ marginBlockEnd: 16 }}>
+                <div className={styles.blockGap}>
                   <Alert tone="success">انتخاب تازه ثبت شد. رزروهایی که پیش از این گرفته شده‌اند تغییری نمی‌کنند.</Alert>
                 </div>
               ) : null}
@@ -356,15 +355,15 @@ export default function ProOutcomePolicyPage() {
               {/* What the customer will be told, in shape — screen 47's copy family owns the real text. */}
               {complete ? (
                 <Card>
-                  <div data-testid="customer-consequence" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <span style={{ fontSize: 13, fontWeight: 800 }}>مشتری، پیش از تأیید رزرو، این را می‌بیند</span>
-                    <p style={{ margin: 0, fontSize: 13, lineHeight: 1.95, color: 'var(--bc-color-ink-soft)' }}>
+                  <div data-testid="customer-consequence" className={styles.consequenceStack}>
+                    <span className={styles.consequenceTitle}>مشتری، پیش از تأیید رزرو، این را می‌بیند</span>
+                    <p className={styles.consequenceText}>
                       لغو رایگان تا {toPersianDigits(draft.cutoffHours ?? 0)} ساعت پیش از نوبت. پس از آن:{' '}
                       {retentionLabel(policy.allowed.lateCancellationRetention, draft.lateCancellationRetention)}. اگر در نوبت حاضر نشود، پس از{' '}
                       {toPersianDigits(draft.noShowGraceMinutes ?? 0)} دقیقه:{' '}
                       {retentionLabel(policy.allowed.noShowRetention, draft.noShowRetention)}.
                     </p>
-                    <p style={{ margin: 0, fontSize: 12, color: 'var(--bc-color-ink-soft)' }}>
+                    <p className={styles.consequenceFootnote}>
                       متنِ دقیقی که مشتری می‌بیند را مدیر منتشر می‌کند؛ این‌جا فقط شکلِ پیامد نشان داده می‌شود.
                     </p>
                   </div>
@@ -372,18 +371,18 @@ export default function ProOutcomePolicyPage() {
               ) : null}
 
               {saveError ? (
-                <p role="alert" style={{ margin: '12px 0 0', fontSize: 13, lineHeight: 1.85, color: 'var(--bc-color-error)' }}>
+                <p role="alert" className={styles.saveError}>
                   {saveError}
                 </p>
               ) : null}
 
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBlockStart: 16 }}>
+              <div className={styles.saveActions}>
                 <Button onClick={() => void save()} loading={busy}>
                   ثبت انتخاب
                 </Button>
               </div>
 
-              <p style={{ margin: '12px 0 0', fontSize: 12.5, lineHeight: 1.9, color: 'var(--bc-color-ink-soft)' }}>
+              <p className={styles.replaceNote}>
                 انتخاب تازه، انتخاب قبلی را جایگزین می‌کند. نوبت‌هایی که تا این لحظه گرفته شده‌اند با همان شرایطی که زیر آن گرفته شده‌اند پیش می‌روند.
               </p>
             </section>

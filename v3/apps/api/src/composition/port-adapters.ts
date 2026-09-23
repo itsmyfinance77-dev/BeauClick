@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, IsNull, Repository } from 'typeorm';
 
 import { CityEntity, ProfessionalEntity, SellerOwnerRoleGrantPort, ServiceOfferingEntity } from '@beauclick/provider';
-import { ProfessionalDirectory } from '@beauclick/booking';
+import { CustomerDisplayNameDirectory, ProfessionalDirectory } from '@beauclick/booking';
 import {
   BookingCollectionPolicyResolver,
   BookingOutcomePolicyResolver,
@@ -80,6 +80,21 @@ export class ProviderBackedProfessionalDirectory implements ProfessionalDirector
       select: { id: true, ownerId: true },
     });
     return professional?.id ?? null;
+  }
+}
+
+@Injectable()
+export class IdentityBackedCustomerDisplayNameDirectory implements CustomerDisplayNameDirectory {
+  constructor(@InjectRepository(UserEntity) private readonly users: Repository<UserEntity>) {}
+
+  async displayNamesFor(customerIds: readonly string[]): Promise<ReadonlyMap<string, string | null>> {
+    const ids = [...new Set(customerIds)];
+    if (ids.length === 0) return new Map();
+    const users = await this.users.find({
+      where: { id: In(ids), deletedAt: IsNull() },
+      select: { id: true, displayName: true },
+    });
+    return new Map(users.map((user) => [user.id, user.displayName?.trim() || null]));
   }
 }
 

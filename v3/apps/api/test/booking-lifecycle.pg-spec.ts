@@ -410,20 +410,23 @@ describeIfPg('Booking lifecycle, idempotency and authorization on real PostgreSQ
       const { customer, professional, slotId } = await scenario();
       const booking = await bookings.create({ customerId: customer.id, professionalId: professional.id, slotId, serviceId: professional.serviceId });
 
-      await request(app.getHttpServer())
+      const res = await request(app.getHttpServer())
         .get(`/api/v1/bookings/${booking.id}`)
         .set('Authorization', `Bearer ${customer.accessToken}`)
         .expect(200);
+      expect(res.body.data).not.toHaveProperty('customerDisplayName');
     });
 
     it('lets the professional read a booking made with them', async () => {
       const { customer, owner, professional, slotId } = await scenario();
       const booking = await bookings.create({ customerId: customer.id, professionalId: professional.id, slotId, serviceId: professional.serviceId });
 
-      await request(app.getHttpServer())
+      await dataSource.query(`UPDATE identity.users SET display_name = 'مریم احمدی' WHERE id = $1`, [customer.id]);
+      const res = await request(app.getHttpServer())
         .get(`/api/v1/bookings/${booking.id}`)
         .set('Authorization', `Bearer ${owner.accessToken}`)
         .expect(200);
+      expect(res.body.data.customerDisplayName).toBe('مریم احمدی');
     });
 
     it("gives a stranger the same 404 as a nonexistent booking, leaking nothing", async () => {

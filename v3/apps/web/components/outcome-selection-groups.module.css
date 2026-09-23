@@ -1,0 +1,60 @@
+/*
+ * The four outcome-policy selection groups (`outcome-selection-groups.tsx`)
+ * -- #219's inline-style migration. Nothing here changes behaviour or
+ * values; every declaration is moved verbatim from the inline `style={{}}`
+ * object it replaces. `NumberGroup` and `RetentionGroup` share the same
+ * fieldset/legend/error styling (they always did, as identical inline
+ * objects); they now share the same classes instead of repeating them.
+ */
+
+.fieldset {
+  border: 1px solid var(--bc-color-line);
+  border-radius: var(--bc-radius-row);
+  padding: 12px 14px;
+  margin-block-end: 16px;
+}
+
+.fieldsetInvalid {
+  border-color: var(--bc-color-error);
+}
+
+.legend {
+  font-size: 13px;
+  font-weight: 800;
+  padding: 0 6px;
+}
+
+.error {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  color: var(--bc-color-error);
+}
+
+/* NumberGroup's options run inline; RetentionGroup's stack, since each retention description can run long. */
+.optionsRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.optionsColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.radioLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  min-height: 44px;
+}
+
+.radioLabelWide {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  min-height: 44px;
+}

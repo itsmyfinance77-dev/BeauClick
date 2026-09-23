@@ -24,6 +24,7 @@ import {
   rescheduleBooking,
   type BookingHistoryEntry,
   type BookingSummary,
+  type ProfessionalBookingSummary,
   type MyProviderProfile,
   type MySlot,
   type ServiceOffering,
@@ -53,7 +54,7 @@ const EMPTY: Record<Tab, string> = {
 function ProBookings({ profile }: { profile: MyProviderProfile }) {
   const { api } = useAuth();
 
-  const [bookings, setBookings] = useState<BookingSummary[]>([]);
+  const [bookings, setBookings] = useState<ProfessionalBookingSummary[]>([]);
   const [services, setServices] = useState<ServiceOffering[]>([]);
   const [loading, setLoading] = useState(true);
   const [loaded, setLoaded] = useState(false);
@@ -74,14 +75,14 @@ function ProBookings({ profile }: { profile: MyProviderProfile }) {
 
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [confirming, setConfirming] = useState<{ booking: BookingSummary; action: 'complete' | 'no_show' } | null>(null);
+  const [confirming, setConfirming] = useState<{ booking: ProfessionalBookingSummary; action: 'complete' | 'no_show' } | null>(null);
 
   const [historyFor, setHistoryFor] = useState<string | null>(null);
   const [history, setHistory] = useState<BookingHistoryEntry[]>([]);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
 
-  const [reschedulingFor, setReschedulingFor] = useState<BookingSummary | null>(null);
+  const [reschedulingFor, setReschedulingFor] = useState<ProfessionalBookingSummary | null>(null);
   const [openSlots, setOpenSlots] = useState<MySlot[]>([]);
   const [targetSlot, setTargetSlot] = useState('');
   const [slotsError, setSlotsError] = useState<string | null>(null);
@@ -155,9 +156,9 @@ function ProBookings({ profile }: { profile: MyProviderProfile }) {
 
   const { upcoming, past, cancelled } = useMemo(() => {
     const now = Date.now();
-    const up: BookingSummary[] = [];
-    const done: BookingSummary[] = [];
-    const called: BookingSummary[] = [];
+    const up: ProfessionalBookingSummary[] = [];
+    const done: ProfessionalBookingSummary[] = [];
+    const called: ProfessionalBookingSummary[] = [];
     for (const booking of bookings) {
       // A cancelled booking has its own tab (spec 05: it "has data but no
       // separate filter"). `expired` — an unpaid hold that lapsed — stays with
@@ -187,10 +188,14 @@ function ProBookings({ profile }: { profile: MyProviderProfile }) {
    * codebase's CAS discipline exists to handle correctly.
    */
   function applyServerState(updated: BookingSummary) {
-    setBookings((current) => current.map((b) => (b.id === updated.id ? updated : b)));
+    setBookings((current) =>
+      current.map((booking) =>
+        booking.id === updated.id ? { ...updated, customerDisplayName: booking.customerDisplayName } : booking,
+      ),
+    );
   }
 
-  async function runAction(booking: BookingSummary, action: 'complete' | 'no_show') {
+  async function runAction(booking: ProfessionalBookingSummary, action: 'complete' | 'no_show') {
     setBusyId(booking.id);
     setActionError(null);
     try {
@@ -214,7 +219,7 @@ function ProBookings({ profile }: { profile: MyProviderProfile }) {
     }
   }
 
-  async function openHistory(booking: BookingSummary) {
+  async function openHistory(booking: ProfessionalBookingSummary) {
     if (historyFor === booking.id) {
       setHistoryFor(null);
       return;
@@ -233,7 +238,7 @@ function ProBookings({ profile }: { profile: MyProviderProfile }) {
     }
   }
 
-  async function openReschedule(booking: BookingSummary) {
+  async function openReschedule(booking: ProfessionalBookingSummary) {
     setReschedulingFor(booking);
     setTargetSlot('');
     setSlotsError(null);
@@ -284,7 +289,7 @@ function ProBookings({ profile }: { profile: MyProviderProfile }) {
   // Grouped by the PLATFORM-local day, not the browser's, so a late-evening
   // Tehran booking is not filed under the wrong date for a viewer elsewhere.
   const days = useMemo(() => {
-    const map = new Map<string, BookingSummary[]>();
+    const map = new Map<string, ProfessionalBookingSummary[]>();
     for (const booking of visible) {
       const key = zonedIsoDate(new Date(booking.startAt));
       const list = map.get(key) ?? [];
@@ -356,14 +361,8 @@ function ProBookings({ profile }: { profile: MyProviderProfile }) {
                           {name ?? 'خدمت نامشخص'}
                           {service ? ` — ${formatToman(service.priceToman)}` : ''}
                         </p>
-                        {/* A truncated customer reference, because a raw identity
-                            id is genuinely all the booking API exposes about the
-                            customer -- no name, no phone, deliberately. Inventing
-                            a friendlier identity would mean fabricating one.
-                            Rendered LTR so the hex does not visually reverse
-                            inside the RTL document. */}
                         <p className={styles.meta}>
-                          مشتری: <span className={styles.ref}>{booking.customerId.slice(0, 8)}</span>
+                          مشتری: {booking.customerDisplayName ?? 'نام مشتری ثبت نشده'}
                         </p>
                         {booking.rescheduleCount > 0 ? (
                           <p className={styles.meta}>{toPersianDigits(booking.rescheduleCount)} بار جابه‌جا شده</p>

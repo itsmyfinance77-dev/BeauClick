@@ -186,9 +186,7 @@ function DashboardContent() {
       <div className={styles.columns}>
         <div className={styles.main}>
           <section>
-            <h2 className={styles.sectionTitle} style={{ marginBlockEnd: 12 }}>
-              نوبت پیش‌رو
-            </h2>
+            <h2 className={`${styles.sectionTitle} ${styles.sectionTitleSpaced}`}>نوبت پیش‌رو</h2>
             {upcoming ? (
               <div className={styles.next} data-testid="upcoming-booking">
                 <div className={styles.nextBar}>
@@ -199,7 +197,7 @@ function DashboardContent() {
                 </div>
                 <div className={styles.nextBody}>
                   <span className={styles.thumb} aria-hidden="true" />
-                  <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className={styles.nextMain}>
                     <div className={styles.nextTitle}>{nameOf(upcoming) ?? 'نوبت شما'}</div>
                     <div className={styles.nextTime}>
                       {slotTimeLabel(upcoming.startAt)} تا {slotTimeLabel(upcoming.endAt)}
@@ -382,9 +380,7 @@ function DashboardContent() {
           </div>
 
           <div className={styles.card}>
-            <h2 className={styles.cardTitle} style={{ marginBlockEnd: 12 }}>
-              حساب من
-            </h2>
+            <h2 className={`${styles.cardTitle} ${styles.cardTitleSpaced}`}>حساب من</h2>
             <dl className={styles.prefs}>
               <dt>شماره موبایل</dt>
               <dd className={styles.ltr}>{formatIranianPhone(me?.phone ?? '')}</dd>

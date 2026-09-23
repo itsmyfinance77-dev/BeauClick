@@ -7,7 +7,12 @@ import { BookingPartyResolver, BookingProfessionalResolver } from './booking-par
 import { BookingEntity } from '../entities/booking.entity';
 import { BookingHistoryEntity } from '../entities/booking-history.entity';
 import { CancelBookingDto, MarkNoShowDto, RescheduleBookingDto } from '../dto/booking.dto';
-import { PROFESSIONAL_DIRECTORY, ProfessionalDirectory } from '../ports';
+import {
+  CUSTOMER_DISPLAY_NAME_DIRECTORY,
+  CustomerDisplayNameDirectory,
+  PROFESSIONAL_DIRECTORY,
+  ProfessionalDirectory,
+} from '../ports';
 
 export function toBookingShape(booking: BookingEntity) {
   return {
@@ -24,6 +29,10 @@ export function toBookingShape(booking: BookingEntity) {
     cancellationReason: booking.cancellationReason,
     createdAt: booking.createdAt.toISOString(),
   };
+}
+
+export function toProfessionalBookingShape(booking: BookingEntity, customerDisplayName: string | null) {
+  return { ...toBookingShape(booking), customerDisplayName };
 }
 
 function toHistoryShape(row: BookingHistoryEntity) {
@@ -55,6 +64,7 @@ export class BookingController {
     private readonly bookings: BookingService,
     private readonly party: BookingPartyResolver,
     @Inject(PROFESSIONAL_DIRECTORY) private readonly directory: ProfessionalDirectory,
+    @Inject(CUSTOMER_DISPLAY_NAME_DIRECTORY) private readonly customerNames: CustomerDisplayNameDirectory,
   ) {}
 
   @Get('me/bookings')
@@ -70,18 +80,27 @@ export class BookingController {
   async myProfessionalBookings(
     @CurrentUser() user: AuthenticatedUser,
     @Query() query: PageQueryDto,
-  ): Promise<PaginatedResult<ReturnType<typeof toBookingShape>[]>> {
+  ): Promise<PaginatedResult<ReturnType<typeof toProfessionalBookingShape>[]>> {
     const professionalId = await this.directory.professionalIdForOwner(user.userId);
     if (!professionalId) throw new NotFoundOrNotYoursException();
     const { items, total } = await this.bookings.listForProfessional(professionalId, query.page, query.limit);
-    return { value: items.map(toBookingShape), meta: { pagination: { page: query.page, limit: query.limit, total } } };
+    const displayNames = await this.customerNames.displayNamesFor(items.map((booking) => booking.customerId));
+    return {
+      value: items.map((booking) => toProfessionalBookingShape(booking, displayNames.get(booking.customerId) ?? null)),
+      meta: { pagination: { page: query.page, limit: query.limit, total } },
+    };
   }
 
   @ResolveOwner(BookingPartyResolver)
   @Get('bookings/:id')
-  async getOne(@Param('id') id: string) {
+  async getOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     const booking = await this.bookings.findById(id);
     if (!booking) throw new NotFoundOrNotYoursException();
+    const role = await this.party.roleFor(id, user.userId);
+    if (role === 'professional') {
+      const displayNames = await this.customerNames.displayNamesFor([booking.customerId]);
+      return toProfessionalBookingShape(booking, displayNames.get(booking.customerId) ?? null);
+    }
     return toBookingShape(booking);
   }
 

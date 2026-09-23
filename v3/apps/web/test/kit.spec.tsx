@@ -38,22 +38,26 @@ beforeEach(() => {
 });
 
 /**
- * jsdom computes no layout, so a rendered height cannot be measured here. What
- * CAN be asserted is the declared style that produces it, which is exactly
- * where every one of the six historical instances went wrong -- none was a
- * layout surprise, each was a missing `minHeight`.
+ * jsdom computes no layout, so a rendered height cannot be measured here, and
+ * `kit.module.css`'s real declarations never load into it either -- CSS
+ * modules are mocked to an identity proxy (`test/style-mock.js`) that
+ * preserves class NAMES only. What CAN be asserted, and what every one of the
+ * six historical instances actually went wrong on, is that the element gets
+ * the shared class that carries both `min-height: 44px` and
+ * `display: inline-flex` together -- `min-height` alone does nothing on an
+ * inline element, which is the trap a single missing declaration falls into
+ * and a missing CLASS cannot: the two properties live in one rule
+ * (`kit.module.css` `.textLink` / `.segment`), so getting the class is
+ * getting both or neither.
  */
-function assertTouchBaseline(element: HTMLElement) {
-  expect(element).toHaveStyle({ minHeight: '44px' });
-  // `min-height` alone does nothing on an inline element, which is the trap
-  // that makes this a two-part contract rather than one property.
-  expect(element).toHaveStyle({ display: 'inline-flex' });
+function assertTouchBaseline(element: HTMLElement, className: string) {
+  expect(element).toHaveClass(className);
 }
 
 describe('TOUCH-CLASS — every interactive primitive carries the 44px baseline', () => {
   it('TextLink does, at any font size the caller picks', () => {
     render(<TextLink href="/providers">مشاهده‌ی متخصص‌ها</TextLink>);
-    assertTouchBaseline(screen.getByRole('link', { name: 'مشاهده‌ی متخصص‌ها' }));
+    assertTouchBaseline(screen.getByRole('link', { name: 'مشاهده‌ی متخصص‌ها' }), 'textLink');
   });
 
   it('SegmentedControl options do', () => {
@@ -69,13 +73,16 @@ describe('TOUCH-CLASS — every interactive primitive carries the 44px baseline'
       />,
     );
     for (const option of screen.getAllByRole('button')) {
-      expect(option).toHaveStyle({ minHeight: '44px' });
+      assertTouchBaseline(option, 'segment');
     }
   });
 
   it('Badge deliberately does NOT — a chip that cannot be tapped for anything is not a target', () => {
     render(<Badge tone="success">تأیید شده</Badge>);
-    expect(screen.getByText('تأیید شده')).not.toHaveStyle({ minHeight: '44px' });
+    // Badge's own class never carries a touch-sizing declaration, unlike
+    // TextLink's and SegmentedControl's -- the absence is structural, not a
+    // value a runtime style object happened to omit.
+    expect(screen.getByText('تأیید شده')).not.toHaveClass('textLink', 'segment');
   });
 });
 
@@ -164,8 +171,11 @@ describe('StatCard / StatGrid', () => {
     // A formatted Toman figure is a long unbroken run of Persian digits and
     // separators. Inside a 180px grid track at 375px, the eight inline versions
     // this component replaced could push their own card past its column.
+    // `overflow-wrap: anywhere` now lives in `kit.module.css`'s `.statValue`
+    // (jsdom never loads it -- CSS modules are mocked to class names only),
+    // so the class itself is the durable claim.
     render(<StatCard label="فروش ناخالص" value="۱۲۳٬۴۵۶٬۷۸۹" />);
-    expect(screen.getByText('۱۲۳٬۴۵۶٬۷۸۹')).toHaveStyle({ overflowWrap: 'anywhere' });
+    expect(screen.getByText('۱۲۳٬۴۵۶٬۷۸۹')).toHaveClass('statValue');
   });
 
   it('omits the footer row entirely when there is no footer', () => {

@@ -33,16 +33,9 @@ import styles from './search.module.css';
  * So: a filter column at 1024 and up, a bottom sheet below it, and a real
  * `<select>` for order. The shape of a control now tells you what it does.
  *
- * ## Two design claims that do not hold at this baseline
+ * ## One design claim that does not hold at this baseline
  *
- *  1. **The specialty filter cannot be wired.** The design's column has a
- *     specialty checkbox group. `facets.specialties` buckets on
- *     `specialtyNames.keyword` — so a facet key is a NAME — while the filter
- *     parameter `specialtyIds` matches `doc.specialtyIds`. There is no way to
- *     turn a facet the server returned into a filter the server accepts. The
- *     group is not rendered; a group whose boxes do nothing is worse than an
- *     absent one. Recorded as a gap.
- *  2. **`avatarUrl` and `portfolioCount` are not in the response.** The spec
+ * **`avatarUrl` and `portfolioCount` are not in the response.** The spec
  *     calls both "IMPLEMENTABLE NOW (phase C)", and `PublicProviderResult`
  *     carries neither. The card keeps the design's placeholder artwork and
  *     shows no «۳ نمونه» count.
@@ -102,10 +95,13 @@ export function SearchResults() {
     open the input is the user's, and re-seeding it from a stale URL on a
     later render would overwrite what they are typing.
   */
-  const initialQuery = useSearchParams()?.get('q')?.trim() ?? '';
+  const urlParams = useSearchParams();
+  const initialQuery = urlParams?.get('q')?.trim() ?? '';
+  const initialSpecialtyIds = urlParams?.getAll('specialtyIds').filter(Boolean) ?? [];
   const [query, setQuery] = useState(initialQuery);
   const [params, setParams] = useState<SearchParams>({
     q: initialQuery || undefined,
+    specialtyIds: initialSpecialtyIds.length > 0 ? initialSpecialtyIds : undefined,
     sort: 'relevance',
     page: 1,
   });
@@ -207,6 +203,16 @@ export function SearchResults() {
     setParams((p) => ({ ...p, minPrice: band?.minPrice, maxPrice: band?.maxPrice, page: 1 }));
   }
 
+  function toggleSpecialty(specialtyId: string) {
+    setParams((current) => {
+      const selected = new Set(current.specialtyIds ?? []);
+      if (selected.has(specialtyId)) selected.delete(specialtyId);
+      else selected.add(specialtyId);
+      const specialtyIds = Array.from(selected);
+      return { ...current, specialtyIds: specialtyIds.length > 0 ? specialtyIds : undefined, page: 1 };
+    });
+  }
+
   /**
    * Save and unsave, against the caller's own wishlist.
    *
@@ -244,6 +250,15 @@ export function SearchResults() {
 
   const band = activeBand(params);
   const activeFilters = [
+    ...(params.specialtyIds ?? []).map((specialtyId) => {
+      const facet = result?.facets.specialties.find((candidate) => candidate.key === specialtyId);
+      const label = facet?.label ?? 'تخصص انتخاب‌شده';
+      return {
+        key: `specialty:${specialtyId}`,
+        label,
+        clear: () => toggleSpecialty(specialtyId),
+      };
+    }),
     ...(params.verifiedOnly ? [{ key: 'verified', label: 'فقط تأییدشده', clear: () => setParams((p) => ({ ...p, verifiedOnly: undefined, page: 1 })) }] : []),
     ...(band ? [{ key: 'band', label: PRICE_BANDS[band].label, clear: () => setBand(null) }] : []),
     ...(params.q ? [{ key: 'q', label: `«${params.q}»`, clear: () => { setQuery(''); search(''); } }] : []),
@@ -261,7 +276,7 @@ export function SearchResults() {
           search(query);
         }}
         role="search"
-        style={{ marginBlockEnd: 16, position: 'relative', maxWidth: 560 }}
+        className={styles.searchForm}
       >
         <label htmlFor="search-q" className="bc-visually-hidden">
           نام متخصص، خدمت یا شهر
@@ -279,17 +294,7 @@ export function SearchResults() {
           aria-controls={listboxId}
           aria-autocomplete="list"
           aria-activedescendant={highlighted >= 0 ? `${listboxId}-${highlighted}` : undefined}
-          style={{
-            width: '100%',
-            font: 'inherit',
-            fontSize: 16,
-            minHeight: 48,
-            padding: '0 14px',
-            border: '1px solid var(--bc-color-border)',
-            borderRadius: 'var(--bc-radius-input)',
-            background: 'var(--bc-color-surface)',
-            color: 'var(--bc-color-text)',
-          }}
+          className={styles.searchInput}
         />
         {suggestions.length > 0 && (
           /*
@@ -298,23 +303,7 @@ export function SearchResults() {
             name becomes the button's, and the listbox stops being operable
             as a listbox. Click and keyboard both land here now.
           */
-          <ul
-            id={listboxId}
-            role="listbox"
-            aria-label="پیشنهادها"
-            style={{
-              listStyle: 'none',
-              margin: '6px 0 0',
-              padding: 6,
-              position: 'absolute',
-              insetInline: 0,
-              zIndex: 20,
-              background: 'var(--bc-color-surface)',
-              border: '1px solid var(--bc-color-border)',
-              borderRadius: 'var(--bc-radius-card)',
-              boxShadow: 'var(--bc-shadow-float)',
-            }}
-          >
+          <ul id={listboxId} role="listbox" aria-label="پیشنهادها" className={styles.suggestions}>
             {suggestions.map((text, index) => (
               <li
                 key={text}
@@ -327,15 +316,7 @@ export function SearchResults() {
                   search(text);
                 }}
                 onMouseEnter={() => setHighlighted(index)}
-                style={{
-                  padding: '10px 12px',
-                  minHeight: 44,
-                  display: 'flex',
-                  alignItems: 'center',
-                  cursor: 'pointer',
-                  borderRadius: 'var(--bc-radius-control)',
-                  background: index === highlighted ? 'var(--bc-color-surface-muted)' : 'transparent',
-                }}
+                className={`${styles.suggestion} ${index === highlighted ? styles.suggestionHighlighted : ''}`}
               >
                 {text}
               </li>
@@ -386,6 +367,24 @@ export function SearchResults() {
               {verifiedCount !== null ? <span className={styles.optionCount}>{toPersianDigits(verifiedCount)}</span> : null}
             </label>
           </fieldset>
+
+          {result && result.facets.specialties.length > 0 ? (
+            <fieldset className={styles.group}>
+              <legend className={styles.groupLegend}>تخصص</legend>
+              {result.facets.specialties.map((specialty) => (
+                <label key={specialty.key} className={styles.option} data-specialty={specialty.key}>
+                  <input
+                    type="checkbox"
+                    className={styles.checkbox}
+                    checked={params.specialtyIds?.includes(specialty.key) ?? false}
+                    onChange={() => toggleSpecialty(specialty.key)}
+                  />
+                  <span>{specialty.label ?? 'تخصص'}</span>
+                  <span className={styles.optionCount}>{toPersianDigits(specialty.count)}</span>
+                </label>
+              ))}
+            </fieldset>
+          ) : null}
 
           <fieldset className={styles.group}>
             <legend className={styles.groupLegend}>محدوده قیمت</legend>
@@ -514,9 +513,7 @@ export function SearchResults() {
           {error && !result ? <ErrorState message={error} onRetry={() => void run(params)} /> : null}
 
           {error && result && result.items.length > 0 ? (
-            <p style={{ fontSize: 13, color: 'var(--bc-color-text-faint)', marginBlockEnd: 12 }}>
-              نتایج زیر مربوط به جست‌وجوی قبلی است و ممکن است به‌روز نباشد.
-            </p>
+            <p className={styles.staleNotice}>نتایج زیر مربوط به جست‌وجوی قبلی است و ممکن است به‌روز نباشد.</p>
           ) : null}
 
           {loading && !result ? (
@@ -634,7 +631,7 @@ export function SearchResults() {
           )}
 
           {result && result.pagination.totalPages > 1 ? (
-            <nav aria-label="صفحه‌بندی" className={styles.pager} style={{ gap: 8, display: 'flex' }}>
+            <nav aria-label="صفحه‌بندی" className={styles.pager}>
               <button
                 type="button"
                 className={styles.sortSelect}
@@ -643,7 +640,7 @@ export function SearchResults() {
               >
                 قبلی
               </button>
-              <span style={{ alignSelf: 'center', fontSize: 14, fontVariantNumeric: 'tabular-nums' }}>
+              <span className={styles.pageIndicator}>
                 صفحه {toPersianDigits(result.pagination.page)} از {toPersianDigits(result.pagination.totalPages)}
               </span>
               <button

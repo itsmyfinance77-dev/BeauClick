@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { Alert, Card, LoadingState } from '@/components/ui';
 import { bookingApi, type ProviderSummary } from '@/lib/booking-api';
+import styles from './providers.module.css';
 
 /**
  * The entry point to the booking flow: the professionals a customer can
@@ -43,59 +44,36 @@ export default function ProvidersPage() {
   if (providers.length === 0) {
     return (
       <Card>
-        <h1 style={{ fontSize: 22, marginBlockEnd: 8 }}>متخصص‌ها</h1>
-        <p style={{ color: 'var(--bc-color-ink-soft)' }}>هنوز متخصصی ثبت نشده است.</p>
+        <h1 className={styles.emptyTitle}>متخصص‌ها</h1>
+        <p className={styles.emptyText}>هنوز متخصصی ثبت نشده است.</p>
       </Card>
     );
   }
 
   return (
     <section>
-      <h1 style={{ fontSize: 24, marginBlockEnd: 16 }}>متخصص‌ها</h1>
+      <h1 className={styles.title}>متخصص‌ها</h1>
 
-      <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 'var(--bc-spacing-card-gap)' }}>
+      <ul className={styles.list}>
         {providers.map((provider) => (
           <li key={provider.id}>
-            <Link
-              href={`/providers/${provider.id}`}
-              style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}
-            >
+            <Link href={`/providers/${provider.id}`} className={styles.cardLink}>
               <Card>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+                <div className={styles.cardRow}>
                   <div>
-                    <h2 style={{ fontSize: 18, marginBlockEnd: 4 }}>{provider.displayName}</h2>
-                    {provider.bio ? (
-                      <p style={{ fontSize: 14, color: 'var(--bc-color-ink-soft)', margin: 0 }}>{provider.bio}</p>
-                    ) : null}
+                    <h2 className={styles.providerName}>{provider.displayName}</h2>
+                    {provider.bio ? <p className={styles.providerBio}>{provider.bio}</p> : null}
                     {provider.specialties.length > 0 ? (
-                      <ul
-                        style={{
-                          listStyle: 'none',
-                          padding: 0,
-                          margin: '8px 0 0',
-                          display: 'flex',
-                          flexWrap: 'wrap',
-                          gap: 'var(--bc-spacing-chip-gap)',
-                        }}
-                      >
+                      <ul className={styles.specialtyList}>
                         {provider.specialties.map((s) => (
-                          <li
-                            key={s.id}
-                            style={{
-                              fontSize: 12,
-                              padding: '4px 10px',
-                              borderRadius: 'var(--bc-radius-pill)',
-                              background: 'var(--bc-color-surface-tint)',
-                              color: 'var(--bc-color-ink-soft)',
-                            }}
-                          >
+                          <li key={s.id} className={styles.specialtyChip}>
                             {s.name}
                           </li>
                         ))}
                       </ul>
                     ) : null}
                   </div>
-                  <span aria-hidden="true" style={{ color: 'var(--bc-color-ink-faint)', fontSize: 20 }}>
+                  <span aria-hidden="true" className={styles.chevron}>
                     ‹
                   </span>
                 </div>

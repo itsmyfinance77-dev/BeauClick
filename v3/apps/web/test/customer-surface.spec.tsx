@@ -133,9 +133,12 @@ describe('customer bookings', () => {
       </AuthProvider>,
     );
 
-    // Was a bare `<Link style={{ fontWeight: 600 }}>`, roughly 29px tall.
+    // Was a bare `<Link style={{ fontWeight: 600 }}>`, roughly 29px tall. Now
+    // `TextLink`'s own `kit.module.css` class carries the 44px baseline --
+    // jsdom never loads that real stylesheet (CSS modules mock to class
+    // names only), so the class itself is what a jsdom test can assert.
     const link = await screen.findByRole('link', { name: 'مشاهده‌ی متخصص‌ها' });
-    expect(link).toHaveStyle({ minHeight: '44px', display: 'inline-flex' });
+    expect(link).toHaveClass('textLink');
   });
 });
 
@@ -215,9 +218,12 @@ describe('business surface', () => {
 
     // Two bare radios in labels with no `minHeight` -- the tappable area was
     // the glyph plus a 14px line, well under the project's 44px baseline.
+    // `SegmentedControl`'s `.segment` class (`kit.module.css`) carries it now;
+    // jsdom never loads that real stylesheet, so the class is what a jsdom
+    // test can assert.
     const group = await screen.findByRole('group', { name: 'نقش' });
     for (const option of within(group).getAllByRole('button')) {
-      expect(option).toHaveStyle({ minHeight: '44px' });
+      expect(option).toHaveClass('segment');
     }
   });
 

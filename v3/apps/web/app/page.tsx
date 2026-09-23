@@ -30,11 +30,9 @@ import styles from './home.module.css';
  *
  *  1. **A starting price on each specialty card.** The design's own data note
  *     calls this "derivable from the same facets, with no new API route".
- *     Measured against the search service, it is not: `facets.specialties` is
- *     bucketed on `specialtyNames.keyword`, so a facet key is a NAME, and the
- *     filter parameter is `specialtyIds`. There is no way to ask for "the
- *     cheapest professional in this specialty" at this baseline. The card
- *     shows the count, which is real, and no price rather than a guessed one.
+ *     It would require an additional filtered read per card (or an extended
+ *     facet), which this page does not issue. The card shows the count, which
+ *     is real, and no price rather than a guessed one.
  *  2. **«پرجست‌وجوترین» as the label on the shortcut chips.** No search-volume
  *     data exists anywhere in the product. The chips are the specialties with
  *     the most professionals, and they are labelled as that.
@@ -77,6 +75,10 @@ interface HomeData {
 
 function searchHref(term: string): string {
   return `/search?q=${encodeURIComponent(term)}`;
+}
+
+function specialtyHref(id: string): string {
+  return `/search?specialtyIds=${encodeURIComponent(id)}`;
 }
 
 export default function HomePage() {
@@ -177,7 +179,7 @@ export default function HomePage() {
                 {data.specialties.map((specialty) => (
                   <Link
                     key={specialty.key}
-                    href={searchHref(specialty.label ?? specialty.key)}
+                    href={specialtyHref(specialty.key)}
                     className={styles.term}
                   >
                     {specialty.label ?? specialty.key}
@@ -241,7 +243,7 @@ export default function HomePage() {
                     return (
                       <Link
                         key={specialty.key}
-                        href={searchHref(name)}
+                        href={specialtyHref(specialty.key)}
                         className={styles.categoryCard}
                         data-specialty={specialty.key}
                       >
@@ -336,9 +338,7 @@ export default function HomePage() {
 
       <section className={styles.section}>
         <div className={styles.sectionInner}>
-          <h2 className={styles.sectionTitle} style={{ marginBlockEnd: 24 }}>
-            رزرو در سه قدم
-          </h2>
+          <h2 className={`${styles.sectionTitle} ${styles.sectionTitleSpaced}`}>رزرو در سه قدم</h2>
           <div className={styles.stepGrid}>
             {STEPS.map((step, index) => (
               <div key={step.title} className={styles.step}>

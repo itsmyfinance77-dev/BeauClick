@@ -83,10 +83,9 @@ export interface AvailableSlot {
 export interface BookingSummary {
   id: string;
   /**
-   * Present on every booking response -- `toBookingShape` has always included
-   * it -- but it was missing from this type until the professional surface
-   * needed it. A raw identity id is the ONLY thing the booking API exposes
-   * about the customer: no name, no phone, by design.
+   * Present on every booking response. The customer-facing base shape keeps
+   * identity display fields out; `ProfessionalBookingSummary` below adds only
+   * the display name for the professional operating surface.
    */
   customerId: string;
   professionalId: string;
@@ -99,6 +98,11 @@ export interface BookingSummary {
   rescheduleCount: number;
   cancellationReason: string | null;
   createdAt: string;
+}
+
+/** The additional identity field returned only to the booking's professional. */
+export interface ProfessionalBookingSummary extends BookingSummary {
+  customerDisplayName: string | null;
 }
 
 export interface OrderAdjustment {

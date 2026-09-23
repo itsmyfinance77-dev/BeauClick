@@ -96,7 +96,7 @@ export class InMemorySearchEngine implements SearchEnginePort {
       items: sorted.slice(from, from + criteria.pageSize),
       facets: {
         cities: this.bucket(matched, (d) => (d.cityName ? [d.cityName] : [])),
-        specialties: this.bucket(matched, (d) => d.specialtyNames),
+        specialties: this.specialtyBuckets(matched),
         verification: this.bucket(matched, (d) => [d.verificationStatus]),
         priceRanges: this.bucket(matched, (d) => (d.minPriceToman === null ? [] : [this.priceBand(d.minPriceToman)])),
       },
@@ -170,6 +170,24 @@ export class InMemorySearchEngine implements SearchEnginePort {
     }
     return Array.from(counts.entries())
       .map(([key, count]) => ({ key, label: key, count }))
+      .sort((a, b) => b.count - a.count || a.key.localeCompare(b.key));
+  }
+
+  private specialtyBuckets(
+    docs: ProviderSearchDocument[],
+  ): Array<{ key: string; label: string | null; count: number }> {
+    const buckets = new Map<string, { label: string | null; count: number }>();
+    for (const doc of docs) {
+      for (const [index, key] of doc.specialtyIds.entries()) {
+        const current = buckets.get(key);
+        buckets.set(key, {
+          label: current?.label ?? doc.specialtyNames[index] ?? null,
+          count: (current?.count ?? 0) + 1,
+        });
+      }
+    }
+    return Array.from(buckets.entries())
+      .map(([key, value]) => ({ key, ...value }))
       .sort((a, b) => b.count - a.count || a.key.localeCompare(b.key));
   }
 
