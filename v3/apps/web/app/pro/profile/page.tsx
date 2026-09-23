@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Button, ErrorState, Input, LoadingState } from '@/components/ui';
 import { CheckChip, CheckChipGroup, PageHeader, Select, Textarea } from '@/components/kit';
-import { VerificationBadge } from '@/components/pro-shell';
+import { VerificationBadge } from '@/components/pro-verification';
 import { useAuth } from '@/lib/auth-context';
 import { useProProfile } from '@/lib/pro-context';
 import {

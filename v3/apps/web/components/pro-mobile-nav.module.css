@@ -1,0 +1,196 @@
+/*
+ * The professional's phone navigation — `25_MOBILE_NAVIGATION.md` and
+ * `V3_INFORMATION_ARCHITECTURE.md` §3: "موبایل: ستون به یک برگهٔ کشویی
+ * می‌رود؛ «امروز» و «رزروها» در نوارِ پایین می‌مانند."
+ *
+ * The bar itself is `mobile-tab-bar.module.css`, shared with the customer.
+ * What is here is the sheet the trigger opens, and it deliberately reuses the
+ * bottom-sheet values the search filters already established (scrim colour,
+ * z-index, the 82vh ceiling, `card-lg` on the top corners only): a second
+ * sheet that looked like a different idea would be a worse answer than one
+ * that reads as the same one.
+ *
+ * ## Why the whole column moves, not only its links
+ *
+ * The column's head carries the professional's identity and verification, and
+ * its foot the way back to the customer view. Below 640 the column is hidden
+ * outright, so the sheet has to carry all three or a phone would lose them —
+ * the architecture says the COLUMN goes to the sheet, not its link list.
+ *
+ * The 640–1024 band is untouched: there the column is still a horizontal
+ * scroller, which shows every destination at once and beats a two-item bar
+ * plus a sheet at that width. Neither document specifies that band.
+ */
+
+/*
+ * Below 640 only — and expressed as `display`, not merely as an unreachable
+ * trigger. A viewport that grows while the sheet is open (a rotation, a
+ * desktop window drag) must not strand it on screen.
+ */
+.scrim {
+  display: none;
+}
+
+@media (max-width: 639px) {
+  .scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 45;
+    background: oklch(0.22 0.02 330 / 0.38);
+  }
+}
+
+.panel {
+  position: fixed;
+  inset-inline: 0;
+  inset-block-end: 0;
+  z-index: 50;
+  max-height: 82vh;
+  overflow-y: auto;
+  background: var(--bc-color-surface);
+  border-block-start: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-card-lg) var(--bc-radius-card-lg) 0 0;
+  box-shadow: var(--bc-shadow-float);
+  padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--bc-text-card-title-size);
+  font-weight: var(--bc-text-card-title-weight);
+}
+
+/*
+ * An explicit close, because the scrim covers the trigger that opened the
+ * sheet: toggling it shut again is not reachable while the sheet is up.
+ */
+.close {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  position: relative;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  color: var(--bc-color-text-muted);
+}
+
+.close::before,
+.close::after {
+  content: '';
+  position: absolute;
+  inset-block-start: 19px;
+  inset-inline-start: 11px;
+  width: 18px;
+  border-block-start: 2px solid currentColor;
+}
+
+.close::before {
+  transform: rotate(45deg);
+}
+
+.close::after {
+  transform: rotate(-45deg);
+}
+
+/* The column head's job, in the column's absence. */
+.who {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-block-start: 12px;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--bc-color-surface-tint);
+}
+
+.avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--bc-radius-chip);
+  background: repeating-linear-gradient(
+    135deg,
+    oklch(0.963 0.012 340) 0 4px,
+    oklch(0.945 0.026 340) 4px 8px
+  );
+  flex-shrink: 0;
+}
+
+.whoText {
+  min-width: 0;
+}
+
+.whoName {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+/* The separator and its link are one list child each, not a wrapper between. */
+.item {
+  display: contents;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-block: 12px;
+}
+
+.link {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-height: 48px;
+  padding: 0 12px;
+  border-radius: var(--bc-radius-control);
+  color: var(--bc-color-text);
+  font-size: 15px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+/* The current destination is filled AND bold — not colour alone. */
+.link[aria-current='page'] {
+  background: var(--bc-color-primary);
+  color: var(--bc-color-surface);
+  font-weight: 700;
+}
+
+.separator {
+  height: 1px;
+  margin: 10px 0;
+  background: oklch(0.94 0.006 60);
+}
+
+.exit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding-block-start: 12px;
+  border-block-start: 1px solid oklch(0.94 0.006 60);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--bc-color-text-muted);
+  text-decoration: none;
+}
+
+.exitChevron {
+  width: 7px;
+  height: 7px;
+  border-block-start: 2px solid currentColor;
+  border-inline-end: 2px solid currentColor;
+  transform: rotate(45deg);
+}

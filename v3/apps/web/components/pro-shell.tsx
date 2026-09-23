@@ -3,9 +3,10 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
-import { Badge } from './kit';
 import { useProProfile } from '@/lib/pro-context';
-import type { MyProviderProfile } from '@/lib/pro-api';
+import { ProMobileNav } from './pro-mobile-nav';
+import { PRO_NAV, isCurrentProNav } from './pro-nav';
+import { VerificationBadge } from './pro-verification';
 import styles from './pro-shell.module.css';
 
 /**
@@ -31,67 +32,18 @@ import styles from './pro-shell.module.css';
  * chrome would mean a second header, a second skip-link target and a second
  * place for the notification badge to drift out of sync.
  *
- * Below 1024 the column becomes a horizontal scroller. The design puts it in
- * a drawer; a scroller keeps every destination reachable and is honest about
- * there being more, and the drawer is recorded rather than half-built.
- */
-
-/**
- * `separator: true` marks where the design's rule falls — the daily work
- * above it, the occasional destinations below.
- */
-const PRO_NAV: { href: string; label: string; separatorBefore?: boolean }[] = [
-  // Renamed per the information architecture: this page is today's work,
-  // and «نمای کلی» described a summary it is not.
-  { href: '/pro', label: 'امروز' },
-  { href: '/pro/bookings', label: 'رزروها' },
-  { href: '/pro/availability', label: 'زمان‌های آزاد' },
-  { href: '/pro/services', label: 'خدمات' },
-  { href: '/pro/finance', label: 'مالی' },
-  { href: '/pro/analytics', label: 'آمار' },
-  // V3.3 `#42b` / #159. Beside «مالی» rather than inside it: the terms
-  // decide what a cancellation COSTS, which is an operating decision the
-  // seller makes once, not a figure they read.
-  { href: '/pro/outcome-policy', label: 'شرایط لغو' },
-  { href: '/pro/profile', label: 'پروفایل عمومی', separatorBefore: true },
-  { href: '/business', label: 'کسب‌وکار' },
-];
-
-/** `/pro` matches only itself; every other destination owns its subtree. */
-function isCurrent(pathname: string, href: string): boolean {
-  return href === '/pro' ? pathname === '/pro' : pathname === href || pathname.startsWith(`${href}/`);
-}
-
-const VERIFICATION_LABELS: Record<MyProviderProfile['verificationStatus'], string> = {
-  unverified: 'تأیید نشده',
-  pending: 'در انتظار بررسی',
-  verified: 'تأیید شده',
-  rejected: 'رد شده',
-  suspended: 'معلق',
-  revoked: 'باطل شده',
-};
-
-const VERIFICATION_TONE = {
-  unverified: 'neutral',
-  pending: 'warning',
-  verified: 'success',
-  rejected: 'error',
-  suspended: 'warning',
-  revoked: 'error',
-} as const;
-
-/**
- * The professional's real verification status.
+ * ## Three widths, because a column is only right at one of them
  *
- * When Task 1 wrote this, no route anywhere in V3 moved a professional past
- * `unverified`, so the badge deliberately carried no call to action -- showing
- * a true status is correct, implying the user can act on one they cannot is
- * not. Phase A closed that gap (`R31-02`): `/pro/profile` now offers a real
- * submission and this badge tracks a status that actually moves.
+ * From 1024 up it is the column the architecture asks for. Between 640 and
+ * 1024 it is a horizontal scroller: every destination stays reachable and the
+ * row is honest about there being more. Below 640 the column is gone
+ * altogether and `ProMobileNav` takes over — §3's own instruction, "موبایل:
+ * ستون به یک برگهٔ کشویی می‌رود؛ «امروز» و «رزروها» در نوارِ پایین می‌مانند".
+ *
+ * Neither document specifies the 640–1024 band. The scroller stays there
+ * rather than being replaced by a two-destination bar and a sheet, which shows
+ * less at a width that has room for more.
  */
-export function VerificationBadge({ status }: { status: MyProviderProfile['verificationStatus'] }) {
-  return <Badge tone={VERIFICATION_TONE[status]}>{VERIFICATION_LABELS[status]}</Badge>;
-}
 
 export function ProShell({ children }: { children: ReactNode }) {
   const { profile, state } = useProProfile();
@@ -125,7 +77,7 @@ export function ProShell({ children }: { children: ReactNode }) {
               <Link
                 href={item.href}
                 className={styles.link}
-                aria-current={isCurrent(pathname, item.href) ? 'page' : undefined}
+                aria-current={isCurrentProNav(pathname, item) ? 'page' : undefined}
                 data-pro-nav={item.href}
               >
                 {item.label}
@@ -141,6 +93,10 @@ export function ProShell({ children }: { children: ReactNode }) {
       </aside>
 
       <div className={styles.content}>{children}</div>
+
+      {/* Below 640 only; the stylesheets decide, so there is no viewport
+          guess here and nothing to mismatch on hydration. */}
+      <ProMobileNav />
     </div>
   );
 }
