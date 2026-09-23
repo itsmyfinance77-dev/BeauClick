@@ -493,14 +493,3 @@
 .suggestionHighlighted {
   background: var(--bc-color-surface-muted);
 }
-
-/*
- * The mobile artboard's save control reads «ذخیره در علاقه‌مندی‌ها» in full;
- * the desktop one sits in the name row and reads «ذخیره». One control, one
- * accessible name — only the visible suffix changes.
- */
-@media (min-width: 1024px) {
-  .saveSuffix {
-    display: none;
-  }
-}
