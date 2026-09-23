@@ -258,8 +258,9 @@ describe('the mobile bar and the footer', () => {
 
   it.each(['/admin', '/admin/verification', '/pro', '/pro/bookings'])(
     // `25_MOBILE_NAVIGATION.md`: admin gets a dark horizontal scrolling bar
-    // instead of any bottom bar, and pro is meant to get its own two-tab bar.
-    // Either way the customer's five destinations are the wrong ones here.
+    // instead of any bottom bar, and pro carries its own two destinations plus
+    // a sheet (`ProMobileNav`). Either way the customer's five are the wrong
+    // ones here.
     'does not carry the customer bar on %s, which has its own nav chrome',
     async (route) => {
       pathname = route;

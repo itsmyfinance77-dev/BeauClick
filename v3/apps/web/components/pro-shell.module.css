@@ -10,10 +10,13 @@
  * The column also carries the professional's own identity and verification
  * at its head — the job `ContextBand` was doing in a worse place.
  *
- * Below 1024 the column becomes a horizontal scroller. The design puts it in
- * a drawer, and a drawer is a bigger change than this pass: a scroller keeps
- * every destination reachable and honest about there being more, and the
- * drawer is recorded rather than half-built.
+ * Between 640 and 1024 the column becomes a horizontal scroller: every
+ * destination stays reachable and the row is honest about there being more.
+ *
+ * Below 640 the column is not here at all. §3 sends it to a slide-up sheet
+ * with «امروز» and «رزروها» on a bottom bar, which is `pro-mobile-nav.tsx`
+ * and `mobile-tab-bar.tsx`; a card carrying nine links above every page would
+ * be the third answer at a width that already has one.
  */
 
 .shell {
@@ -29,6 +32,18 @@
     /* Cancels the app shell's own gutter: the column meets the header. */
     margin-inline: calc(-1 * var(--bc-spacing-gutter-customer));
     margin-block: calc(-1 * var(--bc-spacing-section-desktop));
+  }
+}
+
+/*
+ * Gone below 640 — the sheet carries this column's links, its identity head
+ * and its exit. It is hidden here rather than unmounted in the shell so that
+ * one width is one stylesheet decision, not a stylesheet and a render branch
+ * that have to agree.
+ */
+@media (max-width: 639px) {
+  .sidebar {
+    display: none;
   }
 }
 
@@ -242,6 +257,13 @@
 
 .content {
   min-width: 0;
+}
+
+/* Room for the fixed bottom bar, so the last control is never underneath it. */
+@media (max-width: 639px) {
+  .content {
+    padding-block-end: 84px;
+  }
 }
 
 @media (min-width: 1024px) {

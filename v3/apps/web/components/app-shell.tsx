@@ -8,7 +8,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useUnread } from '@/lib/unread-context';
 import { ErrorBoundary } from './error-boundary';
 import { AvatarMenu, type AvatarMenuEntry } from './avatar-menu';
-import { MobileTabBar } from './mobile-tab-bar';
+import { MobileTabBar, type MobileTab } from './mobile-tab-bar';
 import { SiteFooter } from './site-footer';
 import styles from './app-shell.module.css';
 
@@ -57,13 +57,30 @@ import styles from './app-shell.module.css';
 const FOOTER_ROUTES = new Set(['/', '/terms', '/privacy-policy', '/contact', '/support']);
 
 /**
+ * The customer's five, chosen on one rule: things a customer does several
+ * times a month. Professional mode, the business and the waitlist are not
+ * that, and live under «حساب» -- `25_MOBILE_NAVIGATION.md`'s table.
+ *
+ * The bar is shared with the professional shell, which passes its own two
+ * destinations plus a sheet trigger; only the destinations differ, which is
+ * what spec 25 asks for.
+ */
+const CUSTOMER_TABS: MobileTab[] = [
+  // `/` is every path's prefix, so it is the one that must match itself only.
+  { href: '/', label: 'خانه', glyph: 'home', exact: true },
+  { href: '/search', label: 'جست‌وجو', glyph: 'search' },
+  { href: '/bookings', label: 'رزروها', glyph: 'bookings' },
+  { href: '/loyalty', label: 'باشگاه', glyph: 'loyalty' },
+  { href: '/dashboard', label: 'حساب', glyph: 'account' },
+];
+
+/**
  * Route groups with their own nav chrome, and so never the customer's bottom
  * bar -- `25_MOBILE_NAVIGATION.md`'s own table. `/admin` gets a dark
  * horizontal scrolling bar instead of any bottom bar at all (`AdminShell`);
- * `/pro` is meant to get its own two-tab bar plus a sheet for the rest,
- * which is not built yet, but the customer's five destinations (home,
- * search, bookings, loyalty, account) are still the wrong ones to show over
- * either shell in the meantime.
+ * `/pro` now carries its own two destinations plus a sheet for the rest
+ * (`ProMobileNav`), and the customer's five (home, search, bookings, loyalty,
+ * account) are the wrong ones to show over either shell.
  */
 const NO_TAB_BAR_PREFIXES = ['/admin', '/pro'];
 
@@ -216,7 +233,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {FOOTER_ROUTES.has(pathname) ? <SiteFooter /> : null}
 
-      {hidesTabBar(pathname) ? null : <MobileTabBar />}
+      {hidesTabBar(pathname) ? null : <MobileTabBar tabs={CUSTOMER_TABS} />}
     </div>
   );
 }

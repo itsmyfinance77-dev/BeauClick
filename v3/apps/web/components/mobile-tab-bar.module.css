@@ -1,0 +1,141 @@
+/*
+ * The mobile bottom bar — `25_MOBILE_NAVIGATION.md`.
+ *
+ * The spec is explicit that this is ONE component across every surface: "یک
+ * جزء واحد — MobileTabBar — با ظاهر یکسان (ارتفاع ۵۶، سایهٔ bar، حداکثر پنج
+ * مقصد، aria-current روی فعال) در هر چهار بستر استفاده می‌شود. تفاوت بسترها
+ * فقط در کدام مقصدها روی نوار می‌نشینند، نه در جزء." So the height, the
+ * shadow, the hidden-from-640 rule and the current-destination treatment live
+ * here once, and each shell supplies only its own destinations.
+ *
+ * These rules were in `app-shell.module.css` while the customer was the only
+ * caller. They moved here unchanged when the professional became the second:
+ * a shell importing another shell's stylesheet to reach them would be worse
+ * than a stylesheet that belongs to the component it styles.
+ */
+
+.tabBar {
+  position: fixed;
+  inset-inline: 0;
+  inset-block-end: 0;
+  z-index: 30;
+  background: var(--bc-color-surface);
+  border-block-start: 1px solid var(--bc-color-border);
+  box-shadow: var(--bc-shadow-bar);
+  display: grid;
+  /*
+   * Equal columns for however many destinations the caller passes — five for
+   * the customer, three for the professional. `repeat(5, 1fr)` was right
+   * while there was one caller; enumerating a rule per count would be a
+   * second place to keep in step with the callers, and an implicit-track
+   * width needs neither.
+   */
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  padding: 6px 4px calc(10px + env(safe-area-inset-bottom, 0px));
+}
+
+@media (min-width: 640px) {
+  .tabBar {
+    display: none;
+  }
+}
+
+.tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 56px;
+  font-size: var(--bc-text-badge-size);
+  font-weight: 500;
+  color: var(--bc-color-text-muted);
+  text-decoration: none;
+  /* The sheet trigger is a button and must not inherit the UA's own. */
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.tab[aria-current="page"] {
+  color: var(--bc-color-primary);
+  font-weight: 700;
+}
+
+/* The trigger reads as active while its sheet is open, for the same reason. */
+.tab[aria-expanded="true"] {
+  color: var(--bc-color-primary);
+  font-weight: 700;
+}
+
+/*
+ * Each destination has a distinct SHAPE as well as a colour, so the current
+ * tab is never signalled by colour alone.
+ */
+.tabGlyph {
+  width: 20px;
+  height: 20px;
+  border: 2px solid currentColor;
+}
+
+.tabGlyphHome {
+  border-radius: 6px;
+}
+
+.tabGlyphSearch {
+  border-radius: var(--bc-radius-chip);
+}
+
+.tabGlyphBookings {
+  border-radius: 5px;
+}
+
+.tabGlyphLoyalty {
+  border-radius: var(--bc-radius-chip);
+  border-style: dashed;
+}
+
+.tabGlyphAccount {
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-chip);
+  background: repeating-linear-gradient(
+    135deg,
+    oklch(0.963 0.012 340) 0 3px,
+    oklch(0.945 0.026 340) 3px 6px
+  );
+}
+
+/* «امروز» — a day, so a square with a ruled head. */
+.tabGlyphToday {
+  border-radius: 4px;
+  border-block-start-width: 5px;
+}
+
+/* The sheet trigger — three rules, the one shape that is not a destination. */
+.tabGlyphMore {
+  border: 0;
+  height: 14px;
+  border-block-start: 2px solid currentColor;
+  border-block-end: 2px solid currentColor;
+  position: relative;
+}
+
+.tabGlyphMore::after {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  inset-block-start: 5px;
+  border-block-start: 2px solid currentColor;
+}
+
+.tab[aria-current="page"] .tabGlyphHome {
+  background: currentColor;
+}
+
+.tab[aria-current="page"] .tabGlyphToday {
+  background: currentColor;
+}
