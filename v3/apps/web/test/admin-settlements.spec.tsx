@@ -123,7 +123,7 @@ describe('the lookup', () => {
     expect(within(party).getByText('خالص قابل پرداخت')).toBeInTheDocument();
     const table = screen.getByRole('table', { name: 'سفارش‌های در انتظار تسویه' });
     expect(within(table).getAllByRole('row')).toHaveLength(3); // header + two orders
-    expect(within(table).getByRole('columnheader', { name: 'مبلغ در انتظار' })).toBeInTheDocument();
+    expect(within(table).getByRole('columnheader', { name: 'مبلغ در انتظار (تومان)' })).toBeInTheDocument();
   });
 
   it('says so plainly, and offers no settlement panel, when nothing is outstanding', async () => {
@@ -208,7 +208,7 @@ describe('recording a settlement', () => {
     await user.click(screen.getByRole('button', { name: 'ثبت تسویه' }));
     await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'ثبت کن' }));
 
-    expect(await screen.findByText(/تسویه به مبلغ .* ثبت شد/)).toBeInTheDocument();
+    expect(await screen.findByText(/تسویه به مبلغ .* تومان ثبت شد/)).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect(screen.getByLabelText('روش پرداخت')).toHaveValue('');
     expect(screen.getByRole('button', { name: 'ثبت تسویه' })).toBeDisabled();

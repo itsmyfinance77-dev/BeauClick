@@ -87,7 +87,7 @@ export function RuleStatement({ version }: { version: CommissionPolicyVersion })
     <div className={styles.ruleStack}>
       {version.fixedToman !== null ? (
         <p className={styles.ruleLine}>
-          مبلغ ثابت: <strong className={styles.ruleValue}><PriceDisplay amount={version.fixedToman} /></strong>
+          مبلغ ثابت: <strong className={styles.ruleValue}><PriceDisplay amount={version.fixedToman} /> تومان</strong>
         </p>
       ) : null}
       {version.basisPoints !== null ? (

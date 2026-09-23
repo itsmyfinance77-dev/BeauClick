@@ -2,6 +2,7 @@
 
 import { PriceDisplay } from './price-display';
 import { Card } from '@/components/ui';
+import { MoneyUnitNote } from '@/components/kit';
 import type { WorkspaceFunds } from '@/lib/pro-api';
 import styles from './funds-by-state.module.css';
 
@@ -153,6 +154,8 @@ export function FundsByState({ funds }: { funds: WorkspaceFunds }) {
       <p className={styles.intro}>
         این ارقام و سه رقمِ بالا <strong>به دو پرسشِ متفاوت پاسخ می‌دهند و با هم جمع نمی‌شوند</strong>. هیچ نسبتی میانشان محاسبه نمی‌شود.
       </p>
+
+      <MoneyUnitNote />
 
       {/* Not an empty state: the server answered, and the answer is zero. */}
       {allZero ? (

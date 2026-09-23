@@ -70,12 +70,12 @@ describe('the settlement history', () => {
     mockApi({ batches: [batch({ id: 's1' }), batch({ id: 's2', kind: 'reversal', amountToman: 250_000, method: null })] });
     renderFinance();
     const table = await screen.findByRole('table', { name: 'تاریخچه تسویه' });
-    expect(within(table).getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['تاریخ', 'مبلغ', 'روش', 'نوع']);
+    expect(within(table).getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['تاریخ', 'مبلغ (تومان)', 'روش', 'نوع']);
     const rows = within(table).getAllByRole('row');
     expect(rows).toHaveLength(3); // header + two batches
     // Each body cell repeats its own label — what the phone's card layout prints above its value.
     const cells = within(rows[1]).getAllByRole('cell');
-    expect(cells.map((c) => c.getAttribute('data-label'))).toEqual(['تاریخ', 'مبلغ', 'روش', 'نوع']);
+    expect(cells.map((c) => c.getAttribute('data-label'))).toEqual(['تاریخ', 'مبلغ (تومان)', 'روش', 'نوع']);
   });
 
   it('names a settlement and a reversal in words, with a tone, and shows a neutral word for a kind it does not know', async () => {

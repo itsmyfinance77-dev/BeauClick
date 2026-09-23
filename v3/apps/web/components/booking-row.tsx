@@ -76,7 +76,7 @@ export function BookingRow({
         </p>
         <p className={styles.service}>
           {serviceName ?? 'خدمت نامشخص'}
-          {service ? ` — ${formatToman(service.priceToman)}` : ''}
+          {service ? ` — ${formatToman(service.priceToman)} تومان` : ''}
         </p>
         <p className={styles.meta}>مشتری: {booking.customerDisplayName ?? 'نام مشتری ثبت نشده'}</p>
         {booking.rescheduleCount > 0 ? (

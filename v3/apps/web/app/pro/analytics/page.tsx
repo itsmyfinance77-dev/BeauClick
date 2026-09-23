@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { formatToman, formatZonedFullDate, toPersianDigits, zonedIsoDate } from '@beauclick/persian-utils';
 import { PriceDisplay } from '@/components/price-display';
 import { ErrorState, LoadingState } from '@/components/ui';
-import { Badge, EmptyState, PageHeader, SegmentedControl, Select, StatCard, StatGrid } from '@/components/kit';
+import { Badge, EmptyState, PageHeader, MoneyUnitNote, SegmentedControl, Select, StatCard, StatGrid } from '@/components/kit';
 import { MoneyChart, type ChartPoint } from '@/components/money-chart';
 import { ProGuard } from '@/components/pro-guard';
 import { useAuth } from '@/lib/auth-context';
@@ -169,6 +169,7 @@ function Analytics() {
           {metrics && Object.keys(metrics.revenue ?? {}).length > 0 ? (
             <div className={styles.section}>
               <h2 className={styles.sectionTitle}>درآمد</h2>
+              <MoneyUnitNote />
               <StatGrid>
                 {Object.entries(metrics.revenue).map(([key, metric]) => (
                   <StatCard

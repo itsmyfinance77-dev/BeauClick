@@ -439,6 +439,17 @@ export function StatGrid({ min = 180, children }: { min?: number; children: Reac
 }
 
 /**
+ * The money unit for a block of figures that cannot carry it themselves — a
+ * stat grid, or a list of cards. «واحد یک بار در هر بلوک نه روی هر رقم»
+ * (`V3_DESIGN_SYSTEM.md` §«پول»): rendered once beside the block, never per
+ * figure. A sentence carries «تومان» inline and a table in its column header;
+ * this is for the blocks that have neither.
+ */
+export function MoneyUnitNote() {
+  return <p className={styles.moneyUnitNote}>مبالغ به تومان</p>;
+}
+
+/**
  * One figure with its label.
  *
  * The value font size was 20, 22 or 24 depending on which screen you were on;

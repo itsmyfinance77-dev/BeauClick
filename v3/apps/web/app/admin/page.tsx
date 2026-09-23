@@ -137,7 +137,7 @@ export default function AdminOverviewPage() {
               <StatGrid min={170}>
                 <StatCard label="رزروهای ثبت‌شده" value={toPersianDigits(metrics.bookings.created.value)} />
                 <StatCard label="نوبت‌های انجام‌شده" value={toPersianDigits(metrics.bookings.completed.value)} />
-                <StatCard label="فروش ناخالص" value={<PriceDisplay amount={metrics.commerce.grossToman.value} />} />
+                <StatCard label="فروش ناخالص (تومان)" value={<PriceDisplay amount={metrics.commerce.grossToman.value} />} />
                 <StatCard
                   label="جست‌وجوی بدون نتیجه"
                   value={`${toPersianDigits(Math.round(metrics.search.emptyResultRate.value * 100))}٪`}

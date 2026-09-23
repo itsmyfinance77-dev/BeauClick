@@ -624,7 +624,10 @@ describe('the payment schedule on the receipt', () => {
 
     // `مبلغ کل` is untouched: the schedule is additive, never a replacement.
     expect(within(receipt).getByText('مبلغ کل')).toBeInTheDocument();
-    expect(within(receipt).getByText('۲۰۰٬۰۰۰ تومان')).toBeInTheDocument();
+    expect(within(within(receipt).getByText('مبلغ کل').closest('tr') as HTMLElement).getByText('۲۰۰٬۰۰۰')).toBeInTheDocument();
+    // The unit is the column header's, once — not printed on each row (#287).
+    expect(within(receipt).getByRole('columnheader', { name: 'مبلغ (تومان)' })).toBeInTheDocument();
+    expect(within(receipt).getAllByRole('cell').some((c) => c.textContent?.includes('تومان'))).toBe(false);
 
     // ...and the split rows are absent, because "collect 200,000 / pay 0 at the
     // venue" is noise on a receipt where nothing is payable at the venue.
@@ -675,9 +678,9 @@ describe('the payment schedule on the receipt', () => {
     const receipt = (await screen.findByText('رسید')).closest('div') as HTMLElement;
 
     expect(within(receipt).getByText('پرداخت‌شده به بیوکلیک')).toBeInTheDocument();
-    expect(within(receipt).getByText('۶۰٬۰۰۰ تومان')).toBeInTheDocument();
+    expect(within(receipt).getByText('۶۰٬۰۰۰')).toBeInTheDocument();
     expect(within(receipt).getByText('قابل پرداخت در محل')).toBeInTheDocument();
-    expect(within(receipt).getByText('۱۴۰٬۰۰۰ تومان')).toBeInTheDocument();
+    expect(within(receipt).getByText('۱۴۰٬۰۰۰')).toBeInTheDocument();
   });
 });
 

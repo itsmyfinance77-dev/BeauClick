@@ -4,7 +4,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { formatZonedFullDate, toPersianDigits } from '@beauclick/persian-utils';
 import { PriceDisplay } from './price-display';
 import { Button, ErrorState, LoadingState } from '@/components/ui';
-import { Badge, DataCell, DataRow, DataTable, EmptyState, PageHeader, StatCard, StatGrid } from '@/components/kit';
+import { Badge, DataCell, DataRow, DataTable, EmptyState, MoneyUnitNote, PageHeader, StatCard, StatGrid } from '@/components/kit';
 import { FundsByState } from '@/components/funds-by-state';
 import { useAuth } from '@/lib/auth-context';
 import { ApiRequestError } from '@/lib/api-client';
@@ -33,7 +33,8 @@ import {
 import styles from './finance-workspace.module.css';
 
 const SETTLEMENTS_HEADING_ID = 'finance-settlements-heading';
-const SETTLEMENT_HEAD = ['تاریخ', 'مبلغ', 'روش', 'نوع'] as const;
+// the header is not rendered below 640px (the card layout prints each cell's data-label instead), so the DataCell labels must carry the unit too — do not tidy them back to a bare «مبلغ» (#287).
+const SETTLEMENT_HEAD = ['تاریخ', 'مبلغ (تومان)', 'روش', 'نوع'] as const;
 
 /**
  * The persona-neutral finance surface -- V3.3 Story #152 (`#149b`), shared by
@@ -428,6 +429,7 @@ export function FinanceWorkspaceSurface() {
             <ErrorState message={summaryError} onRetry={() => void loadSummary(active.workspaceRef)} />
           ) : summary ? (
             <div className={styles.section}>
+              <MoneyUnitNote />
               <StatGrid min={180}>
                 <StatCard label="خالص قابل دریافت" value={<PriceDisplay amount={summary.receivableNetToman} />} />
                 <StatCard label="تسویه‌شده" value={<PriceDisplay amount={summary.settledToman} />} />
@@ -457,54 +459,57 @@ export function FinanceWorkspaceSurface() {
           ) : orders.length === 0 ? (
             <EmptyState message="سفارشی در انتظار تسویه ندارید." />
           ) : (
-            <ul className={styles.orders}>
-              {orders.map((order) => (
-                <li key={order.orderId} className={`${styles.panel} ${styles.order}`} data-order={order.orderId}>
-                  <div className={styles.orderText}>
-                    <p className={styles.orderAmount}><PriceDisplay amount={order.outstandingToman} /></p>
-                    <p className={styles.orderRef}>
-                      سفارش <span className={styles.ref}>{order.orderId.slice(0, 8)}</span>
-                    </p>
-                  </div>
-                  <Button type="button" variant="ghost" inline onClick={() => void toggleLedger(order.orderId)}>
-                    {ledgerFor === order.orderId ? 'بستن ریز تراکنش' : 'ریز تراکنش'}
-                  </Button>
-
-                  {ledgerFor === order.orderId ? (
-                    <div className={styles.ledger}>
-                      {ledgerLoading ? (
-                        <LoadingState label="در حال بارگذاری ریز تراکنش…" lines={2} />
-                      ) : ledgerError ? (
-                        <ErrorState message={ledgerError} onRetry={() => void toggleLedger(order.orderId)} />
-                      ) : ledger.length === 0 ? (
-                        <p className={styles.ledgerEmpty}>تراکنشی برای این سفارش ثبت نشده است.</p>
-                      ) : (
-                        <>
-                          <p id={`ledger-heading-${order.orderId}`} className={styles.ledgerCaption}>
-                            ریز تراکنش سفارش
-                          </p>
-                          <DataTable head={['ردیف', 'مبلغ', 'نرخ']} aria-labelledby={`ledger-heading-${order.orderId}`}>
-                            {ledger.map((entry) => (
-                              <DataRow key={entry.id}>
-                                <DataCell label="ردیف">{ledgerEntryLabel(entry.entryType)}</DataCell>
-                                <DataCell label="مبلغ">
-                                  <PriceDisplay amount={entry.amountToman} />
-                                </DataCell>
-                                <DataCell label="نرخ">
-                                  <span className={styles.ledgerRate}>
-                                    {toPersianDigits((entry.commissionRateBp / 100).toFixed(1))}٪
-                                  </span>
-                                </DataCell>
-                              </DataRow>
-                            ))}
-                          </DataTable>
-                        </>
-                      )}
+            <>
+              <MoneyUnitNote />
+              <ul className={styles.orders}>
+                {orders.map((order) => (
+                  <li key={order.orderId} className={`${styles.panel} ${styles.order}`} data-order={order.orderId}>
+                    <div className={styles.orderText}>
+                      <p className={styles.orderAmount}><PriceDisplay amount={order.outstandingToman} /></p>
+                      <p className={styles.orderRef}>
+                        سفارش <span className={styles.ref}>{order.orderId.slice(0, 8)}</span>
+                      </p>
                     </div>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
+                    <Button type="button" variant="ghost" inline onClick={() => void toggleLedger(order.orderId)}>
+                      {ledgerFor === order.orderId ? 'بستن ریز تراکنش' : 'ریز تراکنش'}
+                    </Button>
+
+                    {ledgerFor === order.orderId ? (
+                      <div className={styles.ledger}>
+                        {ledgerLoading ? (
+                          <LoadingState label="در حال بارگذاری ریز تراکنش…" lines={2} />
+                        ) : ledgerError ? (
+                          <ErrorState message={ledgerError} onRetry={() => void toggleLedger(order.orderId)} />
+                        ) : ledger.length === 0 ? (
+                          <p className={styles.ledgerEmpty}>تراکنشی برای این سفارش ثبت نشده است.</p>
+                        ) : (
+                          <>
+                            <p id={`ledger-heading-${order.orderId}`} className={styles.ledgerCaption}>
+                              ریز تراکنش سفارش
+                            </p>
+                            <DataTable head={['ردیف', 'مبلغ (تومان)', 'نرخ']} aria-labelledby={`ledger-heading-${order.orderId}`}>
+                              {ledger.map((entry) => (
+                                <DataRow key={entry.id}>
+                                  <DataCell label="ردیف">{ledgerEntryLabel(entry.entryType)}</DataCell>
+                                  <DataCell label="مبلغ (تومان)">
+                                    <PriceDisplay amount={entry.amountToman} />
+                                  </DataCell>
+                                  <DataCell label="نرخ">
+                                    <span className={styles.ledgerRate}>
+                                      {toPersianDigits((entry.commissionRateBp / 100).toFixed(1))}٪
+                                    </span>
+                                  </DataCell>
+                                </DataRow>
+                              ))}
+                            </DataTable>
+                          </>
+                        )}
+                      </div>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
 
           <h2 id={SETTLEMENTS_HEADING_ID} className={styles.sectionTitleSpaced}>
@@ -525,7 +530,7 @@ export function FinanceWorkspaceSurface() {
                 {batches.map((batch) => (
                   <DataRow key={batch.id} data-settlement={batch.id}>
                     <DataCell label="تاریخ">{formatZonedFullDate(new Date(batch.createdAt))}</DataCell>
-                    <DataCell label="مبلغ">
+                    <DataCell label="مبلغ (تومان)">
                       <span className={styles.amount}><PriceDisplay amount={batch.amountToman} /></span>
                     </DataCell>
                     <DataCell label="روش">

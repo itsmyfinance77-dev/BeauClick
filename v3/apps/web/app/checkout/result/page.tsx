@@ -392,14 +392,15 @@ function ResultContent() {
             رسید
           </h2>
 
-          <DataTable head={['ردیف', 'مبلغ']} aria-labelledby="checkout-receipt-heading">
+          {/* the header is not rendered below 640px (the card layout prints each cell's data-label instead), so the DataCell labels must carry the unit too — do not tidy them back to a bare «مبلغ» (#287). */}
+          <DataTable head={['ردیف', 'مبلغ (تومان)']} aria-labelledby="checkout-receipt-heading">
             {order.items.map((item) => (
               <DataRow key={item.id}>
                 <DataCell label="ردیف">
                   {item.name}
                   {item.quantity > 1 ? ` × ${toPersianDigits(item.quantity)}` : ''}
                 </DataCell>
-                <DataCell label="مبلغ"><PriceDisplay amount={item.lineTotalToman} /></DataCell>
+                <DataCell label="مبلغ (تومان)"><PriceDisplay amount={item.lineTotalToman} /></DataCell>
               </DataRow>
             ))}
 
@@ -410,7 +411,7 @@ function ResultContent() {
             {order.adjustments.map((adjustment) => (
               <DataRow key={adjustment.ruleKey + adjustment.label} className={styles.adjustment}>
                 <DataCell label="ردیف">{adjustment.label}</DataCell>
-                <DataCell label="مبلغ">
+                <DataCell label="مبلغ (تومان)">
                   <span className={styles.signed}><PriceDisplay amount={adjustment.amountToman} /></span>
                 </DataCell>
               </DataRow>
@@ -418,7 +419,7 @@ function ResultContent() {
 
             <DataRow className={styles.total}>
               <DataCell label="ردیف">مبلغ کل</DataCell>
-              <DataCell label="مبلغ"><PriceDisplay amount={order.totalToman} /> تومان</DataCell>
+              <DataCell label="مبلغ (تومان)"><PriceDisplay amount={order.totalToman} /></DataCell>
             </DataRow>
 
             {/*
@@ -435,11 +436,11 @@ function ResultContent() {
               <>
                 <DataRow>
                   <DataCell label="ردیف">پرداخت‌شده به بیوکلیک</DataCell>
-                  <DataCell label="مبلغ"><PriceDisplay amount={order.paymentSchedule.platformCollectibleNowToman} /> تومان</DataCell>
+                  <DataCell label="مبلغ (تومان)"><PriceDisplay amount={order.paymentSchedule.platformCollectibleNowToman} /></DataCell>
                 </DataRow>
                 <DataRow>
                   <DataCell label="ردیف">قابل پرداخت در محل</DataCell>
-                  <DataCell label="مبلغ"><PriceDisplay amount={order.paymentSchedule.venueBalanceToman} /> تومان</DataCell>
+                  <DataCell label="مبلغ (تومان)"><PriceDisplay amount={order.paymentSchedule.venueBalanceToman} /></DataCell>
                 </DataRow>
               </>
             ) : null}
@@ -447,7 +448,7 @@ function ResultContent() {
             {order.refundedTotalToman > 0 ? (
               <DataRow className={styles.refund}>
                 <DataCell label="ردیف">مبلغ بازگردانده‌شده</DataCell>
-                <DataCell label="مبلغ"><PriceDisplay amount={order.refundedTotalToman} /> تومان</DataCell>
+                <DataCell label="مبلغ (تومان)"><PriceDisplay amount={order.refundedTotalToman} /></DataCell>
               </DataRow>
             ) : null}
           </DataTable>
