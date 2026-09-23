@@ -264,3 +264,9 @@
   gap: 8px;
   flex-wrap: wrap;
 }
+
+.moneyUnitNote {
+  margin: 0 0 8px;
+  font-size: var(--bc-text-small-size);
+  color: var(--bc-color-text-muted);
+}

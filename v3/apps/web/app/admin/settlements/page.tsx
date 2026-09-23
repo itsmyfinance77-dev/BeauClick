@@ -10,6 +10,7 @@ import {
   DataRow,
   DataTable,
   EmptyState,
+  MoneyUnitNote,
   PageHeader,
   Select,
   StatCard,
@@ -38,7 +39,7 @@ interface LookedUpParty {
 }
 
 const ORDERS_HEADING_ID = 'settlement-orders-heading';
-const ORDERS_HEAD = ['انتخاب', 'شمارهٔ سفارش', 'مبلغ در انتظار'] as const;
+const ORDERS_HEAD = ['انتخاب', 'شمارهٔ سفارش', 'مبلغ در انتظار (تومان)'] as const;
 const SUMMARY_DESCRIPTION_ID = 'settlement-confirm-summary';
 
 /**
@@ -161,7 +162,7 @@ export default function AdminSettlementsPage() {
         reference: reference.trim() || undefined,
         note: note.trim() || undefined,
       });
-      setSuccess(`تسویه به مبلغ ${formatToman(res.data?.amountToman ?? 0)} ثبت شد.`);
+      setSuccess(`تسویه به مبلغ ${formatToman(res.data?.amountToman ?? 0)} تومان ثبت شد.`);
       setPending(false);
       setSelected([]);
       setMethod('');
@@ -198,11 +199,14 @@ export default function AdminSettlementsPage() {
       ) : loadError && !totals ? (
         <ErrorState message={loadError} onRetry={() => void load()} />
       ) : totals ? (
+        <>
+          <MoneyUnitNote />
         <StatGrid>
           <StatCard label="کارمزد پلتفرم" value={<PriceDisplay amount={totals.commissionToman} />} />
           <StatCard label="سهم فروشندگان" value={<PriceDisplay amount={totals.receivableToman} />} />
           <StatCard label="سفارش‌های پرداخت‌شده" value={toPersianDigits(totals.orderCount)} />
         </StatGrid>
+        </>
       ) : null}
 
       <section className={styles.panel} aria-labelledby="settlement-lookup-heading">
@@ -238,6 +242,7 @@ export default function AdminSettlementsPage() {
                 <span>{partyTypeLabel(looked.type)}</span>
                 <span className={styles.partyId}>{looked.id}</span>
               </p>
+              <MoneyUnitNote />
               <dl className={styles.figures}>
                 <div className={`${styles.figure} ${styles.figureStrong}`}>
                   <dt>خالص قابل پرداخت</dt>
@@ -285,7 +290,7 @@ export default function AdminSettlementsPage() {
                           {short}
                         </span>
                       </DataCell>
-                      <DataCell label="مبلغ در انتظار">
+                      <DataCell label="مبلغ در انتظار (تومان)">
                         <span className={styles.amount}><PriceDisplay amount={order.outstandingToman} /></span>
                       </DataCell>
                     </DataRow>
@@ -312,7 +317,7 @@ export default function AdminSettlementsPage() {
               />
               <Textarea label="توضیح" value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} />
               <p className={styles.total} role="status">
-                مبلغ انتخاب‌شده: <strong><PriceDisplay amount={selectedTotal} /></strong> ({toPersianDigits(selected.length)} سفارش)
+                مبلغ انتخاب‌شده: <strong><PriceDisplay amount={selectedTotal} /> تومان</strong> ({toPersianDigits(selected.length)} سفارش)
               </p>
               <Button type="button" disabled={selected.length === 0} onClick={() => setPending(true)}>
                 ثبت تسویه
@@ -333,7 +338,7 @@ export default function AdminSettlementsPage() {
         body={
           <div id={SUMMARY_DESCRIPTION_ID} className={styles.dialogBody}>
             <p className={styles.dialogText}>
-              تسویه <PriceDisplay amount={selectedTotal} /> برای {toPersianDigits(selected.length)} سفارشِ {looked ? partyTypeLabel(looked.type) : ''}{' '}
+              تسویه <PriceDisplay amount={selectedTotal} /> تومان برای {toPersianDigits(selected.length)} سفارشِ {looked ? partyTypeLabel(looked.type) : ''}{' '}
               <span className={styles.partyId}>{looked?.id}</span> ثبت می‌شود.
             </p>
             <p className={styles.dialogWarning}>

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { formatZonedFullDate, toPersianDigits } from '@beauclick/persian-utils';
 import { PriceDisplay } from './price-display';
 import { Button, ErrorState, LoadingState } from '@/components/ui';
-import { Badge, DataCell, DataRow, DataTable, EmptyState, PageHeader, StatCard, StatGrid } from '@/components/kit';
+import { Badge, DataCell, DataRow, DataTable, EmptyState, MoneyUnitNote, PageHeader, StatCard, StatGrid } from '@/components/kit';
 import { FundsByState } from '@/components/funds-by-state';
 import { useAuth } from '@/lib/auth-context';
 import { ApiRequestError } from '@/lib/api-client';
@@ -33,7 +33,7 @@ import {
 import styles from './finance-workspace.module.css';
 
 const SETTLEMENTS_HEADING_ID = 'finance-settlements-heading';
-const SETTLEMENT_HEAD = ['تاریخ', 'مبلغ', 'روش', 'نوع'] as const;
+const SETTLEMENT_HEAD = ['تاریخ', 'مبلغ (تومان)', 'روش', 'نوع'] as const;
 
 /**
  * The persona-neutral finance surface -- V3.3 Story #152 (`#149b`), shared by
@@ -428,6 +428,7 @@ export function FinanceWorkspaceSurface() {
             <ErrorState message={summaryError} onRetry={() => void loadSummary(active.workspaceRef)} />
           ) : summary ? (
             <div className={styles.section}>
+              <MoneyUnitNote />
               <StatGrid min={180}>
                 <StatCard label="خالص قابل دریافت" value={<PriceDisplay amount={summary.receivableNetToman} />} />
                 <StatCard label="تسویه‌شده" value={<PriceDisplay amount={summary.settledToman} />} />
@@ -457,6 +458,8 @@ export function FinanceWorkspaceSurface() {
           ) : orders.length === 0 ? (
             <EmptyState message="سفارشی در انتظار تسویه ندارید." />
           ) : (
+            <>
+            <MoneyUnitNote />
             <ul className={styles.orders}>
               {orders.map((order) => (
                 <li key={order.orderId} className={`${styles.panel} ${styles.order}`} data-order={order.orderId}>
@@ -499,6 +502,7 @@ export function FinanceWorkspaceSurface() {
                 </li>
               ))}
             </ul>
+            </>
           )}
 
           <h2 id={SETTLEMENTS_HEADING_ID} className={styles.sectionTitleSpaced}>
@@ -519,7 +523,7 @@ export function FinanceWorkspaceSurface() {
                 {batches.map((batch) => (
                   <DataRow key={batch.id} data-settlement={batch.id}>
                     <DataCell label="تاریخ">{formatZonedFullDate(new Date(batch.createdAt))}</DataCell>
-                    <DataCell label="مبلغ">
+                    <DataCell label="مبلغ (تومان)">
                       <span className={styles.amount}><PriceDisplay amount={batch.amountToman} /></span>
                     </DataCell>
                     <DataCell label="روش">

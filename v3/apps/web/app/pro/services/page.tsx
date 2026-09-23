@@ -206,7 +206,7 @@ function Services({ profile }: { profile: MyProviderProfile }) {
                 <div className={styles.serviceText}>
                   <p className={styles.serviceName}>{service.name}</p>
                   <p className={styles.serviceMeta}>
-                    {toPersianDigits(service.durationMinutes)} دقیقه — <PriceDisplay amount={service.priceToman} />
+                    {toPersianDigits(service.durationMinutes)} دقیقه — <PriceDisplay amount={service.priceToman} /> تومان
                   </p>
                 </div>
                 <div className={styles.serviceActions}>
