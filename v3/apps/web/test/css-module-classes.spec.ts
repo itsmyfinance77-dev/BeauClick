@@ -29,6 +29,13 @@ import { dirname, join, relative, resolve, sep } from 'node:path';
  *     as a bare object: which classes those select is not knowable statically,
  *     and this check does not guess. It reports only what it can prove.
  *
+ * A third finding, so a green run never means "saw nothing": an import that names
+ * a `.module.css` the walk did not collect is reported, not skipped — otherwise
+ * that file's references would silently drop out of both directions above.
+ *
+ * Known reading: `styles?.foo` is treated as an opaque use of the binding, not as
+ * a named reference (no such access exists in the app today).
+ *
  * A class that is used only by another selector in the same stylesheet
  * (`.list .count { … }`) still counts as unreferenced: the stylesheet cannot
  * consume its own class, only markup can.
@@ -108,6 +115,7 @@ export function importsOf(file: string, source: string): Importer[] {
 }
 
 export interface Findings {
+  unresolved: string[];
   missing: string[];
   unreferenced: string[];
 }
@@ -118,11 +126,18 @@ export function audit(sources: Map<string, string>, stylesheets: Map<string, str
   const referenced = new Map<string, Set<string>>();
   const opaque = new Set<string>();
   const missing: string[] = [];
+  const unresolved: string[] = [];
 
   for (const [file, source] of sources) {
     for (const imp of importsOf(file, source)) {
       const defined = definitions.get(imp.module);
-      if (!defined) continue;
+      if (!defined) {
+        unresolved.push(
+          `${posix(file)}: imports ${posix(imp.module)}, which the stylesheet walk did not find — ` +
+            `none of this file's styles.* references can be checked until the path resolves`,
+        );
+        continue;
+      }
       const usage = usageOf(source, imp.binding);
       if (usage.opaque) opaque.add(imp.module);
       const seen = referenced.get(imp.module) ?? new Set<string>();
@@ -152,7 +167,7 @@ export function audit(sources: Map<string, string>, stylesheets: Map<string, str
       }
     }
   }
-  return { missing, unreferenced };
+  return { unresolved, missing, unreferenced };
 }
 
 describe('the checker itself — exercised on synthetic input, so a silent parser bug cannot pass the real check', () => {
@@ -192,6 +207,17 @@ describe('the checker itself — exercised on synthetic input, so a silent parse
     expect(run(`${head}helper(styles);`, '.dead { a: b; }').unreferenced).toEqual([]);
   });
 
+  it('reports an import it cannot resolve instead of skipping the file', () => {
+    const { unresolved, missing } = audit(
+      new Map([[at('a.tsx'), "import styles from './nowhere.module.css';\nconst x = styles.gone;"]]),
+      new Map([[at('a.module.css'), '.here { a: b; }']]),
+    );
+    expect(unresolved).toHaveLength(1);
+    expect(unresolved[0]).toContain('a.tsx');
+    expect(unresolved[0]).toContain('nowhere.module.css');
+    expect(missing).toEqual([]);
+  });
+
   it('ignores a class named only in a comment', () => {
     const { unreferenced } = run(`${head}// styles.dead is gone\nconst x = styles.live;`, '.live { a: b; } .dead { a: b; }');
     expect(unreferenced).toHaveLength(1);
@@ -202,7 +228,7 @@ describe('css modules — every reference resolves, and every definition is reac
   const sourceFiles = walk(WEB, (n) => /\.(ts|tsx)$/.test(n) && !n.endsWith('.d.ts'));
   const sources = new Map(sourceFiles.map((f) => [f, readFileSync(f, 'utf8')]));
   const stylesheets = new Map(walk(WEB, (n) => n.endsWith('.module.css')).map((f) => [f, readFileSync(f, 'utf8')]));
-  const { missing, unreferenced } = audit(sources, stylesheets);
+  const { unresolved, missing, unreferenced } = audit(sources, stylesheets);
 
   it('finds what it is supposed to be checking', () => {
     // A check that matched nothing would pass forever.
@@ -211,6 +237,10 @@ describe('css modules — every reference resolves, and every definition is reac
     expect(stylesheets.size).toBeGreaterThan(40);
     expect(imports.length).toBeGreaterThan(50);
     expect(refs).toBeGreaterThan(500);
+  });
+
+  it('imports only stylesheets it can see', () => {
+    expect(unresolved).toEqual([]);
   });
 
   it('never names a class its module does not define', () => {
