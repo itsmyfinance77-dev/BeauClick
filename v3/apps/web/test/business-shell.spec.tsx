@@ -97,8 +97,8 @@ describe('/business for everyone else', () => {
   });
 });
 
-describe('while identity is unknown', () => {
-  it('shows no column: it is the page alone until the session settles', () => {
+describe('before the session has answered', () => {
+  it('shows no column before any session exists — the page alone (the status guard itself is pinned in seller-frame.spec.tsx)', () => {
     // A request that never answers leaves the session in `loading`.
     (global.fetch as jest.Mock).mockImplementation(() => new Promise(() => {}));
     page();
