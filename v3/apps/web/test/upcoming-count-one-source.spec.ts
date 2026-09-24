@@ -109,11 +109,22 @@ describe('the web fixture agrees with the server it is standing in for', () => {
   }
 
   it('can still find both lists, so a silently-unmatched regex cannot pass this', () => {
-    // The failure `css-module-classes.spec.ts` was corrected for: a parser that
-    // sees nothing and reports success. Both extractions are asserted to have
-    // worked before they are compared.
-    expect(declaredList(readFileSync(ENTITY, 'utf8'), 'CONCLUDED_BOOKING_STATUSES')).toHaveLength(4);
-    expect(declaredList(readFileSync(join(WEB, 'test/pro-bookings-page.spec.tsx'), 'utf8'), 'FIXTURE_CONCLUDED_STATUSES')).toHaveLength(4);
+    /*
+     * The failure `css-module-classes.spec.ts` was corrected for: a parser that
+     * sees nothing and reports success. Both extractions are asserted to have
+     * found something before they are compared.
+     *
+     * Non-empty rather than a fixed length, deliberately. Pinning `4` here would
+     * mean a concluded set that legitimately grows to five fails THIS test first,
+     * with a message about a length — the wrong reason, pointing at the wrong
+     * thing. The comparison below is what should speak about a disagreement, and
+     * it already covers the count.
+     */
+    expect(declaredList(readFileSync(ENTITY, 'utf8'), 'CONCLUDED_BOOKING_STATUSES')?.length).toBeGreaterThan(0);
+    expect(
+      declaredList(readFileSync(join(WEB, 'test/pro-bookings-page.spec.tsx'), 'utf8'), 'FIXTURE_CONCLUDED_STATUSES')
+        ?.length,
+    ).toBeGreaterThan(0);
   });
 
   it('restates exactly the server’s concluded statuses, so changing one breaks the other', () => {
