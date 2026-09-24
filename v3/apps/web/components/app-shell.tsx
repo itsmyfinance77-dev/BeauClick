@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { toPersianDigits } from '@beauclick/persian-utils';
+import { isSellerSession } from '@/lib/seller-identity';
 import { useAuth } from '@/lib/auth-context';
 import { useUnread } from '@/lib/unread-context';
 import { ErrorBoundary } from './error-boundary';
@@ -117,7 +118,7 @@ export function AppShell({ children }: { children: ReactNode }) {
    * The information architecture asks for `bc_provider`; no such capability
    * exists, and `professional` is the role that vocabulary means.
    */
-  const isSeller = user?.roles?.includes('professional') ?? false;
+  const isSeller = isSellerSession(user);
 
   const primary = [
     { href: '/search', label: 'خدمات' },
