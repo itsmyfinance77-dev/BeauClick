@@ -44,7 +44,15 @@ async function bootstrap() {
   app.enableCors({
     origin: allowedOrigins,
     credentials: true,
-    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    // PUT was MISSING here, and its absence broke every "save an existing
+    // draft" on the commercial-catalogue screens and the professional's
+    // outcome-policy assignment (#311): thirteen `@Put` routes exist and
+    // apps/web calls seven of them, and a credentialed cross-origin PUT is
+    // refused at PREFLIGHT when this list does not name it. The same shape, in
+    // the same option object, as the `Idempotency-Key` note below -- which is
+    // why neither list is maintained by memory any more. `cors-surface.spec.ts`
+    // compares BOTH against what the application actually uses.
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     // X-CSRF-Token is the double-submit header the refresh route requires.
     // A cross-origin attacker cannot set it without this allow-list naming it,
     // which is half of why the double-submit check works.
