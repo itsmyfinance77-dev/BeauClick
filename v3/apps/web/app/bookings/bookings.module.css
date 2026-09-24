@@ -121,12 +121,6 @@
   display: inline-block;
 }
 
-.note {
-  margin: 8px 0 0;
-  font-size: var(--bc-text-small-size);
-  color: var(--bc-color-text-muted);
-}
-
 .actions {
   padding: 0 16px 16px;
 }

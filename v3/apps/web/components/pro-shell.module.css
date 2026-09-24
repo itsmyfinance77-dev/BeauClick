@@ -202,27 +202,6 @@
   font-weight: 700;
 }
 
-.count {
-  margin-inline-start: auto;
-  font-size: var(--bc-text-badge-size);
-  font-weight: 700;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 6px;
-  border-radius: var(--bc-radius-chip);
-  background: var(--bc-color-primary-soft);
-  color: var(--bc-color-primary-on-soft);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-variant-numeric: tabular-nums;
-}
-
-.link[aria-current='page'] .count {
-  background: var(--bc-color-surface);
-  color: var(--bc-color-primary);
-}
-
 .separator {
   flex-shrink: 0;
   width: 1px;
