@@ -81,3 +81,45 @@ describe('the upcoming-bookings count has one source', () => {
     );
   });
 });
+
+/**
+ * The one copy of the status classification this repository cannot avoid — #282.
+ *
+ * `apps/web` may not import `services/booking`; the dependency does not go that
+ * way. So `pro-bookings-page.spec.tsx`'s fake server restates
+ * `CONCLUDED_BOOKING_STATUSES` to work out what a real server would count, and a
+ * restatement with no link back to its original is a drift waiting to happen.
+ *
+ * Read off disk rather than documented, which is the same reason the assertions
+ * above are: a comment saying "update this if the server changes" is a hope, and
+ * a test is a consequence. `booking-state-machine.spec.ts` covers the server side
+ * of the same classification from inside the service.
+ */
+describe('the web fixture agrees with the server it is standing in for', () => {
+  const ENTITY = join(WEB, '..', '..', 'services', 'booking', 'src', 'entities', 'booking.entity.ts');
+
+  /** The members of a `readonly BookingStatus[]` literal, or null when the shape moved. */
+  function declaredList(source: string, name: string): string[] | null {
+    const match = new RegExp(`${name}[^=]*=\\s*\\[([^\\]]*)\\]`).exec(source);
+    if (!match) return null;
+    return match[1]
+      .split(',')
+      .map((part) => part.trim().replace(/^'|'$/g, ''))
+      .filter((part) => part.length > 0);
+  }
+
+  it('can still find both lists, so a silently-unmatched regex cannot pass this', () => {
+    // The failure `css-module-classes.spec.ts` was corrected for: a parser that
+    // sees nothing and reports success. Both extractions are asserted to have
+    // worked before they are compared.
+    expect(declaredList(readFileSync(ENTITY, 'utf8'), 'CONCLUDED_BOOKING_STATUSES')).toHaveLength(4);
+    expect(declaredList(readFileSync(join(WEB, 'test/pro-bookings-page.spec.tsx'), 'utf8'), 'FIXTURE_CONCLUDED_STATUSES')).toHaveLength(4);
+  });
+
+  it('restates exactly the server’s concluded statuses, so changing one breaks the other', () => {
+    const server = declaredList(readFileSync(ENTITY, 'utf8'), 'CONCLUDED_BOOKING_STATUSES');
+    const fixture = declaredList(readFileSync(join(WEB, 'test/pro-bookings-page.spec.tsx'), 'utf8'), 'FIXTURE_CONCLUDED_STATUSES');
+
+    expect(fixture?.slice().sort()).toEqual(server?.slice().sort());
+  });
+});

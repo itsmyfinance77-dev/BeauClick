@@ -54,13 +54,30 @@ function booking(id: string, status: string, hours: number) {
 }
 
 /**
+ * The server's `CONCLUDED_BOOKING_STATUSES`, restated — #282.
+ *
+ * `apps/web` cannot import `services/booking`; the dependency does not go that
+ * way, and it should not. So this is a third copy of one classification, which
+ * would ordinarily be a drift waiting to happen.
+ *
+ * It is not left to a comment: `upcoming-count-one-source.spec.ts` reads the
+ * entity off disk and fails if this list and the server's disagree. Changing
+ * the server's set therefore breaks a test here rather than quietly leaving
+ * this fixture behind.
+ */
+export const FIXTURE_CONCLUDED_STATUSES = ['completed', 'cancelled', 'expired', 'no_show'];
+
+/**
  * The rule the SERVER counts by (#282): an open status, `endAt` still ahead.
  * Restated here so the fixture's default count is the one a real server would
  * give for the same rows, rather than a number chosen to make a test pass.
+ *
+ * Complement-shaped like the server's, so an unclassified new status drifts in
+ * the same direction at both ends — counted, not dropped.
  */
 const serverUpcomingCount = (list: unknown[]) =>
   (list as { status: string; endAt: string }[]).filter(
-    (b) => !['completed', 'cancelled', 'expired', 'no_show'].includes(b.status) && new Date(b.endAt).getTime() > Date.now(),
+    (b) => !FIXTURE_CONCLUDED_STATUSES.includes(b.status) && new Date(b.endAt).getTime() > Date.now(),
   ).length;
 
 function mockApi(
