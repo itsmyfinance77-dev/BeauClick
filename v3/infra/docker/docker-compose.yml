@@ -60,17 +60,25 @@ services:
   # that is undecided and downstream of `HOSTING`. `GAP-C-01` records the
   # distinction rather than letting a working local bucket imply it is closed.
   #
-  # Pulled from Quay, MinIO's own registry, pinned to an immutable release
-  # tag. Docker Hub stopped serving `minio/minio` on 2026-09-11 (`pull access
-  # denied ... repository does not exist`), which broke every FRESH machine
-  # while machines holding the cached image kept working -- exactly the
-  # failure that hides. CI pulls `quay.io/minio/minio:latest` (#145); this
-  # tag is the release that `latest` resolved to when CI proved it green
-  # (digest sha256:14cea493d9a3..., run 34657365674), so local and CI run
-  # the same bytes today. One centrally defined MinIO version shared by CI
-  # and Compose is a later deduplication, not this file's job (#146).
+  # The same MinIO, now from Chainguard -- see the long note in
+  # `.github/workflows/v3-ci.yml`'s "Start object storage" step for the full
+  # history and the reasoning (#305).
+  #
+  # This file was ALSO broken by the same outage and the breakage was of the
+  # kind that hides: it pinned `quay.io/minio/minio:RELEASE.2025-09-07T...`,
+  # and a pinned tag reads as the safe choice. It is not immune, because the
+  # registry stopped answering for the whole repository rather than for one
+  # tag -- both a dated release and `latest` return 401. So a machine holding
+  # the cached image kept working while every fresh checkout failed, which is
+  # the same trap the previous comment here described for Docker Hub and the
+  # same one it then walked into.
+  #
+  # `user: '0'` for the reason CI needs `--user 0`: the image runs as uid
+  # 65532 by default and cannot write the backend directory, exiting with
+  # "FATAL Unable to initialize backend: file access denied".
   objectstorage:
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    image: chainguard/minio:latest
+    user: '0'
     container_name: bc-v3-minio
     command: server /data
     environment:
