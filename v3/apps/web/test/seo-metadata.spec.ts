@@ -148,7 +148,7 @@ describe('providerPageMetadata -- generateMetadata for /providers/[id]', () => {
 
   it('reads the profile and the city list, and joins the city name to the cityId', async () => {
     (global.fetch as jest.Mock).mockImplementation((url: string) =>
-      url.endsWith('/v1/providers/cities') ? ok([{ id: 'c-1', name: 'یزد' }]) : ok(provider()),
+      url.endsWith('/v1/cities') ? ok([{ id: 'c-1', name: 'یزد' }]) : ok(provider()),
     );
     const md = await providerPageMetadata('p-1');
     expect(md.description).toBe('سالن نگین، آرایشگر، مانیکور در یزد');
@@ -156,7 +156,7 @@ describe('providerPageMetadata -- generateMetadata for /providers/[id]', () => {
 
   it('still describes the professional when the city cannot be resolved', async () => {
     (global.fetch as jest.Mock).mockImplementation((url: string) =>
-      url.endsWith('/v1/providers/cities') ? Promise.reject(new Error('down')) : ok(provider()),
+      url.endsWith('/v1/cities') ? Promise.reject(new Error('down')) : ok(provider()),
     );
     const md = await providerPageMetadata('p-1');
     expect(md.description).toBe('سالن نگین، آرایشگر، مانیکور');
