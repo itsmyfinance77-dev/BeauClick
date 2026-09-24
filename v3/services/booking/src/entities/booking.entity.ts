@@ -34,6 +34,35 @@ export type BookingStatus = (typeof BOOKING_STATUSES)[number];
 /** The statuses that still hold a slot against other customers. Used by the partial unique index and by availability queries. */
 export const SLOT_HOLDING_STATUSES: readonly BookingStatus[] = ['pending', 'confirmed'];
 
+/**
+ * The statuses that put a booking BEHIND both parties -- #282.
+ *
+ * Deliberately not `SLOT_HOLDING_STATUSES` inverted, though the two sets are
+ * complements of each other today. That one answers "does this booking still
+ * hold the slot against another customer", which is a contention question
+ * owned by the partial unique index and the availability queries. This one
+ * answers "is this booking still ahead of the people involved", which is a
+ * worklist question. Sharing one constant between them would mean a change
+ * made for contention silently moved a booking out of a professional's
+ * counter.
+ */
+export const CONCLUDED_BOOKING_STATUSES: readonly BookingStatus[] = ['completed', 'cancelled', 'expired', 'no_show'];
+
+/**
+ * Everything else, DERIVED rather than written out -- #282.
+ *
+ * The professional's booking list partitions by complement ("cancelled to its
+ * own tab, the terminal ones to the past, everything else upcoming"), so the
+ * count beside «رزروها» has to agree with a complement, not with a hand-kept
+ * allow-list. Deriving it means a status added to `BOOKING_STATUSES` tomorrow
+ * lands here by default and is counted, which is what that list would already
+ * do with it. The failure mode of forgetting to classify a new status is
+ * therefore agreement, not a badge that silently disagrees with the tab.
+ */
+export const OPEN_BOOKING_STATUSES: readonly BookingStatus[] = BOOKING_STATUSES.filter(
+  (status) => !CONCLUDED_BOOKING_STATUSES.includes(status),
+);
+
 export const BOOKING_ACTOR_TYPES = ['customer', 'professional', 'system', 'admin'] as const;
 export type BookingActorType = (typeof BOOKING_ACTOR_TYPES)[number];
 

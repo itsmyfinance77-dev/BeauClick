@@ -30,13 +30,22 @@ export interface ProNavItem {
    * read as the current one from «زمان‌های آزاد» to «شرایط لغو».
    */
   exact?: true;
+  /**
+   * Which count sits beside this destination in the column — §3's
+   * «+ شمارندهٔ پیش‌رو», and the reason §3 gives for moving to a column in the
+   * first place: «جای شمارنده هم هست».
+   *
+   * Names the count, never the number. This list is static data read by three
+   * surfaces; resolving a figure here would turn it into a component.
+   */
+  badge?: 'upcomingBookings';
 }
 
 export const PRO_NAV: ProNavItem[] = [
   // Renamed per the information architecture: this page is today's work,
   // and «نمای کلی» described a summary it is not.
   { href: '/pro', label: 'امروز', bar: 'today', exact: true },
-  { href: '/pro/bookings', label: 'رزروها', bar: 'bookings' },
+  { href: '/pro/bookings', label: 'رزروها', bar: 'bookings', badge: 'upcomingBookings' },
   { href: '/pro/availability', label: 'زمان‌های آزاد' },
   { href: '/pro/services', label: 'خدمات' },
   { href: '/pro/finance', label: 'مالی' },

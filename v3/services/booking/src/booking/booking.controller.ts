@@ -121,6 +121,30 @@ export class BookingController {
     };
   }
 
+  /**
+   * How many bookings are still ahead of this professional -- #282,
+   * `V3_INFORMATION_ARCHITECTURE.md` §3's «+ شمارندهٔ پیش‌رو».
+   *
+   * A COUNT rather than a filtered page, following the precedent of `GET
+   * /v1/me/notifications/unread-count`. The professional's navigation draws this
+   * on every screen under `/pro`, and the alternative -- reading page one of the
+   * list beside it and counting what looks upcoming -- is exact only while the
+   * professional has fewer upcoming bookings than one page holds.
+   *
+   * Same ownership rule as the list: a caller with no professional profile gets
+   * the identical 404, never a zero. A zero would tell someone with no
+   * professional identity at all that they have no upcoming bookings.
+   *
+   * Nothing shadows this path: `me/professional-bookings` above takes no
+   * parameter, so there is no `:id` for `upcoming-count` to be captured by.
+   */
+  @Get('me/professional-bookings/upcoming-count')
+  async myUpcomingProfessionalBookingCount(@CurrentUser() user: AuthenticatedUser): Promise<{ upcomingCount: number }> {
+    const professionalId = await this.directory.professionalIdForOwner(user.userId);
+    if (!professionalId) throw new NotFoundOrNotYoursException();
+    return { upcomingCount: await this.bookings.countUpcomingForProfessional(professionalId) };
+  }
+
   @ResolveOwner(BookingPartyResolver)
   @Get('bookings/:id')
   async getOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {

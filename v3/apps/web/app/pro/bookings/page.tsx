@@ -8,6 +8,7 @@ import { BookingRow } from '@/components/booking-row';
 import { TabList, TabPanel } from '@/components/tab-list';
 import { ProGuard } from '@/components/pro-guard';
 import { useAuth } from '@/lib/auth-context';
+import { useProProfile } from '@/lib/pro-context';
 import {
   bookingHistory,
   completeBooking,
@@ -43,6 +44,14 @@ const EMPTY: Record<Tab, string> = {
 
 function ProBookings({ profile }: { profile: MyProviderProfile }) {
   const { api } = useAuth();
+  /*
+   * #282. The «پیش‌رو» tab's own number, read from `ProProvider` rather than
+   * counted here. It used to be `upcoming.length` with a `+` suffix, which was
+   * a count of the pages HELD -- honest about being partial, but a different
+   * number from the badge the navigation now draws beside «رزروها». One source
+   * for both is what keeps them from disagreeing.
+   */
+  const { upcomingBookings, refreshUpcomingBookings } = useProProfile();
 
   const [bookings, setBookings] = useState<ProfessionalBookingSummary[]>([]);
   const [services, setServices] = useState<ServiceOffering[]>([]);
@@ -183,6 +192,11 @@ function ProBookings({ profile }: { profile: MyProviderProfile }) {
         booking.id === updated.id ? { ...updated, customerDisplayName: booking.customerDisplayName } : booking,
       ),
     );
+    // Completing, no-showing or rescheduling moves a booking across the
+    // upcoming boundary, so the shared count is now stale. Re-read rather than
+    // decremented: the server decides which side it landed on, exactly as the
+    // docblock above says for the booking itself.
+    void refreshUpcomingBookings();
   }
 
   async function runAction(booking: ProfessionalBookingSummary, action: 'complete' | 'no_show') {
@@ -293,13 +307,28 @@ function ProBookings({ profile }: { profile: MyProviderProfile }) {
     return Array.from(map.entries());
   }, [visible]);
 
-  // These are counts of what is HELD, not of what exists. With more pages
-  // unread the honest suffix is "+", not a total the screen cannot
-  // substantiate for this partition -- the server's `total` counts every
-  // booking, not one tab's share of them.
+  /*
+   * «گذشته» and «لغوشده» count what is HELD, not what exists, and say so with
+   * a `+` while pages remain unread -- the server's `total` counts every
+   * booking, not one tab's share of them, and no route counts those two.
+   */
   const count = (n: number) => `${toPersianDigits(n)}${hasMore ? '+' : ''}`;
+  /*
+   * «پیش‌رو» is the exception, and #282 is why: its number comes from the
+   * server's own COUNT, the same one the navigation's badge draws, so it needs
+   * no `+` -- it is not an approximation. Above one page it can exceed the rows
+   * visible beneath it, which is the ordinary shape of a paginated list with a
+   * total and a "load more", and it REPLACES the `+` that was standing in for
+   * the number nobody could read.
+   *
+   * When the count is unknown the label carries no figure at all. Falling back
+   * to `upcoming.length` would put a second, quietly different number under the
+   * same word -- the exact disagreement this change exists to remove.
+   */
+  const upcomingLabel =
+    upcomingBookings === null ? 'پیش‌رو' : `پیش‌رو (${toPersianDigits(upcomingBookings)})`;
   const tabs = [
-    { value: 'upcoming', label: `پیش‌رو (${count(upcoming.length)})` },
+    { value: 'upcoming', label: upcomingLabel },
     { value: 'past', label: `گذشته (${count(past.length)})` },
     { value: 'cancelled', label: `لغوشده (${count(cancelled.length)})` },
   ] as const;

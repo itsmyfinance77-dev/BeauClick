@@ -180,6 +180,28 @@ export function listProfessionalBookings(api: ApiClient, page = 1, limit = 20) {
   return api.get<ProfessionalBookingSummary[]>(`/v1/me/professional-bookings?page=${page}&limit=${limit}`);
 }
 
+/**
+ * How many bookings are still ahead of the caller -- #282.
+ *
+ * A whole count, which is the point of the route existing: the list above is
+ * paged and ordered `slotStart DESC`, so counting a held page is exact only
+ * while there are fewer upcoming bookings than one page holds.
+ *
+ * The server's rule is an open status with `slotEnd` still ahead, and `slotEnd`
+ * is **the same instant** as this client's `endAt`: `toBookingShape` serialises
+ * it with `booking.slotEnd.toISOString()`, so the boundary the count applies and
+ * the boundary the list partitions on are one instant in two encodings, not two
+ * instants that happen to be close. It is the same rule
+ * `/pro/bookings` partitions its «پیش‌رو» tab by, and deliberately NOT
+ * `booking-api.ts`'s `isUpcomingBooking`, which is the CUSTOMER's reading and
+ * turns on `startAt`. A booking in progress right now counts here and does not
+ * count there, and that difference is intended: a job you are in the middle of
+ * is not behind you.
+ */
+export function upcomingBookingCount(api: ApiClient) {
+  return api.get<{ upcomingCount: number }>('/v1/me/professional-bookings/upcoming-count');
+}
+
 export function bookingHistory(api: ApiClient, bookingId: string) {
   return api.get<BookingHistoryEntry[]>(`/v1/bookings/${bookingId}/history`);
 }

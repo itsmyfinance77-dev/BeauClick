@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
+import { toPersianDigits } from '@beauclick/persian-utils';
 import { useProProfile } from '@/lib/pro-context';
 import { ProMobileNav } from './pro-mobile-nav';
 import { PRO_NAV, isCurrentProNav } from './pro-nav';
@@ -46,9 +47,19 @@ import styles from './pro-shell.module.css';
  */
 
 export function ProShell({ children }: { children: ReactNode }) {
-  const { profile, state } = useProProfile();
+  const { profile, state, upcomingBookings } = useProProfile();
   const pathname = usePathname() ?? '/pro';
   const ready = state === 'ready' && profile;
+
+  /*
+   * The badge is absent for an UNKNOWN count and for a genuine zero alike, and
+   * those are not the same thing -- #282. `upcomingBookings` is null when the
+   * read failed or has not happened, and zero when the server said zero.
+   * Neither draws anything, because «۰» beside «رزروها» is noise either way;
+   * only `/pro/bookings`'s own tab label distinguishes them, where there is room
+   * to.
+   */
+  const showCount = upcomingBookings !== null && upcomingBookings > 0;
 
   return (
     <div className={styles.shell}>
@@ -81,6 +92,18 @@ export function ProShell({ children }: { children: ReactNode }) {
                 data-pro-nav={item.href}
               >
                 {item.label}
+                {item.badge === 'upcomingBookings' && showCount ? (
+                  /*
+                   * Inside the link, so the number is announced as part of the
+                   * destination rather than as a loose figure beside it, and the
+                   * hidden half says what the figure counts — «۳» on its own
+                   * names nothing.
+                   */
+                  <span className={styles.count} data-testid="pro-nav-upcoming-count">
+                    <span aria-hidden="true">{toPersianDigits(upcomingBookings)}</span>
+                    <span className="bc-visually-hidden">{`${toPersianDigits(upcomingBookings)} رزرو پیش‌رو`}</span>
+                  </span>
+                ) : null}
               </Link>
             </span>
           ))}

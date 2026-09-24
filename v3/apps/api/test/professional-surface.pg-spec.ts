@@ -586,6 +586,117 @@ describePg('professional operating surface (real PostgreSQL)', () => {
       const slot = await dataSource.query(`SELECT status FROM booking.availability_slots WHERE id = $1`, [foreignSlot]);
       expect(slot[0].status).toBe('open');
     });
+
+    /**
+     * The count behind the navigation's «رزروها» badge -- #282.
+     *
+     * Every case asserts against the SAME rule the professional's own booking
+     * list partitions by, because the badge sits beside that list: an open
+     * status, and `slot_end` still ahead.
+     */
+    describe('GET /v1/me/professional-bookings/upcoming-count', () => {
+      const countFor = async (token: string) =>
+        (
+          await request(app.getHttpServer())
+            .get('/api/v1/me/professional-bookings/upcoming-count')
+            .set('Authorization', `Bearer ${token}`)
+            .expect(200)
+        ).body.data.upcomingCount as number;
+
+      it('counts the professional’s own upcoming bookings and nobody else’s', async () => {
+        const mine = await seedConfirmedBooking({ hoursFromNow: 48 });
+        await seedConfirmedBooking({ hoursFromNow: 72 });
+
+        expect(await countFor(mine.proUser.accessToken)).toBe(1);
+      });
+
+      it('counts every page’s worth, not one page’s worth', async () => {
+        // The whole reason this route exists rather than the client counting
+        // page one of the list.
+        const first = await seedConfirmedBooking({ hoursFromNow: 24 });
+        for (const hours of [48, 72, 96]) {
+          const slotId = await seedSlot(
+            dataSource,
+            first.professional.id,
+            first.professional.serviceId,
+            futureSlotTime(hours),
+          );
+          const extra = await bookings.create({
+            customerId: first.customer.id,
+            professionalId: first.professional.id,
+            serviceId: first.professional.serviceId,
+            slotId,
+            idempotencyKey: uuidv7(),
+          });
+          await dataSource.query(
+            `UPDATE booking.bookings SET status = 'confirmed', hold_expires_at = NULL WHERE id = $1`,
+            [extra.id],
+          );
+        }
+
+        const onePage = await request(app.getHttpServer())
+          .get('/api/v1/me/professional-bookings?page=1&limit=2')
+          .set('Authorization', `Bearer ${first.proUser.accessToken}`)
+          .expect(200);
+        expect(onePage.body.data).toHaveLength(2);
+
+        expect(await countFor(first.proUser.accessToken)).toBe(4);
+      });
+
+      it('still counts a booking that has STARTED but not ended, which the customer’s own predicate drops', async () => {
+        // `slot_end`, not `slot_start`: a job you are in the middle of is not
+        // behind you. `isUpcomingBooking` on the customer surface uses `startAt`
+        // and excludes this booking; the professional's list includes it, so the
+        // badge beside that list must too.
+        const { proUser, booking } = await seedConfirmedBooking({ hoursFromNow: 48 });
+        await dataSource.query(
+          `UPDATE booking.bookings SET slot_start = now() - interval '20 minutes', slot_end = now() + interval '40 minutes' WHERE id = $1`,
+          [booking.id],
+        );
+
+        expect(await countFor(proUser.accessToken)).toBe(1);
+      });
+
+      it('stops counting a booking once its slot has ended', async () => {
+        const { proUser, booking } = await seedConfirmedBooking({ hoursFromNow: 48 });
+        await dataSource.query(
+          `UPDATE booking.bookings SET slot_start = now() - interval '2 hours', slot_end = now() - interval '1 hour' WHERE id = $1`,
+          [booking.id],
+        );
+
+        expect(await countFor(proUser.accessToken)).toBe(0);
+      });
+
+      it('stops counting a booking that reaches a concluded status while its slot is still ahead', async () => {
+        const { proUser, booking } = await seedConfirmedBooking({ hoursFromNow: 48 });
+        expect(await countFor(proUser.accessToken)).toBe(1);
+
+        await request(app.getHttpServer())
+          .post(`/api/v1/bookings/${booking.id}/cancel`)
+          .set('Authorization', `Bearer ${proUser.accessToken}`)
+          .send({ reason: 'برنامه عوض شد' })
+          // 201, as `booking-outcome-policy.pg-spec.ts` also expects: the route
+          // is a POST with no `@HttpCode`, so Nest's default stands.
+          .expect(201);
+
+        expect(await countFor(proUser.accessToken)).toBe(0);
+      });
+
+      it('gives a user with no professional profile the same 404 as the list, never a zero', async () => {
+        // A zero would tell someone with no professional identity at all that
+        // they have no upcoming bookings.
+        const nobody = await seedUser(app, dataSource, nextPhone('+9891200009'));
+
+        await request(app.getHttpServer())
+          .get('/api/v1/me/professional-bookings/upcoming-count')
+          .set('Authorization', `Bearer ${nobody.accessToken}`)
+          .expect(404);
+      });
+
+      it('is refused without a session', async () => {
+        await request(app.getHttpServer()).get('/api/v1/me/professional-bookings/upcoming-count').expect(401);
+      });
+    });
   });
 
   // -------------------------------------------------------------------

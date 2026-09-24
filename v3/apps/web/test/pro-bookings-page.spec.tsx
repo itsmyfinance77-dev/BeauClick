@@ -1,6 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ProBookingsPage from '@/app/pro/bookings/page';
+import { ProShell } from '@/components/pro-shell';
 import { AuthProvider } from '@/lib/auth-context';
 import { ProProvider } from '@/lib/pro-context';
 import { tokenStorage } from '@/lib/token-storage';
@@ -52,12 +53,33 @@ function booking(id: string, status: string, hours: number) {
   };
 }
 
-function mockApi(list: unknown[], extra: Record<string, () => Promise<unknown>> = {}) {
+/**
+ * The rule the SERVER counts by (#282): an open status, `endAt` still ahead.
+ * Restated here so the fixture's default count is the one a real server would
+ * give for the same rows, rather than a number chosen to make a test pass.
+ */
+const serverUpcomingCount = (list: unknown[]) =>
+  (list as { status: string; endAt: string }[]).filter(
+    (b) => !['completed', 'cancelled', 'expired', 'no_show'].includes(b.status) && new Date(b.endAt).getTime() > Date.now(),
+  ).length;
+
+function mockApi(
+  list: unknown[],
+  extra: Record<string, () => Promise<unknown>> = {},
+  /** Overridable so a test can prove the label follows the SERVER and not the rows it holds. */
+  upcomingCount: number | 'fails' = serverUpcomingCount(list),
+) {
   (global.fetch as jest.Mock).mockImplementation((url: string) => {
     for (const [fragment, handler] of Object.entries(extra)) if (url.includes(fragment)) return handler();
     if (url.includes('/v1/auth/refresh')) return ok({ accessToken: 'a', csrfToken: 'c' });
     if (/\/v1\/me(\?|$)/.test(url)) return ok({ id: 'u1', phone: '+989123456789', displayName: null, roles: [], capabilities: [] });
     if (url.includes('/v1/me/provider')) return ok(PROFILE);
+    // Ordered most-specific first: the list fragment is a prefix of this one.
+    if (url.includes('/v1/me/professional-bookings/upcoming-count')) {
+      return upcomingCount === 'fails'
+        ? Promise.resolve({ ok: false, status: 500, json: async () => ({ data: null, meta: null, error: { code: 'INTERNAL_ERROR', message: 'خطا' } }) })
+        : ok({ upcomingCount });
+    }
     if (url.includes('/v1/me/professional-bookings')) return ok(list);
     return ok([]);
   });
@@ -68,6 +90,25 @@ function renderPage() {
     <AuthProvider>
       <ProProvider>
         <ProBookingsPage />
+      </ProProvider>
+    </AuthProvider>,
+  );
+}
+
+/**
+ * The page inside its real shell, under ONE `ProProvider` — #282.
+ *
+ * The badge and the tab label are two surfaces reading one number, and the only
+ * way to assert they cannot disagree is to render both together and give them a
+ * count that contradicts the rows.
+ */
+function renderWithShell() {
+  return render(
+    <AuthProvider>
+      <ProProvider>
+        <ProShell>
+          <ProBookingsPage />
+        </ProShell>
       </ProProvider>
     </AuthProvider>,
   );
@@ -124,6 +165,49 @@ describe('the tabs', () => {
     expect(await screen.findByText('رزرو لغوشده‌ای ندارید.')).toBeInTheDocument();
     await user.click(screen.getByRole('tab', { name: /گذشته/ }));
     expect(await screen.findByText('هنوز رزرو گذشته‌ای ندارید.')).toBeInTheDocument();
+  });
+});
+
+/**
+ * One number, two places that show it — #282.
+ *
+ * Before this, the «پیش‌رو» tab counted the pages it HELD and marked the
+ * shortfall with a `+`, because the true total was unreadable. The navigation's
+ * badge counts everything. Two numbers under one word is the failure these cases
+ * exist to prevent, so each is written to fail if EITHER surface goes back to
+ * counting for itself.
+ */
+describe('the badge and the tab label are the same number', () => {
+  it('both follow the server, even when it disagrees with the rows on screen', async () => {
+    // Two rows held, sixty-two upcoming in total. Anything deriving a figure
+    // from what is loaded would say ۲.
+    mockApi([booking('a', 'confirmed', 24), booking('b', 'confirmed', 48)], {}, 62);
+    renderWithShell();
+
+    await waitFor(() => expect(screen.queryByTestId('pro-nav-upcoming-count')).not.toBeNull());
+    expect(screen.getByTestId('pro-nav-upcoming-count')).toHaveTextContent('۶۲');
+    expect(screen.getByRole('tab', { name: /پیش‌رو \(۶۲\)/ })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /پیش‌رو \(۲\)/ })).toBeNull();
+  });
+
+  it('carries no “+” on «پیش‌رو», because that number is no longer an approximation', async () => {
+    // The other two tabs keep theirs: no route counts them, so "at least this
+    // many" stays the honest thing for them to say.
+    mockApi([booking('a', 'confirmed', 24), booking('done', 'completed', -48)], {}, 7);
+    renderWithShell();
+
+    expect(await screen.findByRole('tab', { name: 'پیش‌رو (۷)' })).toBeInTheDocument();
+  });
+
+  it('shows no figure on either surface when the count cannot be read, rather than two different guesses', async () => {
+    mockApi([booking('a', 'confirmed', 24), booking('b', 'confirmed', 48)], {}, 'fails');
+    renderWithShell();
+
+    expect(await screen.findByRole('tab', { name: 'پیش‌رو' })).toBeInTheDocument();
+    expect(screen.queryByTestId('pro-nav-upcoming-count')).toBeNull();
+    // Specifically not a fallback to the rows it holds — that is the second
+    // source this change removed.
+    expect(screen.queryByRole('tab', { name: /پیش‌رو \(/ })).toBeNull();
   });
 });
 
