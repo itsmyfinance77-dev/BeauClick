@@ -204,9 +204,3 @@
   flex-wrap: wrap;
   margin-block-start: 10px;
 }
-
-.empty {
-  margin: 0;
-  color: var(--bc-color-text-muted);
-  line-height: 1.8;
-}

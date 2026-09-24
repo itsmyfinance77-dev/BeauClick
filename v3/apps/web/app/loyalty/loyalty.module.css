@@ -61,10 +61,6 @@
   font-size: 15px;
 }
 
-.muted {
-  color: var(--bc-color-text-faint);
-}
-
 .until {
   margin: 6px 0 0;
   font-size: 13px;

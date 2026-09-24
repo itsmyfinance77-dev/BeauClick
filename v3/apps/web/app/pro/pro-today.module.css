@@ -219,16 +219,6 @@
   font-weight: 700;
 }
 
-.sectionLink {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--bc-color-primary);
-  text-decoration: none;
-  min-height: 44px;
-  display: inline-flex;
-  align-items: center;
-}
-
 .timeline {
   background: var(--bc-color-surface);
   border: 1px solid var(--bc-color-border);
@@ -334,23 +324,6 @@
   border-radius: var(--bc-radius-chip);
   background: var(--bc-color-primary-soft);
   color: var(--bc-color-primary-on-soft);
-}
-
-.statusChipDue {
-  background: var(--bc-color-error-soft);
-  color: var(--bc-color-error);
-}
-
-.rowAction {
-  font: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--bc-color-primary);
-  text-decoration: none;
-  flex-shrink: 0;
-  min-height: 44px;
-  display: inline-flex;
-  align-items: center;
 }
 
 .empty {

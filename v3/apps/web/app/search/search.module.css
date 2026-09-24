@@ -189,30 +189,6 @@
 
 /* ------------------------------------------------------------ results head */
 
-.resultsHead {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 24px;
-  margin-block-end: 8px;
-  flex-wrap: wrap;
-}
-
-.resultsTitle {
-  margin: 0;
-  font-family: var(--bc-font-display);
-  font-size: 24px;
-  font-weight: 800;
-  line-height: 1.45;
-}
-
-@media (min-width: 1024px) {
-  .resultsTitle {
-    font-size: 30px;
-    line-height: 1.5;
-  }
-}
-
 .count {
   margin: 0 0 18px;
   font-size: 15px;
