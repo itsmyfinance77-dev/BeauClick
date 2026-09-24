@@ -194,6 +194,12 @@ describe('the sheet', () => {
     mockApi({ hasProfile: false });
     render(shell());
     await waitFor(() => expect(bar().querySelectorAll('[data-tab]').length).toBeGreaterThan(0));
+    // The bar is there from the first render, so that wait proves nothing about
+    // the profile read. The 404 has to land inside act, or it lands after the
+    // case (#298); a macrotask lets the whole request chain finish first.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
 
     const sheet = openSheet();
     expect(within(sheet).getByRole('link', { name: 'پروفایل عمومی' })).toBeInTheDocument();
