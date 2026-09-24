@@ -55,7 +55,7 @@ import styles from './provider.module.css';
  * ## The city needed a second read
  *
  * The professional shape carries `cityId` and not a name. `GET
- * /v1/providers/cities` is public and small, so the name comes from there.
+ * /v1/cities` is public and small, so the name comes from there.
  * A page that shows a customer a raw uuid is showing them nothing.
  *
  * ## What the design shows and this does not

@@ -210,7 +210,7 @@ export const bookingApi = {
    * at. The professional shape carries the id and not the name, and a page
    * that shows a raw uuid to a customer is showing them nothing.
    */
-  listCities: (api: ApiClient) => api.get<CityRef[]>('/v1/providers/cities'),
+  listCities: (api: ApiClient) => api.get<CityRef[]>('/v1/cities'),
 
   listAvailability: (api: ApiClient, id: string, serviceId?: string | null) =>
     api.get<AvailableSlot[]>(`/v1/providers/${id}/availability${serviceId ? `?serviceId=${serviceId}` : ''}`),

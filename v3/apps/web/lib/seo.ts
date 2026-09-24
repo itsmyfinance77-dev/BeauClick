@@ -139,7 +139,7 @@ export async function providerPageMetadata(id: string): Promise<Metadata> {
 
   let cityName: string | null = null;
   if (profile.data.cityId) {
-    const cities = await fetchPublic<CityRef[]>('/v1/providers/cities');
+    const cities = await fetchPublic<CityRef[]>('/v1/cities');
     cityName = cities?.data.find((c) => c.id === profile.data.cityId)?.name ?? null;
   }
   return providerMetadata(profile.data, cityName);

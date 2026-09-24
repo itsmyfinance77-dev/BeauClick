@@ -95,7 +95,7 @@ function mockApi(options: {
       }
       return method === 'DELETE' ? ok(null) : ok({ id: 'w1' });
     }
-    if (url.includes('/v1/providers/cities')) {
+    if (url.includes('/v1/cities')) {
       if (options.citiesFail) return Promise.resolve({ ok: false, status: 500, json: async () => ({ data: null, meta: null, error: { code: 'X', message: 'x' } }) });
       return ok([{ id: 'city-yazd', name: 'یزد' }]);
     }
@@ -149,7 +149,9 @@ describe('the profile shows what the server said, and no more', () => {
     await screen.findByRole('heading', { name: 'آتلیه سارا محمدی', level: 1 });
     // `ProviderSummary` carries `cityId` only; the name comes from the
     // public city list. A uuid on a customer's screen is not information.
-    expect(document.body.textContent).toContain('یزد');
+    // Asserted on the place line itself, not the page text: the bio also says
+    // «یزد», so a page-wide match passed with the city read broken (#302).
+    expect(await screen.findByText('یزد · میکاپ عروس، شینیون')).toBeInTheDocument();
     expect(document.body.textContent).not.toContain('city-yazd');
   });
 
@@ -160,6 +162,7 @@ describe('the profile shows what the server said, and no more', () => {
     await screen.findByRole('heading', { name: 'آتلیه سارا محمدی', level: 1 });
     // A profile whose city cannot be named is still a usable profile.
     expect(screen.getByTestId('services')).toBeInTheDocument();
+    expect(screen.getByText('میکاپ عروس، شینیون')).toBeInTheDocument();
     expect(document.body.textContent).not.toContain('city-yazd');
   });
 
