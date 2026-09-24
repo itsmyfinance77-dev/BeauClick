@@ -183,16 +183,54 @@ jobs:
           echo "::add-mask::$CI_MINIO_PASSWORD"
           echo "CI_MINIO_USER=$CI_MINIO_USER" >> "$GITHUB_ENV"
           echo "CI_MINIO_PASSWORD=$CI_MINIO_PASSWORD" >> "$GITHUB_ENV"
-          # Pulled from Quay, MinIO's own registry. On 2026-09-11 Docker Hub
-          # stopped serving `minio/minio` ("pull access denied ... repository
-          # does not exist"; the Hub API answers "object not found"), which
-          # failed this step on a branch whose identical step had passed on
-          # master four hours earlier. `quay.io/minio/minio` is the same
-          # image, published by the same project; nothing else here changes.
-          docker run -d --name bc-ci-minio -p 9000:9000 \
+          # The SAME MinIO, from a third registry -- the second time this one
+          # dependency has stopped serving us from outside (#305).
+          #
+          #   2026-09-11  Docker Hub stopped serving `minio/minio` ("pull access
+          #               denied ... repository does not exist"). Moved to Quay.
+          #   2026-09-24  quay.io began requiring authentication for anonymous
+          #               access, including its public API. `docker run` returns
+          #               "unauthorized: access to the requested resource is not
+          #               authorized" and the job dies in ~2 minutes, before a
+          #               single test runs. Master failed identically, so every
+          #               open branch became unmergeable at once.
+          #
+          # Pinning would NOT have helped: two dated releases 401 exactly as
+          # `latest` does, so Quay restricted the whole repository rather than
+          # the moving tag.
+          #
+          # `chainguard/minio` is the same MinIO server (the image this landed
+          # with is RELEASE.2026-09-22T19-25-18Z), published by Chainguard
+          # rather than by MinIO. Established by running it, not by reading a
+          # registry API.
+          #
+          # `--user 0` is REQUIRED and is not tidiness. The image defaults to
+          # non-root uid 65532, which cannot write the backend directory:
+          # without it the container exits immediately with "FATAL Unable to
+          # initialize backend: file access denied" -- whatever path is given,
+          # and whether or not a volume is mounted with matching ownership.
+          # Both were tried. This is a throwaway container holding fixture
+          # objects for one CI run, so running it as root costs nothing; the
+          # hardening the image is built for protects a deployment, which this
+          # is not.
+          #
+          # `:latest` stays, deliberately, against the general rule that an
+          # external tag should be pinned. Chainguard's public repository keeps
+          # exactly two real tags -- `latest` and `latest-dev` -- and everything
+          # else it publishes is a `.sig` signature artifact. A digest there is
+          # garbage-collected on their rebuild cycle, so pinning would trade a
+          # tag that moves for a reference that disappears: the same outage in a
+          # worse form, because it would arrive without anyone changing
+          # anything. If this must become pinnable, `adobe/s3mock` carries real
+          # version tags -- but it is a different S3 implementation, so that is
+          # a change to what this tier tests against, not a swap.
+          #
+          # Startup is slower than MinIO's own image: measured ~12s to answer
+          # the health probe, against the 60s this loop allows.
+          docker run -d --name bc-ci-minio --user 0 -p 9000:9000 \
             -e MINIO_ROOT_USER="$CI_MINIO_USER" \
             -e MINIO_ROOT_PASSWORD="$CI_MINIO_PASSWORD" \
-            quay.io/minio/minio:latest server /data
+            chainguard/minio:latest server /data
           for i in $(seq 1 30); do
             if curl -sf http://localhost:9000/minio/health/live > /dev/null; then
               echo "MinIO is live"

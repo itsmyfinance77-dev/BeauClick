@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within, cleanup } from '@testing-library/react';
+import { act, render, screen, waitFor, within, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import CheckoutResultPage from '@/app/checkout/result/page';
 import { ApiRequestError } from '@/lib/api-client';
@@ -36,9 +36,17 @@ jest.mock('@/lib/auth-context', () => ({
   useAuth: () => ({ api: apiStub, status: authStatus, user: null }),
 }));
 
-function renderResult(query: Record<string, string>) {
+/**
+ * The page reads the order from an unawaited promise, so a case that asserts
+ * synchronously ends with that read still in flight and its state update lands
+ * after the case, outside any act() scope (#298). Awaiting an empty act here
+ * lets the read settle inside one, for every case.
+ */
+async function renderResult(query: Record<string, string>) {
   searchParams = new URLSearchParams(query);
-  return render(<CheckoutResultPage />);
+  const view = render(<CheckoutResultPage />);
+  await act(async () => {});
+  return view;
 }
 
 /**
@@ -117,16 +125,16 @@ describe('the six result statuses', () => {
     ['duplicate_refunded', 'رزرو شما تأیید شد'],
     ['unresolved', 'وضعیت پرداخت هنوز مشخص نیست'],
   ])('%s renders its own heading', async (status, heading) => {
-    renderResult({ status, orderId: 'o1' });
+    await renderResult({ status, orderId: 'o1' });
     expect(await screen.findByRole('heading', { level: 1, name: new RegExp(heading) })).toBeInTheDocument();
   });
 
-  it('covers every status the contract declares — none is unhandled', () => {
+  it('covers every status the contract declares — none is unhandled', async () => {
     // If a status is added server-side and nobody adds copy for it, this fails
     // rather than the page silently falling back to "پرداخت انجام نشد" in
     // production.
     for (const status of PAYMENT_RESULT_STATUSES) {
-      renderResult({ status, orderId: 'o1' });
+      await renderResult({ status, orderId: 'o1' });
       const heading = screen.getAllByRole('heading', { level: 1 }).at(-1);
       expect(heading?.textContent).toBeTruthy();
       if (status !== 'failed') {
@@ -142,7 +150,7 @@ describe('the corrected copy — the contradiction the design found', () => {
     // تعیین تکلیف می‌شود". There is no reconciliation sweep; §8 of the Phase F
     // report records that one was deliberately not built. The sentence
     // described a mechanism that does not exist, about a customer's money.
-    renderResult({ status: 'unresolved', orderId: 'o1', reason: 'unresolved' });
+    await renderResult({ status: 'unresolved', orderId: 'o1', reason: 'unresolved' });
     const text = banner().textContent ?? '';
 
     expect(text).not.toContain('تعیین تکلیف');
@@ -152,7 +160,7 @@ describe('the corrected copy — the contradiction the design found', () => {
   });
 
   it('says the three things the design requires and nothing more', async () => {
-    renderResult({ status: 'unresolved', orderId: 'o1' });
+    await renderResult({ status: 'unresolved', orderId: 'o1' });
     const text = banner().textContent ?? '';
 
     expect(text).toContain('معلوم نیست'); // the result is unknown
@@ -165,7 +173,7 @@ describe('the corrected copy — the contradiction the design found', () => {
     // `gateway_error` is a DEFINITIVE failure: the gateway said the
     // transaction did not succeed, so nothing was captured and there is
     // nothing to refund. The old copy promised one anyway.
-    renderResult({ status: 'failed', orderId: 'o1', reason: 'gateway_error' });
+    await renderResult({ status: 'failed', orderId: 'o1', reason: 'gateway_error' });
     const text = banner().textContent ?? '';
 
     expect(text).not.toContain('بازگردانده می‌شود');
@@ -187,7 +195,7 @@ describe('the corrected copy — the contradiction the design found', () => {
     // distinction for a reader who cannot tell amber from red. The token pair
     // itself is measured against WCAG AA in
     // `packages/design-tokens/src/contrast.spec.ts`.
-    renderResult({ status: 'refunded', orderId: 'o1' });
+    await renderResult({ status: 'refunded', orderId: 'o1' });
     const heading = await screen.findByRole('heading', { level: 1 });
 
     expect(heading.textContent).toContain('⚠');
@@ -205,13 +213,13 @@ describe('the corrected copy — the contradiction the design found', () => {
       ['unresolved', '⚠'],
       ['failed', '✕'],
     ] as const) {
-      renderResult({ status, orderId: 'o1' });
+      await renderResult({ status, orderId: 'o1' });
       expect(screen.getAllByRole('heading', { level: 1 }).at(-1)?.textContent).toContain(glyph);
     }
   });
 
   it('hides the glyph from assistive tech, because the heading already says it', async () => {
-    renderResult({ status: 'succeeded', orderId: 'o1' });
+    await renderResult({ status: 'succeeded', orderId: 'o1' });
     const heading = await screen.findByRole('heading', { level: 1 });
     expect(heading.querySelector('[aria-hidden="true"]')?.textContent).toBe('✓');
   });
@@ -219,7 +227,7 @@ describe('the corrected copy — the contradiction the design found', () => {
 
 describe('the eight public failure reasons', () => {
   it.each(PAYMENT_FAILURE_REASONS.map((r) => [r]))('%s renders its own sentence', async (reason) => {
-    renderResult({ status: 'failed', orderId: 'o1', reason });
+    await renderResult({ status: 'failed', orderId: 'o1', reason });
     const text = banner().textContent ?? '';
     expect(text.length).toBeGreaterThan(20);
     // Never the raw code, in any of them.
@@ -227,10 +235,10 @@ describe('the eight public failure reasons', () => {
   });
 
   it('gives cancel and decline DIFFERENT sentences — the regression QA-21 names', async () => {
-    renderResult({ status: 'failed', orderId: 'o1', reason: 'cancelled_by_user' });
+    await renderResult({ status: 'failed', orderId: 'o1', reason: 'cancelled_by_user' });
     const cancelled = banner().textContent;
 
-    renderResult({ status: 'failed', orderId: 'o1', reason: 'declined' });
+    await renderResult({ status: 'failed', orderId: 'o1', reason: 'declined' });
     const declined = screen.getAllByRole('alert').at(-1)?.textContent;
 
     expect(cancelled).not.toEqual(declined);
@@ -238,10 +246,10 @@ describe('the eight public failure reasons', () => {
     expect(declined).toContain('بانک این تراکنش را تأیید نکرد');
   });
 
-  it('produces a distinct sentence for every reason — no two collapse', () => {
+  it('produces a distinct sentence for every reason — no two collapse', async () => {
     const sentences = new Set<string>();
     for (const reason of PAYMENT_FAILURE_REASONS) {
-      renderResult({ status: 'failed', orderId: 'o1', reason });
+      await renderResult({ status: 'failed', orderId: 'o1', reason });
       sentences.add(screen.getAllByRole('alert').at(-1)?.textContent ?? '');
     }
     expect(sentences.size).toBe(PAYMENT_FAILURE_REASONS.length);
@@ -257,7 +265,7 @@ describe('a tampered URL', () => {
     // The server attaches a reason only to `failed` and `unresolved`. A
     // recognised reason appended to a success must be IGNORED, not rendered —
     // otherwise the page contradicts itself.
-    renderResult({ status: 'succeeded', orderId: 'o1', reason: 'declined' });
+    await renderResult({ status: 'succeeded', orderId: 'o1', reason: 'declined' });
 
     expect(await screen.findByRole('heading', { level: 1, name: /پرداخت انجام شد/ })).toBeInTheDocument();
     const text = banner().textContent ?? '';
@@ -268,20 +276,20 @@ describe('a tampered URL', () => {
   it.each(['replayed', 'refunded', 'duplicate_refunded'])(
     'ignores a reason on %s, where the server never attaches one',
     async (status) => {
-      renderResult({ status, orderId: 'o1', reason: 'amount_mismatch' });
+      await renderResult({ status, orderId: 'o1', reason: 'amount_mismatch' });
       expect(banner().textContent).not.toContain('رویداد امنیتی');
     },
   );
 
   it('falls back safely for an unknown status', async () => {
-    renderResult({ status: 'totally-made-up', orderId: 'o1' });
+    await renderResult({ status: 'totally-made-up', orderId: 'o1' });
     expect(await screen.findByRole('heading', { level: 1, name: /پرداخت انجام نشد/ })).toBeInTheDocument();
   });
 
   it('falls back safely for an unknown reason, and never echoes it', async () => {
     // Forward compatibility in the safe direction, and the redaction boundary:
     // a value this bundle does not know must not be rendered.
-    renderResult({ status: 'failed', orderId: 'o1', reason: 'NOK merchant 1234-5678 rejected authority A000' });
+    await renderResult({ status: 'failed', orderId: 'o1', reason: 'NOK merchant 1234-5678 rejected authority A000' });
     const text = banner().textContent ?? '';
 
     expect(text).toContain('مبلغی از حساب شما کسر نشده است');
@@ -291,7 +299,7 @@ describe('a tampered URL', () => {
 
   it('never renders a provider or internal code, whatever the URL carries', async () => {
     for (const hostile of ['-51', 'intent_expired', 'verification_timeout', '<script>alert(1)</script>']) {
-      renderResult({ status: 'failed', orderId: 'o1', reason: hostile });
+      await renderResult({ status: 'failed', orderId: 'o1', reason: hostile });
       const text = screen.getAllByRole('alert').at(-1)?.textContent ?? '';
       expect(text).not.toContain(hostile);
     }
@@ -299,7 +307,7 @@ describe('a tampered URL', () => {
 
   it('still reads the receipt from the authenticated API, never from the URL', async () => {
     // The figures come from the server regardless of what the status claims.
-    renderResult({ status: 'succeeded', orderId: 'o1', totalToman: '999999999' } as Record<string, string>);
+    await renderResult({ status: 'succeeded', orderId: 'o1', totalToman: '999999999' } as Record<string, string>);
     await waitFor(() => expect(getOrder).toHaveBeenCalledWith(apiStub, 'o1'));
 
     // The server's figure, not the URL's. It appears twice -- once as the line
@@ -312,19 +320,19 @@ describe('a tampered URL', () => {
 
 describe('the states that used to render nothing', () => {
   it('explains a missing orderId instead of silently dropping the receipt', async () => {
-    renderResult({ status: 'failed' });
+    await renderResult({ status: 'failed' });
     expect(await screen.findByText(/شناسهٔ سفارش در این لینک موجود نیست/)).toBeInTheDocument();
   });
 
   it('makes NO order request when there is no orderId', async () => {
-    renderResult({ status: 'failed' });
+    await renderResult({ status: 'failed' });
     await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument());
     expect(getOrder).not.toHaveBeenCalled();
   });
 
   it('offers login to an unauthenticated visitor, returning to this exact URL', async () => {
     authStatus = 'unauthenticated';
-    renderResult({ status: 'succeeded', orderId: 'o1' });
+    await renderResult({ status: 'succeeded', orderId: 'o1' });
 
     const login = await screen.findByRole('link', { name: 'ورود' });
     const href = login.getAttribute('href') ?? '';
@@ -336,7 +344,7 @@ describe('the states that used to render nothing', () => {
     // A page that fired an authenticated read without a session would produce
     // a 401 on every visit and teach nobody anything.
     authStatus = 'unauthenticated';
-    renderResult({ status: 'succeeded', orderId: 'o1' });
+    await renderResult({ status: 'succeeded', orderId: 'o1' });
     await screen.findByRole('link', { name: 'ورود' });
     expect(getOrder).not.toHaveBeenCalled();
   });
@@ -344,7 +352,7 @@ describe('the states that used to render nothing', () => {
   it('still shows the result banner without a session', async () => {
     // The outcome is not private; the receipt is.
     authStatus = 'unauthenticated';
-    renderResult({ status: 'succeeded', orderId: 'o1' });
+    await renderResult({ status: 'succeeded', orderId: 'o1' });
     expect(await screen.findByRole('heading', { level: 1, name: /پرداخت انجام شد/ })).toBeInTheDocument();
   });
 });
@@ -352,7 +360,7 @@ describe('the states that used to render nothing', () => {
 describe('a failed receipt fetch', () => {
   it('offers a retry and actually refetches on it', async () => {
     getOrder.mockRejectedValueOnce(new Error('ارتباط با سرور برقرار نشد.'));
-    renderResult({ status: 'succeeded', orderId: 'o1' });
+    await renderResult({ status: 'succeeded', orderId: 'o1' });
 
     const retry = await screen.findByRole('button', { name: 'تلاش دوباره' });
     expect(getOrder).toHaveBeenCalledTimes(1);
@@ -368,7 +376,7 @@ describe('a failed receipt fetch', () => {
 
 describe('heading focus', () => {
   it('moves focus to the heading once, so a returning customer lands on the outcome', async () => {
-    renderResult({ status: 'succeeded', orderId: 'o1' });
+    await renderResult({ status: 'succeeded', orderId: 'o1' });
     const heading = await screen.findByRole('heading', { level: 1 });
 
     expect(heading).toHaveFocus();
@@ -380,7 +388,7 @@ describe('heading focus', () => {
     // on every render and yanks the cursor back mid-interaction, which is
     // worse than not moving it at all.
     getOrder.mockRejectedValueOnce(new Error('failed'));
-    renderResult({ status: 'succeeded', orderId: 'o1' });
+    await renderResult({ status: 'succeeded', orderId: 'o1' });
 
     const retry = await screen.findByRole('button', { name: 'تلاش دوباره' });
     retry.focus();
@@ -402,7 +410,7 @@ describe('the retry action', () => {
   }
 
   it.each(RETRYABLE.map((r) => [r]))('is offered for %s', async (reason) => {
-    renderResult({ status: 'failed', orderId: 'o1', reason });
+    await renderResult({ status: 'failed', orderId: 'o1', reason });
     await screen.findByRole('heading', { level: 1 });
     expect(retryButton()).not.toBeNull();
   });
@@ -412,32 +420,32 @@ describe('the retry action', () => {
     // `amount_mismatch` is an open security question, `unknown_reference`
     // cannot be reasoned about, and `expired` is a re-booking question this
     // platform has no safe path for.
-    renderResult({ status: 'failed', orderId: 'o1', reason });
+    await renderResult({ status: 'failed', orderId: 'o1', reason });
     await screen.findByRole('heading', { level: 1 });
     expect(retryButton()).toBeNull();
   });
 
   it('is not offered on an unresolved STATUS either', async () => {
-    renderResult({ status: 'unresolved', orderId: 'o1', reason: 'unresolved' });
+    await renderResult({ status: 'unresolved', orderId: 'o1', reason: 'unresolved' });
     await screen.findByRole('heading', { level: 1 });
     expect(retryButton()).toBeNull();
   });
 
   it.each(['succeeded', 'replayed', 'refunded', 'duplicate_refunded'])('is not offered on %s', async (status) => {
-    renderResult({ status, orderId: 'o1', reason: 'declined' });
+    await renderResult({ status, orderId: 'o1', reason: 'declined' });
     await screen.findByRole('heading', { level: 1 });
     expect(retryButton()).toBeNull();
   });
 
   it('is not offered without a session, because retry needs one', async () => {
     authStatus = 'unauthenticated';
-    renderResult({ status: 'failed', orderId: 'o1', reason: 'declined' });
+    await renderResult({ status: 'failed', orderId: 'o1', reason: 'declined' });
     await screen.findByRole('heading', { level: 1 });
     expect(retryButton()).toBeNull();
   });
 
   it('is not offered without an orderId, because there is nothing to name', async () => {
-    renderResult({ status: 'failed', reason: 'declined' });
+    await renderResult({ status: 'failed', reason: 'declined' });
     await screen.findByRole('heading', { level: 1 });
     expect(retryButton()).toBeNull();
   });
@@ -448,7 +456,7 @@ describe('the retry action', () => {
       meta: null,
       error: null,
     } as never);
-    renderResult({ status: 'failed', orderId: 'o1', reason: 'declined' });
+    await renderResult({ status: 'failed', orderId: 'o1', reason: 'declined' });
 
     await userEvent.click(await screen.findByRole('button', { name: 'تلاش دوباره' }));
 
@@ -462,7 +470,7 @@ describe('the retry action', () => {
   it('cannot be submitted twice by a double click', async () => {
     let resolve: (v: unknown) => void = () => undefined;
     retryOrderPayment.mockImplementation(() => new Promise((r) => (resolve = r)));
-    renderResult({ status: 'failed', orderId: 'o1', reason: 'declined' });
+    await renderResult({ status: 'failed', orderId: 'o1', reason: 'declined' });
 
     const button = await screen.findByRole('button', { name: 'تلاش دوباره' });
     await userEvent.click(button);
@@ -482,7 +490,7 @@ describe('the retry action', () => {
       meta: null,
       error: null,
     } as never);
-    renderResult({ status: 'failed', orderId: 'o1', reason: 'declined' });
+    await renderResult({ status: 'failed', orderId: 'o1', reason: 'declined' });
 
     const button = await screen.findByRole('button', { name: 'تلاش دوباره' });
     await userEvent.click(button);
@@ -503,7 +511,7 @@ describe('the retry action', () => {
     retryOrderPayment.mockRejectedValue(
       new ApiRequestError('PAYMENT_RETRY_NOT_AVAILABLE', 'امکان تلاش دوباره وجود ندارد.', 409, { reason: refusal }),
     );
-    renderResult({ status: 'failed', orderId: 'o1', reason: 'declined' });
+    await renderResult({ status: 'failed', orderId: 'o1', reason: 'declined' });
 
     await userEvent.click(await screen.findByRole('button', { name: 'تلاش دوباره' }));
 
@@ -516,7 +524,7 @@ describe('the retry action', () => {
     retryOrderPayment.mockRejectedValue(
       new ApiRequestError('PAYMENT_RETRY_NOT_AVAILABLE', 'no', 409, { reason: 'verification_pending' }),
     );
-    renderResult({ status: 'failed', orderId: 'o1', reason: 'declined' });
+    await renderResult({ status: 'failed', orderId: 'o1', reason: 'declined' });
 
     const button = await screen.findByRole('button', { name: 'تلاش دوباره' });
     await userEvent.click(button);
@@ -528,7 +536,7 @@ describe('the retry action', () => {
     retryOrderPayment.mockRejectedValue(
       new ApiRequestError('PAYMENT_RETRY_NOT_AVAILABLE', 'پیام سرور', 409, { reason: 'something_new' }),
     );
-    renderResult({ status: 'failed', orderId: 'o1', reason: 'declined' });
+    await renderResult({ status: 'failed', orderId: 'o1', reason: 'declined' });
 
     await userEvent.click(await screen.findByRole('button', { name: 'تلاش دوباره' }));
 
@@ -538,7 +546,7 @@ describe('the retry action', () => {
 
   it('reports a network failure without navigating anywhere', async () => {
     retryOrderPayment.mockRejectedValue(new ApiRequestError('NETWORK_ERROR', 'ارتباط با سرور برقرار نشد.', 0));
-    renderResult({ status: 'failed', orderId: 'o1', reason: 'declined' });
+    await renderResult({ status: 'failed', orderId: 'o1', reason: 'declined' });
 
     await userEvent.click(await screen.findByRole('button', { name: 'تلاش دوباره' }));
 
@@ -549,7 +557,7 @@ describe('the retry action', () => {
 
   it('does not navigate when the server returns no URL', async () => {
     retryOrderPayment.mockResolvedValue({ data: {}, meta: null, error: null } as never);
-    renderResult({ status: 'failed', orderId: 'o1', reason: 'declined' });
+    await renderResult({ status: 'failed', orderId: 'o1', reason: 'declined' });
 
     await userEvent.click(await screen.findByRole('button', { name: 'تلاش دوباره' }));
 
@@ -558,7 +566,7 @@ describe('the retry action', () => {
   });
 
   it('keeps the two navigation links alongside it', async () => {
-    renderResult({ status: 'failed', orderId: 'o1', reason: 'declined' });
+    await renderResult({ status: 'failed', orderId: 'o1', reason: 'declined' });
     expect(await screen.findByRole('link', { name: 'رزروهای من' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'بازگشت به فهرست متخصص‌ها' })).toBeInTheDocument();
   });
@@ -569,7 +577,7 @@ describe('preserved behaviour', () => {
     // `TextLink`'s `kit.module.css` class carries `min-height: 44px` now, not
     // an inline style; jsdom never loads that real stylesheet, so the class
     // itself is what a jsdom test can assert.
-    renderResult({ status: 'succeeded', orderId: 'o1' });
+    await renderResult({ status: 'succeeded', orderId: 'o1' });
     for (const name of ['رزروهای من', 'بازگشت به فهرست متخصص‌ها']) {
       const link = await screen.findByRole('link', { name });
       expect(link).toHaveClass('textLink');
@@ -578,7 +586,7 @@ describe('preserved behaviour', () => {
 
   it('announces loading politely rather than as an alert', async () => {
     getOrder.mockImplementation(() => new Promise(() => undefined));
-    renderResult({ status: 'succeeded', orderId: 'o1' });
+    await renderResult({ status: 'succeeded', orderId: 'o1' });
     const loading = await screen.findByText('در حال دریافت رسید…');
     // The label lives inside the live region (LoadingState is a skeleton now,
     // with the sentence visually hidden), so it is the region that is polite.
@@ -592,18 +600,18 @@ describe('preserved behaviour', () => {
     // A confirmation that interrupts the screen reader is the same defect as
     // a refusal that does not. Both banners are live regions; only one of
     // them is urgent.
-    renderResult({ status: 'succeeded', orderId: 'o1' });
+    await renderResult({ status: 'succeeded', orderId: 'o1' });
     await waitFor(() => expect(banner()).toHaveAttribute('data-bc-alert', 'success'));
     expect(banner()).toHaveAttribute('role', 'status');
 
     cleanup();
-    renderResult({ status: 'failed', orderId: 'o1' });
+    await renderResult({ status: 'failed', orderId: 'o1' });
     await waitFor(() => expect(banner()).toHaveAttribute('data-bc-alert', 'error'));
     expect(banner()).toHaveAttribute('role', 'alert');
   });
 
   it('renders the receipt from server figures', async () => {
-    renderResult({ status: 'succeeded', orderId: 'o1' });
+    await renderResult({ status: 'succeeded', orderId: 'o1' });
     const receipt = await screen.findByText('رسید');
     expect(receipt).toBeInTheDocument();
     expect(within(receipt.closest('div') as HTMLElement).getByText('میکاپ')).toBeInTheDocument();
@@ -619,7 +627,7 @@ describe('preserved behaviour', () => {
  */
 describe('the payment schedule on the receipt', () => {
   it('leaves a full-online receipt showing exactly the total it showed before #41a', async () => {
-    renderResult({ status: 'succeeded', orderId: 'o1' });
+    await renderResult({ status: 'succeeded', orderId: 'o1' });
     const receipt = (await screen.findByText('رسید')).closest('div') as HTMLElement;
 
     // `مبلغ کل` is untouched: the schedule is additive, never a replacement.
@@ -674,7 +682,7 @@ describe('the payment schedule on the receipt', () => {
       error: null,
     });
 
-    renderResult({ status: 'succeeded', orderId: 'o1' });
+    await renderResult({ status: 'succeeded', orderId: 'o1' });
     const receipt = (await screen.findByText('رسید')).closest('div') as HTMLElement;
 
     expect(within(receipt).getByText('پرداخت‌شده به بیوکلیک')).toBeInTheDocument();
@@ -692,7 +700,7 @@ describe('presentation — the shape of an outcome, and the sign of a discount',
     ['refunded', 'iconWarning'],
     ['unresolved', 'iconWarning'],
   ])('%s draws its glyph in the %s container', async (status, className) => {
-    renderResult({ status, orderId: 'o1' });
+    await renderResult({ status, orderId: 'o1' });
     const heading = await screen.findByRole('heading', { level: 1 });
     const icon = heading.querySelector('[aria-hidden="true"]') as HTMLElement;
     expect(icon.className).toContain(className);
@@ -704,7 +712,7 @@ describe('presentation — the shape of an outcome, and the sign of a discount',
       meta: null,
       error: null,
     } as never);
-    renderResult({ status: 'succeeded', orderId: 'o1' });
+    await renderResult({ status: 'succeeded', orderId: 'o1' });
     const row = (await screen.findByText('کد تخفیف')).closest('tr') as HTMLElement;
     // A bare "-۶۰٬۰۰۰" in a right-to-left cell renders as "۶۰٬۰۰۰-".
     const amount = within(row).getByText(/۶۰٬۰۰۰/);
@@ -714,7 +722,7 @@ describe('presentation — the shape of an outcome, and the sign of a discount',
 
   it('shows a neutral word, never a raw key, for an order status it does not know', async () => {
     getOrder.mockResolvedValue({ data: { ...ORDER, status: 'brand_new_status' }, meta: null, error: null } as never);
-    renderResult({ status: 'succeeded', orderId: 'o1' });
+    await renderResult({ status: 'succeeded', orderId: 'o1' });
     expect(await screen.findByText('نامشخص')).toBeInTheDocument();
     expect(screen.queryByText('brand_new_status')).not.toBeInTheDocument();
   });
