@@ -619,4 +619,70 @@ describePg('commercial catalogue — authorization, audit and adversarial (real 
       }
     });
   });
+  // =========================================================================
+  // §F. The schedule-version id a plan draft needs (#271)
+  // =========================================================================
+
+  describe('§F schedule version identity', () => {
+    it('names the version id on both schedule reads, so a plan can be drafted from the API alone', async () => {
+      const schedule = await publishedSchedule();
+
+      const list = await request(app.getHttpServer())
+        .get(`${BASE}/price-schedules/${schedule.key}/versions`)
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .expect(200);
+      const listed = list.body.data.items[0];
+      expect(listed.id).toBe(schedule.id);
+
+      const one = await request(app.getHttpServer())
+        .get(`${BASE}/price-schedules/${schedule.key}/versions/${listed.version}`)
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .expect(200);
+      expect(one.body.data.id).toBe(schedule.id);
+    });
+
+    it('accepts that id as priceScheduleVersionId, which is the whole point of returning it', async () => {
+      const schedule = await publishedSchedule();
+      const planKey = nextKey('from-listed-id');
+
+      // Deliberately NOT `schedule.id` from the service: only the id this
+      // client could have learned over HTTP. Before #271 a caller holding no
+      // existing plan had no way to reach this value, so the draft below was
+      // impossible and `/admin/commercial/plans` shipped its form disabled.
+      const list = await request(app.getHttpServer())
+        .get(`${BASE}/price-schedules/${schedule.key}/versions`)
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .expect(200);
+      const discoveredId = list.body.data.items[0].id;
+
+      await request(app.getHttpServer())
+        .post(`${BASE}/plans`)
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send({ planKey, reason: 'drafting against a schedule discovered over HTTP' })
+        .expect(201);
+
+      const drafted = await request(app.getHttpServer())
+        .post(`${BASE}/plans/${planKey}/versions`)
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send(planVersionBody(discoveredId))
+        .expect(201);
+
+      expect(drafted.body.data.priceScheduleVersionId).toBe(discoveredId);
+    });
+
+    it('still discloses no actor identity now that the id is returned', async () => {
+      const schedule = await publishedSchedule();
+      const response = await request(app.getHttpServer())
+        .get(`${BASE}/price-schedules/${schedule.key}/versions`)
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .expect(200);
+
+      const serialised = JSON.stringify(response.body);
+      expect(serialised).not.toContain(admin.id);
+      expect(serialised).not.toContain('createdByUserId');
+      expect(serialised).not.toContain('publishedByUserId');
+      // The positive control: the id that IS meant to be here.
+      expect(serialised).toContain(schedule.id);
+    });
+  });
 });

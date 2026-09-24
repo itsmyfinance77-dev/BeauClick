@@ -10,6 +10,8 @@ import { CancelBookingDto, MarkNoShowDto, RescheduleBookingDto } from '../dto/bo
 import {
   CUSTOMER_DISPLAY_NAME_DIRECTORY,
   CustomerDisplayNameDirectory,
+  ORDER_DIRECTORY,
+  OrderDirectory,
   PROFESSIONAL_DIRECTORY,
   ProfessionalDirectory,
 } from '../ports';
@@ -33,6 +35,27 @@ export function toBookingShape(booking: BookingEntity) {
 
 export function toProfessionalBookingShape(booking: BookingEntity, customerDisplayName: string | null) {
   return { ...toBookingShape(booking), customerDisplayName };
+}
+
+/**
+ * The customer's view, which names the order this booking produced (#225).
+ *
+ * A sibling of `toProfessionalBookingShape` rather than a widening of the
+ * base, for the reason #224 established: the base shape is returned to EITHER
+ * party (every mutation below does), so a field that belongs to one of them
+ * cannot live there.
+ *
+ * It is the customer's alone on the evidence rather than by caution:
+ * `OrderOwnerResolver` resolves an order's owner to `order.customerId`, so
+ * `GET /v1/orders/:id` answers 404 to the professional. Handing them this id
+ * would be handing them a reference that leads nowhere.
+ *
+ * `null` when no order exists — a booking can be held before anything is
+ * ordered, and the receipt surface reads that as "nothing to show" rather
+ * than as an error.
+ */
+export function toCustomerBookingShape(booking: BookingEntity, orderId: string | null) {
+  return { ...toBookingShape(booking), orderId };
 }
 
 function toHistoryShape(row: BookingHistoryEntity) {
@@ -65,15 +88,22 @@ export class BookingController {
     private readonly party: BookingPartyResolver,
     @Inject(PROFESSIONAL_DIRECTORY) private readonly directory: ProfessionalDirectory,
     @Inject(CUSTOMER_DISPLAY_NAME_DIRECTORY) private readonly customerNames: CustomerDisplayNameDirectory,
+    @Inject(ORDER_DIRECTORY) private readonly orders: OrderDirectory,
   ) {}
 
   @Get('me/bookings')
   async myBookings(
     @CurrentUser() user: AuthenticatedUser,
     @Query() query: PageQueryDto,
-  ): Promise<PaginatedResult<ReturnType<typeof toBookingShape>[]>> {
+  ): Promise<PaginatedResult<ReturnType<typeof toCustomerBookingShape>[]>> {
     const { items, total } = await this.bookings.listForCustomer(user.userId, query.page, query.limit);
-    return { value: items.map(toBookingShape), meta: { pagination: { page: query.page, limit: query.limit, total } } };
+    // One commerce query for the whole page, not one per row -- the reason
+    // `OrderDirectory` is batch-shaped.
+    const orderIds = await this.orders.orderIdsFor(items.map((booking) => booking.id));
+    return {
+      value: items.map((booking) => toCustomerBookingShape(booking, orderIds.get(booking.id) ?? null)),
+      meta: { pagination: { page: query.page, limit: query.limit, total } },
+    };
   }
 
   @Get('me/professional-bookings')
@@ -101,7 +131,10 @@ export class BookingController {
       const displayNames = await this.customerNames.displayNamesFor([booking.customerId]);
       return toProfessionalBookingShape(booking, displayNames.get(booking.customerId) ?? null);
     }
-    return toBookingShape(booking);
+    // The guard already refused anyone who is neither party, so this is the
+    // customer.
+    const orderIds = await this.orders.orderIdsFor([booking.id]);
+    return toCustomerBookingShape(booking, orderIds.get(booking.id) ?? null);
   }
 
   @ResolveOwner(BookingPartyResolver)

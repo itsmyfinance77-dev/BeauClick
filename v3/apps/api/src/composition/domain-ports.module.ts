@@ -8,6 +8,7 @@ import { IdentityModule, UserEntity } from '@beauclick/identity';
 import {
   BOOKING_CANCELLATION_ENTITLEMENT_HOOK,
   CUSTOMER_DISPLAY_NAME_DIRECTORY,
+  ORDER_DIRECTORY,
   PROFESSIONAL_DIRECTORY,
 } from '@beauclick/booking';
 import {
@@ -16,6 +17,7 @@ import {
   BOOKING_OUTCOME_POLICY_RESOLVER,
   COMMISSION_TERMS_RESOLVER,
   LEGAL_EVIDENCE_STATE_READER,
+  OrderEntity,
   PRICING_RULES,
   SERVICE_CATALOG,
 } from '@beauclick/commerce';
@@ -78,6 +80,7 @@ import {
   PublicNameBackedFinanceWorkspaceLabels,
   IdentityAndProviderBackedStaffDisplayIdentity,
   IdentityBackedCustomerDisplayNameDirectory,
+  CommerceBackedOrderDirectory,
   SellerPartyLookup,
 } from './port-adapters';
 import {
@@ -111,7 +114,13 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
 @Module({
   imports: [
     ConfigModule,
-    TypeOrmModule.forFeature([ProfessionalEntity, ServiceOfferingEntity, UserEntity, BusinessEntity, BusinessStaffEntity]),
+    /*
+     * `OrderEntity` is here for `CommerceBackedOrderDirectory` (#225). Every
+     * adapter this module provides that holds a repository needs its entity
+     * declared here, and nowhere else states that requirement -- the adapter
+     * itself compiles and typechecks without it, and fails only at boot.
+     */
+    TypeOrmModule.forFeature([ProfessionalEntity, ServiceOfferingEntity, UserEntity, BusinessEntity, BusinessStaffEntity, OrderEntity]),
     // Imported so the membership pricing rule can resolve BenefitService.
     LoyaltyModule,
     // V3.1 Phase C: the reindex source reads a professional's imagery through
@@ -163,6 +172,7 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     SellerPartyLookup,
     ProviderBackedProfessionalDirectory,
     IdentityBackedCustomerDisplayNameDirectory,
+    CommerceBackedOrderDirectory,
     ProviderBackedServiceCatalog,
     CommercialPolicyBackedCollectionResolver,
     CommercialPolicyBackedCommissionTerms,
@@ -171,6 +181,7 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     OwnershipBackedSubscriberPartyResolver,
     { provide: PROFESSIONAL_DIRECTORY, useExisting: ProviderBackedProfessionalDirectory },
     { provide: CUSTOMER_DISPLAY_NAME_DIRECTORY, useExisting: IdentityBackedCustomerDisplayNameDirectory },
+    { provide: ORDER_DIRECTORY, useExisting: CommerceBackedOrderDirectory },
     // waitlist-service's port for the identical question booking-service's
     // PROFESSIONAL_DIRECTORY already answers -- ADR-011 forbids waitlist
     // importing booking's token directly, so the SAME adapter instance is
@@ -442,6 +453,7 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
   exports: [
     PROFESSIONAL_DIRECTORY,
     CUSTOMER_DISPLAY_NAME_DIRECTORY,
+    ORDER_DIRECTORY,
     PROFESSIONAL_OWNER_LOOKUP,
     SERVICE_CATALOG,
     BOOKING_COLLECTION_POLICY_RESOLVER,

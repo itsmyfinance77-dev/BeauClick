@@ -31,10 +31,9 @@ import type { ApiClient } from './api-client';
  * and nothing that names an actor — the server takes the actor from the
  * session and refuses unknown fields outright.
  *
- * Note one absence that shapes a screen: no schedule read returns a version's
- * `id`, yet a plan version must reference one (`priceScheduleVersionId`). A new
- * plan version therefore cannot be drafted from this UI until the API returns
- * it — #271.
+ * Both schedule reads return a version's `id` (#271), which is what a plan
+ * version must reference in `priceScheduleVersionId`. Before that they did
+ * not, and a new plan version could not be drafted from this UI at all.
  */
 
 const ROOT = '/v1/admin/commercial';
@@ -63,6 +62,8 @@ export interface PriceScheduleSummary {
 }
 
 export interface PriceScheduleVersion extends LifecycleVersion {
+  /** The row's own id, which a plan version must name. Returned since #271. */
+  id: string;
   scheduleKey: string;
   displayName: string;
   currency: string;
@@ -168,6 +169,11 @@ export function createPlan(api: ApiClient, body: { planKey: string; reason: stri
 
 export function planVersions(api: ApiClient, planKey: string) {
   return api.get<{ items: PlanVersion[] }>(`${ROOT}/plans/${seg(planKey)}/versions`);
+}
+
+/** Drafts a NEW plan version. Possible since #271 returned the schedule version's id. */
+export function draftPlanVersion(api: ApiClient, planKey: string, body: PlanVersionBody) {
+  return api.post<PlanVersion>(`${ROOT}/plans/${seg(planKey)}/versions`, body);
 }
 
 export function replacePlanVersion(api: ApiClient, planKey: string, version: number, body: PlanVersionBody) {

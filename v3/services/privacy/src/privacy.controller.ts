@@ -6,7 +6,7 @@ import { policy, RequireCapability } from '@beauclick/auth';
 import { AuditAction } from '@beauclick/audit';
 import { AuthenticatedUser, CurrentUser, PageQueryDto, PaginatedResult } from '@beauclick/http';
 
-import { DataRequestEntity } from './entities/data-request.entity';
+import { DATA_REQUEST_KINDS, DataRequestEntity, type DataRequestKind } from './entities/data-request.entity';
 import { PrivacyService } from './privacy.service';
 
 export class ErasureConfirmationDto {
@@ -30,6 +30,16 @@ export class PrivacyRequestQueryDto extends PageQueryDto {
   @IsString()
   @Length(3, 16)
   status?: string;
+
+  /**
+   * Validated against the closed vocabulary rather than by length, unlike
+   * `status` above. There are exactly two kinds and they are named in one
+   * place (`DATA_REQUEST_KINDS`), so a typo should be a 400 here rather than
+   * an empty page the operator has to interpret.
+   */
+  @IsOptional()
+  @IsIn(DATA_REQUEST_KINDS)
+  kind?: DataRequestKind;
 }
 
 function present(request: DataRequestEntity) {
@@ -168,7 +178,7 @@ export class AdminPrivacyController {
   async list(@Query() query: PrivacyRequestQueryDto): Promise<PaginatedResult<unknown[]>> {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
-    const result = await this.privacy.listForOperator({ page, limit, status: query.status });
+    const result = await this.privacy.listForOperator({ page, limit, status: query.status, kind: query.kind });
     return { value: result.items, meta: { pagination: { page, limit, total: result.total } } };
   }
 }

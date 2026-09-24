@@ -3,12 +3,13 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, IsNull, Repository } from 'typeorm';
 
 import { CityEntity, ProfessionalEntity, SellerOwnerRoleGrantPort, ServiceOfferingEntity } from '@beauclick/provider';
-import { CustomerDisplayNameDirectory, ProfessionalDirectory } from '@beauclick/booking';
+import { CustomerDisplayNameDirectory, OrderDirectory, ProfessionalDirectory } from '@beauclick/booking';
 import {
   BookingCollectionPolicyResolver,
   BookingOutcomePolicyResolver,
   CommissionTermsResolver,
   LegalEvidenceStateReader,
+  OrderEntity,
   OrderSellerParty,
   ResolvedBookingCollectionPolicy,
   ResolvedBookingOutcomePolicy,
@@ -95,6 +96,34 @@ export class IdentityBackedCustomerDisplayNameDirectory implements CustomerDispl
       select: { id: true, displayName: true },
     });
     return new Map(users.map((user) => [user.id, user.displayName?.trim() || null]));
+  }
+}
+
+/**
+ * Answers `OrderDirectory` from `commerce.orders` (#225).
+ *
+ * The query is the unique pair the schema already guarantees --
+ * `source_type = 'booking'` AND `source_id IN (…)` -- so one round trip
+ * answers a whole page and a booking that produced no order simply has no
+ * row. Nothing is written and no booking gains a column.
+ *
+ * Deliberately selects only the two columns it maps. This adapter exists to
+ * hand out an IDENTIFIER, and a `find` that dragged every order figure into
+ * booking's request path would make it easy for a later caller to reach for
+ * one -- which is the thing #225 says not to do.
+ */
+@Injectable()
+export class CommerceBackedOrderDirectory implements OrderDirectory {
+  constructor(@InjectRepository(OrderEntity) private readonly orders: Repository<OrderEntity>) {}
+
+  async orderIdsFor(bookingIds: readonly string[]): Promise<ReadonlyMap<string, string>> {
+    const ids = [...new Set(bookingIds)];
+    if (ids.length === 0) return new Map();
+    const rows = await this.orders.find({
+      where: { sourceType: 'booking', sourceId: In(ids) },
+      select: { id: true, sourceId: true },
+    });
+    return new Map(rows.map((order) => [order.sourceId, order.id]));
   }
 }
 

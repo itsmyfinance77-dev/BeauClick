@@ -210,6 +210,28 @@
   font-variant-numeric: tabular-nums;
 }
 
+/*
+ * The collected amount (#225), a trailing block at the end of the card body.
+ * The label is 13px muted over a 19px figure, as the prototype draws it; the
+ * figure needs no `font-variant-numeric`, since `globals.css` sets tabular-nums
+ * on `body` and it inherits. The label carries «تومان» for the whole block
+ * (#287), so it is left to wrap rather than being clipped on a narrow card.
+ */
+.nextPaid {
+  text-align: end;
+  flex-shrink: 0;
+}
+
+.nextPaidLabel {
+  font-size: 13px;
+  color: var(--bc-color-text-faint);
+}
+
+.nextPaidValue {
+  font-size: 19px;
+  font-weight: 800;
+}
+
 .nextActions {
   padding: 0 16px 16px;
   display: flex;

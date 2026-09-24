@@ -11,6 +11,7 @@ import { useAuth } from '@/lib/auth-context';
 import {
   createPlan,
   createPriceSchedule,
+  draftPlanVersion,
   draftPriceScheduleVersion,
   planVersions,
   plans,
@@ -35,15 +36,18 @@ import styles from './plans.module.css';
  * `/admin/commercial/plans` — spec 40, ADR-041. The plan catalogue and the
  * price-schedule catalogue: 18 routes on `CommercialCatalogueController`.
  *
- * ## What cannot be done from here, and why
+ * ## Drafting a new plan version
  *
- * A NEW plan version cannot be drafted: `WritePlanVersionDto` requires a
- * `priceScheduleVersionId`, and no read returns a schedule version's id
- * (#271). Offering a picker built from whatever ids existing plans happen to
- * carry would present schedules nobody has used yet as unavailable, for a
- * reason the administrator cannot see. So plan keys, plan history, and the
- * edit, publish, retire and discard of EXISTING plan drafts all work, and a
- * new plan draft waits for the API.
+ * `WritePlanVersionDto` requires a `priceScheduleVersionId`, which the
+ * schedule reads now return (#271). The editor picks one: a schedule key,
+ * then a version within it.
+ *
+ * Every version is offered, whatever its lifecycle state, and each one shows
+ * that state beside it. That mirrors the server exactly —
+ * `createPlanVersionDraft` checks only that the referenced version EXISTS —
+ * rather than the UI inventing a narrower rule the API does not have. An
+ * administrator drafting a plan against a schedule draft is doing something
+ * the server permits, and seeing «پیش‌نویس» next to it is what tells them so.
  *
  * ## The base workspace is a row
  *
@@ -69,16 +73,30 @@ const PUBLISH = (
 const RETIRE =
   'با تأیید، این نسخه دیگر برای انتخاب‌های آینده در دسترس نیست. بازنشسته نه ویرایش می‌شود و نه دوباره فعال؛ برای بازگرداندن، نسخه‌ای تازه منتشر کنید.';
 
-const NEW_PLAN_BLOCKED =
-  'پیش‌نویس تازهٔ طرح از این صفحه ساختنی نیست: هر نسخهٔ طرح باید به یک نسخهٔ جدول قیمت اشاره کند و هیچ خواندنی شناسهٔ آن نسخه‌ها را برنمی‌گرداند (#271). ویرایش، انتشار و بازنشستگی پیش‌نویس‌ها و نسخه‌های موجود ممکن است.';
-
 function PlansScreen() {
   const { api } = useAuth();
   const [schedules, setSchedules] = useState<PriceScheduleSummary[]>([]);
+  /*
+   * Every schedule version the page has loaded, keyed by its schedule. The
+   * plan editor picks from these, so it offers exactly what the administrator
+   * can already see on this page rather than a second, separately-fetched
+   * idea of what exists.
+   */
+  const [scheduleVersionsByKey, setScheduleVersionsByKey] = useState<Record<string, PriceScheduleVersion[]>>({});
+  /*
+   * Whether the KEYS read has returned, which `schedules.length` cannot say.
+   * An empty `schedules` means either "not read yet" or "this platform has no
+   * price schedules", and those need different sentences from the plan editor
+   * -- the same distinction `scheduleVersionsComplete` below exists to make,
+   * one level up. Without this flag the zero-schedule platform would be told
+   * its list is incomplete forever.
+   */
+  const [schedulesLoaded, setSchedulesLoaded] = useState(false);
 
   const loadScheduleKeys = useCallback(async () => {
     const rows = (await priceSchedules(api)).data?.items ?? [];
     setSchedules(rows);
+    setSchedulesLoaded(true);
     return rows.map((s) => ({ key: s.scheduleKey, label: null, meta: schedulePurposeLabel(s.purpose) }));
   }, [api]);
   const loadScheduleVersions = useCallback(async (key: string) => (await priceScheduleVersions(api, key)).data?.items ?? [], [api]);
@@ -95,6 +113,46 @@ function PlansScreen() {
   const loadPlanVersions = useCallback(async (key: string) => (await planVersions(api, key)).data?.items ?? [], [api]);
 
   const creditScheduleKeys = schedules.filter((s) => s.purpose === 'booking_credit').map((s) => s.scheduleKey);
+
+  /*
+   * Flattened for the plan editor. Every version is offered whatever its
+   * lifecycle state, because `createPlanVersionDraft` checks only that the id
+   * EXISTS -- the state travels with it so the administrator sees what they
+   * are choosing rather than being silently prevented from choosing it.
+   */
+  const scheduleVersionChoices = Object.entries(scheduleVersionsByKey).flatMap(([key, versions]) =>
+    versions.map((version) => ({
+      id: version.id,
+      scheduleKey: key,
+      version: version.version,
+      displayName: version.displayName,
+      lifecycleState: version.lifecycleState,
+    })),
+  );
+
+  /*
+   * Whether every schedule key has reported its versions yet.
+   *
+   * The family reads all of them on mount, so the complete list is normally
+   * there before the plans family's own button is clickable. But "normally" is
+   * not "always": until each key has reported, the list is SHORT, not empty,
+   * and a short list is the dangerous state -- it looks like the whole
+   * catalogue. The editor is told so it can say so, rather than presenting a
+   * partial list as complete.
+   *
+   * It stays false when a versions read FAILED, which is correct: the family
+   * shows that error with its own retry, and the honest thing for the picker
+   * to say is that the list is incomplete, not why. Same for a failed KEYS
+   * read: `schedulesLoaded` stays false, and "incomplete" is the truth.
+   *
+   * `schedulesLoaded` rather than `schedules.length > 0`, because `every` over
+   * an empty array is `true` -- so during the initial load the picker would
+   * otherwise claim a complete, empty catalogue. On a platform that genuinely
+   * has no price schedules this is then complete and empty, which is the state
+   * the "none has been made yet" sentence is written for.
+   */
+  const scheduleVersionsComplete =
+    schedulesLoaded && schedules.every((s) => s.scheduleKey in scheduleVersionsByKey);
 
   return (
     <div className={styles.page}>
@@ -122,6 +180,7 @@ function PlansScreen() {
         renderEditor={(props) => <PriceScheduleEditor {...(props as EditorProps<PriceScheduleVersionDetail>)} />}
         draft={(key, body) => draftPriceScheduleVersion(api, key, body as PriceScheduleVersionBody)}
         replace={(key, version, body) => replacePriceScheduleVersion(api, key, version, body as PriceScheduleVersionBody)}
+        onVersions={(key, versions) => setScheduleVersionsByKey((prev) => ({ ...prev, [key]: versions }))}
         startIsServer={false}
         publishConsequence={PUBLISH}
         retireConsequence={RETIRE}
@@ -136,9 +195,15 @@ function PlansScreen() {
         loadVersions={loadPlanVersions}
         create={{ displayName: false, submit: ({ key, reason }) => createPlan(api, { planKey: key, reason }) }}
         summarize={(version) => <PlanSummary version={version} />}
-        renderEditor={(props) => <PlanEditor {...props} creditScheduleKeys={creditScheduleKeys} />}
-        draft={null}
-        newDraftBlocked={NEW_PLAN_BLOCKED}
+        renderEditor={(props) => (
+          <PlanEditor
+            {...props}
+            creditScheduleKeys={creditScheduleKeys}
+            scheduleVersions={scheduleVersionChoices}
+            scheduleVersionsComplete={scheduleVersionsComplete}
+          />
+        )}
+        draft={(key, body) => draftPlanVersion(api, key, body as PlanVersionBody)}
         replace={(key, version, body) => replacePlanVersion(api, key, version, body as PlanVersionBody)}
         startIsServer={false}
         publishConsequence={PUBLISH}

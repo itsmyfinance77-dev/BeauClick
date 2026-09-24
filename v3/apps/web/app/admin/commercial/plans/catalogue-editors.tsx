@@ -10,6 +10,7 @@ import {
   validatePriceScheduleTermsV1,
 } from '@beauclick/commercial-policy-contract';
 import { Button, Input } from '@/components/ui';
+import { Select } from '@/components/kit';
 import { NumberSetEditor, ReasonField, RefusalNotice, WholeField, reasonIsValid, type EditorProps } from '@/components/commercial-lifecycle';
 import type {
   PlanVersion,
@@ -18,6 +19,7 @@ import type {
   PriceScheduleVersionDetail,
   PriceTier,
 } from '@/lib/commercial-admin-api';
+import { lifecycleView } from '@/lib/commercial-labels';
 import { isoToLocalInput, localInputToIso, parseWhole } from '@/lib/commercial-lifecycle';
 import styles from './plans.module.css';
 
@@ -216,10 +218,30 @@ export function PriceScheduleEditor({ initial, busy, refusal, onSubmit, onCancel
 
 // ======================================================================= plan
 
+/** One schedule version a new plan draft may point at. */
+export interface ScheduleVersionChoice {
+  id: string;
+  scheduleKey: string;
+  version: number;
+  displayName: string;
+  lifecycleState: string;
+}
+
 /**
- * Edits an EXISTING plan draft. A new plan draft cannot be made from this UI
- * (#271): it must name a `priceScheduleVersionId`, and no read returns one.
- * An existing draft already carries its id, so editing keeps it, read-only.
+ * Drafts a NEW plan version, or edits an existing one.
+ *
+ * The two differ in exactly one field. A new draft PICKS the price-schedule
+ * version it points at, which is possible since #271 made schedule reads
+ * return each version's id. An existing draft already carries one, and it
+ * stays read-only: changing which schedule a drafted plan prices against is a
+ * different decision from editing the plan's own terms, and `WritePlanVersionDto`
+ * takes the id on the replace too, so silently re-pointing it would be the
+ * easiest mistake on this screen to make and the hardest to notice.
+ *
+ * `scheduleVersionsComplete` says whether every schedule key has reported. It
+ * is separate from `scheduleVersions.length` because "not read yet" and "none
+ * exist" call for different sentences, and because a list that is merely SHORT
+ * is indistinguishable from a complete one unless the picker is told.
  */
 export function PlanEditor({
   initial,
@@ -228,7 +250,13 @@ export function PlanEditor({
   onSubmit,
   onCancel,
   creditScheduleKeys,
-}: EditorProps<PlanVersion> & { creditScheduleKeys: string[] }) {
+  scheduleVersions,
+  scheduleVersionsComplete,
+}: EditorProps<PlanVersion> & {
+  creditScheduleKeys: string[];
+  scheduleVersions: ScheduleVersionChoice[];
+  scheduleVersionsComplete: boolean;
+}) {
   const [displayName, setDisplayName] = useState(initial?.displayName ?? '');
   const [billing, setBilling] = useState(initial?.billingTermDays == null ? '' : String(initial.billingTermDays));
   const [credits, setCredits] = useState(initial ? String(initial.includedBookingCredits) : '');
@@ -241,11 +269,16 @@ export function PlanEditor({
   const [startsAt, setStartsAt] = useState(isoToLocalInput(initial?.activationStartsAt ?? null));
   const [endsAt, setEndsAt] = useState(isoToLocalInput(initial?.activationEndsAt ?? null));
   const [reason, setReason] = useState('');
+  /*
+   * An existing draft keeps its own id; a new one starts with none chosen.
+   * Nothing is pre-selected even when exactly one version exists -- the same
+   * rule the seller's workspace chooser follows (`V33-DEC-020`): a default
+   * here is a price the administrator did not pick.
+   */
+  const [pickedScheduleId, setPickedScheduleId] = useState('');
   const creditId = useId();
   const autoName = useId();
   const capabilityId = useId();
-
-  if (!initial) return null;
 
   const billingN = billing.trim() === '' ? null : parseWhole(billing);
   const creditsN = parseWhole(credits);
@@ -267,9 +300,11 @@ export function PlanEditor({
     autoAssignable !== null &&
     startIso !== null &&
     (endsAt === '' || endIso !== null) &&
+    // A new draft is not valid until a schedule version is chosen.
+    (initial !== null || pickedScheduleId !== '') &&
     reasonIsValid(reason);
 
-  const scheduleId = initial.priceScheduleVersionId;
+  const scheduleId = initial ? initial.priceScheduleVersionId : pickedScheduleId;
 
   return (
     <form
@@ -296,12 +331,41 @@ export function PlanEditor({
       }}
     >
       <Input label="نام نمایشی" value={displayName} maxLength={120} onChange={(e) => setDisplayName(e.target.value)} disabled={busy} />
-      <p className={styles.readOnly}>
-        نسخهٔ جدول قیمت: <span dir="ltr">{scheduleId}</span>
-        <span className={styles.readOnlyHint}>
-          همان که این پیش‌نویس با آن ساخته شده. انتخاب نسخهٔ دیگری از این صفحه ممکن نیست، چون هیچ خواندنی شناسهٔ نسخه‌ها را برنمی‌گرداند (#271).
-        </span>
-      </p>
+      {initial ? (
+        <p className={styles.readOnly}>
+          نسخهٔ جدول قیمت: <span dir="ltr">{scheduleId}</span>
+          <span className={styles.readOnlyHint}>همان که این پیش‌نویس با آن ساخته شده؛ از اینجا تغییر نمی‌کند.</span>
+        </p>
+      ) : (
+        <Select
+          label="نسخهٔ جدول قیمت"
+          value={pickedScheduleId}
+          onChange={(e) => setPickedScheduleId(e.target.value)}
+          disabled={busy}
+          /*
+           * Three states, and the middle one is why this is not a one-liner.
+           * While a schedule key has not reported its versions the list is
+           * INCOMPLETE rather than empty, and saying nothing would present a
+           * partial catalogue as the whole of it. The earlier wording told the
+           * administrator to "open" the schedules section, which is an action
+           * that does not exist -- the family reads every key on mount.
+           */
+          hint={
+            !scheduleVersionsComplete
+              ? 'فهرست نسخه‌ها کامل نیست. وضعیت خواندن در بخش «جدول‌های قیمت» بالاتر در همین صفحه دیده می‌شود.'
+              : scheduleVersions.length === 0
+                ? 'هنوز هیچ نسخهٔ جدول قیمتی ساخته نشده است. ابتدا در بخش «جدول‌های قیمت» یکی بسازید.'
+                : 'پس از ساخت پیش‌نویس، این انتخاب تغییر نمی‌کند.'
+          }
+        >
+          <option value="">انتخاب کنید</option>
+          {scheduleVersions.map((choice) => (
+            <option key={choice.id} value={choice.id}>
+              {`${choice.scheduleKey} — نسخهٔ ${toPersianDigits(choice.version)} — ${choice.displayName} (${lifecycleView(choice.lifecycleState).label})`}
+            </option>
+          ))}
+        </Select>
+      )}
       <div className={styles.grid}>
         <WholeField
           label="دورهٔ صورت‌حساب"
@@ -356,7 +420,8 @@ export function PlanEditor({
       </label>
       <select id={creditId} className={styles.select} value={creditKey} onChange={(e) => setCreditKey(e.target.value)} disabled={busy}>
         <option value="">بدون فروش اعتبار اضافه</option>
-        {[...new Set([...creditScheduleKeys, ...(initial.bookingCreditScheduleKey ? [initial.bookingCreditScheduleKey] : [])])].map((key) => (
+        {/* A new draft carries nothing; an existing one keeps its own key on the list even if that schedule's purpose has since changed. */}
+        {[...new Set([...creditScheduleKeys, ...(initial?.bookingCreditScheduleKey ? [initial.bookingCreditScheduleKey] : [])])].map((key) => (
           <option key={key} value={key}>
             {key}
           </option>
@@ -382,7 +447,8 @@ export function PlanEditor({
       {refusal ? <RefusalNotice refusal={refusal} /> : null}
       <div className={styles.actions}>
         <Button type="submit" inline disabled={!valid || busy} loading={busy}>
-          ذخیرهٔ پیش‌نویس
+          {/* Same wording as the schedule editor above: a new draft is submitted, an existing one saved. */}
+          {initial ? 'ذخیرهٔ پیش‌نویس' : 'ثبت پیش‌نویس'}
         </Button>
         <Button type="button" variant="ghost" inline onClick={onCancel} disabled={busy}>
           انصراف

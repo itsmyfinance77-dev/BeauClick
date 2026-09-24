@@ -520,6 +520,13 @@ export class CommercialCatalogueController {
 
   private scheduleVersionView(row: CommercialPriceScheduleVersionEntity) {
     return {
+      /*
+       * The row's own id, which `WritePlanVersionDto.priceScheduleVersionId`
+       * requires. Without it a plan version could only be drafted against a
+       * schedule some existing plan already named, because `planVersionView`
+       * was the only place this id appeared (#271).
+       */
+      id: row.id,
       scheduleKey: row.scheduleKey,
       version: row.version,
       lifecycleState: row.lifecycleState,

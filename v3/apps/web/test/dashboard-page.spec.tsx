@@ -57,6 +57,31 @@ function booking(overrides: Record<string, unknown> = {}) {
     rescheduleCount: 0,
     cancellationReason: null,
     createdAt: '2026-01-01T00:00:00.000Z',
+    /* #225: the customer's own read names the order this booking produced, or null. */
+    orderId: null,
+    ...overrides,
+  };
+}
+
+/** An order as `GET /v1/orders/:id` returns it — only the fields this page reads matter. */
+function order(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'o1',
+    sourceType: 'booking',
+    sourceId: 'b1',
+    status: 'paid' as const,
+    currency: 'IRT',
+    subtotalToman: 807_500,
+    discountTotalToman: 0,
+    feeTotalToman: 0,
+    totalToman: 807_500,
+    refundedTotalToman: 0,
+    collectedTotalToman: 807_500,
+    paidAt: '2026-09-01T00:00:00.000Z',
+    createdAt: '2026-09-01T00:00:00.000Z',
+    items: [],
+    adjustments: [],
+    paymentSchedule: { onlineToman: 807_500, venueToman: 0, entries: [] },
     ...overrides,
   };
 }
@@ -77,6 +102,8 @@ const LOYALTY = {
 
 /** How many times each professional was read, so an N+1 shows up. */
 let providerReads: string[];
+/** Which orders were read, so a page that reads one it was not given shows up. */
+let orderReads: string[];
 
 function mockApi(options: {
   bookings?: unknown[];
@@ -84,9 +111,12 @@ function mockApi(options: {
   noticesFail?: boolean;
   journeyFails?: boolean;
   providerFails?: boolean;
+  orders?: Record<string, unknown>;
+  orderFails?: boolean;
   notices?: unknown[];
 } = {}) {
   providerReads = [];
+  orderReads = [];
   (global.fetch as jest.Mock).mockImplementation((url: string) => {
     if (url.includes('/v1/auth/refresh')) return ok({ accessToken: 'a', csrfToken: 'c' });
     if (/\/v1\/me(\?|$)/.test(url)) {
@@ -108,6 +138,12 @@ function mockApi(options: {
     }
     if (url.includes('/v1/me/journey/profile')) {
       return options.journeyFails ? fail() : ok({ preferredCityId: null, preferredSpecialtyIds: [], budgetMinToman: null, budgetMaxToman: 2_000_000, notes: null });
+    }
+    if (/\/v1\/orders\/[^/]+$/.test(url)) {
+      const id = url.split('/').pop() as string;
+      orderReads.push(id);
+      if (options.orderFails) return fail();
+      return ok(options.orders?.[id] ?? order({ id }));
     }
     if (/\/v1\/providers\/[^/]+$/.test(url)) {
       const id = url.split('/').pop() as string;
@@ -273,18 +309,99 @@ describe('a section that fails does not take the page with it', () => {
   });
 });
 
-describe('claims the page does not make', () => {
-  it('shows no amount on the upcoming booking, because no order id reaches it', async () => {
-    mockApi();
+describe('the amount collected on the upcoming booking (#225)', () => {
+  it('reads the order the booking names, and shows what that order collected', async () => {
+    mockApi({ bookings: [booking({ orderId: 'o1' })] });
     renderDashboard();
     const upcoming = await screen.findByTestId('upcoming-booking');
 
-    // The design shows «پرداخت‌شده ۸۰۷٬۵۰۰». `BookingSummary` carries no
-    // order id, so there is nothing to read a total from.
-    expect(upcoming.textContent).not.toContain('پرداخت‌شده');
-    expect(upcoming.textContent).not.toContain('تومان');
+    const paid = await within(upcoming).findByTestId('upcoming-paid');
+    expect(paid).toHaveTextContent('پرداخت‌شده');
+    expect(paid).toHaveTextContent('۸۰۷٬۵۰۰');
+    // One read, of the order the booking named — not a guess at an id.
+    expect(orderReads).toEqual(['o1']);
   });
 
+  /*
+   * The figure is the ORDER's, and `collectedTotalToman` is the only field it
+   * may come from: the page must not reach the same number by subtracting
+   * refunds from a total, or by adding the schedule up.
+   */
+  it('shows what was collected, not the order total, when a refund has moved them apart', async () => {
+    mockApi({
+      bookings: [booking({ orderId: 'o1' })],
+      orders: { o1: order({ id: 'o1', status: 'partially_refunded', refundedTotalToman: 300_000, collectedTotalToman: 507_500 }) },
+    });
+    renderDashboard();
+    const paid = await screen.findByTestId('upcoming-paid');
+
+    expect(paid).toHaveTextContent('۵۰۷٬۵۰۰');
+    expect(paid.textContent).not.toContain('۸۰۷٬۵۰۰');
+  });
+
+  it('carries the unit on the label exactly once, and never on the figure', async () => {
+    mockApi({ bookings: [booking({ orderId: 'o1' })] });
+    renderDashboard();
+    const paid = await screen.findByTestId('upcoming-paid');
+
+    // #287: the unit once per block. The label is where a labelled figure carries it.
+    expect(paid).toHaveTextContent('پرداخت‌شده (تومان)');
+    expect(paid.textContent?.match(/تومان/g)).toHaveLength(1);
+  });
+
+  it('reads the order of the EARLIEST upcoming booking, whatever order the server returned', async () => {
+    mockApi({
+      bookings: [
+        booking({ id: 'b-later', startAt: '2099-12-01T06:30:00.000Z', endAt: '2099-12-01T09:30:00.000Z', orderId: 'o-later' }),
+        booking({ id: 'b-sooner', startAt: FUTURE, endAt: '2099-09-15T09:30:00.000Z', orderId: 'o-sooner' }),
+      ],
+    });
+    renderDashboard();
+    await screen.findByTestId('upcoming-paid');
+
+    // The card shows one booking; reading the other one's order would put a
+    // different appointment's money on it.
+    expect(orderReads).toEqual(['o-sooner']);
+  });
+
+  it('asks for nothing when the booking produced no order', async () => {
+    mockApi({ bookings: [booking({ orderId: null })] });
+    renderDashboard();
+    const upcoming = await screen.findByTestId('upcoming-booking');
+
+    await waitFor(() => expect(providerReads).toEqual(['prof-1']));
+    expect(orderReads).toEqual([]);
+    expect(within(upcoming).queryByTestId('upcoming-paid')).toBeNull();
+  });
+
+  it('shows nothing rather than zero when the order collected nothing online', async () => {
+    // V3.3 `#41b`: not paid, not free, not settled. «پرداخت‌شده ۰» would be a lie.
+    mockApi({
+      bookings: [booking({ orderId: 'o1' })],
+      orders: { o1: order({ id: 'o1', status: 'online_collection_not_required', collectedTotalToman: 0, paidAt: null }) },
+    });
+    renderDashboard();
+    const upcoming = await screen.findByTestId('upcoming-booking');
+
+    await waitFor(() => expect(orderReads).toEqual(['o1']));
+    expect(within(upcoming).queryByTestId('upcoming-paid')).toBeNull();
+    expect(upcoming.textContent).not.toContain('پرداخت‌شده');
+  });
+
+  it('keeps the card when the order read fails, like a missing professional name', async () => {
+    mockApi({ bookings: [booking({ orderId: 'o1' })], orderFails: true });
+    renderDashboard();
+    const upcoming = await screen.findByTestId('upcoming-booking');
+
+    await waitFor(() => expect(orderReads).toEqual(['o1']));
+    expect(within(upcoming).queryByTestId('upcoming-paid')).toBeNull();
+    // The rest of the card is still there, and the page did not fail.
+    expect(upcoming).toHaveTextContent('آتلیه سارا محمدی');
+    expect(screen.queryByRole('button', { name: /تلاش/ })).toBeNull();
+  });
+});
+
+describe('claims the page does not make', () => {
   it('shows no membership date, because /v1/me has no createdAt', async () => {
     mockApi();
     renderDashboard();
