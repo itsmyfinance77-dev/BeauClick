@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, In, LessThan, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, LessThan, MoreThan, Repository } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
 import {
   BOOKING_CANCELLATION_ENTITLEMENT_HOOK,
@@ -22,6 +22,7 @@ import {
   BookingActorType,
   BookingEntity,
   BookingStatus,
+  OPEN_BOOKING_STATUSES,
   SLOT_HOLDING_STATUSES,
 } from '../entities/booking.entity';
 import { BookingHistoryEntity, BookingHistoryEvent, BookingHistoryMetadata } from '../entities/booking-history.entity';
@@ -1117,6 +1118,37 @@ export class BookingService {
       take: limit,
     });
     return { items, total };
+  }
+
+  /**
+   * How many of this professional's bookings are still ahead of them -- #282.
+   *
+   * One `COUNT`, not a page. `listForProfessional` orders by `slotStart DESC`,
+   * so reading page one and counting what looks upcoming would be exact only
+   * while the professional has fewer upcoming bookings than a page holds, and
+   * wrong without saying so above that. The navigation draws this on every
+   * professional screen, so it has to be cheap and it has to be whole.
+   *
+   * `slotEnd`, not `slotStart`: an appointment that started twenty minutes ago
+   * and ends in forty is not behind anybody yet. `toBookingShape` serialises
+   * this same column as the client's `endAt`
+   * (`booking.slotEnd.toISOString()`), so the boundary counted here and the
+   * boundary `/pro/bookings` partitions on are one instant in two encodings.
+   * This is deliberately NOT the
+   * rule `apps/web/lib/booking-api.ts`'s `isUpcomingBooking` applies -- that
+   * one is the CUSTOMER's «نوبت پیش‌رو» and uses `startAt`, so a booking in
+   * progress drops out of it. Two predicates, both called "upcoming", and they
+   * disagree on purpose; this one matches the professional's own booking list,
+   * which is what the counter sits beside.
+   */
+  async countUpcomingForProfessional(professionalId: string): Promise<number> {
+    return this.bookings.count({
+      where: {
+        professionalId,
+        status: In([...OPEN_BOOKING_STATUSES]),
+        slotEnd: MoreThan(new Date()),
+      },
+    });
   }
 
   async historyFor(bookingId: string): Promise<BookingHistoryEntity[]> {

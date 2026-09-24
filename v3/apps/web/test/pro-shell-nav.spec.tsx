@@ -30,7 +30,7 @@ function ok(data: unknown) {
   return Promise.resolve({ ok: true, status: 200, json: async () => ({ data, meta: null, error: null }) });
 }
 
-function mockApi(options: { verificationStatus?: string; hasProfile?: boolean } = {}) {
+function mockApi(options: { verificationStatus?: string; hasProfile?: boolean; upcomingCount?: number | 'fails' } = {}) {
   (global.fetch as jest.Mock).mockImplementation((url: string) => {
     if (url.includes('/v1/auth/refresh')) return ok({ accessToken: 'a', csrfToken: 'c' });
     if (/\/v1\/me(\?|$)/.test(url)) {
@@ -49,6 +49,19 @@ function mockApi(options: { verificationStatus?: string; hasProfile?: boolean } 
         displayName: 'سارا محمدی',
         verificationStatus: options.verificationStatus ?? 'verified',
       });
+    }
+    // #282. Declared before nothing that could shadow it, and only answered
+    // when a count was asked for -- the default is no route at all, so the
+    // existing cases keep exercising a shell with no badge.
+    if (url.includes('/v1/me/professional-bookings/upcoming-count')) {
+      if (options.upcomingCount === undefined || options.upcomingCount === 'fails') {
+        return Promise.resolve({
+          ok: false,
+          status: 500,
+          json: async () => ({ data: null, meta: null, error: { code: 'INTERNAL_ERROR', message: 'خطا' } }),
+        });
+      }
+      return ok({ upcomingCount: options.upcomingCount });
     }
     return ok([]);
   });
@@ -145,5 +158,69 @@ describe('the professional column', () => {
     renderShell();
     await screen.findByTestId('pro-identity');
     expect(screen.getByText('محتوا')).toBeInTheDocument();
+  });
+});
+
+/**
+ * The upcoming-bookings counter — #282, IA §3's «+ شمارندهٔ پیش‌رو», which is
+ * the reason §3 gives for a column at all: «جای شمارنده هم هست».
+ */
+describe('the upcoming-bookings count', () => {
+  const badge = () => screen.queryByTestId('pro-nav-upcoming-count');
+
+  it('sits inside the «رزروها» link, so the number is read with its destination', async () => {
+    mockApi({ upcomingCount: 3 });
+    renderShell();
+
+    await waitFor(() => expect(badge()).not.toBeNull());
+    const link = within(nav()).getByRole('link', { name: /رزروها/ });
+    expect(link).toContainElement(badge());
+    expect(link).toHaveAttribute('href', '/pro/bookings');
+    // Persian digits, plus a hidden half saying what the figure counts — «۳»
+    // on its own names nothing.
+    expect(badge()).toHaveTextContent('۳');
+    expect(link).toHaveAccessibleName('رزروها ۳ رزرو پیش‌رو');
+  });
+
+  it('is on «رزروها» and on no other destination', async () => {
+    mockApi({ upcomingCount: 3 });
+    renderShell();
+
+    await waitFor(() => expect(badge()).not.toBeNull());
+    // The nav model names which count sits where, and exactly one destination
+    // claims one.
+    expect(screen.getAllByTestId('pro-nav-upcoming-count')).toHaveLength(1);
+  });
+
+  it('draws nothing when the count is zero, because «۰» beside a destination is noise', async () => {
+    mockApi({ upcomingCount: 0 });
+    renderShell();
+
+    await screen.findByTestId('pro-identity');
+    await waitFor(() => expect(within(nav()).getByRole('link', { name: 'رزروها' })).toBeInTheDocument());
+    expect(badge()).toBeNull();
+  });
+
+  it('draws nothing when the count could not be read, rather than a zero nobody reported', async () => {
+    mockApi({ upcomingCount: 'fails' });
+    renderShell();
+
+    await screen.findByTestId('pro-identity');
+    expect(badge()).toBeNull();
+    // The failure is confined to the badge; the column still works.
+    expect(within(nav()).getByRole('link', { name: 'رزروها' })).toHaveAttribute('href', '/pro/bookings');
+    expect(screen.getByText('محتوا')).toBeInTheDocument();
+  });
+
+  it('asks for no count at all when the user has no professional profile', async () => {
+    // The route 404s for them, and a zero would tell someone with no
+    // professional identity that they have no upcoming bookings.
+    mockApi({ hasProfile: false, upcomingCount: 5 });
+    renderShell();
+
+    await waitFor(() => expect(nav().querySelectorAll('[data-pro-nav]').length).toBeGreaterThan(0));
+    const asked = (global.fetch as jest.Mock).mock.calls.filter((call) => String(call[0]).includes('/upcoming-count'));
+    expect(asked).toEqual([]);
+    expect(badge()).toBeNull();
   });
 });

@@ -202,6 +202,41 @@
   font-weight: 700;
 }
 
+/*
+ * The upcoming-bookings count beside «رزروها» — #282, IA §3's
+ * «+ شمارندهٔ پیش‌رو». A rule with this name existed here unused and #296
+ * rightly deleted it; this one is written for the markup that now renders it.
+ *
+ * `margin-inline-start: auto` inside the flex `.link` pushes it to the far end
+ * of the row, which is why it needs no width of its own. `min-width` keeps a
+ * one-digit badge from being a narrower pill than a two-digit one.
+ */
+.count {
+  margin-inline-start: auto;
+  flex-shrink: 0;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--bc-radius-chip);
+  background: var(--bc-color-primary-soft);
+  color: var(--bc-color-primary-on-soft);
+  font-size: var(--bc-text-badge-size);
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/*
+ * On the current destination the link is already filled with the primary, so
+ * the badge's own soft-primary would sit on it invisibly. Referenced from the
+ * markup through `.count`; this selector only re-colours it.
+ */
+.link[aria-current='page'] .count {
+  background: var(--bc-color-surface);
+  color: var(--bc-color-primary);
+}
+
 .separator {
   flex-shrink: 0;
   width: 1px;

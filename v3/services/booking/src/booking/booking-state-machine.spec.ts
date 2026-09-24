@@ -1,4 +1,10 @@
-import { BOOKING_STATUSES, BookingStatus, SLOT_HOLDING_STATUSES } from '../entities/booking.entity';
+import {
+  BOOKING_STATUSES,
+  BookingStatus,
+  CONCLUDED_BOOKING_STATUSES,
+  OPEN_BOOKING_STATUSES,
+  SLOT_HOLDING_STATUSES,
+} from '../entities/booking.entity';
 import { LEGAL_TRANSITIONS } from './booking.service';
 import { SLOT_STATUSES } from '../entities/availability-slot.entity';
 
@@ -55,6 +61,42 @@ describe('booking state machine', () => {
     // This list mirrors the partial unique index on slot_id. If it drifted
     // from the migration, a terminal booking would start blocking its slot.
     expect([...SLOT_HOLDING_STATUSES].sort()).toEqual(['confirmed', 'pending']);
+  });
+
+  /*
+   * #282. The professional's upcoming counter COUNTs over
+   * `OPEN_BOOKING_STATUSES`, while the list it sits beside partitions by
+   * complement -- "cancelled to its own tab, the terminal ones to the past,
+   * everything else upcoming". These assertions are written over
+   * `BOOKING_STATUSES` itself rather than over a copied list, so a seventh
+   * status cannot end up classified in one place and unclassified in the other.
+   */
+  it('classifies every booking status as open or concluded, and never both', () => {
+    for (const status of BOOKING_STATUSES) {
+      const open = OPEN_BOOKING_STATUSES.includes(status);
+      const concluded = CONCLUDED_BOOKING_STATUSES.includes(status);
+      expect(open || concluded).toBe(true);
+      expect(open && concluded).toBe(false);
+    }
+    expect(OPEN_BOOKING_STATUSES.length + CONCLUDED_BOOKING_STATUSES.length).toBe(BOOKING_STATUSES.length);
+  });
+
+  it('derives the open set rather than listing it, so an unclassified new status is counted', () => {
+    // Forgetting to classify a new status then produces AGREEMENT with the
+    // professional's list (which already calls anything non-terminal upcoming),
+    // rather than a badge that silently disagrees with the tab beside it.
+    expect([...OPEN_BOOKING_STATUSES]).toEqual(
+      BOOKING_STATUSES.filter((status) => !CONCLUDED_BOOKING_STATUSES.includes(status)),
+    );
+  });
+
+  it('treats a booking as concluded exactly when the state machine leaves it nowhere to go', () => {
+    // The two definitions coincide today, and that is worth pinning rather than
+    // leaving as a coincidence: a non-terminal status that should be kept out of
+    // a professional's counter would fail here and have to be argued for.
+    for (const status of BOOKING_STATUSES) {
+      expect(CONCLUDED_BOOKING_STATUSES.includes(status)).toBe(LEGAL_TRANSITIONS[status].length === 0);
+    }
   });
 
   it('makes every state reachable from the initial state', () => {

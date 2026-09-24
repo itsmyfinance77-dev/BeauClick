@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useAuth } from './auth-context';
-import { myProvider, type MyProviderProfile } from './pro-api';
+import { myProvider, upcomingBookingCount, type MyProviderProfile } from './pro-api';
 
 /**
  * The professional profile, loaded once for the whole `/pro` route group.
@@ -37,6 +37,23 @@ interface ProContextValue {
   reload: () => Promise<void>;
   /** Replaces the cached profile after a successful create/update, so every screen sees it without a refetch. */
   setProfile: (profile: MyProviderProfile) => void;
+  /**
+   * Bookings still ahead of this professional -- #282, the number behind the
+   * navigation's «رزروها» badge.
+   *
+   * `null` is "not known": the read is in flight, or it failed, or this user has
+   * no professional profile to count for. It is NOT zero. The same distinction
+   * this file's `state` makes for the profile, for the same reason -- a badge
+   * reading «۰» because a request failed is a claim nobody made.
+   *
+   * ONE place this number is computed. The column badge and `/pro/bookings`'s
+   * «پیش‌رو» tab label both read it from here rather than each counting for
+   * themselves, which is what kept them from disagreeing when the tab counted
+   * the page it held and the badge counted everything.
+   */
+  upcomingBookings: number | null;
+  /** Re-reads the count. Called by screens that move a booking into or out of the upcoming set. */
+  refreshUpcomingBookings: () => Promise<void>;
 }
 
 const ProContext = createContext<ProContextValue | null>(null);
@@ -46,6 +63,7 @@ export function ProProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<ProState>('loading');
   const [profile, setProfileState] = useState<MyProviderProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [upcomingBookings, setUpcomingBookings] = useState<number | null>(null);
 
   const reload = useCallback(async () => {
     setState('loading');
@@ -82,9 +100,39 @@ export function ProProvider({ children }: { children: ReactNode }) {
     setState('ready');
   }, []);
 
+  /**
+   * Re-reads the upcoming count -- #282.
+   *
+   * A failure sets `null` rather than keeping the last number: a stale count is
+   * worse than no count, because nothing on screen would say it is stale. The
+   * badge simply goes away, and the route beside it still works.
+   */
+  const refreshUpcomingBookings = useCallback(async () => {
+    try {
+      const res = await upcomingBookingCount(api);
+      setUpcomingBookings(res.data?.upcomingCount ?? null);
+    } catch {
+      setUpcomingBookings(null);
+    }
+  }, [api]);
+
+  useEffect(() => {
+    /*
+     * Only once there IS a professional profile. The route answers 404 for a
+     * user without one -- correctly, since a zero would tell them they have no
+     * upcoming bookings rather than no professional identity -- and asking
+     * anyway would spend a request to learn what `state` already says.
+     */
+    if (state !== 'ready') {
+      setUpcomingBookings(null);
+      return;
+    }
+    void refreshUpcomingBookings();
+  }, [state, refreshUpcomingBookings]);
+
   const value = useMemo(
-    () => ({ state, profile, error, reload, setProfile }),
-    [state, profile, error, reload, setProfile],
+    () => ({ state, profile, error, reload, setProfile, upcomingBookings, refreshUpcomingBookings }),
+    [state, profile, error, reload, setProfile, upcomingBookings, refreshUpcomingBookings],
   );
 
   return <ProContext.Provider value={value}>{children}</ProContext.Provider>;

@@ -9,6 +9,19 @@ jest.mock('next/navigation', () => ({
 }));
 
 /**
+ * The professional column settles in TWO steps, not one: the profile arrives and
+ * draws the column, and only then does `ProProvider` read the upcoming-booking
+ * count that fills the «رزروها» badge (#282). A test that asserts as soon as the
+ * column exists has not waited for the second, and the state update lands after
+ * it finishes — which `test/setup.ts` correctly calls an unexpected console
+ * error rather than letting it pass as a warning nobody reads (#298).
+ *
+ * So the two seller tests here await the badge, not the column. It is the last
+ * thing this frame does, and awaiting it is what makes them deterministic rather
+ * than dependent on how many microtask ticks their assertions happen to flush.
+ */
+
+/**
  * `/business` is advertised in the professional's own column and sheet, and is
  * also opened from the customer header and the footer (#281). Its frame is
  * chosen by the session's identity: a seller gets the professional shell, anyone
@@ -29,6 +42,12 @@ function mockApi(roles: string[]) {
     if (url.includes('/v1/me/provider')) {
       return ok({ id: 'prof-1', displayName: 'سارا محمدی', verificationStatus: 'verified' });
     }
+    // Answered explicitly rather than falling through to `ok([])`, because the
+    // professional column mounts `ProProvider`, which reads this as a SECOND
+    // request once the profile is ready (#282). A non-zero count is what makes
+    // the badge render, and the badge is what the seller tests below await to
+    // know that second read has landed.
+    if (url.includes('/professional-bookings/upcoming-count')) return ok({ upcomingCount: 3 });
     return ok([]);
   });
 }
@@ -56,6 +75,7 @@ describe('/business in a seller’s session', () => {
 
     expect(await screen.findByRole('navigation', { name: 'ناوبری متخصص' })).toBeInTheDocument();
     expect(await screen.findByTestId('pro-identity')).toHaveTextContent('سارا محمدی');
+    await screen.findByTestId('pro-nav-upcoming-count');
     expect(screen.getByText('صفحهٔ کسب‌وکار')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'بازگشت به نمای مشتری' })).toBeInTheDocument();
   });
@@ -64,6 +84,7 @@ describe('/business in a seller’s session', () => {
     mockApi(['professional']);
     page();
     const column = await screen.findByRole('navigation', { name: 'ناوبری متخصص' });
+    await screen.findByTestId('pro-nav-upcoming-count');
 
     expect(column.querySelector('[data-pro-nav="/business"]')).toHaveAttribute('aria-current', 'page');
     // Only that one: `/business` must not read as current for its neighbours.
