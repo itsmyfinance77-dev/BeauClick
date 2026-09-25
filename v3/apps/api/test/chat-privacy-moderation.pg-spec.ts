@@ -1012,7 +1012,11 @@ describePg('chat — messaging, privacy, moderation (real PostgreSQL)', () => {
       const erased = items.find((m: { sequence: number }) => m.sequence === 1);
       expect(erased.body).toBeNull();
       expect(erased.erased).toBe(true);
-      expect(erased.senderUserId).toBeNull();
+      // No author left to name (#327: the participant view carries no user id,
+      // and an erased placeholder has no side).
+      expect(erased).not.toHaveProperty('senderUserId');
+      expect(erased.side).toBeNull();
+      expect(erased.mine).toBe(false);
       // Their own words are intact.
       expect(items.find((m: { sequence: number }) => m.sequence === 2).body).toBe('جواب من');
     });
