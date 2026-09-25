@@ -428,6 +428,21 @@ describe('inspecting the reported image (#265, screen 52 §5)', () => {
     await waitFor(() => expect(upholdButton()).toBeEnabled());
   });
 
+  it('asks again when the moderator switches to another report and back, without closing the panel', async () => {
+    mockApi();
+    const user = userEvent.setup();
+    renderPage();
+    await openWithReason(user, 'rep-1');
+    await showImage();
+    await waitFor(() => expect(upholdButton()).toBeEnabled());
+
+    await openWithReason(user, 'rep-2');
+    await openWithReason(user, 'rep-1');
+    expect(upholdButton()).toBeDisabled();
+    await showImage();
+    await waitFor(() => expect(upholdButton()).toBeEnabled());
+  });
+
   it('clears the rows and the panel when the media capability is revoked mid-inspection', async () => {
     let revoked = false;
     mockApi({
