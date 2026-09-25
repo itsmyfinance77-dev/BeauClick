@@ -368,10 +368,19 @@ export class NotificationDispatchHandler implements DomainEventHandler {
   ) {}
 
   async handle(envelope: EventEnvelope): Promise<void> {
-    const built = await this.rule.build(envelope.payload as Record<string, unknown>, this.enricher);
-    if (!built || !built.userId || !built.entityId) return;
-
     try {
+      // `build` is INSIDE the try (#313). It used to sit above it, so the
+      // guarantee the catch below states -- a notification failure never
+      // blocks the fact that caused it -- covered only the second half of this
+      // method. That was survivable only because the enricher caught every
+      // exception itself and returned a value meaning "absent", which is the
+      // defect #313 fixes. Now that a failed lookup throws, THIS is what keeps
+      // a database fault from failing the ingestion of a booking that really
+      // was confirmed -- and the log line below is what makes the dropped
+      // notification visible instead of silent.
+      const built = await this.rule.build(envelope.payload as Record<string, unknown>, this.enricher);
+      if (!built || !built.userId || !built.entityId) return;
+
       await this.notifications.notify({
         userId: built.userId,
         templateKey: this.rule.templateKey,

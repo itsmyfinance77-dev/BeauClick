@@ -1,10 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { ProfessionalEntity } from '@beauclick/provider';
 import { BusinessEntity } from '@beauclick/business';
 import { BookingService } from '@beauclick/booking';
 import { TierService } from '@beauclick/loyalty';
+
+const message = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
 export interface BookingNotificationDetails {
   professionalName: string;
@@ -29,12 +31,43 @@ export interface BookingNotificationDetails {
  * every other consumer would then carry, and that would go stale in the event
  * log the moment the professional renamed themselves.
  *
- * Every failure here degrades rather than throws. A notification that says
- * "متخصص" instead of a name is worth sending; a notification that was never
- * sent because a name lookup failed is not.
+ * ## Degrade where a degraded value is honest; refuse where it would be a lie
+ *
+ * The original rule here was "every failure degrades rather than throws", and
+ * half of it is right: a notification that says "متخصص" instead of a name is
+ * worth sending, and one never sent because a NAME lookup failed is not. A
+ * generic label is an honest answer to "who is this" whether the row is missing
+ * or the query failed.
+ *
+ * The other half was wrong, and #313 is what it cost. Every lookup caught its
+ * exceptions and returned the same `null` that means "this row does not exist",
+ * so **one value carried two meanings** and the callers -- reasoning correctly
+ * about the meaning they were told about -- turned an infrastructure failure
+ * into a positive claim:
+ *
+ *  * `bookingStartAt` returning null made a confirmation notification state the
+ *    appointment was "for" the instant we processed the confirmation. The
+ *    caller's own comment names that harm exactly: "confidently wrong in a way
+ *    they would act on".
+ *  * `sellerUserId` returning null made every settlement notification drop
+ *    silently, on a path whose docblock promised null meant "the party's own
+ *    profile is gone".
+ *
+ * Note the asymmetry that makes this worse than it sounds: a deleted row is
+ * rare and permanent, while a failing query is an operational condition that
+ * can affect EVERY event while it lasts. The branch written for the rare case
+ * was the one that ran in the common failure.
+ *
+ * So: a lookup that cannot say whether the row exists **throws**. Only a lookup
+ * that genuinely found nothing returns null. `NotificationDispatchHandler`
+ * catches, logs and drops, which keeps the invariant that actually matters --
+ * a notification failure never blocks the fact that caused it -- while making
+ * the drop a recorded event rather than an invisible one.
  */
 @Injectable()
 export class NotificationEnricher {
+  private readonly logger = new Logger('NotificationEnricher');
+
   /** Shown when the professional cannot be read. Deliberately generic rather than blank. */
   private static readonly FALLBACK_NAME = 'متخصص';
 
@@ -50,27 +83,34 @@ export class NotificationEnricher {
    * financial party -- resolved the SAME way `ProviderBackedFinancialPartyResolver`
    * resolves a party FROM a user, just inverted (party -> user, since a
    * settlement notification starts from the party financial-service already
-   * recorded). Returns null rather than throwing when the party's own row
-   * is gone (a deleted profile) -- a settlement notification is a courtesy,
-   * never something worth failing a financial fact's ingestion over.
+   * recorded).
+   *
+   * Null means exactly one thing: **the party's own row is gone** (a deleted
+   * profile), or the party type is one nobody can be notified for. The caller
+   * drops the notification on null and says so, which is correct for that.
+   *
+   * A query that FAILS throws instead of returning null (#313). It used to
+   * return null, which made a persistent database fault drop every settlement
+   * notification -- money moved and nobody was told -- with no log, no retry
+   * and no dead-letter row, indistinguishable from the deliberate drop. A
+   * settlement notification is still a courtesy and still never worth failing
+   * a financial fact's ingestion over; `NotificationDispatchHandler` is what
+   * guarantees that, by catching and logging, rather than this method by
+   * pretending the row was missing.
    */
   async sellerUserId(partyType: string, partyId: string): Promise<string | null> {
-    try {
-      if (partyType === 'business') {
-        const business = await this.businesses.findOne({ where: { id: partyId, deletedAt: IsNull() }, select: { ownerId: true } });
-        return business?.ownerId ?? null;
-      }
-      if (partyType === 'professional') {
-        const professional = await this.professionals.findOne({
-          where: { id: partyId, deletedAt: IsNull() },
-          select: { ownerId: true },
-        });
-        return professional?.ownerId ?? null;
-      }
-      return null;
-    } catch {
-      return null;
+    if (partyType === 'business') {
+      const business = await this.businesses.findOne({ where: { id: partyId, deletedAt: IsNull() }, select: { ownerId: true } });
+      return business?.ownerId ?? null;
     }
+    if (partyType === 'professional') {
+      const professional = await this.professionals.findOne({
+        where: { id: partyId, deletedAt: IsNull() },
+        select: { ownerId: true },
+      });
+      return professional?.ownerId ?? null;
+    }
+    return null;
   }
 
   /**
@@ -90,9 +130,12 @@ export class NotificationEnricher {
     try {
       const tiers = await this.tiers.activeTiers();
       return tiers.find((t) => t.slug === slug)?.name ?? slug;
-    } catch {
+    } catch (err) {
       // The slug is a poor label but an honest one; failing the notification
-      // outright over a lookup would be worse.
+      // outright over a lookup would be worse. Logged rather than silent
+      // (#313): a degradation nobody can see is indistinguishable from a tier
+      // that really has no name, and this one is operational.
+      this.logger.warn(`Tier name lookup failed for '${slug}', falling back to the slug: ${message(err)}`);
       return slug;
     }
   }
@@ -118,18 +161,33 @@ export class NotificationEnricher {
         select: { id: true, displayName: true },
       });
       return professional?.displayName || NotificationEnricher.FALLBACK_NAME;
-    } catch {
+    } catch (err) {
+      // Kept degrading, deliberately: "متخصص" is an honest answer to "who is
+      // this" whether the row is missing or the read failed, so unlike the
+      // date it costs the reader nothing. Logged so the operational case is
+      // still visible (#313).
+      this.logger.warn(
+        `Professional name lookup failed for '${professionalId}', falling back to a generic label: ${message(err)}`,
+      );
       return NotificationEnricher.FALLBACK_NAME;
     }
   }
 
+  /**
+   * The appointment instant, or null when the booking genuinely cannot be
+   * found any more.
+   *
+   * No catch (#313). Every caller of `bookingDetails` substitutes an event
+   * instant -- `confirmedAt`, `cancelledAt`, `declaredAt` -- when this is null,
+   * and that substitution is a **factual claim about when the appointment is**.
+   * It is defensible for a booking whose row is genuinely gone; it is a lie
+   * when the query simply failed, and the customer acts on the date they are
+   * given. A dropped notification is recoverable. A wrong date in a delivered
+   * one is not.
+   */
   private async bookingStartAt(bookingId: string): Promise<Date | null> {
     if (!bookingId) return null;
-    try {
-      const booking = await this.bookings.findById(bookingId);
-      return booking?.slotStart ?? null;
-    } catch {
-      return null;
-    }
+    const booking = await this.bookings.findById(bookingId);
+    return booking?.slotStart ?? null;
   }
 }
