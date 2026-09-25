@@ -559,6 +559,27 @@ describe('a full moderator typing a platform or commercial URL', () => {
     expect(adminCalls()).toEqual([]);
   });
 
+  // The shell's layer on its own: a page that FORGOT its guard — the exact
+  // state eight pages were in before #264 — is still never rendered for a
+  // moderator. Without this case the page guards above would hide a broken
+  // route gate.
+  it.each(['/admin/users', '/admin/settlements', '/admin/commercial/some-future-page', '/admin/anything-new'])(
+    '%s: the shell refuses even a page with no guard of its own',
+    async (path) => {
+      installApi(ALL_MODERATION);
+      renderAt(path, <p>محتوای بدون نگهبان</p>);
+      expect(await screen.findByText(/دسترسی لازم برای این بخش را ندارد/)).toBeInTheDocument();
+      expect(screen.queryByText('محتوای بدون نگهبان')).toBeNull();
+      expect(within(bar()).getByText('بیوکلیک — بررسی محتوا')).toBeInTheDocument();
+    },
+  );
+
+  it('the shell’s route gate changes nothing for the administrator', async () => {
+    installApi(ADMINISTRATOR);
+    renderAt('/admin/anything-new', <p>محتوای بدون نگهبان</p>);
+    expect(await screen.findByText('محتوای بدون نگهبان')).toBeInTheDocument();
+  });
+
   // The second, independent layer: the page's own guard, with no layout at all.
   // Proves each page states its authority itself rather than relying on the
   // shell — the exact assumption that made #264 dangerous to fix naively.
