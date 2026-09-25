@@ -303,9 +303,9 @@ export class AdminMediaController {
    * never the object's public URL, which is its storage key and never expires.
    *
    * The response names the report, the URL and when it expires, and nothing
-   * else about storage. Every
-   * reason it cannot be inspected is the one shared refusal. A read, so no
-   * audit record: nothing changes, exactly as for verification evidence.
+   * else about storage. Every reason it cannot be inspected is the one shared
+   * refusal. A read, so no audit record: nothing changes, exactly as for
+   * verification evidence.
    */
   @RequireCapability('bc_moderate_media')
   @Get('reports/:id/inspection')
