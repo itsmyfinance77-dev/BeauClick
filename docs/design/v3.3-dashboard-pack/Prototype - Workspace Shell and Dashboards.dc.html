@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BeauClick V3.3 — Workspace shell and dashboards (#45)</title>
+<script src="../v3.3-gap-pack/support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas" />
+<style>
+  @font-face { font-family: 'Vazirmatn'; src: url('../v3.3-gap-pack/fonts/Vazir-Regular.ttf') format('truetype'); font-weight: 400; font-display: swap; }
+  @font-face { font-family: 'Vazirmatn'; src: url('../v3.3-gap-pack/fonts/Vazir-Medium.ttf') format('truetype'); font-weight: 500; font-display: swap; }
+  @font-face { font-family: 'Vazirmatn'; src: url('../v3.3-gap-pack/fonts/Vazir-Bold.ttf') format('truetype'); font-weight: 600 700; font-display: swap; }
+  @font-face { font-family: 'Vazirmatn'; src: url('../v3.3-gap-pack/fonts/Vazir-Black.ttf') format('truetype'); font-weight: 800 900; font-display: swap; }
+  @font-face { font-family: 'Anjoman'; src: url('../v3.3-gap-pack/fonts/Anjoman-Bold.ttf') format('truetype'); font-weight: 700; font-display: swap; }
+  @font-face { font-family: 'Anjoman'; src: url('../v3.3-gap-pack/fonts/Anjoman-ExtraBold.ttf') format('truetype'); font-weight: 800; font-display: swap; }
+  @font-face { font-family: 'Peyda'; src: url('../v3.3-gap-pack/fonts/Peyda-Bold.ttf') format('truetype'); font-weight: 700 900; font-display: swap; }
+  body { margin: 0; background: oklch(0.94 0.005 60); color: oklch(0.22 0.02 330); font-family: 'Vazirmatn', system-ui, sans-serif; }
+  a { color: oklch(0.42 0.13 340); }
+  a:focus-visible, button:focus-visible, input:focus-visible + .opt, [tabindex]:focus-visible { outline: 2px solid oklch(0.42 0.13 340); outline-offset: 2px; }
+  code, .ltr { direction: ltr; unicode-bidi: isolate; font-family: ui-monospace, Menlo, monospace; font-size: 0.85em; }
+  .doc { padding: 40px; display: flex; flex-direction: column; gap: 56px; }
+  .lede { max-width: 940px; display: flex; flex-direction: column; gap: 10px; }
+  .kicker { font-size: 13px; font-weight: 700; letter-spacing: 0.04em; color: oklch(0.47 0.015 330); }
+  h1.title { margin: 0; font-family: 'Peyda', sans-serif; font-size: 40px; font-weight: 800; line-height: 1.4; }
+  .p { margin: 0; font-size: 15px; line-height: 1.9; color: oklch(0.36 0.02 330); }
+  .pills { display: flex; gap: 10px; flex-wrap: wrap; font-size: 12.5px; }
+  .pill { padding: 5px 12px; border-radius: 999px; background: #fff; border: 1px solid oklch(0.88 0.008 60); }
+  section.s { display: flex; flex-direction: column; gap: 16px; }
+  .sh { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .badge { font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: oklch(0.42 0.13 340); color: #fff; }
+  h2.st { margin: 0; font-family: 'Anjoman', sans-serif; font-size: 23px; font-weight: 800; }
+  .sub { font-size: 12.5px; color: oklch(0.47 0.015 330); }
+  .row { display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-start; }
+  .board { box-sizing: border-box; background: oklch(0.985 0.003 75); border: 1px solid oklch(0.88 0.008 60); border-radius: 14px; overflow: hidden; }
+  .desk { width: min(1280px, 100%); }
+  .tab { width: min(768px, 100%); }
+  .phone { width: 390px; max-width: 100%; border: 10px solid oklch(0.2 0.02 330); border-radius: 34px; }
+  .cap { font-size: 11.5px; font-weight: 700; color: oklch(0.47 0.015 330); padding: 6px 12px; background: oklch(0.955 0.004 60); border-bottom: 1px solid oklch(0.88 0.008 60); }
+  .hdr { display: flex; align-items: center; gap: 16px; padding: 10px 20px; background: #fff; border-bottom: 1px solid oklch(0.88 0.008 60); flex-wrap: wrap; }
+  .brand { font-weight: 800; font-size: 16px; }
+  .prim { display: flex; gap: 16px; font-size: 14px; }
+  .prim a { color: oklch(0.3 0.02 330); text-decoration: none; }
+  .grow { flex: 1; }
+  .ctx { font-size: 12.5px; font-weight: 700; padding: 4px 10px; border-radius: 8px; background: oklch(0.95 0.03 340); color: oklch(0.36 0.1 340); border: 1px solid oklch(0.82 0.06 340); }
+  .iconbtn { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px; border: 1px solid oklch(0.88 0.008 60); background: #fff; font: inherit; font-size: 13px; color: oklch(0.3 0.02 330); gap: 6px; padding: 0 10px; }
+  .menu { position: relative; background: #fff; border: 1px solid oklch(0.85 0.01 60); border-radius: 12px; box-shadow: 0 8px 24px oklch(0.2 0.02 330 / 0.12); width: 290px; max-width: 100%; }
+  .menu h3 { margin: 0; padding: 10px 14px 4px; font-size: 12px; color: oklch(0.47 0.015 330); }
+  .menu ul { list-style: none; margin: 0; padding: 4px 6px 8px; }
+  .menu li a { display: flex; min-height: 44px; align-items: center; justify-content: space-between; padding: 0 10px; border-radius: 8px; color: oklch(0.25 0.02 330); text-decoration: none; font-size: 14px; }
+  .menu li a[aria-current] { background: oklch(0.95 0.03 340); font-weight: 700; }
+  .body { padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; }
+  .card { background: #fff; border: 1px solid oklch(0.88 0.008 60); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+  .card h3, .card h4 { margin: 0; font-size: 15px; font-weight: 800; }
+  .kv { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 13.5px; padding: 6px 0; border-bottom: 1px dashed oklch(0.9 0.006 60); }
+  .kv:last-child { border-bottom: 0; }
+  .kv > span:first-child { color: oklch(0.36 0.02 330); }
+  .slot { direction: ltr; unicode-bidi: isolate; font-family: ui-monospace, Menlo, monospace; font-size: 12px; padding: 2px 8px; border-radius: 6px; background: oklch(0.95 0.02 250); color: oklch(0.32 0.08 250); border: 1px solid oklch(0.84 0.04 250); white-space: nowrap; }
+  .unit { font-size: 12px; color: oklch(0.47 0.015 330); }
+  .unavail { border: 2px dashed oklch(0.6 0.02 330); border-radius: 12px; padding: 12px 14px; background: oklch(0.975 0.003 330); font-size: 13px; line-height: 1.8; }
+  .unavail strong { display: block; font-size: 13.5px; }
+  .own { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; }
+  .own::before { content: ''; width: 10px; height: 10px; border-radius: 50%; background: oklch(0.3 0.02 330); }
+  .del { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; }
+  .del::before { content: ''; width: 9px; height: 9px; border: 2px solid oklch(0.3 0.02 330); background: transparent; }
+  fieldset { border: 1px solid oklch(0.88 0.008 60); border-radius: 12px; margin: 0; padding: 10px 12px 12px; background: #fff; }
+  legend { font-size: 13px; font-weight: 800; padding: 0 6px; }
+  .opt { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px 10px; border: 1px solid oklch(0.88 0.008 60); border-radius: 10px; margin-top: 8px; }
+  .opt input { width: 20px; height: 20px; margin: 0; accent-color: oklch(0.42 0.13 340); }
+  .opt .nm { font-weight: 700; font-size: 14px; }
+  .opt .meta { display: flex; gap: 10px; flex-wrap: wrap; font-size: 12px; color: oklch(0.36 0.02 330); }
+  .hint { font-size: 12px; color: oklch(0.47 0.015 330); line-height: 1.8; margin: 6px 0 0; }
+  .note { width: min(1280px, 100%); box-sizing: border-box; border: 2px dashed oklch(0.62 0.02 330); border-radius: 14px; padding: 14px 18px; background: repeating-linear-gradient(135deg, oklch(0.975 0.004 330) 0 10px, oklch(0.96 0.006 330) 10px 20px); font-size: 13px; line-height: 1.9; }
+  .note h3 { margin: 0 0 4px; font-size: 13.5px; }
+  .note ul { margin: 0; padding-inline-start: 18px; }
+  .btn { min-height: 44px; padding: 0 16px; border-radius: 10px; border: 1px solid oklch(0.42 0.13 340); background: oklch(0.42 0.13 340); color: #fff; font: inherit; font-weight: 700; font-size: 14px; }
+  .btn.sec { background: #fff; color: oklch(0.42 0.13 340); }
+  .alert { border: 1px solid oklch(0.7 0.12 25); background: oklch(0.97 0.02 25); border-radius: 10px; padding: 10px 12px; font-size: 13px; display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+  .skel { height: 14px; border-radius: 6px; background: oklch(0.92 0.004 60); }
+  .adminbar { background: oklch(0.22 0.02 330); color: oklch(0.86 0.012 330); display: flex; align-items: center; gap: 16px; padding: 8px 18px; flex-wrap: wrap; }
+  .adminbar .mode { font-weight: 800; font-size: 13.5px; color: #fff; }
+  .adminbar nav { display: flex; gap: 4px; overflow-x: auto; }
+  .adminbar nav a { color: oklch(0.88 0.012 330); text-decoration: none; font-size: 13px; padding: 0 10px; min-height: 44px; display: inline-flex; align-items: center; border-radius: 8px; white-space: nowrap; }
+  .adminbar nav a[aria-current] { background: oklch(0.32 0.03 330); color: #fff; box-shadow: inset 0 -2px 0 oklch(0.78 0.1 70); }
+  .adminbar a:focus-visible { outline-color: oklch(0.85 0.1 70); }
+  .scope { font-size: 11.5px; padding: 3px 8px; border-radius: 6px; border: 1px solid oklch(0.5 0.03 330); color: oklch(0.9 0.01 330); }
+  .qgrid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+  .qcard { background: #fff; border: 1px solid oklch(0.88 0.008 60); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+  .qcard h2 { margin: 0; font-size: 15px; font-weight: 800; font-family: inherit; }
+  .qcard a { font-size: 13.5px; font-weight: 700; min-height: 44px; display: inline-flex; align-items: center; }
+  .zero { color: oklch(0.38 0.09 150); font-weight: 700; font-size: 13px; }
+  .tabbar { display: flex; justify-content: space-around; border-top: 1px solid oklch(0.88 0.008 60); background: #fff; }
+  .tabbar a { min-height: 56px; min-width: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11.5px; color: oklch(0.36 0.02 330); text-decoration: none; }
+  .tabbar a[aria-current] { color: oklch(0.42 0.13 340); font-weight: 800; }
+  .img { aspect-ratio: 4 / 3; border-radius: 10px; background: repeating-linear-gradient(45deg, oklch(0.93 0.01 250) 0 12px, oklch(0.9 0.012 250) 12px 24px); display: flex; align-items: center; justify-content: center; font-size: 12px; color: oklch(0.36 0.04 250); }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  caption { caption-side: top; text-align: start; font-size: 12.5px; color: oklch(0.4 0.015 330); padding: 8px 0; }
+  th, td { text-align: start; padding: 8px 10px; border-bottom: 1px solid oklch(0.9 0.006 60); vertical-align: top; }
+  th { font-size: 12px; color: oklch(0.36 0.02 330); }
+  .band { display: flex; gap: 12px; flex-wrap: wrap; }
+  .band > * { flex: 1 1 260px; min-width: 0; }
+  .card, .body, .board { min-width: 0; }
+  .btn:disabled { background: oklch(0.93 0.004 330); border-color: oklch(0.78 0.01 330); color: oklch(0.42 0.015 330); cursor: not-allowed; }
+  .tscroll { overflow-x: auto; max-width: 100%; }
+  .tscroll .slot { white-space: nowrap; overflow-wrap: normal; }
+  .kv > span:last-child { min-width: 0; overflow-wrap: anywhere; text-align: end; }
+  .slot { white-space: normal; overflow-wrap: anywhere; }
+</style>
+</helmet>
+
+<main class="doc" dir="rtl" lang="fa">
+  <div class="lede">
+    <div class="kicker">BEAUCLICK V3.3 — #45 · صفحه‌های ۵۱ و ۵۲</div>
+    <h1 class="title">یک پوسته، چند فضا، داشبوردِ مبتنی بر اختیار</h1>
+    <p class="p">هر عدد، شمار، تاریخ یا مبلغ در این نمونه به‌صورتِ <strong>نامِ میدانِ سرور</strong> نشان داده شده — مثل <span class="slot">‹settledToman›</span> — نه یک رقم. هیچ مبلغ، درصد، مهلت یا جملهٔ حقوقی در این طراحی نوشته نشده است.</p>
+    <p class="p">مبنای پیاده‌سازی: <code>master 2e3da4a</code> · مبنای طراحی: <code>design/claude-design 4b5b120</code>. نگاشتِ کاملِ مسیر و میدان: <code>ROUTE_CONTRACT_MATRIX.md</code>.</p>
+    <div class="pills"><span class="pill">هیچ میدانی اختراع نشده</span><span class="pill">ناموجود ≠ صفر</span><span class="pill">پنهان‌کردن ≠ مجوز</span><span class="pill">دسترسی با متن + شکل</span></div>
+    <nav aria-label="بخش‌ها" class="pills"><a class="pill" href="#s1">S۱ پوسته</a><a class="pill" href="#s2">S۲ فضا</a><a class="pill" href="#s3">S۳ مشتری</a><a class="pill" href="#s4">S۴ متخصص</a><a class="pill" href="#s5">S۵ مالک</a><a class="pill" href="#s6">S۶ اعضا</a><a class="pill" href="#s7">S۷ مالی</a><a class="pill" href="#s8">S۸ ناظر</a><a class="pill" href="#s9">S۹ لغو</a><a class="pill" href="#s10">S۱۰ تصویر</a><a class="pill" href="#s11">S۱۱ اختلاف</a><a class="pill" href="#s12">S۱۲ حالت‌ها</a></nav>
+  </div>
+
+  <section class="s" id="s1" data-screen-label="S۱" aria-labelledby="s1-h">
+    <div class="sh"><span class="badge">S۱</span><h2 class="st" id="s1-h">یک پوسته، چند بستر</h2><span class="sub">هدر، منوی آواتار و جابه‌جاییِ بستر — ۱۲۸۰ و ۳۹۰</span></div>
+
+    <div class="row">
+      <div class="board desk"><div class="cap">۱۲۸۰ · مالکِ دوگانه (متخصص + کسب‌وکار) با دسترسیِ مالی — بسترِ «حساب من»</div><div class="hdr"><span class="brand">BeauClick</span>
+      <nav class="prim" aria-label="ناوبری اصلی"><a href="#s1">خدمات</a><a href="#s1">متخصص‌ها</a><a href="#s3" aria-current="page">حساب من</a></nav>
+      <span class="grow"></span><button type="button" class="iconbtn" aria-label="پیام‌ها">پیام‌ها <span class="slot">‹total›</span></button>
+      <button type="button" class="iconbtn" aria-label="اعلان‌ها">اعلان‌ها <span class="slot">‹unreadCount›</span></button>
+      <button type="button" class="iconbtn" aria-expanded="true" aria-controls="menu-demo"><span class="slot">‹displayName›</span></button></div><div class="body"><div class="row"><div class="menu" id="menu-demo"><h3>رفتن به</h3><ul><li><a href="#s1" aria-current="page">نمای مشتری<span class="sub">همیشه</span></a></li><li><a href="#s1">حالت متخصص<span class="sub">roles ⊇ professional</span></a></li><li><a href="#s1">کسب‌وکار من<span class="sub">همیشه؛ صفحه خودش تعیین می‌کند</span></a></li><li><a href="#s1">امور مالی<span class="sub">همیشه (#152)</span></a></li></ul></div><div class="menu" id="menu-mod"><h3>رفتن به</h3><ul><li><a href="#s1" aria-current="page">نمای مشتری<span class="sub">همیشه</span></a></li><li><a href="#s1">کسب‌وکار من<span class="sub"></span></a></li><li><a href="#s1">امور مالی<span class="sub"></span></a></li><li><a href="#s1">بررسی محتوا<span class="sub">فقط bc_moderate_* — بدون bc_manage_platform</span></a></li></ul></div></div><p class="hint">منوی دوم: همان پوسته برای یک ناظرِ محتوا. «حالت متخصص» غایب است، نه غیرفعال. «مدیریت» برای دارندهٔ <code>bc_manage_platform</code> و «بررسی محتوا» برای ناظر — یک مسیر، یک پوسته، دو برچسب.</p></div></div>
+      <div class="board phone"><div class="cap">۳۹۰ · مشتری</div><div class="hdr"><span class="brand">BeauClick</span><span class="grow"></span><button type="button" class="iconbtn" aria-label="اعلان‌ها"><span class="slot">‹unreadCount›</span></button></div><div class="body"><div class="card"><h3>حساب</h3><a href="#s1">حالت متخصص</a><a href="#s1">کسب‌وکار من</a><a href="#s1">امور مالی</a></div></div><nav class="tabbar" aria-label="ناوبری پایین"><a href="#s1">خانه</a><a href="#s1">جست‌وجو</a><a href="#s1">رزروها</a><a href="#s1">باشگاه</a><a href="#s1" aria-current="page">حساب</a></nav></div>
+    </div>
+    <div class="note" role="note"><h3>یادداشتِ طراحی — S۱</h3><ul><li>بستر از پیشوندِ مسیر می‌آید؛ هویت یکی است: <code>GET /v1/me</code> → <code>roles</code>, <code>capabilities</code> که زنده خوانده می‌شود.</li><li>ترتیبِ منو ثابت است: مشتری · متخصص · کسب‌وکار · مالی · مدیریت. بستری که در دسترس نیست حذف می‌شود؛ هیچ ورودیِ غیرفعالی کشیده نمی‌شود.</li><li>پیام‌ها فقط با <code>bc_use_chat</code>؛ عدد از <code>GET /v1/chat/unread-count</code> → <code>total</code>. خطا یعنی بدونِ نشان، نه عددِ حدسی.</li><li>پنهان‌کردن یک ورودی کنترلِ امنیتی نیست؛ هر مسیر و هر API بررسیِ خودش را دارد.</li></ul></div>
+  </section>
+  <section class="s" id="s2" data-screen-label="S۲" aria-labelledby="s2-h">
+    <div class="sh"><span class="badge">S۲</span><h2 class="st" id="s2-h">جابه‌جاییِ فضای کاری</h2><span class="sub">GET /v1/me/finance/workspaces · هیچ پیش‌انتخابی</span></div>
+
+    <div class="row">
+      <div class="board tab"><div class="cap">۷۶۸ · چند فضا — انتخابِ صریح لازم است</div><div class="body"><fieldset><legend>کدام فضای کاری؟</legend>
+      <label class="opt"><input type="radio" name="ws"> <span><span class="nm"><span class="slot">‹displayLabel›</span></span><span class="meta"><span>کسب‌وکار</span><span class="own">مالک</span></span></span></label>
+      <label class="opt"><input type="radio" name="ws"> <span><span class="nm"><span class="slot">‹displayLabel›</span></span><span class="meta"><span>تخصصی</span><span class="own">مالک</span></span></span></label>
+      <label class="opt"><input type="radio" name="ws"> <span><span class="nm"><span class="slot">‹displayLabel›</span></span><span class="meta"><span>کسب‌وکار</span><span class="del">فقط‌خواندنی — دسترسیِ واگذارشده</span></span></span></label>
+      <p class="hint">انتخاب فقط در همین صفحه نگه داشته می‌شود؛ پس از بارگذاریِ دوباره دوباره پرسیده می‌شود. شناسهٔ فضا هرگز نمایش داده یا ذخیره نمی‌شود.</p></fieldset><div aria-live="polite" class="sub">فضای کاری: <span class="slot">‹displayLabel›</span></div></div></div>
+      <div class="board phone"><div class="cap">۳۹۰ · حالت‌ها</div><div class="body"><div class="card" aria-busy="true"><h3>در حال بارگذاری فضاها</h3><div class="skel"></div><div class="skel" style="width:70%"></div></div><div class="card"><h3>فضای کاری‌ای در دسترس نیست</h3><p class="p">حسابِ شما به هیچ فضای مالی دسترسی ندارد. این یک پاسخ درست است، نه خطا.</p></div><div class="alert" role="alert"><span>فهرستِ فضاها خوانده نشد.</span><button type="button" class="btn sec">تلاش دوباره</button></div><div class="card"><h3>کدام فضای کاری؟</h3><p class="p">برای ادامه یک فضا را انتخاب کنید. <span class="sub">(پاسخِ ۴۰۹ — هرگز نمی‌گوید کدام یا چند فضا)</span></p></div></div></div>
+    </div>
+    <div class="note" role="note"><h3>یادداشتِ طراحی — S۲</h3><ul><li>یک فضا ← بدونِ انتخاب‌گر، مستقیم باز می‌شود. چند فضا ← هیچ‌چیز انتخاب نمی‌شود تا کاربر انتخاب کند.</li><li>دسترسی با متن + شکل: دایرهٔ پُر «مالک»، مربعِ توخالی «فقط‌خواندنی». نه فقط رنگ.</li><li>در فهرستِ اشتراک‌ها (<code>GET /v1/me/subscriptions</code>) برچسبی نیست؛ چون هر مالک حداکثر یک فضای هر نوع دارد (<code>uq_professionals_owner_id</code>, <code>uq_businesses_owner_id</code>)، <code>workspaceType</code> آن را یکتا نام می‌برد. شناسه‌ها میان سطوح مقایسه نمی‌شوند.</li><li>با تغییرِ فضا، دادهٔ فضای قبلی پیش از نمایشِ فضای بعدی پاک می‌شود.</li></ul></div>
+  </section>
+  <section class="s" id="s3" data-screen-label="S۳" aria-labelledby="s3-h">
+    <div class="sh"><span class="badge">S۳</span><h2 class="st" id="s3-h">مشتری — پول روی نوبتِ پیش‌رو</h2><span class="sub">GET /v1/orders/:id · paymentSchedule</span></div>
+
+    <div class="row">
+      <div class="board phone"><div class="cap">۳۹۰ · پیش‌پرداختِ آنلاین، باقی در محل</div><div class="body"><div class="card"><h3>نوبتِ پیش‌رو</h3><div class="kv"><span>شیوهٔ دریافت</span><span><span class="slot">‹collectionMode›</span></span></div><p class="sub">مبالغ به تومان</p><div class="kv"><span>مبلغ خدمت</span><span><span class="slot">‹serviceTotalToman›</span></span></div><div class="kv"><span>مبلغِ پرداختِ آنلاین</span><span><span class="slot">‹platformCollectibleNowToman›</span></span></div><div class="kv"><span>باقی‌مانده، پرداخت در محل</span><span><span class="slot">‹venueBalanceToman›</span></span></div><div class="kv"><span>پرداخت‌شده</span><span><span class="slot">‹collectedTotalToman›</span></span></div></div><div class="card"><h3>فروشندهٔ خدمت</h3><div class="kv"><span>نام و نوع</span><span>از snapshot سفارش</span></div><div class="unavail" role="note"><strong>متن شرایط هنوز منتشر نشده است.</strong>جملهٔ مسئولیت‌ها فقط از متنِ منتشرشدهٔ مدیریت می‌آید (صفحهٔ ۴۷).</div></div></div></div>
+      <div class="board phone"><div class="cap">۳۹۰ · نوبت بدونِ سفارش</div><div class="body"><div class="card"><h3>نوبتِ پیش‌رو</h3><div class="kv"><span>زمان</span><span><span class="slot">‹startAt›</span></span></div><p class="hint">این نوبت سفارشی ندارد (<code>orderId: null</code>)؛ هیچ ردیفِ پولی کشیده نمی‌شود — نه «۰».</p></div><div class="unavail" role="note"><strong>ثبت اعتراض در این نسخه فعال نیست.</strong>مسیری برای ثبتِ اعتراض وجود ندارد. <code>#162</code></div></div></div>
+    </div>
+    <div class="note" role="note"><h3>یادداشتِ طراحی — S۳</h3><ul><li><code>collectionMode</code> واژگانِ بسته دارد: <code>pay_at_venue</code> · <code>deposit_online_balance_at_venue</code> · <code>full_payment_online</code>. مقدارِ ناشناخته «نامشخص» است.</li><li>فقط <code>collectedTotalToman</code> «پرداخت‌شده» نامیده می‌شود. <code>venueBalanceToman</code> رقمِ برنامه است؛ بیوکلیک پرداختِ در محل را ثبت نمی‌کند.</li><li>هیچ مبلغی در کلاینت از مبلغِ دیگر کم یا جمع نمی‌شود. واحد یک بار در هر بلوک (#294).</li></ul></div>
+  </section>
+  <section class="s" id="s4" data-screen-label="S۴" aria-labelledby="s4-h">
+    <div class="sh"><span class="badge">S۴</span><h2 class="st" id="s4-h">متخصص — وضعیتِ تجاری</h2><span class="sub">GET /v1/me/subscriptions · credit-purchases</span></div>
+
+    <div class="row">
+      <div class="board desk"><div class="cap">۱۲۸۰ · کارتِ «وضعیت تجاری» در /pro — بدونِ رقمِ مالی</div><div class="body"><div class="band"><div class="card"><h3>طرح</h3><div class="kv"><span>وضعیت</span><span><span class="slot">‹subscription.state›</span></span></div><div class="kv"><span>طرح</span><span><span class="slot">‹displayName›</span></span></div><div class="kv"><span>از</span><span><span class="slot">‹effectiveAt›</span></span></div><div class="kv"><span>کنش‌ها</span><span><span class="slot">‹availableActions›</span></span></div></div><div class="card"><h3>سهمیهٔ طرح</h3><div class="kv"><span>اعتبارِ رزروِ شامل</span><span><span class="slot">‹includedBookingCredits›</span></span></div><div class="kv"><span>صندلیِ کارکنان</span><span><span class="slot">‹staffSeats›</span></span></div><div class="kv"><span>شعبه</span><span><span class="slot">‹includedLocations›</span></span></div><p class="hint">صفر یعنی «بدون سهمیه» — نه نامحدود.</p><div class="unavail" role="note"><strong>میزانِ مصرفِ سهمیه در این نسخه نمایش داده نمی‌شود.</strong>هیچ مسیری مصرف را برنمی‌گرداند.</div></div><div class="card"><h3>اعتبارِ رزرو</h3><div class="unavail" role="note"><strong>ماندهٔ اعتبارِ رزرو در این نسخه قابلِ نمایش نیست.</strong>مانده در سرور محاسبه می‌شود ولی به فروشنده بازگردانده نمی‌شود.</div><div class="tscroll" tabindex="0" role="region" aria-labelledby="tcap1"><table><caption id="tcap1">خریدها — مبالغ به تومان</caption><thead><tr><th scope="col">تعداد</th><th scope="col">مبلغ</th><th scope="col">وضعیت</th></tr></thead><tbody><tr><td><span class="slot">‹quantity›</span></td><td><span class="slot">‹totalToman›</span></td><td>در انتظار پرداخت — پرداختِ آنلاین هنوز فعال نیست</td></tr></tbody></table></div></div></div><p class="sub">پول: <a href="#s7">امور مالی</a> — هیچ رقمی در /pro تکرار نمی‌شود.</p></div></div>
+    </div>
+    <div class="row">
+      <div class="board phone"><div class="cap">۳۹۰ · طرحی ثبت نشده (subscription: null)</div><div class="body"><div class="card"><h3>طرح</h3><p class="p">طرحی برای این فضا ثبت نشده است.</p><p class="hint">دکمه فقط وقتی کشیده می‌شود که <code>availableActions</code> خالی نباشد.</p></div><div class="card"><h3>خرید اعتبار</h3><p class="p">خرید در حالِ حاضر ممکن نیست.</p><p class="hint">یک پاسخِ یکسان برای هر علت (<code>purchase_unavailable</code>).</p></div></div></div>
+    </div>
+    <div class="note" role="note"><h3>یادداشتِ طراحی — S۴</h3><ul><li>فعال‌سازیِ پرداختی (#99) و ریلِ پرداخت (#47) بسته‌اند؛ خرید در <code>awaiting_payment</code> می‌ماند.</li><li>بازپرداختِ اعتبارِ مصرف‌نشده (<code>V33-DEC-041</code> R6) تا وجودِ ریل و استوری‌اش <strong>غایب</strong> است — این یادداشت جای آینده‌اش را نشان می‌دهد، نه رابط.</li><li><code>bc_manage_own_subscription</code> ممتاز نیست؛ لغوِ آن زنده نیست و طراحی ادعای خلافش را نمی‌کند.</li></ul></div>
+  </section>
+  <section class="s" id="s5" data-screen-label="S۵" aria-labelledby="s5-h">
+    <div class="sh"><span class="badge">S۵</span><h2 class="st" id="s5-h">مالکِ کسب‌وکار — عملیات</h2><span class="sub">همهٔ مسیرهای مالک‌فقط</span></div>
+
+    <div class="row">
+      <div class="board desk"><div class="cap">۱۲۸۰ · /business برای مالک</div><div class="body"><div class="band"><div class="card"><h3>کسب‌وکار</h3><div class="kv"><span>نام</span><span><span class="slot">‹displayName›</span></span></div><div class="kv"><span>نوع فعالیت</span><span><span class="slot">‹vertical›</span></span></div><p class="hint">نوع فعالیت هیچ دسترسی‌ای نمی‌دهد و داشبورد بر اساسش تغییر نمی‌کند.</p></div><div class="card"><h3>اعضا</h3><div class="tscroll" tabindex="0" role="region" aria-labelledby="tcap2"><table><caption id="tcap2">فقط برای مالک — staff-management</caption><thead><tr><th scope="col">عضو</th><th scope="col">نقش</th><th scope="col">دسترسی‌ها</th></tr></thead><tbody><tr><td><span class="slot">‹displayLabel›</span></td><td><span class="slot">‹role›</span></td><td><span class="slot">‹roles›</span></td></tr><tr><td><span class="slot">‹identificationHint›</span></td><td><span class="slot">‹role›</span></td><td>finance_read</td></tr></tbody></table></div><p class="hint">واژگانِ دسترسی دقیقاً دو عضو دارد: <code>practitioner_chat</code>، <code>finance_read</code>.</p></div><div class="card"><h3>طرح و سهمیه</h3><p class="p">همان کارتِ S۴ برای فضای <strong>کسب‌وکار</strong>.</p><p class="sub">پول: <a href="#s7">امور مالی</a></p></div></div></div></div>
+    </div>
+  </section>
+  <section class="s" id="s6" data-screen-label="S۶" aria-labelledby="s6-h">
+    <div class="sh"><span class="badge">S۶</span><h2 class="st" id="s6-h">مدیر، پذیرش، متخصصِ عضو</h2><span class="sub">عضویت بدونِ مالکیت</span></div>
+
+    <div class="row">
+      <div class="board phone"><div class="cap">۳۹۰ · مدیر (manager)</div><div class="body"><div class="card"><h3><span class="slot">‹displayName›</span></h3><p class="sub">عضو · مدیر</p><button type="button" class="btn sec">ویرایش مشخصات کسب‌وکار</button><p class="p">مدیریتِ اعضا، دسترسی‌ها، شعبه‌ها و منابع فقط با مالکِ کسب‌وکار است.</p></div><div class="card"><h3>امور مالی</h3><p class="p">بدونِ دسترسیِ مالیِ واگذارشده، پولِ کسب‌وکار نمایش داده نمی‌شود.</p></div></div></div>
+      <div class="board phone"><div class="cap">۳۹۰ · پذیرش (staff، بدونِ دسترسی)</div><div class="body"><div class="card"><h3><span class="slot">‹displayName›</span></h3><p class="sub">عضو</p></div><div class="unavail" role="note"><strong>ثبت و مدیریتِ نوبت برای دیگر اعضا در این نسخه ممکن نیست.</strong>اختیارِ واگذارشدهٔ تقویم تصمیمی باز است. <code>V33-DEC-030</code></div></div></div>
+      <div class="board phone"><div class="cap">۳۹۰ · متخصصِ عضو با practitioner_chat</div><div class="body"><div class="card"><h3>حالت متخصص</h3><p class="p">نوبت‌ها، زمان‌ها و مالیِ <strong>فضای تخصصیِ خودتان</strong> — نه سالن.</p></div><div class="card"><h3>پیام‌ها</h3><p class="p">گفتگوهای مشتریانی که نزدِ خودِ شما نوبت گرفته‌اند.</p><div class="kv"><span>خوانده‌نشده</span><span><span class="slot">‹total›</span></span></div></div></div></div>
+    </div>
+    <div class="note" role="note"><h3>یادداشتِ طراحی — S۶</h3><ul><li>مدیر: خواندنِ کسب‌وکار و فهرستِ اعضا، و <code>PATCH /v1/businesses/:id</code> (<code>BusinessManagerResolver</code>). دیگر مسیرها فقط مالک.</li><li>نقشِ «پذیرش» وجود ندارد (<code>V33-DEC-033</code> R1): یک عضوِ <code>staff</code> است و طراحی میزِ پذیرش یا تقویمِ مشترک نمی‌کشد.</li><li><code>practitioner_chat</code> فقط گفتگوهای خودِ آن متخصص را باز می‌کند، نه گفتگوی متخصصِ دیگرِ همان سالن (R2).</li><li>هیچ دکمهٔ غیرفعالی برای کارهای بی‌اختیار کشیده نمی‌شود — یک جمله کافی است.</li></ul></div>
+  </section>
+  <section class="s" id="s7" data-screen-label="S۷" aria-labelledby="s7-h">
+    <div class="sh"><span class="badge">S۷</span><h2 class="st" id="s7-h">امور مالی — مرزِ پول‌ها</h2><span class="sub">summary · funds · settlements</span></div>
+
+    <div class="row">
+      <div class="board desk"><div class="cap">۱۲۸۰ · دارندهٔ finance_read — همان داده، فقط‌خواندنی</div><div class="body"><div class="sh"><strong><span class="slot">‹displayLabel›</span></strong><span class="del">فقط‌خواندنی — دسترسیِ واگذارشده</span></div><p class="sub">مبالغ به تومان</p><div class="band"><div class="card"><h3>خلاصهٔ پیشین</h3><div class="kv"><span>طلبِ خالصِ شما</span><span><span class="slot">‹receivableNetToman›</span></span></div><div class="kv"><span>تسویه‌شده</span><span><span class="slot">‹settledToman›</span></span></div><div class="kv"><span>تسویه‌نشده</span><span><span class="slot">‹outstandingToman›</span></span></div></div><div class="card"><h3>پولِ این فضا</h3><div class="kv"><span>در انتظار</span><span><span class="slot">‹pending›</span></span></div><div class="kv"><span>درگیرِ اختلاف</span><span><span class="slot">‹disputed›</span></span></div><div class="kv"><span>قابلِ تسویه</span><span><span class="slot">‹available›</span></span></div><div class="kv"><span>ذخیره</span><span><span class="slot">‹reserve›</span></span></div><div class="kv"><span>تسویه‌شده</span><span><span class="slot">‹settled›</span></span></div><div class="kv"><span>بازگردانده‌شده</span><span><span class="slot">‹refunded›</span></span></div></div><div class="card" style="border-style:dashed"><h3>واقعیتِ امانت — نه ماندهٔ شما</h3><div class="kv"><span>وصول‌شده</span><span><span class="slot">‹collected›</span></span></div><div class="kv"><span>پیش‌دادهٔ سکو</span><span><span class="slot">‹platformAdvance›</span></span></div><div class="kv"><span>بازیافتِ واردشده</span><span><span class="slot">‹recoveredIn›</span></span></div></div><div class="card" style="border:2px solid oklch(0.3 0.02 330)"><h3>پولِ سکو — جدا از ارقامِ بالا</h3><div class="kv"><span>درآمدِ سکو</span><span><span class="slot">‹platformEarned›</span></span></div><div class="kv"><span>کارمزدِ درگاه</span><span><span class="slot">‹providerFee›</span></span></div><div class="kv"><span>بازیافتِ خارج‌شده</span><span><span class="slot">‹recoveryOut›</span></span></div></div></div><p class="p">این گروه‌ها به پرسش‌های متفاوتی پاسخ می‌دهند و با هم جمع نمی‌شوند.</p><div class="band"><div class="card"><div class="tscroll" tabindex="0" role="region" aria-labelledby="tcap3"><table><caption id="tcap3">تسویه‌ها — صفحهٔ کلیددار، بدونِ شمارهٔ صفحه</caption><thead><tr><th scope="col">نوع</th><th scope="col">مبلغ</th><th scope="col">تاریخ</th></tr></thead><tbody><tr><td>تسویه</td><td><span class="slot">‹amountToman›</span></td><td><span class="slot">‹createdAt›</span></td></tr><tr><td>برگشتِ تسویه <span class="sub">(kind = reversal)</span></td><td><span class="slot">‹amountToman›</span></td><td><span class="slot">‹createdAt›</span></td></tr></tbody></table></div><button type="button" class="btn sec">بیشتر</button></div><div class="unavail" role="note"><strong>بدهیِ ثبت‌شده به سکو در این نسخه نمایش داده نمی‌شود.</strong>این «طلبِ فروشنده» در V33-DEC-040 پولی است که فروشنده بدهکار است — عکسِ «طلبِ خالصِ شما». <code>#177</code></div></div></div></div>
+    </div>
+    <div class="note" role="note"><h3>یادداشتِ طراحی — S۷</h3><ul><li>صفحهٔ ۴۶ و اصلاحیه‌اش با اصلاحاتِ R1–R3 بی‌تغییر اعمال می‌شوند؛ اینجا فقط «برگشت» و دو معنای «طلب» افزوده شده.</li><li><code>receivableNetToman</code> = پولی که به فروشنده بدهکاریم. «seller receivable»ِ <code>V33-DEC-040</code> = پولی که فروشنده بدهکار است و وجود ندارد. هرگز یک برچسب، یک کارت یا یک علامت را شریک نمی‌شوند.</li><li>نه عدد از نُه میدانِ فروشنده امروز ساختاراً صفرند؛ صفر پاسخِ درست است، نه حالتِ خالی.</li><li>هیچ کنترلِ نوشتنی برای دارندهٔ <code>finance_read</code> کشیده نمی‌شود، حتی غیرفعال.</li></ul></div>
+  </section>
+  <section class="s" id="s8" data-screen-label="S۸" aria-labelledby="s8-h">
+    <div class="sh"><span class="badge">S۸</span><h2 class="st" id="s8-h">ناظر — صفحهٔ آغازِ بررسی</h2><span class="sub">همان پوستهٔ مدیریت، فقط صف‌های در اختیار</span></div>
+
+    <div class="row">
+      <div class="board desk"><div class="cap">۱۲۸۰ · ناظرِ کامل (چهار bc_moderate_*، بدونِ bc_manage_platform)</div><div class="adminbar"><span class="mode">بیوکلیک — بررسی محتوا</span><nav aria-label="ناوبری مدیریت"><a href="#s8" aria-current="page">صف‌های بررسی</a><a href="#s8">احراز هویت</a><a href="#s8">گزارش تصاویر</a><a href="#s8">بازبینی دیدگاه‌ها</a><a href="#s8">گزارش گفتگوها</a></nav><span class="grow"></span><span class="scope">بررسی احراز هویت</span><span class="scope">بررسی تصاویر</span><span class="scope">بررسی دیدگاه‌ها</span><span class="scope">بررسی گفتگوها</span><a href="#s1" style="color:oklch(0.88 0.012 330)">خروج از پنل</a></div><div class="body"><h1 style="margin:0;font-size:22px">صف‌های بررسی</h1><ul class="qgrid"><li class="qcard"><h2>احراز هویت</h2><div><span class="slot">‹meta.pagination.total›</span> <span class="sub">مورد در صف</span></div><a href="#s10">رفتن به صف احراز هویت</a></li><li class="qcard"><h2>گزارش تصاویر</h2><div><span class="slot">‹meta.pagination.total›</span> <span class="sub">مورد در صف</span></div><a href="#s10">رفتن به صف گزارش تصاویر</a></li><li class="qcard"><h2>بازبینی دیدگاه‌ها</h2><div><span class="slot">‹meta.pagination.total›</span> <span class="sub">مورد در صف</span></div><a href="#s10">رفتن به صف بازبینی دیدگاه‌ها</a></li><li class="qcard"><h2>گزارش گفتگوها</h2><div><span class="slot">‹items.length›</span> <span class="sub">گزارشِ باز</span></div><p class="hint">این مسیر جمعِ کل ندارد: کمتر از حد ← «n گزارش باز»؛ برابرِ حد ← «دست‌کم n».</p><a href="#s10">رفتن به صف گزارش گفتگوها</a></li></ul></div></div>
+    </div>
+    <div class="row">
+      <div class="board tab"><div class="cap">۷۶۸ · ناظرِ جزئی — فقط bc_moderate_media</div><div class="adminbar"><span class="mode">بیوکلیک — بررسی محتوا</span><nav aria-label="ناوبری مدیریت"><a href="#s8" aria-current="page">صف‌های بررسی</a><a href="#s8">گزارش تصاویر</a></nav><span class="grow"></span><span class="scope">بررسی تصاویر</span><a href="#s1" style="color:oklch(0.88 0.012 330)">خروج از پنل</a></div><div class="body"><h1 style="margin:0;font-size:22px">صف‌های بررسی</h1><ul class="qgrid"><li class="qcard"><h2>گزارش تصاویر</h2><div class="zero">صف خالی است</div><a href="#s10">رفتن به صف گزارش تصاویر</a></li></ul><p class="hint">بدونِ هدایتِ خودکار: یک کارت، یک کلید تا صف. کارتی برای صفِ ناداشته کشیده نمی‌شود.</p></div></div>
+      <div class="board phone"><div class="cap">۳۹۰ · ناظر — حالت‌های کارت</div><div class="adminbar"><span class="mode">بررسی محتوا</span><nav aria-label="ناوبری مدیریت"><a href="#s8" aria-current="page">صف‌های بررسی</a><a href="#s8">احراز هویت</a><a href="#s8">گزارش تصاویر</a></nav><span class="grow"></span><a href="#s1" style="color:oklch(0.88 0.012 330)">خروج از پنل</a></div><div class="body"><ul class="qgrid"><li class="qcard" aria-busy="true"><h2>احراز هویت</h2><div class="skel"></div></li><li class="qcard"><h2>گزارش تصاویر</h2><div class="alert" role="alert"><span>شمار خوانده نشد.</span><button type="button" class="btn sec">تلاش دوباره</button></div></li></ul></div></div>
+    </div>
+    <div class="note" role="note"><h3>یادداشتِ طراحی — S۸ (تصمیمِ تأییدشدهٔ A)</h3><ul><li>یک پوسته. دارندهٔ <code>bc_manage_platform</code> نمای کلی را می‌بیند، بی‌تغییر؛ ناظر این صفحه را.</li><li>شمار از <code>meta.pagination.total</code> (با <code>limit=1</code>) برای سه صف؛ صفِ گفتگو جمع ندارد.</li><li>هرگز: آمارِ پلتفرم، کاربران، گزارشِ عملیات، تسویه، حریم خصوصی، جست‌وجو، اعلان‌ها، تعارض شماره، باشگاه، هر صفحهٔ /admin/commercial.</li><li>ترتیب ثابت است و بر اساسِ شمار مرتب نمی‌شود.</li></ul></div>
+  </section>
+  <section class="s" id="s9" data-screen-label="S۹" aria-labelledby="s9-h">
+    <div class="sh"><span class="badge">S۹</span><h2 class="st" id="s9-h">لغوِ زندهٔ اختیار</h2><span class="sub">۴۰۳ → پاک‌کردن → بازخوانیِ /v1/me</span></div>
+
+    <div class="row">
+      <div class="board tab"><div class="cap">۷۶۸ · ناظری که bc_moderate_media را همین حالا از دست داد</div><div class="adminbar"><span class="mode">بیوکلیک — بررسی محتوا</span><nav aria-label="ناوبری مدیریت"><a href="#s8" aria-current="page">صف‌های بررسی</a><a href="#s8">احراز هویت</a></nav><span class="grow"></span><span class="scope">بررسی احراز هویت</span><a href="#s1" style="color:oklch(0.88 0.012 330)">خروج از پنل</a></div><div class="body"><ul class="qgrid"><li class="qcard"><h2>احراز هویت</h2><div><span class="slot">‹meta.pagination.total›</span> <span class="sub">مورد در صف</span></div><a href="#s10">رفتن به صف احراز هویت</a></li><li class="qcard"><h2>گزارش تصاویر</h2><p class="p" role="alert">دسترسی شما به این صف تغییر کرده است.</p></li></ul><p class="hint">بدونِ «تلاش دوباره» و بدونِ شمارِ پیشین. در خواندنِ بعدیِ <code>/v1/me</code> کارت و پیوندِ نوار حذف می‌شوند.</p></div></div>
+    </div>
+  </section>
+  <section class="s" id="s10" data-screen-label="S۱۰" aria-labelledby="s10-h">
+    <div class="sh"><span class="badge">S۱۰</span><h2 class="st" id="s10-h">بازرسیِ امنِ تصویرِ گزارش‌شده</h2><span class="sub">#265 — حالت‌ها، نه شکلِ مسیر</span></div>
+
+    <div class="row">
+      <div class="board desk"><div class="cap">۱۲۸۰ · صف + پنلِ تصمیم</div><div class="adminbar"><span class="mode">بیوکلیک — بررسی محتوا</span><nav aria-label="ناوبری مدیریت"><a href="#s8">صف‌های بررسی</a><a href="#s8" aria-current="page">گزارش تصاویر</a></nav><span class="grow"></span><span class="scope">بررسی تصاویر</span><a href="#s1" style="color:oklch(0.88 0.012 330)">خروج از پنل</a></div><div class="body"><div class="band"><div class="card"><div class="tscroll" tabindex="0" role="region" aria-labelledby="tcap4"><table><caption id="tcap4">گزارش‌های باز</caption><thead><tr><th scope="col">تصویر</th><th scope="col">دلیل</th><th scope="col">زمان</th></tr></thead><tbody><tr><td><div class="img" style="width:72px">محافظت‌شده</div></td><td><span class="slot">‹reason›</span></td><td><span class="slot">‹createdAt›</span></td></tr><tr><td><div class="img" style="width:72px">در دسترس نیست</div></td><td><span class="slot">‹reason›</span></td><td><span class="slot">‹createdAt›</span></td></tr></tbody></table></div></div><div class="card"><h3>تصمیم</h3><div class="img" role="img" aria-label="تصویرِ گزارش‌شده">تصویرِ کامل از نشانیِ محافظت‌شدهٔ کوتاه‌عمر</div><label class="sub" for="why">دلیل (الزامی)</label><textarea id="why" rows="2" style="font:inherit;border:1px solid oklch(0.8 0.01 60);border-radius:8px;padding:8px"></textarea><div class="band"><button type="button" class="btn sec">رد گزارش</button><button type="button" class="btn">تأیید و حذف</button></div></div><div class="card"><h3>تصمیم — تصویر در دسترس نیست</h3><div class="img">تصویر در دسترس نیست</div><div class="band"><button type="button" class="btn sec">رد گزارش</button><button type="button" class="btn" disabled aria-describedby="nodel">تأیید و حذف</button></div><p class="hint" id="nodel">تا نمایشِ تصویر، حذف ممکن نیست.</p></div></div></div></div>
+    </div>
+    <div class="note" role="note"><h3>یادداشتِ طراحی — S۱۰</h3><ul><li>شکلِ مسیر را #265 در فاز ۲ تعریف می‌کند، به الگوی موجودِ <code>GET /v1/admin/verification/:id/evidence</code> → <code>downloadUrl</code> (<code>issueProtectedDownloadUrl</code>، مخصوصِ همان ناظر). هیچ میدانی اینجا اختراع نشده.</li><li>«تأیید و حذف» فقط پس از بارگذاریِ موفقِ تصویر فعال می‌شود؛ برگشت‌ناپذیر است، دلیل می‌خواهد و از <code>ConfirmDialog</code> می‌گذرد. «رد» همیشه ممکن و برگشت‌پذیر است.</li><li>نشانی، کلید، سطل، مسیر یا توکن هرگز نمایش، کپی، ثبت یا در خطا و گزارشِ عملیات گذاشته نمی‌شود.</li><li>نشانیِ منقضی: یک درخواستِ دوبارهٔ بی‌صدا، بعد «دریافت دوباره».</li></ul></div>
+  </section>
+  <section class="s" id="s11" data-screen-label="S۱۱" aria-labelledby="s11-h">
+    <div class="sh"><span class="badge">S۱۱</span><h2 class="st" id="s11-h">اختلاف، اعتراض، جبران</h2><span class="sub">هیچ مسیری برای اختلاف وجود ندارد</span></div>
+
+    <div class="row">
+      <div class="board phone"><div class="cap">۳۹۰ · مشتری</div><div class="body"><div class="unavail" role="note"><strong>ثبت اعتراض در این نسخه فعال نیست.</strong>نه فرم، نه دسته‌بندی، نه شمارشِ معکوسِ مهلت. <code>#162 · #180</code></div><div class="card"><h3>انتخابِ جبران</h3><p class="p">وقتی خواندنِ جبران می‌گوید انتخابی باز است، ورودیِ صفحهٔ ۴۹ اینجا می‌نشیند.</p><p class="sub"><code>GET /v1/bookings/:id/remedy</code> — #212</p></div></div></div>
+      <div class="board phone"><div class="cap">۳۹۰ · فروشنده</div><div class="body"><div class="card"><h3>پولِ درگیرِ اختلاف</h3><div class="kv"><span>درگیرِ اختلاف</span><span><span class="slot">‹disputed›</span> <span class="unit">تومان</span></span></div><p class="hint">تا وجودِ اختلاف ساختاراً صفر است.</p></div></div></div>
+    </div>
+    <div class="note" role="note"><h3>یادداشتِ طراحی — S۱۱</h3><ul><li>صفِ بازبینِ اختلاف و تجدیدنظر به یک اختیارِ ممتازِ تازه نیاز دارد که وجود ندارد (<code>V33-DEC-039</code> R11)؛ پس در صفحهٔ ناظر <strong>غایب</strong> است، نه کارتِ غیرفعال.</li></ul></div>
+  </section>
+  <section class="s" id="s12" data-screen-label="S۱۲" aria-labelledby="s12-h">
+    <div class="sh"><span class="badge">S۱۲</span><h2 class="st" id="s12-h">هفت حالت، یک زبان</h2><span class="sub">بارگذاری · خالی · خطا · تعارض · ناموجود · لغوِ اختیار · پیکربندیِ ناقص</span></div>
+
+    <div class="row">
+      <div class="board desk"><div class="cap">کاتالوگ حالت‌ها</div><div class="body"><div class="band"><div class="card" aria-busy="true"><h3>بارگذاری</h3><div class="skel"></div><div class="skel" style="width:60%"></div><p class="hint">هرگز رقمِ کهنه زیرِ اسکلت.</p></div><div class="card"><h3>خالی</h3><p class="p">هنوز تسویه‌ای ثبت نشده است.</p><p class="hint">صفر همچنان صفر نمایش داده می‌شود.</p></div><div class="card"><h3>خطا</h3><div class="alert" role="alert"><span>این بخش خوانده نشد.</span><button type="button" class="btn sec">تلاش دوباره</button></div></div><div class="card"><h3>تعارض (۴۰۹)</h3><p class="p">برای ادامه یک فضا را انتخاب کنید.</p></div></div><div class="band"><div class="card"><h3>ناموجود</h3><div class="unavail" role="note"><strong>ماندهٔ اعتبارِ رزرو در این نسخه قابلِ نمایش نیست.</strong>بدونِ عدد، بدونِ تاریخ، بدونِ «به‌زودی».</div></div><div class="card"><h3>لغوِ اختیار</h3><p class="p" role="alert">دسترسی شما به این بخش تغییر کرده است.</p><a href="#s1">بازگشت</a><p class="hint">بدونِ تلاشِ دوباره؛ داده پاک می‌شود.</p></div><div class="card"><h3>پیکربندیِ ناقص</h3><p class="p">طرحی برای این فضا ثبت نشده است.</p><p class="hint">لحنِ خنثی، نه خطا؛ کنش فقط اگر سرور فهرستش کند.</p></div></div></div></div>
+    </div>
+  </section>
+</main>
+</x-dc>
+</body>
+</html>
