@@ -228,6 +228,28 @@ export class TokenService {
     await this.refreshRepo.update({ tokenHash }, { revokedAt: new Date() });
   }
 
+  /**
+   * Revokes a refresh token and reports WHOSE it was -- #310.
+   *
+   * Logout is authenticated by the refresh cookie rather than by a bearer, so
+   * the only thing that knows the user is the token itself. `revoke` above
+   * updates by hash and tells the caller nothing, which is right for a caller
+   * that already has an identity and wrong for one whose identity comes from
+   * the token.
+   *
+   * Null means the token matched no row -- an already-revoked or fabricated
+   * token. The caller still clears cookies (that is the point of the route)
+   * but has nothing truthful to write in the audit log, and writing a guess
+   * there would be worse than writing nothing.
+   */
+  async revokeAndIdentify(rawRefreshToken: string): Promise<string | null> {
+    const tokenHash = this.hashToken(rawRefreshToken);
+    const existing = await this.refreshRepo.findOne({ where: { tokenHash }, select: { id: true, userId: true } });
+    if (!existing) return null;
+    await this.refreshRepo.update({ id: existing.id }, { revokedAt: new Date() });
+    return existing.userId;
+  }
+
   async revokeById(id: string): Promise<void> {
     await this.refreshRepo.update({ id }, { revokedAt: new Date() });
   }

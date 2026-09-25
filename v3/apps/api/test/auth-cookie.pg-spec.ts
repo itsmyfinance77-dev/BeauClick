@@ -369,6 +369,63 @@ describePg('authentication — httpOnly refresh cookie and CSRF (real PostgreSQL
         .expect(401);
     });
 
+    it('works with NO bearer at all — the browser path, which used to be 401ed (#310)', async () => {
+      // The test that could not pass before. `apps/web` builds its credentialed
+      // client with the refresh cookie and the CSRF header and NO
+      // `Authorization`, so the global guard rejected every browser logout
+      // before the handler ran: `clearAuthCookies` never executed and the
+      // refresh chain was never revoked. The web swallowed the 401 and cleared
+      // locally, so a user who signed out had not signed out on the server.
+      const loginRes = await login('+989125000015');
+      const refreshCookie = cookieValue(loginRes, REFRESH_COOKIE_NAME);
+      const csrf = loginRes.body.data.csrfToken;
+
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/auth/logout')
+        .set('Origin', ALLOWED_ORIGIN)
+        .set('Cookie', [`${REFRESH_COOKIE_NAME}=${refreshCookie}`, `${CSRF_COOKIE_NAME}=${csrf}`])
+        .set('X-CSRF-Token', csrf)
+        .send({})
+        .expect(200);
+
+      expect(cookieHeader(res, REFRESH_COOKIE_NAME)).toMatch(/Expires=Thu, 01 Jan 1970|Max-Age=0/i);
+
+      // The half that matters: the SERVER was actually told. A logout that
+      // only clears the browser leaves a live session behind on a shared
+      // device, which is the whole harm in #310.
+      await request(app.getHttpServer())
+        .post('/api/v1/auth/refresh')
+        .set('Origin', ALLOWED_ORIGIN)
+        .set('Cookie', [`${REFRESH_COOKIE_NAME}=${refreshCookie}`, `${CSRF_COOKIE_NAME}=${csrf}`])
+        .set('X-CSRF-Token', csrf)
+        .send({})
+        .expect(401);
+    });
+
+    it('refuses a cookie-only logout with no CSRF proof', async () => {
+      // The route is `@Public()` now, so this check is what replaces the guard.
+      // Without it any site could end a visitor's session by causing their
+      // browser to POST here with its cookie attached.
+      const loginRes = await login('+989125000016');
+      const refreshCookie = cookieValue(loginRes, REFRESH_COOKIE_NAME);
+      const csrf = loginRes.body.data.csrfToken;
+
+      await request(app.getHttpServer())
+        .post('/api/v1/auth/logout')
+        .set('Cookie', [`${REFRESH_COOKIE_NAME}=${refreshCookie}`, `${CSRF_COOKIE_NAME}=${csrf}`])
+        .send({})
+        .expect(403);
+
+      // And the session survives it -- a refused logout must not half-succeed.
+      await request(app.getHttpServer())
+        .post('/api/v1/auth/refresh')
+        .set('Origin', ALLOWED_ORIGIN)
+        .set('Cookie', [`${REFRESH_COOKIE_NAME}=${refreshCookie}`, `${CSRF_COOKIE_NAME}=${csrf}`])
+        .set('X-CSRF-Token', csrf)
+        .send({})
+        .expect(200);
+    });
+
     it('clears the cookies even when no token was presented', async () => {
       const loginRes = await login('+989125000014');
       const res = await request(app.getHttpServer())
