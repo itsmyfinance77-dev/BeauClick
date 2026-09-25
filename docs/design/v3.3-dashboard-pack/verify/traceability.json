@@ -1,0 +1,755 @@
+{
+  "_comment": "Single source for ROUTE_CONTRACT_MATRIX.md. Every route the #45 design reads, the authority that governs it, and the exact wire fields the design renders. check-traceability.mjs verifies each (method, path) exists in the implementation checkout and each field name appears in the cited files. Nothing here is a proposal: a route or field that does not exist fails the check.",
+  "implementationBaseline": "2e3da4a43482680db5104c1e78dba48a8d2a18f4",
+  "routes": [
+    {
+      "id": "me",
+      "method": "GET",
+      "path": "/v1/me",
+      "authority": "session; roles and capabilities resolved live from identity.user_roles",
+      "files": [
+        "services/identity/src/me/me.controller.ts"
+      ],
+      "fields": [
+        "id",
+        "phone",
+        "displayName",
+        "roles",
+        "capabilities"
+      ],
+      "screens": [
+        "51 §2",
+        "51 §3",
+        "52 §2"
+      ]
+    },
+    {
+      "id": "fin-ws",
+      "method": "GET",
+      "path": "/v1/me/finance/workspaces",
+      "authority": "session; owned OR live finance_read grant; Cache-Control private, no-store",
+      "files": [
+        "services/financial/src/financial.controller.ts",
+        "services/financial/src/finance-workspace.service.ts"
+      ],
+      "fields": [
+        "items",
+        "workspaceRef",
+        "workspaceType",
+        "accessMode",
+        "displayLabel"
+      ],
+      "screens": [
+        "51 §2.3",
+        "51 §4"
+      ]
+    },
+    {
+      "id": "fin-summary",
+      "method": "GET",
+      "path": "/v1/me/finance/:workspaceRef/summary",
+      "authority": "live ownership OR live finance_read grant; shared NotFoundOrNotYours refusal",
+      "files": [
+        "services/financial/src/financial.controller.ts",
+        "services/financial/src/settlement.service.ts"
+      ],
+      "fields": [
+        "partyType",
+        "receivableNetToman",
+        "settledToman",
+        "outstandingToman",
+        "currency"
+      ],
+      "screens": [
+        "51 §5"
+      ]
+    },
+    {
+      "id": "fin-outstanding",
+      "method": "GET",
+      "path": "/v1/me/finance/:workspaceRef/outstanding-orders",
+      "authority": "as fin-summary",
+      "files": [
+        "services/financial/src/financial.controller.ts",
+        "services/financial/src/settlement.service.ts"
+      ],
+      "fields": [
+        "orderId",
+        "outstandingToman"
+      ],
+      "screens": [
+        "51 §5"
+      ]
+    },
+    {
+      "id": "fin-settlements",
+      "method": "GET",
+      "path": "/v1/me/finance/:workspaceRef/settlements",
+      "authority": "as fin-summary; cursor bound to the workspace",
+      "files": [
+        "services/financial/src/financial.controller.ts",
+        "services/financial/src/entities/settlement.entity.ts"
+      ],
+      "fields": [
+        "items",
+        "nextCursor",
+        "kind",
+        "amountToman",
+        "method",
+        "reference",
+        "createdAt",
+        "'reversal'"
+      ],
+      "screens": [
+        "51 §5"
+      ]
+    },
+    {
+      "id": "fin-funds",
+      "method": "GET",
+      "path": "/v1/me/finance/:workspaceRef/funds",
+      "authority": "as fin-summary",
+      "files": [
+        "services/financial/src/financial.controller.ts"
+      ],
+      "fields": [
+        "pending",
+        "disputed",
+        "available",
+        "reserve",
+        "settled",
+        "refunded",
+        "platformEarned",
+        "providerFee",
+        "recoveryOut",
+        "collected",
+        "platformAdvance",
+        "recoveredIn",
+        "currency"
+      ],
+      "screens": [
+        "51 §5"
+      ]
+    },
+    {
+      "id": "subs",
+      "method": "GET",
+      "path": "/v1/me/subscriptions",
+      "authority": "session + live ownership (reads); writes additionally bc_manage_own_subscription (non-privileged)",
+      "files": [
+        "services/commercial-policy/src/seller-surface/seller-subscription-surface.controller.ts",
+        "services/commercial-policy/src/seller-surface/seller-subscription-surface.service.ts"
+      ],
+      "fields": [
+        "workspaceRef",
+        "workspaceType",
+        "subscription",
+        "state",
+        "planKey",
+        "version",
+        "billingTermDays",
+        "includedBookingCredits",
+        "staffSeats",
+        "includedLocations",
+        "capabilityKeys",
+        "unitPriceToman",
+        "effectiveAt",
+        "baseWorkspace",
+        "availableActions",
+        "'select_plan'",
+        "'cancel'"
+      ],
+      "screens": [
+        "51 §5.2"
+      ]
+    },
+    {
+      "id": "subs-history",
+      "method": "GET",
+      "path": "/v1/me/subscriptions/:workspaceRef/history",
+      "authority": "as subs",
+      "files": [
+        "services/commercial-policy/src/seller-surface/seller-subscription-surface.service.ts"
+      ],
+      "fields": [
+        "supersededAt",
+        "cancelledAt"
+      ],
+      "screens": [
+        "51 §5.2"
+      ]
+    },
+    {
+      "id": "credit-purchases",
+      "method": "GET",
+      "path": "/v1/me/subscriptions/:workspaceRef/credit-purchases",
+      "authority": "as subs",
+      "files": [
+        "services/commercial-policy/src/seller-surface/seller-subscription-surface.controller.ts",
+        "packages/commercial-policy-contract/src/credit-purchase-contract.ts"
+      ],
+      "fields": [
+        "purchaseId",
+        "quantity",
+        "unitPriceToman",
+        "totalToman",
+        "state",
+        "effectiveAt",
+        "createdAt",
+        "'awaiting_payment'",
+        "'abandoned'",
+        "purchase_unavailable"
+      ],
+      "screens": [
+        "51 §5.3"
+      ]
+    },
+    {
+      "id": "plans",
+      "method": "GET",
+      "path": "/v1/me/commercial-plans",
+      "authority": "session",
+      "files": [
+        "services/commercial-policy/src/seller-surface/seller-subscription-surface.service.ts"
+      ],
+      "fields": [
+        "displayName",
+        "selectable",
+        "baseWorkspace"
+      ],
+      "screens": [
+        "51 §5.2"
+      ]
+    },
+    {
+      "id": "order",
+      "method": "GET",
+      "path": "/v1/orders/:id",
+      "authority": "OrderOwnerResolver: the customer who owns the order",
+      "files": [
+        "services/commerce/src/order/order.controller.ts",
+        "services/commerce/src/entities/order.entity.ts",
+        "packages/commercial-policy-contract/src/commercial-policy-contract.ts"
+      ],
+      "fields": [
+        "status",
+        "totalToman",
+        "collectedTotalToman",
+        "refundedTotalToman",
+        "paymentSchedule",
+        "collectionMode",
+        "serviceTotalToman",
+        "platformCollectibleNowToman",
+        "venueBalanceToman",
+        "'pay_at_venue'",
+        "'deposit_online_balance_at_venue'",
+        "'full_payment_online'",
+        "'online_collection_not_required'"
+      ],
+      "screens": [
+        "51 §5.1"
+      ]
+    },
+    {
+      "id": "my-bookings",
+      "method": "GET",
+      "path": "/v1/me/bookings",
+      "authority": "session; own bookings only",
+      "files": [
+        "services/booking/src/booking/booking.controller.ts"
+      ],
+      "fields": [
+        "orderId",
+        "value",
+        "total",
+        "startAt"
+      ],
+      "screens": [
+        "51 §3.1"
+      ]
+    },
+    {
+      "id": "remedy",
+      "method": "GET",
+      "path": "/v1/bookings/:id/remedy",
+      "authority": "booking customer",
+      "files": [
+        "apps/api/src/outcome/booking-remedy.controller.ts"
+      ],
+      "fields": [],
+      "screens": [
+        "51 §6"
+      ]
+    },
+    {
+      "id": "no-show",
+      "method": "GET",
+      "path": "/v1/bookings/:id/no-show",
+      "authority": "booking parties",
+      "files": [
+        "services/booking/src/booking/booking.controller.ts"
+      ],
+      "fields": [],
+      "screens": [
+        "51 §6"
+      ]
+    },
+    {
+      "id": "pro-bookings",
+      "method": "GET",
+      "path": "/v1/me/professional-bookings",
+      "authority": "session; the caller's own professional profile",
+      "files": [
+        "services/booking/src/booking/booking.controller.ts"
+      ],
+      "fields": [],
+      "screens": [
+        "51 §3.2"
+      ]
+    },
+    {
+      "id": "pro-upcoming",
+      "method": "GET",
+      "path": "/v1/me/professional-bookings/upcoming-count",
+      "authority": "session; own professional profile",
+      "files": [
+        "services/booking/src/booking/booking.controller.ts"
+      ],
+      "fields": [
+        "upcomingCount"
+      ],
+      "screens": [
+        "51 §3.2"
+      ]
+    },
+    {
+      "id": "my-provider",
+      "method": "GET",
+      "path": "/v1/me/provider",
+      "authority": "session; own profile",
+      "files": [
+        "services/provider/src/provider.controller.ts"
+      ],
+      "fields": [],
+      "screens": [
+        "51 §2.2"
+      ]
+    },
+    {
+      "id": "my-business",
+      "method": "GET",
+      "path": "/v1/me/business",
+      "authority": "session; owned business or null",
+      "files": [
+        "services/business/src/business.controller.ts"
+      ],
+      "fields": [
+        "displayName"
+      ],
+      "screens": [
+        "51 §2.2",
+        "51 §3.3"
+      ]
+    },
+    {
+      "id": "my-memberships",
+      "method": "GET",
+      "path": "/v1/me/business-staff",
+      "authority": "session; the caller's own memberships",
+      "files": [
+        "services/business/src/business.controller.ts",
+        "services/business/src/entities/business-staff.entity.ts"
+      ],
+      "fields": [
+        "role",
+        "status",
+        "businessId",
+        "'manager'",
+        "'staff'"
+      ],
+      "screens": [
+        "51 §2.2",
+        "51 §3.4",
+        "51 §3.5",
+        "51 §3.6"
+      ]
+    },
+    {
+      "id": "business",
+      "method": "GET",
+      "path": "/v1/businesses/:id",
+      "authority": "BusinessMembershipResolver: owner or live member",
+      "files": [
+        "services/business/src/business.controller.ts"
+      ],
+      "fields": [
+        "displayName"
+      ],
+      "screens": [
+        "51 §3.4",
+        "51 §3.5"
+      ]
+    },
+    {
+      "id": "classification",
+      "method": "GET",
+      "path": "/v1/businesses/:id/classification",
+      "authority": "BusinessMembershipResolver: owner or live member",
+      "files": [
+        "services/business/src/business.controller.ts"
+      ],
+      "fields": [
+        "vertical",
+        "traits"
+      ],
+      "screens": [
+        "51 §3.3",
+        "51 §3.11"
+      ]
+    },
+    {
+      "id": "business-patch",
+      "method": "PATCH",
+      "path": "/v1/businesses/:id",
+      "authority": "BusinessManagerResolver: owner or active manager",
+      "files": [
+        "services/business/src/business.controller.ts"
+      ],
+      "fields": [],
+      "screens": [
+        "51 §3.4"
+      ]
+    },
+    {
+      "id": "staff",
+      "method": "GET",
+      "path": "/v1/businesses/:id/staff",
+      "authority": "BusinessMembershipResolver",
+      "files": [
+        "services/business/src/business.controller.ts"
+      ],
+      "fields": [],
+      "screens": [
+        "51 §3.4"
+      ]
+    },
+    {
+      "id": "staff-mgmt",
+      "method": "GET",
+      "path": "/v1/businesses/:id/staff-management",
+      "authority": "BusinessOwnerResolver: owner only",
+      "files": [
+        "services/business/src/business.controller.ts",
+        "services/business/src/staff-management.service.ts"
+      ],
+      "fields": [
+        "displayLabel",
+        "labelSource",
+        "identificationHint",
+        "roles",
+        "role"
+      ],
+      "screens": [
+        "51 §3.3"
+      ]
+    },
+    {
+      "id": "grants",
+      "method": "GET",
+      "path": "/v1/businesses/:id/staff/:staffId/grants",
+      "authority": "BusinessOwnerResolver: owner only",
+      "files": [
+        "services/business/src/business.controller.ts",
+        "services/business/src/entities/staff-role-grant.entity.ts"
+      ],
+      "fields": [
+        "'practitioner_chat'",
+        "'finance_read'"
+      ],
+      "screens": [
+        "51 §3.3",
+        "51 §3.6",
+        "51 §3.7"
+      ]
+    },
+    {
+      "id": "locations",
+      "method": "GET",
+      "path": "/v1/businesses/:id/locations",
+      "authority": "owner only (per-handler resolver)",
+      "files": [
+        "services/business/src/business-location.controller.ts"
+      ],
+      "fields": [],
+      "screens": [
+        "51 §3.3"
+      ]
+    },
+    {
+      "id": "chat-unread",
+      "method": "GET",
+      "path": "/v1/chat/unread-count",
+      "authority": "bc_use_chat; conversations decided per request by the seller-access port",
+      "files": [
+        "services/chat/src/chat.controller.ts",
+        "services/chat/src/chat.service.ts"
+      ],
+      "fields": [
+        "total",
+        "conversations"
+      ],
+      "screens": [
+        "51 §2.1"
+      ]
+    },
+    {
+      "id": "notif-unread",
+      "method": "GET",
+      "path": "/v1/me/notifications/unread-count",
+      "authority": "session",
+      "files": [
+        "services/notification/src/notification.controller.ts"
+      ],
+      "fields": [
+        "unreadCount"
+      ],
+      "screens": [
+        "51 §2.1"
+      ]
+    },
+    {
+      "id": "loyalty",
+      "method": "GET",
+      "path": "/v1/me/loyalty/summary",
+      "authority": "session",
+      "files": [
+        "services/loyalty/src/loyalty.controller.ts"
+      ],
+      "fields": [
+        "balance",
+        "lifetimeEarned"
+      ],
+      "screens": [
+        "51 §3.1"
+      ]
+    },
+    {
+      "id": "q-verification",
+      "method": "GET",
+      "path": "/v1/admin/verification/queue",
+      "authority": "bc_moderate_verification (live re-check for privileged capabilities)",
+      "files": [
+        "services/provider/src/verification/verification.controller.ts"
+      ],
+      "fields": [
+        "meta",
+        "pagination",
+        "total"
+      ],
+      "screens": [
+        "52 §3"
+      ]
+    },
+    {
+      "id": "q-evidence",
+      "method": "GET",
+      "path": "/v1/admin/verification/:id/evidence",
+      "authority": "bc_moderate_verification; URL minted per moderator",
+      "files": [
+        "services/provider/src/verification/verification.controller.ts"
+      ],
+      "fields": [
+        "downloadUrl",
+        "issueProtectedDownloadUrl"
+      ],
+      "screens": [
+        "52 §5"
+      ]
+    },
+    {
+      "id": "q-media",
+      "method": "GET",
+      "path": "/v1/admin/media/reports",
+      "authority": "bc_moderate_media",
+      "files": [
+        "libs/media/src/media.controller.ts"
+      ],
+      "fields": [
+        "mediaObjectId",
+        "reason",
+        "status",
+        "meta",
+        "total",
+        "createdAt"
+      ],
+      "screens": [
+        "52 §3",
+        "52 §5"
+      ]
+    },
+    {
+      "id": "q-media-decide",
+      "method": "POST",
+      "path": "/v1/admin/media/reports/:id/decide",
+      "authority": "bc_moderate_media",
+      "files": [
+        "libs/media/src/media.controller.ts"
+      ],
+      "fields": [],
+      "screens": [
+        "52 §5"
+      ]
+    },
+    {
+      "id": "q-reviews",
+      "method": "GET",
+      "path": "/v1/admin/reviews/queue",
+      "authority": "bc_moderate_reviews",
+      "files": [
+        "services/provider/src/review.controller.ts"
+      ],
+      "fields": [
+        "meta",
+        "total"
+      ],
+      "screens": [
+        "52 §3"
+      ]
+    },
+    {
+      "id": "q-chat",
+      "method": "GET",
+      "path": "/v1/admin/chat/reports",
+      "authority": "bc_moderate_chat (class-level)",
+      "files": [
+        "services/chat/src/chat-moderation.controller.ts"
+      ],
+      "fields": [
+        "items",
+        "status",
+        "limit"
+      ],
+      "screens": [
+        "52 §3"
+      ]
+    },
+    {
+      "id": "adm-analytics",
+      "method": "GET",
+      "path": "/v1/admin/analytics",
+      "authority": "bc_manage_platform",
+      "files": [
+        "services/analytics/src/analytics.controller.ts"
+      ],
+      "fields": [],
+      "screens": [
+        "52 §4"
+      ]
+    },
+    {
+      "id": "adm-audit",
+      "method": "GET",
+      "path": "/v1/admin/audit-log",
+      "authority": "bc_manage_platform",
+      "files": [
+        "services/identity/src/admin/admin-audit.controller.ts"
+      ],
+      "fields": [],
+      "screens": [
+        "52 §4"
+      ]
+    },
+    {
+      "id": "adm-users",
+      "method": "GET",
+      "path": "/v1/admin/users",
+      "authority": "bc_manage_platform",
+      "files": [
+        "services/identity/src/admin/admin-roles.controller.ts"
+      ],
+      "fields": [],
+      "screens": [
+        "52 §4"
+      ]
+    },
+    {
+      "id": "adm-fin",
+      "method": "GET",
+      "path": "/v1/admin/finance/totals",
+      "authority": "bc_manage_platform",
+      "files": [
+        "services/financial/src/financial.controller.ts"
+      ],
+      "fields": [],
+      "screens": [
+        "52 §4"
+      ]
+    },
+    {
+      "id": "adm-plans",
+      "method": "GET",
+      "path": "/v1/admin/commercial/plans",
+      "authority": "bc_manage_commercial_plans",
+      "files": [
+        "services/commercial-policy/src/catalogue/commercial-catalogue.controller.ts"
+      ],
+      "fields": [],
+      "screens": [
+        "52 §4"
+      ]
+    },
+    {
+      "id": "adm-enforcement",
+      "method": "GET",
+      "path": "/v1/admin/commercial/booking-credit-enforcement",
+      "authority": "bc_manage_commercial_plans",
+      "files": [
+        "services/commercial-policy/src/enforcement/booking-credit-enforcement.controller.ts"
+      ],
+      "fields": [],
+      "screens": [
+        "52 §4"
+      ]
+    }
+  ],
+  "capabilities": {
+    "file": "services/identity/src/rbac/capabilities.ts",
+    "names": [
+      "bc_manage_platform",
+      "bc_moderate_verification",
+      "bc_moderate_reviews",
+      "bc_moderate_media",
+      "bc_moderate_chat",
+      "bc_manage_commercial_plans",
+      "bc_manage_own_subscription",
+      "bc_manage_own_collection_policy",
+      "bc_use_chat",
+      "bc_use_ai_assistant",
+      "bc_book_service"
+    ]
+  },
+  "absences": [
+    {
+      "claim": "no seller-facing route returns a booking-credit balance or consumption count",
+      "grepAbsent": "balanceFor\\(",
+      "onlyIn": [
+        "services/commercial-policy/src/subscription/booking-credit-accounting.service.ts"
+      ]
+    },
+    {
+      "claim": "no dispute or appeal route exists",
+      "routeAbsentPattern": "disput|appeal"
+    },
+    {
+      "claim": "no reception role or scoped role exists",
+      "grepAbsent": "'reception'"
+    },
+    {
+      "claim": "GET /v1/me carries no createdAt (#226)",
+      "fileLacks": {
+        "file": "services/identity/src/me/me.controller.ts",
+        "text": "createdAt"
+      }
+    }
+  ]
+}
