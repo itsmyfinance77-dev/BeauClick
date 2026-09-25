@@ -75,8 +75,9 @@ The multi-workspace commercial and operations dashboard is designed. It is on
 `design/claude-design` at **`dfa0285b8c58039416f54cfc17a02aa7f90937a3`** (#323,
 reviewed by Codex at `280688c`), in the sibling pack
 `docs/design/v3.3-dashboard-pack/`. It was audited against implementation commit
-`2e3da4a43482680db5104c1e78dba48a8d2a18f4`. **Nothing in it is built:** it is
-the design that #264, #265, #226, #255 and #237 implement against.
+`2e3da4a43482680db5104c1e78dba48a8d2a18f4`. It is the design that #264, #265,
+#226, #255 and #237 implement against. **Built so far:** screen 52 §2–§4, the
+moderator landing, its bar and the shell guard (#264). The rest is not built.
 
 What it adds, and where to read it on the design branch:
 
