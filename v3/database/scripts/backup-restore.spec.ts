@@ -1,9 +1,12 @@
 import {
   assertSafeIdentifier,
   compareInventory,
+  compareStructure,
   databaseNameOf,
   defaultBackupPath,
+  ignoredErrorCount,
   libpqEnv,
+  type SchemaStructure,
 } from './backup-restore';
 
 /**
@@ -127,6 +130,100 @@ describe('backup/restore helpers', () => {
       expect(path).not.toContain(':');
       expect(path).toContain('2026-08-29T10-20-30-400Z');
       expect(path.endsWith('.dump')).toBe(true);
+    });
+  });
+});
+
+/**
+ * The two halves of #314: the verdict, and what the verdict can see.
+ *
+ * `restore()` used to decide acceptability from `/warning|already exists/i`
+ * against pg_restore's stderr. That pattern matched precisely the runs that
+ * FAILED, because pg_restore ends such a run with `warning: errors ignored on
+ * restore: N` and a clean run prints no warning at all. And the comparison it
+ * deferred to -- row counts over `relkind = 'r'` -- is structurally unable to
+ * see a lost index, constraint, view or sequence position.
+ */
+describe('#314 — a restore that failed must not read as one that worked', () => {
+  describe('ignoredErrorCount', () => {
+    it('reads pg_restore’s own count out of the line that announces it', () => {
+      // The exact line that used to be RESCUED by the `/warning/i` test.
+      expect(ignoredErrorCount('pg_restore: warning: errors ignored on restore: 7')).toBe(7);
+    });
+
+    it('reads a multi-line stderr, where the count is the last line', () => {
+      const stderr = [
+        'pg_restore: error: could not execute query: ERROR:  relation "commerce.orders" does not exist',
+        'pg_restore: error: could not execute query: ERROR:  duplicate key value',
+        'pg_restore: warning: errors ignored on restore: 2',
+      ].join('\n');
+      expect(ignoredErrorCount(stderr)).toBe(2);
+    });
+
+    it('returns null for a failure that is not "the restore had errors"', () => {
+      // A missing file or a refused connection is "the restore did not
+      // happen". Those must keep throwing rather than being counted as zero,
+      // which is why null is distinct from 0 here.
+      expect(ignoredErrorCount('pg_restore: error: could not open input file: No such file or directory')).toBeNull();
+      expect(ignoredErrorCount('pg_restore: error: connection to server failed')).toBeNull();
+    });
+
+    it('does not mistake the word warning alone for an error count', () => {
+      // The old guard passed on exactly this and on everything else.
+      expect(ignoredErrorCount('pg_restore: warning: something harmless')).toBeNull();
+    });
+  });
+
+  describe('compareStructure', () => {
+    const base: SchemaStructure = {
+      indexes: ['commerce.uq_orders_source', 'booking.ix_bookings_slot'],
+      constraints: ['commerce.orders.ck_orders_source_type'],
+      views: [],
+      sequences: { 'public.audit_log_id_seq': 40_000 },
+    };
+
+    it('agrees with itself', () => {
+      expect(compareStructure(base, base)).toEqual([]);
+    });
+
+    it('names a lost unique index — the case row counts cannot see', () => {
+      // `uq_orders_source` is a UNIQUE INDEX, not a constraint: one of 47 in
+      // this schema whose uniqueness has no backing constraint. A restore that
+      // loses it leaves every row count identical and permits two orders for
+      // one booking.
+      const after = { ...base, indexes: ['booking.ix_bookings_slot'] };
+      expect(compareStructure(base, after)).toEqual([
+        { kind: 'index', name: 'commerce.uq_orders_source', detail: 'missing after restore' },
+      ]);
+    });
+
+    it('names a lost constraint', () => {
+      const after = { ...base, constraints: [] };
+      expect(compareStructure(base, after)).toEqual([
+        { kind: 'constraint', name: 'commerce.orders.ck_orders_source_type', detail: 'missing after restore' },
+      ]);
+    });
+
+    it('catches a sequence that exists at the wrong position', () => {
+      // The failure that looks most like a success: the sequence is present
+      // and correctly named, and the next insert collides with an existing
+      // primary key.
+      const after = { ...base, sequences: { 'public.audit_log_id_seq': 1 } };
+      expect(compareStructure(base, after)).toEqual([
+        { kind: 'sequence', name: 'public.audit_log_id_seq', detail: 'last_value 40000 before, 1 after' },
+      ]);
+    });
+
+    it('reports an object the restore invented, because the target was not clean', () => {
+      const after = { ...base, views: ['public.leftover_view'] };
+      expect(compareStructure(base, after)).toEqual([
+        { kind: 'view', name: 'public.leftover_view', detail: 'present after restore but not in the dump' },
+      ]);
+    });
+
+    it('reports every difference rather than stopping at the first', () => {
+      const after: SchemaStructure = { indexes: [], constraints: [], views: [], sequences: {} };
+      expect(compareStructure(base, after)).toHaveLength(4);
     });
   });
 });

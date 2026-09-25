@@ -43,6 +43,28 @@ import { mkdir, readFile, stat, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 import { Client } from 'pg';
 
+/**
+ * Everything a restore can drop while leaving every row count intact -- #314.
+ *
+ * Names rather than counts, because "seven constraints, seven constraints"
+ * agrees while naming two different sets, and the whole question is whether
+ * THIS constraint came back.
+ *
+ * Sequences carry their `last_value` as well as their name: a sequence that
+ * restores at 1 instead of 40,000 exists, is named, and collides with an
+ * existing primary key on the very next insert.
+ */
+export interface SchemaStructure {
+  /** `schema.index_name`, sorted. */
+  indexes: string[];
+  /** `schema.table.constraint_name`, sorted. Primary, unique, foreign-key and check. */
+  constraints: string[];
+  /** `schema.view_name`, sorted. Ordinary and materialised. */
+  views: string[];
+  /** `schema.sequence_name` -> `last_value`, or -1 where the role may not read it. */
+  sequences: Record<string, number>;
+}
+
 export interface BackupManifest {
   /** ISO-8601. Supplied by the caller so the value is explicit rather than ambient. */
   createdAt: string;
@@ -57,6 +79,20 @@ export interface BackupManifest {
   migrations: string[];
   /** `schema.table` -> row count, at dump time. What a restore is checked against. */
   inventory: Record<string, number>;
+  /**
+   * The schema objects a restore can lose WITHOUT moving a row -- #314.
+   *
+   * Row counts answer "did the data come back". They cannot answer "did the
+   * rules come back": a failed `ADD CONSTRAINT`, `CREATE INDEX`, view or
+   * sequence `setval` leaves every count identical. A database missing
+   * `uq_orders_source` restores to a perfect inventory and permits two orders
+   * for one booking.
+   *
+   * Optional because manifests written before #314 do not carry it. A restore
+   * checked against one of those gets the old, weaker verdict and is told so,
+   * rather than silently comparing against nothing.
+   */
+  structure?: SchemaStructure;
   /**
    * NEVER a connection string. A manifest sits next to a dump file, and both
    * end up in whatever storage the backups live in; a URL there hands out the
@@ -154,6 +190,82 @@ export async function inventory(client: Client): Promise<Record<string, number>>
   return counts;
 }
 
+/**
+ * The schema objects `inventory()` is structurally unable to see -- #314.
+ *
+ * `inventory()` selects `relkind = 'r'` and counts rows, which is the right
+ * question for "did the data come back" and no question at all about whether
+ * the rules came back. A `pg_restore` that failed to create an index, add a
+ * constraint, define a view or advance a sequence leaves every row count
+ * identical, so the rehearsal used to print "Row counts match" and exit 0 over
+ * a database that had lost its uniqueness guarantees.
+ *
+ * System schemas are excluded the same way `inventory()` excludes them, and
+ * index/constraint names implied by a constraint appear in both lists -- which
+ * is intended: losing a unique CONSTRAINT and losing the INDEX that enforces it
+ * are different failures with the same consequence, and neither should be able
+ * to hide inside the other's absence.
+ */
+export async function structure(client: Client): Promise<SchemaStructure> {
+  const notSystem = `n.nspname NOT IN ('pg_catalog', 'information_schema', 'pg_toast')`;
+
+  const { rows: indexes } = await client.query<{ name: string }>(
+    `SELECT n.nspname || '.' || c.relname AS name
+       FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE c.relkind IN ('i', 'I') AND ${notSystem}
+      ORDER BY 1`,
+  );
+
+  const { rows: constraints } = await client.query<{ name: string }>(
+    `SELECT n.nspname || '.' || t.relname || '.' || con.conname AS name
+       FROM pg_constraint con
+       JOIN pg_class t ON t.oid = con.conrelid
+       JOIN pg_namespace n ON n.oid = t.relnamespace
+      WHERE con.contype IN ('p', 'u', 'f', 'c') AND ${notSystem}
+      ORDER BY 1`,
+  );
+
+  const { rows: views } = await client.query<{ name: string }>(
+    `SELECT n.nspname || '.' || c.relname AS name
+       FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE c.relkind IN ('v', 'm') AND ${notSystem}
+      ORDER BY 1`,
+  );
+
+  const { rows: sequenceRows } = await client.query<{ schema: string; name: string }>(
+    `SELECT n.nspname AS schema, c.relname AS name
+       FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE c.relkind = 'S' AND ${notSystem}
+      ORDER BY 1, 2`,
+  );
+
+  const sequences: Record<string, number> = {};
+  for (const row of sequenceRows) {
+    const key = `${row.schema}.${row.name}`;
+    try {
+      // `pg_sequences` rather than `SELECT last_value FROM <seq>`: the view
+      // answers for a sequence the role may describe but not read, and reading
+      // the relation directly requires SELECT on it. `last_value` is null
+      // until the sequence has been used at least once, which is a real state
+      // and not an error -- 0 says "never advanced", -1 says "could not tell".
+      const { rows } = await client.query<{ last_value: string | null }>(
+        `SELECT last_value FROM pg_sequences WHERE schemaname = $1 AND sequencename = $2`,
+        [row.schema, row.name],
+      );
+      sequences[key] = rows[0]?.last_value == null ? 0 : Number(rows[0].last_value);
+    } catch {
+      sequences[key] = -1;
+    }
+  }
+
+  return {
+    indexes: indexes.map((r) => r.name),
+    constraints: constraints.map((r) => r.name),
+    views: views.map((r) => r.name),
+    sequences,
+  };
+}
+
 export async function appliedMigrations(client: Client): Promise<string[]> {
   const { rows } = await client.query<{ filename: string }>(
     `SELECT filename FROM public.schema_migrations ORDER BY filename`,
@@ -178,11 +290,13 @@ export async function backup(options: BackupOptions): Promise<BackupManifest> {
   let serverVersion: string;
   let migrations: string[];
   let counts: Record<string, number>;
+  let schema: SchemaStructure;
   try {
     const { rows } = await client.query<{ version: string }>(`SELECT current_setting('server_version') AS version`);
     serverVersion = rows[0].version;
     migrations = await appliedMigrations(client);
     counts = await inventory(client);
+    schema = await structure(client);
   } finally {
     await client.end();
   }
@@ -215,6 +329,7 @@ export async function backup(options: BackupOptions): Promise<BackupManifest> {
     serverVersion,
     migrations,
     inventory: counts,
+    structure: schema,
     source: { database: databaseNameOf(options.sourceUrl) },
   };
 
@@ -243,6 +358,16 @@ export async function verifyManifest(dumpFile: string): Promise<{ ok: boolean; d
   return { ok: true, detail: null };
 }
 
+export interface RestoreOutcome {
+  /**
+   * `pg_restore`'s own count from `errors ignored on restore: N`. Zero when it
+   * exited cleanly. This is evidence, not a verdict -- see `restore`.
+   */
+  ignoredErrors: number;
+  /** Whatever `pg_restore` said, empty on a clean run. Kept so a caller can report WHICH errors. */
+  stderr: string;
+}
+
 export interface RestoreOptions {
   dumpFile: string;
   /** A connection with CREATEDB rights, pointed at any existing database (usually `postgres`). */
@@ -260,8 +385,12 @@ export interface RestoreOptions {
  * `pg_restore --clean` into the wrong database destroys the data somebody was
  * about to recover. Creating the target makes "which database am I about to
  * overwrite" un-askable.
+ *
+ * Returns `pg_restore`'s own error accounting rather than deciding from it
+ * (#314). Whether a restore with N ignored errors is acceptable is a policy
+ * question, and the rehearsal is the caller entitled to answer it.
  */
-export async function restore(options: RestoreOptions): Promise<void> {
+export async function restore(options: RestoreOptions): Promise<RestoreOutcome> {
   const verification = await verifyManifest(options.dumpFile);
   if (!verification.ok) throw new Error(`Refusing to restore: ${verification.detail}`);
 
@@ -284,25 +413,52 @@ export async function restore(options: RestoreOptions): Promise<void> {
   }
 
   const env = { ...libpqEnv(options.adminUrl), PGDATABASE: options.targetDatabase };
+  let ignoredErrors: number | null = 0;
+  let stderr = '';
   await run(
     'pg_restore',
     [
       `--dbname=${options.targetDatabase}`,
-      // Deliberately NOT `--exit-on-error`. A fresh target legitimately
-      // produces errors a good restore also produces -- roles are
-      // cluster-global and already exist, so re-creating them is a duplicate --
-      // and aborting on those would fail a restore that was going fine. The
-      // inventory comparison plus the role contract are the real verdict, not
-      // pg_restore's exit code.
+      // Deliberately NOT `--exit-on-error`. Stopping at the first error would
+      // abandon a restore halfway and leave a half-populated target, which is
+      // worse than finishing and reporting. Finishing is only safe because the
+      // caller now gets the error COUNT and a structural comparison; it was
+      // not safe when the count was discarded.
       options.dumpFile,
     ],
     env,
   ).catch((err: Error) => {
-    // pg_restore exits non-zero on warnings it also emits for a perfectly good
-    // restore into a target whose roles already exist. The inventory
-    // comparison is the real verdict, so this is recorded and not fatal.
-    if (!/warning|already exists/i.test(err.message)) throw err;
+    // #314. This used to be `if (!/warning|already exists/i.test(err.message))
+    // throw err` -- and that pattern matched precisely the runs that FAILED.
+    // `pg_restore` ends a run that hit errors with
+    //
+    //   pg_restore: warning: errors ignored on restore: 7
+    //
+    // so the guard rescued every message that announced errors, while a
+    // genuinely clean restore prints no warning at all and never reaches this
+    // catch. The test was inverted, not merely loose.
+    //
+    // The number in that line is pg_restore's own accounting, so it is what
+    // decides now. Zero ignored errors is a pass. Anything else is reported
+    // upward as a count, and the CALLER decides -- the rehearsal treats it as
+    // a failure, which is what a rehearsal is for.
+    ignoredErrors = ignoredErrorCount(err.message);
+    stderr = err.message;
+    if (ignoredErrors === null) throw err;
   });
+
+  return { ignoredErrors: ignoredErrors ?? 0, stderr };
+}
+
+/**
+ * The `errors ignored on restore: N` count from `pg_restore`'s stderr, or null
+ * when the failure is not that shape at all -- a missing file, a refused
+ * connection, a dump it cannot read. Those are not "the restore had errors",
+ * they are "the restore did not happen", and they must keep throwing.
+ */
+export function ignoredErrorCount(stderr: string): number | null {
+  const match = /errors ignored on restore:\s*(\d+)/i.exec(stderr);
+  return match ? Number(match[1]) : null;
 }
 
 export function assertSafeIdentifier(name: string): void {
@@ -347,6 +503,57 @@ export function compareInventory(
   for (const table of Object.keys(actual)) {
     if (!(table in expected)) differences.push({ table, expected: 0, actual: actual[table] });
   }
+  return differences;
+}
+
+export interface StructureDifference {
+  kind: 'index' | 'constraint' | 'view' | 'sequence';
+  name: string;
+  detail: string;
+}
+
+/**
+ * Compares the schema objects a row count cannot see -- #314.
+ *
+ * MISSING is the failure this exists for: an object the dump had and the
+ * restore does not. EXTRA is reported too, because an object the restore
+ * invented is a target that was not clean, and a rehearsal that restored over
+ * something is not the rehearsal anyone thinks they ran.
+ *
+ * Sequences compare by VALUE as well as presence. A sequence restored at 1
+ * instead of 40,000 is present, correctly named, and collides with an existing
+ * primary key on the next insert.
+ */
+export function compareStructure(expected: SchemaStructure, actual: SchemaStructure): StructureDifference[] {
+  const differences: StructureDifference[] = [];
+
+  const lists: [StructureDifference['kind'], string[], string[]][] = [
+    ['index', expected.indexes, actual.indexes],
+    ['constraint', expected.constraints, actual.constraints],
+    ['view', expected.views, actual.views],
+  ];
+  for (const [kind, before, after] of lists) {
+    const have = new Set(after);
+    const had = new Set(before);
+    for (const name of before) if (!have.has(name)) differences.push({ kind, name, detail: 'missing after restore' });
+    for (const name of after) if (!had.has(name)) differences.push({ kind, name, detail: 'present after restore but not in the dump' });
+  }
+
+  for (const [name, value] of Object.entries(expected.sequences)) {
+    if (!(name in actual.sequences)) {
+      differences.push({ kind: 'sequence', name, detail: 'missing after restore' });
+    } else if (actual.sequences[name] !== value) {
+      // Not folded into the presence check above: a sequence that exists at
+      // the wrong position is the failure that looks like a success.
+      differences.push({ kind: 'sequence', name, detail: `last_value ${value} before, ${actual.sequences[name]} after` });
+    }
+  }
+  for (const name of Object.keys(actual.sequences)) {
+    if (!(name in expected.sequences)) {
+      differences.push({ kind: 'sequence', name, detail: 'present after restore but not in the dump' });
+    }
+  }
+
   return differences;
 }
 
