@@ -126,6 +126,8 @@ describePg('#264 — moderator admin boundary (real PostgreSQL)', () => {
     return offenders;
   }
 
+  const PARTIAL_ROLE = 'test_media_moderator_264';
+
   const QUEUES = {
     bc_moderate_verification: '/api/v1/admin/verification/queue?page=1&limit=1',
     bc_moderate_media: '/api/v1/admin/media/reports?page=1&limit=1',
@@ -197,29 +199,45 @@ describePg('#264 — moderator admin boundary (real PostgreSQL)', () => {
     // The persona matrix: "a subset of bc_moderate_* (for example through a
     // future role); the design must hold for any subset". Roles are data, so a
     // subset role is two rows.
-    await dataSource.query(
-      `INSERT INTO identity.roles (slug, name, description, is_privileged, is_default)
-       VALUES ('test_media_moderator', 'Media moderator (test)', '#264 partial-moderator fixture', true, false)`,
-    );
-    await dataSource.query(
-      `INSERT INTO identity.role_capabilities (role_slug, capability_slug) VALUES ('test_media_moderator', 'bc_moderate_media')`,
-    );
-    const user = await seedUser(app, dataSource, '+989152640004', ['customer']);
-    await dataSource.query(
-      `INSERT INTO identity.user_roles (user_id, role_slug, granted_by, reason) VALUES ($1, 'test_media_moderator', NULL, 'test')`,
-      [user.id],
-    );
-    const token = app.get(JwtService).sign({ sub: user.id, roles: ['customer', 'test_media_moderator'], capabilities: ['bc_moderate_media'] });
+    //
+    // `identity.roles` is SEED data that `resetDatabase` deliberately keeps, so
+    // this fixture removes itself afterwards -- a leftover role would otherwise
+    // outlive this file and appear in every later suite's role catalogue on the
+    // same database. It also clears any leftover first, so a run interrupted
+    // before its `finally` cannot fail the next one.
+    const removeFixtureRole = async () => {
+      await dataSource.query(`DELETE FROM identity.user_roles WHERE role_slug = $1`, [PARTIAL_ROLE]);
+      await dataSource.query(`DELETE FROM identity.roles WHERE slug = $1`, [PARTIAL_ROLE]);
+    };
+    await removeFixtureRole();
+    try {
+      await dataSource.query(
+        `INSERT INTO identity.roles (slug, name, description, is_privileged, is_default)
+         VALUES ($1, 'Media moderator (test)', '#264 partial-moderator fixture', true, false)`,
+        [PARTIAL_ROLE],
+      );
+      await dataSource.query(`INSERT INTO identity.role_capabilities (role_slug, capability_slug) VALUES ($1, 'bc_moderate_media')`, [
+        PARTIAL_ROLE,
+      ]);
+      const user = await seedUser(app, dataSource, '+989152640004', ['customer']);
+      await dataSource.query(
+        `INSERT INTO identity.user_roles (user_id, role_slug, granted_by, reason) VALUES ($1, $2, NULL, 'test')`,
+        [user.id, PARTIAL_ROLE],
+      );
+      const token = app.get(JwtService).sign({ sub: user.id, roles: ['customer', PARTIAL_ROLE], capabilities: ['bc_moderate_media'] });
 
-    const me = await request(app.getHttpServer()).get('/api/v1/me').set('Authorization', `Bearer ${token}`).expect(200);
-    expect(me.body.data.capabilities).toContain('bc_moderate_media');
-    expect(me.body.data.capabilities).not.toContain('bc_moderate_verification');
+      const me = await request(app.getHttpServer()).get('/api/v1/me').set('Authorization', `Bearer ${token}`).expect(200);
+      expect(me.body.data.capabilities).toContain('bc_moderate_media');
+      expect(me.body.data.capabilities).not.toContain('bc_moderate_verification');
 
-    await request(app.getHttpServer()).get(QUEUES.bc_moderate_media).set('Authorization', `Bearer ${token}`).expect(200);
-    for (const path of [QUEUES.bc_moderate_verification, QUEUES.bc_moderate_reviews, QUEUES.bc_moderate_chat]) {
-      await request(app.getHttpServer()).get(path).set('Authorization', `Bearer ${token}`).expect(403);
+      await request(app.getHttpServer()).get(QUEUES.bc_moderate_media).set('Authorization', `Bearer ${token}`).expect(200);
+      for (const path of [QUEUES.bc_moderate_verification, QUEUES.bc_moderate_reviews, QUEUES.bc_moderate_chat]) {
+        await request(app.getHttpServer()).get(path).set('Authorization', `Bearer ${token}`).expect(403);
+      }
+      expect(await notRefused(guardedRoutes(), token)).toEqual([]);
+    } finally {
+      await removeFixtureRole();
     }
-    expect(await notRefused(guardedRoutes(), token)).toEqual([]);
   });
 
   it('revokes on the next request: /v1/me drops the capability and the queue refuses the SAME token', async () => {
