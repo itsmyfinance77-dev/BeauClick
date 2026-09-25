@@ -90,7 +90,12 @@ export interface ObjectStorageDriver {
    */
   readRange(objectKey: string, start: number, endInclusive: number): Promise<Buffer>;
 
-  /** The whole object. Only ever called for a `protected` object being served to an authorized viewer. */
+  /**
+   * The whole object. Only ever called after `MediaService` has authorized the
+   * read: a `protected` object for its viewer, a reported public object for a
+   * live media moderator (#265), or a public object on the local driver's own
+   * serving route.
+   */
   read(objectKey: string): Promise<Buffer>;
 
   /** Idempotent: deleting an absent object is a success, not an error. */

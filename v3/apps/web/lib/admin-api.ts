@@ -166,6 +166,19 @@ export function mediaReports(api: ApiClient, page = 1, limit = 20) {
 }
 
 /**
+ * A short-lived URL for looking at the image an OPEN report is about (#265),
+ * minted for the signed-in media moderator and re-authorized by the API on
+ * every request. It is rendered only, as an `<img>` source: never shown,
+ * copied, logged, opened or downloaded. Any reason the image cannot be
+ * inspected is the shared refusal, a 404.
+ */
+export function mediaReportInspection(api: ApiClient, reportId: string) {
+  return api.get<{ id: string; inspectionUrl: string; expiresAt: string }>(
+    `/v1/admin/media/reports/${encodeURIComponent(reportId)}/inspection`,
+  );
+}
+
+/**
  * `uphold` deletes the image's bytes and cannot be undone; `reject` leaves the
  * image up and closes the report. `reason` is 4–500 characters
  * (`DecideAbuseReportDto`). A report somebody else already decided is refused

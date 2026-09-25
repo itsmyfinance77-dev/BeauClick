@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { formatZonedDateTime, toPersianDigits } from '@beauclick/persian-utils';
-import { Button, ErrorState, LoadingState } from '@/components/ui';
-import { Badge, DataCell, DataRow, DataTable, EmptyState, PageHeader, Textarea } from '@/components/kit';
+import { Button, ErrorState, LoadingState, Skeleton } from '@/components/ui';
+import { Badge, ConfirmDialog, DataCell, DataRow, DataTable, EmptyState, PageHeader, Textarea } from '@/components/kit';
 import { AdminGuard } from '@/components/admin-guard';
 import { useAuth } from '@/lib/auth-context';
 import { ApiRequestError } from '@/lib/api-client';
-import { decideMediaReport, mediaReports, type MediaAbuseReport } from '@/lib/admin-api';
+import { decideMediaReport, mediaReportInspection, mediaReports, type MediaAbuseReport } from '@/lib/admin-api';
 import { mediaReportReasonLabel } from '@/lib/moderation-labels';
 import styles from './media.module.css';
 
@@ -15,23 +15,31 @@ import styles from './media.module.css';
 const MIN_REASON = 4;
 
 /**
- * Whether a moderator can be shown the image a report is about.
+ * The inspection of one report's image (#265, `52_MODERATOR_LANDING.md` §5).
  *
- * Always false today, and on purpose: `GET /v1/admin/media/reports` returns a
- * `mediaObjectId` and nothing that locates the picture. A public object's key
- * is `public/<purpose>/<id>` and the report row does not carry the purpose, and
- * in production the public URL belongs to the storage driver, not to this API,
- * so the web app cannot build it either.
+ * The URL comes from `GET /v1/admin/media/reports/:id/inspection`: minted for
+ * this moderator, short-lived, re-authorized by the API on every request. It
+ * is only ever an `<img>` source -- never shown, copied, logged, put in an
+ * error, opened or downloaded.
  *
- * Upholding a report DELETES the bytes and cannot be undone, so it is not
- * offered on an image nobody can look at. Rejecting is: a wrongful rejection
- * can be corrected, because the image can be reported again. When the API
- * returns a way to show the image (#265), this is the one place that changes —
- * together with the irreversible-deletion confirmation the design asks for.
+ *   loading       the URL is being minted, or re-minted after the image failed
+ *   ready         an image can be rendered from `url` until `expiresAt`
+ *   unavailable   the shared refusal: the object is gone, private, foreign or
+ *                 the report is no longer open -- never which
+ *   failed        the URL could not be fetched, or the image failed again after
+ *                 its one silent re-request: the moderator may ask again
  */
-function canShowImage(_report: MediaAbuseReport): boolean {
-  return false;
-}
+type Inspection =
+  | { kind: 'loading' }
+  | { kind: 'ready'; url: string; expiresAt: number }
+  | { kind: 'unavailable' }
+  | { kind: 'failed' };
+
+/** The image's text alternative, always: never anything the uploader wrote. */
+const IMAGE_ALT = 'تصویرِ گزارش‌شده';
+const UNAVAILABLE = 'تصویر در دسترس نیست';
+const UPHOLD_BLOCKED = 'تا نمایش تصویر، حذف ممکن نیست.';
+const CONSEQUENCE = 'حذف تصویر برگشت‌پذیر نیست.';
 
 export default function AdminMediaPage() {
   // Content moderation, not platform operation: `bc_moderate_media` is a
@@ -67,6 +75,21 @@ function MediaQueue() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+
+  // One inspection per report, shared by its queue row and its panel, kept
+  // across queue reloads so a decision does not re-mint every other row.
+  const [inspections, setInspections] = useState<Record<string, Inspection>>({});
+  // The URL whose image has actually rendered IN THE PANEL, per report. Uphold
+  // needs this to equal the current URL: a thumbnail is not an inspection.
+  const [shownUrl, setShownUrl] = useState<Record<string, string>>({});
+  // Whether the one silent re-request after an image error has been spent. A
+  // successful render gives it back, so a later expiry is also silent once.
+  const silentRetryUsed = useRef<Record<string, boolean>>({});
+  // Only the latest request for a report may land.
+  const requestSeq = useRef<Record<string, number>>({});
+  const inspectionsRef = useRef(inspections);
+  inspectionsRef.current = inspections;
 
   const titleId = useId();
   const panelId = useId();
@@ -96,6 +119,67 @@ function MediaQueue() {
     void load();
   }, [load]);
 
+  const inspect = useCallback(
+    async (reportId: string) => {
+      const seq = (requestSeq.current[reportId] ?? 0) + 1;
+      requestSeq.current[reportId] = seq;
+      setInspections((prev) => ({ ...prev, [reportId]: { kind: 'loading' } }));
+      let next: Inspection;
+      try {
+        const res = await mediaReportInspection(api, reportId);
+        const expiresAt = Date.parse(res.data?.expiresAt ?? '');
+        next =
+          res.data?.inspectionUrl && Number.isFinite(expiresAt)
+            ? { kind: 'ready', url: res.data.inspectionUrl, expiresAt }
+            : { kind: 'failed' };
+      } catch (err) {
+        // A 403 has already asked `/v1/me` again (the client's admin hook); if
+        // the capability is gone, the guard clears this whole page.
+        next = err instanceof ApiRequestError && err.status === 404 ? { kind: 'unavailable' } : { kind: 'failed' };
+      }
+      if (requestSeq.current[reportId] !== seq) return;
+      setInspections((prev) => ({ ...prev, [reportId]: next }));
+    },
+    [api],
+  );
+
+  // Every report on the page gets its inspection once; a reload keeps the
+  // ones still in the queue and forgets the rest.
+  useEffect(() => {
+    if (!loaded) return;
+    const ids = new Set(items.map((item) => item.id));
+    setInspections((prev) => Object.fromEntries(Object.entries(prev).filter(([id]) => ids.has(id))));
+    for (const item of items) {
+      if (!(item.id in inspectionsRef.current)) void inspect(item.id);
+    }
+  }, [items, loaded, inspect]);
+
+  function imageShown(reportId: string, url: string) {
+    silentRetryUsed.current[reportId] = false;
+    setShownUrl((prev) => ({ ...prev, [reportId]: url }));
+  }
+
+  /** A panel that opens again must render the image again before uphold returns. */
+  function forgetShown(reportId: string) {
+    setShownUrl((prev) => {
+      if (!(reportId in prev)) return prev;
+      const rest = { ...prev };
+      delete rest[reportId];
+      return rest;
+    });
+  }
+
+  /** The image errored, or its URL lapsed: uphold goes away until a fresh one renders. */
+  function imageFailed(reportId: string) {
+    forgetShown(reportId);
+    if (!silentRetryUsed.current[reportId]) {
+      silentRetryUsed.current[reportId] = true;
+      void inspect(reportId);
+    } else {
+      setInspections((prev) => ({ ...prev, [reportId]: { kind: 'failed' } }));
+    }
+  }
+
   useEffect(() => {
     const index = focusIndexAfterLoad.current;
     if (index === null || loading) return;
@@ -117,29 +201,38 @@ function MediaQueue() {
   }, [selectedId]);
 
   function open(item: MediaAbuseReport) {
+    forgetShown(item.id);
     setSelectedId(item.id);
     setReason('');
+    setConfirming(false);
   }
 
   function close() {
     const id = selectedId;
+    if (id) forgetShown(id);
     setSelectedId(null);
     setReason('');
+    setConfirming(false);
     if (id) rowButton(id)?.focus();
   }
 
   async function decide(decision: 'uphold' | 'reject') {
     if (!selected) return;
+    // The irreversible decision is re-checked here, not only on the button:
+    // a stale click must not send an uphold for an image no longer shown.
+    if (decision === 'uphold' && !upholdAllowed) return;
     const index = items.findIndex((item) => item.id === selected.id);
     setBusy(true);
     setError(null);
     try {
       await decideMediaReport(api, selected.id, { decision, reason: reason.trim() });
+      setConfirming(false);
       setSelectedId(null);
       setReason('');
       focusIndexAfterLoad.current = index;
       await load();
     } catch (err) {
+      setConfirming(false);
       setSelectedId(null);
       setReason('');
       // Reload FIRST, then report: `load` clears the error, so the other way
@@ -155,7 +248,10 @@ function MediaQueue() {
 
   const reasonLength = reason.trim().length;
   const reasonTooShort = reasonLength < MIN_REASON;
-  const imageShown = selected ? canShowImage(selected) : false;
+  const selectedInspection: Inspection = (selected && inspections[selected.id]) || { kind: 'loading' };
+  const imageOnScreen =
+    selected !== null && selectedInspection.kind === 'ready' && shownUrl[selected.id] === selectedInspection.url;
+  const upholdAllowed = imageOnScreen && !reasonTooShort && !busy;
 
   return (
     <div className={styles.page}>
@@ -197,6 +293,7 @@ function MediaQueue() {
                         </Button>
                       </DataCell>
                       <DataCell label="تصویر">
+                        <RowThumbnail inspection={inspections[item.id] ?? { kind: 'loading' }} />
                         <span className={`${styles.id} ${styles.shortId}`}>{item.mediaObjectId.slice(0, 8)}</span>
                       </DataCell>
                       <DataCell label="دلیل گزارش">
@@ -254,13 +351,17 @@ function MediaQueue() {
               </div>
             </dl>
 
-            {imageShown ? null : (
-              <p className={styles.noImage} id={`${panelId}-noimage`} role="note">
-                پیش‌نمایش این تصویر هنوز از سرور در دسترس نیست. چون حذف تصویر غیرقابل‌بازگشت است، «تأیید و حذف» تا وقتی
-                نتوان خودِ تصویر را دید غیرفعال است. رد گزارش ممکن است؛ اگر تصویر واقعاً نامناسب باشد، می‌توان دوباره
-                گزارشش کرد.
-              </p>
-            )}
+            <PanelImage
+              key={selected.id}
+              inspection={selectedInspection}
+              onShown={(url) => imageShown(selected.id, url)}
+              onFailed={() => imageFailed(selected.id)}
+              onRetry={() => {
+                // An explicit request: the silent one stays spent until an image renders.
+                silentRetryUsed.current[selected.id] = true;
+                void inspect(selected.id);
+              }}
+            />
 
             <Textarea
               label="دلیل تصمیم"
@@ -278,9 +379,9 @@ function MediaQueue() {
                 type="button"
                 variant="danger"
                 inline
-                disabled={!imageShown || reasonTooShort || busy}
-                aria-describedby={imageShown ? undefined : `${panelId}-noimage`}
-                onClick={() => void decide('uphold')}
+                disabled={!upholdAllowed}
+                aria-describedby={imageOnScreen ? undefined : `${panelId}-blocked`}
+                onClick={() => setConfirming(true)}
               >
                 تأیید و حذف
               </Button>
@@ -295,9 +396,156 @@ function MediaQueue() {
                 رد گزارش
               </Button>
             </div>
+            {imageOnScreen ? null : (
+              <p className={styles.blocked} id={`${panelId}-blocked`}>
+                {UPHOLD_BLOCKED}
+              </p>
+            )}
+
+            <ConfirmDialog
+              open={confirming}
+              title="حذف تصویر"
+              tone="danger"
+              confirmLabel="تأیید و حذف"
+              busy={busy}
+              // Re-evaluated while open: an image that expires or errors under
+              // the dialog takes the confirmation away with it.
+              confirmDisabled={!upholdAllowed}
+              describedById={`${panelId}-consequence`}
+              onConfirm={() => void decide('uphold')}
+              onCancel={() => setConfirming(false)}
+              body={
+                <>
+                  <p id={`${panelId}-consequence`} className={styles.consequence}>
+                    {CONSEQUENCE}
+                  </p>
+                  <p className={styles.dialogReason}>
+                    دلیل ثبت‌شده: <span className={styles.note}>{reason.trim()}</span>
+                  </p>
+                  {imageOnScreen ? null : <p className={styles.blocked}>{UPHOLD_BLOCKED}</p>}
+                </>
+              }
+            />
           </section>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+/**
+ * The queue row's thumbnail: the same protected URL as the panel, drawn small.
+ * It is not an inspection -- only the panel's own render enables uphold -- so
+ * a thumbnail that fails simply stops drawing; the panel owns the retries.
+ */
+function RowThumbnail({ inspection }: { inspection: Inspection }) {
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  if (inspection.kind === 'loading') {
+    return (
+      <span className={styles.thumb} aria-hidden="true">
+        <Skeleton width={48} height={48} />
+      </span>
+    );
+  }
+  if (inspection.kind === 'ready' && failedUrl !== inspection.url) {
+    return (
+      <img
+        className={styles.thumb}
+        src={inspection.url}
+        alt={IMAGE_ALT}
+        width={48}
+        height={48}
+        crossOrigin="anonymous"
+        referrerPolicy="no-referrer"
+        draggable={false}
+        onError={() => setFailedUrl(inspection.url)}
+      />
+    );
+  }
+  if (inspection.kind === 'unavailable') return <span className={styles.unavailable}>{UNAVAILABLE}</span>;
+  return <span className={styles.thumbEmpty} aria-hidden="true" />;
+}
+
+/**
+ * The decision panel's image, in the four states of screen 52 §5.
+ *
+ * `crossOrigin="anonymous"` makes the browser fetch it in CORS mode, so the
+ * API's origin allow-list -- not a relaxed resource policy -- decides which
+ * site may render it. It is never a link, never a download, never text.
+ */
+function PanelImage({
+  inspection,
+  onShown,
+  onFailed,
+  onRetry,
+}: {
+  inspection: Inspection;
+  onShown: (url: string) => void;
+  onFailed: () => void;
+  onRetry: () => void;
+}) {
+  const [renderedUrl, setRenderedUrl] = useState<string | null>(null);
+  const loading = inspection.kind === 'loading' || (inspection.kind === 'ready' && renderedUrl !== inspection.url);
+
+  // A rendered image outlives its authorization on screen. When the URL
+  // lapses, treat it as an image error: uphold is taken away, and the one
+  // silent re-request fetches a fresh URL.
+  const expiresAt = inspection.kind === 'ready' ? inspection.expiresAt : null;
+  const shown = inspection.kind === 'ready' && renderedUrl === inspection.url;
+  // The latest callback, read when the timer fires; the timer belongs to the URL.
+  const onFailedRef = useRef(onFailed);
+  onFailedRef.current = onFailed;
+  useEffect(() => {
+    if (!shown || expiresAt === null) return;
+    const timer = setTimeout(
+      () => {
+        setRenderedUrl(null);
+        onFailedRef.current();
+      },
+      Math.min(Math.max(expiresAt - Date.now(), 0), 2_147_483_647),
+    );
+    return () => clearTimeout(timer);
+  }, [shown, expiresAt]);
+
+  if (inspection.kind === 'unavailable') {
+    return (
+      <div className={styles.imageFrame} data-image-state="unavailable">
+        <p className={styles.unavailable}>{UNAVAILABLE}</p>
+      </div>
+    );
+  }
+  if (inspection.kind === 'failed') {
+    return (
+      <div className={styles.imageFrame} data-image-state="failed">
+        <p className={styles.unavailable}>{UNAVAILABLE}</p>
+        <Button type="button" variant="ghost" inline onClick={onRetry}>
+          دریافت دوباره
+        </Button>
+      </div>
+    );
+  }
+  return (
+    <div className={styles.imageFrame} data-image-state={loading ? 'loading' : 'shown'} aria-busy={loading || undefined}>
+      {loading ? <Skeleton height={240} /> : null}
+      {inspection.kind === 'ready' ? (
+        <img
+          key={inspection.url}
+          className={loading ? styles.imageLoading : styles.image}
+          src={inspection.url}
+          alt={IMAGE_ALT}
+          crossOrigin="anonymous"
+          referrerPolicy="no-referrer"
+          draggable={false}
+          onLoad={() => {
+            setRenderedUrl(inspection.url);
+            onShown(inspection.url);
+          }}
+          onError={() => {
+            setRenderedUrl(null);
+            onFailed();
+          }}
+        />
+      ) : null}
     </div>
   );
 }
