@@ -33,6 +33,21 @@ export class MeController {
       displayName: record.displayName,
       roles: access.roles,
       capabilities: access.capabilities,
+      /**
+       * When THIS account was created -- `identity.users.created_at`, the row
+       * this read just loaded, and nothing else (#226). Not the professional
+       * profile's, not the first booking's, not the current date.
+       *
+       * On the self projection and nowhere else: `GET /v1/me` is identity read
+       * from the caller's own verified JWT, so the only person who can obtain it
+       * is the account it describes. No public professional or customer shape
+       * carries an account creation date, and none gains one here.
+       *
+       * The instant, as `toISOString()` writes it (`2025-07-01T08:30:15.123Z`,
+       * UTC). Presenting it -- in a Jalali month, in the platform's zone -- is
+       * the client's job.
+       */
+      createdAt: record.createdAt,
     };
   }
 

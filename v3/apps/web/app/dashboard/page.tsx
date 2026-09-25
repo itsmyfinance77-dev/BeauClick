@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import { formatFullJalaliDate, formatIranianPhone, toPersianDigits } from '@beauclick/persian-utils';
+import { formatFullJalaliDate, formatIranianPhone, formatMonthYear, toPersianDigits } from '@beauclick/persian-utils';
 import { PriceDisplay } from '@/components/price-display';
 import { useAuth } from '@/lib/auth-context';
 import { ProtectedRoute } from '@/components/protected-route';
@@ -66,10 +66,16 @@ import styles from './dashboard.module.css';
  * and «پرداخت‌شده ۰ تومان» would assert a payment that did not happen. Saying
  * instead what is still owed would be a new line the design does not have.
  *
- * ## One thing the design shows that still has no data
+ * ## «عضویت از تیر ۱۴۰۴»
  *
- * «عضویت از تیر ۱۴۰۴»: `/v1/me` has no `createdAt`. It is not guessed; it is
- * simply absent.
+ * `GET /v1/me` carries `createdAt` since #226 — the account's own persisted
+ * creation instant, on the self projection and nowhere public. The row shows its
+ * Jalali month and year, read in the platform's zone (`formatMonthYear`): the
+ * month a person joined is the claim, and a day beside it would be false
+ * precision. The API returns the instant; presenting it is this page's job.
+ *
+ * When the response has none (a server that predates the field) or the value is
+ * not a date, the row is absent — never a guessed one and never today's.
  */
 
 interface MeResponse {
@@ -78,6 +84,15 @@ interface MeResponse {
   displayName: string | null;
   roles: string[];
   capabilities: string[];
+  /** ISO-8601 UTC instant of account creation. Optional only so a stale server degrades to no row. */
+  createdAt?: string;
+}
+
+/** «تیر ۱۴۰۴», or `null` when there is no usable creation instant. */
+function memberSince(createdAt: string | undefined): string | null {
+  if (!createdAt) return null;
+  const at = new Date(createdAt);
+  return Number.isNaN(at.getTime()) ? null : formatMonthYear(at);
 }
 
 /** How many past bookings the summary list shows before deferring to `/bookings`. */
@@ -192,6 +207,7 @@ function DashboardContent() {
   if (error && !me) return <ErrorState message={error} onRetry={() => void load()} />;
 
   const { upcoming, past } = visible(bookings);
+  const joined = memberSince(me?.createdAt);
   const unread = notices.filter((n) => !n.read).length;
   const activeGoals = goals.filter((g) => g.status !== 'abandoned');
 
@@ -392,6 +408,12 @@ function DashboardContent() {
             <dl className={styles.prefs}>
               <dt>شماره موبایل</dt>
               <dd className={styles.ltr}>{formatIranianPhone(me?.phone ?? '')}</dd>
+              {joined ? (
+                <>
+                  <dt>عضویت</dt>
+                  <dd data-testid="member-since">از {joined}</dd>
+                </>
+              ) : null}
             </dl>
             <div className={styles.accountList}>
               <Link href="/waitlist" className={styles.accountLink}>

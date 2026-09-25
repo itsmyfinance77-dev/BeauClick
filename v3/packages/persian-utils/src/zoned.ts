@@ -155,6 +155,20 @@ export function formatZonedFullDate( instant: Date, timeZone: string = PLATFORM_
 	return `${ PERSIAN_WEEKDAYS[ p.weekday ] }، ${ toPersianDigits( jd ) } ${ JALALI_MONTHS[ jm - 1 ] } ${ toPersianDigits( jy ) }`;
 }
 
+/**
+ * "تیر ۱۴۰۴" -- the Jalali month and year only, as seen in the zone.
+ *
+ * For a fact whose DAY is noise ("member since", #226): the month a person
+ * joined is the claim, and a day beside it would be false precision. Read in the
+ * platform's zone like every formatter here, so an account created at 20:30 UTC
+ * on the 21st -- already the 1st of Tir in Tehran -- is a Tir account.
+ */
+export function formatZonedMonthYear( instant: Date, timeZone: string = PLATFORM_TIMEZONE ): string {
+	const p = wallClockIn( instant, timeZone );
+	const { jy, jm } = toJalali( p.year, p.month, p.day );
+	return `${ JALALI_MONTHS[ jm - 1 ] } ${ toPersianDigits( jy ) }`;
+}
+
 /** "چهارشنبه، ۲۲ مرداد ۱۴۰۵ — ساعت ۰۹:۳۰" — the one-line form slot and booking rows use. */
 export function formatZonedDateTime( instant: Date, timeZone: string = PLATFORM_TIMEZONE ): string {
 	return `${ formatZonedFullDate( instant, timeZone ) } — ساعت ${ formatZonedTime( instant, timeZone ) }`;

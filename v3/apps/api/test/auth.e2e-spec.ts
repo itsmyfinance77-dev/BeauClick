@@ -323,3 +323,89 @@ describe('Authentication flow (e2e)', () => {
     });
   });
 });
+
+/**
+ * #226 -- `GET /v1/me` carries the account's own creation instant.
+ *
+ * The customer dashboard renders «عضویت از تیر ۱۴۰۴» from it. The value must be
+ * the persisted `identity.users.created_at`: not the professional profile's
+ * creation, not the first booking's, not the moment of the request.
+ */
+describe('GET /v1/me createdAt (e2e)', () => {
+  let app: INestApplication;
+  let otpObserver: CapturingOtpObserver;
+  let dataSource: DataSource;
+
+  beforeAll(async () => {
+    const testApp = await createTestApp();
+    app = testApp.app;
+    otpObserver = testApp.otpObserver;
+    dataSource = testApp.dataSource;
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  async function signIn(phone: string): Promise<{ accessToken: string; userId: string; loginUser: Record<string, unknown> }> {
+    await request(app.getHttpServer()).post('/api/v1/auth/request-otp').send({ phone, purpose: 'login' }).expect(200);
+    const code = otpObserver.lastCodeFor('+98' + phone.slice(1));
+    const verified = await request(app.getHttpServer())
+      .post('/api/v1/auth/verify-otp')
+      .send({ phone, code, purpose: 'login' })
+      .expect(200);
+    return {
+      accessToken: verified.body.data.accessToken,
+      userId: verified.body.data.user.id,
+      loginUser: verified.body.data.user,
+    };
+  }
+
+  it('returns the persisted created_at, as a stable UTC ISO-8601 instant', async () => {
+    const { accessToken, userId } = await signIn('09125550001');
+    // A value nobody could produce by accident: neither "now" nor the row's
+    // own default, so only reading the column can satisfy the assertion.
+    await dataSource.query('UPDATE identity.users SET created_at = $1 WHERE id = $2', ['2025-07-01T08:30:15.123Z', userId]);
+
+    const first = await request(app.getHttpServer()).get('/api/v1/me').set('Authorization', `Bearer ${accessToken}`).expect(200);
+    const second = await request(app.getHttpServer()).get('/api/v1/me').set('Authorization', `Bearer ${accessToken}`).expect(200);
+
+    expect(first.body.data.createdAt).toBe('2025-07-01T08:30:15.123Z');
+    // Stable: the same instant on every read, in the one format the API uses
+    // for instants everywhere else.
+    expect(second.body.data.createdAt).toBe(first.body.data.createdAt);
+    expect(first.body.data.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+  });
+
+  it('is each account\'s own -- two accounts, two values', async () => {
+    const a = await signIn('09125550002');
+    const b = await signIn('09125550003');
+    await dataSource.query('UPDATE identity.users SET created_at = $1 WHERE id = $2', ['2024-01-02T03:04:05.000Z', a.userId]);
+    await dataSource.query('UPDATE identity.users SET created_at = $1 WHERE id = $2', ['2026-02-03T04:05:06.000Z', b.userId]);
+
+    const meA = await request(app.getHttpServer()).get('/api/v1/me').set('Authorization', `Bearer ${a.accessToken}`).expect(200);
+    const meB = await request(app.getHttpServer()).get('/api/v1/me').set('Authorization', `Bearer ${b.accessToken}`).expect(200);
+
+    expect(meA.body.data.createdAt).toBe('2024-01-02T03:04:05.000Z');
+    expect(meB.body.data.createdAt).toBe('2026-02-03T04:05:06.000Z');
+  });
+
+  it('is refused without a session, and the refusal says nothing about the account', async () => {
+    const res = await request(app.getHttpServer()).get('/api/v1/me').expect(401);
+    expect(JSON.stringify(res.body)).not.toMatch(/createdAt|created_at|\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it('does not appear on the login projection or on the write response', async () => {
+    const { accessToken, loginUser } = await signIn('09125550004');
+    // The self READ carries it. The projection `verify-otp` returns is a
+    // different shape and has not been widened.
+    expect(loginUser).not.toHaveProperty('createdAt');
+
+    const patched = await request(app.getHttpServer())
+      .patch('/api/v1/me')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ displayName: 'نام آزمایشی' })
+      .expect(200);
+    expect(patched.body.data).not.toHaveProperty('createdAt');
+  });
+});
