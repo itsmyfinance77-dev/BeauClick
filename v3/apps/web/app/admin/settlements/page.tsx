@@ -18,6 +18,7 @@ import {
   Textarea,
 } from '@/components/kit';
 import { useAuth } from '@/lib/auth-context';
+import { AdminGuard } from '@/components/admin-guard';
 import { partyTypeLabel } from '@/lib/admin-labels';
 import {
   createSettlement,
@@ -68,7 +69,7 @@ const SUMMARY_DESCRIPTION_ID = 'settlement-confirm-summary';
  * after a lookup and pressing «ثبت تسویه» sent the first party's order ids
  * against the second party's id.
  */
-export default function AdminSettlementsPage() {
+function AdminSettlementsContent() {
   const { api } = useAuth();
 
   const [totals, setTotals] = useState<PlatformTotals | null>(null);
@@ -349,5 +350,21 @@ export default function AdminSettlementsPage() {
         }
       />
     </div>
+  );
+}
+
+/**
+ * #264: this page's OWN guard. Before #264 the `/admin` layout gated every
+ * page on `bc_manage_platform`, and this page relied on that alone. The shell
+ * now also admits moderators, so the page states its authority itself — the
+ * same capability that gated it before, so nothing changes for an operator or
+ * administrator — and a moderator's typed URL is refused here as well as by
+ * `AdminRouteGate`. The API's `CapabilityGuard` remains the control.
+ */
+export default function AdminSettlementsPage() {
+  return (
+    <AdminGuard capability="bc_manage_platform">
+      <AdminSettlementsContent />
+    </AdminGuard>
   );
 }

@@ -61,6 +61,13 @@ export interface ApiClientOptions {
   withCredentials?: boolean;
   /** Supplies the double-submit CSRF token for cookie-authenticated requests. */
   getCsrfToken?: () => string | null;
+  /**
+   * Told about every `403` this client receives, with the request path — #264.
+   * A notification only: the error is still thrown to the caller unchanged.
+   * The auth provider uses it to re-read `/v1/me` after an admin route refuses,
+   * so a revoked capability leaves the UI at the next read (`51` §2.4).
+   */
+  onForbidden?: (path: string) => void;
 }
 
 export class ApiClient {
@@ -140,19 +147,24 @@ export class ApiClient {
     extraHeaders?: Record<string, string>,
   ): Promise<ApiResponse<T>> {
     try {
-      return await this.raw<T>(method, path, body, extraHeaders);
-    } catch (err) {
-      const isAuthFailure = err instanceof ApiRequestError && err.status === 401;
-      if (!isAuthFailure || !this.options.onUnauthorized) throw err;
+      try {
+        return await this.raw<T>(method, path, body, extraHeaders);
+      } catch (err) {
+        const isAuthFailure = err instanceof ApiRequestError && err.status === 401;
+        if (!isAuthFailure || !this.options.onUnauthorized) throw err;
 
-      const refreshed = await this.options.onUnauthorized();
-      if (!refreshed) throw err;
-      // Exactly one retry -- never a loop, so a persistently-401 endpoint
-      // can't spin. The SAME extra headers are replayed, which is what keeps
-      // an Idempotency-Key meaningful across the refresh retry: without it
-      // the retry would look like a brand-new request and could create a
-      // second booking.
-      return this.raw<T>(method, path, body, extraHeaders);
+        const refreshed = await this.options.onUnauthorized();
+        if (!refreshed) throw err;
+        // Exactly one retry -- never a loop, so a persistently-401 endpoint
+        // can't spin. The SAME extra headers are replayed, which is what keeps
+        // an Idempotency-Key meaningful across the refresh retry: without it
+        // the retry would look like a brand-new request and could create a
+        // second booking.
+        return await this.raw<T>(method, path, body, extraHeaders);
+      }
+    } catch (err) {
+      if (err instanceof ApiRequestError && err.status === 403) this.options.onForbidden?.(path);
+      throw err;
     }
   }
 

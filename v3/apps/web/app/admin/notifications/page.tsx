@@ -5,6 +5,7 @@ import { formatZonedDateTime, toPersianDigits } from '@beauclick/persian-utils';
 import { Alert, Button, Card, ErrorState, LoadingState } from '@/components/ui';
 import { Badge, ConfirmDialog, EmptyState, PageHeader } from '@/components/kit';
 import { useAuth } from '@/lib/auth-context';
+import { AdminGuard } from '@/components/admin-guard';
 import { notificationStatus, retryDueNotifications, type NotificationStatus } from '@/lib/admin-api';
 import styles from './notifications.module.css';
 
@@ -15,7 +16,7 @@ const CHANNEL_LABELS: Record<string, string> = {
   push: 'اعلان موبایل',
 };
 
-export default function AdminNotificationsPage() {
+function AdminNotificationsContent() {
   const { api } = useAuth();
 
   const [status, setStatus] = useState<NotificationStatus | null>(null);
@@ -158,5 +159,21 @@ export default function AdminNotificationsPage() {
         }
       />
     </>
+  );
+}
+
+/**
+ * #264: this page's OWN guard. Before #264 the `/admin` layout gated every
+ * page on `bc_manage_platform`, and this page relied on that alone. The shell
+ * now also admits moderators, so the page states its authority itself — the
+ * same capability that gated it before, so nothing changes for an operator or
+ * administrator — and a moderator's typed URL is refused here as well as by
+ * `AdminRouteGate`. The API's `CapabilityGuard` remains the control.
+ */
+export default function AdminNotificationsPage() {
+  return (
+    <AdminGuard capability="bc_manage_platform">
+      <AdminNotificationsContent />
+    </AdminGuard>
   );
 }

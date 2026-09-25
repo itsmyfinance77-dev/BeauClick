@@ -5,6 +5,7 @@ import { formatZonedDateTime, toPersianDigits } from '@beauclick/persian-utils';
 import { Alert, Button, Card, ErrorState, LoadingState } from '@/components/ui';
 import { Badge, ConfirmDialog, EmptyState, PageHeader, Textarea } from '@/components/kit';
 import { useAuth } from '@/lib/auth-context';
+import { AdminGuard } from '@/components/admin-guard';
 import { phoneConflicts, resolvePhoneConflict, type PhoneConflict } from '@/lib/admin-api';
 import styles from './phone-conflicts.module.css';
 
@@ -21,7 +22,7 @@ import styles from './phone-conflicts.module.css';
  * ambiguity", and a button that merged them would be that silent merge with a
  * slower trigger.
  */
-export default function AdminPhoneConflictsPage() {
+function AdminPhoneConflictsContent() {
   const { api } = useAuth();
 
   const [items, setItems] = useState<PhoneConflict[]>([]);
@@ -160,5 +161,21 @@ export default function AdminPhoneConflictsPage() {
         }
       />
     </>
+  );
+}
+
+/**
+ * #264: this page's OWN guard. Before #264 the `/admin` layout gated every
+ * page on `bc_manage_platform`, and this page relied on that alone. The shell
+ * now also admits moderators, so the page states its authority itself — the
+ * same capability that gated it before, so nothing changes for an operator or
+ * administrator — and a moderator's typed URL is refused here as well as by
+ * `AdminRouteGate`. The API's `CapabilityGuard` remains the control.
+ */
+export default function AdminPhoneConflictsPage() {
+  return (
+    <AdminGuard capability="bc_manage_platform">
+      <AdminPhoneConflictsContent />
+    </AdminGuard>
   );
 }

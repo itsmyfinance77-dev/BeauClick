@@ -5,6 +5,7 @@ import { toPersianDigits } from '@beauclick/persian-utils';
 import { Alert, Card, ErrorState, LoadingState } from '@/components/ui';
 import { Badge, DataCell, DataRow, DataTable, PageHeader } from '@/components/kit';
 import { useAuth } from '@/lib/auth-context';
+import { AdminGuard } from '@/components/admin-guard';
 import { loyaltyPolicy, type LoyaltyPolicy } from '@/lib/admin-api';
 import styles from './loyalty.module.css';
 
@@ -34,7 +35,7 @@ const BASIS_LABELS: Record<string, string> = {
  * platform's economics from a screen, which is a business decision with no
  * approval trail behind it. GAP-10 asks for a sign-off pass, not a text box.
  */
-export default function AdminLoyaltyPage() {
+function AdminLoyaltyContent() {
   const { api } = useAuth();
 
   const [policy, setPolicy] = useState<LoyaltyPolicy | null>(null);
@@ -121,5 +122,21 @@ export default function AdminLoyaltyPage() {
         </>
       ) : null}
     </>
+  );
+}
+
+/**
+ * #264: this page's OWN guard. Before #264 the `/admin` layout gated every
+ * page on `bc_manage_platform`, and this page relied on that alone. The shell
+ * now also admits moderators, so the page states its authority itself — the
+ * same capability that gated it before, so nothing changes for an operator or
+ * administrator — and a moderator's typed URL is refused here as well as by
+ * `AdminRouteGate`. The API's `CapabilityGuard` remains the control.
+ */
+export default function AdminLoyaltyPage() {
+  return (
+    <AdminGuard capability="bc_manage_platform">
+      <AdminLoyaltyContent />
+    </AdminGuard>
   );
 }

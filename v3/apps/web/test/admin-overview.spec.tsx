@@ -34,6 +34,13 @@ interface Sources {
   metrics?: () => Promise<unknown>;
 }
 
+/*
+ * #264: the overview is what `/admin` renders for `bc_manage_platform`. These
+ * cases used to pass `bc_moderate_verification` alone -- a caller the old
+ * layout refused before the page rendered, so the page never had to tell the
+ * difference. Now that caller gets the moderator landing, and the cases pass
+ * the capabilities of somebody who can actually reach the overview.
+ */
 function mockApi(capabilities: string[], sources: Sources = {}) {
   (global.fetch as jest.Mock).mockImplementation((url: string) => {
     if (url.includes('/v1/auth/refresh')) return ok({ accessToken: 'a', csrfToken: 'c' });
@@ -74,7 +81,7 @@ beforeEach(() => {
 
 describe('the two sections', () => {
   it('puts the queues under their own heading, before the platform figures under theirs', async () => {
-    mockApi(['bc_moderate_verification']);
+    mockApi(['bc_manage_platform', 'bc_moderate_verification']);
     renderPage();
     const queues = await screen.findByRole('heading', { name: 'در انتظار بررسی شما' });
     const figures = screen.getByRole('heading', { name: 'پلتفرم در ۳۰ روز گذشته' });
@@ -85,7 +92,7 @@ describe('the two sections', () => {
   });
 
   it('shows the platform figures', async () => {
-    mockApi(['bc_moderate_verification']);
+    mockApi(['bc_manage_platform', 'bc_moderate_verification']);
     renderPage();
     expect(await screen.findByText('رزروهای ثبت‌شده')).toBeInTheDocument();
     expect(screen.getByText('نوبت‌های انجام‌شده')).toBeInTheDocument();
@@ -95,7 +102,7 @@ describe('the two sections', () => {
 
 describe('a queue', () => {
   it('is a row with its counter, its state, and a link to its own destination', async () => {
-    mockApi(['bc_moderate_verification']);
+    mockApi(['bc_manage_platform', 'bc_moderate_verification']);
     renderPage();
     await loaded();
     const verification = queue('/admin/verification');
@@ -110,7 +117,7 @@ describe('a queue', () => {
   });
 
   it('gives every link its own name — four bare «مشاهده» are not a list of destinations', async () => {
-    mockApi(['bc_moderate_verification']);
+    mockApi(['bc_manage_platform', 'bc_moderate_verification']);
     renderPage();
     await loaded();
     const names = screen.getAllByRole('link', { name: /^مشاهدهٔ / }).map((a) => a.getAttribute('aria-label'));
@@ -118,7 +125,7 @@ describe('a queue', () => {
   });
 
   it('never reads a source that failed as zero', async () => {
-    mockApi(['bc_moderate_verification'], { conflicts: fail, search: fail });
+    mockApi(['bc_manage_platform', 'bc_moderate_verification'], { conflicts: fail, search: fail });
     renderPage();
     await loaded();
     const conflicts = queue('/admin/phone-conflicts');
@@ -145,7 +152,7 @@ describe('the platform figures', () => {
     // operator's capabilities and again after, so "the first request fails" is
     // a race between those two loads and the test passed or failed with the load.
     let failing = true;
-    mockApi(['bc_moderate_verification'], { metrics: () => (failing ? fail() : ok(METRICS)) });
+    mockApi(['bc_manage_platform', 'bc_moderate_verification'], { metrics: () => (failing ? fail() : ok(METRICS)) });
     const user = userEvent.setup();
     renderPage();
     expect(await screen.findByText('آمار پلتفرم بارگذاری نشد.')).toBeInTheDocument();

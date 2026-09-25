@@ -205,6 +205,26 @@ describe('the avatar menu', () => {
     );
   });
 
+  // #264, `51_WORKSPACE_SHELL_AND_DASHBOARDS.md` §2.2: one admin shell, two
+  // labels. A moderation-only session is offered the SAME /admin under its
+  // own name, and never the platform one.
+  it('offers a moderation-only session «بررسی محتوا», and not «مدیریت»', async () => {
+    await signedIn({ capabilities: ['bc_moderate_media'] });
+    await userEvent.click(screen.getByRole('button', { name: /حساب کاربری/ }));
+    const menu = screen.getByTestId('avatar-menu-items');
+    expect(within(menu).getByRole('link', { name: 'بررسی محتوا' })).toHaveAttribute('href', '/admin');
+    expect(within(menu).queryByRole('link', { name: 'مدیریت' })).toBeNull();
+  });
+
+  it('keeps «مدیریت» for a session that also holds the platform capability, and offers /admin once', async () => {
+    await signedIn({ capabilities: ['bc_manage_platform', 'bc_moderate_verification', 'bc_moderate_chat'] });
+    await userEvent.click(screen.getByRole('button', { name: /حساب کاربری/ }));
+    const menu = screen.getByTestId('avatar-menu-items');
+    expect(within(menu).getByRole('link', { name: 'مدیریت' })).toHaveAttribute('href', '/admin');
+    expect(within(menu).queryByRole('link', { name: 'بررسی محتوا' })).toBeNull();
+    expect(within(menu).getAllByRole('link').filter((a) => a.getAttribute('href') === '/admin')).toHaveLength(1);
+  });
+
   it('closes on Escape and gives focus back to the control that opened it', async () => {
     await signedIn();
     const trigger = screen.getByRole('button', { name: /حساب کاربری/ });

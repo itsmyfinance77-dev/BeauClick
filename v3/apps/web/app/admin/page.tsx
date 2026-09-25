@@ -6,6 +6,8 @@ import { PriceDisplay } from '@/components/price-display';
 import { Button, ErrorState, LoadingState } from '@/components/ui';
 import { Badge, PageHeader, StatCard, StatGrid, TextLink } from '@/components/kit';
 import { useAuth } from '@/lib/auth-context';
+import { adminMode } from '@/lib/admin-access';
+import { ModeratorLanding } from '@/components/moderator-landing';
 import {
   notificationStatus,
   phoneConflicts,
@@ -17,6 +19,23 @@ import {
 import styles from './overview.module.css';
 
 /**
+ * What `/admin` is depends on who asks — #264, `52_MODERATOR_LANDING.md` §2.
+ *
+ * `bc_manage_platform` gets the overview below, unchanged. A moderation-only
+ * caller gets the moderator landing: every read on the overview is a
+ * `bc_manage_platform` read, so rendering it for them would be a page of
+ * refusals. Nobody else reaches this component — `AdminAreaGuard` has already
+ * shown them the no-access state.
+ */
+export default function AdminIndexPage() {
+  const { user } = useAuth();
+  const mode = adminMode(user?.capabilities);
+  if (mode === 'platform') return <AdminOverviewPage />;
+  if (mode === 'moderation') return <ModeratorLanding />;
+  return null;
+}
+
+/**
  * The operator's landing screen.
  *
  * Its job is to answer one question -- "is anything waiting for me?" -- before
@@ -25,7 +44,7 @@ import styles from './overview.module.css';
  * platform figures come second, under their own heading, because one is work
  * and the other is information (`20_ADMIN_OVERVIEW.md`).
  */
-export default function AdminOverviewPage() {
+function AdminOverviewPage() {
   const { api, user } = useAuth();
 
   const [pendingVerifications, setPendingVerifications] = useState<number | null>(null);

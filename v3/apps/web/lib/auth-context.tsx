@@ -66,6 +66,21 @@ interface AuthContextValue {
    * retrying the creation would hit a correct `409`.
    */
   refreshSession: () => Promise<boolean>;
+  /**
+   * Re-reads `GET /v1/me` and replaces `user` if anything in it changed — #264,
+   * `51_WORKSPACE_SHELL_AND_DASHBOARDS.md` §2.4.
+   *
+   * `/v1/me` resolves roles and capabilities LIVE from `identity.user_roles`,
+   * so this is how a revocation reaches the UI without a reload. The admin
+   * layout calls it on every navigation into `/admin`, and the provider calls
+   * it itself after any `403` from an admin route.
+   *
+   * Single-flight, like `refreshSession`. A failed read keeps the current
+   * user rather than signing anybody out: an unreadable `/v1/me` is not
+   * evidence of anything, and the server refuses a revoked caller either way.
+   * A `401` still goes through the ordinary refresh, whose failure signs out.
+   */
+  reloadUser: () => Promise<void>;
   api: ApiClient;
 }
 
@@ -147,6 +162,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return attempt;
   }, [authApi]);
 
+  /**
+   * `reloadUser` needs `api`, and `api` must call `reloadUser` on a 403, so
+   * the client reaches it through a ref rather than a dependency cycle.
+   */
+  const reloadUserRef = useRef<() => Promise<void>>(async () => undefined);
+
   // The app-wide client. Carries the access token as a header and never a
   // cookie; `onUnauthorized` wires the refresh in at the transport layer, so
   // no individual caller has to know that access tokens expire.
@@ -156,9 +177,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         baseUrl: API_BASE_URL,
         getAccessToken: () => tokenStorage.getAccessToken(),
         onUnauthorized: refreshSession,
+        // #264. Only ADMIN routes: their 403 is a privileged capability that
+        // the server re-checks live, so it can mean "revoked a moment ago".
+        // Elsewhere a 403 is an ordinary ownership refusal and says nothing
+        // new about the session.
+        onForbidden: (path) => {
+          if (path.startsWith('/v1/admin/')) void reloadUserRef.current();
+        },
       }),
     [refreshSession],
   );
+
+  const inFlightReload = useRef<Promise<void> | null>(null);
+
+  const reloadUser = useCallback((): Promise<void> => {
+    if (inFlightReload.current) return inFlightReload.current;
+
+    const attempt = (async () => {
+      try {
+        const me = await api.get<AuthenticatedUser>('/v1/me');
+        const next = me.data ?? null;
+        // Signed out while the read was in flight: nothing to update.
+        if (!next || !tokenStorage.getAccessToken()) return;
+        // Same content, same object: a re-read that changed nothing must not
+        // re-render every consumer of `user` or re-run their effects.
+        setUser((current) => (current && JSON.stringify(current) === JSON.stringify(next) ? current : next));
+      } catch {
+        // Kept, deliberately -- see the interface docblock.
+      } finally {
+        inFlightReload.current = null;
+      }
+    })();
+
+    inFlightReload.current = attempt;
+    return attempt;
+  }, [api]);
+
+  reloadUserRef.current = reloadUser;
 
   /**
    * Session restore on mount.
@@ -253,8 +308,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [authApi]);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, status, requestOtp, verifyOtp, logout, refreshSession, api }),
-    [user, status, requestOtp, verifyOtp, logout, refreshSession, api],
+    () => ({ user, status, requestOtp, verifyOtp, logout, refreshSession, reloadUser, api }),
+    [user, status, requestOtp, verifyOtp, logout, refreshSession, reloadUser, api],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

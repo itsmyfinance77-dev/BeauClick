@@ -5,6 +5,7 @@ import { toPersianDigits, zonedIsoDate } from '@beauclick/persian-utils';
 import { Alert, Button, Card, ErrorState, LoadingState } from '@/components/ui';
 import { Badge, ConfirmDialog, PageHeader, StatCard, StatGrid } from '@/components/kit';
 import { useAuth } from '@/lib/auth-context';
+import { AdminGuard } from '@/components/admin-guard';
 import {
   platformMetrics,
   rebuildSearchProjection,
@@ -28,7 +29,7 @@ import styles from './search.module.css';
  * `clickThroughRate` are the server's own figures, not ratios recomputed in the
  * browser, which is how two engines start.
  */
-export default function AdminSearchPage() {
+function AdminSearchContent() {
   const { api } = useAuth();
 
   const [status, setStatus] = useState<SearchIndexStatus | null>(null);
@@ -198,5 +199,21 @@ export default function AdminSearchPage() {
         }
       />
     </>
+  );
+}
+
+/**
+ * #264: this page's OWN guard. Before #264 the `/admin` layout gated every
+ * page on `bc_manage_platform`, and this page relied on that alone. The shell
+ * now also admits moderators, so the page states its authority itself — the
+ * same capability that gated it before, so nothing changes for an operator or
+ * administrator — and a moderator's typed URL is refused here as well as by
+ * `AdminRouteGate`. The API's `CapabilityGuard` remains the control.
+ */
+export default function AdminSearchPage() {
+  return (
+    <AdminGuard capability="bc_manage_platform">
+      <AdminSearchContent />
+    </AdminGuard>
   );
 }

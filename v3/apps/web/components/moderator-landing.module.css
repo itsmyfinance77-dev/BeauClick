@@ -1,0 +1,94 @@
+/*
+ * The moderator landing — `52_MODERATOR_LANDING.md` §3 and §6.
+ *
+ *   390          the cards stack full-width (one column: 358px of content is
+ *                less than two 240px minimums).
+ *   768, 1280    a grid of up to four, `repeat(auto-fit, minmax(240px, 1fr))`
+ *                exactly as §6 gives it. The ORDER is the list's DOM order
+ *                and is never sorted by count.
+ *
+ * No media query: the column count follows from the minimum width alone, so
+ * there is no breakpoint here for `breakpoints.spec.ts` to check.
+ *
+ * Light-surface tokens throughout (§6). Only the admin BAR is dark; the
+ * overview's dark page (`overview.module.css`) is the overview's own design.
+ */
+
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+}
+
+.cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--bc-spacing-card-gap);
+}
+
+.card {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding: 16px;
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border);
+  border-inline-start: 4px solid var(--bc-color-warning);
+  border-radius: var(--bc-radius-card);
+  box-shadow: var(--bc-shadow-subtle);
+  min-width: 0;
+}
+
+/* Spec 20's zero-queue rule: the success edge, and the success badge below. */
+.cardEmpty {
+  border-inline-start-color: var(--bc-color-success);
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: var(--bc-text-card-title-size);
+  font-weight: var(--bc-text-card-title-weight);
+  line-height: var(--bc-text-card-title-leading);
+}
+
+/* A real 44px target, the same baseline `TextLink` keeps. */
+.cardLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--bc-color-primary);
+  text-decoration: none;
+}
+
+.cardLink:hover {
+  text-decoration: underline;
+}
+
+.cardLink:focus-visible {
+  outline: 2px solid var(--bc-color-primary);
+  outline-offset: 2px;
+  border-radius: var(--bc-radius-cell);
+}
+
+.cardBody {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+}
+
+.count {
+  font-size: var(--bc-text-section-size);
+  font-weight: var(--bc-text-section-weight);
+  color: var(--bc-color-text);
+}
+
+.message {
+  margin: 0;
+  font-size: var(--bc-text-body-size);
+  color: var(--bc-color-text-muted);
+}
