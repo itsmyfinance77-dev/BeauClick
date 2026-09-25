@@ -203,14 +203,14 @@ export class ChatController {
     @Param('id', new ParseUUIDPipe()) id: string,
     @Query() query: ListMessagesDto,
   ) {
-    const { items, nextBeforeSequence, side } = await this.chat.listMessages(
+    const { items, nextBeforeSequence } = await this.chat.listMessages(
       user.userId,
       id,
       query.limit ?? CHAT_DEFAULT_PAGE_SIZE,
       query.before ?? null,
     );
     return {
-      items: items.map((m) => toMessageView(m, user.userId, side)),
+      items: items.map((m) => toMessageView(m, user.userId)),
       nextBeforeSequence,
     };
   }
@@ -228,9 +228,8 @@ export class ChatController {
       dto.body,
       dto.idempotencyKey ?? null,
     );
-    const side = await this.access.sideOf(this.access.manager, user.userId, conversation);
     return {
-      message: toMessageView(message, user.userId, side ?? 'customer'),
+      message: toMessageView(message, user.userId),
       conversation: await this.summarise(user.userId, conversation, message.sequence),
     };
   }
@@ -322,21 +321,16 @@ export class ChatController {
  * One message, as the browser receives it.
  *
  * Written field by field rather than spread: an entity gaining a column must not
- * ship it. `customerUserId` and `idempotencyKey` are on the entity and
- * deliberately absent here — the first is redundant with the conversation and the
- * second is the client's own value echoed back for no reason.
+ * ship it. `senderUserId`, `customerUserId` and `idempotencyKey` are on the
+ * entity and deliberately absent here — the first two are user ids, which this
+ * projection never carries (#327), and the third is the client's own value
+ * echoed back for no reason.
  */
-export function toMessageView(
-  message: ChatMessageEntity,
-  callerUserId: string,
-  callerSide: ChatSide,
-): ChatMessageView {
-  const mine = message.senderUserId !== null && message.senderUserId === callerUserId;
+export function toMessageView(message: ChatMessageEntity, callerUserId: string): ChatMessageView {
   return {
     id: message.id,
-    senderUserId: message.senderUserId,
-    // Which side wrote it, so the page can align a bubble without resolving ids.
-    side: mine ? callerSide : otherSide(callerSide),
+    mine: message.senderUserId !== null && message.senderUserId === callerUserId,
+    side: authorSide(message),
     body: message.body,
     erased: message.erasedAt !== null,
     sequence: message.sequence,
@@ -344,6 +338,21 @@ export function toMessageView(
   };
 }
 
-function otherSide(side: ChatSide): ChatSide {
-  return side === 'customer' ? 'seller' : 'customer';
+/**
+ * The side of the conversation that WROTE a message — a fact about the author,
+ * the same for every reader.
+ *
+ * It used to be derived from the reader ("not mine, so the other side"), which
+ * is wrong wherever one side has more than one reader: a business owner reading
+ * a reply their manager wrote got `customer` (#327). The row carries the
+ * conversation's customer, and the composite foreign key
+ * `(conversation_id, customer_user_id)` keeps it equal to the conversation's, so
+ * anyone else who wrote in it wrote for the seller.
+ *
+ * An erased placeholder has no author any more (`V32-DEC-013`), so it has no
+ * side either — null rather than a guess.
+ */
+function authorSide(message: ChatMessageEntity): ChatSide | null {
+  if (message.senderUserId === null) return null;
+  return message.senderUserId === message.customerUserId ? 'customer' : 'seller';
 }

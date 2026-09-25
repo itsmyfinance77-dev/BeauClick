@@ -260,13 +260,33 @@ export function isAcceptableReportNote(text: string | null | undefined): boolean
 // Response shapes
 // ---------------------------------------------------------------------------
 
-/** One message as the browser receives it. */
+/**
+ * One message as the browser receives it.
+ *
+ * **No user id of any kind** (#327). It used to carry `senderUserId`, which
+ * handed a customer the raw user id of whichever salon owner, manager or
+ * practitioner wrote each reply — telling staff members apart is exactly what
+ * `V32-DEC-010` keeps from the customer, who talks to the business. The page
+ * needs two facts and gets exactly those: whether the reader wrote it (`mine`)
+ * and which side of the conversation did (`side`). The moderator's window is a
+ * separate projection that keeps the sender id (`V32-DEC-015`); the two are not
+ * merged.
+ */
 export interface ChatMessageView {
   readonly id: string;
-  /** The sender's user id, or null for a message whose author erased their account. */
-  readonly senderUserId: string | null;
-  /** Which side sent it, so the page can align the bubble without resolving ids. */
-  readonly side: ChatSide;
+  /** True when the caller wrote this message. Always false on an erased placeholder. */
+  readonly mine: boolean;
+  /**
+   * Which side of the conversation WROTE it — decided by the author, never by the
+   * reader.
+   *
+   * A business conversation has several legitimate seller-side readers (owner,
+   * active managers, a `practitioner_chat` holder), so "not mine" does not mean
+   * "the customer's": a colleague's reply is still `seller`. Null only on an
+   * erased placeholder, whose author — and therefore side — the server no longer
+   * holds (`V32-DEC-013`); the page renders those neutrally.
+   */
+  readonly side: ChatSide | null;
   /**
    * The text — or `null` for a structural placeholder left by account erasure
    * (`V32-DEC-013`).
