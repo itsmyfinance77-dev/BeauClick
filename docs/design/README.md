@@ -77,7 +77,8 @@ reviewed by Codex at `280688c`), in the sibling pack
 `docs/design/v3.3-dashboard-pack/`. It was audited against implementation commit
 `2e3da4a43482680db5104c1e78dba48a8d2a18f4`. It is the design that #264, #265,
 #226, #255 and #237 implement against. **Built so far:** screen 52 §2–§4, the
-moderator landing, its bar and the shell guard (#264). The rest is not built.
+moderator landing, its bar and the shell guard (#264), and screen 52 §5, safe
+inspection of a reported image before uphold (#265). The rest is not built.
 
 What it adds, and where to read it on the design branch:
 
