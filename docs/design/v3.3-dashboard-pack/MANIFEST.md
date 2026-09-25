@@ -16,7 +16,7 @@
 | `Prototype - Workspace Shell and Dashboards.dc.html` | The drawing, §S1–S12. Every value is a **wire field name**, never a number |
 | `screenshots/` | Each section at 390, 768 and 1280 |
 | `AUDIT.md` | The readiness audit and every verification result, each with its non-vacuity control |
-| `verify/check-traceability.mjs` · `verify/traceability.json` | Design ↔ contract check: routes, fields, capabilities, recorded absences and prototype slots |
+| `verify/check-traceability.mjs` · `verify/traceability.json` | Design ↔ contract check: routes, fields, capabilities, recorded absences and prototype slots. Paths are canonical POSIX on every platform, and a built-in self-test (`--self-test`, also run before every check) proves that under Windows path semantics |
 | `verify/audit-prototype.mjs` | Browser measurement: overflow, contrast, keyboard and structure |
 | `tools/build_prototype.py` | Rebuilds the prototype from one set of helpers, so a slot cannot drift between sections |
 

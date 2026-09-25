@@ -17,16 +17,58 @@ Posted on the issue: <https://github.com/itsmyfinance77-dev/BeauClick/issues/45#
 ## 2. Contract traceability — `verify/check-traceability.mjs`
 
 ```
-routes derived: 291 · cited: 41 · fields checked: 125 · capabilities: 11 · absences: 4 · prototype slots: 42
+$ node verify/check-traceability.mjs --self-test
+SELF-TEST PASS (win32, win32 with forward-slash root, posix; allowlist exempt, detector still fires, defect witness held)
+$ node verify/check-traceability.mjs <master 2e3da4a>/v3
+routes derived: 291 · cited: 41 · fields checked: 125 · capabilities: 11 · absences: 4 · prototype slots: 42 · windows replay: 549 paths
 PASS
 ```
 
-| Non-vacuity control (each applied, run, then restored; a restored run was PASS again) | Result |
+### 2.1 Correction after Codex review (REQUEST_CHANGES at `f1ba127`)
+
+**Defect.** On Windows, `path.relative` returns `\`-separated paths, while the `onlyIn` allowlist in `traceability.json` is written with `/`. The absence check compared the two raw, so on Windows the known internal file `booking-credit-accounting.service.ts` was never exempted. The documented command against master `2e3da4a` then failed with `absence no longer holds … services\commercial-policy\src\subscription\booking-credit-accounting.service.ts`. Codex reproduced this on Windows. It was reproduced here, byte for byte, by running the pre-fix comparison under Node's `path.win32`, which is the implementation Node uses on Windows.
+
+**Fix.**
+- Every derived path (route rows, the absence comparison, the generated markdown `file:line`) now goes through one function, `canonicalRelative`: relative to the root and `/`-separated on every platform.
+- The absence rule is a pure function, `absenceHits`, that compares canonical paths exactly.
+- The allowlist was **not** widened. There is no basename, suffix or case-insensitive matching.
+
+**Permanent regression guard, run before every check:**
+
+- **Self-test** with its own fixed fixture, independent of `traceability.json`, so a mutated spec cannot crash it. Under `win32`, `win32` with a forward-slash root, and `posix`, it proves three things:
+  - the allowlisted file is exempt;
+  - a seller-facing file containing the same `balanceFor(` is **still reported**;
+  - no backslash survives.
+
+  A **defect witness** asserts that the raw, un-normalised Windows path is still reported. So the test cannot pass vacuously if normalisation is removed.
+- **Windows replay** over the real tree: all 549 source paths from master are re-derived from `E:\BeauClick\v3` with `path.win32`. They must give the identical canonical path and the identical absence verdicts as the native run.
+- **Runtime invariants:** a run fails on any derived path containing `\`, and on any `onlyIn` entry in `traceability.json` that is not canonical.
+
+**Where it was run:**
+
+| Platform | Result |
 |---|---|
-| added field `createdAtBogusField` to `GET /v1/me`, plus a cited route `GET /v1/me/disputes` | exit 1: both reported |
-| pointed each of the four absences at a fact that exists (`balanceFor` without its exemption, route pattern `funds`, `'manager'` for `'reception'`, `createdAt` in `financial.controller.ts`) | exit 1: all four reported |
-| renamed the prototype slot `‹staffSeats›` to `‹staffSeatsUsed›` | exit 1: `prototype slot not traceable: staffSeatsUsed`. The file was restored and `cmp` confirmed it byte-identical |
+| Linux, master `2e3da4a` | PASS |
+| Windows | **not run on real Windows.** This environment has no Windows runtime (no Windows host, wine or pwsh). The Windows evidence is the `path.win32` self-test plus the 549-path Windows replay above. **A confirming run on real Windows by the reviewer is still owed** and is not claimed |
+
+### 2.2 Non-vacuity controls
+
+Each control was applied to a temporary copy of the checker, or to `traceability.json` with a backup, then run and restored. A restored run was PASS again. **None of these exits is a crash:** each failed on its own assertion.
+
+| Control | Result |
+|---|---|
+| added field `createdAtBogusField` to `GET /v1/me`, plus a cited route `GET /v1/me/disputes` (first pass) | exit 1: both reported |
+| **four absences inverted** (`balanceFor` allowlist emptied, route pattern `funds`, `'manager'` for `'reception'`, `createdAt` in `financial.controller.ts`) — re-run on the corrected checker | exit 1: all four reported **by the full run**. On the first corrected build this control exited 1 by *crashing*, because the self-test read its fixture from the mutated file. That is not a valid kill, so the self-test was given its own fixture |
+| M1: normalisation removed from `canonicalRelative` | exit 1: `win32: canonical path equals the allowlist entry (got services\commercial-policy\…)` |
+| M2: `absenceHits` blinded (returns nothing) | exit 1: `win32: … a seller-facing use still reported (got [])` |
+| M3: allowlist exempts every file | exit 1: same assertion |
+| M4: a backslash injected into derived paths | exit 1: `non-canonical derived path: services\ai/src/ai.controller.ts` |
+| M6: Windows replay derives raw `win32` paths | exit 1: 484 × `windows replay: … derived as services\ai\src\…` |
+| M7: a backslash allowlist entry written into `traceability.json` | exit 1: `non-canonical allowlist entry in traceability.json` |
+| renamed the prototype slot `‹staffSeats›` to `‹staffSeatsUsed›` (first pass) | exit 1: `prototype slot not traceable: staffSeatsUsed`. The file was restored and `cmp` confirmed it byte-identical |
 | first real run | exit 1: four `staff-management` fields cited against the wrong file. The fix is a correct citation (`staff-management.service.ts`), not a weaker check |
+
+The generated route matrix (`ROUTE_CONTRACT_MATRIX.md` §2) is byte-identical before and after the correction. On Linux the paths were already canonical, and the correction changes only what Windows derives.
 
 ## 3. Responsive — `verify/audit-prototype.mjs`
 

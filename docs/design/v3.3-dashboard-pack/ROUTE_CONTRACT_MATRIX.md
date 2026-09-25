@@ -12,8 +12,9 @@
 | every capability named in the pack is in `capabilities.ts` | 11 / 11 |
 | every value slot (`‹field›`) in the prototype is a cited field | 42 / 42 |
 | every recorded absence still holds: no seller credit-balance read, no dispute/appeal route, no `reception` role, no `createdAt` on `/v1/me` | 4 / 4 |
+| paths are platform-independent: the self-test (win32, win32 with a forward-slash root, posix) and the Windows replay of every derived source path give identical canonical paths and absence verdicts | self-test PASS · 549 / 549 |
 
-**Non-vacuity:** each check was made to fail on purpose, then restored (`AUDIT.md` §2). An injected field on `/v1/me`, an injected `GET /v1/me/disputes`, four inverted absences, and a prototype slot renamed to `staffSeatsUsed` all exit `1`.
+**Non-vacuity:** each check was made to fail on purpose, then restored (`AUDIT.md` §2.2). An injected field on `/v1/me`, an injected `GET /v1/me/disputes`, four inverted absences, a prototype slot renamed to `staffSeatsUsed`, and seven path and allowlist mutants (M1–M7) all exit `1` without crashing. **Windows:** proven by `path.win32` simulation, not yet by a run on real Windows (`AUDIT.md` §2.1).
 
 ## 2. Routes the design reads
 
