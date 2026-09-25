@@ -2,8 +2,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, IsNull, Repository } from 'typeorm';
 
-import { CityEntity, ProfessionalEntity, SellerOwnerRoleGrantPort, ServiceOfferingEntity } from '@beauclick/provider';
-import { CustomerDisplayNameDirectory, OrderDirectory, ProfessionalDirectory } from '@beauclick/booking';
+import { CityEntity, CompletedBookingCountPort, ProfessionalEntity, SellerOwnerRoleGrantPort, ServiceOfferingEntity } from '@beauclick/provider';
+import { CustomerDisplayNameDirectory, OrderDirectory, ProfessionalDirectory, countPublicCompletedBookings } from '@beauclick/booking';
 import {
   BookingCollectionPolicyResolver,
   BookingOutcomePolicyResolver,
@@ -1051,5 +1051,28 @@ export class IdentityAndProviderBackedStaffDisplayIdentity implements StaffDispl
       });
     }
     return described;
+  }
+}
+
+/**
+ * The public completed-booking count -- #226, `provider`'s
+ * `COMPLETED_BOOKING_COUNT`.
+ *
+ * `provider` shows «N نوبت انجام‌شده» on a professional's public profile and may
+ * not read `booking.bookings` (ADR-011), so it asks through a port and this
+ * adapter -- which may -- answers. The answer is `countPublicCompletedBookings`,
+ * the ONE statement of the definition (lifetime, `completed` only, appointment
+ * ended by the database clock), so this adapter contains no rule of its own.
+ *
+ * It holds the application DataSource and nothing else: no entity, no
+ * repository, and no method that returns anything but an integer. One indexed
+ * count per profile read.
+ */
+@Injectable()
+export class BookingBackedCompletedBookingCount implements CompletedBookingCountPort {
+  constructor(private readonly dataSource: DataSource) {}
+
+  completedBookingCount(professionalId: string): Promise<number> {
+    return countPublicCompletedBookings(this.dataSource, professionalId);
   }
 }

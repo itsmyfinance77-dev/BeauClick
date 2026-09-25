@@ -143,3 +143,36 @@ export interface SellerGovernanceInitializationPort {
 }
 
 export const SELLER_GOVERNANCE_INITIALIZATION = Symbol('BEAUCLICK_PROVIDER_SELLER_GOVERNANCE_INITIALIZATION');
+
+/**
+ * The fourth outbound port `provider` declares -- #226.
+ *
+ * The public profile shows «N نوبت انجام‌شده». The bookings live in
+ * `booking.bookings`, and `provider` may not import `booking` (ADR-011), so it
+ * declares the question and the composition root binds the answer -- the way
+ * `WISHLIST_SAVED_TARGETS` above is bound.
+ *
+ * ## The definition is not here
+ *
+ * It is `countPublicCompletedBookings` in `@beauclick/booking`, next to the
+ * status machine it is a statement about: lifetime; `completed` only; the
+ * appointment has ended by the DATABASE clock. This port carries no window, no
+ * status list and no instant, so no caller of it can redefine the number.
+ *
+ * ## Shaped so it cannot leak
+ *
+ * It takes ONE professional id -- the one the route already resolved -- and
+ * returns one non-negative integer. There is no customer, no booking id, no
+ * date and no amount anywhere in its signature, and no method returning a list.
+ *
+ * ## Nothing is provided by default, deliberately
+ *
+ * `ProviderModule` binds nothing. A composition that forgets it fails to boot
+ * rather than quietly publishing `0` on every profile, which would look exactly
+ * like a marketplace of brand-new sellers.
+ */
+export interface CompletedBookingCountPort {
+  completedBookingCount(professionalId: string): Promise<number>;
+}
+
+export const COMPLETED_BOOKING_COUNT = Symbol('BEAUCLICK_PROVIDER_COMPLETED_BOOKING_COUNT');

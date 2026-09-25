@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, Repository } from 'typeorm';
 import { PortfolioService, ProfessionalEntity, ServiceOfferingEntity } from '@beauclick/provider';
 import { UserEntity } from '@beauclick/identity';
-import { ProviderReindexSourcePort } from '@beauclick/search';
+import { ProviderReindexSourcePort, PublicProviderImageryPort } from '@beauclick/search';
 import { RecipientResolverPort } from '@beauclick/notification';
 import { AnalyticsSubjectResolverPort } from '@beauclick/analytics';
 
@@ -149,5 +149,27 @@ export class ProviderBackedAnalyticsSubjectResolver implements AnalyticsSubjectR
       select: { id: true, ownerId: true },
     });
     return professional?.id ?? null;
+  }
+}
+
+/**
+ * A page of professionals' PUBLIC imagery for search results -- #226,
+ * `search`'s `PUBLIC_PROVIDER_IMAGERY`.
+ *
+ * Deliberately delegates to `PortfolioService.publicImageryForMany`, which
+ * decides what a visitor may see with the same `MediaService.describe` the
+ * provider detail route uses, and reads the authoritative `portfolio_items` and
+ * `media.objects` rows instead of the search projection. The projection's own
+ * `avatarUrl` / `portfolioCount` are written by `ProfessionalMediaChanged` and
+ * are never refreshed when a moderator takes an image down, so serving them
+ * would keep a removed image on a result card. Three statements per page, however
+ * many results it holds.
+ */
+@Injectable()
+export class ProviderBackedPublicImagery implements PublicProviderImageryPort {
+  constructor(private readonly portfolio: PortfolioService) {}
+
+  imageryFor(professionalIds: readonly string[]) {
+    return this.portfolio.publicImageryForMany(professionalIds);
   }
 }

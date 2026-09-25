@@ -3,7 +3,14 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 
-import { ProfessionalEntity, ProviderModule, SELLER_GOVERNANCE_INITIALIZATION, SELLER_OWNER_ROLE_GRANT, ServiceOfferingEntity } from '@beauclick/provider';
+import {
+  COMPLETED_BOOKING_COUNT,
+  ProfessionalEntity,
+  ProviderModule,
+  SELLER_GOVERNANCE_INITIALIZATION,
+  SELLER_OWNER_ROLE_GRANT,
+  ServiceOfferingEntity,
+} from '@beauclick/provider';
 import { IdentityModule, UserEntity } from '@beauclick/identity';
 import {
   BOOKING_CANCELLATION_ENTITLEMENT_HOOK,
@@ -36,7 +43,7 @@ import {
   OWNED_SUBSCRIBER_PARTY_RESOLVER,
   SellerSubscriptionModule,
 } from '@beauclick/commercial-policy';
-import { PROVIDER_REINDEX_SOURCE } from '@beauclick/search';
+import { PROVIDER_REINDEX_SOURCE, PUBLIC_PROVIDER_IMAGERY } from '@beauclick/search';
 import { RECIPIENT_RESOLVER } from '@beauclick/notification';
 import { ANALYTICS_SUBJECT_RESOLVER } from '@beauclick/analytics';
 import { LoyaltyModule } from '@beauclick/loyalty';
@@ -76,6 +83,7 @@ import {
   ProviderBackedLocationCityCatalogue,
   ProviderBackedServiceOwnershipDirectory,
   BusinessBackedEligibleResourceDirectory,
+  BookingBackedCompletedBookingCount,
   BookingBackedResourceAssignmentDirectory,
   PublicNameBackedFinanceWorkspaceLabels,
   IdentityAndProviderBackedStaffDisplayIdentity,
@@ -86,6 +94,7 @@ import {
 import {
   IdentityBackedRecipientResolver,
   ProviderBackedAnalyticsSubjectResolver,
+  ProviderBackedPublicImagery,
   ProviderBackedReindexSource,
 } from './phase3-ports';
 import {
@@ -423,6 +432,21 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     IdentityBackedRecipientResolver,
     ProviderBackedAnalyticsSubjectResolver,
     { provide: PROVIDER_REINDEX_SOURCE, useExisting: ProviderBackedReindexSource },
+    /*
+     * #226. Two ports for the public profile facts, both MANDATORY: neither
+     * `search` nor `provider` declares an `@Optional()` fallback, so a
+     * composition that forgot one fails to boot rather than serving every result
+     * card in its no-image state or publishing `0` completed bookings for every
+     * professional -- two failures that would look like a quiet marketplace.
+     *
+     * `ProviderBackedPublicImagery` reads through `PortfolioService`, which is why
+     * `ProviderModule` is imported above; `BookingBackedCompletedBookingCount`
+     * needs only the application DataSource and no entity.
+     */
+    ProviderBackedPublicImagery,
+    { provide: PUBLIC_PROVIDER_IMAGERY, useExisting: ProviderBackedPublicImagery },
+    BookingBackedCompletedBookingCount,
+    { provide: COMPLETED_BOOKING_COUNT, useExisting: BookingBackedCompletedBookingCount },
     { provide: RECIPIENT_RESOLVER, useExisting: IdentityBackedRecipientResolver },
     { provide: ANALYTICS_SUBJECT_RESOLVER, useExisting: ProviderBackedAnalyticsSubjectResolver },
 
@@ -481,6 +505,8 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     WORKSPACE_REFERENCE_SECRET,
     FINANCIAL_DATA_SOURCE,
     PROVIDER_REINDEX_SOURCE,
+    PUBLIC_PROVIDER_IMAGERY,
+    COMPLETED_BOOKING_COUNT,
     RECIPIENT_RESOLVER,
     ANALYTICS_SUBJECT_RESOLVER,
     PRICING_RULES,

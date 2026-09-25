@@ -3,7 +3,7 @@ import { CurrentUser, AuthenticatedUser, PaginatedResult } from '@beauclick/http
 import { ResolveOwner, NotFoundOrNotYoursException } from '@beauclick/ownership';
 import { wishlistTargetKey } from '@beauclick/wishlist-contract';
 import type { WishlistSavedState } from '@beauclick/wishlist-contract';
-import { WISHLIST_SAVED_TARGETS, WishlistSavedTargetsPort } from './ports';
+import { COMPLETED_BOOKING_COUNT, CompletedBookingCountPort, WISHLIST_SAVED_TARGETS, WishlistSavedTargetsPort } from './ports';
 import { ProviderService } from './provider.service';
 import { ServiceOfferingService } from './service-offering.service';
 import { ProviderOwnerResolver } from './provider-owner.resolver';
@@ -178,6 +178,12 @@ export class ProviderController {
      * than quietly reporting `saved: null` for every signed-in customer forever.
      */
     @Inject(WISHLIST_SAVED_TARGETS) private readonly wishlist: WishlistSavedTargetsPort,
+    /**
+     * Bound by the composition root and by nothing else, for the same reason
+     * (#226). `ProviderModule` provides no default, so a composition that forgets
+     * it fails to boot rather than publishing `0` on every profile.
+     */
+    @Inject(COMPLETED_BOOKING_COUNT) private readonly completedBookings: CompletedBookingCountPort,
   ) {}
 
   /**
@@ -247,17 +253,35 @@ export class ProviderController {
     // learn anything about a professional who does not resolve: the wishlist is
     // never consulted for an id that got a 404.
     if (!provider) throw new NotFoundOrNotYoursException();
-    const [images, ratings, saved] = await Promise.all([
+    const [images, ratings, saved, completedBookingCount] = await Promise.all([
       this.portfolio.imagesFor(provider),
       this.reviews.ratingSummaryFor([provider.id]),
       this.savedLookup(user?.userId ?? null, [{ targetType: 'professional', targetId: provider.id }]),
+      // Keyed by the id THIS route resolved -- `provider.id`, never the raw
+      // path segment -- so the count cannot be asked about anybody else.
+      this.completedBookings.completedBookingCount(provider.id),
     ]);
-    return toPublicShape(
-      provider,
-      images,
-      ratings.get(provider.id) ?? EMPTY_RATING,
-      saved({ targetType: 'professional', targetId: provider.id }),
-    );
+    return {
+      ...toPublicShape(
+        provider,
+        images,
+        ratings.get(provider.id) ?? EMPTY_RATING,
+        saved({ targetType: 'professional', targetId: provider.id }),
+      ),
+      /**
+       * How many bookings this professional has completed (#226): lifetime,
+       * `completed` only, and only once the appointment has ended by the
+       * database's clock. The definition lives in `countPublicCompletedBookings`
+       * in `@beauclick/booking`; nothing in this request can influence it.
+       *
+       * A single non-negative integer on the DETAIL read only. It is deliberately
+       * not part of `toPublicShape`: that shape is also the professional's own
+       * profile, every mutation response and the listing, and giving them a
+       * default would publish a false `0` where nothing was counted. It carries
+       * no customer, booking or date.
+       */
+      completedBookingCount,
+    };
   }
 
   @Post()

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Inject, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Inject, Logger, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { Public, policy } from '@beauclick/auth';
 import { AuthenticatedUser, CurrentUser } from '@beauclick/http';
@@ -9,7 +9,14 @@ import type { WishlistSavedState } from '@beauclick/wishlist-contract';
 import { AutocompleteDto, RecordProfileViewDto, SearchProvidersDto } from './dto/search.dto';
 import { SearchIndexerService } from './indexing/search-indexer.service';
 import { SearchService } from './search.service';
-import { ProviderSearchDocument, WISHLIST_SAVED_TARGETS, WishlistSavedTargetsPort } from './ports';
+import {
+  PUBLIC_PROVIDER_IMAGERY,
+  ProviderSearchDocument,
+  PublicProviderImagery,
+  PublicProviderImageryPort,
+  WISHLIST_SAVED_TARGETS,
+  WishlistSavedTargetsPort,
+} from './ports';
 
 /**
  * The public search API.
@@ -55,9 +62,29 @@ interface PublicProviderResult {
    * an absent field is an honest one.
    */
   saved: WishlistSavedState;
+  /**
+   * The professional's public avatar and cover -- exactly the `images` the
+   * provider detail route returns (`GET /v1/providers/:id`), one shape for both,
+   * and `{ avatar: null, cover: null }` rather than absent when there is none
+   * (#226). The card draws `avatar`; `cover` is carried for the same-shape
+   * guarantee and costs nothing extra.
+   *
+   * Read from the authoritative media rows AFTER the search, not from the
+   * indexed copy: a moderator's takedown never refreshes the index, so a copy
+   * would go on offering a removed image. See `PublicProviderImageryPort`.
+   */
+  images: PublicProviderImagery['images'];
+  /**
+   * How many pieces of public work this professional shows -- their WHOLE live
+   * portfolio, not the slice of it a card draws, and unchanged by which page of
+   * results they appear on. `0` when there is none; never absent.
+   */
+  portfolioCount: number;
 }
 
-function toPublic(doc: ProviderSearchDocument, saved: WishlistSavedState): PublicProviderResult {
+const NO_IMAGERY: PublicProviderImagery = { images: { avatar: null, cover: null }, portfolioCount: 0 };
+
+function toPublic(doc: ProviderSearchDocument, saved: WishlistSavedState, imagery: PublicProviderImagery): PublicProviderResult {
   return {
     id: doc.professionalId,
     displayName: doc.displayName,
@@ -74,8 +101,10 @@ function toPublic(doc: ProviderSearchDocument, saved: WishlistSavedState): Publi
     priceFromToman: doc.minPriceToman,
     rating: { average: doc.ratingAvg, count: doc.reviewCount },
     badges: doc.rankingSignalKeys,
-    // Last, so the additive field is additive in the serialised order too.
+    // Last, so the additive fields are additive in the serialised order too.
     saved,
+    images: imagery.images,
+    portfolioCount: imagery.portfolioCount,
   };
 }
 
@@ -88,6 +117,8 @@ function toPublic(doc: ProviderSearchDocument, saved: WishlistSavedState): Publi
 @Throttle(policy('read'))
 @Controller('v1/search')
 export class SearchController {
+  private readonly logger = new Logger('SearchController');
+
   constructor(
     private readonly search: SearchService,
     private readonly indexer: SearchIndexerService,
@@ -97,6 +128,12 @@ export class SearchController {
      * quietly reporting `saved: null` for every signed-in customer forever.
      */
     @Inject(WISHLIST_SAVED_TARGETS) private readonly wishlist: WishlistSavedTargetsPort,
+    /**
+     * Bound by the composition root and by nothing else, for the same reason:
+     * a composition that forgets it fails to boot rather than serving a
+     * marketplace of cards that all show the no-image state (#226).
+     */
+    @Inject(PUBLIC_PROVIDER_IMAGERY) private readonly imagery: PublicProviderImageryPort,
   ) {}
 
   /**
@@ -140,14 +177,32 @@ export class SearchController {
      * the search is identical for a signed-in and a signed-out caller, and a
      * save can never become a ranking signal (`V32-DEC-021`).
      */
-    const saved = user
-      ? await this.wishlist.savedTargets(
-          // From the verified JWT. `searchProviders` is `@Public()`, so this is
-          // the only identity in play and it is never read from the query string.
-          user.userId,
-          result.items.map((doc) => ({ targetType: 'professional' as const, targetId: doc.professionalId })),
-        )
-      : null;
+    const [saved, imagery] = await Promise.all([
+      user
+        ? this.wishlist.savedTargets(
+            // From the verified JWT. `searchProviders` is `@Public()`, so this is
+            // the only identity in play and it is never read from the query string.
+            user.userId,
+            result.items.map((doc) => ({ targetType: 'professional' as const, targetId: doc.professionalId })),
+          )
+        : null,
+      /*
+        Imagery, in the same one-call-for-the-page shape (#226). For every caller,
+        signed in or not, and after the engine has chosen the results -- so it can
+        neither influence which providers appear nor where, and it is read from the
+        authoritative media rows rather than the index (`PublicProviderImageryPort`).
+      */
+      this.imagery.imageryFor(result.items.map((doc) => doc.professionalId)).catch((err: unknown) => {
+        /*
+          A picture is not worth the search. Results the engine already chose are
+          still returned, with every card in its honest no-image state, and the
+          failure is logged -- the same trade `SearchService` makes when the engine
+          itself is down. Not silent: it is a warning per failed page.
+        */
+        this.logger.warn(`Public imagery unavailable, serving results without it: ${err instanceof Error ? err.message : String(err)}`);
+        return new Map<string, PublicProviderImagery>();
+      }),
+    ]);
 
     return {
       items: result.items.map((doc) =>
@@ -157,6 +212,7 @@ export class SearchController {
           // literal here — this side and the wishlist side must agree, and a
           // second format is how they would stop.
           saved ? saved.has(wishlistTargetKey({ targetType: 'professional', targetId: doc.professionalId })) : null,
+          imagery.get(doc.professionalId) ?? NO_IMAGERY,
         ),
       ),
       pagination: {
