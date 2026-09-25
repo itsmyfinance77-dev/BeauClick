@@ -33,12 +33,13 @@ import styles from './search.module.css';
  * So: a filter column at 1024 and up, a bottom sheet below it, and a real
  * `<select>` for order. The shape of a control now tells you what it does.
  *
- * ## One design claim that does not hold at this baseline
+ * ## The card's picture and count are real
  *
- * **`avatarUrl` and `portfolioCount` are not in the response.** The spec
- *     calls both "IMPLEMENTABLE NOW (phase C)", and `PublicProviderResult`
- *     carries neither. The card keeps the design's placeholder artwork and
- *     shows no «۳ نمونه» count.
+ * `01_SEARCH.md` calls the avatar and the portfolio count "IMPLEMENTABLE NOW",
+ * and since #226 the response carries both — `images` (the provider detail
+ * route's own shape) and `portfolioCount`. `ProviderCard` draws the avatar,
+ * or a dashed no-image state that says what is missing, and «N نمونه» when
+ * there is portfolio. Nothing is invented for a professional who has neither.
  *
  * ## And one deliberate departure from the drawing
  *
@@ -534,11 +535,10 @@ export function SearchResults() {
             </p>
           ) : (
             <div className={styles.cardList} data-testid="results">
-              {(result?.items ?? []).map((item, index) => (
+              {(result?.items ?? []).map((item) => (
                 <ProviderCard
                   key={item.id}
                   item={item}
-                  index={index}
                   saving={savingIds.has(item.id)}
                   onToggleSaved={() => void toggleSaved(item)}
                 />

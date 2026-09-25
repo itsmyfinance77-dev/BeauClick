@@ -58,12 +58,24 @@ import styles from './provider.module.css';
  * /v1/cities` is public and small, so the name comes from there.
  * A page that shows a customer a raw uuid is showing them nothing.
  *
- * ## What the design shows and this does not
+ * ## The completed-booking count is the server's, and is drawn twice
  *
- * «۴۸ نوبت انجام‌شده» twice — as a stat card and as a credibility card. The
- * design's data note calls it countable from the professional's completed
- * bookings, and no public route exposes that count. Neither card is rendered
- * with a guessed number; the credibility section keeps its other three.
+ * «۴۸ نوبت انجام‌شده» appears twice in the design — as a stat card and as a
+ * credibility card — and since #226 `GET /v1/providers/:id` carries it as
+ * `completedBookingCount`. Its definition is the server's and is written in
+ * `countPublicCompletedBookings` (`@beauclick/booking`): lifetime, only
+ * `completed`, only once the appointment has ended. This page does not count,
+ * filter or adjust anything.
+ *
+ * Three states, told apart on purpose:
+ *
+ * - **A positive count** fills both cards.
+ * - **Zero** is a real answer and says so in the stat («هنوز نوبتی انجام نشده»),
+ *   but earns no credibility card — nothing has been done that a card could
+ *   vouch for, and «۰ نوبت انجام‌شده» under «اعتبار این متخصص» would read as a
+ *   mark against a professional who is simply new.
+ * - **Absent** — a server that predates the field — renders neither. Missing is
+ *   not zero.
  *
  * The reviews card IS rendered, as the dashed placeholder the design draws,
  * because the design is explicit that its place in the layout is held on
@@ -264,6 +276,18 @@ export default function ProviderBookingPage() {
 
   const isVerified = provider.verificationStatus === 'verified';
   const savedProfessional = provider.saved;
+  /*
+    The server's count, or `null` when the response does not carry one. A number
+    that is not a whole non-negative one is treated as absent rather than drawn:
+    the definition allows nothing else, so anything else is not the server's
+    figure.
+  */
+  const completedCount =
+    typeof provider.completedBookingCount === 'number' &&
+    Number.isInteger(provider.completedBookingCount) &&
+    provider.completedBookingCount >= 0
+      ? provider.completedBookingCount
+      : null;
 
   return (
     <section>
@@ -358,16 +382,24 @@ export default function ProviderBookingPage() {
             {provider.bio ? <p className={styles.bio}>{provider.bio}</p> : null}
           </div>
 
-          <div className={styles.stats}>
+          <dl className={styles.stats}>
             <div className={styles.stat}>
-              <div className={styles.statLabel}>عضو بیوکلیک از</div>
-              <div className={styles.statValue}>{formatFullJalaliDate(new Date(provider.createdAt))}</div>
+              <dt className={styles.statLabel}>عضو بیوکلیک از</dt>
+              <dd className={styles.statValue}>{formatFullJalaliDate(new Date(provider.createdAt))}</dd>
             </div>
+            {completedCount === null ? null : (
+              <div className={styles.stat} data-testid="stat-completed">
+                <dt className={styles.statLabel}>نوبت‌های انجام‌شده</dt>
+                <dd className={styles.statValue}>
+                  {completedCount > 0 ? `${toPersianDigits(completedCount)} نوبت` : 'هنوز نوبتی انجام نشده'}
+                </dd>
+              </div>
+            )}
             <div className={styles.stat}>
-              <div className={styles.statLabel}>خدمات فعال</div>
-              <div className={styles.statValue}>{toPersianDigits(services.length)} خدمت</div>
+              <dt className={styles.statLabel}>خدمات فعال</dt>
+              <dd className={styles.statValue}>{toPersianDigits(services.length)} خدمت</dd>
             </div>
-          </div>
+          </dl>
 
           <div>
             <h2 className={styles.sectionTitle}>خدمات و قیمت‌ها</h2>
@@ -418,6 +450,15 @@ export default function ProviderBookingPage() {
                   </div>
                 </div>
               </div>
+              {completedCount !== null && completedCount > 0 ? (
+                <div className={styles.cred} data-testid="cred-completed">
+                  <span className={`${styles.credDot} ${styles.credDotAccent}`} aria-hidden="true" />
+                  <div>
+                    <div className={styles.credTitle}>{toPersianDigits(completedCount)} نوبت انجام‌شده</div>
+                    <div className={styles.credText}>شمار نوبت‌هایی که این متخصص در بیوکلیک به پایان رسانده است.</div>
+                  </div>
+                </div>
+              ) : null}
               {/*
                 Kept as the design's dashed placeholder rather than dropped:
                 the design holds this card's place in the layout on purpose,

@@ -25,8 +25,9 @@ jest.mock('next/navigation', () => ({
  *
  * The profile half is new, and its risk is the usual one — claiming more
  * than the server said. So: a placeholder only where a picture genuinely
- * does not exist, the city NAME and never its uuid, and no completed-booking
- * count at all, because no route exposes one.
+ * does not exist, the city NAME and never its uuid, and a completed-booking
+ * count only as the server's own figure (#226) — never guessed, and absent
+ * when the response carries none.
  */
 
 function ok(data: unknown) {
@@ -203,16 +204,79 @@ describe('the profile shows what the server said, and no more', () => {
     expect(screen.getByTestId('services')).toBeInTheDocument();
   });
 
-  it('claims no completed-booking count, because no route exposes one', async () => {
-    mockApi();
-    renderProfile();
-    await screen.findByTestId('services');
+  /**
+   * #226 — «۴۸ نوبت انجام‌شده», drawn twice as the design draws it: a stat card
+   * and a credibility card. Both show the SERVER's `completedBookingCount`;
+   * nothing on this page counts, filters or adjusts it.
+   */
+  describe('the completed-booking count', () => {
+    it('shows the server’s count in the stat row and in the credibility section', async () => {
+      mockApi({ provider: { completedBookingCount: 48 } });
+      renderProfile();
+      await screen.findByTestId('services');
 
-    // The design shows «۴۸ نوبت انجام‌شده» twice. It is countable in
-    // principle and unreadable in practice, so neither card ships.
-    expect(document.body.textContent).not.toContain('نوبت انجام‌شده');
-    // What does ship is countable from what is on screen.
-    expect(document.body.textContent).toContain('۲ خدمت');
+      const stat = screen.getByTestId('stat-completed');
+      // A labelled statistic: term and value, not two loose divs.
+      expect(within(stat).getByText('نوبت‌های انجام‌شده').tagName).toBe('DT');
+      expect(within(stat).getByText('۴۸ نوبت').tagName).toBe('DD');
+
+      const cred = screen.getByTestId('cred-completed');
+      expect(within(cred).getByText('۴۸ نوبت انجام‌شده')).toBeInTheDocument();
+      expect(within(cred).getByText(/شمار نوبت‌هایی که این متخصص در بیوکلیک به پایان رسانده است/)).toBeInTheDocument();
+      // What was already there is still there.
+      expect(document.body.textContent).toContain('۲ خدمت');
+    });
+
+    it('writes the number the server sent, with Persian digits and no invented example', async () => {
+      mockApi({ provider: { completedBookingCount: 1234 } });
+      renderProfile();
+      await screen.findByTestId('services');
+
+      expect(within(screen.getByTestId('stat-completed')).getByText('۱۲۳۴ نوبت')).toBeInTheDocument();
+      expect(document.body.textContent).not.toContain('۴۸ نوبت');
+    });
+
+    it('states zero honestly in the stat row and gives credibility no card for it', async () => {
+      mockApi({ provider: { completedBookingCount: 0 } });
+      renderProfile();
+      await screen.findByTestId('services');
+
+      expect(within(screen.getByTestId('stat-completed')).getByText('هنوز نوبتی انجام نشده')).toBeInTheDocument();
+      // «۰ نوبت انجام‌شده» under «اعتبار این متخصص» would read as a mark against a
+      // professional who is simply new.
+      expect(screen.queryByTestId('cred-completed')).toBeNull();
+      expect(document.body.textContent).not.toContain('۰ نوبت');
+    });
+
+    it('draws neither card when the response carries no count — missing is not zero', async () => {
+      mockApi(); // the base fixture has no `completedBookingCount`
+      renderProfile();
+      await screen.findByTestId('services');
+
+      expect(screen.queryByTestId('stat-completed')).toBeNull();
+      expect(screen.queryByTestId('cred-completed')).toBeNull();
+      expect(document.body.textContent).not.toContain('نوبت انجام‌شده');
+      expect(document.body.textContent).not.toContain('هنوز نوبتی انجام نشده');
+    });
+
+    it.each([[-3], [2.5], ['48'], [null]])('treats %p as no count rather than drawing it', async (value) => {
+      mockApi({ provider: { completedBookingCount: value } });
+      renderProfile();
+      await screen.findByTestId('services');
+
+      expect(screen.queryByTestId('stat-completed')).toBeNull();
+      expect(screen.queryByTestId('cred-completed')).toBeNull();
+    });
+
+    it('keeps the credibility section’s other cards when the count arrives', async () => {
+      mockApi({ provider: { completedBookingCount: 7 } });
+      renderProfile();
+      await screen.findByTestId('services');
+
+      expect(screen.getByText('هویت بررسی شده')).toBeInTheDocument();
+      expect(screen.getByText('پرداخت با پشتوانه')).toBeInTheDocument();
+      expect(screen.getByTestId('reviews-placeholder')).toBeInTheDocument();
+    });
   });
 
   it('keeps the reviews card as the placeholder the design holds space with', async () => {

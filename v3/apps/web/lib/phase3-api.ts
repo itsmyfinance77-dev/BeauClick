@@ -1,4 +1,5 @@
 import type { ApiClient } from './api-client';
+import type { MediaDescriptor } from './booking-api';
 
 /**
  * Typed wrappers for the Phase 3 surfaces.
@@ -33,6 +34,20 @@ export interface SearchResultItem {
    * this type, so no surface could use it.
    */
   saved: boolean | null;
+  /**
+   * The professional's public avatar and cover -- exactly what
+   * `GET /v1/providers/:id` returns under `images`, so one shape describes both
+   * (#226). Always present, each `null` when there is nothing to show, which is
+   * what makes the card's no-image state a real answer and not a missing field.
+   * A descriptor here always has a loadable `url`: the server drops anything not
+   * public and stored rather than sending it flagged.
+   */
+  images: { avatar: MediaDescriptor | null; cover: MediaDescriptor | null };
+  /**
+   * How many pieces of public work this professional shows -- their whole
+   * portfolio, not the slice a card draws. `0` when none; never absent.
+   */
+  portfolioCount: number;
 }
 
 export interface FacetBucket {

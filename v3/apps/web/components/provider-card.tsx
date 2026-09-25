@@ -1,4 +1,8 @@
+'use client';
+
 import Link from 'next/link';
+import { useState } from 'react';
+import { toPersianDigits } from '@beauclick/persian-utils';
 import type { SearchResultItem } from '@/lib/phase3-api';
 import { PriceDisplay } from './price-display';
 import styles from './provider-card.module.css';
@@ -16,30 +20,72 @@ import styles from './provider-card.module.css';
  * NO «شروع از» label: a zero or a dash beside that label would both read as a
  * price, so the label goes with the figure.
  *
- * The artwork is a placeholder. `avatarUrl` and `portfolioCount` are not in
- * the public search result at this baseline, and `bronze` simply alternates so
- * a long list does not read as one block of colour — which is why the caller
- * passes the row's index rather than the card deriving anything from it.
+ * ## The artwork is the professional's own, or an honest absence (#226)
+ *
+ * `01_SEARCH.md`: the avatar in the card's corner, «۳ نمونه» over it when there
+ * is portfolio, and — for the many professionals with neither — a real no-image
+ * state "rather than one identical placeholder for everyone". The card used to
+ * draw the design's striped tile for every result, which is exactly that
+ * placeholder.
+ *
+ * - **An avatar** is drawn from `images.avatar.url`, with its own dimensions so
+ *   the space is reserved before it loads.
+ * - **No avatar** is a dashed, neutral box that SAYS what is missing — «بدون
+ *   نمونه کار» when there is no portfolio either, «بدون تصویر» when there is
+ *   work but no photo. Nothing is invented to fill it.
+ * - **An image that fails to load** falls back to that same box. A broken-image
+ *   glyph is not a state, and the professional's name and the link stay usable
+ *   regardless.
+ * - **The count** is `portfolioCount` as the server sent it, shown only when it
+ *   is above zero; a «۰ نمونه» badge would be noise on the many cards that
+ *   have none. It is text, so it survives greyscale and a screen reader.
  */
 export function ProviderCard({
   item,
-  index,
   saving,
   onToggleSaved,
 }: {
   item: SearchResultItem;
-  /** Position in the list, for the alternating placeholder artwork only. */
-  index: number;
   /** A save for THIS professional is in flight. */
   saving: boolean;
   onToggleSaved: () => void;
 }) {
   const href = `/providers/${item.id}?from=search`;
+  // Tolerant of a server one release behind this client: the fields are
+  // always present in the current contract, and their absence reads as "none".
+  const avatar = item.images?.avatar ?? null;
+  const portfolioCount = item.portfolioCount ?? 0;
+  // The URL that failed, not a boolean, so a professional who replaces their
+  // avatar is given a fresh chance without remounting the card.
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const picture = avatar?.url && avatar.url !== failedUrl ? { ...avatar, url: avatar.url } : null;
 
   return (
     <article className={styles.card} data-provider={item.id}>
-      <div className={`${styles.cardArt} ${index % 2 === 1 ? styles.cardArtBronze : ''}`} aria-hidden="true">
-        <span className={styles.cardArtLabel}>نمونه کار</span>
+      <div className={`${styles.cardArt} ${picture ? '' : styles.cardArtEmpty}`} data-testid="card-art">
+        {picture ? (
+          /* A media-pipeline URL whose host is deployment-dependent, so `next/image`
+             would need a configured remote pattern; the intrinsic size is passed so
+             the box is reserved before the bytes arrive. */
+          <img
+            src={picture.url}
+            alt={`تصویر ${item.displayName}`}
+            width={picture.width ?? undefined}
+            height={picture.height ?? undefined}
+            className={styles.cardImage}
+            loading="lazy"
+            decoding="async"
+            onError={() => setFailedUrl(picture.url)}
+          />
+        ) : (
+          <span className={styles.cardArtLabel}>{portfolioCount > 0 ? 'بدون تصویر' : 'بدون نمونه کار'}</span>
+        )}
+        {portfolioCount > 0 ? (
+          <span className={styles.portfolioBadge} data-testid="portfolio-count">
+            <span aria-hidden="true">{toPersianDigits(portfolioCount)} نمونه</span>
+            <span className="bc-visually-hidden">{toPersianDigits(portfolioCount)} نمونه‌کار</span>
+          </span>
+        ) : null}
       </div>
 
       <div className={styles.cardBody}>

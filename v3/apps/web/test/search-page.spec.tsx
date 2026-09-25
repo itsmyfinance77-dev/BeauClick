@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import SearchPage from '@/app/search/page';
 import { AuthProvider } from '@/lib/auth-context';
@@ -49,8 +49,16 @@ function provider(overrides: Record<string, unknown> = {}) {
     rating: { average: 0, count: 0 },
     badges: ['verified'],
     saved: false,
+    // What the server sends for a professional with nothing uploaded (#226).
+    images: { avatar: null, cover: null },
+    portfolioCount: 0,
     ...overrides,
   };
+}
+
+/** A public descriptor exactly as `GET /v1/providers/:id` gives one under `images`. */
+function picture(id: string, width = 512, height = 512) {
+  return { id, url: `https://cdn.example/media/${id}.png`, contentType: 'image/png', width, height };
 }
 
 function response(overrides: Record<string, unknown> = {}) {
@@ -312,7 +320,7 @@ describe('the result card', () => {
     expect(screen.getByRole('combobox', { name: /نام متخصص/ })).toHaveValue('میکاپ عروس');
   });
 
-  it('carries the fields the contract has and no portfolio count', async () => {
+  it('carries the fields the contract has', async () => {
     mockApi();
     renderSearch();
 
@@ -321,9 +329,6 @@ describe('the result card', () => {
     expect(results.textContent).toContain('یزد');
     expect(results.textContent).toContain('۸۵۰٬۰۰۰');
     expect(within(results).getByText('تأیید شده')).toBeInTheDocument();
-    // `avatarUrl` and `portfolioCount` are not in `PublicProviderResult`,
-    // whatever the spec says is implementable — so no «۳ نمونه» badge.
-    expect(results.textContent).not.toMatch(/\d+ نمونه|۳ نمونه/);
   });
 
   it('shows no rating at all rather than zero stars', async () => {
@@ -336,6 +341,143 @@ describe('the result card', () => {
     expect(results.textContent).not.toContain('۰ از');
     expect(results.textContent).not.toContain('★');
     expect(results.textContent).not.toContain('امتیاز');
+  });
+});
+
+/**
+ * #226 — the card's picture and its portfolio count are the professional's own.
+ *
+ * `01_SEARCH.md`: the avatar in the card's corner, «N نمونه» over it when there
+ * is portfolio, and a real no-image state "rather than one identical placeholder
+ * for everyone". These cases replace the one that used to assert the count was
+ * ABSENT: the server now sends `images` and `portfolioCount`, and every
+ * assertion below is about something rendered from them.
+ */
+describe('the card’s picture and portfolio count (#226)', () => {
+  const cardOf = (results: HTMLElement, id: string) => results.querySelector(`[data-provider="${id}"]`) as HTMLElement;
+
+  it('draws the professional’s own avatar, with its size and a name a screen reader can use', async () => {
+    mockApi({
+      body: response({
+        items: [provider({ images: { avatar: picture('a1', 512, 384), cover: null }, portfolioCount: 3 })],
+      }),
+    });
+    renderSearch();
+
+    const results = await screen.findByTestId('results');
+    const img = within(cardOf(results, 'p1')).getByRole('img', { name: 'تصویر آتلیه سارا محمدی' });
+    expect(img).toHaveAttribute('src', 'https://cdn.example/media/a1.png');
+    // The intrinsic size reserves the box before the bytes arrive.
+    expect(img).toHaveAttribute('width', '512');
+    expect(img).toHaveAttribute('height', '384');
+    // Not a fixed tile: it is the picture the server named and no other.
+    expect(within(cardOf(results, 'p1')).queryByText('بدون نمونه کار')).toBeNull();
+    expect(within(cardOf(results, 'p1')).queryByText('بدون تصویر')).toBeNull();
+  });
+
+  it('shows the real portfolio count, in Persian digits, over the picture', async () => {
+    mockApi({
+      body: response({
+        items: [provider({ images: { avatar: picture('a1'), cover: null }, portfolioCount: 12 })],
+      }),
+    });
+    renderSearch();
+
+    const results = await screen.findByTestId('results');
+    const badge = within(cardOf(results, 'p1')).getByTestId('portfolio-count');
+    expect(within(badge).getByText('۱۲ نمونه')).toBeInTheDocument();
+    // A screen reader gets the unabbreviated phrase, once.
+    expect(badge).toHaveTextContent('۱۲ نمونه‌کار');
+  });
+
+  it('shows a no-image state that says what is missing, and no badge, for a professional with nothing', async () => {
+    mockApi(); // default: images all null, portfolioCount 0
+    renderSearch();
+
+    const results = await screen.findByTestId('results');
+    const card = cardOf(results, 'p1');
+    expect(within(card).queryByRole('img')).toBeNull();
+    expect(within(card).getByText('بدون نمونه کار')).toBeInTheDocument();
+    // Zero is stated by the empty box, never as a «۰ نمونه» badge.
+    expect(within(card).queryByTestId('portfolio-count')).toBeNull();
+    expect(card.textContent).not.toContain('۰ نمونه');
+    // The old identical placeholder tile, with its «نمونه کار» label, is gone.
+    expect(within(card).queryByText(/^نمونه کار$/)).toBeNull();
+  });
+
+  it('says «بدون تصویر» and still shows the count when there is work but no photo', async () => {
+    mockApi({ body: response({ items: [provider({ portfolioCount: 4 })] }) });
+    renderSearch();
+
+    const card = cardOf(await screen.findByTestId('results'), 'p1');
+    expect(within(card).queryByRole('img')).toBeNull();
+    expect(within(card).getByText('بدون تصویر')).toBeInTheDocument();
+    expect(within(card).getByText('۴ نمونه')).toBeInTheDocument();
+  });
+
+  it('gives each professional their own picture and count, never one for everybody', async () => {
+    mockApi({
+      body: response({
+        items: [
+          provider({ id: 'p1', displayName: 'الف', images: { avatar: picture('aaa'), cover: null }, portfolioCount: 2 }),
+          provider({ id: 'p2', displayName: 'ب', images: { avatar: picture('bbb'), cover: null }, portfolioCount: 9 }),
+          provider({ id: 'p3', displayName: 'ج' }),
+        ],
+        pagination: { page: 1, pageSize: 20, total: 3, totalIsApproximate: false, totalPages: 1 },
+      }),
+    });
+    renderSearch();
+
+    const results = await screen.findByTestId('results');
+    const srcOf = (id: string) => within(cardOf(results, id)).queryByRole('img')?.getAttribute('src') ?? null;
+    expect(srcOf('p1')).toBe('https://cdn.example/media/aaa.png');
+    expect(srcOf('p2')).toBe('https://cdn.example/media/bbb.png');
+    expect(srcOf('p3')).toBeNull();
+    expect(within(cardOf(results, 'p1')).getByText('۲ نمونه')).toBeInTheDocument();
+    expect(within(cardOf(results, 'p2')).getByText('۹ نمونه')).toBeInTheDocument();
+    expect(within(cardOf(results, 'p3')).queryByTestId('portfolio-count')).toBeNull();
+  });
+
+  it('falls back to the no-image state when the picture will not load, keeping the count and the link', async () => {
+    mockApi({
+      body: response({ items: [provider({ images: { avatar: picture('gone'), cover: null }, portfolioCount: 2 })] }),
+    });
+    renderSearch();
+
+    const results = await screen.findByTestId('results');
+    const card = cardOf(results, 'p1');
+    fireEvent.error(within(card).getByRole('img'));
+
+    // No broken-image glyph is left behind as the card's only state.
+    expect(within(card).queryByRole('img')).toBeNull();
+    expect(within(card).getByText('بدون تصویر')).toBeInTheDocument();
+    expect(within(card).getByText('۲ نمونه')).toBeInTheDocument();
+    expect(within(card).getByRole('link', { name: 'آتلیه سارا محمدی' })).toHaveAttribute('href', '/providers/p1?from=search');
+  });
+
+  it('renders a result from a server that has not sent the fields yet as the no-image state', async () => {
+    const legacy = provider();
+    delete (legacy as Record<string, unknown>).images;
+    delete (legacy as Record<string, unknown>).portfolioCount;
+    mockApi({ body: response({ items: [legacy] }) });
+    renderSearch();
+
+    const card = cardOf(await screen.findByTestId('results'), 'p1');
+    expect(within(card).queryByRole('img')).toBeNull();
+    expect(within(card).getByText('بدون نمونه کار')).toBeInTheDocument();
+  });
+
+  it('draws nothing for an avatar with no loadable url', async () => {
+    mockApi({
+      body: response({
+        items: [provider({ images: { avatar: { id: 'x', url: null, contentType: null, width: null, height: null }, cover: null } })],
+      }),
+    });
+    renderSearch();
+
+    const card = cardOf(await screen.findByTestId('results'), 'p1');
+    expect(within(card).queryByRole('img')).toBeNull();
+    expect(within(card).getByText('بدون نمونه کار')).toBeInTheDocument();
   });
 });
 

@@ -38,25 +38,19 @@
   }
 }
 
+/*
+ * The card's picture — the professional's own avatar (#226), or the design's
+ * dashed no-image box. There is no striped placeholder any more: one identical
+ * tile on every card is exactly what `01_SEARCH.md` says not to draw.
+ */
 .cardArt {
   height: 160px;
-  background: repeating-linear-gradient(
-    135deg,
-    oklch(0.963 0.012 340) 0 9px,
-    oklch(0.945 0.026 340) 9px 18px
-  );
+  background: var(--bc-color-surface-muted);
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.cardArtBronze {
-  background: repeating-linear-gradient(
-    135deg,
-    oklch(0.955 0.028 70) 0 9px,
-    oklch(0.94 0.04 70) 9px 18px
-  );
+  overflow: hidden;
 }
 
 @media (min-width: 1024px) {
@@ -66,9 +60,48 @@
   }
 }
 
+/* Dashed, on the muted ground, and with a word in it: absence stated, not decorated. */
+.cardArtEmpty {
+  border: 1px dashed var(--bc-color-border-strong);
+}
+
+@media (max-width: 1023.98px) {
+  .cardArtEmpty {
+    border-inline: 0;
+    border-block-start: 0;
+  }
+}
+
+.cardImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .cardArtLabel {
-  font-family: ui-monospace, monospace;
-  font-size: 11px;
+  font-size: 12px;
+  line-height: 1.6;
+  text-align: center;
+  padding: 0 8px;
+  color: var(--bc-color-text-faint);
+}
+
+/*
+ * «۳ نمونه», over the picture at its inline start. A near-opaque white pill, so
+ * it reads on any photograph, and text rather than an icon so it carries its own
+ * meaning without colour.
+ */
+.portfolioBadge {
+  position: absolute;
+  inset-block-end: 8px;
+  inset-inline-start: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.6;
+  padding: 3px 9px;
+  border-radius: var(--bc-radius-chip);
+  background: oklch(1 0 0 / 0.92);
   color: var(--bc-color-text-muted);
 }
 
