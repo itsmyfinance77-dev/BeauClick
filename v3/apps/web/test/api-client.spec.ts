@@ -158,4 +158,41 @@ describe('ApiClient', () => {
       await expect(client.get('/v1/thing')).rejects.toMatchObject({ status: 500 });
     });
   });
+
+  // #264: the auth provider re-reads `/v1/me` after an admin route refuses.
+  describe('onForbidden', () => {
+    const refusal = { data: null, meta: null, error: { code: 'FORBIDDEN', message: 'اجازه دسترسی ندارید.' } };
+
+    it('is told the path of a 403, and the caller still gets the same error', async () => {
+      const onForbidden = jest.fn();
+      const client = new ApiClient({ baseUrl: 'http://api.test', onForbidden });
+      mockFetchOnce(403, refusal);
+
+      await expect(client.get('/v1/admin/media/reports?page=1&limit=1')).rejects.toMatchObject({
+        status: 403,
+        code: 'FORBIDDEN',
+        message: 'اجازه دسترسی ندارید.',
+      });
+      expect(onForbidden).toHaveBeenCalledTimes(1);
+      expect(onForbidden).toHaveBeenCalledWith('/v1/admin/media/reports?page=1&limit=1');
+    });
+
+    it('is told about a 403 that arrives on the retry after a refresh', async () => {
+      const onForbidden = jest.fn();
+      const client = new ApiClient({ baseUrl: 'http://api.test', onUnauthorized: jest.fn().mockResolvedValue(true), onForbidden });
+      mockFetchOnce(401, { data: null, meta: null, error: { code: 'UNAUTHORIZED', message: 'x' } });
+      mockFetchOnce(403, refusal);
+
+      await expect(client.get('/v1/admin/reviews/queue')).rejects.toMatchObject({ status: 403 });
+      expect(onForbidden).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([200, 401, 404, 409, 500])('is not told about a %i', async (status) => {
+      const onForbidden = jest.fn();
+      const client = new ApiClient({ baseUrl: 'http://api.test', onForbidden });
+      mockFetchOnce(status, status === 200 ? { data: {}, meta: null, error: null } : { data: null, meta: null, error: { code: 'X', message: 'x' } });
+      await client.get('/v1/admin/x').catch(() => undefined);
+      expect(onForbidden).not.toHaveBeenCalled();
+    });
+  });
 });

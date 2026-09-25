@@ -5,6 +5,7 @@ import { formatZonedDateTime, toPersianDigits } from '@beauclick/persian-utils';
 import { Button, ErrorState, LoadingState } from '@/components/ui';
 import { Badge, EmptyState, PageHeader, Select } from '@/components/kit';
 import { useAuth } from '@/lib/auth-context';
+import { AdminGuard } from '@/components/admin-guard';
 import { auditActions, auditLog, type AuditEntry } from '@/lib/admin-api';
 import { SNAPSHOT_LABELS, actionLabel, targetLabel } from '@/lib/audit-labels';
 import styles from './audit-log.module.css';
@@ -18,7 +19,7 @@ import styles from './audit-log.module.css';
  * only, so a mutation route added here in future would be refused by PostgreSQL
  * rather than by this file's restraint.
  */
-export default function AdminAuditLogPage() {
+function AdminAuditLogContent() {
   const { api } = useAuth();
 
   const [entries, setEntries] = useState<AuditEntry[]>([]);
@@ -159,4 +160,20 @@ function renderSnapshot(snapshot: Record<string, string | number | boolean | nul
   return Object.entries(snapshot)
     .map(([key, value]) => `${SNAPSHOT_LABELS[key] ?? key}: ${value === null ? '—' : toPersianDigits(String(value))}`)
     .join('، ');
+}
+
+/**
+ * #264: this page's OWN guard. Before #264 the `/admin` layout gated every
+ * page on `bc_manage_platform`, and this page relied on that alone. The shell
+ * now also admits moderators, so the page states its authority itself — the
+ * same capability that gated it before, so nothing changes for an operator or
+ * administrator — and a moderator's typed URL is refused here as well as by
+ * `AdminRouteGate`. The API's `CapabilityGuard` remains the control.
+ */
+export default function AdminAuditLogPage() {
+  return (
+    <AdminGuard capability="bc_manage_platform">
+      <AdminAuditLogContent />
+    </AdminGuard>
+  );
 }

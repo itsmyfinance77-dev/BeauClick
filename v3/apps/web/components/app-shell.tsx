@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 import { toPersianDigits } from '@beauclick/persian-utils';
 import { isSellerSession } from '@/lib/seller-identity';
 import { useAuth } from '@/lib/auth-context';
+import { adminMode } from '@/lib/admin-access';
 import { useUnread } from '@/lib/unread-context';
 import { ErrorBoundary } from './error-boundary';
 import { AvatarMenu, type AvatarMenuEntry } from './avatar-menu';
@@ -90,6 +91,19 @@ function isCurrent(pathname: string, href: string): boolean {
   return href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`);
 }
 
+/**
+ * The admin entry in the AvatarMenu — one shell with two labels (#264,
+ * `51_WORKSPACE_SHELL_AND_DASHBOARDS.md` §2.2). «مدیریت» for
+ * `bc_manage_platform`, exactly as before; «بررسی محتوا» for a caller holding
+ * only moderation capabilities; absent, never disabled, for anybody else.
+ */
+function adminMenuEntry(capabilities: string[] | undefined): AvatarMenuEntry[] {
+  const mode = adminMode(capabilities);
+  if (mode === 'platform') return [{ href: '/admin', label: 'مدیریت' }];
+  if (mode === 'moderation') return [{ href: '/admin', label: 'بررسی محتوا' }];
+  return [];
+}
+
 /** True for `/admin`, `/admin/x`, `/pro`, `/pro/x` -- never for a route that merely starts with the same letters, e.g. `/products`. */
 function hidesTabBar(pathname: string): boolean {
   return NO_TAB_BAR_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
@@ -157,7 +171,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         { href: '/finance', label: 'امور مالی' },
         { href: '/business', label: 'کسب‌وکار من' },
         ...(isSeller ? [{ href: '/pro', label: 'حالت متخصص' }] : []),
-        ...(user?.capabilities?.includes('bc_manage_platform') ? [{ href: '/admin', label: 'مدیریت' }] : []),
+        ...adminMenuEntry(user?.capabilities),
       ]
     : [];
 

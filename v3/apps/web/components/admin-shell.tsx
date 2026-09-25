@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 import { useEffect, useRef } from 'react';
 import { toPersianDigits } from '@beauclick/persian-utils';
 import { useAuth } from '@/lib/auth-context';
+import { adminMode, heldModerationQueues } from '@/lib/admin-access';
 import styles from './admin-shell.module.css';
 
 /**
@@ -103,7 +104,19 @@ export function AdminShell({ children, queues }: { children: ReactNode; queues?:
   // Hiding a link the operator cannot use is a courtesy, not a control: the
   // API refuses the request regardless of what the nav shows, and the
   // `operability-foundation.pg-spec` suite proves that for every route here.
-  const visible = ADMIN_NAV.filter((item) => !item.capability || capabilities.includes(item.capability));
+  //
+  // #264: a moderation-only caller's bar is NOT this list filtered. The
+  // entries above without a capability are `bc_manage_platform` destinations
+  // (the layout used to be what gated them), so for a moderator the bar is
+  // built from the held queues alone, in their fixed order, behind the
+  // landing — `52_MODERATOR_LANDING.md` §2.
+  const moderation = adminMode(capabilities) === 'moderation';
+  const visible = moderation
+    ? [
+        { href: '/admin', label: 'صف‌های بررسی', system: false },
+        ...heldModerationQueues(capabilities).map((queue) => ({ href: queue.href, label: queue.label, system: false })),
+      ]
+    : ADMIN_NAV.filter((item) => !item.capability || capabilities.includes(item.capability));
   const operatorCapabilities = capabilities.filter(
     (c) => c.startsWith('bc_manage_platform') || c.startsWith('bc_moderate'),
   );
@@ -127,7 +140,7 @@ export function AdminShell({ children, queues }: { children: ReactNode; queues?:
     <div>
       <div className={styles.bar} data-testid="admin-bar">
         <div className={styles.barStart}>
-          <span className={styles.mode}>بیوکلیک — مدیریت</span>
+          <span className={styles.mode}>{moderation ? 'بیوکلیک — بررسی محتوا' : 'بیوکلیک — مدیریت'}</span>
           <nav aria-label="ناوبری مدیریت" className={styles.nav} ref={navRef}>
             {visible.map((item) => {
               const count = queues?.[item.href];

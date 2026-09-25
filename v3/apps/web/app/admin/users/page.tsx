@@ -5,6 +5,7 @@ import { normalizeDigits, toPersianDigits } from '@beauclick/persian-utils';
 import { Alert, Button, ErrorState, Input, LoadingState } from '@/components/ui';
 import { Badge, ConfirmDialog, EmptyState, PageHeader, Textarea } from '@/components/kit';
 import { useAuth } from '@/lib/auth-context';
+import { AdminGuard } from '@/components/admin-guard';
 import {
   findUserByPhone,
   mutateUserRole,
@@ -27,7 +28,7 @@ const MIN_REASON = 4;
  * when one comes back, because "دسترسی ندارید" with no reason is where an
  * operator gets stuck.
  */
-export default function AdminUsersPage() {
+function AdminUsersContent() {
   const { api, user: me } = useAuth();
 
   const [phone, setPhone] = useState('');
@@ -262,5 +263,21 @@ export default function AdminUsersPage() {
         }
       />
     </div>
+  );
+}
+
+/**
+ * #264: this page's OWN guard. Before #264 the `/admin` layout gated every
+ * page on `bc_manage_platform`, and this page relied on that alone. The shell
+ * now also admits moderators, so the page states its authority itself — the
+ * same capability that gated it before, so nothing changes for an operator or
+ * administrator — and a moderator's typed URL is refused here as well as by
+ * `AdminRouteGate`. The API's `CapabilityGuard` remains the control.
+ */
+export default function AdminUsersPage() {
+  return (
+    <AdminGuard capability="bc_manage_platform">
+      <AdminUsersContent />
+    </AdminGuard>
   );
 }
