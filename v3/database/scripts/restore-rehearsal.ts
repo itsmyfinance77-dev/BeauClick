@@ -44,11 +44,13 @@ import {
   appliedMigrations,
   backup,
   compareInventory,
+  compareStructure,
   databaseNameOf,
   defaultBackupPath,
   dropDatabase,
   inventory,
   restore,
+  structure,
   verifyManifest,
 } from './backup-restore';
 import { formatChecks, verifyRoleContract } from './role-contract';
@@ -110,7 +112,24 @@ async function main(): Promise<void> {
 
     log(`Restoring into the disposable database ${REHEARSAL_DATABASE} …`);
     await dropDatabase(adminUrl, REHEARSAL_DATABASE);
-    await restore({ dumpFile, adminUrl, targetDatabase: REHEARSAL_DATABASE });
+    const outcome = await restore({ dumpFile, adminUrl, targetDatabase: REHEARSAL_DATABASE });
+
+    // #314. `pg_restore`'s own error count, treated as a failure rather than
+    // rescued by a substring. This used to be swallowed by a `/warning/i` test
+    // that matched the very line announcing the errors, so a restore with
+    // seven failures reported exactly like a clean one.
+    if (outcome.ignoredErrors > 0) {
+      failures.push(
+        `pg_restore ignored ${outcome.ignoredErrors} error(s) during the restore:\n${outcome.stderr
+          .split('\n')
+          .filter((line) => /error/i.test(line))
+          .slice(0, 20)
+          .map((line) => `    ${line.trim()}`)
+          .join('\n')}`,
+      );
+    } else {
+      log('  pg_restore reported no ignored errors.');
+    }
 
     const restoredAdminUrl = withDatabase(adminUrl, REHEARSAL_DATABASE);
     const restored = new Client({ connectionString: restoredAdminUrl });
@@ -126,6 +145,38 @@ async function main(): Promise<void> {
         );
       } else {
         log(`  Row counts match across ${Object.keys(manifest.inventory).length} tables.`);
+      }
+
+      // #314. Row counts cannot see a lost index, constraint, view or sequence
+      // position: a restore that failed to create `uq_orders_source` -- a
+      // UNIQUE INDEX, one of 47 in this schema whose uniqueness has no backing
+      // constraint -- leaves every count identical and permits two orders for
+      // one booking. This is the comparison that makes a restore verifiable
+      // rather than merely plausible.
+      if (manifest.structure) {
+        const restoredStructure = await structure(restored);
+        const structural = compareStructure(manifest.structure, restoredStructure);
+        if (structural.length > 0) {
+          failures.push(
+            `Schema objects differ after restore:\n${structural
+              .map((d) => `    ${d.kind} ${d.name}: ${d.detail}`)
+              .join('\n')}`,
+          );
+        } else {
+          const { indexes, constraints, views, sequences } = manifest.structure;
+          log(
+            `  Schema objects match: ${indexes.length} indexes, ${constraints.length} constraints, ` +
+              `${views.length} views, ${Object.keys(sequences).length} sequences.`,
+          );
+        }
+      } else {
+        // Said out loud rather than skipped silently: a manifest from before
+        // #314 gets the old, weaker verdict, and a reader deserves to know the
+        // structural check did not run.
+        failures.push(
+          'This manifest predates the schema-object comparison (#314), so indexes, constraints, views and ' +
+            'sequence positions were NOT verified. Take a fresh backup to get the full check.',
+        );
       }
 
       const restoredMigrations = await appliedMigrations(restored);
