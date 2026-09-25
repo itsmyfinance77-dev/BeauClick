@@ -142,9 +142,21 @@ export class AuthService {
     return this.tokens.rotate(rawRefreshToken, deviceLabel, userAgent);
   }
 
-  async logout(rawRefreshToken: string, userId: string): Promise<void> {
-    await this.tokens.revoke(rawRefreshToken);
-    this.auditLog.log({ action: 'auth.logout', userId });
+  /**
+   * Revokes one session's refresh token.
+   *
+   * `userId` is OPTIONAL and only ever reaches the audit log -- the revocation
+   * itself is driven entirely by the token (#310). That is what makes it
+   * possible for this route to be authenticated by the refresh cookie instead
+   * of a bearer: the token identifies the session, and now the user too.
+   *
+   * When no caller-supplied id is available the id is taken from the revoked
+   * row. A token matching no row audits nothing rather than auditing a guess.
+   */
+  async logout(rawRefreshToken: string, userId?: string): Promise<void> {
+    const revokedFor = await this.tokens.revokeAndIdentify(rawRefreshToken);
+    const actor = userId ?? revokedFor;
+    if (actor) this.auditLog.log({ action: 'auth.logout', userId: actor });
   }
 
   async logoutAllDevices(userId: string): Promise<void> {

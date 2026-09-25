@@ -217,16 +217,71 @@ export class AuthController {
     return { accessToken: pair.accessToken, refreshToken: pair.refreshToken, csrfToken };
   }
 
+  /**
+   * Ends one session.
+   *
+   * `@Public()` at the guard level, and NOT unauthenticated -- #310. This route
+   * used to require a bearer, and `apps/web` does not send one on it: its
+   * credentialed client carries the refresh cookie and the CSRF header and no
+   * `Authorization`. So the global guard rejected every browser logout before
+   * the handler ran, `clearAuthCookies` never executed, and the refresh chain
+   * was never revoked. A user who signed out -- on a shared device especially
+   * -- had not signed out, and the web swallowed the error and cleared locally,
+   * so nothing on screen or in any log said so.
+   *
+   * Requiring a bearer was the wrong bar anyway, and not only because the web
+   * omitted it: the access token has often EXPIRED at the moment someone signs
+   * out, which is one of the commonest times to press it. A logout that works
+   * only while you are still signed in is not a logout.
+   *
+   * The authentication is therefore the one `refresh` above already uses and
+   * this codebase already reviewed -- the refresh cookie proves the session and
+   * CSRF is checked on the cookie path only. Deliberately not a new scheme. The
+   * exposure is strictly LOWER than `refresh`'s, which is public on the same
+   * controller under the same rules and MINTS tokens; the worst a forged call
+   * here achieves is ending a session whose cookie the caller already had.
+   *
+   * A bearer is still honoured when present, so a native client keeping the
+   * body/bearer contract is unaffected.
+   */
+  @Public()
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   async logout(
     @Body() dto: RefreshDto,
-    @CurrentUser() user: AuthenticatedUser,
+    @CurrentUser() user: AuthenticatedUser | undefined,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<{ loggedOut: true }> {
-    const token = readRefreshCookie(req) ?? dto.refreshToken;
-    if (token) await this.auth.logout(token, user.userId);
+    const cookieToken = readRefreshCookie(req);
+    const token = cookieToken ?? dto.refreshToken;
+
+    // CSRF applies to the cookie path, and only when the cookie is the ONLY
+    // thing authenticating the call.
+    //
+    // A body-supplied token is not CSRF-vulnerable, which is `refresh`'s rule
+    // above. A verified bearer is not either, and that is worth stating because
+    // it is a property of `JwtAuthGuard` rather than an assumption: on a public
+    // route the guard still VERIFIES a presented bearer and sets `request.user`
+    // from the signed payload, and silently leaves `user` unset when the token
+    // is absent or invalid. So `user` being present here means a
+    // cryptographically valid access token -- something a cross-site attacker
+    // cannot obtain by making a browser send a cookie.
+    //
+    // Without this exception the native/bearer contract would newly require a
+    // CSRF header it has never sent, which is a breaking change to a path that
+    // was never broken.
+    if (cookieToken && !user) {
+      const verdict = evaluateCsrf(req, this.csrfPolicy);
+      if (!verdict.ok) {
+        throw new ForbiddenException({ code: 'CSRF_FAILED', message: 'درخواست نامعتبر است. صفحه را تازه‌سازی کنید.' });
+      }
+    }
+
+    // `user` may be absent now that the route is public, and its absence is
+    // never an error: the token identifies the session, and `logout` resolves
+    // the user from the revoked row for the audit entry.
+    if (token) await this.auth.logout(token, user?.userId);
 
     // Cookies are cleared even when no token was presented. A logout that
     // leaves a live cookie behind because the body happened to be empty is
