@@ -139,10 +139,63 @@ for (const file of markdownFiles) {
   });
 }
 
+// The spec-to-route map states its own totals in prose ("**Counts.** Of the N
+// numbered specs plus the `46` amendment (R rows): …"). Rows were added without
+// the sentence being updated once already (#324), so the totals are recounted
+// from the map's tables and must match the sentence exactly. A sentence that
+// can no longer be parsed is a failure, never a skip.
+const specMapFile = join(root, 'docs/design/V3.3_SPEC_TO_ROUTE_MAP.md');
+const specMap = readFileSync(specMapFile, 'utf8');
+const mapBody = specMap.slice(specMap.indexOf('## The map'), specMap.indexOf('## What the map shows'));
+const mapCounts = { rows: 0, numbered: new Set(), amendments: 0, done: 0, partial: 0, notBuilt: 0, blocked: 0, crossCutting: 0 };
+let mapSection = '';
+for (const line of mapBody.split(/\r?\n/)) {
+  if (line.startsWith('### ')) mapSection = line;
+  const row = line.match(/^\| (\d+)(a?) \| [A-Z0-9_]+ \|/);
+  if (!row) continue;
+  const cells = line.split('|').slice(1, -1).map((cell) => cell.trim());
+  mapCounts.rows += 1;
+  if (row[2]) mapCounts.amendments += 1;
+  else mapCounts.numbered.add(row[1]);
+  if (mapSection.startsWith('### Cross-cutting')) {
+    mapCounts.crossCutting += 1;
+    continue;
+  }
+  const verdict = cells[4];
+  if (verdict === '✅') mapCounts.done += 1;
+  else if (verdict === '◐') mapCounts.partial += 1;
+  else if (verdict === '⬜') mapCounts.notBuilt += 1;
+  else if (verdict === '⛔') mapCounts.blocked += 1;
+  else failures.push(`V3.3_SPEC_TO_ROUTE_MAP.md: row ${row[1]}${row[2]} has an unrecognised verdict "${verdict}"`);
+}
+if (mapCounts.rows < 50) failures.push(`spec-map recount is vacuous: parsed only ${mapCounts.rows} rows`);
+const stated = specMap.match(
+  /\*\*Counts\.\*\* Of the (\d+) numbered specs plus the `46` amendment \((\d+) rows\): \*\*(\d+) ✅\*\* routes[\s\S]*?\*\*(\d+) ◐\*\* routes?[\s\S]*?\*\*(\d+)\*\* with no route \(\*\*(\d+) ⬜\*\* and \*\*(\d+) ⛔\*\*\)[^*]*and \*\*(\d+) cross-cutting\*\*/,
+);
+if (!stated) {
+  failures.push('V3.3_SPEC_TO_ROUTE_MAP.md: the **Counts.** sentence is missing or no longer parseable');
+} else {
+  const [, numbered, rows, done, partial, noRoute, notBuilt, blocked, crossCutting] = stated.map(Number);
+  const actual = {
+    numbered: mapCounts.numbered.size,
+    rows: mapCounts.rows,
+    done: mapCounts.done,
+    partial: mapCounts.partial,
+    noRoute: mapCounts.notBuilt + mapCounts.blocked,
+    notBuilt: mapCounts.notBuilt,
+    blocked: mapCounts.blocked,
+    crossCutting: mapCounts.crossCutting,
+  };
+  const claimed = { numbered, rows, done, partial, noRoute, notBuilt, blocked, crossCutting };
+  for (const key of Object.keys(actual)) {
+    if (claimed[key] !== actual[key]) failures.push(`V3.3_SPEC_TO_ROUTE_MAP.md: Counts sentence says ${key} = ${claimed[key]}, the tables contain ${actual[key]}`);
+  }
+}
+
 if (failures.length > 0) {
   console.error(`Documentation audit failed (${failures.length}):`);
   failures.forEach((failure) => console.error(`- ${failure}`));
   process.exit(1);
 }
 
-console.log(`Documentation audit passed: ${markdownFiles.length} Markdown files, ${checkedRelativeLinks} relative links, ${adrFiles.length} ADRs, V3.2/V3.3 decision sequences complete, ${proposalFiles.length} unratified V3.3 proposal(s).`);
+console.log(`Documentation audit passed: ${markdownFiles.length} Markdown files, ${checkedRelativeLinks} relative links, ${adrFiles.length} ADRs, V3.2/V3.3 decision sequences complete, ${proposalFiles.length} unratified V3.3 proposal(s), spec-to-route map totals match its ${mapCounts.rows} rows.`);

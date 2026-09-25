@@ -68,3 +68,43 @@ point of use and pinned by a test, so a future re-sync cannot quietly undo it.
 task.** Eight such gaps are listed in the open-items document with their issue numbers.
 Where one exists, the UI renders nothing and a test asserts the absence — never a
 plausible-looking number.
+
+## V3.3 dashboard design (#45) (2026-09-25)
+
+The multi-workspace commercial and operations dashboard is designed. It is on
+`design/claude-design` at **`dfa0285b8c58039416f54cfc17a02aa7f90937a3`** (#323,
+reviewed by Codex at `280688c`), in the sibling pack
+`docs/design/v3.3-dashboard-pack/`. It was audited against implementation commit
+`2e3da4a43482680db5104c1e78dba48a8d2a18f4`. **Nothing in it is built:** it is
+the design that #264, #265, #226, #255 and #237 implement against.
+
+What it adds, and where to read it on the design branch:
+
+- **Screen 51** (`51_WORKSPACE_SHELL_AND_DASHBOARDS.md`) covers:
+  - one authenticated shell whose contexts (customer, professional, business,
+    finance, admin) are read from live `/v1/me` facts, never from stored
+    persona types;
+  - workspace switching with no pre-selection and no persisted `workspaceRef`;
+  - dashboards for ten personas;
+  - every money fact bound to a server field or to an explicit *unavailable*
+    state;
+  - seven states per surface, plus responsive, RTL and keyboard rules.
+- **Screen 52** (`52_MODERATOR_LANDING.md`) is the owner-approved moderator
+  landing inside the shared admin shell, and the safe media-inspection states
+  (#264, #265).
+- **Screen 51 §12** lists the amendments this design makes to specs 03, 13/46,
+  20, 25, 27, 36 and 42. **Read it before implementing any of them.**
+- **`verify/check-traceability.mjs`** checks the design against the code. It
+  fails if a cited route, field or capability disappears, if a recorded
+  absence stops being true, or if the prototype shows a field no route
+  returns. Its paths are canonical on every platform, and it was run on Linux
+  and, by the reviewer, on Windows.
+
+It **renders, rather than invents**, facts the API does not have:
+
+- reception has no role (`V33-DEC-030`, `V33-DEC-033` R1);
+- disputes and appeals have no route (#162, #180);
+- there is no seller-owed receivable (#177);
+- two gaps have no issue yet: a seller read for the booking-credit balance, and
+  a read for entitlement usage. Both are recorded in
+  `V3.3_FRONTEND_OPEN_ITEMS.md` §4.
