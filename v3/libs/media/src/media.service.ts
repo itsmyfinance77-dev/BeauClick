@@ -2,6 +2,7 @@ import { HttpStatus, Inject, Injectable, Logger, Optional } from '@nestjs/common
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { isUUID } from 'class-validator';
 import { DataSource, EntityManager, In, IsNull, LessThan, Repository } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
 
@@ -46,6 +47,22 @@ export class MediaNotFoundOrNotYoursException extends DomainException {
   constructor() {
     super('NOT_FOUND_OR_NOT_YOURS', 'این مورد یافت نشد.', HttpStatus.NOT_FOUND);
   }
+}
+
+/**
+ * What a download token signs. `r` is present only on a report-inspection
+ * token (#265), and its presence is what decides which authorization applies.
+ */
+interface DownloadClaims {
+  m: string;
+  u: string;
+  e: number;
+  r?: string;
+}
+
+/** What a moderator may inspect under an abuse report: a live, stored, PUBLIC object -- the only kind that can be reported. */
+function isInspectable(row: MediaObjectEntity): boolean {
+  return row.status === 'stored' && row.accessClass === 'public' && row.deletedAt === null;
 }
 
 export interface UploadGrant {
@@ -436,10 +453,78 @@ export class MediaService {
     return `${baseUrl.replace(/\/+$/, '')}/v1/media/${mediaId}/content?token=${token}`;
   }
 
-  private signDownloadToken(mediaId: string, viewerUserId: string, expiresAt: number): string {
-    const body = Buffer.from(JSON.stringify({ m: mediaId, u: viewerUserId, e: expiresAt })).toString('base64url');
+  /**
+   * Mints a short-lived inspection URL for the image an OPEN abuse report is
+   * about, for the moderator asking (#265).
+   *
+   * Upholding a report deletes the bytes and cannot be undone, so the
+   * moderator must be able to see the image first. The object is public, but
+   * its public URL is not handed out: that URL IS the storage key, it never
+   * expires, and it is not bound to anybody. This is the verification-evidence
+   * pattern instead -- a token for one object and one viewer, re-authorized on
+   * every request -- with the report id signed in as well, so the token opens
+   * this object only while THIS report is still open.
+   *
+   * Everything is resolved from the report. The caller names a report, never
+   * an object. An unknown or malformed report id, a report that is already
+   * decided, an object that is gone, not stored, not public or has no bytes,
+   * all get the one shared refusal: none of them may be told apart.
+   */
+  async issueReportInspectionUrl(
+    baseUrl: string,
+    reportId: string,
+    viewerUserId: string,
+  ): Promise<{ url: string; expiresAt: Date }> {
+    if (!isUUID(reportId)) throw new MediaNotFoundOrNotYoursException();
+    const report = await this.reports.findOne({ where: { id: reportId } });
+    if (!report || report.status !== 'open') throw new MediaNotFoundOrNotYoursException();
+
+    const row = await this.objects.findOne({ where: { id: report.mediaObjectId } });
+    if (!row || !isInspectable(row)) throw new MediaNotFoundOrNotYoursException();
+
+    // A row can say `stored` while the store has lost the bytes. Minting a URL
+    // for nothing would show the moderator a broken image and invite retries
+    // that can never succeed; the refusal says the same thing once, and says
+    // it the same way as every other reason.
+    let present = false;
+    try {
+      present = (await this.storage.head(row.storageKey)).exists;
+    } catch {
+      present = false;
+    }
+    if (!present) throw new MediaNotFoundOrNotYoursException();
+
+    const expiresAt = Math.floor(Date.now() / 1000) + PROTECTED_DOWNLOAD_TTL_SECONDS;
+    const token = this.signDownloadToken(row.id, viewerUserId, expiresAt, report.id);
+    return {
+      url: `${baseUrl.replace(/\/+$/, '')}/v1/media/${row.id}/content?token=${token}`,
+      expiresAt: new Date(expiresAt * 1000),
+    };
+  }
+
+  private signDownloadToken(mediaId: string, viewerUserId: string, expiresAt: number, reportId?: string): string {
+    const claims: DownloadClaims = { m: mediaId, u: viewerUserId, e: expiresAt };
+    if (reportId !== undefined) claims.r = reportId;
+    const body = Buffer.from(JSON.stringify(claims)).toString('base64url');
     const mac = createHmac('sha256', this.downloadTokenSecret).update(body).digest('base64url');
     return `${body}.${mac}`;
+  }
+
+  /**
+   * Whether the moderator named in an inspection token may still see the
+   * reported object, read live on every request.
+   *
+   * All four must hold NOW, not when the token was minted: the object is still
+   * a stored public object, the report still exists and is still open, the
+   * report is still about THIS object, and the viewer still holds
+   * `bc_moderate_media`. A decided report closes its tokens, and so does a
+   * revoked capability.
+   */
+  private async canInspectReported(row: MediaObjectEntity, reportId: string, viewerUserId: string): Promise<boolean> {
+    if (!isInspectable(row)) return false;
+    const report = await this.reports.findOne({ where: { id: reportId } });
+    if (!report || report.status !== 'open' || report.mediaObjectId !== row.id) return false;
+    return this.viewerHasCapability(viewerUserId, 'bc_moderate_media');
   }
 
   /**
@@ -465,7 +550,7 @@ export class MediaService {
       throw new MediaNotFoundOrNotYoursException();
     }
 
-    let claims: { m: string; u: string; e: number };
+    let claims: DownloadClaims;
     try {
       claims = JSON.parse(Buffer.from(parts[0], 'base64url').toString('utf8'));
     } catch {
@@ -486,13 +571,33 @@ export class MediaService {
     if (claims.m !== requestedMediaId) throw new MediaNotFoundOrNotYoursException();
 
     const row = await this.objects.findOne({ where: { id: claims.m } });
-    if (!row || row.status !== 'stored' || row.accessClass !== 'protected') {
-      throw new MediaNotFoundOrNotYoursException();
+    if (!row) throw new MediaNotFoundOrNotYoursException();
+
+    // Two kinds of token, and neither opens what the other does. An inspection
+    // token (it names a report) opens only a public object under that open
+    // report, for a live media moderator, and never through `canView` -- so it
+    // can never reach evidence, and an owner's shortcut never applies to it. A
+    // plain token opens only a protected object, exactly as before #265.
+    if (typeof claims.r === 'string') {
+      if (!(await this.canInspectReported(row, claims.r, claims.u))) throw new MediaNotFoundOrNotYoursException();
+    } else {
+      if (claims.r !== undefined || row.status !== 'stored' || row.accessClass !== 'protected') {
+        throw new MediaNotFoundOrNotYoursException();
+      }
+      if (!(await canView(row, claims.u))) throw new MediaNotFoundOrNotYoursException();
     }
 
-    if (!(await canView(row, claims.u))) throw new MediaNotFoundOrNotYoursException();
-
-    return { row, body: await this.storage.read(row.storageKey) };
+    // A store that has lost the bytes is the shared refusal too, not a 500:
+    // the driver's own error names the object's path or key, and the
+    // exception filter would log it verbatim for any unrecognized error.
+    let body: Buffer;
+    try {
+      body = await this.storage.read(row.storageKey);
+    } catch {
+      this.logger.warn(`Stored object ${row.id} could not be read for an authorized viewer`);
+      throw new MediaNotFoundOrNotYoursException();
+    }
+    return { row, body };
   }
 
   /** True when the user currently holds the capability, read live. Fails closed. */

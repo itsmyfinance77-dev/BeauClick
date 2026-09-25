@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   HttpCode,
   Param,
   Post,
@@ -211,7 +212,8 @@ export class MediaController {
     @Query('token') token: string,
     @Res() response: Response,
   ): Promise<void> {
-    if (!token) throw new MediaNotFoundOrNotYoursException();
+    // A repeated `?token=` arrives as an array; it is a refusal, not a 500.
+    if (typeof token !== 'string' || !token) throw new MediaNotFoundOrNotYoursException();
 
     const { row, body } = await this.media.resolveProtectedDownload(id, token, async (object, viewerUserId) => {
       // The owner may always read back what they submitted.
@@ -264,7 +266,14 @@ export class MediaController {
  */
 @Controller('v1/admin/media')
 export class AdminMediaController {
-  constructor(private readonly media: MediaService) {}
+  private readonly apiBaseUrl: string;
+
+  constructor(
+    private readonly media: MediaService,
+    config: ConfigService,
+  ) {
+    this.apiBaseUrl = (config.get<string>('PUBLIC_API_BASE_URL') ?? 'http://localhost:3099/api').replace(/\/+$/, '');
+  }
 
   @RequireCapability('bc_moderate_media')
   @Get('reports')
@@ -281,6 +290,31 @@ export class AdminMediaController {
       })),
       meta: { pagination: { page: query.page, limit: query.limit, total } },
     };
+  }
+
+  /**
+   * A short-lived URL for looking at the image an open report is about (#265).
+   *
+   * Upholding a report deletes the image for good, so the moderator must see
+   * it first; the decision panel keeps «تأیید و حذف» disabled until this URL
+   * has actually rendered. The URL is minted for THIS moderator and this open
+   * report, expires with `PROTECTED_DOWNLOAD_TTL_SECONDS`, and is re-authorized
+   * on every request against live data -- the evidence route's pattern. It is
+   * never the object's public URL, which is its storage key and never expires.
+   *
+   * The response names the report, the URL and when it expires, and nothing
+   * else about storage. Every reason it cannot be inspected is the one shared
+   * refusal. A read, so no audit record: nothing changes, exactly as for
+   * verification evidence.
+   */
+  @RequireCapability('bc_moderate_media')
+  @Get('reports/:id/inspection')
+  @Header('Cache-Control', 'private, no-store')
+  async inspection(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    const { url, expiresAt } = await this.media.issueReportInspectionUrl(this.apiBaseUrl, id, user.userId);
+    // `expiresAt` lets the panel take uphold away when the URL lapses, rather
+    // than leaving it enabled on an image whose authorization has run out.
+    return { id, inspectionUrl: url, expiresAt: expiresAt.toISOString() };
   }
 
   @RequireCapability('bc_moderate_media')

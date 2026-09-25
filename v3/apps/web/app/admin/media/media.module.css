@@ -164,14 +164,82 @@
   line-height: 1.8;
 }
 
-.noImage {
+.imageFrame {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  justify-items: start;
   margin: 0 0 16px;
-  padding: 12px 14px;
+  min-block-size: 64px;
+}
+
+.imageFrame > span {
+  inline-size: 100%;
+}
+
+/* The full image: never wider than the panel, never taller than most of the screen. */
+.image {
+  display: block;
+  max-inline-size: 100%;
+  max-block-size: 60vh;
+  block-size: auto;
+  inline-size: auto;
+  object-fit: contain;
   border-radius: var(--bc-radius-control);
-  background: var(--bc-color-warning-soft);
-  color: var(--bc-color-warning);
+  border: 1px solid var(--bc-color-border);
+}
+
+/* Loading underneath the skeleton, so `onLoad` can fire; invisible until it has. */
+.imageLoading {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.thumb {
+  display: inline-block;
+  inline-size: 48px;
+  block-size: 48px;
+  object-fit: cover;
+  border-radius: var(--bc-radius-cell);
+  vertical-align: middle;
+  margin-inline-end: 8px;
+}
+
+.thumbEmpty {
+  display: inline-block;
+  inline-size: 48px;
+  block-size: 48px;
+  border-radius: var(--bc-radius-cell);
+  background: var(--bc-color-surface-tint);
+  vertical-align: middle;
+  margin-inline-end: 8px;
+}
+
+.unavailable {
+  margin: 0;
   font-size: 13px;
-  line-height: 1.8;
+  color: var(--bc-color-ink-soft);
+}
+
+.blocked {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--bc-color-ink-soft);
+}
+
+.consequence {
+  margin: 0 0 8px;
+  font-weight: 700;
+  color: var(--bc-color-error);
+}
+
+.dialogReason {
+  margin: 0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
 }
 
 .reasonError {
