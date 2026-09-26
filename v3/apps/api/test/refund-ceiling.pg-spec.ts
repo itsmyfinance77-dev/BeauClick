@@ -248,6 +248,62 @@ describeIfPg('Refund ceiling on real PostgreSQL (#322)', () => {
   });
 
   describe('under concurrency', () => {
+    /*
+     * The deterministic form of the race. Another refund of the same payment
+     * is part-way through its check-and-insert: it holds the payment's lock
+     * and has written a `pending` 300 000 it has not committed yet. A refund
+     * started now must WAIT for it and then see it. Without the lock it would
+     * not wait, would not see the uncommitted row, and would send 200 000 on
+     * top -- 500 000 out of a 400 000 capture.
+     */
+    it('makes a refund wait for one in flight on the same payment, then measures it against that one', async () => {
+      const { orderId, intentId } = await capturedOrder(400_000);
+      const gateway = jest.spyOn(sandbox, 'refund');
+
+      const inFlight = dataSource.createQueryRunner();
+      await inFlight.connect();
+      await inFlight.startTransaction();
+      let racing: Promise<RefundEntity> | null = null;
+      try {
+        await inFlight.query(`SELECT id FROM payment.payment_intents WHERE id = $1 FOR UPDATE`, [intentId]);
+        await inFlight.manager.insert(RefundEntity, {
+          id: uuidv7(),
+          orderId,
+          paymentIntentId: intentId,
+          paymentAttemptId: null,
+          requestKey: 'in-flight',
+          amountToman: 300_000,
+          status: 'pending',
+          kind: 'order',
+          providerRefundReference: null,
+          failureCode: null,
+          reason: 'در جریان',
+          requestedByActorType: 'system',
+          requestedByActorId: null,
+          completedAt: null,
+        });
+
+        let finished = false;
+        racing = refund(orderId, 200_000, 'racing');
+        void racing.then(
+          () => (finished = true),
+          () => (finished = true),
+        );
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        // Still waiting on the lock, and nothing sent to the gateway.
+        expect(finished).toBe(false);
+        expect(gateway).not.toHaveBeenCalled();
+
+        await inFlight.commitTransaction();
+      } finally {
+        if (inFlight.isTransactionActive) await inFlight.rollbackTransaction();
+        await inFlight.release();
+      }
+
+      await expect(racing).rejects.toMatchObject(exceeds(200_000, 100_000));
+      expect(gateway).not.toHaveBeenCalled();
+    });
+
     it('never lets concurrent refunds of one payment add up past the capture', async () => {
       const { orderId } = await capturedOrder(400_000);
       const gateway = jest.spyOn(sandbox, 'refund');
@@ -274,8 +330,12 @@ describeIfPg('Refund ceiling on real PostgreSQL (#322)', () => {
       const { orderId } = await capturedOrder(400_000);
       const gateway = jest.spyOn(sandbox, 'refund');
 
-      const results = await Promise.all(Array.from({ length: 4 }, () => refund(orderId, 400_000, 'same-key')));
+      // `allSettled`, not `all`: every call finishes inside this test even if
+      // one is refused, so none is still writing when the next test truncates.
+      const settled = await Promise.allSettled(Array.from({ length: 4 }, () => refund(orderId, 400_000, 'same-key')));
 
+      expect(settled.map((s) => s.status)).toEqual(['fulfilled', 'fulfilled', 'fulfilled', 'fulfilled']);
+      const results = settled.map((s) => (s as PromiseFulfilledResult<RefundEntity>).value);
       expect(new Set(results.map((r) => r.id)).size).toBe(1);
       expect(await refundRows(orderId)).toHaveLength(1);
       expect(gateway).toHaveBeenCalledTimes(1);
