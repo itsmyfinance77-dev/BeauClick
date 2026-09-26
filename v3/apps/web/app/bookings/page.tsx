@@ -7,6 +7,7 @@ import { formatFullJalaliDate } from '@beauclick/persian-utils';
 
 import { useAuth } from '@/lib/auth-context';
 import { ProtectedRoute } from '@/components/protected-route';
+import { RemedyPanel } from '@/components/remedy-panel';
 import { Alert, Button, LoadingState } from '@/components/ui';
 import { ConfirmDialog, EmptyState, PageHeader, SegmentedControl, TextLink } from '@/components/kit';
 import { bookingApi, isUpcomingBooking, slotTimeLabel, type BookingSummary } from '@/lib/booking-api';
@@ -63,6 +64,32 @@ function BookingsContent() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [pendingCancel, setPendingCancel] = useState<BookingSummary | null>(null);
   const [tab, setTab] = useState<Tab>('upcoming');
+
+  /*
+   * Screen 49 (#212): which rows have their remedy panel open. Each panel
+   * reads when it opens, never on load — the remedy route is per booking and
+   * this is a list.
+   */
+  const [remedyOpen, setRemedyOpen] = useState<ReadonlySet<string>>(new Set());
+  function toggleRemedy(id: string) {
+    setRemedyOpen((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  /**
+   * A remedy reschedule revives the booking on its new slot as `confirmed`, so
+   * it now belongs on the upcoming tab. The list is re-read — the server
+   * decides where it landed — and the tab follows it, with its panel still
+   * open to show the closed resolution.
+   */
+  async function afterRemedyReschedule() {
+    await load();
+    setTab('upcoming');
+  }
 
   const load = useCallback(async () => {
     try {
@@ -182,6 +209,13 @@ function BookingsContent() {
             // time has passed sits on the past tab, where a cancel button would offer to
             // release a slot nobody can take any more.
             const cancellable = isUpcomingBooking(booking);
+            // Screen 49 (#212). A remedy follows a cancellation that was not the
+            // customer's, and a remedy reschedule leaves the booking confirmed
+            // with a reschedule behind it — so the panel is OFFERED on those two
+            // shapes, and whether a remedy EXISTS is the server's answer
+            // (`REMEDY_NOT_OFFERED` is ordinary, not an error).
+            const remedyRelevant = booking.status === 'cancelled' || booking.rescheduleCount > 0;
+            const remedyIsOpen = remedyOpen.has(booking.id);
             return (
               <li key={booking.id} className={styles.card} data-booking={booking.id}>
                 <div className={styles.bar}>
@@ -209,6 +243,26 @@ function BookingsContent() {
                     >
                       پیام
                     </Button>
+                  </div>
+                ) : null}
+
+                {remedyRelevant ? (
+                  <div className={styles.actions}>
+                    <Button
+                      variant="ghost"
+                      inline
+                      aria-expanded={remedyIsOpen}
+                      aria-controls={`remedy-${booking.id}`}
+                      onClick={() => toggleRemedy(booking.id)}
+                    >
+                      {remedyIsOpen ? 'بستن بازپرداخت و جبران' : 'بازپرداخت و جبران'}
+                    </Button>
+                  </div>
+                ) : null}
+
+                {remedyRelevant && remedyIsOpen ? (
+                  <div id={`remedy-${booking.id}`} className={styles.remedy}>
+                    <RemedyPanel booking={booking} onRescheduled={() => void afterRemedyReschedule()} />
                   </div>
                 ) : null}
 

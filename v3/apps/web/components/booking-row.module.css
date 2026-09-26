@@ -17,6 +17,7 @@
     'info'
     'actions'
     'notes'
+    'outcome'
     'history';
 }
 
@@ -33,6 +34,7 @@
     grid-template-areas:
       'info status actions'
       'notes notes notes'
+      'outcome outcome outcome'
       'history history history';
   }
 }
@@ -107,6 +109,12 @@
 
 .notes {
   grid-area: notes;
+}
+
+/* Screen 49 (#212): the no-show panel, full width under the row. */
+.outcome {
+  grid-area: outcome;
+  min-inline-size: 0;
 }
 
 .note {

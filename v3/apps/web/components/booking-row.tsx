@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import {
   formatToman,
   formatZonedFullDate,
@@ -29,8 +30,10 @@ export function BookingRow({
   service,
   busy,
   onComplete,
-  onNoShow,
   onReschedule,
+  noShowOpen,
+  onToggleNoShow,
+  noShowPanel,
   historyOpen,
   historyLoading,
   historyError,
@@ -43,8 +46,12 @@ export function BookingRow({
   service: ServiceOffering | undefined;
   busy: boolean;
   onComplete: () => void;
-  onNoShow: () => void;
   onReschedule: () => void;
+  /** Screen 49 (#212): whether this row's no-show panel is open. */
+  noShowOpen: boolean;
+  onToggleNoShow: () => void;
+  /** Rendered only while open, so a closed row has read nothing. */
+  noShowPanel: ReactNode;
   historyOpen: boolean;
   historyLoading: boolean;
   historyError: string | null;
@@ -53,17 +60,23 @@ export function BookingRow({
   onRetryHistory: () => void;
 }) {
   const start = new Date(booking.startAt);
-  const ended = new Date(booking.endAt).getTime() <= Date.now();
   const hoursUntil = (start.getTime() - Date.now()) / 3_600_000;
 
   const canComplete = booking.status === 'confirmed';
-  const canNoShow = booking.status === 'confirmed' && ended;
+  /*
+   * Screen 49 (#212). The panel is OFFERED on every booking a declaration can
+   * concern — confirmed ones, and no-shows to read back what was declared —
+   * and whether a declaration is PERMITTED is the panel's question for the
+   * server. This row used to decide it from the clock (`endAt <= now`), which
+   * was wrong for every governed booking: the server's rule is slot start plus
+   * the booking's own grace, and it refuses an empty statement there.
+   */
+  const hasNoShowPanel = booking.status === 'confirmed' || booking.status === 'no_show';
   const canReschedule =
     (booking.status === 'confirmed' || booking.status === 'pending') &&
     booking.rescheduleCount < MAX_RESCHEDULES &&
     hoursUntil >= RESCHEDULE_MIN_HOURS;
 
-  const noShowNote = booking.status === 'confirmed' && !ended;
   const rescheduleNote = (booking.status === 'confirmed' || booking.status === 'pending') && !canReschedule;
 
   return (
@@ -93,9 +106,16 @@ export function BookingRow({
             ثبت انجام نوبت
           </Button>
         ) : null}
-        {canNoShow ? (
-          <Button type="button" variant="danger" inline disabled={busy} onClick={onNoShow}>
-            عدم حضور مشتری
+        {hasNoShowPanel ? (
+          <Button
+            type="button"
+            variant="ghost"
+            inline
+            aria-expanded={noShowOpen}
+            aria-controls={`no-show-${booking.id}`}
+            onClick={onToggleNoShow}
+          >
+            {noShowOpen ? 'بستن عدم حضور' : 'عدم حضور مشتری'}
           </Button>
         ) : null}
         {canReschedule ? (
@@ -111,16 +131,19 @@ export function BookingRow({
       {/* Why an action is unavailable, rather than a dead button.
           The server is the authority in every case; these are
           explanations of its rules, not the enforcement of them. */}
-      {noShowNote || rescheduleNote ? (
+      {rescheduleNote ? (
         <div className={styles.notes}>
-          {noShowNote ? <p className={styles.note}>ثبت عدم حضور تنها پس از پایان زمان نوبت ممکن است.</p> : null}
-          {rescheduleNote ? (
-            <p className={styles.note}>
-              {booking.rescheduleCount >= MAX_RESCHEDULES
-                ? `حداکثر ${toPersianDigits(MAX_RESCHEDULES)} بار جابه‌جایی مجاز است.`
-                : `تغییر زمان تا ${toPersianDigits(RESCHEDULE_MIN_HOURS)} ساعت پیش از نوبت ممکن است.`}
-            </p>
-          ) : null}
+          <p className={styles.note}>
+            {booking.rescheduleCount >= MAX_RESCHEDULES
+              ? `حداکثر ${toPersianDigits(MAX_RESCHEDULES)} بار جابه‌جایی مجاز است.`
+              : `تغییر زمان تا ${toPersianDigits(RESCHEDULE_MIN_HOURS)} ساعت پیش از نوبت ممکن است.`}
+          </p>
+        </div>
+      ) : null}
+
+      {noShowOpen ? (
+        <div id={`no-show-${booking.id}`} className={styles.outcome}>
+          {noShowPanel}
         </div>
       ) : null}
 

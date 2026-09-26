@@ -5,6 +5,7 @@ import { formatZonedFullDate, formatZonedTime, toPersianDigits, zonedIsoDate } f
 import { Alert, Button, ErrorState, LoadingState } from '@/components/ui';
 import { ConfirmDialog, EmptyState, PageHeader, Select } from '@/components/kit';
 import { BookingRow } from '@/components/booking-row';
+import { NoShowPanel } from '@/components/no-show-panel';
 import { TabList, TabPanel } from '@/components/tab-list';
 import { ProGuard } from '@/components/pro-guard';
 import { useAuth } from '@/lib/auth-context';
@@ -15,7 +16,6 @@ import {
   listMyServices,
   listMySlots,
   listProfessionalBookings,
-  markNoShow,
   rescheduleBooking,
   type BookingHistoryEntry,
   type BookingSummary,
@@ -74,7 +74,24 @@ function ProBookings({ profile }: { profile: MyProviderProfile }) {
 
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [confirming, setConfirming] = useState<{ booking: ProfessionalBookingSummary; action: 'complete' | 'no_show' } | null>(null);
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState<ProfessionalBookingSummary | null>(null);
+
+  /*
+   * Screen 49 (#212): which rows have their no-show panel open. A set, not one
+   * id, so opening a second row does not discard what the first one read; and
+   * each panel reads only when it opens, so the list itself costs no request
+   * per row.
+   */
+  const [noShowOpen, setNoShowOpen] = useState<ReadonlySet<string>>(new Set());
+  const toggleNoShow = useCallback((id: string) => {
+    setNoShowOpen((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
 
   const [historyFor, setHistoryFor] = useState<string | null>(null);
   const [history, setHistory] = useState<BookingHistoryEntry[]>([]);
@@ -180,7 +197,7 @@ function ProBookings({ profile }: { profile: MyProviderProfile }) {
    * Replaces one booking with the server's own returned state.
    *
    * Deliberately NOT an optimistic update. `complete()` and `markNoShow()`
-   * return `false` when the compare-and-swap loses -- a booking cancelled by
+   * (the latter now sent from `NoShowPanel`, #212) return `false` when the compare-and-swap loses -- a booking cancelled by
    * the customer a second earlier, say -- and the controller then returns the
    * booking's REAL current state with a 200. Optimistically painting
    * "انجام شد" would contradict the server on exactly the races this
@@ -199,11 +216,25 @@ function ProBookings({ profile }: { profile: MyProviderProfile }) {
     void refreshUpcomingBookings();
   }
 
-  async function runAction(booking: ProfessionalBookingSummary, action: 'complete' | 'no_show') {
+  /**
+   * Screen 49 (#212). A declared booking is terminal, so it moves to «گذشته»;
+   * the tab follows it and its panel stays open there, showing the permanent
+   * record. The result is announced here, at page level, because the panel is
+   * remounted under the other tab.
+   */
+  function onDeclared(updated: BookingSummary) {
+    applyServerState(updated);
+    if (updated.status === 'no_show') {
+      setActionNotice('عدم حضور ثبت شد.');
+      setTab('past');
+    }
+  }
+
+  async function runComplete(booking: ProfessionalBookingSummary) {
     setBusyId(booking.id);
     setActionError(null);
     try {
-      const res = action === 'complete' ? await completeBooking(api, booking.id) : await markNoShow(api, booking.id);
+      const res = await completeBooking(api, booking.id);
       if (res.data) applyServerState(res.data);
       setConfirming(null);
     } catch (err) {
@@ -211,7 +242,7 @@ function ProBookings({ profile }: { profile: MyProviderProfile }) {
       setActionError(err instanceof Error ? err.message : 'انجام این عملیات ممکن نشد.');
       // Reload, do not merely report the error.
       //
-      // The commonest reason a complete/no-show is refused is that the card on
+      // The commonest reason a completion is refused is that the card on
       // screen is STALE -- the customer cancelled after this list was fetched,
       // so the server 409s an illegal transition while the UI still shows
       // "تأیید شده". Showing only the message would leave the user staring at
@@ -342,6 +373,7 @@ function ProBookings({ profile }: { profile: MyProviderProfile }) {
 
       {error ? <ErrorState message={error} onRetry={() => void load()} /> : null}
       {actionError ? <Alert>{actionError}</Alert> : null}
+      {actionNotice ? <Alert tone="success">{actionNotice}</Alert> : null}
 
       <TabList label="فیلتر رزروها" idPrefix="pro-bookings" tabs={tabs} value={tab} onChange={setTab} />
 
@@ -362,9 +394,15 @@ function ProBookings({ profile }: { profile: MyProviderProfile }) {
                     serviceName={serviceName(booking.serviceId)}
                     service={services.find((s) => s.id === booking.serviceId)}
                     busy={busyId === booking.id}
-                    onComplete={() => setConfirming({ booking, action: 'complete' })}
-                    onNoShow={() => setConfirming({ booking, action: 'no_show' })}
+                    onComplete={() => setConfirming(booking)}
                     onReschedule={() => void openReschedule(booking)}
+                    noShowOpen={noShowOpen.has(booking.id)}
+                    onToggleNoShow={() => toggleNoShow(booking.id)}
+                    noShowPanel={
+                      noShowOpen.has(booking.id) ? (
+                        <NoShowPanel booking={booking} onDeclared={onDeclared} onStale={() => void load()} />
+                      ) : null
+                    }
                     historyOpen={historyFor === booking.id}
                     historyLoading={historyLoading}
                     historyError={historyError}
@@ -396,27 +434,20 @@ function ProBookings({ profile }: { profile: MyProviderProfile }) {
 
       <ConfirmDialog
         open={confirming !== null}
-        title={confirming?.action === 'complete' ? 'ثبت انجام نوبت' : 'ثبت عدم حضور مشتری'}
-        tone={confirming?.action === 'complete' ? 'primary' : 'danger'}
-        confirmLabel={confirming?.action === 'complete' ? 'بله، انجام شد' : 'بله، مشتری نیامد'}
+        title="ثبت انجام نوبت"
+        confirmLabel="بله، انجام شد"
         busy={busyId !== null}
-        onConfirm={() => confirming && void runAction(confirming.booking, confirming.action)}
+        onConfirm={() => confirming && void runComplete(confirming)}
         onCancel={() => setConfirming(null)}
         // The consequence text is the dialog's accessible description: a
         // screen-reader user hears what confirming does, not just its title.
         describedById="pro-bookings-confirm-consequence"
         body={
           <div id="pro-bookings-confirm-consequence">
-            {confirming?.action === 'complete' ? (
-              <>
-                <p className={styles.dialogText}>این نوبت به‌عنوان «انجام‌شده» ثبت می‌شود.</p>
-                <p className={styles.dialogLast}>
-                  پس از ثبت، امتیاز باشگاه مشتری، مسیر زیبایی او و آمار شما به‌روزرسانی می‌شود. این عملیات برگشت‌پذیر نیست.
-                </p>
-              </>
-            ) : (
-              <p className={styles.dialogLast}>این نوبت به‌عنوان «عدم حضور» ثبت می‌شود. این عملیات برگشت‌پذیر نیست.</p>
-            )}
+            <p className={styles.dialogText}>این نوبت به‌عنوان «انجام‌شده» ثبت می‌شود.</p>
+            <p className={styles.dialogLast}>
+              پس از ثبت، امتیاز باشگاه مشتری، مسیر زیبایی او و آمار شما به‌روزرسانی می‌شود. این عملیات برگشت‌پذیر نیست.
+            </p>
           </div>
         }
       />
