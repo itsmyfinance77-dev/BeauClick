@@ -192,26 +192,34 @@ export function MoneyChart({
         {showTable ? 'پنهان کردن جدول' : 'نمایش به‌صورت جدول'}
       </button>
 
-      {/* Always in the document: this is the accessible equivalent of the plot. */}
-      <table id={tableId} className={showTable ? styles.table : styles.srOnly}>
-        <caption className={styles.srOnly}>{title}</caption>
-        <thead>
-          <tr>
-            <th scope="col">{period}</th>
-            <th scope="col">{valueHeading}</th>
-            {hasDetail ? <th scope="col">{detailHeading ?? 'جزئیات'}</th> : null}
-          </tr>
-        </thead>
-        <tbody>
-          {points.map((p) => (
-            <tr key={p.key}>
-              <th scope="row">{p.label}</th>
-              <td>{formatValue(p.value)}</td>
-              {hasDetail ? <td>{p.detail ?? ''}</td> : null}
+      {/*
+        Always in the document: this is the accessible equivalent of the plot.
+        Hidden through a BLOCK wrapper, never on the <table> itself: a table box
+        is at least as wide as its content and ignores a 1px width and
+        `overflow: hidden`, so a "hidden" table with long rows still widened the
+        page -- 84px of sideways scroll on /finance at 375 (#255).
+      */}
+      <div id={tableId} className={showTable ? undefined : styles.srOnly}>
+        <table className={styles.table}>
+          <caption className={styles.srOnly}>{title}</caption>
+          <thead>
+            <tr>
+              <th scope="col">{period}</th>
+              <th scope="col">{valueHeading}</th>
+              {hasDetail ? <th scope="col">{detailHeading ?? 'جزئیات'}</th> : null}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {points.map((p) => (
+              <tr key={p.key}>
+                <th scope="row">{p.label}</th>
+                <td>{formatValue(p.value)}</td>
+                {hasDetail ? <td>{p.detail ?? ''}</td> : null}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
