@@ -384,6 +384,7 @@ describePg('chat — messaging, privacy, moderation (real PostgreSQL)', () => {
     it('refuses an unauthenticated caller on every participant route', async () => {
       await api().get('/api/v1/chat/conversations').expect(401);
       await api().get('/api/v1/chat/unread-count').expect(401);
+      await api().get('/api/v1/chat/eligible-counterparties').expect(401);
       await api().post('/api/v1/chat/conversations').send({}).expect(401);
     });
 

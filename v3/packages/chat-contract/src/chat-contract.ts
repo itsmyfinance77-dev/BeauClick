@@ -307,6 +307,15 @@ export interface ChatMessageView {
 /** One conversation in an inbox. Carries no message bodies. */
 export interface ChatConversationSummary {
   readonly id: string;
+  /**
+   * Which side of THIS conversation the caller sits on (#328).
+   *
+   * An inbox unions both sides — a professional who has also booked as a
+   * customer gets one list — and for a seller-side reader `counterpartyType/Id`
+   * names their OWN party, so without this a row cannot be labelled. Computed
+   * per request from the same live access verdict as `canSend`.
+   */
+  readonly side: ChatSide;
   readonly counterpartyType: ChatCounterpartyType;
   readonly counterpartyId: string;
   readonly messageCount: number;
@@ -324,6 +333,30 @@ export interface ChatConversationSummary {
   readonly canSend: boolean;
   readonly cannotSendReason: ChatRefusalReason | null;
   readonly closedReason: ChatClosedReason | null;
+  /**
+   * Whether THIS caller placed a block on the other side (#328) — so the page
+   * can offer «unblock» to the one person allowed to use it (only the blocker
+   * may unblock). False for everybody else, including the blocked party, who
+   * already knows they placed none; the refusal they see stays the one generic
+   * `blocked`, never a direction (`V32-DEC-014`).
+   */
+  readonly blockedByMe: boolean;
+}
+
+/**
+ * A counterparty the caller may open a conversation with, and the caller's own
+ * bookings that make it so (#328).
+ *
+ * The eligibility is the server's (`V32-DEC-011`): `bookingIds` are exactly the
+ * caller's qualifying bookings with this counterparty — the seller party as
+ * snapshotted at checkout — so a page can offer «message» on those bookings and
+ * no others without re-deriving the rule. Self-scoped: there is no parameter
+ * through which another customer's relationships could be asked for.
+ */
+export interface ChatEligibleCounterpartyView {
+  readonly counterpartyType: ChatCounterpartyType;
+  readonly counterpartyId: string;
+  readonly bookingIds: readonly string[];
 }
 
 /** The unread badge. Server-computed; never decremented locally. */

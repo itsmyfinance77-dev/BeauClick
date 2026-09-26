@@ -60,6 +60,12 @@ export interface ChatEligibleRelationship {
    * would leave those two with an undefined send window.
    */
   readonly lastQualifyingSlotEnd: Date;
+  /**
+   * The customer's qualifying bookings with this counterparty, newest slot
+   * first (#328). The same rows `lastQualifyingSlotEnd` is taken over — so a
+   * page can offer «message» on exactly the bookings that make it possible.
+   */
+  readonly bookingIds: readonly string[];
 }
 
 /**

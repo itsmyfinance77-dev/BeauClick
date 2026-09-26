@@ -41,6 +41,15 @@ import {
 import { CHAT_SELLER_ACCESS, ChatSellerAccessPort } from './ports/chat.ports';
 
 /**
+ * An optional narrowing of the caller's inbox (#328): which side of the union,
+ * and which kind of seller party. Absent means the whole inbox, as before.
+ */
+export interface ChatInboxFilter {
+  side?: ChatSide;
+  counterpartyType?: ChatCounterpartyType;
+}
+
+/**
  * Conversations and messages.
  *
  * ## The path a message takes
@@ -375,6 +384,7 @@ export class ChatService {
     callerUserId: string,
     limit: number,
     cursor: string | null,
+    filter: ChatInboxFilter = {},
   ): Promise<{ items: ChatConversationEntity[]; nextCursor: string | null }> {
     const pageSize = Math.min(Math.max(1, limit), CHAT_MAX_PAGE_SIZE);
     const decoded = cursor ? decodeConversationCursor(cursor) : null;
@@ -423,13 +433,22 @@ export class ChatService {
      * vocabulary members this process read back from its own database, and the
      * separator is a character neither can contain.
      */
-    const clauses = ['c.customerUserId = :callerUserId'];
+    /*
+     * #328: an optional narrowing, never a widening. `side` picks which of the
+     * union's halves to keep and `counterpartyType` which kind of seller party;
+     * both only ever REMOVE clauses built from the caller's own access, so no
+     * filter value can reach a conversation the unfiltered inbox would not.
+     */
+    const wantCustomer = filter.side !== 'seller';
+    const wantSeller = filter.side !== 'customer';
+    const clauses: string[] = [];
     const parameters: Record<string, unknown> = { callerUserId };
-    if (sellerParties.length > 0) {
+    if (wantCustomer) clauses.push('c.customerUserId = :callerUserId');
+    if (wantSeller && sellerParties.length > 0) {
       clauses.push(`(c.counterparty_type || ':' || c.counterparty_id::text) = ANY(CAST(:pairKeys AS text[]))`);
       parameters.pairKeys = sellerParties.map((p) => `${p.counterpartyType}:${p.counterpartyId}`);
     }
-    if (grantedScopes.length > 0) {
+    if (wantSeller && grantedScopes.length > 0) {
       clauses.push(
         `(c.counterparty_type || ':' || c.counterparty_id::text || ':' || c.customer_user_id::text) = ANY(CAST(:grantedKeys AS text[]))`,
       );
@@ -437,7 +456,13 @@ export class ChatService {
         (s) => `${s.counterpartyType}:${s.counterpartyId}:${s.customerUserId}`,
       );
     }
+    // Nothing left to match (a seller-only view for a caller with no seller
+    // reach): an empty page, not an unfiltered one.
+    if (clauses.length === 0) return { items: [], nextCursor: null };
     query.where(`(${clauses.join(' OR ')})`, parameters);
+    if (filter.counterpartyType) {
+      query.andWhere('c.counterpartyType = :counterpartyType', { counterpartyType: filter.counterpartyType });
+    }
 
     if (decoded) {
       query.andWhere(

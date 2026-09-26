@@ -104,7 +104,9 @@ export class BookingBackedChatEligibility implements ChatEligibilityPort {
   private readonly sql = `
     SELECT o.seller_party_type AS counterparty_type,
            o.seller_party_id   AS counterparty_id,
-           MAX(b.slot_end)     AS last_slot_end
+           MAX(b.slot_end)     AS last_slot_end,
+           -- #328: the qualifying bookings themselves, newest slot first.
+           array_agg(b.id::text ORDER BY b.slot_end DESC, b.id DESC) AS booking_ids
       FROM booking.bookings b
       -- INNER JOIN, deliberately. A booking with no order snapshot fails closed.
       JOIN commerce.orders o
@@ -117,7 +119,7 @@ export class BookingBackedChatEligibility implements ChatEligibilityPort {
     manager: EntityManager,
     customerUserId: string,
   ): Promise<readonly ChatEligibleRelationship[]> {
-    const rows: Array<{ counterparty_type: ChatCounterpartyType; counterparty_id: string; last_slot_end: Date }> =
+    const rows: Array<{ counterparty_type: ChatCounterpartyType; counterparty_id: string; last_slot_end: Date; booking_ids: string[] }> =
       await manager.query(
         `${this.sql} GROUP BY o.seller_party_type, o.seller_party_id`,
         [customerUserId],
@@ -127,6 +129,7 @@ export class BookingBackedChatEligibility implements ChatEligibilityPort {
       counterpartyType: row.counterparty_type,
       counterpartyId: row.counterparty_id,
       lastQualifyingSlotEnd: new Date(row.last_slot_end),
+      bookingIds: row.booking_ids,
     }));
   }
 
@@ -136,7 +139,7 @@ export class BookingBackedChatEligibility implements ChatEligibilityPort {
     counterpartyType: ChatCounterpartyType,
     counterpartyId: string,
   ): Promise<ChatEligibleRelationship | null> {
-    const rows: Array<{ counterparty_type: ChatCounterpartyType; counterparty_id: string; last_slot_end: Date }> =
+    const rows: Array<{ counterparty_type: ChatCounterpartyType; counterparty_id: string; last_slot_end: Date; booking_ids: string[] }> =
       await manager.query(
         `${this.sql}
            AND o.seller_party_type = $2 AND o.seller_party_id = $3
@@ -149,6 +152,7 @@ export class BookingBackedChatEligibility implements ChatEligibilityPort {
       counterpartyType: rows[0].counterparty_type,
       counterpartyId: rows[0].counterparty_id,
       lastQualifyingSlotEnd: new Date(rows[0].last_slot_end),
+      bookingIds: rows[0].booking_ids,
     };
   }
 }
