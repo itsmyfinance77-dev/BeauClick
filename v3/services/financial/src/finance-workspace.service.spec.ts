@@ -5,6 +5,7 @@ import {
   FINANCE_PAGE_SIZE_DEFAULT,
   FINANCE_PAGE_SIZE_MAX,
   FinanceWorkspaceService,
+  SETTLEMENT_SERIES_MONTHS,
   decodeWorkspaceCursor,
   encodeWorkspaceCursor,
 } from './finance-workspace.service';
@@ -66,6 +67,9 @@ function serviceFor(
     partySummary: jest.fn(),
     outstandingOrdersForParty: jest.fn(),
     settlementPageForParty: jest.fn().mockResolvedValue([]),
+    monthlyTotalsForParty: jest.fn(async (_type: string, _id: string, windows: readonly unknown[]) =>
+      windows.map((_, i) => ({ settledToman: (i + 1) * 1000, reversedToman: i * 10, settlementCount: i + 1 })),
+    ),
   };
   const fundJournal = { statesForParty: jest.fn().mockResolvedValue({}) };
   const owners = {
@@ -514,5 +518,69 @@ describe('page bounds', () => {
       null,
       expect.any(Number),
     );
+  });
+});
+
+describe('the monthly settlement series (#255)', () => {
+  // 4 Mehr 1405, 15:30 Tehran.
+  const NOW = new Date('2026-09-26T12:00:00.000Z');
+
+  it('reads four Jalali months for the addressed party, oldest first, the running month last and not complete', async () => {
+    const { service, settlements } = serviceFor([PROFESSIONAL, BUSINESS]);
+    const ref = service.referenceFor(OWNER, BUSINESS);
+
+    const months = await service.settlementSeriesFor(OWNER, ref, NOW);
+
+    expect(SETTLEMENT_SERIES_MONTHS).toBe(4);
+    expect(months.map((m) => m.month)).toEqual(['1405-04', '1405-05', '1405-06', '1405-07']);
+    expect(months.map((m) => m.complete)).toEqual([true, true, true, false]);
+    // The totals are the port's, month for month, in the order of the windows.
+    expect(months.map((m) => [m.settledToman, m.reversedToman, m.settlementCount])).toEqual([
+      [1000, 0, 1],
+      [2000, 10, 2],
+      [3000, 20, 3],
+      [4000, 30, 4],
+    ]);
+    const [partyType, partyId, windows] = settlements.monthlyTotalsForParty.mock.calls[0];
+    expect([partyType, partyId]).toEqual(['business', BUSINESS.partyId]);
+    expect((windows as Array<{ startsAt: Date }>).map((w) => w.startsAt.toISOString())).toEqual(months.map((m) => m.startsAt.toISOString()));
+  });
+
+  it('marks a month complete from the instant it ends, not a moment later', async () => {
+    const { service } = serviceFor([PROFESSIONAL]);
+    const ref = service.referenceFor(OWNER, PROFESSIONAL);
+
+    // 1 Mehr 1405 begins at 2026-09-22T20:30Z: Shahrivar is complete from exactly then.
+    const atEnd = await service.settlementSeriesFor(OWNER, ref, new Date('2026-09-22T20:30:00.000Z'));
+    expect(atEnd.map((m) => [m.month, m.complete])).toEqual([
+      ['1405-04', true],
+      ['1405-05', true],
+      ['1405-06', true],
+      ['1405-07', false],
+    ]);
+    const justBefore = await service.settlementSeriesFor(OWNER, ref, new Date('2026-09-22T20:29:59.999Z'));
+    expect(justBefore.map((m) => [m.month, m.complete])).toEqual([
+      ['1405-03', true],
+      ['1405-04', true],
+      ['1405-05', true],
+      ['1405-06', false],
+    ]);
+  });
+
+  it('is readable by a finance_read grantee, for the granted business', async () => {
+    const { service, settlements } = serviceFor([], [GRANTED]);
+    const ref = service.referenceFor(OWNER, GRANTED);
+
+    await expect(service.settlementSeriesFor(OWNER, ref, NOW)).resolves.toHaveLength(4);
+    expect(settlements.monthlyTotalsForParty.mock.calls[0].slice(0, 2)).toEqual(['business', GRANTED.partyId]);
+  });
+
+  it('refuses a foreign reference with the shared exception, before any row is read', async () => {
+    const { service, settlements } = serviceFor([PROFESSIONAL]);
+    const foreign = deriveWorkspaceReference(SECRET, '018f4b1a-0000-7000-8000-000000000002', PROFESSIONAL);
+
+    await expect(service.settlementSeriesFor(OWNER, foreign, NOW)).rejects.toThrow(NotFoundOrNotYoursException);
+    await expect(service.settlementSeriesFor(OWNER, 'x'.repeat(43), NOW)).rejects.toThrow(NotFoundOrNotYoursException);
+    expect(settlements.monthlyTotalsForParty).not.toHaveBeenCalled();
   });
 });

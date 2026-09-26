@@ -12,6 +12,8 @@ export * from './my-finance.service';
 // V3.3 #72 (`V33-DEC-020`). The workspace-aware finance surface: ownership-only
 // reads addressed by the shared `workspaceRef`, plus the one new refusal.
 export * from './finance-workspace.service';
+// #255: the Jalali month windows the settlement series is counted in.
+export * from './settlement-months';
 export * from './finance.exceptions';
 export * from './dto/finance-workspace.dto';
 export * from './financial.controller';

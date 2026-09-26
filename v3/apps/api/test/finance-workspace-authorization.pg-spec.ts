@@ -562,7 +562,7 @@ describePg('finance workspace authorization (real PostgreSQL)', () => {
   // =======================================================================
 
   describe('§5 authentication', () => {
-    it('refuses all ten finance routes without a token', async () => {
+    it('refuses all eleven finance routes without a token', async () => {
       const ref = 'A'.repeat(43);
       const orderId = uuidv7();
 
@@ -573,6 +573,8 @@ describePg('finance workspace authorization (real PostgreSQL)', () => {
         `/me/finance/${ref}/settlements`,
         `/me/finance/${ref}/orders/${orderId}/ledger`,
         `/me/finance/${ref}/funds`,
+        // #255: the eleventh, workspace-aware only.
+        `/me/finance/${ref}/settlement-series`,
         '/me/finance/summary',
         '/me/finance/outstanding-orders',
         '/me/finance/settlements',
@@ -581,7 +583,7 @@ describePg('finance workspace authorization (real PostgreSQL)', () => {
         await get(path).expect(401);
       }
 
-      // The control that proves the ten above are real routes rather than
+      // The control that proves the eleven above are real routes rather than
       // 401s produced by a catch-all.
       await get('/me/finance/no-such-route/at/all').expect(404);
     });
@@ -834,7 +836,7 @@ describePg('finance workspace authorization (real PostgreSQL)', () => {
   // =======================================================================
 
   describe('§8 route registration', () => {
-    it('maps all ten finance routes, and the static one is not captured by the dynamic', async () => {
+    it('maps all eleven finance routes, and the static one is not captured by the dynamic', async () => {
       const server = app.getHttpServer();
       const router = server._events.request._router as { stack: Array<{ route?: { path: string } }> };
       const paths = router.stack.filter((layer) => layer.route).map((layer) => layer.route!.path);
@@ -848,6 +850,7 @@ describePg('finance workspace authorization (real PostgreSQL)', () => {
           '/api/v1/me/finance/:workspaceRef/settlements',
           '/api/v1/me/finance/:workspaceRef/orders/:orderId/ledger',
           '/api/v1/me/finance/:workspaceRef/funds',
+          '/api/v1/me/finance/:workspaceRef/settlement-series',
           '/api/v1/me/finance/summary',
           '/api/v1/me/finance/outstanding-orders',
           '/api/v1/me/finance/settlements',

@@ -11,10 +11,10 @@
  * words. Amounts use tabular figures. Breakpoints are the design's 640 and
  * 1024 (`breakpoints.spec.ts`).
  *
- * A four-month trend chart (spec 13) is NOT drawn: the workspace routes return
- * only a summary, the outstanding orders, a cursor-paged settlement history
- * and a per-order ledger. A trend from the first page of a paged history would
- * be a partial series presented as a whole.
+ * The four-month trend chart (spec 13) is drawn from its own server series,
+ * `/settlement-series` (#255), never from the cursor-paged settlement history:
+ * a trend from the first page of a paged history would be a partial series
+ * presented as a whole.
  */
 
 .section {
@@ -31,6 +31,14 @@
   margin: 24px 0 12px;
   font-size: 16px;
   font-weight: 800;
+}
+
+/* #255: what the trend measures, under the chart. */
+.trendNote {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  color: var(--bc-color-text-muted);
+  line-height: 1.8;
 }
 
 .legacyTitle {

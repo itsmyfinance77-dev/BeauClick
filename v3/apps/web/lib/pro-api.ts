@@ -362,6 +362,29 @@ export function settlements(api: ApiClient, workspaceRef: string, page: { cursor
   return api.get<SettlementPage>(`/v1/me/finance/${workspaceRef}/settlements${suffix ? `?${suffix}` : ''}`);
 }
 
+/**
+ * One Jalali month of a workspace's settlements -- #255,
+ * `GET /v1/me/finance/:workspaceRef/settlement-series`.
+ *
+ * `month` is an ASCII Jalali `YYYY-MM`, counted from 00:00 Tehran on the 1st.
+ * `reversedToman` is a positive amount, counted in the month the reversal
+ * happened. The last item is the month still running: `complete: false`.
+ */
+export interface SettlementMonth {
+  month: string;
+  startsAt: string;
+  endsAt: string;
+  settledToman: number;
+  reversedToman: number;
+  settlementCount: number;
+  complete: boolean;
+}
+
+/** The last four Jalali months, oldest first -- computed by the server, never summed from one page of `settlements`. */
+export function settlementSeries(api: ApiClient, workspaceRef: string) {
+  return api.get<{ items: SettlementMonth[]; currency: string }>(`/v1/me/finance/${workspaceRef}/settlement-series`);
+}
+
 export function orderLedger(api: ApiClient, workspaceRef: string, orderId: string) {
   return api.get<LedgerEntry[]>(`/v1/me/finance/${workspaceRef}/orders/${orderId}/ledger`);
 }

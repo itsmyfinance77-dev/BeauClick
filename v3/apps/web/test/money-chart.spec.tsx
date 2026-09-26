@@ -166,3 +166,18 @@ describe('empty and loading', () => {
     expect(container.querySelectorAll('[class*=skeletonBar]').length).toBeGreaterThan(5);
   });
 });
+
+describe('what one bar is (#255)', () => {
+  it('is a day unless the caller says otherwise, in the summary and the table', () => {
+    renderChart();
+    expect(screen.getByRole('img', { name: /روند روزانهٔ فروش: ۴ روز،/ })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'روز' })).toBeInTheDocument();
+  });
+
+  it('is a month for a monthly series, and never announced as days', () => {
+    renderChart(POINTS, { title: 'تسویهٔ ماهانه', period: 'ماه' });
+    expect(screen.getByRole('img', { name: /تسویهٔ ماهانه: ۴ ماه،/ })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'ماه' })).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'روز' })).not.toBeInTheDocument();
+  });
+});

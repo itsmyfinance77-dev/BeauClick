@@ -3,6 +3,7 @@ import { DataSource } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
 import { emitEvent, AuditLogger } from '@beauclick/events';
 import { DomainException } from '@beauclick/http';
+import { requiredMoneyTransformer } from '@beauclick/money';
 
 import { LedgerPartyType } from './entities/ledger-entry.entity';
 import { SettlementBatchEntity, SettlementItemEntity } from './entities/settlement.entity';
@@ -191,6 +192,52 @@ export class SettlementService {
     if (after) query.andWhere('b.id < :after', { after });
 
     return query.getMany();
+  }
+
+  /**
+   * One party's settlement totals per window — the monthly series, #255.
+   *
+   * One statement, one row per window IN THE ORDER GIVEN, including windows
+   * with no settlement at all (the `LEFT JOIN` over the unnested windows is
+   * what makes an empty month a zero rather than a missing row):
+   *
+   *  * `settled` sums the window's `settlement` rows;
+   *  * `reversed` sums its `reversal` rows, negated to a positive amount. A
+   *    reversal is counted in the window it HAPPENED in, not the one of the
+   *    batch it reverses -- an append-only ledger has no other date for it,
+   *    and moving it back would rewrite a month that was already shown.
+   *
+   * The party predicate is always present, exactly as in
+   * `settlementPageForParty`. Sums come back as text and are read through the
+   * money transformer, so a `bigint` total never passes through a float
+   * unchecked. No new index: `ix_settlement_batches_party` narrows to the
+   * party, and a party's batch count is small.
+   */
+  async monthlyTotalsForParty(
+    partyType: LedgerPartyType,
+    partyId: string,
+    windows: ReadonlyArray<{ startsAt: Date; endsAt: Date }>,
+  ): Promise<Array<{ settledToman: number; reversedToman: number; settlementCount: number }>> {
+    const rows: Array<{ settled: string; reversed: string; settlements: number }> = await this.dataSource.query(
+      `SELECT w.idx,
+              COALESCE(SUM(b.amount_toman) FILTER (WHERE b.kind = 'settlement'), 0)::text AS settled,
+              COALESCE(-SUM(b.amount_toman) FILTER (WHERE b.kind = 'reversal'), 0)::text AS reversed,
+              COUNT(b.id) FILTER (WHERE b.kind = 'settlement')::int AS settlements
+         FROM unnest($3::timestamptz[], $4::timestamptz[]) WITH ORDINALITY AS w(starts_at, ends_at, idx)
+         LEFT JOIN financial.settlement_batches b
+           ON b.party_type = $1
+          AND b.party_id = $2
+          AND b.created_at >= w.starts_at
+          AND b.created_at < w.ends_at
+        GROUP BY w.idx
+        ORDER BY w.idx`,
+      [partyType, partyId, windows.map((w) => w.startsAt.toISOString()), windows.map((w) => w.endsAt.toISOString())],
+    );
+    return rows.map((row) => ({
+      settledToman: requiredMoneyTransformer.from(row.settled),
+      reversedToman: requiredMoneyTransformer.from(row.reversed),
+      settlementCount: row.settlements,
+    }));
   }
 
   async itemsFor(settlementId: string): Promise<SettlementItemEntity[]> {

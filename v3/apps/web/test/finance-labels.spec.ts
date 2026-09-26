@@ -10,6 +10,7 @@ import {
   ledgerEntryLabel,
   settlementKindLabel,
   settlementKindTone,
+  settlementMonthLabel,
 } from '@/lib/finance-labels';
 
 const FINANCIAL = join(__dirname, '../../../services/financial/src');
@@ -59,5 +60,17 @@ describe('access modes', () => {
     const server = serverList('ports.ts', 'FINANCE_ACCESS_MODES');
     expect(server.length).toBeGreaterThanOrEqual(2);
     expect(Object.keys(ACCESS_MODE_LABEL).sort()).toEqual(server);
+  });
+});
+
+describe('settlementMonthLabel (#255)', () => {
+  it('names a Jalali month from the server’s ASCII key, never from an instant in the browser’s zone', () => {
+    expect(settlementMonthLabel('1405-04', true)).toBe('تیر ۱۴۰۵');
+    expect(settlementMonthLabel('1405-12', true)).toBe('اسفند ۱۴۰۵');
+    expect(settlementMonthLabel('1406-01', true)).toBe('فروردین ۱۴۰۶');
+  });
+
+  it('says the running month is to date', () => {
+    expect(settlementMonthLabel('1405-07', false)).toBe('مهر ۱۴۰۵ (تا امروز)');
   });
 });

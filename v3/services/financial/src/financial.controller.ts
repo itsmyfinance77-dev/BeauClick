@@ -62,13 +62,15 @@ function toLedgerEntry(entry: LedgerEntryEntity) {
 /**
  * A seller's own finances -- V3.3 #72, `V33-DEC-020`.
  *
- * ## Ten routes, in two families
+ * ## Eleven routes, in two families
  *
  * `#43a` (ADR-052 §16) added the tenth, `:workspaceRef/funds`, workspace-aware
  * only -- the pending-funds journal has no legacy singular shape to keep
- * compatible, so it gets no singular sibling.
+ * compatible, so it gets no singular sibling. #255 added the eleventh,
+ * `:workspaceRef/settlement-series`, on the same terms: a read-only monthly
+ * series for the finance page's trend, with no singular sibling either.
  *
- * The five (now six) WORKSPACE-AWARE routes name one addressable workspace by an opaque,
+ * The five (now seven) WORKSPACE-AWARE routes name one addressable workspace by an opaque,
  * server-issued `workspaceRef`. They are what a dual owner uses to reach each of
  * their workspaces separately, and what makes "which workspace?" an explicit
  * question instead of a silent server-side choice. Since V3.3 #111 (`#44e`,
@@ -242,6 +244,39 @@ export class MyFinanceController {
   ) {
     const states = await this.workspaces.fundsFor(user.userId, workspaceRef);
     return toFundsResponse(states);
+  }
+
+  /**
+   * `GET /me/finance/:workspaceRef/settlement-series` -- the eleventh route
+   * (#255). The last four Jalali months' settled and reversed Toman, oldest
+   * first, computed here so the finance page never presents one page of the
+   * paged history as a whole series. Workspace-aware only, no party
+   * parameter and no query parameter: the window is fixed by spec 13's
+   * four-month trend.
+   *
+   * `month` is an ASCII Jalali `YYYY-MM`; `startsAt`/`endsAt` are the month's
+   * half-open window as instants (00:00 Tehran on the 1st). The current month
+   * is last and `complete: false` -- its figures are to date.
+   */
+  @Get(':workspaceRef/settlement-series')
+  async workspaceSettlementSeries(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('workspaceRef') workspaceRef: string,
+    @Query() _query: EmptyFinanceQueryDto,
+  ) {
+    const months = await this.workspaces.settlementSeriesFor(user.userId, workspaceRef);
+    return {
+      items: months.map((m) => ({
+        month: m.month,
+        startsAt: m.startsAt.toISOString(),
+        endsAt: m.endsAt.toISOString(),
+        settledToman: m.settledToman,
+        reversedToman: m.reversedToman,
+        settlementCount: m.settlementCount,
+        complete: m.complete,
+      })),
+      currency: 'IRT' as const,
+    };
   }
 
   // =========================================================================
