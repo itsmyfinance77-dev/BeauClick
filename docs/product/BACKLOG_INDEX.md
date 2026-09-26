@@ -1906,3 +1906,38 @@ So a screen is finished when it has been **measured in a browser at two widths**
 the professional and admin platforms are half-migrated (new shells, old page layouts),
 and the styling layer (`#219`) still blocks the component work (`#220`) and the
 screen-by-screen pass (`#221`).
+
+## V3.3 Story #237 split and re-estimated, 2026-09-25
+
+#237 ("Internal chat and the AI assistant", specs 35 and 36, `sp:8`) had a readiness preflight
+against `ef4e4957014e732888fc85236218a77625cefdf8` that returned **NEEDS SPLIT**: two independently
+valuable outcomes, different capabilities (`bc_use_ai_assistant`, `bc_use_chat`), different personas
+and backends, and an honest size of about 21 against the repository's 13-point Ready ceiling. The
+comparable delivered screen stories were #238 (four operator queues) and #239 (three admin screens),
+13 each. The owner approved the split, its estimates and its order. No decision card and no ADR:
+nothing was decided beyond sizing, and every binding decision (`V32-DEC-001`–`015`, `V33-DEC-033`)
+stands unchanged.
+
+| Item | Before | After | Outcome it owns |
+|---|---|---|---|
+| #237 | `status:proposed`, 8, both screens | retitled, **`status:ready`**, **`gate:legal`**, 8 | the customer AI assistant (spec 35); no backend change |
+| #327 | — | **bug**, `status:ready`, `priority:p2`, 2 | chat's public message projection: a salon colleague's reply labelled `side: 'customer'`, and each staff member's raw `senderUserId` in the customer's payload — LATENT until a participant page exists |
+| #328 | — | `status:proposed`, 13, depends on #327 | chat on `/messages`, `/pro/messages`, `/business/messages` and the spec 51 header entry, including two additive contract gaps: starting from a salon-sold booking, and the caller's side on an inbox row |
+
+**The legal line was too strong.** `V3.3_SPEC_TO_ROUTE_MAP.md` said both screens were "blocked on
+legal-approved consent copy". `V32-DEC-006` holds the assistant's final disclosure for Legal review
+*before public release*, and ADR-031 makes approved chat copy a public-release gate that is
+"explicitly *not*" a construction gate. `gate:legal` on #237 therefore gates public activation of
+that copy only — the reading `V33-DEC-043` already gave `#42a`. The map is corrected in place with
+the old sentence quoted.
+
+**What moved.** V3.3 scope **614 → 629** (+15), done unchanged at **492**; proposed 89 → 94; ready
+10 → 20; blocked 23. The live dashboard (issue #2), `scripts/backlog-report.mjs` run locally, and an
+independent recomputation from raw labels agree: **492 / 629**, and the data-quality warning list is
+identical before and after (every warning in it predates this split). Order: #327, then #237, then
+#328; #328 may not start before #327 merges. #226 and #255 are untouched.
+
+**Since, the same day:** #327 was delivered by #330 (`25677a8`) and closed at `sp:2`. V3.3 done
+**492 → 494**, ready 20 → 18, scope unchanged at **629**; the live dashboard, the report script and a
+raw-label recount agree. #237 is Ready; #328's explicit #327 dependency is cleared, while the
+owner-approved sequencing still keeps #328 after #237.
