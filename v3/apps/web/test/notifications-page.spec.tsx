@@ -92,8 +92,16 @@ describe('notification centre', () => {
     expect(within(row('n1')).getByRole('link', { name: 'مشاهده' })).toHaveAttribute('href', '/waitlist');
   });
 
+  // #328: the chat template names `/chat` — the inbox, never a thread.
+  it('opens the inbox for a new-message notification', async () => {
+    mockApi([item({ deepLink: '/chat' })], 1);
+    renderPage();
+    await screen.findByText('نوبت شما تأیید شد');
+    expect(within(row('n1')).getByRole('link', { name: 'مشاهده' })).toHaveAttribute('href', '/messages');
+  });
+
   it.each([
-    ['a page not built yet', '/chat'],
+    ['a page that does not exist', '/somewhere-unbuilt'],
     ['an off-site address', 'https://evil.example/bookings'],
     ['a protocol-relative address', '//evil.example'],
     ['no link at all', null],

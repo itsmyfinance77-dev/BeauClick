@@ -22,9 +22,7 @@ function templateDestinations(): string[] {
  * named piece of work; when the page lands, move the path into
  * `NOTIFICATION_ROUTES` and delete it here — the last test fails until you do.
  */
-const NOT_BUILT_YET: Record<string, string> = {
-  '/chat': 'spec 36, story #237',
-};
+const NOT_BUILT_YET: Record<string, string> = {};
 
 describe('notificationHref', () => {
   it('follows a link to a page that exists, keeping its query and fragment', () => {
@@ -34,8 +32,14 @@ describe('notificationHref', () => {
     expect(notificationHref('/referral')).toBe('/referral');
   });
 
-  it('renders no link for a page that does not exist yet, rather than a link that 404s', () => {
-    expect(notificationHref('/chat')).toBeNull();
+  it('renders no link for a page that does not exist, rather than a link that 404s', () => {
+    expect(notificationHref('/somewhere-unbuilt')).toBeNull();
+  });
+
+  // #328. The chat template links to `/chat`, the INBOX rather than a thread —
+  // an id in a URL would leak which conversation it was. The page is `/messages`.
+  it('follows the server’s /chat link to the inbox, and never to a thread', () => {
+    expect(notificationHref('/chat')).toBe('/messages');
   });
 
   it('follows the server’s /privacy link to the page that serves it, keeping the query and fragment', () => {

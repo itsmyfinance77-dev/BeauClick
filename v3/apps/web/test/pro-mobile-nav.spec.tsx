@@ -137,7 +137,7 @@ describe('the professional’s bottom bar', () => {
     // that derivation exists for: a destination added to the column cannot go
     // missing from the phone.
     expect([...onBar, ...inSheet].sort()).toEqual(PRO_NAV.map((item) => item.href).sort());
-    expect(inSheet).toHaveLength(7);
+    expect(inSheet).toHaveLength(8);
   });
 });
 
@@ -159,7 +159,7 @@ describe('the sheet', () => {
     expect(sheet).toHaveAccessibleName('مقصدهای دیگر');
   });
 
-  it('holds the other seven destinations in the column’s order, and the way out', async () => {
+  it('holds the other eight destinations in the column’s order, and the way out', async () => {
     mockApi();
     render(shell());
     await screen.findByTestId('pro-identity');
@@ -171,6 +171,7 @@ describe('the sheet', () => {
       '/pro/finance',
       '/pro/analytics',
       '/pro/outcome-policy',
+      '/pro/messages',
       '/pro/profile',
       '/business',
     ]);

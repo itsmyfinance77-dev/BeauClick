@@ -8,6 +8,7 @@ import { isSellerSession } from '@/lib/seller-identity';
 import { useAuth } from '@/lib/auth-context';
 import { adminMode } from '@/lib/admin-access';
 import { useUnread } from '@/lib/unread-context';
+import { useChatUnread } from '@/lib/chat-polling';
 import { ErrorBoundary } from './error-boundary';
 import { AvatarMenu, type AvatarMenuEntry } from './avatar-menu';
 import { MobileTabBar, type MobileTab } from './mobile-tab-bar';
@@ -110,7 +111,7 @@ function hidesTabBar(pathname: string): boolean {
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { status, user, logout } = useAuth();
+  const { status, user, logout, api } = useAuth();
   // Shared with the notification centre, so marking everything read updates
   // the badge immediately rather than at the next full page load.
   const { unreadCount: unread } = useUnread();
@@ -143,6 +144,16 @@ export function AppShell({ children }: { children: ReactNode }) {
    * control.
    */
   const hasAssistant = authenticated && (user?.capabilities?.includes('bc_use_ai_assistant') ?? false);
+
+  /**
+   * The messages entry (spec 51 §2.1, #328): only for a session holding
+   * `bc_use_chat`. The count is the server's `unread-count` total, in the
+   * accessible name; `0` draws no badge, and a failed read draws no badge and no
+   * number — never a guessed one. It covers every side the caller reads, so it
+   * opens the whole inbox.
+   */
+  const hasChat = authenticated && (user?.capabilities?.includes('bc_use_chat') ?? false);
+  const chatUnread = useChatUnread(api, hasChat);
 
   const primary = [
     { href: '/search', label: 'خدمات' },
@@ -217,6 +228,22 @@ export function AppShell({ children }: { children: ReactNode }) {
                 {isSeller ? (
                   <Link href="/pro" className={styles.proMode}>
                     حالت متخصص
+                  </Link>
+                ) : null}
+                {hasChat ? (
+                  <Link
+                    href="/messages"
+                    className={styles.bell}
+                    data-testid="header-messages"
+                    aria-label={chatUnread && chatUnread > 0 ? `پیام‌ها، ${toPersianDigits(chatUnread)} خوانده‌نشده` : 'پیام‌ها'}
+                    aria-current={isCurrent(pathname, '/messages') ? 'page' : undefined}
+                  >
+                    <span className={styles.messagesGlyph} aria-hidden="true" />
+                    {chatUnread && chatUnread > 0 ? (
+                      <span className={styles.bellCount} aria-hidden="true">
+                        {toPersianDigits(chatUnread)}
+                      </span>
+                    ) : null}
                   </Link>
                 ) : null}
                 <Link

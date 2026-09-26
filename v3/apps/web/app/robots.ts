@@ -27,6 +27,7 @@ export const PRIVATE_PATHS = [
   '/dashboard',
   '/finance',
   '/journey',
+  '/messages',
   '/loyalty',
   '/notifications',
   '/referral',

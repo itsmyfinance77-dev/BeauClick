@@ -54,6 +54,9 @@ export const PRO_NAV: ProNavItem[] = [
   // decide what a cancellation COSTS, which is an operating decision the
   // seller makes once, not a figure they read.
   { href: '/pro/outcome-policy', label: 'شرایط لغو' },
+  // #328. The conversations addressed to this professional profile; the
+  // header's messages entry opens the whole inbox, this one the seller half.
+  { href: '/pro/messages', label: 'پیام‌ها' },
   { href: '/pro/profile', label: 'پروفایل عمومی', separatorBefore: true },
   { href: '/business', label: 'کسب‌وکار' },
 ];
