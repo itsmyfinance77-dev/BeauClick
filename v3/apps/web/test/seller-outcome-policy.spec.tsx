@@ -27,14 +27,18 @@ jest.mock('next/navigation', () => ({
  *     (`V33-DEC-020`).
  */
 
+/** An owned workspace, as `GET /v1/me/workspaces` (#210) projects it: no access mode. */
 const OWNED = {
   workspaceRef: 'o'.repeat(43),
   workspaceType: 'business' as const,
-  accessMode: 'owner' as const,
   displayLabel: 'سالن نور',
 };
 
-/** A workspace reached only by a finance_read grant — never offered here. */
+/**
+ * A workspace the FINANCE list reaches through a finance_read grant. It is
+ * served only by the finance mock, so it can reach the chooser only if the
+ * page reads the finance list — which it must not since #210.
+ */
 const GRANTED = {
   workspaceRef: 'g'.repeat(43),
   workspaceType: 'business' as const,
@@ -107,7 +111,8 @@ function mockApi(options: {
       return ok({ assignment: options.assignment === undefined ? null : options.assignment });
     }
     if (url.includes('/v1/me/outcome-policies')) return ok({ items: options.policies ?? [POLICY] });
-    if (url.includes('/v1/me/finance/workspaces')) return ok({ items: options.workspaces ?? [OWNED] });
+    if (url.includes('/v1/me/workspaces')) return ok({ items: options.workspaces ?? [OWNED] });
+    if (url.includes('/v1/me/finance/workspaces')) return ok({ items: [{ ...OWNED, accessMode: 'owner' }, GRANTED] });
     return ok([]);
   });
 }
@@ -136,14 +141,20 @@ beforeEach(() => {
 });
 
 describe('screen 48 — seller outcome-policy selection', () => {
-  it('offers only owned workspaces, never one reached by a finance_read grant', async () => {
-    mockApi({ workspaces: [OWNED, GRANTED] });
+  it('chooses from the ownership list (#210), never the finance list and never a finance_read grant', async () => {
+    mockApi();
     renderPage();
 
     const chooser = await screen.findByTestId('workspace-chooser');
     expect(chooser.querySelector(`[data-workspace="${OWNED.workspaceRef}"]`)).not.toBeNull();
+    expect(within(chooser).getByText(OWNED.displayLabel)).toBeInTheDocument();
     // A grantee may read that workspace's money; they may not set its policy.
     expect(chooser.querySelector(`[data-workspace="${GRANTED.workspaceRef}"]`)).toBeNull();
+
+    // The policy screen no longer depends on finance's access rules at all.
+    const urls = (global.fetch as jest.Mock).mock.calls.map((call) => String(call[0]));
+    expect(urls.filter((url) => url.includes('/v1/me/workspaces'))).toHaveLength(1);
+    expect(urls.filter((url) => url.includes('/v1/me/finance/'))).toEqual([]);
   });
 
   it('pre-selects no workspace, and renders no terms until one is chosen', async () => {

@@ -309,6 +309,32 @@ export function financeWorkspaces(api: ApiClient) {
   return api.get<{ items: FinanceWorkspace[] }>('/v1/me/finance/workspaces');
 }
 
+/**
+ * One seller workspace this session OWNS -- V3.3 #210, `GET /v1/me/workspaces`.
+ *
+ * The list the seller commercial surfaces choose from: outcome and collection
+ * policy, subscriptions, credit purchases. Ownership only -- a staff member,
+ * a manager or a `finance_read` grantee owns nothing of the salon and gets
+ * nothing of it here -- which is why it is not `FinanceWorkspace` filtered to
+ * `owner`: that list follows finance's access rules, and a policy screen must
+ * not break when those change.
+ *
+ * `workspaceRef` carries the same rules as `FinanceWorkspace.workspaceRef`
+ * (opaque, never displayed, re-read if it stops resolving). There is no
+ * capability list: the server decides what the seller may do on each
+ * workspace, and a client-side list could only ever be a hint.
+ */
+export interface SellerWorkspace {
+  workspaceRef: string;
+  workspaceType: 'professional' | 'business';
+  /** The public display name. Presentation only, never an authorization input. */
+  displayLabel: string;
+}
+
+export function myWorkspaces(api: ApiClient) {
+  return api.get<{ items: SellerWorkspace[] }>('/v1/me/workspaces');
+}
+
 export function financeSummary(api: ApiClient, workspaceRef: string) {
   return api.get<FinanceSummary>(`/v1/me/finance/${workspaceRef}/summary`);
 }
