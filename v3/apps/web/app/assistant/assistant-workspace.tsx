@@ -6,6 +6,7 @@ import {
   AI_MAX_INPUT_CHARACTERS,
   aiInputLength,
   isAcceptableAiInput,
+  isUserResolvableRefusal,
   type AiConversationSummary,
   type AiMessageView,
   type AiProviderState,
@@ -81,6 +82,13 @@ export function AssistantWorkspace({
   const [moreError, setMoreError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
+  /**
+   * A start refused for a reason the customer cannot fix by trying again
+   * (`isUserResolvableRefusal` false — in practice `conversation_limit_reached`).
+   * Every start control is disabled while it stands; deleting a conversation,
+   * the refusal's own remedy, lifts it.
+   */
+  const [startBlocked, setStartBlocked] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState('');
 
   // ------------------------------------------------------------ the thread
@@ -176,7 +184,9 @@ export function AssistantWorkspace({
       setAnnouncement('گفتگوی تازه شروع شد.');
     } catch (err) {
       if (escalate(err)) return;
-      setStartError(aiRefusalOf(err)?.message ?? 'شروعِ گفتگو ممکن نشد. دوباره تلاش کنید.');
+      const refusal = aiRefusalOf(err);
+      if (refusal && !isUserResolvableRefusal(refusal.reason)) setStartBlocked(refusal.message);
+      else setStartError(refusal?.message ?? 'شروعِ گفتگو ممکن نشد. دوباره تلاش کنید.');
     } finally {
       setStarting(false);
     }
@@ -193,6 +203,7 @@ export function AssistantWorkspace({
 
   function removed(id: string) {
     setItems((current) => current.filter((c) => c.id !== id));
+    setStartBlocked(null);
     setThread({ status: 'idle' });
     setAnnouncement('گفتگو برای همیشه حذف شد.');
   }
@@ -213,12 +224,19 @@ export function AssistantWorkspace({
             گفتگوهای شما
           </h2>
           {!empty ? (
-            <Button type="button" variant="ghost" inline loading={starting} onClick={() => void start()}>
+            <Button
+              type="button"
+              variant="ghost"
+              inline
+              loading={starting}
+              disabled={startBlocked !== null}
+              onClick={() => void start()}
+            >
               گفتگوی جدید
             </Button>
           ) : null}
         </div>
-        {startError ? <Alert>{startError}</Alert> : null}
+        {startBlocked ? <Alert>{startBlocked}</Alert> : startError ? <Alert>{startError}</Alert> : null}
 
         {listLoading && !listLoaded ? (
           <LoadingState label="در حال بارگذاری گفتگوها…" lines={3} />
@@ -228,7 +246,7 @@ export function AssistantWorkspace({
           <EmptyState
             message="هنوز گفتگویی ندارید. هر سؤالی دربارهٔ خدمات و متخصص‌ها دارید بپرسید."
             action={
-              <Button type="button" inline loading={starting} onClick={() => void start()}>
+              <Button type="button" inline loading={starting} disabled={startBlocked !== null} onClick={() => void start()}>
                 شروعِ گفتگو
               </Button>
             }
@@ -287,6 +305,7 @@ export function AssistantWorkspace({
               quota={quota}
               exhausted={exhausted}
               starting={starting}
+              startBlocked={startBlocked !== null}
               onStartNew={() => void start()}
               onExchanged={(exchange) => {
                 updated(exchange.conversation, exchange.messages);
@@ -329,6 +348,7 @@ function ConversationView({
   quota,
   exhausted,
   starting,
+  startBlocked,
   onStartNew,
   onExchanged,
   onQuotaExhausted,
@@ -341,6 +361,7 @@ function ConversationView({
   quota: AiQuotaView | null;
   exhausted: { message: string; resetsAt: string | null } | null;
   starting: boolean;
+  startBlocked: boolean;
   onStartNew: () => void;
   onExchanged: (exchange: Exchange) => void;
   onQuotaExhausted: (message: string, resetsAt: string | null) => void;
@@ -437,7 +458,7 @@ function ConversationView({
               ? 'این گفتگو با شروعِ گفتگویِ دیگری بسته شد و فقط‌خواندنی است.'
               : 'این گفتگو به‌دلیل عدم فعالیت در ۲۴ ساعتِ گذشته بسته شده و فقط‌خواندنی است.'}
           </Alert>
-          <Button type="button" inline loading={starting} onClick={onStartNew}>
+          <Button type="button" inline loading={starting} disabled={startBlocked} onClick={onStartNew}>
             شروعِ گفتگویِ جدید
           </Button>
         </div>
@@ -539,6 +560,14 @@ function Composer({
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<{ message: string; retry: boolean } | null>(null);
+  /**
+   * A send refused for a reason the customer cannot fix by editing and sending
+   * again (`isUserResolvableRefusal` false). The contract makes that helper decide
+   * whether the composer stays open, and here it does not: no field, no send
+   * control, only the server's sentence — so the same request cannot simply be
+   * sent again. Reopening the conversation later offers a fresh composer.
+   */
+  const [closedBy, setClosedBy] = useState<string | null>(null);
   const counterId = useId();
   const fieldId = useId();
 
@@ -572,28 +601,37 @@ function Composer({
         });
         return;
       }
-      switch (refusal.reason) {
-        case 'quota_exhausted':
-          onQuotaExhausted(refusal.message, refusal.resetsAt);
-          return;
-        case 'conversation_closed':
-          setError({ message: refusal.message, retry: false });
-          onClosed();
-          return;
-        case 'unsafe_request':
-          // The refused text is never shown back, and retrying it would be
-          // refused again: the field is cleared for a different question.
-          setDraft('');
-          setError({ message: refusal.message, retry: false });
-          return;
-        default:
-          // message_too_long keeps the draft to shorten; assistant_unavailable
-          // offers no fake retry, and never a silently substituted answer.
-          setError({ message: refusal.message, retry: false });
+      if (refusal.reason === 'quota_exhausted') {
+        // Not resolvable either; its closed composer is page-wide, with the
+        // server's reset instant.
+        onQuotaExhausted(refusal.message, refusal.resetsAt);
+        return;
       }
+      if (refusal.reason === 'conversation_closed') {
+        // Resolvable by starting a new one: the read-only state offers that.
+        onClosed();
+        return;
+      }
+      if (isUserResolvableRefusal(refusal.reason)) {
+        // message_too_long: the draft stays, to be shortened and sent.
+        setError({ message: refusal.message, retry: false });
+        return;
+      }
+      // unsafe_request, assistant_unavailable: the composer closes. The refused
+      // text is dropped and never shown back, and no answer is substituted.
+      setDraft('');
+      setClosedBy(refusal.message);
     } finally {
       setSending(false);
     }
+  }
+
+  if (closedBy) {
+    return (
+      <div className={styles.exhausted} data-testid="assistant-composer-closed">
+        <Alert>{closedBy}</Alert>
+      </div>
+    );
   }
 
   if (exhausted) {
