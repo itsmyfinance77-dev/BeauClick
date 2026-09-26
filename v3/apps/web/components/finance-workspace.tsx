@@ -166,6 +166,15 @@ export function FinanceWorkspaceSurface() {
   const [series, setSeries] = useState<SettlementMonth[]>([]);
   const [seriesError, setSeriesError] = useState<string | null>(null);
   const [seriesLoadedFor, setSeriesLoadedFor] = useState<string | null>(null);
+  /**
+   * The one series request still wanted. Every `loadSeries` call -- a new
+   * selection, a re-selection or a retry -- takes a new number, and a response
+   * carrying an older one is dropped whole: success, error and refusal alike.
+   * Otherwise workspace A's late answer, arriving after B was selected and
+   * drawn, would put B's chart back to loading, show A's error under B, or
+   * treat A's refusal as the loss of B.
+   */
+  const seriesRequest = useRef(0);
 
   const [ledgerFor, setLedgerFor] = useState<string | null>(null);
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
@@ -322,13 +331,17 @@ export function FinanceWorkspaceSurface() {
 
   const loadSeries = useCallback(
     async (workspaceRef: string) => {
+      seriesRequest.current += 1;
+      const request = seriesRequest.current;
       setSeriesError(null);
       setSeriesLoadedFor(null);
       try {
         const res = await settlementSeries(api, workspaceRef);
+        if (request !== seriesRequest.current) return;
         setSeries(res.data?.items ?? []);
         setSeriesLoadedFor(workspaceRef);
       } catch (err) {
+        if (request !== seriesRequest.current) return;
         if (isRecoverableRefusal(err)) {
           handleAuthorityLoss(workspaceRef);
           return;

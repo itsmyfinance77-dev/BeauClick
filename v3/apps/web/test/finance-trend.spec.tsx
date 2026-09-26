@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import FinancePage from '@/app/finance/page';
 import { AuthProvider } from '@/lib/auth-context';
@@ -236,5 +236,111 @@ describe('the four-month settlement trend (#255)', () => {
     const table = await trendTable();
     expect(table).toHaveTextContent('۲ تومان');
     expect(table).not.toHaveTextContent('۳۵۰٬۰۰۰');
+  });
+});
+
+/*
+ * Codex review of 518b3a5: a series answer for workspace A that arrives AFTER
+ * the user has moved to B -- and B has already drawn -- belongs to a
+ * selection that no longer exists. Each test holds A's response in the test's
+ * own hand and releases it only once B is on screen, so the out-of-order
+ * arrival is certain rather than a timing accident.
+ */
+describe('a late answer for a workspace the user has left (#255 review)', () => {
+  const A = workspace(REF, 'سالن نور');
+  const B = workspace(OTHER_REF, 'کلینیک آفتاب');
+  const B_SERIES = { items: SERIES.map((m) => ({ ...m, settledToman: 8 })), currency: 'IRT' };
+
+  function held() {
+    let release!: (response: unknown) => void;
+    const promise = new Promise((resolve) => (release = resolve));
+    return { promise, release };
+  }
+  const answer = (data: unknown) => ({ ok: true, status: 200, json: async () => ({ data, meta: null, error: null }) });
+  const refusal = (status: number, code: string, message: string) => ({
+    ok: false,
+    status,
+    json: async () => ({ data: null, meta: null, error: { code, message } }),
+  });
+
+  /** A selected with its series held, then B selected and drawn. */
+  async function moveToBWhileAIsPending(heldA: Promise<unknown>) {
+    mockApi({
+      workspaces: [A, B],
+      seriesFor: (ref) => (ref === REF ? heldA : ok(B_SERIES)),
+    });
+    const user = userEvent.setup();
+    renderFinance();
+    await user.click(await screen.findByRole('radio', { name: /سالن نور/ }));
+    expect(await screen.findByText('در حال بارگذاری نمودار…')).toBeInTheDocument();
+    await user.click(screen.getByRole('radio', { name: /کلینیک آفتاب/ }));
+    expect(await trendTable()).toHaveTextContent('۸ تومان');
+    return user;
+  }
+
+  /** Lets a released response travel all the way through the component. */
+  const settle = () => act(async () => new Promise((resolve) => setTimeout(resolve, 30)));
+
+  const workspaceReads = () =>
+    (global.fetch as jest.Mock).mock.calls.map((c) => String(c[0])).filter((u) => u.includes('/v1/me/finance/workspaces')).length;
+
+  function expectBStillDrawn() {
+    expect(screen.getByRole('radio', { name: /کلینیک آفتاب/ })).toBeChecked();
+    const table = screen.getByText('تسویهٔ ماهانه', { selector: 'caption' }).closest('table') as HTMLTableElement;
+    expect(table).toHaveTextContent('۸ تومان');
+    expect(table).not.toHaveTextContent('۳۵۰٬۰۰۰');
+    expect(screen.queryByText('در حال بارگذاری نمودار…')).not.toBeInTheDocument();
+  }
+
+  it('ignores A’s late success: B’s chart stays drawn and never shows A’s figures', async () => {
+    const lateA = held();
+    await moveToBWhileAIsPending(lateA.promise);
+
+    lateA.release(answer({ items: SERIES, currency: 'IRT' }));
+    await settle();
+    expectBStillDrawn();
+  });
+
+  it('ignores A’s late failure: no error of A’s is shown under B', async () => {
+    const lateA = held();
+    await moveToBWhileAIsPending(lateA.promise);
+
+    lateA.release(refusal(503, 'SERVICE_UNAVAILABLE', 'سرویس موقتاً در دسترس نیست.'));
+    await settle();
+    expectBStillDrawn();
+    expect(screen.queryByText('سرویس موقتاً در دسترس نیست.')).not.toBeInTheDocument();
+  });
+
+  it('ignores A’s late refusal: B is not cleared, A is not dropped, the list is not reloaded', async () => {
+    const lateA = held();
+    await moveToBWhileAIsPending(lateA.promise);
+    const readsBefore = workspaceReads();
+
+    lateA.release(refusal(404, 'NOT_FOUND_OR_NOT_YOURS', 'این مورد پیدا نشد یا در دسترس شما نیست.'));
+    await settle();
+    expectBStillDrawn();
+    expect(screen.getByRole('radio', { name: /سالن نور/ })).toBeInTheDocument();
+    expect(workspaceReads()).toBe(readsBefore);
+  });
+
+  it('ignores a superseded retry: A’s retried read landing after the move to B changes nothing', async () => {
+    const retriedA = held();
+    mockApi({
+      workspaces: [A, B],
+      seriesFor: (ref, attempt) => {
+        if (ref !== REF) return ok(B_SERIES);
+        return attempt === 1 ? failed(503, 'SERVICE_UNAVAILABLE', 'سرویس موقتاً در دسترس نیست.') : (retriedA.promise as Promise<unknown>);
+      },
+    });
+    const user = userEvent.setup();
+    renderFinance();
+    await user.click(await screen.findByRole('radio', { name: /سالن نور/ }));
+    await user.click(await screen.findByRole('button', { name: /تلاش دوباره/ }));
+    await user.click(screen.getByRole('radio', { name: /کلینیک آفتاب/ }));
+    expect(await trendTable()).toHaveTextContent('۸ تومان');
+
+    retriedA.release(answer({ items: SERIES, currency: 'IRT' }));
+    await settle();
+    expectBStillDrawn();
   });
 });
