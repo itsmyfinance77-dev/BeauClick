@@ -65,6 +65,30 @@ export class PaymentRetryNotAvailableException extends DomainException {
 }
 
 /**
+ * A refund that would give back more than this payment captured (#322).
+ *
+ * Refused by the service that OWNS refunds, before the gateway is called and
+ * before any refund row exists -- so nothing is recorded, nothing is emitted,
+ * and no gateway is asked to move money the platform never received. Commerce
+ * refuses the same over-refund in its projection (`REFUND_EXCEEDS_ORDER`);
+ * without this check payment would record the refund as `succeeded` and
+ * commerce would refuse it, leaving two stores disagreeing by the full amount.
+ *
+ * 409 like commerce's: the request is well formed; the money state forbids it.
+ * `refundableToman` is what is still available under this payment.
+ */
+export class RefundExceedsCapturedException extends DomainException {
+  constructor(requestedToman: bigint, refundableToman: bigint) {
+    super(
+      'REFUND_EXCEEDS_CAPTURED',
+      'مبلغ بازگشتی از مبلغ دریافت‌شدهٔ این پرداخت بیشتر است.',
+      HttpStatus.CONFLICT,
+      { requestedToman: Number(requestedToman), refundableToman: Number(refundableToman) },
+    );
+  }
+}
+
+/**
  * Internal only -- never thrown out of the service.
  *
  * Deliberately NOT a `DomainException`: a verification deadline is not an
@@ -755,12 +779,19 @@ export class PaymentService {
    * Issues a refund, at most once per `requestKey`.
    *
    * Three phases, in this order, for a reason:
-   *   1. write the refund row (so a crash leaves evidence, not a ghost),
+   *   1. check the ceiling and write the refund row, in one transaction
+   *      (so a crash leaves evidence, not a ghost),
    *   2. call the gateway (outside any transaction),
    *   3. compare-and-swap the row to its outcome.
    *
    * A replayed call short-circuits at phase 1 on the unique constraint and
    * returns the existing refund -- the gateway is never asked twice.
+   *
+   * The ceiling (#322): a refund may not take the money given back under this
+   * payment past what it captured. It is checked here, where refunds are
+   * authored, not only downstream in commerce's projection -- see
+   * `assertWithinCaptured` for what counts and why it is safe under
+   * concurrency.
    */
   async refund(input: RequestRefundInput): Promise<RefundEntity> {
     assertNonNegativeAmount(input.amountToman, 'refund amount');
@@ -778,24 +809,36 @@ export class PaymentService {
           order: { id: 'DESC' },
         });
 
+    const kind = input.kind ?? 'order';
     const refundId = uuidv7();
     try {
-      await this.refunds.insert({
-        id: refundId,
-        orderId: input.orderId,
-        paymentIntentId: intent.id,
-        paymentAttemptId: attempt?.id ?? null,
-        requestKey: input.requestKey,
-        amountToman: input.amountToman,
-        status: 'pending',
-        kind: input.kind ?? 'order',
-        providerRefundReference: null,
-        failureCode: null,
-        reason: input.reason,
-        requestedByActorType: input.actorType,
-        requestedByActorId: input.actorId,
-        completedAt: null,
+      const replay = await this.dataSource.transaction(async (m) => {
+        await this.lockIntent(m, intent.id);
+        // Re-read under the lock: a concurrent call with the SAME key may have
+        // written its row since the read above. That is a replay to return,
+        // not a second refund to measure against the ceiling.
+        const raced = await m.findOne(RefundEntity, { where: { orderId: input.orderId, requestKey: input.requestKey } });
+        if (raced) return raced;
+        await this.assertWithinCaptured(m, intent, attempt, kind, input.orderId, input.amountToman);
+        await m.insert(RefundEntity, {
+          id: refundId,
+          orderId: input.orderId,
+          paymentIntentId: intent.id,
+          paymentAttemptId: attempt?.id ?? null,
+          requestKey: input.requestKey,
+          amountToman: input.amountToman,
+          status: 'pending',
+          kind,
+          providerRefundReference: null,
+          failureCode: null,
+          reason: input.reason,
+          requestedByActorType: input.actorType,
+          requestedByActorId: input.actorId,
+          completedAt: null,
+        });
+        return null;
       });
+      if (replay) return replay;
     } catch (err) {
       if (isUniqueViolation(err)) {
         const settled = await this.refunds.findOne({ where: { orderId: input.orderId, requestKey: input.requestKey } });
@@ -837,6 +880,79 @@ export class PaymentService {
     });
 
     return this.refunds.findOneOrFail({ where: { id: refundId } });
+  }
+
+  /**
+   * Refuses a refund that would exceed what this payment captured (#322).
+   *
+   * **What was captured.** For an `order` refund, the intent's amount: a
+   * capture only succeeds when the gateway's server-verified amount equals it,
+   * and that same verified amount is what commerce records as the order's
+   * `collected_total_toman` -- so this is exactly the ceiling commerce's
+   * projection enforces, checked before money moves instead of after. For a
+   * `duplicate_charge` refund, the duplicate attempt's own verified amount: it
+   * returns a second charge, which was never part of the order's total.
+   *
+   * **What is already committed.** Every refund of the same kind that has not
+   * `failed` -- `succeeded`, `manual_required` (the money still goes back, by
+   * hand) and `pending`. Counting `pending` is what makes this safe under
+   * concurrency: a refund is `pending` for the whole gateway call, and a check
+   * that counted only `succeeded` would let two concurrent refunds each see
+   * the full capture available and both be sent. A `pending` row that never
+   * resolves keeps its amount reserved -- the conservative direction, since
+   * the gateway may have moved that money.
+   *
+   * **Serialised.** The caller has already locked the intent row
+   * (`lockIntent`, `FOR UPDATE`) in the transaction that then inserts the
+   * refund row, so a concurrent refund of the same payment waits for that lock
+   * and then sees this one's `pending` row. Callers invoke `refund()` outside
+   * their own transactions, so the lock is never taken while a caller already
+   * holds it.
+   *
+   * Sums are read as text and added as `bigint`: a `SUM` over `bigint` is
+   * `numeric`, and money is never passed through a JS float.
+   */
+  private async assertWithinCaptured(
+    m: EntityManager,
+    intent: PaymentIntentEntity,
+    attempt: PaymentAttemptEntity | null,
+    kind: RefundKind,
+    orderId: string,
+    amountToman: number,
+  ): Promise<void> {
+    let capturedToman: bigint;
+    let committed: Array<{ total: string }>;
+    if (kind === 'duplicate_charge') {
+      capturedToman =
+        attempt && attempt.status === 'succeeded' && attempt.verifiedAmountToman !== null
+          ? BigInt(attempt.verifiedAmountToman)
+          : 0n;
+      committed = await m.query(
+        `SELECT COALESCE(SUM(amount_toman), 0)::text AS total
+           FROM payment.refunds
+          WHERE order_id = $1 AND kind = 'duplicate_charge' AND payment_attempt_id = $2 AND status <> 'failed'`,
+        [orderId, attempt?.id ?? null],
+      );
+    } else {
+      capturedToman = BigInt(intent.amountToman);
+      committed = await m.query(
+        `SELECT COALESCE(SUM(amount_toman), 0)::text AS total
+           FROM payment.refunds
+          WHERE order_id = $1 AND kind = 'order' AND status <> 'failed'`,
+        [orderId],
+      );
+    }
+
+    const requested = BigInt(amountToman);
+    const refundable = capturedToman - BigInt(committed[0].total);
+    if (requested > refundable) {
+      throw new RefundExceedsCapturedException(requested, refundable > 0n ? refundable : 0n);
+    }
+  }
+
+  /** Serialises every refund of one payment: see `assertWithinCaptured`. */
+  private async lockIntent(m: EntityManager, intentId: string): Promise<void> {
+    await m.query(`SELECT id FROM payment.payment_intents WHERE id = $1 FOR UPDATE`, [intentId]);
   }
 
   /**
