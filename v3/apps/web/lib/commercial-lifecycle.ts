@@ -1,3 +1,4 @@
+import { zonedDateTimeToInstant, zonedIsoDate, zonedIsoTime } from '@beauclick/persian-utils';
 import { ApiRequestError } from './api-client';
 import type { LifecycleVersion } from './commercial-admin-api';
 import type { DerivedState } from './commercial-labels';
@@ -74,20 +75,48 @@ export function refusalMeansStale(refusal: Refusal): boolean {
   return refusal.code === 'COMMERCIAL_LIFECYCLE_CONFLICT' || refusal.code === 'COMMERCIAL_NOT_FOUND';
 }
 
-/** A `datetime-local` value (the browser's wall clock) as the ISO instant the API takes. */
+/*
+ * An activation window's `datetime-local` fields mean the PLATFORM's wall
+ * clock (#321). The instant a price schedule, plan, collection or outcome
+ * policy starts or stops applying is one the whole platform shares, so it is
+ * never read in the operator's own zone: `new Date('2026-01-01T09:00')` on a
+ * UTC machine is 12:30 Tehran, and reading it back the same way shows 09:00
+ * again -- self-consistent, so the three-and-a-half-hour error never shows.
+ * The conversion is `@beauclick/persian-utils`' own, the one the availability
+ * editor and every date display already use, and the labels below say so.
+ */
+
+/** The field labels, naming the zone the fields mean. Tied to `PLATFORM_TIMEZONE` by a test. */
+export const ACTIVATION_START_LABEL = 'شروع فعال‌سازی (به وقت تهران)';
+export const ACTIVATION_END_LABEL = 'پایان فعال‌سازی (اختیاری، به وقت تهران)';
+
+const DATETIME_LOCAL = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?$/;
+
+/**
+ * A `datetime-local` value, read as wall clock in `PLATFORM_TIMEZONE`, as the
+ * ISO instant the API takes -- or `null` when it is empty or not a real
+ * date and time (`2026-02-30T09:00` is not 2 March).
+ */
 export function localInputToIso(value: string): string | null {
-  if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  const match = DATETIME_LOCAL.exec(value);
+  if (!match) return null;
+  const [year, month, day, hour, minute, second] = match.slice(1, 7).map((part) => Number(part ?? 0));
+  const calendar = new Date(Date.UTC(year, month - 1, day));
+  if (calendar.getUTCFullYear() !== year || calendar.getUTCMonth() !== month - 1 || calendar.getUTCDate() !== day) return null;
+  if (hour > 23 || minute > 59 || second > 59) return null;
+  // Seconds and milliseconds, which a `datetime-local` carries only when typed
+  // with a finer `step`, are kept rather than dropped.
+  const millis = second * 1000 + Number((match[7] ?? '').padEnd(3, '0'));
+  const instant = zonedDateTimeToInstant(`${match[1]}-${match[2]}-${match[3]}`, `${match[4]}:${match[5]}`);
+  return new Date(instant.getTime() + millis).toISOString();
 }
 
-/** An ISO instant as a `datetime-local` value, for editing a draft. */
+/** An ISO instant as a `datetime-local` value in `PLATFORM_TIMEZONE`, for editing a draft. */
 export function isoToLocalInput(iso: string | null): string {
   if (!iso) return '';
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return `${zonedIsoDate(date)}T${zonedIsoTime(date)}`;
 }
 
 /**

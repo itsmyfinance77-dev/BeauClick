@@ -1,8 +1,13 @@
+/**
+ * @jest-environment ./test/ambient-zone-environment.js
+ */
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import AdminControlPlanePage from '@/app/admin/commercial/control-plane/page';
 import { AuthProvider } from '@/lib/auth-context';
+import { ACTIVATION_END_LABEL } from '@/lib/commercial-lifecycle';
 import { tokenStorage } from '@/lib/token-storage';
+import { withAmbientZone } from './ambient-zone';
 import { ADMIN, FAR_PAST, fail, installFakeApi, ok, type Route } from './commercial-fake-api';
 
 jest.mock('next/navigation', () => ({
@@ -310,5 +315,57 @@ describe('the collection policy editor', () => {
     });
     await user.click(within(family).getByRole('button', { name: 'انتشار نسخهٔ ۱' }));
     expect(screen.getByRole('dialog')).toHaveAccessibleDescription(/رزروهای موجود تغییری نمی‌کنند/);
+  });
+});
+
+/*
+ * #321. The operator's machine is on UTC; the end typed is still Tehran's
+ * wall clock, and a saved draft still opens at the Tehran time it means.
+ */
+describe('the collection policy’s end is Tehran time, whatever zone the operator is in (#321)', () => {
+  withAmbientZone('UTC');
+
+  async function openFamily() {
+    const user = userEvent.setup();
+    renderPage();
+    const family = await waitFor(() => {
+      const el = document.querySelector('[data-family="collection-policies"]') as HTMLElement | null;
+      expect(el?.querySelector('[data-version="1"]')).toBeTruthy();
+      return el as HTMLElement;
+    });
+    return { user, family };
+  }
+
+  it('sends the end typed as the Tehran instant', async () => {
+    const api = installFakeApi(CAP, routes());
+    const { user, family } = await openFamily();
+    await user.click(within(family).getByRole('button', { name: 'پیش‌نویس تازه برای venue-default' }));
+    const editor = await screen.findByTestId('collection-policy-editor');
+    await user.click(within(editor).getByRole('radio', { name: /پرداخت کامل آنلاین/ }));
+    await user.type(within(editor).getByLabelText(ACTIVATION_END_LABEL), '2026-01-01T09:00');
+    await user.type(within(editor).getByLabelText('دلیل'), 'دلیل کافی');
+    await user.click(within(editor).getByRole('button', { name: 'ثبت پیش‌نویس' }));
+    await waitFor(() => expect(api.sent('POST', `${ADMIN}/collection-policies/venue-default/versions`)).toHaveLength(1));
+    expect(api.sent('POST', `${ADMIN}/collection-policies/venue-default/versions`)[0].body).toMatchObject({ activationEndsAt: '2026-01-01T05:30:00.000Z' });
+  });
+
+  it('opens a draft at the Tehran time it was saved with, and saves it back unchanged', async () => {
+    const api = installFakeApi(
+      CAP,
+      routes({
+        overrides: [
+          ['GET', /^\/v1\/admin\/commercial\/collection-policies\/[^/]+\/versions$/, () => ok({ items: [{ ...DRAFT, activationEndsAt: '2025-12-31T20:30:00.000Z' }] })],
+          ['PUT', /^\/v1\/admin\/commercial\/collection-policies\/[^/]+\/versions\/1$/, () => ok(DRAFT)],
+        ],
+      }),
+    );
+    const { user, family } = await openFamily();
+    await user.click(within(family).getByRole('button', { name: 'ویرایش پیش‌نویس ۱' }));
+    const editor = await screen.findByTestId('collection-policy-editor');
+    expect(within(editor).getByLabelText(ACTIVATION_END_LABEL)).toHaveValue('2026-01-01T00:00');
+    await user.type(within(editor).getByLabelText('دلیل'), 'بدون تغییر زمان');
+    await user.click(within(editor).getByRole('button', { name: 'ذخیرهٔ پیش‌نویس' }));
+    await waitFor(() => expect(api.sent('PUT', `${ADMIN}/collection-policies/venue-default/versions/1`)).toHaveLength(1));
+    expect(api.sent('PUT', `${ADMIN}/collection-policies/venue-default/versions/1`)[0].body).toMatchObject({ activationEndsAt: '2025-12-31T20:30:00.000Z' });
   });
 });

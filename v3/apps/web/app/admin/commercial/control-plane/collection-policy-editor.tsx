@@ -13,7 +13,7 @@ import { Button, Input } from '@/components/ui';
 import { ReasonField, RefusalNotice, WholeField, reasonIsValid, type EditorProps } from '@/components/commercial-lifecycle';
 import type { CollectionDeposit, CollectionPolicyVersion, CollectionPolicyVersionBody } from '@/lib/commercial-admin-api';
 import { COLLECTION_MODE_LABEL, DEPOSIT_KIND_LABEL, PERCENTAGE_BASE_LABEL } from '@/lib/commercial-labels';
-import { isoToLocalInput, localInputToIso, parseWhole } from '@/lib/commercial-lifecycle';
+import { ACTIVATION_END_LABEL, isoToLocalInput, localInputToIso, parseWhole } from '@/lib/commercial-lifecycle';
 import styles from './control-plane.module.css';
 
 /**
@@ -145,7 +145,7 @@ export function CollectionPolicyEditor({ initial, busy, refusal, onSubmit, onCan
       ) : null}
 
       <Input
-        label="پایان فعال‌سازی (اختیاری)"
+        label={ACTIVATION_END_LABEL}
         type="datetime-local"
         dir="ltr"
         value={endsAt}
