@@ -278,6 +278,13 @@
   background: var(--bc-color-surface-muted);
 }
 
+/* A destination that is a primary header link from 640px up (#237). */
+@media (min-width: 640px) {
+  .menuItemPhoneOnly {
+    display: none;
+  }
+}
+
 .menuSeparator {
   height: 1px;
   margin: 6px 8px;

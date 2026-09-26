@@ -263,6 +263,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@beauclick/ai-contract':
+        specifier: workspace:*
+        version: link:../../packages/ai-contract
       '@beauclick/design-tokens':
         specifier: workspace:*
         version: link:../../packages/design-tokens

@@ -252,6 +252,44 @@ describe('the avatar menu', () => {
   });
 });
 
+// #237, `35_AI_ASSISTANT.md` §17: «دستیار» is a new level-one destination for a
+// session holding `bc_use_ai_assistant`, and nothing at all for one without it.
+// On a phone the header links are hidden, so the same destination is ALSO in the
+// avatar menu there — marked phone-only, so the wide header does not carry it
+// twice (which one is visible at a width is a browser claim, measured there).
+describe('the assistant entry', () => {
+  it('is absent — from the header and the menu — without the capability', async () => {
+    await signedIn();
+    expect(within(header()).queryByRole('link', { name: 'دستیار' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: /حساب کاربری/ }));
+    expect(within(screen.getByTestId('avatar-menu-items')).queryByRole('link', { name: 'دستیار هوشمند' })).toBeNull();
+  });
+
+  it('is the fourth header destination for a session that holds it', async () => {
+    await signedIn({ capabilities: ['bc_use_ai_assistant'] });
+    expect(within(header()).getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual([
+      '/search',
+      '/providers',
+      '/dashboard',
+      '/assistant',
+    ]);
+  });
+
+  it('is in the avatar menu as a phone-only entry, first of the occasional destinations', async () => {
+    await signedIn({ capabilities: ['bc_use_ai_assistant'] });
+    await userEvent.click(screen.getByRole('button', { name: /حساب کاربری/ }));
+    const entry = within(screen.getByTestId('avatar-menu-items')).getByRole('link', { name: 'دستیار هوشمند' });
+    expect(entry).toHaveAttribute('href', '/assistant');
+    expect(entry.className).toContain('menuItemPhoneOnly');
+  });
+
+  it('marks the assistant current on its own page', async () => {
+    pathname = '/assistant';
+    await signedIn({ capabilities: ['bc_use_ai_assistant'] });
+    expect(within(header()).getByRole('link', { name: 'دستیار' })).toHaveAttribute('aria-current', 'page');
+  });
+});
+
 describe('the mobile bar and the footer', () => {
   it('carries five destinations, each with its own glyph shape', async () => {
     await signedIn();

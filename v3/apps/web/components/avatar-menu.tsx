@@ -24,6 +24,12 @@ import styles from './app-shell.module.css';
 export interface AvatarMenuEntry {
   label: string;
   href: string;
+  /**
+   * Shown only below 640px, where the header's primary links are hidden — for a
+   * destination that is ALREADY a primary link on wider screens (#237's
+   * assistant). The same link twice in one header teaches nothing.
+   */
+  phoneOnly?: boolean;
 }
 
 export function AvatarMenu({
@@ -81,7 +87,12 @@ export function AvatarMenu({
         <div className={styles.menu} data-testid="avatar-menu-items">
           {identity ? <div className={styles.menuIdentity}>{identity}</div> : null}
           {entries.map((entry) => (
-            <Link key={entry.href} href={entry.href} className={styles.menuItem} onClick={() => setOpen(false)}>
+            <Link
+              key={entry.href}
+              href={entry.href}
+              className={`${styles.menuItem} ${entry.phoneOnly ? styles.menuItemPhoneOnly : ''}`}
+              onClick={() => setOpen(false)}
+            >
               {entry.label}
             </Link>
           ))}

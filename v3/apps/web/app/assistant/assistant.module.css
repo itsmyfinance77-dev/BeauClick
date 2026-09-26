@@ -1,0 +1,335 @@
+/*
+ * The customer AI assistant — `35_AI_ASSISTANT.md`, `Prototype - Customer` §17.
+ *
+ *   390   one column. The list, or — once a conversation is open — that
+ *         conversation with a way back to the list.
+ *   1024  the list and the open conversation side by side.
+ *
+ * Breakpoints are the design's 640 and 1024 (`breakpoints.spec.ts`). No bubble
+ * or typing animation exists, so reduced motion needs no override.
+ */
+
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--bc-spacing-card-gap);
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: var(--bc-text-card-title-size);
+  line-height: var(--bc-text-card-title-leading);
+  font-weight: var(--bc-text-card-title-weight);
+}
+
+/* ------------------------------------------------------------ consent */
+
+.consent {
+  display: grid;
+  gap: 12px;
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-card);
+  padding: 18px 20px;
+  max-inline-size: 720px;
+}
+
+.consentText {
+  margin: 0;
+  line-height: 1.9;
+}
+
+.legalPending {
+  margin: 0;
+  font-size: 13px;
+  color: var(--bc-color-ink-soft);
+  border: 1px dashed var(--bc-color-border-strong);
+  border-radius: var(--bc-radius-control);
+  padding: 8px 12px;
+}
+
+.consentAction {
+  display: flex;
+}
+
+/* ------------------------------------------------------------ workspace */
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--bc-spacing-card-gap);
+  align-items: start;
+}
+
+@media (max-width: 1023px) {
+  /* One column: an open conversation replaces the list until "back". */
+  .workspace[data-open='true'] .listPane {
+    display: none;
+  }
+}
+
+@media (min-width: 1024px) {
+  .workspace {
+    grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  }
+
+  .back {
+    display: none;
+  }
+}
+
+.listPane,
+.threadPane {
+  display: grid;
+  gap: 12px;
+  min-inline-size: 0;
+}
+
+.listHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.row {
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+  inline-size: 100%;
+  min-block-size: 44px;
+  text-align: start;
+  font: inherit;
+  color: inherit;
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-card);
+  padding: 12px 14px;
+  cursor: pointer;
+}
+
+.row:hover {
+  border-color: var(--bc-color-border-strong);
+}
+
+/* The open conversation: a heavier border AND `aria-current`, never colour alone. */
+.rowCurrent {
+  border-color: var(--bc-color-primary);
+  border-width: 2px;
+  padding: 11px 13px;
+}
+
+.rowTitle {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.rowMeta {
+  margin: 0;
+  font-size: 13px;
+  color: var(--bc-color-text-muted);
+}
+
+.more {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+
+.back {
+  justify-self: start;
+  min-block-size: 44px;
+  padding: 0 4px;
+  font: inherit;
+  color: var(--bc-color-primary);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* ------------------------------------------------------------ conversation */
+
+.conversation {
+  display: grid;
+  gap: 14px;
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-card);
+  padding: 16px;
+  min-inline-size: 0;
+}
+
+.conversationHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.log {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-inline-size: 0;
+}
+
+.logEmpty {
+  margin: 0;
+  color: var(--bc-color-text-muted);
+}
+
+.bubbleCustomer,
+.bubbleAssistant {
+  max-inline-size: min(100%, 560px);
+  border-radius: var(--bc-radius-card);
+  padding: 10px 14px;
+  overflow-wrap: anywhere;
+}
+
+/* The customer's own words sit at the end of the line, the assistant's at the start. */
+.bubbleCustomer {
+  align-self: flex-end;
+  background: var(--bc-color-primary-soft);
+  color: var(--bc-color-primary-on-soft);
+}
+
+.bubbleAssistant {
+  align-self: flex-start;
+  background: var(--bc-color-surface-muted);
+  border: 1px solid var(--bc-color-border);
+  display: grid;
+  gap: 8px;
+}
+
+.bubbleBody {
+  margin: 0;
+  line-height: 1.9;
+  white-space: pre-wrap;
+}
+
+.providerLabel {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--bc-color-ink-soft);
+}
+
+.recommendations {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+@media (min-width: 640px) {
+  .recommendations {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.card {
+  display: grid;
+  gap: 2px;
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-control);
+  padding: 10px 12px;
+}
+
+.cardKind {
+  font-size: 12px;
+  color: var(--bc-color-ink-faint);
+}
+
+.cardName {
+  font-weight: 700;
+  color: inherit;
+  overflow-wrap: anywhere;
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 44px;
+}
+
+a.cardName {
+  color: var(--bc-color-primary);
+  text-decoration: underline;
+}
+
+.closed {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+
+/* ------------------------------------------------------------ composer */
+
+.composer {
+  display: grid;
+  gap: 8px;
+}
+
+.fieldLabel {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.field {
+  font: inherit;
+  padding: 12px 14px;
+  border-radius: var(--bc-radius-button);
+  border: 1px solid var(--bc-color-line);
+  background: var(--bc-color-surface);
+  color: var(--bc-color-ink);
+  min-block-size: 96px;
+  resize: vertical;
+}
+
+.field[aria-invalid='true'] {
+  border-color: var(--bc-color-error);
+}
+
+.composerFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.counter {
+  font-size: 13px;
+  color: var(--bc-color-text-muted);
+}
+
+/* Near the cap: bold as well as coloured, so it is not colour alone. */
+.counterNear {
+  color: var(--bc-color-error);
+  font-weight: 700;
+}
+
+.exhausted {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-control);
+  background: var(--bc-color-surface-muted);
+  padding: 12px 14px;
+}
+
+.exhaustedText {
+  margin: 0;
+  font-weight: 600;
+}
