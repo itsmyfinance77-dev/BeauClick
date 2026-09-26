@@ -1,0 +1,277 @@
+/*
+ * The participant inbox — `36_INTERNAL_CHAT.md`, §18 / §17 of the prototypes.
+ *
+ *   390   one column: the list, or — once a conversation is open — that
+ *         conversation with a way back to the list.
+ *   1024  the list and the open conversation side by side.
+ *
+ * Breakpoints are the design's 640 and 1024 (`breakpoints.spec.ts`). No
+ * typing, presence or bubble animation exists, so reduced motion needs no
+ * override.
+ */
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--bc-spacing-card-gap);
+  align-items: start;
+}
+
+@media (max-width: 1023px) {
+  .workspace[data-open='true'] .listPane {
+    display: none;
+  }
+}
+
+@media (min-width: 1024px) {
+  .workspace {
+    grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  }
+
+  .back {
+    display: none;
+  }
+}
+
+.listPane,
+.threadPane {
+  display: grid;
+  gap: 12px;
+  min-inline-size: 0;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: var(--bc-text-card-title-size);
+  line-height: var(--bc-text-card-title-leading);
+  font-weight: var(--bc-text-card-title-weight);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.row {
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+  inline-size: 100%;
+  min-block-size: 44px;
+  text-align: start;
+  font: inherit;
+  color: inherit;
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-card);
+  padding: 12px 14px;
+  cursor: pointer;
+}
+
+.row:hover {
+  border-color: var(--bc-color-border-strong);
+}
+
+/* The open conversation: a heavier border AND `aria-current`, never colour alone. */
+.rowCurrent {
+  border-color: var(--bc-color-primary);
+  border-width: 2px;
+  padding: 11px 13px;
+}
+
+.rowTitle {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.rowMeta {
+  margin: 0;
+  font-size: 13px;
+  color: var(--bc-color-text-muted);
+}
+
+.rowBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* A count in words ("۲ خوانده‌نشده"), so it is not a coloured dot alone. */
+.unread {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--bc-radius-chip);
+  background: var(--bc-color-primary);
+  color: var(--bc-color-surface);
+}
+
+.more {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+
+.back {
+  justify-self: start;
+  min-block-size: 44px;
+  padding: 0 4px;
+  font: inherit;
+  color: var(--bc-color-primary);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.conversation {
+  display: grid;
+  gap: 14px;
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-card);
+  padding: 16px;
+  min-inline-size: 0;
+}
+
+.conversationHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.log {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-inline-size: 0;
+}
+
+.logEmpty {
+  margin: 0;
+  color: var(--bc-color-text-muted);
+}
+
+.bubbleOurs,
+.bubbleTheirs,
+.bubbleErased {
+  max-inline-size: min(100%, 560px);
+  border-radius: var(--bc-radius-card);
+  padding: 8px 14px;
+  overflow-wrap: anywhere;
+  display: grid;
+  gap: 2px;
+}
+
+/* The reader's side at the end of the line, the other side at the start. */
+.bubbleOurs {
+  align-self: flex-end;
+  background: var(--bc-color-primary-soft);
+  color: var(--bc-color-primary-on-soft);
+}
+
+.bubbleTheirs {
+  align-self: flex-start;
+  background: var(--bc-color-surface-muted);
+  border: 1px solid var(--bc-color-border);
+}
+
+/* An erased author: neither side (V32-DEC-013 leaves no side to draw). */
+.bubbleErased {
+  align-self: center;
+  border: 1px dashed var(--bc-color-border-strong);
+  color: var(--bc-color-text-muted);
+  font-style: italic;
+}
+
+.author {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.time {
+  font-weight: 400;
+}
+
+.body {
+  margin: 0;
+  line-height: 1.9;
+  white-space: pre-wrap;
+}
+
+.reportLink {
+  justify-self: start;
+  min-block-size: 44px;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  color: var(--bc-color-text-muted);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.readOnly {
+  display: grid;
+  gap: 8px;
+}
+
+.composer {
+  display: grid;
+  gap: 8px;
+}
+
+.fieldLabel {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.field {
+  font: inherit;
+  padding: 12px 14px;
+  border-radius: var(--bc-radius-button);
+  border: 1px solid var(--bc-color-line);
+  background: var(--bc-color-surface);
+  color: var(--bc-color-ink);
+  min-block-size: 44px;
+}
+
+textarea.field {
+  min-block-size: 96px;
+  resize: vertical;
+}
+
+.field[aria-invalid='true'] {
+  border-color: var(--bc-color-error);
+}
+
+.composerFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.counter {
+  font-size: 13px;
+  color: var(--bc-color-text-muted);
+}
+
+/* Near the cap: bold as well as coloured, so it is not colour alone. */
+.counterNear {
+  color: var(--bc-color-error);
+  font-weight: 700;
+}
+
+.reportForm {
+  display: grid;
+  gap: 8px;
+}

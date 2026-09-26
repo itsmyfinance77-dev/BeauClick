@@ -298,6 +298,16 @@ export class ChatAccessService {
   }
 
   /** The default `DataSource` manager, for read paths that hold no transaction. */
+  /**
+   * The caller's own eligible relationships, as a CUSTOMER (#328).
+   *
+   * Self-scoped by construction: the only identity passed is the session's, so
+   * nothing here can be asked about anybody else's bookings.
+   */
+  async eligibleCounterpartiesFor(manager: EntityManager, callerUserId: string) {
+    return this.eligibility.eligibleCounterpartiesFor(manager, callerUserId);
+  }
+
   get manager(): EntityManager {
     return this.dataSource.manager;
   }

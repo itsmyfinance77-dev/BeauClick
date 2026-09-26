@@ -21,6 +21,7 @@
       "@beauclick/referral-contract": ["../../packages/referral-contract/src/index.ts"],
       "@beauclick/wishlist-contract": ["../../packages/wishlist-contract/src/index.ts"],
       "@beauclick/ai-contract": ["../../packages/ai-contract/src/index.ts"],
+      "@beauclick/chat-contract": ["../../packages/chat-contract/src/index.ts"],
       "@beauclick/commercial-policy-contract": ["../../packages/commercial-policy-contract/src/index.ts"]
     },
     "plugins": [{ "name": "next" }]

@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import { ApiRequestError } from '@/lib/api-client';
 import { ProtectedRoute } from '@/components/protected-route';
 import { Alert, Button, ErrorState, Input, LoadingState } from '@/components/ui';
-import { Badge, ConfirmDialog, PageHeader, SegmentedControl } from '@/components/kit';
+import { Badge, ConfirmDialog, PageHeader, SegmentedControl, TextLink } from '@/components/kit';
 import {
   acceptStaffInvite,
   createBusiness,
@@ -418,6 +418,7 @@ function BusinessDashboard() {
 
   const pendingInvites = memberships.filter((m) => m.status === 'invited');
   const activeMembership = memberships.find((m) => m.status === 'active');
+  const hasChat = user?.capabilities?.includes('bc_use_chat') ?? false;
 
   return (
     <section className={styles.page}>
@@ -428,7 +429,20 @@ function BusinessDashboard() {
           still shows whichever of those apply, because that is the real data
           model, but each is now a named section instead of an unlabelled
           card. */}
-      <PageHeader title="کسب‌وکار" subtitle="دعوت‌ها، کسب‌وکار شما و اعضای آن." />
+      <PageHeader
+        title="کسب‌وکار"
+        subtitle="دعوت‌ها، کسب‌وکار شما و اعضای آن."
+        action={
+          /* #328: the business inbox, for the owner and active managers (spec 36,
+             "business inbox access"). An ordinary staff member gets no entry at
+             all — not an empty or disabled one; a `practitioner_chat` holder
+             reaches their own customers' conversations from the header's
+             messages entry (spec 51 §2.1). The server decides which rows appear. */
+          hasChat && (owned || activeMembership?.role === 'manager') ? (
+            <TextLink href="/business/messages">صندوق گفتگو</TextLink>
+          ) : null
+        }
+      />
       {error ? <Alert tone="error">{error}</Alert> : null}
 
       {pendingInvites.length > 0 && (

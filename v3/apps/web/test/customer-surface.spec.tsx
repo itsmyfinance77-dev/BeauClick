@@ -3,10 +3,12 @@ import userEvent from '@testing-library/user-event';
 import BookingsPage from '@/app/bookings/page';
 import BusinessPage from '@/app/business/page';
 import { AuthProvider } from '@/lib/auth-context';
+import { takePendingConversation } from '@/lib/chat-intent';
 import { tokenStorage } from '@/lib/token-storage';
 
+const mockPush = jest.fn();
 jest.mock('next/navigation', () => ({
-  useRouter: () => ({ replace: jest.fn(), push: jest.fn() }),
+  useRouter: () => ({ replace: jest.fn(), push: mockPush }),
   usePathname: () => '/bookings',
 }));
 
@@ -54,7 +56,7 @@ function mockApi(overrides: Record<string, (init?: RequestInit) => Promise<unkno
     }
     if (url.includes('/v1/auth/refresh')) return ok({ accessToken: 'a', csrfToken: 'c' });
     if (/\/v1\/me(\?|$)/.test(url)) {
-      return ok({ id: 'u1', phone: '+989123456789', displayName: null, roles: [], capabilities: [] });
+      return ok({ id: 'u1', phone: '+989123456789', displayName: null, roles: [], capabilities: capabilities });
     }
     if (url.includes('/v1/me/bookings')) return ok([CONFIRMED_BOOKING]);
     if (url.includes('/v1/me/business-staff')) return ok([]);
@@ -63,7 +65,12 @@ function mockApi(overrides: Record<string, (init?: RequestInit) => Promise<unkno
   });
 }
 
+let capabilities: string[] = [];
+
 beforeEach(() => {
+  capabilities = [];
+  mockPush.mockReset();
+  takePendingConversation();
   global.fetch = jest.fn() as unknown as typeof fetch;
   tokenStorage.clear();
   tokenStorage.set({ accessToken: 'test-access-token', csrfToken: 'test-csrf-token' });
@@ -203,7 +210,96 @@ describe('customer bookings — upcoming and past', () => {
   });
 });
 
+// #328: a conversation starts from a qualifying booking, and only there.
+describe('customer bookings — the message entry', () => {
+  const SALON_BOOKING = { ...CONFIRMED_BOOKING, id: 'b9' };
+  const PENDING = { ...CONFIRMED_BOOKING, id: 'b8', status: 'pending' as const };
+
+  function renderBookings() {
+    return render(
+      <AuthProvider>
+        <BookingsPage />
+      </AuthProvider>,
+    );
+  }
+
+  const fail = () => Promise.resolve({ ok: false, status: 500, json: async () => ({ data: null, meta: null, error: { code: 'X', message: 'x' } }) });
+
+  it('is offered only on the bookings the server listed as qualifying', async () => {
+    capabilities = ['bc_use_chat'];
+    mockApi({
+      '/v1/chat/eligible-counterparties': () => ok({ items: [{ counterpartyType: 'business', counterpartyId: 'biz-9', bookingIds: ['b9'] }] }),
+      '/v1/me/bookings': () => ok([SALON_BOOKING, PENDING]),
+    });
+    renderBookings();
+    const list = await screen.findByTestId('bookings-upcoming');
+    await waitFor(() => expect(within(list.querySelector('[data-booking="b9"]') as HTMLElement).getByRole('button', { name: 'پیام' })).toBeInTheDocument());
+    expect(within(list.querySelector('[data-booking="b8"]') as HTMLElement).queryByRole('button', { name: 'پیام' })).toBeNull();
+  });
+
+  it('opens the SALON`s conversation for a salon-sold booking — the pair exactly as the server gave it — and goes to the inbox', async () => {
+    capabilities = ['bc_use_chat'];
+    mockApi({
+      '/v1/chat/eligible-counterparties': () => ok({ items: [{ counterpartyType: 'business', counterpartyId: 'biz-9', bookingIds: ['b9'] }] }),
+      '/v1/chat/conversations': () => Promise.resolve({ ok: true, status: 201, json: async () => ({ data: { id: 'conv-9' }, meta: null, error: null }) }),
+      '/v1/me/bookings': () => ok([SALON_BOOKING]),
+    });
+    const user = userEvent.setup();
+    renderBookings();
+    await user.click(await screen.findByRole('button', { name: 'پیام' }));
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/messages'));
+    const started = (global.fetch as jest.Mock).mock.calls.find(([url, init]: [string, RequestInit]) => String(url).endsWith('/v1/chat/conversations') && init?.method === 'POST');
+    expect(JSON.parse(String(started[1].body))).toEqual({ counterpartyType: 'business', counterpartyId: 'biz-9' });
+    // The thread to open travels in memory, never in the URL.
+    expect(mockPush.mock.calls[0][0]).toBe('/messages');
+    expect(takePendingConversation()).toBe('conv-9');
+  });
+
+  it('offers no message entry anywhere when the eligibility read fails, or without bc_use_chat', async () => {
+    capabilities = ['bc_use_chat'];
+    mockApi({ '/v1/chat/eligible-counterparties': fail, '/v1/me/bookings': () => ok([SALON_BOOKING]) });
+    const first = renderBookings();
+    await screen.findByTestId('bookings-upcoming');
+    await waitFor(() => expect((global.fetch as jest.Mock).mock.calls.some(([url]: [string]) => String(url).includes('eligible-counterparties'))).toBe(true));
+    expect(screen.queryByRole('button', { name: 'پیام' })).toBeNull();
+    first.unmount();
+
+    capabilities = [];
+    (global.fetch as jest.Mock).mockClear();
+    renderBookings();
+    await screen.findByTestId('bookings-upcoming');
+    expect(screen.queryByRole('button', { name: 'پیام' })).toBeNull();
+    expect((global.fetch as jest.Mock).mock.calls.some(([url]: [string]) => String(url).includes('/v1/chat/'))).toBe(false);
+  });
+});
+
 describe('business surface', () => {
+  const OWNED = { id: 'biz-1', ownerId: 'u1', displayName: 'سالن', bio: null, cityId: null, verificationStatus: 'unverified', createdAt: '2099-01-01T00:00:00.000Z' };
+
+  // #328: the business inbox entry — the owner (and active managers) only.
+  it('links the owner to the business inbox when the session holds bc_use_chat', async () => {
+    capabilities = ['bc_use_chat'];
+    mockApi({ '/v1/me/business-staff': () => ok([]), '/v1/me/business': () => ok(OWNED), '/businesses/biz-1/staff': () => ok([]) });
+    render(
+      <AuthProvider>
+        <BusinessPage />
+      </AuthProvider>,
+    );
+    expect(await screen.findByRole('link', { name: 'صندوق گفتگو' })).toHaveAttribute('href', '/business/messages');
+  });
+
+  it('gives a session with no business of its own no inbox entry at all', async () => {
+    capabilities = ['bc_use_chat'];
+    mockApi({ '/v1/me/business-staff': () => ok([]), '/v1/me/business': () => ok(null) });
+    render(
+      <AuthProvider>
+        <BusinessPage />
+      </AuthProvider>,
+    );
+    await screen.findByRole('heading', { level: 1, name: 'کسب‌وکار' });
+    expect(screen.queryByRole('link', { name: 'صندوق گفتگو' })).toBeNull();
+  });
+
   it('offers the role choice as 44px controls rather than bare radios', async () => {
     mockApi({
       '/v1/me/business-staff': () => ok([]),

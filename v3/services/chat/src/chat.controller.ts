@@ -18,6 +18,7 @@ import { RequireCapability } from '@beauclick/auth';
 import {
   CHAT_COUNTERPARTY_TYPES,
   CHAT_DEFAULT_PAGE_SIZE,
+  CHAT_SIDES,
   CHAT_MAX_MESSAGE_CHARACTERS,
   CHAT_MAX_PAGE_SIZE,
   CHAT_MAX_REPORT_NOTE_CHARACTERS,
@@ -26,10 +27,13 @@ import {
 import type {
   ChatConversationSummary,
   ChatCounterpartyType,
+  ChatEligibleCounterpartyView,
   ChatMessageView,
   ChatReportReason,
   ChatSide,
 } from '@beauclick/chat-contract';
+
+import { NotFoundOrNotYoursException } from '@beauclick/ownership';
 
 import { ChatAccessService } from './chat-access.service';
 import { ChatModerationService } from './chat-moderation.service';
@@ -103,6 +107,20 @@ export class ListConversationsDto {
   @MaxLength(200)
   cursor?: string;
 
+  /**
+   * #328. Keeps one half of the inbox — the conversations the caller is the
+   * customer in, or those they read for a seller party. A narrowing only:
+   * both halves are still built from the caller's own access.
+   */
+  @IsOptional()
+  @IsIn([...CHAT_SIDES])
+  side?: ChatSide;
+
+  /** #328. Keeps conversations whose seller party is of this kind. */
+  @IsOptional()
+  @IsIn([...CHAT_COUNTERPARTY_TYPES])
+  counterpartyType?: ChatCounterpartyType;
+
   @IsOptional()
   @Type(() => Number)
   @IsInt()
@@ -168,7 +186,29 @@ export class ChatController {
       dto.counterpartyType,
       dto.counterpartyId,
     );
-    return this.summarise(user.userId, conversation, 0);
+    return this.summariseReadable(user.userId, conversation, 0);
+  }
+
+  /**
+   * The counterparties the caller may open a conversation with, and which of
+   * their own bookings make it so (#328).
+   *
+   * Takes no parameter: the subject is the session, and the answer is the
+   * eligibility port's — the same rule `POST /conversations` enforces, so a
+   * page offering «message» on these bookings offers nothing the server would
+   * refuse for want of a qualifying booking. A counterparty the caller has
+   * never booked is simply absent; there is nothing here to enumerate.
+   */
+  @Get('eligible-counterparties')
+  async eligibleCounterparties(@CurrentUser() user: AuthenticatedUser): Promise<{ items: ChatEligibleCounterpartyView[] }> {
+    const relationships = await this.access.eligibleCounterpartiesFor(this.access.manager, user.userId);
+    return {
+      items: relationships.map((r) => ({
+        counterpartyType: r.counterpartyType,
+        counterpartyId: r.counterpartyId,
+        bookingIds: [...r.bookingIds],
+      })),
+    };
   }
 
   /** The caller's inbox — both sides, one list, cursor-paginated. */
@@ -178,14 +218,16 @@ export class ChatController {
       user.userId,
       query.limit ?? CHAT_DEFAULT_PAGE_SIZE,
       query.cursor ?? null,
+      { side: query.side, counterpartyType: query.counterpartyType },
     );
     const watermarks = await this.chat.watermarksFor(user.userId, items.map((c) => c.id));
 
     const summaries: ChatConversationSummary[] = [];
     for (const conversation of items) {
-      summaries.push(
-        await this.summarise(user.userId, conversation, watermarks.get(conversation.id) ?? 0),
-      );
+      const summary = await this.summarise(user.userId, conversation, watermarks.get(conversation.id) ?? 0);
+      // Access lost between the listing query and this verdict (a manager
+      // deactivated mid-request): the row is no longer theirs to see.
+      if (summary) summaries.push(summary);
     }
     return { items: summaries, nextCursor };
   }
@@ -194,7 +236,7 @@ export class ChatController {
   async read(@CurrentUser() user: AuthenticatedUser, @Param('id', new ParseUUIDPipe()) id: string) {
     const { conversation } = await this.access.requireReadable(this.access.manager, user.userId, id);
     const watermarks = await this.chat.watermarksFor(user.userId, [conversation.id]);
-    return this.summarise(user.userId, conversation, watermarks.get(conversation.id) ?? 0);
+    return this.summariseReadable(user.userId, conversation, watermarks.get(conversation.id) ?? 0);
   }
 
   @Get('conversations/:id/messages')
@@ -230,7 +272,7 @@ export class ChatController {
     );
     return {
       message: toMessageView(message, user.userId),
-      conversation: await this.summarise(user.userId, conversation, message.sequence),
+      conversation: await this.summariseReadable(user.userId, conversation, message.sequence),
     };
   }
 
@@ -300,10 +342,12 @@ export class ChatController {
     callerUserId: string,
     conversation: ChatConversationEntity,
     watermark: number,
-  ): Promise<ChatConversationSummary> {
+  ): Promise<ChatConversationSummary | null> {
     const verdict = await this.access.evaluate(this.access.manager, callerUserId, conversation);
+    if (verdict.side === null) return null;
     return {
       id: conversation.id,
+      side: verdict.side,
       counterpartyType: conversation.counterpartyType,
       counterpartyId: conversation.counterpartyId,
       messageCount: conversation.messageCount,
@@ -313,7 +357,24 @@ export class ChatController {
       canSend: verdict.canSend,
       cannotSendReason: verdict.reason,
       closedReason: conversation.closedReason,
+      blockedByMe: await this.moderation.hasBlocked(callerUserId, conversation),
     };
+  }
+
+  /**
+   * For a conversation the route has ALREADY proven readable (it was just
+   * started by, loaded for, or written to by this caller). A null here would be
+   * access lost within the same request; answering with the shared 404 is what
+   * every other route in this controller does for "not yours".
+   */
+  private async summariseReadable(
+    callerUserId: string,
+    conversation: ChatConversationEntity,
+    watermark: number,
+  ): Promise<ChatConversationSummary> {
+    const summary = await this.summarise(callerUserId, conversation, watermark);
+    if (!summary) throw new NotFoundOrNotYoursException();
+    return summary;
   }
 }
 

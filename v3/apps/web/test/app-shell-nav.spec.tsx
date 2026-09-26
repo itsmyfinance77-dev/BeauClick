@@ -41,7 +41,9 @@ function ok(data: unknown) {
   return Promise.resolve({ ok: true, status: 200, json: async () => ({ data, meta: null, error: null }) });
 }
 
-function mockApi(options: { capabilities?: string[]; roles?: string[]; displayName?: string | null; unread?: number } = {}) {
+function mockApi(
+  options: { capabilities?: string[]; roles?: string[]; displayName?: string | null; unread?: number; chatUnread?: number | 'fail' } = {},
+) {
   (global.fetch as jest.Mock).mockImplementation((url: string) => {
     if (url.includes('/v1/auth/refresh')) return ok({ accessToken: 'a', csrfToken: 'c' });
     if (/\/v1\/me(\?|$)/.test(url)) {
@@ -57,6 +59,12 @@ function mockApi(options: { capabilities?: string[]; roles?: string[]; displayNa
     }
     if (url.includes('/v1/me/notifications')) {
       return ok({ items: [], unreadCount: options.unread ?? 0 });
+    }
+    if (url.includes('/v1/chat/unread-count')) {
+      if (options.chatUnread === 'fail') {
+        return Promise.resolve({ ok: false, status: 500, json: async () => ({ data: null, meta: null, error: { code: 'X', message: 'x' } }) });
+      }
+      return ok({ total: options.chatUnread ?? 0, conversations: options.chatUnread ? 1 : 0 });
     }
     return ok([]);
   });
@@ -287,6 +295,39 @@ describe('the assistant entry', () => {
     pathname = '/assistant';
     await signedIn({ capabilities: ['bc_use_ai_assistant'] });
     expect(within(header()).getByRole('link', { name: 'دستیار' })).toHaveAttribute('aria-current', 'page');
+  });
+});
+
+// #328, spec 51 §2.1: the messages entry — only for `bc_use_chat`, the count in
+// its accessible name, no badge at 0 and none (and no number) on a failed read.
+describe('the messages entry', () => {
+  it('is absent without bc_use_chat, and no unread count is read', async () => {
+    await signedIn();
+    expect(screen.queryByTestId('header-messages')).toBeNull();
+    expect((global.fetch as jest.Mock).mock.calls.some(([url]: [string]) => String(url).includes('/v1/chat/'))).toBe(false);
+  });
+
+  it('opens the whole inbox and carries the server`s unread total in its name', async () => {
+    await signedIn({ capabilities: ['bc_use_chat'], chatUnread: 3 });
+    const entry = await screen.findByRole('link', { name: 'پیام‌ها، ۳ خوانده‌نشده' });
+    expect(entry).toHaveAttribute('href', '/messages');
+    expect(entry).toHaveTextContent('۳');
+  });
+
+  it('draws no badge at zero', async () => {
+    await signedIn({ capabilities: ['bc_use_chat'], chatUnread: 0 });
+    await waitFor(() => expect((global.fetch as jest.Mock).mock.calls.some(([url]: [string]) => String(url).includes('/v1/chat/unread-count'))).toBe(true));
+    const entry = screen.getByTestId('header-messages');
+    expect(entry).toHaveAccessibleName('پیام‌ها');
+    expect(entry.textContent).toBe('');
+  });
+
+  it('draws no badge and no number when the count cannot be read', async () => {
+    await signedIn({ capabilities: ['bc_use_chat'], chatUnread: 'fail' });
+    await waitFor(() => expect((global.fetch as jest.Mock).mock.calls.some(([url]: [string]) => String(url).includes('/v1/chat/unread-count'))).toBe(true));
+    const entry = screen.getByTestId('header-messages');
+    expect(entry).toHaveAccessibleName('پیام‌ها');
+    expect(entry.textContent).toBe('');
   });
 });
 

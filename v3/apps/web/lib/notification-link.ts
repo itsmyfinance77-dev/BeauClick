@@ -18,7 +18,7 @@ import { safeReturnPath } from './safe-return';
  * `notification-link.spec.ts` fails if an entry has no page, and lists every
  * template destination that is still waiting for one.
  */
-export const NOTIFICATION_ROUTES: readonly string[] = ['/account/privacy', '/bookings', '/dashboard', '/loyalty', '/referral', '/waitlist'];
+export const NOTIFICATION_ROUTES: readonly string[] = ['/account/privacy', '/bookings', '/dashboard', '/loyalty', '/messages', '/referral', '/waitlist'];
 
 /**
  * Destinations the server names by one path and this app serves at another.
@@ -26,7 +26,7 @@ export const NOTIFICATION_ROUTES: readonly string[] = ['/account/privacy', '/boo
  * (spec 29). The alias is explicit so a link is followed only when it is BOTH
  * a known name and a page that exists.
  */
-export const NOTIFICATION_ALIASES: Readonly<Record<string, string>> = { '/privacy': '/account/privacy' };
+export const NOTIFICATION_ALIASES: Readonly<Record<string, string>> = { '/privacy': '/account/privacy', '/chat': '/messages' };
 
 export function notificationHref(deepLink: string | null | undefined): string | null {
   const path = safeReturnPath(deepLink);

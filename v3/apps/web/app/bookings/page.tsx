@@ -1,6 +1,8 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
+import type { ChatCounterpartyType } from '@beauclick/chat-contract';
 import { formatFullJalaliDate } from '@beauclick/persian-utils';
 
 import { useAuth } from '@/lib/auth-context';
@@ -8,6 +10,8 @@ import { ProtectedRoute } from '@/components/protected-route';
 import { Alert, Button, LoadingState } from '@/components/ui';
 import { ConfirmDialog, EmptyState, PageHeader, SegmentedControl, TextLink } from '@/components/kit';
 import { bookingApi, isUpcomingBooking, slotTimeLabel, type BookingSummary } from '@/lib/booking-api';
+import { chatApi, chatRefusalOf } from '@/lib/chat-api';
+import { setPendingConversation } from '@/lib/chat-intent';
 import styles from './bookings.module.css';
 
 const STATUS_FA: Record<BookingSummary['status'], { label: string; tone: string }> = {
@@ -41,7 +45,19 @@ const EMPTY: Record<Tab, string> = {
  * cancelled" are different things to tell someone.
  */
 function BookingsContent() {
-  const { api } = useAuth();
+  const { api, user } = useAuth();
+  const router = useRouter();
+  const hasChat = user?.capabilities?.includes('bc_use_chat') ?? false;
+  /**
+   * #328: which of these bookings can open a conversation, and with whom — the
+   * server's answer (`eligible-counterparties`), never re-derived from a status.
+   * The counterparty is the seller snapshotted at checkout, so a salon-sold
+   * booking opens the SALON's conversation, and the customer never chooses
+   * between the professional and the salon (V32-DEC-010). A failed read offers
+   * no «message» button anywhere, rather than a guessed one.
+   */
+  const [chatTargets, setChatTargets] = useState<Map<string, { type: ChatCounterpartyType; id: string }>>(new Map());
+  const [openingChat, setOpeningChat] = useState<string | null>(null);
   const [bookings, setBookings] = useState<BookingSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -60,6 +76,43 @@ function BookingsContent() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!hasChat) return;
+    let cancelled = false;
+    chatApi
+      .eligibleCounterparties(api)
+      .then((res) => {
+        if (cancelled) return;
+        const map = new Map<string, { type: ChatCounterpartyType; id: string }>();
+        for (const item of res.data?.items ?? []) {
+          for (const bookingId of item.bookingIds) map.set(bookingId, { type: item.counterpartyType, id: item.counterpartyId });
+        }
+        setChatTargets(map);
+      })
+      .catch(() => {
+        if (!cancelled) setChatTargets(new Map());
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [api, hasChat]);
+
+  async function openChat(bookingId: string) {
+    const target = chatTargets.get(bookingId);
+    if (!target) return;
+    setOpeningChat(bookingId);
+    setError(null);
+    try {
+      const res = await chatApi.start(api, target.type, target.id);
+      if (!res.data) throw new Error('empty');
+      setPendingConversation(res.data.id);
+      router.push('/messages');
+    } catch (err) {
+      setError(chatRefusalOf(err)?.message ?? 'گفتگو باز نشد. دوباره تلاش کنید.');
+      setOpeningChat(null);
+    }
+  }
 
   async function cancel(bookingId: string) {
     setBusyId(bookingId);
@@ -144,6 +197,20 @@ function BookingsContent() {
                     ساعت <span className={styles.clock}>{slotTimeLabel(booking.startAt)}</span>
                   </p>
                 </div>
+
+                {chatTargets.has(booking.id) ? (
+                  <div className={styles.actions}>
+                    <Button
+                      variant="ghost"
+                      inline
+                      loading={openingChat === booking.id}
+                      disabled={openingChat !== null && openingChat !== booking.id}
+                      onClick={() => void openChat(booking.id)}
+                    >
+                      پیام
+                    </Button>
+                  </div>
+                ) : null}
 
                 {cancellable ? (
                   <div className={styles.actions}>
