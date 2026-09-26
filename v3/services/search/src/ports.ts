@@ -1,3 +1,4 @@
+import type { MediaDescriptor } from '@beauclick/media';
 import type { WishlistTargetRef } from '@beauclick/wishlist-contract';
 
 /**
@@ -225,3 +226,56 @@ export interface WishlistSavedTargetsPort {
 }
 
 export const WISHLIST_SAVED_TARGETS = Symbol('BEAUCLICK_SEARCH_WISHLIST_SAVED_TARGETS');
+
+/**
+ * A page of professionals' public imagery, read from the authoritative rows
+ * rather than from this module's own index -- #226.
+ *
+ * ## Why it is not in the search document
+ *
+ * The document already carries `avatarUrl`, `portfolioCount` and
+ * `portfolioPreviewUrls`, written by `ProfessionalMediaChanged`. That event fires
+ * when a professional edits their own gallery and NOT when a moderator upholds
+ * an abuse report, which marks the object deleted and removes its bytes without
+ * telling search. A result card drawn from the document would go on showing a
+ * removed image's URL and counting a portfolio item that renders nothing, until
+ * the professional next touched their gallery -- which, having been moderated,
+ * they have no reason to do. So the public response hydrates imagery AFTER the
+ * search, from the same media read the provider detail route uses, and the
+ * document's copies are no longer what a visitor sees.
+ *
+ * This is the same shape as `WishlistSavedTargetsPort` above and for the same
+ * reason: `search` may not import `provider` (ADR-011), so it declares the
+ * question and the composition root binds the answer. The `MediaDescriptor` TYPE
+ * is importable -- `media` is `scope:shared` -- which is what lets the two
+ * responses share one shape instead of describing it twice.
+ *
+ * ## The shape is the detail route's, not a second one
+ *
+ * `images` is exactly what `GET /v1/providers/:id` returns under `images`
+ * (`{ avatar, cover }`, each a `MediaDescriptor` or `null`), so one client type
+ * and one test describe both. `portfolioCount` counts the professional's whole
+ * live, public portfolio -- not the slice a card draws.
+ *
+ * Batched: the whole page in one call. Never one call per result.
+ *
+ * ## What it must never become
+ *
+ * It returns only what a visitor may already load. A protected, pending, deleted
+ * or moderated object is absent, not flagged: there is no field here that could
+ * say "this was removed", carry a storage key, or describe a report.
+ */
+export interface PublicProviderImagery {
+  images: { avatar: MediaDescriptor | null; cover: MediaDescriptor | null };
+  portfolioCount: number;
+}
+
+export interface PublicProviderImageryPort {
+  /**
+   * Imagery for each of `professionalIds` that resolves. An id with no entry has
+   * no live professional behind it; callers report it as having no imagery.
+   */
+  imageryFor(professionalIds: readonly string[]): Promise<ReadonlyMap<string, PublicProviderImagery>>;
+}
+
+export const PUBLIC_PROVIDER_IMAGERY = Symbol('BEAUCLICK_SEARCH_PUBLIC_PROVIDER_IMAGERY');

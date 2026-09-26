@@ -114,13 +114,24 @@ function mockApi(options: {
   orders?: Record<string, unknown>;
   orderFails?: boolean;
   notices?: unknown[];
+  /** Fields of `GET /v1/me` to override. `createdAt: undefined` is a server that predates the field. */
+  me?: Record<string, unknown>;
 } = {}) {
   providerReads = [];
   orderReads = [];
   (global.fetch as jest.Mock).mockImplementation((url: string) => {
     if (url.includes('/v1/auth/refresh')) return ok({ accessToken: 'a', csrfToken: 'c' });
     if (/\/v1\/me(\?|$)/.test(url)) {
-      return ok({ id: 'u1', phone: '+989131234567', displayName: 'مینا', roles: [], capabilities: [] });
+      return ok({
+        id: 'u1',
+        phone: '+989131234567',
+        displayName: 'مینا',
+        roles: [],
+        capabilities: [],
+        // 10 Tir 1404, at Tehran noon -- the «عضویت از تیر ۱۴۰۴» of the design.
+        createdAt: '2025-07-01T08:30:15.123Z',
+        ...options.me,
+      });
     }
     if (url.includes('/v1/me/bookings')) return ok(options.bookings ?? [booking()]);
     if (url.includes('/v1/me/loyalty/summary')) return options.loyaltyFails ? fail() : ok(LOYALTY);
@@ -401,14 +412,66 @@ describe('the amount collected on the upcoming booking (#225)', () => {
   });
 });
 
-describe('claims the page does not make', () => {
-  it('shows no membership date, because /v1/me has no createdAt', async () => {
+/**
+ * #226 — «عضویت از تیر ۱۴۰۴». `GET /v1/me` carries the account's own
+ * `createdAt`; the row shows its Jalali month and year, in the platform's zone,
+ * and is absent — never guessed — when there is no usable instant.
+ */
+describe('the membership row', () => {
+  const rowOf = () => within(screen.getByRole('heading', { name: 'حساب من' }).parentElement as HTMLElement);
+
+  it('shows the month and year the account was created, from the server’s createdAt', async () => {
     mockApi();
     renderDashboard();
     await screen.findByTestId('loyalty-card');
 
-    expect(document.body.textContent).not.toContain('عضویت');
+    const since = await screen.findByTestId('member-since');
+    expect(since).toHaveTextContent('از تیر ۱۴۰۴');
+    // A term and its value in the account card's own list, beside the phone.
+    expect(since.tagName).toBe('DD');
+    expect(since.previousElementSibling).toHaveTextContent('عضویت');
+    expect(rowOf().getByText('شماره موبایل')).toBeInTheDocument();
   });
+
+  it('is derived from the instant it was sent, not from anything else on the page', async () => {
+    // Every other date on this page is in 1404-08 or 2099; only `createdAt` says Dey 1401.
+    mockApi({ me: { createdAt: '2023-01-15T10:00:00.000Z' } });
+    renderDashboard();
+    await screen.findByTestId('loyalty-card');
+
+    expect(await screen.findByTestId('member-since')).toHaveTextContent('از دی ۱۴۰۱');
+    expect(document.body.textContent).not.toContain('تیر ۱۴۰۴');
+  });
+
+  it('reads the month in Tehran, not in UTC', async () => {
+    // 1 Tir 1404 begins at 20:30 UTC on 21 June.
+    mockApi({ me: { createdAt: '2025-06-21T20:29:59.000Z' } });
+    const first = renderDashboard();
+    expect(await screen.findByTestId('member-since')).toHaveTextContent('از خرداد ۱۴۰۴');
+    first.unmount();
+
+    mockApi({ me: { createdAt: '2025-06-21T20:30:00.000Z' } });
+    renderDashboard();
+    expect(await screen.findByTestId('member-since')).toHaveTextContent('از تیر ۱۴۰۴');
+  });
+
+  it.each([['absent', undefined], ['empty', ''], ['not a date', 'yesterday-ish']])(
+    'draws no row when createdAt is %s, and no guessed date in its place',
+    async (_label, createdAt) => {
+      mockApi({ me: { createdAt } });
+      renderDashboard();
+      await screen.findByTestId('loyalty-card');
+
+      expect(screen.queryByTestId('member-since')).toBeNull();
+      expect(document.body.textContent).not.toContain('عضویت');
+      // The rest of the account card is unaffected.
+      expect(rowOf().getByText('شماره موبایل')).toBeInTheDocument();
+      expect(screen.getByText('خروج از حساب')).toBeInTheDocument();
+    },
+  );
+});
+
+describe('claims the page does not make', () => {
 
   it('says plainly when there is no upcoming booking', async () => {
     mockApi({ bookings: [] });

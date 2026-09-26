@@ -46,6 +46,17 @@ export interface ProviderSummary {
   /** `null` for an anonymous visitor: not "unsaved", but "no caller to answer for". */
   saved: boolean | null;
   createdAt: string;
+  /**
+   * How many bookings this professional has completed -- #226. Lifetime, only
+   * `completed` ones, and only once the appointment has ended by the server's
+   * clock; a whole number, never a customer or a date.
+   *
+   * On the DETAIL read (`GET /v1/providers/:id`) alone, so it is optional here:
+   * the listing and the owner's own profile do not carry it, and a page that
+   * treated its absence as `0` would state something nobody counted. Render
+   * nothing when it is `undefined`.
+   */
+  completedBookingCount?: number;
 }
 
 /** One picture of this professional's work. */

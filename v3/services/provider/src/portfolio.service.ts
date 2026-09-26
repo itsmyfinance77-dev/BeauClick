@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, IsNull, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, IsNull, Repository } from 'typeorm';
 import { uuidv7 } from 'uuidv7';
 
 import { DomainException } from '@beauclick/http';
@@ -106,6 +106,80 @@ export class PortfolioService {
       out.set(p.id, {
         avatar: p.avatarMediaId ? descriptors.get(p.avatarMediaId) ?? null : null,
         cover: p.coverMediaId ? descriptors.get(p.coverMediaId) ?? null : null,
+      });
+    }
+    return out;
+  }
+
+  /**
+   * What a visitor may see of a PAGE of professionals' imagery, read from the
+   * authoritative rows -- #226.
+   *
+   * ## Why search does not read this from its own index
+   *
+   * `ProfessionalMediaChanged` refreshes the projection when a professional
+   * edits their own gallery. A moderator upholding an abuse report does not: it
+   * marks the object `deleted` and removes the bytes, and nothing tells search.
+   * A card drawn from the projection would keep a URL to an object that is gone
+   * and keep counting a portfolio item that renders nothing -- exactly the
+   * "moderated media still influences the thumbnail and the count" defect. Read
+   * here, at query time, it cannot: the same `MediaService.describe` the detail
+   * route uses decides what exists, so the two surfaces cannot disagree.
+   *
+   * ## What counts as public
+   *
+   * `describe` returns an object only while it is `stored`, and gives it a URL
+   * only when its access class is `public`. An entry with no URL is treated as
+   * absent here, so a protected, pending, deleted or moderated object never
+   * becomes an image and never adds to `portfolioCount`. The count is over the
+   * professional's whole live portfolio, not over what a card can draw.
+   *
+   * ## Cost
+   *
+   * Three statements for any number of professionals -- the professionals, their
+   * live portfolio rows, one `describe` over every media id -- and never one per
+   * row. The portfolio is capped at `MAX_PORTFOLIO_ITEMS` per professional, so
+   * the batch is bounded by page size times forty.
+   */
+  async publicImageryForMany(
+    professionalIds: readonly string[],
+  ): Promise<Map<string, { images: { avatar: MediaDescriptor | null; cover: MediaDescriptor | null }; portfolioCount: number }>> {
+    const ids = [...new Set(professionalIds)];
+    const out = new Map<string, { images: { avatar: MediaDescriptor | null; cover: MediaDescriptor | null }; portfolioCount: number }>();
+    if (ids.length === 0) return out;
+
+    const [professionals, items] = await Promise.all([
+      this.professionals.find({
+        where: { id: In(ids), deletedAt: IsNull() },
+        select: { id: true, avatarMediaId: true, coverMediaId: true },
+      }),
+      this.items.find({
+        where: { professionalId: In(ids), deletedAt: IsNull() },
+        select: { id: true, professionalId: true, mediaId: true },
+      }),
+    ]);
+
+    const mediaIds = [
+      ...professionals.flatMap((p) => [p.avatarMediaId, p.coverMediaId]),
+      ...items.map((i) => i.mediaId),
+    ].filter((id): id is string => !!id);
+    const descriptors = await this.media.describe(null, mediaIds);
+
+    /** A descriptor a visitor can actually load: stored (it exists) AND public (it has a URL). */
+    const visible = (mediaId: string | null): MediaDescriptor | null => {
+      const descriptor = mediaId ? descriptors.get(mediaId) : undefined;
+      return descriptor && descriptor.url !== null ? descriptor : null;
+    };
+
+    const counts = new Map<string, number>();
+    for (const item of items) {
+      if (visible(item.mediaId)) counts.set(item.professionalId, (counts.get(item.professionalId) ?? 0) + 1);
+    }
+
+    for (const p of professionals) {
+      out.set(p.id, {
+        images: { avatar: visible(p.avatarMediaId), cover: visible(p.coverMediaId) },
+        portfolioCount: counts.get(p.id) ?? 0,
       });
     }
     return out;

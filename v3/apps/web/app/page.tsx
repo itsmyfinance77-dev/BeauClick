@@ -41,9 +41,12 @@ import styles from './home.module.css';
  *     contract carries `city` and nothing finer; the design marks the district
  *     as a placeholder for a future field. Only the city renders.
  *
- * Portfolio imagery is a deliberate placeholder rather than a gap: `avatarUrl`
- * and `portfolioCount` do exist, but the media pipeline that serves them is
- * phase C, so the design's striped tiles are what ships.
+ * Portfolio imagery is a deliberate placeholder rather than a gap. Since #226
+ * the search response these cards are built from carries `images` and
+ * `portfolioCount`, and `/search` draws them; this page still ships the
+ * design's striped tiles, which its own artboard draws and #226 did not
+ * change. Drawing the real avatar here is a separate, small piece of work, not
+ * a missing fact.
  */
 
 /** How many specialty cards the grid holds — four on desktop, two rows of two on a phone. */

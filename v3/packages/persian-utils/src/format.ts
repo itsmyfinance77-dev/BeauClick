@@ -14,7 +14,7 @@
  * file, preserved here as a regression test (format.spec.ts).
  */
 
-import { formatZonedFullDate, formatZonedShortDate, formatZonedTime } from './zoned';
+import { formatZonedFullDate, formatZonedMonthYear, formatZonedShortDate, formatZonedTime } from './zoned';
 
 export { normalizeDigits, toPersianDigits } from './digits';
 import { toPersianDigits } from './digits';
@@ -77,6 +77,11 @@ export function formatShortDate(
 /** Complete "چهارشنبه، ۲۲ مرداد ۱۴۰۵" — for surfaces that need the year. */
 export function formatFullJalaliDate( date: Date, timeZone?: string ): string {
 	return formatZonedFullDate( date, timeZone );
+}
+
+/** "تیر ۱۴۰۴" — the Jalali month and year alone, read in the platform timezone. */
+export function formatMonthYear( date: Date, timeZone?: string ): string {
+	return formatZonedMonthYear( date, timeZone );
 }
 
 /** "۰۹:۳۰", read in the platform timezone. */

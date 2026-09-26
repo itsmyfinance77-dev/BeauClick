@@ -1,4 +1,4 @@
-import { formatCount, formatFullJalaliDate, formatIranianPhone, formatRating, formatShortDate, formatTime, formatToman, normalizeDigits, toPersianDigits } from './format';
+import { formatCount, formatFullJalaliDate, formatIranianPhone, formatMonthYear, formatRating, formatShortDate, formatTime, formatToman, normalizeDigits, toPersianDigits } from './format';
 
 describe( 'toPersianDigits', () => {
 	it( 'converts every ASCII digit to its Persian equivalent', () => {
@@ -72,6 +72,31 @@ describe( 'formatFullJalaliDate', () => {
 	it( 'combines weekday, Jalali day, Jalali month name, and Jalali year into one Persian string', () => {
 		const result = formatFullJalaliDate( new Date( Date.UTC( 2024, 2, 20, 12, 0 ) ) );
 		expect( result ).toBe( 'چهارشنبه، ۱ فروردین ۱۴۰۳' );
+	} );
+} );
+
+describe( 'formatMonthYear', () => {
+	it( 'writes the Jalali month and year alone, in Persian digits', () => {
+		// 2025-07-01 is 10 Tir 1404 -- the «عضویت از تیر ۱۴۰۴» of the customer dashboard.
+		expect( formatMonthYear( new Date( '2025-07-01T08:30:15.123Z' ) ) ).toBe( 'تیر ۱۴۰۴' );
+	} );
+
+	it( 'changes month at Tehran midnight, not at UTC midnight', () => {
+		// 1 Tir 1404 begins at 20:30 UTC on 21 June: a second earlier it is still Khordad.
+		expect( formatMonthYear( new Date( '2025-06-21T20:29:59.000Z' ) ) ).toBe( 'خرداد ۱۴۰۴' );
+		expect( formatMonthYear( new Date( '2025-06-21T20:30:00.000Z' ) ) ).toBe( 'تیر ۱۴۰۴' );
+	} );
+
+	it( 'changes year at Nowruz, in the platform zone', () => {
+		// 1 Farvardin 1405 = 21 March 2026; Tehran midnight is 20:30 UTC on the 20th.
+		expect( formatMonthYear( new Date( '2026-03-20T20:29:59.000Z' ) ) ).toBe( 'اسفند ۱۴۰۴' );
+		expect( formatMonthYear( new Date( '2026-03-20T20:30:00.000Z' ) ) ).toBe( 'فروردین ۱۴۰۵' );
+	} );
+
+	it( 'agrees with an explicit Asia/Tehran request and not with a UTC reading', () => {
+		const instant = new Date( '2025-06-21T21:00:00.000Z' );
+		expect( formatMonthYear( instant ) ).toBe( formatMonthYear( instant, 'Asia/Tehran' ) );
+		expect( formatMonthYear( instant ) ).not.toBe( formatMonthYear( instant, 'UTC' ) );
 	} );
 } );
 

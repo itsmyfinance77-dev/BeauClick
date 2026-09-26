@@ -10,11 +10,18 @@ import { BeauClickExceptionFilter, ResponseEnvelopeInterceptor, ValidationExcept
 import { JwtAuthGuard, CapabilityGuard } from '@beauclick/auth';
 import { OwnershipGuard } from '@beauclick/ownership';
 import { IdentityModule, IDENTITY_ENTITIES, OTP_DEBUG_OBSERVER, OtpDebugObserver } from '@beauclick/identity';
-import { ProviderModule, PROVIDER_ENTITIES, SELLER_GOVERNANCE_INITIALIZATION, SELLER_OWNER_ROLE_GRANT } from '@beauclick/provider';
+import {
+  COMPLETED_BOOKING_COUNT,
+  ProviderModule,
+  PROVIDER_ENTITIES,
+  SELLER_GOVERNANCE_INITIALIZATION,
+  SELLER_OWNER_ROLE_GRANT,
+} from '@beauclick/provider';
+import { BookingEntity } from '@beauclick/booking';
 import type { SellerGovernanceInitializationPort } from '@beauclick/provider';
 import { CAPABILITIES_BY_ROLE, ROLES } from '@beauclick/identity';
 import { PRIVILEGED_CAPABILITIES } from '@beauclick/auth';
-import { IdentityBackedOwnerRoleGrant } from '../src/composition/port-adapters';
+import { BookingBackedCompletedBookingCount, IdentityBackedOwnerRoleGrant } from '../src/composition/port-adapters';
 import { WISHLIST_ENTITIES } from '@beauclick/wishlist';
 import { EventContractsModule } from '@beauclick/event-contracts';
 import { AuditModule, AUDIT_ENTITIES } from '@beauclick/audit';
@@ -153,8 +160,17 @@ class DormantGovernanceInitialization implements SellerGovernanceInitializationP
     { provide: SELLER_OWNER_ROLE_GRANT, useExisting: IdentityBackedOwnerRoleGrant },
     DormantGovernanceInitialization,
     { provide: SELLER_GOVERNANCE_INITIALIZATION, useExisting: DormantGovernanceInitialization },
+    /*
+     * #226. The REAL adapter again: `BookingBackedCompletedBookingCount` needs
+     * only the DataSource, and `BookingEntity` is in this layer's entity list
+     * below so the table it counts exists. `ProviderController` requires the
+     * port without an `@Optional()` fallback, so a graph without it fails to
+     * compile.
+     */
+    BookingBackedCompletedBookingCount,
+    { provide: COMPLETED_BOOKING_COUNT, useExisting: BookingBackedCompletedBookingCount },
   ],
-  exports: [SELLER_OWNER_ROLE_GRANT, SELLER_GOVERNANCE_INITIALIZATION],
+  exports: [SELLER_OWNER_ROLE_GRANT, SELLER_GOVERNANCE_INITIALIZATION, COMPLETED_BOOKING_COUNT],
 })
 class OwnerRoleTestPortsModule {}
 
@@ -230,7 +246,9 @@ export async function createTestApp(): Promise<TestApp> {
   // prove nothing about the wiring — which is precisely the failure Story #8
   // shipped (the entity was missing from the DataSource list, every POST
   // returned 500 at request time, and the app booted cleanly).
-  const entities = [...IDENTITY_ENTITIES, ...PROVIDER_ENTITIES, ...AUDIT_ENTITIES, ...WISHLIST_ENTITIES];
+  // `BookingEntity` (#226): the public profile's completed-booking count reads
+  // `booking.bookings`, and a professional's detail read now asks for it.
+  const entities = [...IDENTITY_ENTITIES, ...PROVIDER_ENTITIES, ...AUDIT_ENTITIES, ...WISHLIST_ENTITIES, BookingEntity];
   // Built and initialized BEFORE the testing module is compiled -- see
   // TypeOrmTestingModule's docblock for why this must be synchronous, not
   // an async dynamic module.
