@@ -204,4 +204,37 @@ describe('the four-month settlement trend (#255)', () => {
     expect(table).not.toHaveTextContent('۳۵۰٬۰۰۰');
     expect(table).toHaveTextContent('۱ تومان');
   });
+
+  it('shows a re-selected workspace as loading until its fresh answer, never the figures from before', async () => {
+    // A -> B (B still loading) -> A again. The first answer for A must not be
+    // shown again while A's second read is in flight: every section on this
+    // page shows loading then, and the chart is no exception.
+    let releaseSecondA: () => void = () => {};
+    mockApi({
+      workspaces: [workspace(REF, 'سالن نور'), workspace(OTHER_REF, 'کلینیک آفتاب')],
+      seriesFor: (ref, attempt) => {
+        if (ref === OTHER_REF) return new Promise(() => {});
+        if (attempt === 1) return ok({ items: SERIES, currency: 'IRT' });
+        return new Promise((resolve) => {
+          releaseSecondA = () =>
+            resolve({ ok: true, status: 200, json: async () => ({ data: { items: SERIES.map((m) => ({ ...m, settledToman: 2 })), currency: 'IRT' }, meta: null, error: null }) });
+        });
+      },
+    });
+    const user = userEvent.setup();
+    renderFinance();
+
+    await user.click(await screen.findByRole('radio', { name: /سالن نور/ }));
+    expect(await trendTable()).toHaveTextContent('۳۵۰٬۰۰۰');
+    await user.click(screen.getByRole('radio', { name: /کلینیک آفتاب/ }));
+    await user.click(screen.getByRole('radio', { name: /سالن نور/ }));
+
+    expect(await screen.findByText('در حال بارگذاری نمودار…')).toBeInTheDocument();
+    expect(screen.queryByText('تسویهٔ ماهانه', { selector: 'caption' })).not.toBeInTheDocument();
+
+    releaseSecondA();
+    const table = await trendTable();
+    expect(table).toHaveTextContent('۲ تومان');
+    expect(table).not.toHaveTextContent('۳۵۰٬۰۰۰');
+  });
 });
