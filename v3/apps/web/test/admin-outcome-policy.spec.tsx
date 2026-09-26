@@ -1,8 +1,13 @@
+/**
+ * @jest-environment ./test/ambient-zone-environment.js
+ */
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import AdminOutcomePolicyPage from '@/app/admin/commercial/outcome-policy/page';
 import { AuthProvider } from '@/lib/auth-context';
+import { ACTIVATION_END_LABEL } from '@/lib/commercial-lifecycle';
 import { tokenStorage } from '@/lib/token-storage';
+import { withAmbientZone } from './ambient-zone';
 import { ADMIN, FAR_PAST, fail, installFakeApi, ok, type Route } from './commercial-fake-api';
 
 jest.mock('next/navigation', () => ({
@@ -368,5 +373,56 @@ describe('the evidence register', () => {
     await waitFor(() => expect(register.querySelector('[data-evidence="cap-old"]')).not.toBeNull());
     expect(within(register.querySelector('[data-evidence="cap-ok"]') as HTMLElement).queryByRole('button', { name: /بازنشستگی/ })).not.toBeNull();
     expect(within(register.querySelector('[data-evidence="cap-old"]') as HTMLElement).queryByRole('button', { name: /بازنشستگی/ })).toBeNull();
+  });
+});
+
+/*
+ * #321. The operator's machine is on UTC; an end typed in either editor on
+ * this page is still Tehran's wall clock, and a draft opens at the Tehran time
+ * it means.
+ */
+describe('activation ends on this page are Tehran time, whatever zone the operator is in (#321)', () => {
+  withAmbientZone('UTC');
+
+  it('opens an outcome-policy draft at the Tehran time it was saved with, and saves an end typed as the Tehran instant', async () => {
+    const api = installFakeApi(
+      CAP,
+      routes({
+        versions: [VERSIONS[1], { ...VERSIONS[2], activationEndsAt: '2025-12-31T20:30:00.000Z' }],
+        overrides: [['PUT', /^\/v1\/admin\/commercial\/outcome-policies\/[^/]+\/versions\/3$/, () => ok(VERSIONS[2])]],
+      }),
+    );
+    const user = userEvent.setup();
+    renderPage();
+    await waitFor(() => expect(versionRow('outcome-policies', 3)).not.toBeNull());
+    await user.click(within(versionRow('outcome-policies', 3)).getByRole('button', { name: 'ویرایش پیش‌نویس ۳' }));
+    const editor = await screen.findByTestId('outcome-policy-editor');
+    const end = within(editor).getByLabelText(ACTIVATION_END_LABEL);
+    expect(end).toHaveValue('2026-01-01T00:00');
+
+    await user.clear(end);
+    await user.type(end, '2026-03-21T02:00');
+    await user.type(within(editor).getByLabelText('دلیل'), 'پایان نوروز');
+    await user.click(within(editor).getByRole('button', { name: 'ذخیرهٔ پیش‌نویس' }));
+    await waitFor(() => expect(api.sent('PUT', `${ADMIN}/outcome-policies/standard-outcome/versions/3`)).toHaveLength(1));
+    expect(api.sent('PUT', `${ADMIN}/outcome-policies/standard-outcome/versions/3`)[0].body).toMatchObject({ activationEndsAt: '2026-03-20T22:30:00.000Z' });
+  });
+
+  it('sends a customer copy’s end typed as the Tehran instant', async () => {
+    const api = installFakeApi(
+      CAP,
+      routes({ overrides: [['POST', /^\/v1\/admin\/commercial\/customer-policy-copies\/[^/]+\/versions$/, () => ok({ ...COPY_ACTIVE, version: 3, lifecycleState: 'draft', body: 'متن' })]] }),
+    );
+    const user = userEvent.setup();
+    renderPage();
+    await waitFor(() => expect(versionRow('policy-copies', 2)).not.toBeNull());
+    await user.click(within(family('policy-copies')).getByRole('button', { name: 'پیش‌نویس تازه برای checkout-copy' }));
+    const editor = await screen.findByTestId('policy-copy-editor');
+    await user.type(within(editor).getByLabelText('متن سیاست'), 'متن تازه');
+    await user.type(within(editor).getByLabelText(ACTIVATION_END_LABEL), '2026-01-01T09:00');
+    await user.type(within(editor).getByLabelText('دلیل'), 'متن تازه');
+    await user.click(within(editor).getByRole('button', { name: 'ثبت پیش‌نویس' }));
+    await waitFor(() => expect(api.sent('POST', `${ADMIN}/customer-policy-copies/checkout-copy/versions`)).toHaveLength(1));
+    expect(api.sent('POST', `${ADMIN}/customer-policy-copies/checkout-copy/versions`)[0].body).toMatchObject({ activationEndsAt: '2026-01-01T05:30:00.000Z' });
   });
 });

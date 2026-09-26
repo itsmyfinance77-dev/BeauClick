@@ -1,8 +1,14 @@
+/**
+ * @jest-environment ./test/ambient-zone-environment.js
+ */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ApiRequestError } from '@/lib/api-client';
 import type { LifecycleVersion } from '@/lib/commercial-admin-api';
+import { PLATFORM_TIMEZONE } from '@beauclick/persian-utils';
 import {
+  ACTIVATION_END_LABEL,
+  ACTIVATION_START_LABEL,
   activeVersion,
   derivedState,
   isoToLocalInput,
@@ -11,6 +17,7 @@ import {
   refusalFrom,
   refusalMeansStale,
 } from '@/lib/commercial-lifecycle';
+import { ambientZone, withAmbientZone } from './ambient-zone';
 
 /** The shared lifecycle helpers (#239). */
 
@@ -59,12 +66,57 @@ describe('parseWhole — an integer or nothing, never a rounded one', () => {
   });
 });
 
-describe('datetime-local round trip', () => {
-  it('keeps the instant', () => {
-    const iso = '2026-09-22T09:30:00.000Z';
-    expect(localInputToIso(isoToLocalInput(iso))).toBe(iso);
-    expect(localInputToIso('')).toBeNull();
+/*
+ * #321: an activation field means Tehran's wall clock, whatever zone the
+ * operator's machine is on. Each case runs under four ambient zones -- UTC,
+ * one west, the platform's own, and the furthest east -- so a conversion that
+ * fell back to the browser's zone fails in at least three of them.
+ */
+describe.each(['UTC', 'America/Los_Angeles', 'Asia/Tehran', 'Pacific/Kiritimati'])('activation fields, operator on %s', (zone) => {
+  withAmbientZone(zone);
+
+  it('really is running on that zone', () => {
+    expect(ambientZone()).toBe(zone);
+  });
+
+  it('reads 09:00 as 09:00 Tehran — 05:30 UTC — and shows it back as 09:00', () => {
+    expect(localInputToIso('2026-01-01T09:00')).toBe('2026-01-01T05:30:00.000Z');
+    expect(isoToLocalInput('2026-01-01T05:30:00.000Z')).toBe('2026-01-01T09:00');
+  });
+
+  it.each([
+    ['Tehran midnight is the previous UTC day', '2026-01-01T00:00', '2025-12-31T20:30:00.000Z'],
+    ['the last minute of a Tehran day', '2025-12-31T23:59', '2025-12-31T20:29:00.000Z'],
+    ['Nowruz, 02:00', '2026-03-21T02:00', '2026-03-20T22:30:00.000Z'],
+    ['a leap day', '2028-02-29T12:00', '2028-02-29T08:30:00.000Z'],
+    // Iran kept summer time until 2022: +04:30, not a hardcoded +03:30.
+    ['a 2021 summer date, when Tehran was +04:30', '2021-06-01T09:00', '2021-06-01T04:30:00.000Z'],
+  ])('%s: %s → %s, and back', (_label, local, iso) => {
+    expect(localInputToIso(local)).toBe(iso);
+    expect(isoToLocalInput(iso)).toBe(local);
+  });
+
+  it('keeps seconds and milliseconds typed with a finer step', () => {
+    expect(localInputToIso('2026-01-01T09:00:30')).toBe('2026-01-01T05:30:30.000Z');
+    expect(localInputToIso('2026-01-01T09:00:30.5')).toBe('2026-01-01T05:30:30.500Z');
+  });
+
+  it.each(['', 'abc', '2026-02-30T09:00', '2026-13-01T09:00', '2026-01-01T24:00', '2026-01-01T09:60', '2026-01-01 09:00', '2026-01-01T09:00Z', '2026-01-01T09:00+03:30'])(
+    '%j is not a date and time, so it is no instant at all',
+    (value) => expect(localInputToIso(value)).toBeNull(),
+  );
+
+  it('shows nothing for no instant', () => {
     expect(isoToLocalInput(null)).toBe('');
+    expect(isoToLocalInput('not a date')).toBe('');
+  });
+});
+
+describe('the activation field labels', () => {
+  it('name the zone the fields mean, which is the platform’s', () => {
+    expect(PLATFORM_TIMEZONE).toBe('Asia/Tehran');
+    expect(ACTIVATION_START_LABEL).toBe('شروع فعال‌سازی (به وقت تهران)');
+    expect(ACTIVATION_END_LABEL).toBe('پایان فعال‌سازی (اختیاری، به وقت تهران)');
   });
 });
 

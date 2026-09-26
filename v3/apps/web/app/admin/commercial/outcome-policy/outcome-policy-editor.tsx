@@ -20,7 +20,7 @@ import { NumberSetEditor, ReasonField, RefusalNotice, WholeField, reasonIsValid,
 import { describeRetention } from '@/components/outcome-selection-groups';
 import type { LegalEvidence, OutcomePolicyVersion, OutcomePolicyVersionBody } from '@/lib/commercial-admin-api';
 import { RETENTION_KIND_LABEL } from '@/lib/commercial-labels';
-import { isoToLocalInput, localInputToIso, parseWhole } from '@/lib/commercial-lifecycle';
+import { ACTIVATION_END_LABEL, isoToLocalInput, localInputToIso, parseWhole } from '@/lib/commercial-lifecycle';
 import styles from './outcome-policy.module.css';
 
 /**
@@ -340,7 +340,7 @@ export function OutcomePolicyEditor({
       </fieldset>
 
       <Input
-        label="پایان فعال‌سازی (اختیاری)"
+        label={ACTIVATION_END_LABEL}
         type="datetime-local"
         dir="ltr"
         value={endsAt}

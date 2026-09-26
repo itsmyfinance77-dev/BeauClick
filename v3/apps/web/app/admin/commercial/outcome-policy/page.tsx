@@ -57,7 +57,7 @@ import {
   evidenceStatusView,
   evidenceSubjectLabel,
 } from '@/lib/commercial-labels';
-import { activeVersion, isoToLocalInput, localInputToIso, refusalFrom, type Refusal } from '@/lib/commercial-lifecycle';
+import { ACTIVATION_END_LABEL, activeVersion, isoToLocalInput, localInputToIso, refusalFrom, type Refusal } from '@/lib/commercial-lifecycle';
 import { OutcomePolicyEditor, OutcomePolicySummary } from './outcome-policy-editor';
 import styles from './outcome-policy.module.css';
 
@@ -272,7 +272,7 @@ function PolicyCopyEditor({ initial, busy, refusal, onSubmit, onCancel }: Editor
         error={bytes > MAX_CUSTOMER_POLICY_COPY_BYTES ? 'متن از اندازهٔ مجاز بلندتر است.' : null}
       />
       <Input
-        label="پایان فعال‌سازی (اختیاری)"
+        label={ACTIVATION_END_LABEL}
         type="datetime-local"
         dir="ltr"
         value={endsAt}

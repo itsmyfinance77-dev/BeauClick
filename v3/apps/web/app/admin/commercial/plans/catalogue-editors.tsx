@@ -20,7 +20,7 @@ import type {
   PriceTier,
 } from '@/lib/commercial-admin-api';
 import { lifecycleView } from '@/lib/commercial-labels';
-import { isoToLocalInput, localInputToIso, parseWhole } from '@/lib/commercial-lifecycle';
+import { ACTIVATION_END_LABEL, ACTIVATION_START_LABEL, isoToLocalInput, localInputToIso, parseWhole } from '@/lib/commercial-lifecycle';
 import styles from './plans.module.css';
 
 /**
@@ -131,9 +131,9 @@ export function PriceScheduleEditor({ initial, busy, refusal, onSubmit, onCancel
       <p className={styles.note}>هیچ قیمت، ردیف یا تعدادی پیشنهاد نمی‌شود. همهٔ مبالغ تومان و عدد صحیح‌اند.</p>
       <Input label="نام نمایشی" value={displayName} maxLength={120} onChange={(e) => setDisplayName(e.target.value)} disabled={busy} />
       <div className={styles.grid}>
-        <Input label="شروع فعال‌سازی" type="datetime-local" dir="ltr" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} disabled={busy} />
+        <Input label={ACTIVATION_START_LABEL} type="datetime-local" dir="ltr" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} disabled={busy} />
         <Input
-          label="پایان فعال‌سازی (اختیاری)"
+          label={ACTIVATION_END_LABEL}
           type="datetime-local"
           dir="ltr"
           value={endsAt}
@@ -439,8 +439,8 @@ export function PlanEditor({
       </fieldset>
 
       <div className={styles.grid}>
-        <Input label="شروع فعال‌سازی" type="datetime-local" dir="ltr" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} disabled={busy} />
-        <Input label="پایان فعال‌سازی (اختیاری)" type="datetime-local" dir="ltr" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} disabled={busy} />
+        <Input label={ACTIVATION_START_LABEL} type="datetime-local" dir="ltr" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} disabled={busy} />
+        <Input label={ACTIVATION_END_LABEL} type="datetime-local" dir="ltr" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} disabled={busy} />
       </div>
 
       <ReasonField value={reason} onChange={setReason} disabled={busy} />

@@ -1,8 +1,13 @@
+/**
+ * @jest-environment ./test/ambient-zone-environment.js
+ */
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import AdminPlansPage from '@/app/admin/commercial/plans/page';
 import { AuthProvider } from '@/lib/auth-context';
+import { ACTIVATION_END_LABEL, ACTIVATION_START_LABEL } from '@/lib/commercial-lifecycle';
 import { tokenStorage } from '@/lib/token-storage';
+import { withAmbientZone } from './ambient-zone';
 import { ADMIN, FAR_PAST, fail, installFakeApi, ok, type Route } from './commercial-fake-api';
 
 jest.mock('next/navigation', () => ({
@@ -157,7 +162,7 @@ describe('plans (#271)', () => {
     await user.type(within(editor).getByLabelText('جای کارمند'), '5');
     await user.type(within(editor).getByLabelText('شعبه'), '2');
     await user.click(within(editor).getByRole('radio', { name: 'خیر' }));
-    await user.type(within(editor).getByLabelText('شروع فعال‌سازی'), '2026-11-01T09:00');
+    await user.type(within(editor).getByLabelText(ACTIVATION_START_LABEL), '2026-11-01T09:00');
     await user.type(within(editor).getByLabelText('دلیل'), 'طرح تازه');
     expect(within(editor).getByRole('button', { name: 'ثبت پیش‌نویس' })).toBeDisabled();
 
@@ -176,7 +181,7 @@ describe('plans (#271)', () => {
       priceScheduleVersionId: SCHEDULE_V2_ID,
       bookingCreditScheduleKey: null,
       autoAssignable: false,
-      activationStartsAt: new Date('2026-11-01T09:00').toISOString(),
+      activationStartsAt: '2026-11-01T05:30:00.000Z', // 09:00 Tehran (#321)
       activationEndsAt: null,
       reason: 'طرح تازه',
     });
@@ -385,7 +390,7 @@ describe('price schedules', () => {
     const editor = await screen.findByTestId('price-schedule-editor');
     // Everything else valid, so the gap is the ONLY thing between this and a request.
     await user.type(within(editor).getByLabelText('نام نمایشی'), 'بسته');
-    await user.type(within(editor).getByLabelText('شروع فعال‌سازی'), '2026-10-01T09:00');
+    await user.type(within(editor).getByLabelText(ACTIVATION_START_LABEL), '2026-10-01T09:00');
     await user.type(within(editor).getByLabelText('دلیل'), 'دلیل کافی');
     await user.type(within(editor).getByLabelText('کمترین تعداد خرید'), '1');
     await user.type(within(editor).getByLabelText('بیشترین تعداد خرید'), '100');
@@ -414,7 +419,7 @@ describe('price schedules', () => {
     await user.click(within(family('price-schedules')).getByRole('button', { name: 'پیش‌نویس تازه برای seller-price' }));
     const editor = await screen.findByTestId('price-schedule-editor');
     await user.type(within(editor).getByLabelText('نام نمایشی'), 'بستهٔ پاییز');
-    await user.type(within(editor).getByLabelText('شروع فعال‌سازی'), '2026-10-01T09:00');
+    await user.type(within(editor).getByLabelText(ACTIVATION_START_LABEL), '2026-10-01T09:00');
     await user.type(within(editor).getByLabelText('کمترین تعداد خرید'), '1');
     await user.type(within(editor).getByLabelText('بیشترین تعداد خرید'), '100');
     const presets = within(editor).getByRole('group', { name: 'تعدادهای پیشنهادی در رابط خرید (فقط نمایشی)' });
@@ -434,7 +439,7 @@ describe('price schedules', () => {
     await waitFor(() => expect(api.sent('POST', `${ADMIN}/price-schedules/seller-price/versions`)).toHaveLength(1));
     expect(api.sent('POST', `${ADMIN}/price-schedules/seller-price/versions`)[0].body).toEqual({
       displayName: 'بستهٔ پاییز',
-      activationStartsAt: new Date('2026-10-01T09:00').toISOString(),
+      activationStartsAt: '2026-10-01T05:30:00.000Z', // 09:00 Tehran (#321)
       activationEndsAt: null,
       minPurchaseQuantity: 1,
       maxPurchaseQuantity: 100,
@@ -463,5 +468,95 @@ describe('price schedules', () => {
     const row = await waitForRow('price-schedules', 'seller-price', 1);
     await user.click(within(row).getByRole('button', { name: 'نمایش ردیف‌های نسخهٔ ۱' }));
     expect(await within(row).findByText(/۱\+: ۰ تومان/)).toBeInTheDocument();
+  });
+});
+
+/*
+ * #321. The operator's machine is on UTC; the window typed is still Tehran's
+ * wall clock, and a saved draft still opens at the Tehran time it means. With
+ * the browser's zone these would send 00:00Z / 02:00Z and show 20:30 / 05:30.
+ */
+describe('activation windows are Tehran time, whatever zone the operator is in (#321)', () => {
+  withAmbientZone('UTC');
+
+  async function fillNewPlan(user: ReturnType<typeof userEvent.setup>, editor: HTMLElement) {
+    await user.type(within(editor).getByLabelText('نام نمایشی'), 'حرفه‌ای');
+    await user.type(within(editor).getByLabelText('اعتبار رزرو همراه طرح'), '50');
+    await user.type(within(editor).getByLabelText('جای کارمند'), '5');
+    await user.type(within(editor).getByLabelText('شعبه'), '2');
+    await user.click(within(editor).getByRole('radio', { name: 'خیر' }));
+    await user.selectOptions(within(editor).getByLabelText('نسخهٔ جدول قیمت'), SCHEDULE_V2_ID);
+    await user.type(within(editor).getByLabelText('دلیل'), 'طرح تازه');
+  }
+
+  it('sends a new plan’s start and end as the Tehran instants typed', async () => {
+    const api = installFakeApi(CAP, routes());
+    const user = userEvent.setup();
+    renderPage();
+    await waitForRow('price-schedules', 'seller-price', 2);
+    await user.click(within(family('plans')).getByRole('button', { name: 'پیش‌نویس تازه برای starter' }));
+    const editor = await screen.findByTestId('plan-editor');
+    await fillNewPlan(user, editor);
+    await user.type(within(editor).getByLabelText(ACTIVATION_START_LABEL), '2026-01-01T00:00');
+    await user.type(within(editor).getByLabelText(ACTIVATION_END_LABEL), '2026-03-21T02:00');
+    await user.click(within(editor).getByRole('button', { name: 'ثبت پیش‌نویس' }));
+
+    await waitFor(() => expect(api.sent('POST', `${ADMIN}/plans/starter/versions`)).toHaveLength(1));
+    expect(api.sent('POST', `${ADMIN}/plans/starter/versions`)[0].body).toMatchObject({
+      activationStartsAt: '2025-12-31T20:30:00.000Z',
+      activationEndsAt: '2026-03-20T22:30:00.000Z',
+    });
+  });
+
+  it('opens a plan draft at the Tehran time it was saved with, and saves it back unchanged', async () => {
+    const api = installFakeApi(
+      CAP,
+      routes([
+        ['GET', /^\/v1\/admin\/commercial\/plans\/starter\/versions$/, () =>
+          ok({ items: [planV({ version: 2, lifecycleState: 'draft', publishedAt: null, activationStartsAt: '2025-12-31T20:30:00.000Z', activationEndsAt: '2026-01-01T05:30:00.000Z' })] })],
+      ]),
+    );
+    const user = userEvent.setup();
+    renderPage();
+    const row = await waitForRow('plans', 'starter', 2);
+    await user.click(within(row).getByRole('button', { name: 'ویرایش پیش‌نویس ۲' }));
+    const editor = await screen.findByTestId('plan-editor');
+    expect(within(editor).getByLabelText(ACTIVATION_START_LABEL)).toHaveValue('2026-01-01T00:00');
+    expect(within(editor).getByLabelText(ACTIVATION_END_LABEL)).toHaveValue('2026-01-01T09:00');
+
+    await user.type(within(editor).getByLabelText('دلیل'), 'بدون تغییر زمان');
+    await user.click(within(editor).getByRole('button', { name: 'ذخیرهٔ پیش‌نویس' }));
+    await waitFor(() => expect(api.sent('PUT', `${ADMIN}/plans/starter/versions/2`)).toHaveLength(1));
+    expect(api.sent('PUT', `${ADMIN}/plans/starter/versions/2`)[0].body).toMatchObject({
+      activationStartsAt: '2025-12-31T20:30:00.000Z',
+      activationEndsAt: '2026-01-01T05:30:00.000Z',
+    });
+  });
+
+  it('sends a price schedule’s start and end as the Tehran instants typed', async () => {
+    const api = installFakeApi(CAP, routes());
+    const user = userEvent.setup();
+    renderPage();
+    await waitForRow('price-schedules', 'seller-price', 1);
+    await user.click(within(family('price-schedules')).getByRole('button', { name: 'پیش‌نویس تازه برای seller-price' }));
+    const editor = await screen.findByTestId('price-schedule-editor');
+    await user.type(within(editor).getByLabelText('نام نمایشی'), 'بستهٔ نوروز');
+    await user.type(within(editor).getByLabelText(ACTIVATION_START_LABEL), '2026-03-21T00:00');
+    await user.type(within(editor).getByLabelText(ACTIVATION_END_LABEL), '2026-04-02T23:59');
+    await user.type(within(editor).getByLabelText('کمترین تعداد خرید'), '1');
+    await user.type(within(editor).getByLabelText('بیشترین تعداد خرید'), '10');
+    const tiers = screen.getByTestId('tier-editor');
+    await user.click(within(tiers).getByRole('button', { name: 'افزودن ردیف' }));
+    const [tier] = within(tiers).getAllByRole('listitem');
+    await user.type(within(tier).getByLabelText('از تعداد'), '1');
+    await user.type(within(tier).getByLabelText('قیمت واحد (تومان)'), '100000');
+    await user.type(within(editor).getByLabelText('دلیل'), 'قیمت نوروز');
+    await user.click(within(editor).getByRole('button', { name: 'ثبت پیش‌نویس' }));
+
+    await waitFor(() => expect(api.sent('POST', `${ADMIN}/price-schedules/seller-price/versions`)).toHaveLength(1));
+    expect(api.sent('POST', `${ADMIN}/price-schedules/seller-price/versions`)[0].body).toMatchObject({
+      activationStartsAt: '2026-03-20T20:30:00.000Z',
+      activationEndsAt: '2026-04-02T20:29:00.000Z',
+    });
   });
 });
