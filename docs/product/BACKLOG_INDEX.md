@@ -1939,4 +1939,5 @@ identical before and after (every warning in it predates this split). Order: #32
 
 **Since, the same day:** #327 was delivered by #330 (`25677a8`) and closed at `sp:2`. V3.3 done
 **492 → 494**, ready 20 → 18, scope unchanged at **629**; the live dashboard, the report script and a
-raw-label recount agree. #237 is Ready and #328 is no longer waiting on anything.
+raw-label recount agree. #237 is Ready; #328's explicit #327 dependency is cleared, while the
+owner-approved sequencing still keeps #328 after #237.
