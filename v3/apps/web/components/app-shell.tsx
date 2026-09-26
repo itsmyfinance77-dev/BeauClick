@@ -134,6 +134,16 @@ export function AppShell({ children }: { children: ReactNode }) {
    */
   const isSeller = isSellerSession(user);
 
+  /**
+   * The assistant (`35_AI_ASSISTANT.md`, #237): a new level-one destination
+   * beside the existing three, shown only to a session holding the customer
+   * capability. On a phone the primary links are hidden and the bottom bar
+   * already carries its five (`25_MOBILE_NAVIGATION.md`), so there it lives in
+   * the avatar menu instead. Hiding it is a courtesy; `CapabilityGuard` is the
+   * control.
+   */
+  const hasAssistant = authenticated && (user?.capabilities?.includes('bc_use_ai_assistant') ?? false);
+
   const primary = [
     { href: '/search', label: 'خدمات' },
     { href: '/providers', label: 'متخصص‌ها' },
@@ -143,6 +153,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     // حساب من». `/bookings` keeps its own full page and the dashboard links to
     // it, so nothing breaks — this only changes which one the header names.
     ...(authenticated ? [{ href: '/dashboard', label: 'حساب من' }] : []),
+    ...(hasAssistant ? [{ href: '/assistant', label: 'دستیار' }] : []),
   ];
 
   /*
@@ -165,6 +176,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   */
   const menuEntries: AvatarMenuEntry[] = authenticated
     ? [
+        ...(hasAssistant ? [{ href: '/assistant', label: 'دستیار هوشمند', phoneOnly: true }] : []),
         { href: '/journey', label: 'مسیر من' },
         { href: '/loyalty', label: 'باشگاه' },
         { href: '/waitlist', label: 'لیست انتظار' },

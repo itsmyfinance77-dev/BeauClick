@@ -16,6 +16,7 @@ module.exports = {
     '^@beauclick/payment-contract$': '<rootDir>/../../packages/payment-contract/src/index.ts',
     '^@beauclick/referral-contract$': '<rootDir>/../../packages/referral-contract/src/index.ts',
     '^@beauclick/wishlist-contract$': '<rootDir>/../../packages/wishlist-contract/src/index.ts',
+    '^@beauclick/ai-contract$': '<rootDir>/../../packages/ai-contract/src/index.ts',
     // V3.3 `#43b-1` / #173. The admin commission surface re-declares this
     // package's closed vocabularies as literal unions rather than importing
     // them into the browser bundle; one test asserts the two still agree,

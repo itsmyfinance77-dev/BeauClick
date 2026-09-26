@@ -11,6 +11,7 @@
     "next": "14.2.35",
     "react": "18.3.1",
     "react-dom": "18.3.1",
+    "@beauclick/ai-contract": "workspace:*",
     "@beauclick/design-tokens": "workspace:*",
     "@beauclick/persian-utils": "workspace:*",
     "@beauclick/payment-contract": "workspace:*",

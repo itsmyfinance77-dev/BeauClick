@@ -21,6 +21,7 @@ export const PRIVATE_PATHS = [
   '/pro/',
   '/admin/',
   '/checkout/',
+  '/assistant',
   '/bookings',
   '/business',
   '/dashboard',
