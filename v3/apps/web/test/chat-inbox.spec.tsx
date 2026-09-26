@@ -498,6 +498,117 @@ describe('blocking and reporting', () => {
   });
 });
 
+// ---------------------------------------------------------------- the read watermark
+
+/**
+ * Codex review of `76d6b9e`: the watermark was advanced BEFORE `POST /read`
+ * succeeded, so one lost request left an open conversation unread until a
+ * newer message arrived. The confirmed value now moves only on the server's
+ * answer; a failure is retried by the next poll for the same sequence.
+ */
+describe('the read watermark', () => {
+  const serverError: Reply = { status: 500, error: { code: 'INTERNAL_ERROR', message: 'x' } };
+
+  async function openWithFakeTimers(routes: Routes) {
+    jest.useFakeTimers();
+    mockApi({ list: () => ok({ items: [conv('c1', { unreadCount: 1 })], nextCursor: null }), ...routes });
+    const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+    renderPage();
+    const log = await openFirst(user);
+    return { user, log };
+  }
+
+  const tick = () =>
+    act(async () => {
+      await jest.advanceTimersByTimeAsync(CHAT_POLL_THREAD_MS + 50);
+    });
+
+  it('retries a failed mark-read for the same sequence on the next poll, then takes the unread figures from the server', async () => {
+    let reads = 0;
+    let confirmed = false;
+    const announced: number[] = [];
+    const listener = (e: Event) => announced.push((e as CustomEvent<{ total: number }>).detail.total);
+    window.addEventListener('bc:chat-unread', listener);
+    try {
+      await openWithFakeTimers({
+        summary: () => ok(conv('c1', { unreadCount: confirmed ? 0 : 1 })),
+        messages: () => ok({ items: [msg(2), msg(1, { mine: true, side: 'customer' })], nextBeforeSequence: null }),
+        read: () => {
+          reads += 1;
+          if (reads === 1) return serverError;
+          confirmed = true;
+          return ok({ lastReadSequence: 2, unread: { total: 0, conversations: 0 } });
+        },
+      });
+      await waitFor(() => expect(calls('/read', 'POST')).toHaveLength(1));
+      // The failure changed nothing locally: still unread, nothing announced.
+      expect(announced).toEqual([]);
+      expect(within(screen.getByRole('list')).getByRole('button')).toHaveTextContent('۱ خوانده‌نشده');
+
+      await tick();
+      await waitFor(() => expect(calls('/read', 'POST')).toHaveLength(2));
+      expect(calls('/read', 'POST').map(bodyOf)).toEqual([{ upToSequence: 2 }, { upToSequence: 2 }]);
+      // The server's figures, not a local decrement.
+      await waitFor(() => expect(announced).toEqual([0]));
+      await waitFor(() => expect(within(screen.getByRole('list')).getByRole('button')).not.toHaveTextContent('خوانده‌نشده'));
+
+      // Confirmed: the next quiet poll asks nothing more.
+      await tick();
+      expect(calls('/read', 'POST')).toHaveLength(2);
+    } finally {
+      window.removeEventListener('bc:chat-unread', listener);
+    }
+  });
+
+  it('sends no second mark-read for a sequence already in flight', async () => {
+    let release: (reply: Reply) => void = () => undefined;
+    await openWithFakeTimers({
+      summary: () => ok(conv('c1')),
+      messages: () => ok({ items: [msg(2), msg(1)], nextBeforeSequence: null }),
+      read: () => new Promise<Reply>((resolve) => (release = resolve)),
+    });
+    await waitFor(() => expect(calls('/read', 'POST')).toHaveLength(1));
+    await tick();
+    await tick();
+    expect(calls('/read', 'POST')).toHaveLength(1);
+    await act(async () => release(ok({ lastReadSequence: 2, unread: { total: 0, conversations: 0 } })));
+  });
+
+  it('marks read a message that arrives by polling', async () => {
+    let newest = 1;
+    await openWithFakeTimers({
+      summary: () => ok(conv('c1')),
+      messages: () => ok({ items: Array.from({ length: newest }, (_, i) => msg(newest - i)), nextBeforeSequence: null }),
+      read: (_url, init) => ok({ lastReadSequence: JSON.parse(String(init?.body)).upToSequence, unread: { total: 0, conversations: 0 } }),
+    });
+    await waitFor(() => expect(calls('/read', 'POST')).toHaveLength(1));
+    newest = 2;
+    await tick();
+    await waitFor(() => expect(calls('/read', 'POST').map(bodyOf)).toEqual([{ upToSequence: 1 }, { upToSequence: 2 }]));
+  });
+
+  it('does not let one`s own sent message stand in for a read the server never confirmed', async () => {
+    let reads = 0;
+    const { user } = await openWithFakeTimers({
+      summary: () => ok(conv('c1')),
+      messages: () => ok({ items: [msg(2), msg(1)], nextBeforeSequence: null }),
+      read: () => {
+        reads += 1;
+        return reads === 1 ? serverError : ok({ lastReadSequence: 3, unread: { total: 0, conversations: 0 } });
+      },
+      send: () => ok({ message: msg(3, { mine: true, side: 'customer', body: 'سلام' }), conversation: conv('c1', { messageCount: 3 }) }, 201),
+    });
+    await waitFor(() => expect(calls('/read', 'POST')).toHaveLength(1));
+    await user.type(screen.getByLabelText('پیام شما'), 'سلام');
+    await user.click(screen.getByRole('button', { name: 'ارسال' }));
+    await waitFor(() => expect(calls('/messages', 'POST')).toHaveLength(1));
+    await tick();
+    // The unconfirmed read is still asked for — now up to the newest seen.
+    await waitFor(() => expect(calls('/read', 'POST')).toHaveLength(2));
+    expect(bodyOf(calls('/read', 'POST')[1]).upToSequence).toBeGreaterThanOrEqual(2);
+  });
+});
+
 // ---------------------------------------------------------------- polling
 
 describe('polling — the transport', () => {

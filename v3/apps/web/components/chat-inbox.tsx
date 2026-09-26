@@ -123,6 +123,11 @@ export function ChatInbox({ filter, emptyAction }: { filter: ChatInboxFilter; em
   const [withdrawn, setWithdrawn] = useState(false);
   const [announcement, setAnnouncement] = useState('');
 
+  // What is on screen, readable synchronously: a setState updater runs at
+  // render time, so a value computed inside one is not there to be returned.
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+
   const side = filter.side;
   const counterpartyType = filter.counterpartyType;
   const load = useCallback(async () => {
@@ -159,15 +164,13 @@ export function ChatInbox({ filter, emptyAction }: { filter: ChatInboxFilter; em
     async () => {
       const res = await chatApi.conversations(api, { side, counterpartyType });
       const fresh = res.data?.items ?? [];
-      let changed = false;
-      setItems((current) => {
-        const freshIds = new Set(fresh.map((c) => c.id));
-        const next = [...fresh, ...current.filter((c) => !freshIds.has(c.id))];
-        changed =
-          next.length !== current.length ||
-          next.some((c, i) => current[i]?.id !== c.id || current[i]?.lastMessageAt !== c.lastMessageAt || current[i]?.unreadCount !== c.unreadCount);
-        return next;
-      });
+      const current = itemsRef.current;
+      const freshIds = new Set(fresh.map((c) => c.id));
+      const next = [...fresh, ...current.filter((c) => !freshIds.has(c.id))];
+      const changed =
+        next.length !== current.length ||
+        next.some((c, i) => current[i]?.id !== c.id || current[i]?.lastMessageAt !== c.lastMessageAt || current[i]?.unreadCount !== c.unreadCount);
+      if (changed) setItems(next);
       return changed;
     },
     CHAT_POLL_LIST_MS,
@@ -331,7 +334,25 @@ function Thread({
   const [blockError, setBlockError] = useState<string | null>(null);
   const [reporting, setReporting] = useState<ChatMessageView | null>(null);
   const headingRef = useRef<HTMLHeadingElement | null>(null);
+  /**
+   * The read watermark, in two parts (Codex review of `76d6b9e`):
+   *
+   *   - `lastMarked`: the highest sequence the SERVER has confirmed as read.
+   *     Advanced only by a successful `POST /read`, from its own answer.
+   *   - `markingUpTo`: the highest sequence with a request in flight, 0 if none.
+   *
+   * A failed mark-read therefore leaves `lastMarked` where it was, and the next
+   * poll (or the next load) asks again for the same sequence — the conversation
+   * cannot stay unread because one request was lost. The in-flight marker stops
+   * a second request for a sequence already being marked; the confirmed value
+   * only ever grows, so an older response arriving late cannot move it back.
+   * Nothing is decremented locally: the unread figures always come from the
+   * server's answer and a re-read summary.
+   */
   const lastMarked = useRef(0);
+  const markingUpTo = useRef(0);
+  /** The newest sequence present in this thread — read synchronously by the poll. */
+  const newestSeen = useRef(0);
   const titleId = useId();
 
   const fail = useCallback(
@@ -359,14 +380,18 @@ function Thread({
 
   const markRead = useCallback(
     async (upTo: number) => {
-      if (upTo <= lastMarked.current) return;
-      lastMarked.current = upTo;
+      if (upTo <= lastMarked.current || upTo <= markingUpTo.current) return;
+      markingUpTo.current = upTo;
       try {
         const res = await chatApi.markRead(api, conversationId, upTo);
+        lastMarked.current = Math.max(lastMarked.current, res.data?.lastReadSequence ?? upTo);
         if (res.data) announceChatUnread(res.data.unread);
         await refreshSummary();
       } catch (err) {
+        // Not confirmed: `lastMarked` is untouched, so the next poll retries.
         fail(err);
+      } finally {
+        if (markingUpTo.current === upTo) markingUpTo.current = 0;
       }
     },
     [api, conversationId, refreshSummary, fail],
@@ -384,8 +409,8 @@ function Thread({
       setMessages(mergeMessages([], items));
       setNextBefore(page.data?.nextBeforeSequence ?? null);
       setStatus('ready');
-      const newest = items.reduce((max, m) => Math.max(max, m.sequence), 0);
-      if (newest > 0) void markRead(newest);
+      newestSeen.current = items.reduce((max, m) => Math.max(max, m.sequence), 0);
+      if (newestSeen.current > 0) void markRead(newestSeen.current);
     } catch (err) {
       if (!fail(err)) setStatus('failed');
     }
@@ -409,18 +434,17 @@ function Thread({
         const page = await chatApi.messages(api, conversationId);
         const items = page.data?.items ?? [];
         const newest = items.reduce((max, m) => Math.max(max, m.sequence), 0);
-        let changed = false;
-        setMessages((current) => {
-          const currentNewest = current.reduce((max, m) => Math.max(max, m.sequence), 0);
-          changed = newest > currentNewest;
-          return changed ? mergeMessages(current, items) : current;
-        });
+        const changed = newest > newestSeen.current;
         if (changed) {
-          void markRead(newest);
+          newestSeen.current = newest;
+          setMessages((current) => mergeMessages(current, items));
         } else {
           // `canSend` can change with no new message: a block, a closure, the window.
           await refreshSummary();
         }
+        // Also the RETRY path: anything seen but not yet confirmed read is asked
+        // for again, whether or not this poll brought something new.
+        if (newestSeen.current > lastMarked.current) void markRead(newestSeen.current);
         return changed;
       } catch (err) {
         fail(err);
@@ -534,7 +558,8 @@ function Thread({
           conversationId={conversationId}
           onSent={(message, next) => {
             setMessages((current) => mergeMessages(current, [message]));
-            lastMarked.current = Math.max(lastMarked.current, message.sequence);
+            // Seen, not confirmed read: the poll marks it through the server.
+            newestSeen.current = Math.max(newestSeen.current, message.sequence);
             setSummary(next);
             onSummary(next);
           }}
