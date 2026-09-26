@@ -1,11 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { formatZonedFullDate, toPersianDigits } from '@beauclick/persian-utils';
+import { formatToman, formatZonedFullDate, toPersianDigits } from '@beauclick/persian-utils';
 import { PriceDisplay } from './price-display';
 import { Button, ErrorState, LoadingState } from '@/components/ui';
 import { Badge, DataCell, DataRow, DataTable, EmptyState, MoneyUnitNote, PageHeader, StatCard, StatGrid } from '@/components/kit';
 import { FundsByState } from '@/components/funds-by-state';
+import { MoneyChart, type ChartPoint } from '@/components/money-chart';
 import { useAuth } from '@/lib/auth-context';
 import { ApiRequestError } from '@/lib/api-client';
 import {
@@ -14,6 +15,7 @@ import {
   orderLedger,
   outstandingOrders,
   settlements,
+  settlementSeries,
   workspaceFunds,
   type FinanceAccessMode,
   type FinanceSummary,
@@ -21,6 +23,7 @@ import {
   type LedgerEntry,
   type OutstandingOrder,
   type SettlementBatch,
+  type SettlementMonth,
   type WorkspaceFunds,
 } from '@/lib/pro-api';
 import {
@@ -29,10 +32,31 @@ import {
   ledgerEntryLabel,
   settlementKindLabel,
   settlementKindTone,
+  settlementMonthLabel,
 } from '@/lib/finance-labels';
 import styles from './finance-workspace.module.css';
 
 const SETTLEMENTS_HEADING_ID = 'finance-settlements-heading';
+const TREND_HEADING_ID = 'finance-trend-heading';
+
+/** A Toman amount with its unit, for the chart's tooltip, summary and table. */
+const formatMoney = (value: number) => `${formatToman(value)} تومان`;
+
+/**
+ * The monthly series as chart points (#255): the bar is what was SETTLED that
+ * month; reversals are a separate fact in the same row, never netted into the
+ * bar, so a month with a reversal is never drawn as a smaller settlement.
+ */
+function trendPoints(months: readonly SettlementMonth[]): ChartPoint[] {
+  return months.map((m) => ({
+    key: m.month,
+    label: settlementMonthLabel(m.month, m.complete),
+    value: m.settledToman,
+    detail:
+      `${toPersianDigits(m.settlementCount)} تسویه` +
+      (m.reversedToman > 0 ? `، ${formatMoney(m.reversedToman)} برگشتی` : ''),
+  }));
+}
 // the header is not rendered below 640px (the card layout prints each cell's data-label instead), so the DataCell labels must carry the unit too — do not tidy them back to a bare «مبلغ» (#287).
 const SETTLEMENT_HEAD = ['تاریخ', 'مبلغ (تومان)', 'روش', 'نوع'] as const;
 
@@ -132,6 +156,26 @@ export function FinanceWorkspaceSurface() {
   const [settlementsLoadedFor, setSettlementsLoadedFor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
 
+  /**
+   * #255. A FIFTH independent section, the four-month settlement trend: the
+   * server computes the series, so the chart is never one page of the
+   * settlement history presented as a whole. Same rule as the others -- its
+   * failure blanks nothing else, and until `seriesLoadedFor` matches the
+   * active workspace it is loading, not "no settlements".
+   */
+  const [series, setSeries] = useState<SettlementMonth[]>([]);
+  const [seriesError, setSeriesError] = useState<string | null>(null);
+  const [seriesLoadedFor, setSeriesLoadedFor] = useState<string | null>(null);
+  /**
+   * The one series request still wanted. Every `loadSeries` call -- a new
+   * selection, a re-selection or a retry -- takes a new number, and a response
+   * carrying an older one is dropped whole: success, error and refusal alike.
+   * Otherwise workspace A's late answer, arriving after B was selected and
+   * drawn, would put B's chart back to loading, show A's error under B, or
+   * treat A's refusal as the loss of B.
+   */
+  const seriesRequest = useRef(0);
+
   const [ledgerFor, setLedgerFor] = useState<string | null>(null);
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
   const [ledgerLoading, setLedgerLoading] = useState(false);
@@ -154,6 +198,9 @@ export function FinanceWorkspaceSurface() {
     setNextCursor(null);
     setSettlementsError(null);
     setSettlementsLoadedFor(null);
+    setSeries([]);
+    setSeriesError(null);
+    setSeriesLoadedFor(null);
     setLedgerFor(null);
     setLedger([]);
     setLedgerError(null);
@@ -282,6 +329,29 @@ export function FinanceWorkspaceSurface() {
     [api, handleAuthorityLoss],
   );
 
+  const loadSeries = useCallback(
+    async (workspaceRef: string) => {
+      seriesRequest.current += 1;
+      const request = seriesRequest.current;
+      setSeriesError(null);
+      setSeriesLoadedFor(null);
+      try {
+        const res = await settlementSeries(api, workspaceRef);
+        if (request !== seriesRequest.current) return;
+        setSeries(res.data?.items ?? []);
+        setSeriesLoadedFor(workspaceRef);
+      } catch (err) {
+        if (request !== seriesRequest.current) return;
+        if (isRecoverableRefusal(err)) {
+          handleAuthorityLoss(workspaceRef);
+          return;
+        }
+        setSeriesError(errorMessage(err, 'روند تسویه بارگذاری نشد.'));
+      }
+    },
+    [api, handleAuthorityLoss],
+  );
+
   useEffect(() => {
     void loadWorkspaces();
     // Runs once on mount only -- `loadWorkspaces` is re-created per render via
@@ -298,6 +368,7 @@ export function FinanceWorkspaceSurface() {
     void loadFunds(activeRef);
     void loadOrders(activeRef);
     void loadSettlements(activeRef);
+    void loadSeries(activeRef);
   }, [activeRef]);
 
   function selectWorkspace(workspaceRef: string) {
@@ -510,6 +581,31 @@ export function FinanceWorkspaceSurface() {
                 ))}
               </ul>
             </>
+          )}
+
+          {/* #255, spec 13: the four-month trend, above the settlement table. */}
+          <h2 id={TREND_HEADING_ID} className={styles.sectionTitleSpaced}>
+            روند تسویه در چهار ماه اخیر
+          </h2>
+          {seriesError ? (
+            <ErrorState message={seriesError} onRetry={() => void loadSeries(active.workspaceRef)} />
+          ) : (
+            <div className={styles.section} aria-labelledby={TREND_HEADING_ID} role="group">
+              <MoneyChart
+                points={trendPoints(series)}
+                loading={seriesLoadedFor !== active.workspaceRef}
+                title="تسویهٔ ماهانه"
+                period="ماه"
+                formatValue={formatMoney}
+                valueHeading="تسویه‌شده"
+                detailHeading="جزئیات"
+                emptyMessage="هنوز تراکنشی ثبت نشده"
+              />
+              <p className={styles.trendNote}>
+                ماه‌ها شمسی و به وقت تهران‌اند. ارتفاع هر میله مبلغ تسویه‌شدهٔ همان ماه است؛ برگشت‌ها جدا نوشته می‌شوند و در
+                ماهی شمرده می‌شوند که رخ داده‌اند.
+              </p>
+            </div>
           )}
 
           <h2 id={SETTLEMENTS_HEADING_ID} className={styles.sectionTitleSpaced}>

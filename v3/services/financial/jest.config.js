@@ -12,6 +12,7 @@ module.exports = {
     '^@beauclick/ownership$': '<rootDir>/../../libs/ownership/src/index.ts',
     '^@beauclick/events$': '<rootDir>/../../libs/events/src/index.ts',
     '^@beauclick/money$': '<rootDir>/../../libs/money/src/index.ts',
+    '^@beauclick/persian-utils$': '<rootDir>/../../packages/persian-utils/src/index.ts',
     '^@beauclick/testing$': '<rootDir>/../../libs/testing/src/index.ts',
   },
 };

@@ -593,7 +593,7 @@ describePg('safe staff identification, finance workspace labels and cache safety
   // =======================================================================
 
   describe('§3 Cache-Control: private, no-store on every seller finance response', () => {
-    it('is on all ten routes for a successful read, on the collection, and on the four singular routes', async () => {
+    it('is on all eleven routes for a successful read, on the collection, and on the four singular routes', async () => {
       const owner = await seedUser(app, dataSource, nextPhone(), ['customer', 'business']);
       const business = await seedBusiness(dataSource, owner.id, 'سالن نور');
       const orderId = await earn('business', business.id, 1_000_000);
@@ -608,12 +608,14 @@ describePg('safe staff identification, finance workspace labels and cache safety
         // `#43a` (ADR-052 §16): the ADDITIVE tenth route -- workspace-aware
         // only, no singular sibling.
         `/me/finance/${entry.workspaceRef}/funds`,
+        // #255: the eleventh, workspace-aware only.
+        `/me/finance/${entry.workspaceRef}/settlement-series`,
         '/me/finance/summary',
         '/me/finance/outstanding-orders',
         '/me/finance/settlements',
         `/me/finance/orders/${orderId}/ledger`,
       ];
-      expect(paths).toHaveLength(10);
+      expect(paths).toHaveLength(11);
       for (const path of paths) {
         const res = await get(path, owner).expect(200);
         expect(res.headers['cache-control']).toBe(NO_STORE);

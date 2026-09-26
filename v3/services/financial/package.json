@@ -14,6 +14,7 @@
     "@beauclick/auth": "workspace:*",
     "@beauclick/events": "workspace:*",
     "@beauclick/money": "workspace:*",
+    "@beauclick/persian-utils": "workspace:*",
     "typeorm": "^0.3.20",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",

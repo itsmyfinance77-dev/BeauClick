@@ -26,6 +26,22 @@ import {
   financePartyKey,
 } from './ports';
 import { OutstandingOrder, PartySummary, SettlementService } from './settlement.service';
+import { SettlementMonthWindow, settlementMonthWindows } from './settlement-months';
+
+/** How many months the settlement series covers: spec 13's four-month trend. */
+export const SETTLEMENT_SERIES_MONTHS = 4;
+
+/** One Jalali month of a workspace's settlement series (#255). */
+export interface SettlementMonth extends SettlementMonthWindow {
+  /** Sum of the month's `settlement` batches. */
+  settledToman: number;
+  /** Sum of the month's `reversal` batches, as a positive amount. */
+  reversedToman: number;
+  /** How many `settlement` batches the month has. */
+  settlementCount: number;
+  /** `false` for the month still running: its figures are to date, not final. */
+  complete: boolean;
+}
 
 /**
  * A seller's own finances, addressed by WORKSPACE — V3.3 #72, `V33-DEC-020`.
@@ -323,6 +339,33 @@ export class FinanceWorkspaceService {
     // `limit + 1` and discarding it is what makes `nextCursor` honest.
     const nextCursor = rows.length > limit ? encodeWorkspaceCursor(workspaceRef, items[items.length - 1].id) : null;
     return { items, nextCursor };
+  }
+
+  /**
+   * `GET /me/finance/:workspaceRef/settlement-series` -- the eleventh route
+   * (#255): settled and reversed Toman in each of the last
+   * `SETTLEMENT_SERIES_MONTHS` Jalali months, oldest first, the current
+   * month last and marked `complete: false`.
+   *
+   * It exists so `/finance` can draw its trend WITHOUT building one from the
+   * paged settlement history in the browser: a series summed from the first
+   * page would be a partial series presented as a whole, wrong for anyone
+   * with more than a page of settlements and silently so.
+   *
+   * The same authority as every workspace-aware read -- owner or live
+   * `finance_read` grant, re-read now -- and the same non-enumerating
+   * refusal, because it goes through the same `resolveAddressableWorkspace`.
+   * `now` is a seam for the boundary tests; the route never passes it.
+   */
+  async settlementSeriesFor(sessionUserId: string, workspaceRef: string, now: Date = new Date()): Promise<SettlementMonth[]> {
+    const party = await this.resolveAddressableWorkspace(sessionUserId, workspaceRef);
+    const windows = settlementMonthWindows(now, SETTLEMENT_SERIES_MONTHS);
+    const totals = await this.settlements.monthlyTotalsForParty(party.partyType, party.partyId, windows);
+    return windows.map((window, i) => ({
+      ...window,
+      ...totals[i],
+      complete: window.endsAt.getTime() <= now.getTime(),
+    }));
   }
 
   /**

@@ -206,16 +206,22 @@ describePg('scoped read-only business finance authority (real PostgreSQL, #111)'
     return { salon: s, bookkeeper: k, ref };
   }
 
-  const fourReads = (ref: string, orderId: string) => [
+  /**
+   * Every read of the LEGACY settlement regime. #255's monthly series joined
+   * the original four: it reads the same settlement batches, so it carries the
+   * same authority, refusal, parity and revocation battery they do.
+   */
+  const legacyReads = (ref: string, orderId: string) => [
     `/me/finance/${ref}/summary`,
     `/me/finance/${ref}/outstanding-orders`,
     `/me/finance/${ref}/settlements`,
     `/me/finance/${ref}/orders/${orderId}/ledger`,
+    `/me/finance/${ref}/settlement-series`,
   ];
 
   /**
-   * The tenth route (`#43a`, ADR-052 §16). Kept separate from `fourReads`
-   * rather than folded into it: those four read the LEGACY receivable regime
+   * The tenth route (`#43a`, ADR-052 §16). Kept separate from `legacyReads`
+   * rather than folded into it: those read the LEGACY receivable regime
    * and take an order id, this one reads the new-regime journal and does not.
    * `#185` is what puts it under the same authority, refusal and leakage
    * battery the other four have carried since #111.
@@ -600,11 +606,11 @@ describePg('scoped read-only business finance authority (real PostgreSQL, #111)'
       const summary = (await get(`/me/finance/${ref}/summary`, k.user).expect(200)).body.data;
       expect(summary.receivableNetToman).toBe(a.receivable);
       assertNoLeak(summary, String(b.receivable));
-      for (const path of fourReads(bRef, b.orderId)) await get(path, k.user).expect(404);
+      for (const path of legacyReads(bRef, b.orderId)) await get(path, k.user).expect(404);
       // Nothing about B is in k's list.
       expect(await listWorkspaces(k.user)).toHaveLength(1);
       // And B's owner learns nothing from k's reference.
-      for (const path of fourReads(ref, a.orderId)) await get(path, b.owner).expect(404);
+      for (const path of legacyReads(ref, a.orderId)) await get(path, b.owner).expect(404);
     });
 
     it('bare affiliation grants nothing: staff, manager and a practitioner_chat holder are refused like a stranger', async () => {
@@ -629,8 +635,8 @@ describePg('scoped read-only business finance authority (real PostgreSQL, #111)'
         const theirRef = workspaces.referenceFor(user.id, { partyType: 'business', partyId: s.businessId });
         const bodies = new Set<string>();
         for (const path of [
-          ...fourReads(theirRef, s.orderId),
-          ...fourReads(ownerRef, s.orderId),
+          ...legacyReads(theirRef, s.orderId),
+          ...legacyReads(ownerRef, s.orderId),
           fundsRead(theirRef),
           fundsRead(ownerRef),
         ]) {
@@ -669,7 +675,7 @@ describePg('scoped read-only business finance authority (real PostgreSQL, #111)'
 
       const ownerBodies = [];
       const granteeBodies = [];
-      for (const [ownerPath, granteePath] of fourReads(ownerRef, secondOrder).map((p, i) => [p, fourReads(ref, secondOrder)[i]])) {
+      for (const [ownerPath, granteePath] of legacyReads(ownerRef, secondOrder).map((p, i) => [p, legacyReads(ref, secondOrder)[i]])) {
         ownerBodies.push((await get(ownerPath, s.owner).expect(200)).body);
         granteeBodies.push((await get(granteePath, k.user).expect(200)).body);
       }
@@ -764,7 +770,7 @@ describePg('scoped read-only business finance authority (real PostgreSQL, #111)'
           logMigration: () => undefined,
           log: () => undefined,
         } as never;
-        for (const path of fourReads(ref, s.orderId)) await get(path, k.user).expect(200);
+        for (const path of legacyReads(ref, s.orderId)) await get(path, k.user).expect(200);
       } finally {
         ctx.financialDataSource.logger = original;
       }
@@ -1205,13 +1211,13 @@ describePg('scoped read-only business finance authority (real PostgreSQL, #111)'
       withdraw: () => Promise<void>,
     ) => {
       const token = user.accessToken; // captured once, reused verbatim
-      for (const path of fourReads(ref, s.orderId)) await api().get(`/api/v1${path}`).set(auth(token)).expect(200);
+      for (const path of legacyReads(ref, s.orderId)) await api().get(`/api/v1${path}`).set(auth(token)).expect(200);
       const financialBefore = await financialCounts();
 
       await withdraw();
 
       const bodies = new Set<string>();
-      for (const path of fourReads(ref, s.orderId)) {
+      for (const path of legacyReads(ref, s.orderId)) {
         const res = await api().get(`/api/v1${path}`).set(auth(token)).expect(404);
         bodies.add(JSON.stringify(res.body));
       }
@@ -1493,7 +1499,7 @@ describePg('scoped read-only business finance authority (real PostgreSQL, #111)'
           logMigration: () => undefined,
           log: () => undefined,
         } as never;
-        for (const path of ['/me/finance/workspaces', ...fourReads(ref, s.orderId)]) await get(path).expect(401);
+        for (const path of ['/me/finance/workspaces', ...legacyReads(ref, s.orderId)]) await get(path).expect(401);
       } finally {
         dataSource.logger = original;
       }
@@ -1506,7 +1512,7 @@ describePg('scoped read-only business finance authority (real PostgreSQL, #111)'
       const applicationBefore = await applicationCounts();
 
       await get('/me/finance/workspaces', k.user).expect(200);
-      for (const path of fourReads(ref, s.orderId)) await get(path, k.user).expect(200);
+      for (const path of legacyReads(ref, s.orderId)) await get(path, k.user).expect(200);
       await get(`/me/finance/${'A'.repeat(43)}/summary`, k.user).expect(404);
       await get('/me/finance/summary', k.user).expect(404);
 
@@ -1520,7 +1526,7 @@ describePg('scoped read-only business finance authority (real PostgreSQL, #111)'
   // =======================================================================
 
   describe('§9 the surface is unchanged', () => {
-    it('the finance route table is still exactly ten routes -- `#43a` added ONE additive, workspace-aware-only route (ADR-052 §16)', () => {
+    it('the finance route table is exactly eleven routes -- `#43a` (ADR-052 §16) and #255 each added ONE additive, workspace-aware-only read', () => {
       const server = app.getHttpServer();
       const router = server._events.request._router as { stack: Array<{ route?: { path: string } }> };
       const paths = router.stack.filter((layer) => layer.route).map((layer) => layer.route!.path);
@@ -1532,6 +1538,7 @@ describePg('scoped read-only business finance authority (real PostgreSQL, #111)'
           '/api/v1/me/finance/:workspaceRef/settlements',
           '/api/v1/me/finance/:workspaceRef/orders/:orderId/ledger',
           '/api/v1/me/finance/:workspaceRef/funds',
+          '/api/v1/me/finance/:workspaceRef/settlement-series',
           '/api/v1/me/finance/summary',
           '/api/v1/me/finance/outstanding-orders',
           '/api/v1/me/finance/settlements',

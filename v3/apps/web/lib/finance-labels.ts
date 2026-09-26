@@ -1,3 +1,4 @@
+import { JALALI_MONTHS, toPersianDigits } from '@beauclick/persian-utils';
 import type { BadgeTone } from '@/components/kit';
 
 /**
@@ -41,6 +42,18 @@ export function settlementKindLabel(kind: string): string {
 
 export function settlementKindTone(kind: string): BadgeTone {
   return SETTLEMENT_KIND_TONE[kind] ?? 'neutral';
+}
+
+/**
+ * A settlement-series month as the page names it -- «تیر ۱۴۰۵» (#255).
+ *
+ * Read from the server's ASCII Jalali key, never from `startsAt` in the
+ * browser's zone. The month still running says so: its figures are to date.
+ */
+export function settlementMonthLabel(month: string, complete: boolean): string {
+  const [year, index] = month.split('-').map(Number);
+  const name = JALALI_MONTHS[index - 1] ?? month;
+  return `${name} ${toPersianDigits(year)}${complete ? '' : ' (تا امروز)'}`;
 }
 
 export const WORKSPACE_TYPE_LABEL: Record<'professional' | 'business', string> = {

@@ -97,14 +97,19 @@ describe('the accessible equivalent', () => {
     const user = userEvent.setup();
     renderChart();
     const table = screen.getByRole('table');
+    // #255: hidden through a block wrapper, never on the <table> -- a table box
+    // cannot be clipped to 1px, so a hidden table with long rows widened the page.
+    const wrapper = table.parentElement as HTMLElement;
     const toggle = screen.getByRole('button', { name: 'نمایش به‌صورت جدول' });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    expect(toggle).toHaveAttribute('aria-controls', table.id);
-    expect(table.className).toContain('srOnly');
+    expect(toggle).toHaveAttribute('aria-controls', wrapper.id);
+    expect(wrapper.tagName).toBe('DIV');
+    expect(wrapper.className).toContain('srOnly');
+    expect(table.className).not.toContain('srOnly');
 
     await user.click(toggle);
     expect(screen.getByRole('button', { name: 'پنهان کردن جدول' })).toHaveAttribute('aria-expanded', 'true');
-    expect(table.className).not.toContain('srOnly');
+    expect(wrapper.className).not.toContain('srOnly');
   });
 
   it('omits the detail column when no point carries a detail', () => {
@@ -164,5 +169,20 @@ describe('empty and loading', () => {
     expect(screen.getByRole('status')).toHaveTextContent('در حال بارگذاری نمودار…');
     expect(screen.queryByRole('img')).toBeNull();
     expect(container.querySelectorAll('[class*=skeletonBar]').length).toBeGreaterThan(5);
+  });
+});
+
+describe('what one bar is (#255)', () => {
+  it('is a day unless the caller says otherwise, in the summary and the table', () => {
+    renderChart();
+    expect(screen.getByRole('img', { name: /روند روزانهٔ فروش: ۴ روز،/ })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'روز' })).toBeInTheDocument();
+  });
+
+  it('is a month for a monthly series, and never announced as days', () => {
+    renderChart(POINTS, { title: 'تسویهٔ ماهانه', period: 'ماه' });
+    expect(screen.getByRole('img', { name: /تسویهٔ ماهانه: ۴ ماه،/ })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'ماه' })).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'روز' })).not.toBeInTheDocument();
   });
 });

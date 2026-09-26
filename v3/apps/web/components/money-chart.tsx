@@ -63,6 +63,7 @@ export function MoneyChart({
   detailHeading,
   emptyMessage,
   loading = false,
+  period = 'روز',
 }: {
   points: readonly ChartPoint[];
   /** Names the chart: «روند روزانهٔ فروش». */
@@ -76,6 +77,13 @@ export function MoneyChart({
   /** Shown instead of a flat, empty plot. */
   emptyMessage: string;
   loading?: boolean;
+  /**
+   * What one bar is -- «روز» for the daily analytics series, «ماه» for the
+   * finance page's monthly settlements (#255). It names the bars in the
+   * summary a screen reader hears and heads the table's first column, so a
+   * monthly chart is never announced as «۴ روز».
+   */
+  period?: string;
 }) {
   const [active, setActive] = useState<number | null>(null);
   const [showTable, setShowTable] = useState(false);
@@ -105,7 +113,7 @@ export function MoneyChart({
   const heightOf = (value: number) => (max > 0 ? Math.max(value > 0 ? 2 : 0.8, (value / max) * MAX_BAR) : 0.8);
   const centre = (i: number) => ((i + 0.5) / n) * 100;
 
-  const summary = `${title}: ${toPersianDigits(n)} روز، بیشترین ${formatValue(max)} در ${points[tallest].label}، جمع ${formatValue(total)}.`;
+  const summary = `${title}: ${toPersianDigits(n)} ${period}، بیشترین ${formatValue(max)} در ${points[tallest].label}، جمع ${formatValue(total)}.`;
 
   const shown = active === null ? null : points[active];
 
@@ -184,26 +192,34 @@ export function MoneyChart({
         {showTable ? 'پنهان کردن جدول' : 'نمایش به‌صورت جدول'}
       </button>
 
-      {/* Always in the document: this is the accessible equivalent of the plot. */}
-      <table id={tableId} className={showTable ? styles.table : styles.srOnly}>
-        <caption className={styles.srOnly}>{title}</caption>
-        <thead>
-          <tr>
-            <th scope="col">روز</th>
-            <th scope="col">{valueHeading}</th>
-            {hasDetail ? <th scope="col">{detailHeading ?? 'جزئیات'}</th> : null}
-          </tr>
-        </thead>
-        <tbody>
-          {points.map((p) => (
-            <tr key={p.key}>
-              <th scope="row">{p.label}</th>
-              <td>{formatValue(p.value)}</td>
-              {hasDetail ? <td>{p.detail ?? ''}</td> : null}
+      {/*
+        Always in the document: this is the accessible equivalent of the plot.
+        Hidden through a BLOCK wrapper, never on the <table> itself: a table box
+        is at least as wide as its content and ignores a 1px width and
+        `overflow: hidden`, so a "hidden" table with long rows still widened the
+        page -- 84px of sideways scroll on /finance at 375 (#255).
+      */}
+      <div id={tableId} className={showTable ? undefined : styles.srOnly}>
+        <table className={styles.table}>
+          <caption className={styles.srOnly}>{title}</caption>
+          <thead>
+            <tr>
+              <th scope="col">{period}</th>
+              <th scope="col">{valueHeading}</th>
+              {hasDetail ? <th scope="col">{detailHeading ?? 'جزئیات'}</th> : null}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {points.map((p) => (
+              <tr key={p.key}>
+                <th scope="row">{p.label}</th>
+                <td>{formatValue(p.value)}</td>
+                {hasDetail ? <td>{p.detail ?? ''}</td> : null}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
