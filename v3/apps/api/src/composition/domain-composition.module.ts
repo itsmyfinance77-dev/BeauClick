@@ -57,6 +57,8 @@ import {
 import { WaitlistAcceptanceService } from '../waitlist/waitlist-acceptance.service';
 import { WaitlistAcceptanceController } from '../waitlist/waitlist-acceptance.controller';
 import { WaitlistMatcherHandler } from '../waitlist/waitlist-matcher.handler';
+import { MyWorkspacesController } from '../workspaces/my-workspaces.controller';
+import { MyWorkspacesService } from '../workspaces/my-workspaces.service';
 import {
   FINANCIAL_DOMAIN_EVENT_HANDLERS,
   FINANCIAL_OUTBOX_RELAY,
@@ -220,11 +222,16 @@ import {
     // ADR-011 forbids either service importing the other.
     OrderPaymentController,
     WaitlistAcceptanceController,
+    // V3.3 #210. `GET /v1/me/workspaces`: the seller workspaces the session
+    // OWNS, for the commercial seller surfaces. Here because ownership spans
+    // provider and business, which ADR-011 forbids either service joining.
+    MyWorkspacesController,
   ],
   providers: [
     CheckoutService,
     CheckoutDisclosureService,
     WaitlistAcceptanceService,
+    MyWorkspacesService,
     OutboxSweepScheduler,
 
     OrderPaidLedgerHandler,

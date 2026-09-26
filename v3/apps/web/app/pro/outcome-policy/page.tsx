@@ -15,12 +15,12 @@ import {
 import {
   assignOutcomePolicy,
   assignableOutcomePolicies,
-  financeWorkspaces,
+  myWorkspaces,
   outcomePolicyAssignment,
   retentionRuleIdentity,
   type AssignableOutcomePolicyV1,
   type CurrentOutcomePolicyAssignmentV1,
-  type FinanceWorkspace,
+  type SellerWorkspace,
 } from '@/lib/pro-api';
 import styles from './outcome-policy.module.css';
 
@@ -51,17 +51,19 @@ import styles from './outcome-policy.module.css';
  *
  * ## Where the workspace list comes from
  *
- * `GET /v1/me/finance/workspaces`, filtered to `accessMode: 'owner'`, because
- * no ownership-scoped list exists (#210). Fail-safe rather than authoritative:
- * this only decides what to OFFER, and the server decides ownership live
- * through the opaque reference and refuses anything wrong.
+ * `GET /v1/me/workspaces` (#210): the workspaces the session OWNS, by the
+ * same ownership resolver the assignment routes match a reference against.
+ * Until #210 this screen filtered the finance list to `accessMode: 'owner'`,
+ * which made a policy screen depend on finance's access rules. Either way the
+ * list only decides what to OFFER: the server decides ownership live through
+ * the opaque reference and refuses anything wrong.
  *
  * No workspace is ever pre-selected, not even when there is one and not from
  * the previous session -- `V33-DEC-020`, the rule `finance-workspace.tsx`
  * already follows.
  */
 
-const WORKSPACE_TYPE_LABEL: Record<FinanceWorkspace['workspaceType'], string> = {
+const WORKSPACE_TYPE_LABEL: Record<SellerWorkspace['workspaceType'], string> = {
   professional: 'تخصصی',
   business: 'کسب‌وکار',
 };
@@ -84,7 +86,7 @@ function draftFrom(assignment: CurrentOutcomePolicyAssignmentV1 | null): DraftSe
 export default function ProOutcomePolicyPage() {
   const { api } = useAuth();
 
-  const [workspaces, setWorkspaces] = useState<FinanceWorkspace[] | null>(null);
+  const [workspaces, setWorkspaces] = useState<SellerWorkspace[] | null>(null);
   const [workspacesError, setWorkspacesError] = useState<string | null>(null);
 
   const [activeRef, setActiveRef] = useState<string | null>(null);
@@ -119,8 +121,8 @@ export default function ProOutcomePolicyPage() {
   const loadWorkspaces = useCallback(async () => {
     setWorkspacesError(null);
     try {
-      const res = await financeWorkspaces(api);
-      setWorkspaces((res.data?.items ?? []).filter((w) => w.accessMode === 'owner'));
+      const res = await myWorkspaces(api);
+      setWorkspaces(res.data?.items ?? []);
     } catch (err) {
       setWorkspacesError(errorMessage(err, 'فهرست فضاها بارگذاری نشد.'));
     }
