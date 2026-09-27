@@ -13,6 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { ARTIFACTS_DIR, PORTS, V3_ROOT, profile as resolveProfile } from './lib/demo-config.mjs';
+import { hashTree } from './lib/hash-tree.mjs';
 import { readSourceSha, webEnv } from './lib/runtime.mjs';
 
 const i = process.argv.indexOf('--profile');
@@ -55,26 +56,6 @@ export function linkDistNodeModules() {
   console.log(`linked ${linked} package node_modules into dist/`);
 }
 
-export function hashTree(root, { exclude = [] } = {}) {
-  const h = createHash('sha256');
-  let files = 0;
-  const walk = (dir) => {
-    for (const name of fs.readdirSync(dir).sort()) {
-      const full = path.join(dir, name);
-      const rel = path.relative(root, full).replace(/\\/g, '/');
-      if (name === 'node_modules') continue;
-      if (exclude.some((x) => rel === x || rel.startsWith(`${x}/`))) continue;
-      const st = fs.statSync(full);
-      if (st.isDirectory()) walk(full);
-      else {
-        h.update(rel).update('\0').update(fs.readFileSync(full)).update('\0');
-        files++;
-      }
-    }
-  };
-  walk(root);
-  return { sha256: h.digest('hex'), files };
-}
 const fileSha = (f) => createHash('sha256').update(fs.readFileSync(f)).digest('hex');
 
 // --- guards -----------------------------------------------------------------
