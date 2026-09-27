@@ -50,7 +50,7 @@ fs.writeFileSync(
 distinguished_name = dn
 prompt = no
 [dn]
-CN = BeauClick DEMO ONLY root v2 (2026-09-28, not for production)
+CN = BeauClick DEMO ONLY root v3 (2026-09-28, not for production)
 O = BeauClick demo (synthetic)
 [root]
 basicConstraints = critical, CA:TRUE, pathlen:1
@@ -78,7 +78,7 @@ authorityKeyIdentifier = keyid
 `,
 );
 const key = (n) => ossl(['genpkey', '-algorithm', 'EC', '-pkeyopt', 'ec_paramgen_curve:P-256', '-out', f(n)]);
-const csr = (k, cn, out) => ossl(['req', '-new', '-key', f(k), '-subj', `/CN=${cn}`, '-out', f(out), '-config', f('v2.cnf')]);
+const csr = (k, cn, out, subj = `/CN=${cn}`) => ossl(['req', '-new', '-key', f(k), '-subj', subj, '-out', f(out), '-config', f('v2.cnf')]);
 const sign = (csrN, caCrt, caKey, ext, days, out, serial) =>
   ossl(['x509', '-req', '-in', f(csrN), '-CA', f(caCrt), '-CAkey', f(caKey), '-set_serial', String(serial), '-days', String(days), '-sha256', '-extfile', f('v2.cnf'), '-extensions', ext, '-out', f(out)]);
 
@@ -86,10 +86,11 @@ const sign = (csrN, caCrt, caKey, ext, days, out, serial) =>
 key('root.key');
 ossl(['req', '-new', '-x509', '-key', f('root.key'), '-out', f('demo-ca.crt'), '-days', '21', '-sha256', '-config', f('v2.cnf'), '-extensions', 'root']);
 key('inter.key');
-csr('inter.key', 'BeauClick DEMO ONLY intermediate v2 (constrained)', 'inter.csr');
+csr('inter.key', 'BeauClick DEMO ONLY intermediate v3 (constrained)', 'inter.csr');
 sign('inter.csr', 'demo-ca.crt', 'root.key', 'inter', 20, 'demo-intermediate.crt', 2);
 key('demo-leaf.key');
-csr('demo-leaf.key', 'BeauClick demo (synthetic data)', 'leaf.csr');
+// No CN on the leaf: see the Schannel note above ca-v2's probes.
+csr('demo-leaf.key', '', 'leaf.csr', '/O=BeauClick demo (synthetic data)');
 sign('leaf.csr', 'demo-intermediate.crt', 'inter.key', 'leaf', 14, 'demo-leaf.crt', 3);
 fs.writeFileSync(f('demo-leaf-chain.crt'), fs.readFileSync(f('demo-leaf.crt'), 'utf8') + fs.readFileSync(f('demo-intermediate.crt'), 'utf8'));
 
@@ -111,7 +112,7 @@ const expect = (label, got, want) => {
 expect('real leaf (IP:127.0.0.1, IP:10.20.30.6) via intermediate', verify('demo-leaf.crt', 'demo-intermediate.crt'), 'accept');
 
 key('probe.key');
-csr('probe.key', 'bcdemo-probe', 'probe.csr');
+csr('probe.key', '', 'probe.csr', '/O=bcdemo probe');
 const SANS = [
   ['IP:10.20.30.7', 'reject'],
   ['IP:::1', 'reject'],
@@ -143,11 +144,40 @@ for (const [name, san] of [['dns-localhost', 'DNS:localhost'], ['ip-127-0-0-2', 
   const q = path.join(STAGE, 'quarantine-probes');
   fs.writeFileSync(f('p.cnf'), `[v]\nbasicConstraints=critical,CA:FALSE\nextendedKeyUsage=serverAuth\nsubjectAltName=${san}\n`);
   ossl(['genpkey', '-algorithm', 'EC', '-pkeyopt', 'ec_paramgen_curve:P-256', '-out', path.join(q, `${name}.key`)]);
-  ossl(['req', '-new', '-key', path.join(q, `${name}.key`), '-subj', `/CN=bcdemo browser-enforcement probe ${name}`, '-out', f('q.csr')]);
+  ossl(['req', '-new', '-key', path.join(q, `${name}.key`), '-subj', `/O=bcdemo browser-enforcement probe ${name}`, '-out', f('q.csr')]);
   ossl(['x509', '-req', '-in', f('q.csr'), '-CA', f('demo-intermediate.crt'), '-CAkey', f('inter.key'), '-set_serial', String(serial++), '-days', '3', '-extfile', f('p.cnf'), '-extensions', 'v', '-out', path.join(q, `${name}.crt`)]);
   fs.writeFileSync(path.join(q, `${name}-chain.crt`), fs.readFileSync(path.join(q, `${name}.crt`), 'utf8') + fs.readFileSync(f('demo-intermediate.crt'), 'utf8'));
 }
 fs.writeFileSync(path.join(STAGE, 'quarantine-probes', 'README.txt'), 'QUARANTINED browser name-constraint probes. Never serve except in an owner-approved enforcement test; delete after.\n');
+
+// 4b. Windows' own verifier (Schannel/CryptoAPI, via curl --cacert with the root as the
+//     only anchor), against loopback-only throwaway servers. CryptoAPI flags a whole chain
+//     INVALID_NAME_CONSTRAINTS (0x4000) when a DNS constraint meets a leaf CN that is not a
+//     DNS name — hence the CN-less leaf above. Real leaf must pass; probes must fail.
+{
+  const https = await import('node:https');
+  const { spawn } = await import('node:child_process');
+  const curl = (url) =>
+    new Promise((res) => {
+      const c = spawn('curl', ['-sS', '--ssl-no-revoke', '-o', 'NUL', '-w', '%{http_code}', '--cacert', f('demo-ca.crt'), url]);
+      let o = '';
+      let e = '';
+      c.stdout.on('data', (x) => (o += x));
+      c.stderr.on('data', (x) => (e += x));
+      c.on('close', () => res(`${o} ${e.trim().split('\n')[0]}`.trim()));
+    });
+  const serve = async (keyFile, chainFile, host, url, want) => {
+    const srv = https.createServer({ key: fs.readFileSync(keyFile), cert: fs.readFileSync(chainFile) }, (q, s) => s.end('ok'));
+    await new Promise((r) => srv.listen(0, host, r));
+    const got = await curl(url.replace('PORT', String(srv.address().port)));
+    srv.close();
+    expect(`Schannel: ${url.replace(':PORT', '')}`, got.startsWith('200') ? 'accept' : `reject (${got})`, want);
+  };
+  const q = path.join(STAGE, 'quarantine-probes');
+  await serve(f('demo-leaf.key'), f('demo-leaf-chain.crt'), '127.0.0.1', 'https://127.0.0.1:PORT/', 'accept');
+  await serve(path.join(q, 'dns-localhost.key'), path.join(q, 'dns-localhost-chain.crt'), '127.0.0.1', 'https://localhost:PORT/', 'reject');
+  await serve(path.join(q, 'ip-127-0-0-2.key'), path.join(q, 'ip-127-0-0-2-chain.crt'), '127.0.0.2', 'https://127.0.0.2:PORT/', 'reject');
+}
 
 // 5. Destroy the root and intermediate keys, and every probe CA/leaf key used above.
 for (const n of ['root.key', 'inter.key', 'pinter.key', 'pinter.crt', 'probe.key', 'probe.csr', 'p.crt', 'p.cnf', 'q.csr', 'inter.csr', 'leaf.csr', 'pinter.csr']) {
