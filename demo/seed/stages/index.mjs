@@ -5,7 +5,8 @@ import { commercial, governance } from './commercial.mjs';
 import { elapsed } from './elapsed.mjs';
 import { engagement } from './engagement.mjs';
 import { identities } from './identities.mjs';
+import { replacementTour } from './replacement-tour.mjs';
 import { sellers } from './sellers.mjs';
 import { verification } from './verification.mjs';
 
-export const STAGES = [identities, sellers, commercial, governance, availability, futureBookings, elapsed, engagement, verification];
+export const STAGES = [identities, sellers, commercial, governance, availability, futureBookings, elapsed, engagement, verification, replacementTour];

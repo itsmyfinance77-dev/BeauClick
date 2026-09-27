@@ -25,7 +25,8 @@ if (!process.argv.includes('--yes-restore-demo')) throw new Error('Refusing: pas
 const profileKey = arg('--profile') ?? 'L';
 let dir = arg('--backup');
 if (!dir || dir === 'latest-golden') {
-  const golden = fs.readdirSync(BACKUPS_DIR).filter((d) => d.endsWith('-golden')).sort();
+  // Labels like `golden`, `golden-a0`, `golden-b`; the folder name starts with the ISO timestamp, so sort = time.
+  const golden = fs.readdirSync(BACKUPS_DIR).filter((d) => /-golden(-[a-z0-9]+)?$/i.test(d)).sort();
   if (!golden.length) throw new Error('no *-golden backup found');
   dir = path.join(BACKUPS_DIR, golden[golden.length - 1]);
 }
