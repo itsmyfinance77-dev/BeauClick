@@ -1,0 +1,39 @@
+/* DEMO BRANCH ONLY — F-10 manual refunds (tokens only). */
+.list {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.card {
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-card);
+  padding: 16px;
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--bc-spacing-chip-gap);
+}
+
+.meta {
+  margin: 0;
+  font-size: 13px;
+  color: var(--bc-color-ink-soft);
+  overflow-wrap: anywhere;
+}
+
+.form {
+  display: grid;
+  gap: 8px;
+  max-width: 420px;
+}

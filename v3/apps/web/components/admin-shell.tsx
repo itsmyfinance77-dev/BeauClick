@@ -45,6 +45,8 @@ const ADMIN_NAV: { href: string; label: string; capability?: string; system?: bo
   // records rather than the moderation queues.
   { href: '/admin/privacy', label: 'حریم خصوصی', capability: 'bc_manage_platform' },
   { href: '/admin/settlements', label: 'تسویه‌ها' },
+  // DEMO BRANCH ONLY (F-10): controlled manual-refund execution, administrator only.
+  { href: '/admin/refunds', label: 'بازپرداخت دستی', capability: 'bc_execute_manual_refunds' },
   { href: '/admin/search', label: 'جست‌وجو' },
   { href: '/admin/notifications', label: 'اعلان‌ها', system: true },
   { href: '/admin/phone-conflicts', label: 'تعارض شماره' },
