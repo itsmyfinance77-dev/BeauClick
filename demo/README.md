@@ -64,10 +64,15 @@ private channel of their choosing, and deleted after the demo. They are never co
 
 ## TLS
 
-Private demo PKI v2 (`demo/scripts/ca-v2.mjs`): constrained root → constrained intermediate → leaf. Installing the
-root is each viewer's own manual choice (guide in `E:\BeauClick-demo\CA-INSTALL.md`, CurrentUser only). Nothing is
-installed automatically, no browser warning is bypassed, and TLS validation is never disabled. The root and
-intermediate private keys were destroyed after issuance.
+Private demo PKI v3 (`demo/scripts/ca-v2.mjs` generator): constrained root → constrained intermediate → leaf
+(IP SANs `127.0.0.1`, `10.20.30.6`; subject O-only). Installing the root is each viewer's own manual choice (guide in
+`E:\BeauClick-demo\CA-INSTALL.md`, CurrentUser only; compare the SHA-256 in the handout). Nothing is installed
+automatically, no browser warning is bypassed, and TLS validation is never disabled. The root and intermediate
+private keys were destroyed after issuance. The PKI has no CRL/OCSP: browsers accept that; Schannel `curl` needs
+`--ssl-no-revoke` (that skips only the revocation lookup, not validation).
+
+`node demo/verify/browser-sweep.mjs --profile L` re-runs the real-browser check of every role (separate headless
+Edge, own profile, no certificate flags) and writes FALLBACK screenshots under `E:\BeauClick-demo\evidence\`.
 
 ## Owner-approved demo extensions (DEMO-DEC-001; demo branch only)
 
@@ -95,7 +100,12 @@ presentation backup after the final seed with `node demo/scripts/backup.mjs --la
 - All commercial values and policy texts are synthetic and not approved; no legal evidence is recorded; the AI
   assistant uses the deterministic sandbox provider and its disclosure copy is pending legal review.
 - Throttling is per client IP and every request reaches the API from the ingress: the `refresh` limit (20/min) is
-  shared by the whole team behind it — measured in rehearsal before any change.
+  shared by the whole team behind it. Measured: ~19 full page reloads/min from one browser already returns 429 and
+  the page falls back to sign-in (the session survives; wait a minute). In-app navigation does not reload, so a
+  single presenter is fine; for team access (profile W) a raised `THROTTLE_REFRESH_LIMIT` is proposed, not applied.
+- OTP: at most 5 codes per number per hour and a 60 s resend cooldown (production values, unchanged). Every
+  `restore` signs the administrator in once (search reindex), so do not rehearse more than ~3 restores in the hour
+  before the show, or the live admin sign-in may be refused.
 - TLS: private demo PKI v3; browsers trust it only after a viewer's own manual import (`CA-INSTALL.md`).
 
 ## Hard boundaries
