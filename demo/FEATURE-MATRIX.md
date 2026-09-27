@@ -25,29 +25,29 @@ check; "browser" = real-browser verification after the owner installed root v3 (
 | 6 | Availability | bulk/single slots | `/pro/availability` | P, S | 231 bulk + short real-time slots | LIVE | seed:availability |
 | 7 | Checkout | booking + payment through the sandbox bank (success / declined / cancelled), retry | `/providers/[id]`, `/sandbox-gateway`, `/checkout/result` | C | F1–F9 | SIM | seed:future-bookings |
 | 8 | **A** | customer acceptance of the disclosed terms in web checkout; accepted terms in booking details | `/providers/[id]`, `/bookings` | C (other customer **404**) | governed pro1 | DEMO-EXT (LIVE) | verify:a-acceptance 9/9; web tests 6 new (mutation-verified) |
-| 9 | Outcome policy | admin publish; seller selection (screen 48); booking snapshot | `/admin/commercial/outcome-policy`, `/pro/outcome-policy` | A / P | synthetic policy, no legal cap/evidence | LIVE | seed:commercial, seed:governance |
+| 9 | Outcome policy | admin publish; **seller selection (screen 48)**; booking snapshot | `/admin/commercial/outcome-policy`, `/pro/outcome-policy` | A / P (cross-owner: generic 409, controlled) | synthetic policy, no legal cap/evidence | LIVE | browser (390): pro2 selects 24 h / none / 15 min / none with a reason → DB live assignment by pro2 → pre-selected after reload → customer then gets pro2's terms with an unticked box and payment closed; controlled cross-owner test (owner 200/200, requester authenticated, generic 409 `outcome_policy_assignment_unavailable`, row unchanged) |
 | 10 | Cancellation | customer (timely, full refund) — **web**; seller cancellation (#161 default refund) — **API-ONLY: no cancel control on `/pro/bookings` at the baseline** | `/bookings` (customer) | C (other customer **404**) / P via API | F5–F7 | LIVE + SIM refund | browser flow: customer cancel → full refund in DB → pro cancelled tab; seller cancel exercised via API (seed, verify:b-replacement) |
 | 11 | #212 | no-show declaration (governed, grace on DB clock, statement required) | `/pro/bookings` | P (other customer **404**) | 2 seeded + 1 real-time in browser | LIVE | browser flow: real-time slot → booking → "not yet" notice → after grace declared in UI → DB no_show + declaration; customer card shows "عدم مراجعه" (no remedy panel on a no-show card — observed) |
 | 12 | #212 remedy "reschedule" | reschedule instead of the default refund (governed seller cancellation) | `/bookings` | C | — | LIVE code, **not demonstrable with the sandbox provider — owner exception needed to show it**. Exact contract: the remedy is offered only while the cancellation decision's `execution_status` is `pending` or `manual_required` (`customer-remedy-resolution.service.ts` ESCAPABLE set). `BookingCancelledRefundHandler` decides and then immediately executes the refund in the same handler; the sandbox provider declares `supportsAutomaticRefund = true` and returns a final `succeeded`/`failed` synchronously, so the decision leaves `pending` within milliseconds. It IS reachable in production shape when a provider has no refund API (`supportsAutomaticRefund = false` → refund `manual_required`, `payment.service.ts`) or a refund stays unfinished. Showing it here needs such a provider/sandbox mode = a baseline change outside A/B. Unrelated to B (B is a new booking after the refund, not a replacement of it). | code reading + DEMO-DEC-001 |
 | 13 | **B** | durable replacement offer after provider cancellation (new booking, own terms/payment, refund continues) | `/bookings` | C (other customer **404**) | S1/S11/S12 offers | DEMO-EXT (LIVE + SIM payment) | verify:b-replacement 25/25 (also after restore); b-late-capture 4/4; web tests 8; browser: see below |
-| 14 | Completion & reviews | complete (**web**); review writing (**API-ONLY: no customer review form**); seller reply (**API-ONLY, none in the data**: 0 of the reviews carry a reply); moderation hide (**web**) | `/pro/bookings`, `/admin/reviews` | P / C / M (customer moderation **403**) | E2–E5 | LIVE | browser flows: practitioner marks done → loyalty points; moderator hides a review with a reason; api-only-evidence (#14 row) |
+| 14 | Completion & reviews | complete (**web**); review writing (**API-ONLY**: no customer form); seller reply (**API-ONLY**); moderation hide (**web**) | `/pro/bookings`, `/admin/reviews` | P / C / M | E2–E5 | LIVE | browser: completion → loyalty; moderation hide. **API functional** (`evidence/api-only-exercise-*`): customer writes a review 201 (in the moderation queue), duplicate refused 409, another customer refused `REVIEW_NOT_ELIGIBLE`; seller reply 201 persisted + shown publicly, another professional 404 |
 | 15 | Business | business profile, classification | `/business` | B (C denied) | salon | LIVE | seed:sellers |
-| 16 | Business | locations, resources (**data present: 2 + 2**); resource requirements (**0 rows — not seeded**); staff location | — | B | 2 locations, 2 resources | API-ONLY | api-only-evidence: GET locations 200 (2), resources 200 (2); requirements: DB 0 |
+| 16 | Business | locations, resources, resource requirements, staff location | — | B (manager 404 `NOT_FOUND_OR_NOT_YOURS`, finance reader 404) | 2 locations, 2 resources | API-ONLY | **API functional**: location create → suspend → reactivate; room resource create → retire; requirement `room` set → **a new booking of that service received 1 resource assignment** → cleared. Staff location: not exercised |
 | 17 | Staff | phone invitations, accept, scoped grants (`finance_read`, `practitioner_chat`) | `/business`, `/dashboard` | B, S | manager, practitioner, finance reader | LIVE | seed:sellers, seed:governance |
 | 18 | Workspaces | ownership-scoped workspace list (#210) | `/pro/*`, `/finance` | P/B | — | LIVE | browser: see below |
 | 19 | Finance | summary, funds by state, orders, ledger (+ commission snapshot) | `/finance`, `/pro/finance` | P/B/FR (unrelated denied) | collected money in `pending` | LIVE | read via API (pro2: collected 1.8 M, pending 1.8 M) |
 | 20 | Finance | settlements, settlement series (#255), admin settlement | `/finance`, `/admin/settlements` | P/B / A | none | LIVE screens, **no settled data**: release predicate (#174/`#43c`) not built, so nothing becomes settleable | seed:engagement (admin: outstanding = []) |
 | 21 | Commercial admin | commission (R/W), plans/price schedules catalogue, control plane | `/admin/commercial/*` | A (O/M denied) | synthetic commission 10 % | LIVE | seed:commercial |
-| 22 | Commercial seller | subscriptions/plan selection, credit purchases, collection-policy assignment | — | P/B | base workspace | API-ONLY | api-only-evidence: subscriptions 200 (1), plans 200 (1), history 200 (0), assignment 200 (1), collection policies 200 (0); **credit purchases → 404 SUBSCRIPTION_SELLER_NOT_ELIGIBLE** (not purchasable in this setup) |
+| 22 | Commercial seller | subscriptions/plan selection, credit purchases, collection-policy assignment | — | P/B | base workspace | API-ONLY | **API functional**: select D-7 v1 → `active` + history → cancel; another seller refused `SUBSCRIPTION_SELLER_NOT_ELIGIBLE` (generic; owner control 201). **Credit purchase: needs a plan with a credit price schedule — none exists; creating prices = inventing commercial values; paid credits #99 not built → owner exception.** **Collection-policy assignment beyond the default: no admin route creates a collection policy (none exist); SQL seeding is outside demo rules → owner exception.** |
 | 23 | Commercial admin | settlement schedules, seller risk classes, legal evidence registry | — / `/admin/commercial` (evidence) | A | none published | API-ONLY / not seeded (no invented legal or settlement values) | api-only-evidence: all three 200 and **empty** |
 | 24 | Verification | submit + synthetic evidence; moderator approve/reject; queue | `/pro/profile`, `/admin/verification` | P / M (C denied) | approved / rejected / pending | LIVE | seed:verification |
 | 25 | Media moderation | abuse report, inspection, decision | `/providers/[id]`, `/admin/media` | C / M | 1 open report | LIVE | seed:engagement |
 | 26 | Chat | conversations (customer↔professional, customer↔salon manager), report, moderation | `/messages`, `/pro/messages`, `/business/messages`, `/admin/chat-reports` | C/P/B/S / M | 3 threads, 1 report | LIVE | seed:engagement |
 | 27 | AI assistant | recorded consent, conversation, recommendations | `/assistant` | C | 1 conversation | SIM (deterministic provider; disclosure copy pending legal V32-DEC-006) | seed:engagement |
 | 28 | Loyalty | summary, history, tiers; admin policy | `/loyalty`, `/admin/loyalty` | C / A | completed bookings | LIVE (tiers/membership endpoints API-ONLY; **no membership plans defined**) | browser flow: completion → points 15→25 shown on `/loyalty`; api-only-evidence: tiers 200 (2), plans 200 (0) |
-| 29 | Referral | code, claim, qualification | `/referral` | C | code claimed by another account | LIVE | seed:engagement |
+| 29 | Referral | code, claim, qualification | `/referral` | C (claim rules) | code claimed by another account | LIVE | browser (390): cust2's code created on first read; financeReader (the one eligible account: no completed booking) claims in the UI → DB pending attribution; a customer with a completed booking refused (no attribution); duplicate claim refused (**business rule**, not authorization); financeReader's first booking completed by pro2 in the UI → **referral `qualified`**; reward grants 0 points (LOYALTY_POINTS_REFERRAL_* unset; referee 0 by owner decision). Claim facts shown only at claim time (by design) |
 | 30 | Wishlist | professionals and services | `/wishlist` | C | 3 items | LIVE | seed:engagement |
-| 31 | Waitlist | join; offer accept/decline | `/waitlist` | C | 1 entry | LIVE | seed:engagement |
+| 31 | Waitlist | join; offer accept/decline | `/waitlist` | C | fresh professional made in the UI | LIVE up to acceptance; **payment after acceptance: no supported path (F-8)** | browser (390): join, offer on cancellation, decline, second offer, accept → booking `pending`; **F-8: no order/payment intent is created by acceptance, the card shows "در انتظار پرداخت" with no pay control, the hold lapses** → owner exception |
 | 32 | Journey | profile, goals, timeline | `/journey` | C | profile + goal | LIVE | seed:engagement |
 | 33 | Notifications | centre, preferences, unread; SMS via inbox; e-mail logged | `/notifications`, `/admin/notifications` | all / A | event-driven | LIVE in-app; SIM SMS/e-mail | seed (event fan-out) |
 | 34 | Privacy | export, deletion request/cancel, admin queue | `/account/privacy`, `/admin/privacy` | C / A | 1 export | LIVE | seed:engagement |
@@ -137,3 +137,35 @@ the device flow.
 - **F-7** Late capture after a hold lapse is labelled "duplicate" on the result page in one path.
 - Customer's no-show card offers only "پیام" and "شرایط پذیرفته‌شده" (the #212 remedy panel appears on seller-cancelled
   bookings) — observation.
+
+
+## Round 3 (2026-09-27 evening) — actions at 390, remaining gaps, owner exceptions
+
+**Every UI flow group was re-run with actions at 390 px** (`--width 390`; evidence `evidence/flows-2026-09-27T15-37-04-787Z`,
+`…16-17-46-251Z`, `…16-41-46-366Z`, `…16-59-51-028Z`): checkout variants, A, B use/dismiss, account, professional
+(service, free time, completion, real-time no-show), moderation ×4, engagement, business, admin (role, index, strict
+lifecycle), waitlist, recovery, referral, seller outcome selection — with the same ui/persist/other/denied checks. Driver
+fixes made on the way are in the commits; denied checks no longer accept 401 (an expired API session is refreshed).
+
+**Authorization evidence rules applied.** A refusal counts as cross-owner authorization only with: the exact status/code/
+body, a control where the owner's identical valid request succeeds, an authenticated requester (not 401/429), and the target
+unchanged. Generic-by-design refusals are named as such (`outcome_policy_assignment_unavailable` 409,
+`SUBSCRIPTION_SELLER_NOT_ELIGIBLE` 404, `SLOT_NOT_RELEASABLE` 409 for a foreign slot with an owner-scoped delete,
+`REVIEW_NOT_ELIGIBLE` 409). Business rules (duplicate referral claim, second review) are labelled rules, not authorization.
+
+**New baseline findings (not changed).**
+- **F-8** Waitlist acceptance creates the booking via `BookingService.create`, not checkout: no order, no payment intent,
+  no pay control; the booking lapses with its hold.
+- **F-9** "Sign out all other devices": when a signed-out device later returns (after the 10 s replay grace), its revoked
+  token is treated as theft (`TokenService.handleUnclaimableToken` → `revokeAllForUser`) and the device that did the
+  sign-out is signed out too (measured: 0 active sessions, remaining device → `/auth`).
+
+**Needs an owner exception (not marked complete).**
+1. #12 reschedule-instead-of-refund: needs a provider/sandbox mode without automatic refunds (baseline change).
+2. #22 credit purchase (commercial prices + #99) and collection-policy assignment beyond the default (no admin route).
+3. #23 settlement schedules / risk classes / legal evidence registry: legal- or finance-gated values (#174 not built) —
+   reads are empty; nothing invented.
+4. #28 loyalty membership: no admin route creates a plan; none defined.
+5. #31 payment of a waitlist-accepted booking (F-8).
+6. F-9 behaviour of "sign out other devices"; F-1…F-7 as listed above.
+7. Not exercised at all: #16 staff-location assignment; dev-login (unavailable by design); profile W / team devices.
