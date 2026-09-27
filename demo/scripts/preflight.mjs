@@ -104,7 +104,13 @@ export async function preflight(profileKey, { requireArtifact = true, log = cons
     if (!fs.existsSync(manifestFile)) problems.push(`no artifact manifest for profile ${profileKey}`);
     else {
       const m = JSON.parse(fs.readFileSync(manifestFile, 'utf8'));
-      if (m.sourceSha !== sha) problems.push(`artifact ${profileKey} was built from ${m.sourceSha.slice(0, 12)}, source is ${sha.slice(0, 12)}`);
+      // The application bytes come only from v3/. A later commit that touches only
+      // demo/ tooling leaves them identical; anything under v3/ must match exactly.
+      // (The freeze rebuilds at the final exact SHA regardless.)
+      const v3Now = execFileSync('git', ['rev-parse', 'HEAD:v3'], { encoding: 'utf8' }).trim();
+      const v3Then = execFileSync('git', ['rev-parse', `${m.sourceSha}:v3`], { encoding: 'utf8' }).trim();
+      if (v3Now !== v3Then) problems.push(`artifact ${profileKey} was built from ${m.sourceSha.slice(0, 12)} whose v3/ differs from HEAD's; rebuild`);
+      else if (m.sourceSha !== sha) log(`preflight: artifact built at ${m.sourceSha.slice(0, 12)}; HEAD ${sha.slice(0, 12)} differs only outside v3/ (application source identical)`);
     }
   }
 

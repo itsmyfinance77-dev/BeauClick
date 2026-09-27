@@ -98,6 +98,7 @@ const manifest = {
   origin: p.origin,
   sourceSha: sha,
   sourceTree: tree,
+  v3Tree: execFileSync('git', ['rev-parse', 'HEAD:v3'], { encoding: 'utf8' }).trim(),
   baselineSha: 'b2477a30de93ccec22233f5c117db653f2b9ece1',
   lockfileSha256: fileSha(path.join(V3_ROOT, 'pnpm-lock.yaml')),
   builtAt: new Date().toISOString(),
