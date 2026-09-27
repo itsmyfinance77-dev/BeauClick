@@ -88,6 +88,16 @@ import styles from './provider.module.css';
 /** How many gallery tiles the desktop artboard holds: one large, two small. */
 const GALLERY_TILES = 3;
 
+/**
+ * Demo F-5: the service's end, never past the slot's own end. The server lists a
+ * slot for a service only when the slot covers the whole service.
+ */
+function serviceEndAt(slot: { startAt: string; endAt: string }, service: { durationMinutes: number } | null): string {
+  if (!service) return slot.endAt;
+  const end = new Date(slot.startAt).getTime() + service.durationMinutes * 60_000;
+  return end < new Date(slot.endAt).getTime() ? new Date(end).toISOString() : slot.endAt;
+}
+
 export default function ProviderBookingPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -147,9 +157,17 @@ export default function ProviderBookingPage() {
     }
   }, [api, professionalId]);
 
+  /*
+    Demo remediation F-2: wait until the session is KNOWN. `provider.saved` and
+    each service's `saved` are per-caller answers; read while the session was
+    still being restored (a full page load), they came back anonymous (`null`)
+    and a signed-in customer was shown "sign in to save". Re-read when the
+    session state settles or changes (sign-in / sign-out) so they stay truthful.
+  */
   useEffect(() => {
+    if (status === 'loading') return;
     void load();
-  }, [load]);
+  }, [load, status]);
 
   // Availability is re-fetched whenever the chosen service changes: a slot
   // published for one service is not offerable for another, so showing a
@@ -578,8 +596,13 @@ export default function ProviderBookingPage() {
               </div>
               <div className={styles.summaryRow}>
                 <span className={styles.summaryLabel}>پایان تقریبی</span>
-                {/* The server's own end instant, not a duration added here. */}
-                <span className={styles.summaryValue}>{slotTimeLabel(selectedSlot.endAt)}</span>
+                {/*
+                  When the SERVICE ends (demo F-5): the server offers a slot for a
+                  service only when the slot covers it, so start + duration is the
+                  truthful end; the slot's own end is used only with no service
+                  chosen, and never exceeded.
+                */}
+                <span className={styles.summaryValue}>{slotTimeLabel(serviceEndAt(selectedSlot, selectedService))}</span>
               </div>
             </div>
           ) : null}

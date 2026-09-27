@@ -50,7 +50,7 @@ import {
 } from '@beauclick/business';
 import type { CommissionTermV1 } from '@beauclick/commercial-policy-contract';
 import { RoleService, UserEntity, canonicalizePhone } from '@beauclick/identity';
-import { DeliveryLocationDirectory, EligibleResourceDirectory, lockResourceForAssignment } from '@beauclick/booking';
+import { DeliveryLocationDirectory, EligibleResourceDirectory, ServiceDurationDirectory, lockResourceForAssignment } from '@beauclick/booking';
 
 /**
  * The composition root's implementations of the ports booking-, commerce-,
@@ -185,6 +185,24 @@ export class ProviderBackedServiceCatalog implements ServiceCatalog {
       sellerPartyType: seller.partyType,
       sellerPartyId: seller.partyId,
     };
+  }
+}
+
+/**
+ * Booking's service-duration question, answered by provider -- demo
+ * remediation F-5. `booking` may not import `provider` (ADR-011); read on the
+ * CALLER's manager so the slot-fit check sees the same transaction as the
+ * claim. A deleted or unknown service answers `null` (the order path is the
+ * authority that refuses it).
+ */
+@Injectable()
+export class ProviderBackedServiceDurationDirectory implements ServiceDurationDirectory {
+  async durationMinutesFor(manager: EntityManager, serviceId: string): Promise<number | null> {
+    const offering = await manager.findOne(ServiceOfferingEntity, {
+      where: { id: serviceId, deletedAt: IsNull() },
+      select: { id: true, durationMinutes: true },
+    });
+    return offering ? offering.durationMinutes : null;
   }
 }
 

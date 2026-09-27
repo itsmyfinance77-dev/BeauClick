@@ -13,7 +13,13 @@ import {
 } from '../booking.errors';
 import { PLATFORM_TIMEZONE, isIsoDate, isIsoTime, localDateTimeToInstant, zonedWeekday } from './platform-time';
 import { AuditLogger } from '@beauclick/events';
-import { DELIVERY_LOCATION_DIRECTORY, DeliveryLocationDirectory } from '../ports';
+import { NotFoundOrNotYoursException } from '@beauclick/ownership';
+import {
+  DELIVERY_LOCATION_DIRECTORY,
+  DeliveryLocationDirectory,
+  SERVICE_DURATION_DIRECTORY,
+  ServiceDurationDirectory,
+} from '../ports';
 
 export interface CreateSlotInput {
   startAt: Date;
@@ -76,6 +82,12 @@ export class AvailabilityService {
      * boot rather than silently stamping every new slot with no context.
      */
     @Inject(DELIVERY_LOCATION_DIRECTORY) private readonly deliveryLocations: DeliveryLocationDirectory,
+    /**
+     * Demo remediation F-5: a listing for a service offers only slots at least
+     * as long as that service -- the same rule the claim enforces, so the UI
+     * never offers a time that is refused (or, worse, accepted too short).
+     */
+    @Inject(SERVICE_DURATION_DIRECTORY) private readonly serviceDurations: ServiceDurationDirectory,
   ) {}
 
   /**
@@ -311,6 +323,11 @@ export class AvailabilityService {
     if (serviceId) {
       // A slot with no service is generic and offerable for any service.
       qb.andWhere('(s.serviceId IS NULL OR s.serviceId = :serviceId)', { serviceId });
+      // F-5: only a slot that covers the whole service is claimable for it.
+      const minutes = await this.serviceDurations.durationMinutesFor(this.slots.manager, serviceId);
+      if (minutes !== null) {
+        qb.andWhere('s.endAt - s.startAt >= make_interval(mins => :serviceMinutes)', { serviceMinutes: minutes });
+      }
     }
 
     return qb.getMany();
@@ -328,6 +345,13 @@ export class AvailabilityService {
   async deleteSlot(professionalId: string, slotId: string): Promise<void> {
     const result = await this.slots.delete({ id: slotId, professionalId, status: 'open' });
     if (!result.affected) {
+      // Demo remediation F-3: say WHY truthfully. A slot that is not this
+      // professional's (or does not exist) is the generic non-enumerating 404 --
+      // the lookup is scoped to the caller, so a foreign slot and a missing one
+      // are indistinguishable. Only the caller's OWN non-open slot is the 409
+      // "held by a booking" answer, which used to be given for both.
+      const own = await this.slots.findOne({ where: { id: slotId, professionalId }, select: { id: true } });
+      if (!own) throw new NotFoundOrNotYoursException();
       throw new SlotNotReleasableException();
     }
     this.auditLog.log({ action: 'availability.slot_deleted', professionalId, slotId });

@@ -60,7 +60,7 @@ import {
   STAFF_DISPLAY_IDENTITY,
   STAFF_INVITE_IDENTITY_RESOLVER,
 } from '@beauclick/business';
-import { DELIVERY_LOCATION_DIRECTORY, ELIGIBLE_RESOURCE_DIRECTORY } from '@beauclick/booking';
+import { DELIVERY_LOCATION_DIRECTORY, ELIGIBLE_RESOURCE_DIRECTORY, SERVICE_DURATION_DIRECTORY } from '@beauclick/booking';
 import { PROFESSIONAL_OWNER_LOOKUP } from '@beauclick/waitlist';
 import {
   DEVELOPMENT_WORKSPACE_REFERENCE_SECRET,
@@ -73,6 +73,7 @@ import {
   OwnershipBackedFinanceWorkspaceResolver,
   ProviderBackedProfessionalDirectory,
   ProviderBackedServiceCatalog,
+  ProviderBackedServiceDurationDirectory,
   CommercialPolicyBackedCollectionResolver,
   CommercialPolicyBackedCommissionTerms,
   CommercialPolicyBackedOutcomeResolver,
@@ -387,6 +388,13 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     BusinessBackedEligibleResourceDirectory,
     { provide: ELIGIBLE_RESOURCE_DIRECTORY, useExisting: BusinessBackedEligibleResourceDirectory },
     /*
+     * Demo remediation F-5. Booking asks how long a service takes, so a slot
+     * shorter than the service is neither offered nor claimable for it.
+     * MANDATORY -- no `@Optional()` fallback; manager-based, so no repository.
+     */
+    ProviderBackedServiceDurationDirectory,
+    { provide: SERVICE_DURATION_DIRECTORY, useExisting: ProviderBackedServiceDurationDirectory },
+    /*
      * V3.3 #128 (`#110b`), ADR-049 §6.6.
      *
      * `business` may not import `booking` (ADR-011). This adapter answers
@@ -501,6 +509,7 @@ import { financialDataSourceProvider } from './financial-datasource.provider';
     DELIVERY_LOCATION_DIRECTORY,
     SERVICE_OWNERSHIP_DIRECTORY,
     ELIGIBLE_RESOURCE_DIRECTORY,
+    SERVICE_DURATION_DIRECTORY,
     RESOURCE_ASSIGNMENT_DIRECTORY,
     WORKSPACE_REFERENCE_SECRET,
     FINANCIAL_DATA_SOURCE,

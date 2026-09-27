@@ -92,7 +92,18 @@ export class WaitlistService {
    * Idempotent by inspection first: if this slot already has an active
    * offer (a redelivery of the SAME triggering event), this is a no-op.
    */
-  async offerNextFor(professionalId: string, slotId: string, serviceId: string | null): Promise<WaitlistEntryEntity | null> {
+  async offerNextFor(
+    professionalId: string,
+    slotId: string,
+    serviceId: string | null,
+    /**
+     * Demo remediation F-5: the professional's services that FIT this slot's
+     * length, decided by the composition tier (waitlist may not read provider).
+     * An entry for a longer service is not offered a slot it could never book.
+     * `null` (the pre-F-5 callers) applies no length filter.
+     */
+    fittingServiceIds: readonly string[] | null = null,
+  ): Promise<WaitlistEntryEntity | null> {
     return this.dataSource.transaction(async (manager) => {
       const alreadyOffered = await manager.findOne(WaitlistEntryEntity, {
         where: { offeredSlotId: slotId, status: 'offered' as never },
@@ -119,10 +130,11 @@ export class WaitlistService {
         `SELECT id FROM waitlist.entries
           WHERE professional_id = $1 AND status = 'waiting'
             AND (service_id IS NULL OR $2::uuid IS NULL OR service_id = $2)
+            AND ($3::uuid[] IS NULL OR service_id IS NULL OR service_id = ANY($3::uuid[]))
           ORDER BY created_at ASC
           LIMIT 1
           FOR UPDATE SKIP LOCKED`,
-        [professionalId, serviceId],
+        [professionalId, serviceId, fittingServiceIds === null ? null : [...fittingServiceIds]],
       );
       if (candidates.length === 0) return null;
       const candidateId = candidates[0].id;

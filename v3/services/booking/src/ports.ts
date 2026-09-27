@@ -364,3 +364,29 @@ export const RESOURCE_ASSIGNMENT_LOCK_NAMESPACE = 0x62_6b_61_73 | 0; // 'bkas'
 export async function lockResourceForAssignment(manager: EntityManager, resourceId: string): Promise<void> {
   await manager.query('SELECT pg_advisory_xact_lock($1, hashtext($2))', [RESOURCE_ASSIGNMENT_LOCK_NAMESPACE, resourceId]);
 }
+
+/**
+ * How long a service takes -- the fit rule for a slot (demo remediation F-5).
+ *
+ * A booking claims exactly ONE slot, and before this port the booking domain
+ * never compared the service's duration with the slot's length: a 120-minute
+ * service could be booked into a 60-minute slot, leaving the professional's
+ * next slot open and bookable while the first customer was still being
+ * served (a real double booking), and a required resource reserved for only
+ * the first hour. There is no established contract for spanning several
+ * slots, so the rule enforced is the conservative one: a slot is offered for,
+ * and can be claimed by, a service only when the slot is at least as long as
+ * the service.
+ *
+ * `booking` may not import `provider` (ADR-011); `apps/api` answers on the
+ * CALLER's manager so the read is inside the claim's transaction.
+ *
+ * Returns `null` when the service does not exist (or is deleted): the order
+ * path is the authority that refuses an unknown service, and a slot listing
+ * for an unknown service is not narrowed by a guess.
+ */
+export interface ServiceDurationDirectory {
+  durationMinutesFor(manager: EntityManager, serviceId: string): Promise<number | null>;
+}
+
+export const SERVICE_DURATION_DIRECTORY = Symbol('BEAUCLICK_SERVICE_DURATION_DIRECTORY');

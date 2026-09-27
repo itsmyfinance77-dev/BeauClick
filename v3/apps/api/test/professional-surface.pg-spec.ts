@@ -383,13 +383,32 @@ describePg('professional operating surface (real PostgreSQL)', () => {
 
       const slotA = await seedSlot(dataSource, professionalA.id, professionalA.serviceId, futureSlotTime(48));
 
-      await request(app.getHttpServer())
+      // Demo remediation F-3: the generic non-enumerating 404, no longer the
+      // misleading 409 "held by an active booking" (the slot is open).
+      const refused = await request(app.getHttpServer())
         .delete(`/api/v1/me/availability/slots/${slotA}`)
         .set('Authorization', `Bearer ${ownerB.accessToken}`)
-        .expect(409);
+        .expect(404);
+      expect(refused.body.error.code).toBe('NOT_FOUND_OR_NOT_YOURS');
 
       const rows = await dataSource.query(`SELECT id FROM booking.availability_slots WHERE id = $1`, [slotA]);
       expect(rows).toHaveLength(1);
+
+      // Same answer as a slot that does not exist at all -- nothing to enumerate.
+      const missing = await request(app.getHttpServer())
+        .delete('/api/v1/me/availability/slots/01a0e1b0-0000-7000-8000-000000000000')
+        .set('Authorization', `Bearer ${ownerB.accessToken}`)
+        .expect(404);
+      expect(missing.body.error).toEqual(refused.body.error);
+
+      // Owner control: the owner's identical request succeeds.
+      await request(app.getHttpServer())
+        .delete(`/api/v1/me/availability/slots/${slotA}`)
+        .set('Authorization', `Bearer ${ownerA.accessToken}`)
+        .expect((r) => {
+          if (r.status >= 300) throw new Error(`owner delete ${r.status}`);
+        });
+      expect(await dataSource.query(`SELECT id FROM booking.availability_slots WHERE id = $1`, [slotA])).toHaveLength(0);
     });
   });
 

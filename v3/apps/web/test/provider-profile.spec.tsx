@@ -193,6 +193,20 @@ beforeEach(() => {
   tokenStorage.set({ accessToken: 'test-access-token', csrfToken: 'test-csrf-token' });
 });
 
+describe('demo F-2 — per-caller state is read once the session is known', () => {
+  it('fetches the provider only after the session answered, so a signed-in customer never gets the anonymous save state', async () => {
+    mockApi();
+    renderProfile();
+    await screen.findByRole('heading', { level: 1 });
+
+    const urls = (global.fetch as jest.Mock).mock.calls.map(([u]) => String(u));
+    const sessionAt = urls.findIndex((u) => /\/v1\/me(\?|$)/.test(u));
+    const providerAt = urls.findIndex((u) => /\/v1\/providers\/prof-1(\?|$)/.test(u));
+    expect(sessionAt).toBeGreaterThanOrEqual(0);
+    expect(providerAt).toBeGreaterThan(sessionAt);
+  });
+});
+
 describe('the profile shows what the server said, and no more', () => {
   it('names the city instead of showing its identifier', async () => {
     mockApi();
@@ -443,10 +457,27 @@ describe('choosing a service and a time', () => {
 
     await userEvent.click(within(grid).getAllByRole('button')[0]);
     const summary = await screen.findByTestId('booking-summary');
-    // 06:00Z is 09:30 in Asia/Tehran and 09:00Z is 12:30 — the END comes
-    // from `slot.endAt`, never from adding a duration in the browser.
+    // 06:00Z is 09:30 in Asia/Tehran and 09:00Z is 12:30 — a 180-minute
+    // service in a 180-minute slot ends with the slot (demo F-5 caps at it).
     expect(summary.textContent).toContain('۰۹:۳۰');
     expect(summary.textContent).toContain('۱۲:۳۰');
+  });
+
+  it('ends the summary when the SERVICE ends, not at the end of a longer slot (demo F-5)', async () => {
+    // A generic 3-hour slot offered for the 90-minute service.
+    mockApi({ slots: [{ id: 'long', serviceId: null, startAt: '2099-09-15T06:00:00.000Z', endAt: '2099-09-15T09:00:00.000Z' }] });
+    renderProfile();
+    const list = await screen.findByTestId('services');
+    await userEvent.click(within(list).getByRole('button', { name: /^شینیون/ }));
+    await waitFor(() => expect(list.querySelector('[data-chosen="true"]')?.getAttribute('data-service')).toBe('svc-2'));
+
+    const grid = await screen.findByTestId('slot-grid');
+    await userEvent.click(within(grid).getAllByRole('button')[0]);
+    const summary = await screen.findByTestId('booking-summary');
+    // 06:00Z is 09:30 in Tehran; + 90 minutes = 11:00, not the slot's 12:30.
+    expect(summary.textContent).toContain('۰۹:۳۰');
+    expect(summary.textContent).toContain('۱۱:۰۰');
+    expect(summary.textContent).not.toContain('۱۲:۳۰');
   });
 
   it('offers the waitlist, and only when there is genuinely nothing free', async () => {

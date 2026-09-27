@@ -12,6 +12,8 @@ import {
   BookingRescheduleOutcomeHook,
   ELIGIBLE_RESOURCE_DIRECTORY,
   EligibleResourceDirectory,
+  SERVICE_DURATION_DIRECTORY,
+  ServiceDurationDirectory,
   lockResourceForAssignment,
 } from '../ports';
 import { emitEvent, AuditLogger } from '@beauclick/events';
@@ -36,6 +38,7 @@ import {
   NoShowStatementRequiredException,
   RescheduleConsequenceRequiredException,
   RescheduleNotAllowedException,
+  SlotTooShortForServiceException,
   SlotUnavailableException,
   TooManyActiveHoldsException,
 } from '../booking.errors';
@@ -150,6 +153,13 @@ export class BookingService {
      */
     @Inject(BOOKING_RESCHEDULE_OUTCOME_HOOK)
     private readonly rescheduleOutcome: BookingRescheduleOutcomeHook,
+    /**
+     * Demo remediation F-5: the service's duration, so a slot shorter than the
+     * service can never be claimed for it. NOT `@Optional()`: a composition
+     * that forgets it must fail to boot rather than silently skip the check.
+     */
+    @Inject(SERVICE_DURATION_DIRECTORY)
+    private readonly serviceDurations: ServiceDurationDirectory,
   ) {}
 
   // ---------------------------------------------------------------------
@@ -244,6 +254,10 @@ export class BookingService {
     if (slot.serviceId && input.serviceId && slot.serviceId !== input.serviceId) {
       throw new SlotUnavailableException();
     }
+    // F-5: the slot must cover the whole service. Same place and same reason
+    // as the service check above -- after the single-statement claim, whose
+    // effect the transaction rolls back when this rejects.
+    await this.assertSlotFitsService(manager, input.serviceId ?? slot.serviceId ?? null, slot);
 
     const booking = manager.create(BookingEntity, {
       id: bookingId,
@@ -315,6 +329,25 @@ export class BookingService {
 
     this.auditLog.log({ action: 'booking.created', bookingId, customerId: input.customerId, slotId: slot.id });
     return manager.findOneOrFail(BookingEntity, { where: { id: bookingId } });
+  }
+
+  /**
+   * Demo remediation F-5. A slot shorter than the service would leave the
+   * professional's following time open while this customer is still being
+   * served. No service (a generic booking) or an unknown service has nothing
+   * to compare; the order path refuses an unknown service on its own.
+   */
+  private async assertSlotFitsService(
+    manager: EntityManager,
+    serviceId: string | null,
+    slot: Pick<AvailabilitySlotEntity, 'startAt' | 'endAt'>,
+  ): Promise<void> {
+    if (!serviceId) return;
+    const minutes = await this.serviceDurations.durationMinutesFor(manager, serviceId);
+    if (minutes === null) return;
+    if (slot.endAt.getTime() - slot.startAt.getTime() < minutes * 60_000) {
+      throw new SlotTooShortForServiceException();
+    }
   }
 
   /** The single conditional UPDATE the whole concurrency guarantee rests on. */
@@ -785,6 +818,9 @@ export class BookingService {
       ) {
         throw new RescheduleNotAllowedException('invalid_slot');
       }
+      // F-5: the destination must cover the booking's whole service, checked
+      // before anything (claim, consequence, move) is written.
+      await this.assertSlotFitsService(m, booking.serviceId ?? newSlot.serviceId ?? null, newSlot);
 
       // `null` for a free governed reschedule; throws when the consequence is
       // unavailable or not yet confirmed -- before anything is written.

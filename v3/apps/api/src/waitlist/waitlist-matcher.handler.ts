@@ -42,7 +42,19 @@ export class WaitlistMatcherHandler implements DomainEventHandler<SlotReopenedPa
     const slot = await this.slots.findOne({ where: { id: slotId } });
     if (!slot || slot.status !== 'open') return;
 
-    const offered = await this.waitlist.offerNextFor(professionalId, slotId, slot.serviceId);
+    // Demo remediation F-5: only services this slot is long enough for. A
+    // slot bound to a service it cannot cover is offered to nobody (booking
+    // would refuse it for every waiter).
+    const slotMinutes = (slot.endAt.getTime() - slot.startAt.getTime()) / 60_000;
+    const fitting: Array<{ id: string }> = await this.slots.manager.query(
+      `SELECT id FROM provider.services
+        WHERE professional_id = $1 AND deleted_at IS NULL AND duration_minutes <= $2`,
+      [professionalId, slotMinutes],
+    );
+    const fittingIds = fitting.map((s) => s.id);
+    if (slot.serviceId && !fittingIds.includes(slot.serviceId)) return;
+
+    const offered = await this.waitlist.offerNextFor(professionalId, slotId, slot.serviceId, fittingIds);
     if (offered) {
       this.logger.log(`Offered slot ${slotId} (professional ${professionalId}) to waitlist entry ${offered.id}`);
     }

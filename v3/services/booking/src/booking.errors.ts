@@ -119,3 +119,17 @@ export class NoShowStatementRequiredException extends DomainException {
     super('NO_SHOW_STATEMENT_REQUIRED', 'برای ثبت عدم حضور، یک یادداشت کوتاه لازم است.', HttpStatus.BAD_REQUEST);
   }
 }
+
+/**
+ * Demo remediation F-5: the chosen time is shorter than the service. Refused
+ * before anything is written (the claim is rolled back with the transaction).
+ */
+export class SlotTooShortForServiceException extends DomainException {
+  constructor() {
+    super(
+      'SLOT_TOO_SHORT_FOR_SERVICE',
+      'این زمان برای مدت این خدمت کافی نیست. لطفاً زمان دیگری انتخاب کنید.',
+      HttpStatus.CONFLICT,
+    );
+  }
+}
