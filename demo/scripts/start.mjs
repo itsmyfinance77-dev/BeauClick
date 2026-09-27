@@ -134,19 +134,20 @@ fs.writeFileSync(
 \ttls ${fwd(path.join(CERTS_DIR, 'demo-leaf-chain.crt'))} ${fwd(path.join(CERTS_DIR, 'demo-leaf.key'))}
 \t# Never reachable through the ingress: the dev-login seam (also disabled in the
 \t# API), metrics, and the readiness detail. No access log (URLs can carry tokens).
+\t# \`route\` runs its directives in the order written. (Without it Caddy sorts
+\t# \`handle\` before \`respond\`, and the block below would never fire -- found by
+\t# the smoke test when /api/health/ready answered 200.)
 \t@blocked path /api/v1/auth/dev-login /api/v1/auth/dev-login/* /api/metrics /api/metrics/* /api/health/ready
-\trespond @blocked 404
-\trequest_body {
-\t\tmax_size 12MB
-\t}
 \theader {
 \t\t-Server
 \t\tStrict-Transport-Security "max-age=600"
 \t}
-\thandle /api/* {
-\t\treverse_proxy 127.0.0.1:${PORTS.api}
-\t}
-\thandle {
+\troute {
+\t\trespond @blocked 404
+\t\trequest_body {
+\t\t\tmax_size 12MB
+\t\t}
+\t\treverse_proxy /api/* 127.0.0.1:${PORTS.api}
 \t\treverse_proxy 127.0.0.1:${PORTS.web}
 \t}
 }
