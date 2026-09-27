@@ -13,7 +13,7 @@ Source: demo branch `codex/demo-2026-09-28` on top of `b2477a3`. Status legend:
 Roles: C customer · P professional · B business owner · S staff (manager/practitioner) · FR finance-read grantee ·
 M moderator · O platform operator · A administrator. "Denied" = the refusal verified or to be verified in M3.
 Evidence: `seed:<stage>` = produced through the real API by that seed stage; `verify:<script>` = scripted real-API
-check; "browser" = Milestone 3 (desktop + 390 px) — pending the owner's manual CA install.
+check; "browser" = real-browser verification after the owner installed root v3 (section below).
 
 | # | Area | Feature | Web route | Roles (denied) | Seed / scenario | Status | Evidence so far |
 |---|---|---|---|---|---|---|---|
@@ -29,12 +29,12 @@ check; "browser" = Milestone 3 (desktop + 390 px) — pending the owner's manual
 | 10 | Cancellation | customer (timely, full refund) and seller cancellation (#161 default refund) | `/bookings`, `/pro/bookings` | C, P | F5–F7 | LIVE + SIM refund | read-only DB check |
 | 11 | #212 | no-show declaration (governed, grace on DB clock); remedy panel | `/pro/bookings`, `/bookings` | P / C | 2 real no-shows | LIVE | seed:elapsed |
 | 12 | #212 remedy "reschedule" | reschedule instead of refund | `/bookings` | C | — | LIVE but only while the refund decision is `pending`/`manual_required`; sandbox executes at once, so not demonstrable | code + DEMO-DEC-001 |
-| 13 | **B** | durable replacement offer after provider cancellation (new booking, own terms/payment, refund continues) | `/bookings` | C (other customer **404**) | S1/S11/S12 offers | DEMO-EXT (LIVE + SIM payment) | verify:b-replacement 25/25; late-capture (running); web tests 8 |
+| 13 | **B** | durable replacement offer after provider cancellation (new booking, own terms/payment, refund continues) | `/bookings` | C (other customer **404**) | S1/S11/S12 offers | DEMO-EXT (LIVE + SIM payment) | verify:b-replacement 25/25 (also after restore); b-late-capture 4/4; web tests 8; browser: see below |
 | 14 | Completion & reviews | complete, review (async eligibility), seller reply, moderation hide | `/pro/bookings`, `/providers/[id]`, `/admin/reviews` | P / C / M | E2–E5 | LIVE (seller reply API-ONLY: no web) | seed:elapsed |
 | 15 | Business | business profile, classification | `/business` | B (C denied) | salon | LIVE | seed:sellers |
 | 16 | Business | locations, resources, resource requirements, staff location | — | B | 2 locations, 2 resources | API-ONLY | seed:sellers, seed:governance |
 | 17 | Staff | phone invitations, accept, scoped grants (`finance_read`, `practitioner_chat`) | `/business`, `/dashboard` | B, S | manager, practitioner, finance reader | LIVE | seed:sellers, seed:governance |
-| 18 | Workspaces | ownership-scoped workspace list (#210) | `/pro/*`, `/finance` | P/B | — | LIVE | browser pending |
+| 18 | Workspaces | ownership-scoped workspace list (#210) | `/pro/*`, `/finance` | P/B | — | LIVE | browser: see below |
 | 19 | Finance | summary, funds by state, orders, ledger (+ commission snapshot) | `/finance`, `/pro/finance` | P/B/FR (unrelated denied) | collected money in `pending` | LIVE | read via API (pro2: collected 1.8 M, pending 1.8 M) |
 | 20 | Finance | settlements, settlement series (#255), admin settlement | `/finance`, `/admin/settlements` | P/B / A | none | LIVE screens, **no settled data**: release predicate (#174/`#43c`) not built, so nothing becomes settleable | seed:engagement (admin: outstanding = []) |
 | 21 | Commercial admin | commission (R/W), plans/price schedules catalogue, control plane | `/admin/commercial/*` | A (O/M denied) | synthetic commission 10 % | LIVE | seed:commercial |
@@ -44,14 +44,66 @@ check; "browser" = Milestone 3 (desktop + 390 px) — pending the owner's manual
 | 25 | Media moderation | abuse report, inspection, decision | `/providers/[id]`, `/admin/media` | C / M | 1 open report | LIVE | seed:engagement |
 | 26 | Chat | conversations (customer↔professional, customer↔salon manager), report, moderation | `/messages`, `/pro/messages`, `/business/messages`, `/admin/chat-reports` | C/P/B/S / M | 3 threads, 1 report | LIVE | seed:engagement |
 | 27 | AI assistant | recorded consent, conversation, recommendations | `/assistant` | C | 1 conversation | SIM (deterministic provider; disclosure copy pending legal V32-DEC-006) | seed:engagement |
-| 28 | Loyalty | summary, history, tiers; admin policy | `/loyalty`, `/admin/loyalty` | C / A | completed bookings | LIVE (membership/tiers endpoints API-ONLY) | browser pending |
+| 28 | Loyalty | summary, history, tiers; admin policy | `/loyalty`, `/admin/loyalty` | C / A | completed bookings | LIVE (membership/tiers endpoints API-ONLY) | browser: see below |
 | 29 | Referral | code, claim, qualification | `/referral` | C | code claimed by another account | LIVE | seed:engagement |
 | 30 | Wishlist | professionals and services | `/wishlist` | C | 3 items | LIVE | seed:engagement |
 | 31 | Waitlist | join; offer accept/decline | `/waitlist` | C | 1 entry | LIVE | seed:engagement |
 | 32 | Journey | profile, goals, timeline | `/journey` | C | profile + goal | LIVE | seed:engagement |
 | 33 | Notifications | centre, preferences, unread; SMS via inbox; e-mail logged | `/notifications`, `/admin/notifications` | all / A | event-driven | LIVE in-app; SIM SMS/e-mail | seed (event fan-out) |
 | 34 | Privacy | export, deletion request/cancel, admin queue | `/account/privacy`, `/admin/privacy` | C / A | 1 export | LIVE | seed:engagement |
-| 35 | Analytics & audit | pro analytics/series, admin analytics, audit log | `/pro/analytics`, `/admin`, `/admin/audit-log` | P / A | derived | LIVE | browser pending |
-| 36 | Content | terms, privacy policy, contact, support, SEO files | `/terms`, `/privacy-policy`, `/contact`, `/support` | public | — | LIVE (content as built; legal gates unchanged) | browser pending |
+| 35 | Analytics & audit | pro analytics/series, admin analytics, audit log | `/pro/analytics`, `/admin`, `/admin/audit-log` | P / A | derived | LIVE | browser: see below |
+| 36 | Content | terms, privacy policy, contact, support, SEO files | `/terms`, `/privacy-policy`, `/contact`, `/support` | public | — | LIVE (content as built; legal gates unchanged) | browser: see below |
 | 37 | Customer orders list / my reviews | `/v1/me/orders`, `/v1/me/reviews` | — | C | — | API-ONLY | — |
 | 38 | Roadmap | #174/#176/#177/#178/#179, #162 disputes, #180, #99 paid credits, #227/#228, #47 production rail, real SMS/AI/payment providers | — | — | — | UNAVAILABLE | — |
+
+## Browser verification (2026-09-27, after the owner's manual install of root v3)
+
+Two browsers, neither bypassing TLS: the Claude desktop in-app pane (Chromium, owner's user trust store) and a
+separate headless Microsoft Edge driven by `verify/browser-sweep.mjs` (throw-away profile, no certificate flags).
+Every sign-in was the real OTP flow. Widths: 1280 and 390. **A page that rendered is not a feature that was
+exercised** — the three classes below are kept apart on purpose.
+
+### 1. Exercised in the browser — an action taken and its effect checked
+
+| # | What was done in the UI | Width |
+|---|---|---|
+| 1 | OTP sign-in (request → code from the inbox → verify) for cust1, pro1, bizOwner, bizManager, bizPractitioner, financeReader, moderator, operator, admin; the session then carried every page. A refused request (per-number limit / cooldown → 429) shows "تعداد درخواست‌ها بیش از حد مجاز است…" | 1280 |
+| 1 | Demo inbox: member login in the browser; the member's scope is one number and only its code is shown | 1280 |
+| 7 | Booking + sandbox bank **success** → result page → booking confirmed | 1280 |
+| 8 A | Terms shown for the chosen time; box unchecked and pay disabled → tick → enabled → pay → accepted terms visible in "رزروهای من" (versions + instant + text) | 1280 (390: states checked, not paid) |
+| 13 B | Open offer → honest copy + live capacity → pick a time → new terms unticked/pay disabled → tick → fresh payment → offer "used", original cancelled, refund executed. A booking without an offer says so (fix `a889dae`) | 1280 (390: panels open, not paid) |
+| 3, 15, 18, 21, 24… | Typed-URL refusals: every non-admin on `/admin` → "دسترسی لازم … ندارد"; moderator on users/plans/audit-log; operator on plans; anonymous on `/bookings`, `/admin`, `/pro/bookings`, `/finance` → `/auth`. Operator on commission policies: the page frame renders (page gate `bc_manage_platform`) but the API answers **403** (`bc_manage_commercial_plans`) and no data is shown — baseline #264 design, the API is the control | 1280 |
+
+### 2. Rendered only — seeded state displayed, no UI action taken (1280 and 390, 0 app console errors)
+
+4 (`/`, `/providers`, `/providers/[id]`) · 5 (`/search` without a query; `/admin/search`) · 6 (`/pro/availability`) ·
+9 (`/admin/commercial/outcome-policy`, `/pro/outcome-policy`) · 10 (`/bookings`, `/pro/bookings` lists) · 11 (no-show
+bookings and the remedy panel, opened read-only) · 14 (`/pro/bookings`, `/admin/reviews`) · 15/17 (`/business`) ·
+18 (own-workspace scoping observed: practitioner sees only their own professional workspace; customer "no finance
+access") · 19/20 (`/pro/finance`, `/finance`, `/admin/settlements` — empty by design) · 21 (`/admin/commercial/*`) ·
+24 (`/pro/profile`, `/admin/verification`) · 25 (`/admin/media`) · 26 (`/messages`, `/pro/messages`,
+`/business/messages`, `/admin/chat-reports`) · 27 (`/assistant`) · 28 (`/loyalty`, `/admin/loyalty`) · 29 · 30 · 31 ·
+32 · 33 (`/notifications`, `/admin/notifications`) · 34 (`/account/privacy`, `/admin/privacy`) · 35 (`/pro/analytics`,
+`/admin`, `/admin/audit-log` — **overflows at 390**, see below) · 36 (`/terms`, `/privacy-policy`, `/contact`,
+`/support`) · `/admin/users`, `/admin/phone-conflicts`, `/dashboard`.
+
+The write paths behind these rows were performed through the **API** by the seed (see each row's evidence), not in
+the browser.
+
+### 3. Not verified in a browser
+
+1 logout and `/account/devices` · 2 (checked with curl only) · 7 declined / cancelled / "pay again" in the UI (seeded
+via API only) · 12 (not demonstrable in the sandbox) · 16, 22, 23, 37 (API-ONLY, no screen) · 38 (not built) · every
+other UI write: search typing/autocomplete, availability editing, completing a booking, writing a review, declaring a
+no-show, moderation decisions, sending a chat message, waitlist accept/decline, privacy export request, admin
+publish/retire, staff invitation, B dismiss (API-verified only).
+
+### Browser findings (baseline, not changed)
+
+- `/admin/audit-log` at 390 px: document 473 px wide. Cause: `.before` / `.after` snapshot lines
+  (`app/admin/audit-log/audit-log.module.css:104-111`) have no wrap rule, so a 64-hex `bodySha256` cannot break
+  (`.id` in the same file already has `overflow-wrap: anywhere`). Proposed minimal fix — **not applied** (outside A/B):
+  add `overflow-wrap: anywhere;` to `.before` and `.after`. Tested only by injecting that rule in the browser: the page
+  then measures exactly 390 (`evidence/browser-2026-09-27T11-44-41-787Z`, labelled EXPERIMENT).
+- Provider page "پایان تقریبی" is the server slot end: 60-min slots are offered for the 120-min service.
+- Commission-policy page gate broader than its API gate (above); data refused by the API.
