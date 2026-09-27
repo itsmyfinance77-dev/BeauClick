@@ -102,6 +102,22 @@ export class CommerceSubjectDataContract implements SubjectDataContract {
         'The customer\'s remedy after a seller/platform/provider cancellation and its resolution. A financial fact that must survive erasure; it holds no identifying content of its own.',
     },
     {
+      // DEMO BRANCH ONLY (DEMO-DEC-001 B). The durable replacement offer after a
+      // provider-side cancellation, linked to the original and replacement
+      // bookings for history and accounting; retained like the remedy row.
+      table: 'commerce.replacement_offers',
+      disposition: 'retained',
+      reason:
+        'Demo: the replacement offer after a provider-side cancellation and how it was resolved. Links the cancelled and the replacement booking for history and accounting; holds no identifying content of its own.',
+    },
+    {
+      // DEMO BRANCH ONLY (DEMO-DEC-001 B). Every booking attempted under an offer.
+      table: 'commerce.replacement_offer_attempts',
+      disposition: 'retained',
+      reason:
+        'Demo: the bookings attempted under a replacement offer (the link that makes one-successful-replacement checkable). No identifying content of its own.',
+    },
+    {
       /*
        * V3.3 #192 (`#43b-2`), ADR-052 §2 and §15. `retained`, for the reason
        * `commerce.booking_outcome_decisions` above is retained and then some:

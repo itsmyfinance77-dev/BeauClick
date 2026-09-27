@@ -43,6 +43,7 @@ import { BookingOutcomeCompositionModule } from './booking-outcome-composition.m
 import { CheckoutService } from '../checkout/checkout.service';
 import { CheckoutController, SandboxGatewayController, PaymentCallbackController } from '../checkout/checkout.controller';
 import { CheckoutDisclosureController, CheckoutDisclosureService } from '../checkout/checkout-disclosure';
+import { ReplacementOfferController } from '../outcome/replacement-offer.controller';
 import { OrderPaymentController } from '../checkout/order-payment.controller';
 import { OutboxSweepScheduler } from '../events/outbox-sweep.scheduler';
 import {
@@ -226,6 +227,8 @@ import {
     // OWNS, for the commercial seller surfaces. Here because ownership spans
     // provider and business, which ADR-011 forbids either service joining.
     MyWorkspacesController,
+    // DEMO BRANCH ONLY (DEMO-DEC-001 B): the replacement-offer routes (need checkout).
+    ReplacementOfferController,
   ],
   providers: [
     CheckoutService,

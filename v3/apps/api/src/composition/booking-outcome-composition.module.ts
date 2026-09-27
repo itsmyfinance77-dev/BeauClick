@@ -9,6 +9,7 @@ import { CustomerRemedyResolutionService } from '../outcome/customer-remedy-reso
 import { BookingRemedyController } from '../outcome/booking-remedy.controller';
 // DEMO BRANCH ONLY (DEMO-DEC-001 A): the accepted-terms read route.
 import { AcceptedTermsController, AcceptedTermsService } from '../checkout/accepted-terms';
+import { ReplacementOfferService } from '../outcome/replacement-offer.service';
 
 /**
  * The booking outcome composition — V3.3 Story #160 (`#42c`), ADR-051 §6.
@@ -43,7 +44,10 @@ import { AcceptedTermsController, AcceptedTermsService } from '../checkout/accep
     { provide: BOOKING_RESCHEDULE_OUTCOME_HOOK, useExisting: BookingOutcomeOrchestrator },
     CustomerRemedyResolutionService,
     AcceptedTermsService,
+    // DEMO BRANCH ONLY (DEMO-DEC-001 B): used by the orchestrator (offer on cancellation)
+    // and by the replacement controller in DomainCompositionModule.
+    ReplacementOfferService,
   ],
-  exports: [BookingOutcomeOrchestrator, BOOKING_RESCHEDULE_OUTCOME_HOOK, CustomerRemedyResolutionService],
+  exports: [BookingOutcomeOrchestrator, BOOKING_RESCHEDULE_OUTCOME_HOOK, CustomerRemedyResolutionService, ReplacementOfferService],
 })
 export class BookingOutcomeCompositionModule {}

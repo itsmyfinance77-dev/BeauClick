@@ -1,5 +1,5 @@
 import { HttpStatus, Inject, Injectable, Logger, Optional } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 
 import { BookingService, CreateBookingInput } from '@beauclick/booking';
 import {
@@ -208,9 +208,16 @@ export class CheckoutService {
    * network retry returns the same pair rather than a second slot claim.
    */
   async checkout(
-    input: CreateBookingInput & { callbackBaseUrl: string; acceptedPolicy?: BookingOutcomeAcceptanceV1 | null },
+    input: CreateBookingInput & {
+      callbackBaseUrl: string;
+      acceptedPolicy?: BookingOutcomeAcceptanceV1 | null;
+      /** DEMO BRANCH ONLY (DEMO-DEC-001 B): replacement-offer lock (first) and link (after the booking). */
+      replacement?: { lock(m: EntityManager): Promise<void>; link(m: EntityManager, bookingId: string): Promise<void> };
+    },
   ): Promise<CheckoutResult> {
     const { bookingId, order } = await this.dataSource.transaction(async (manager) => {
+      // Lock order for a replacement: the offer row first, then slot/booking/order below.
+      if (input.replacement) await input.replacement.lock(manager);
       const booking = await this.bookings.create(
         {
           customerId: input.customerId,
@@ -235,6 +242,8 @@ export class CheckoutService {
         },
         manager,
       );
+
+      if (input.replacement) await input.replacement.link(manager, booking.id);
 
       return { bookingId: booking.id, order: created };
     });

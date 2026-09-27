@@ -9,6 +9,7 @@ import { useAuth } from '@/lib/auth-context';
 import { ProtectedRoute } from '@/components/protected-route';
 import { RemedyPanel } from '@/components/remedy-panel';
 import { AcceptedTermsPanel } from '@/components/checkout-terms';
+import { ReplacementOfferPanel } from '@/components/replacement-offer-panel';
 import { Alert, Button, LoadingState } from '@/components/ui';
 import { ConfirmDialog, EmptyState, PageHeader, SegmentedControl, TextLink } from '@/components/kit';
 import { bookingApi, isUpcomingBooking, slotTimeLabel, type BookingSummary } from '@/lib/booking-api';
@@ -74,6 +75,16 @@ function BookingsContent() {
   const [remedyOpen, setRemedyOpen] = useState<ReadonlySet<string>>(new Set());
   // DEMO BRANCH ONLY (DEMO-DEC-001 A): which rows show the terms they were accepted under.
   const [termsOpen, setTermsOpen] = useState<ReadonlySet<string>>(new Set());
+  // DEMO BRANCH ONLY (DEMO-DEC-001 B): which cancelled rows show their replacement offer.
+  const [replacementOpen, setReplacementOpen] = useState<ReadonlySet<string>>(new Set());
+  function toggleReplacement(id: string) {
+    setReplacementOpen((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
   function toggleTerms(id: string) {
     setTermsOpen((current) => {
       const next = new Set(current);
@@ -291,6 +302,25 @@ function BookingsContent() {
                 {remedyRelevant && remedyIsOpen ? (
                   <div id={`remedy-${booking.id}`} className={styles.remedy}>
                     <RemedyPanel booking={booking} onRescheduled={() => void afterRemedyReschedule()} />
+                  </div>
+                ) : null}
+
+                {booking.status === 'cancelled' ? (
+                  <div className={styles.actions}>
+                    <Button
+                      variant="ghost"
+                      inline
+                      aria-expanded={replacementOpen.has(booking.id)}
+                      aria-controls={`replacement-${booking.id}`}
+                      onClick={() => toggleReplacement(booking.id)}
+                    >
+                      {replacementOpen.has(booking.id) ? 'بستن پیشنهاد جایگزینی' : 'پیشنهاد جایگزینی'}
+                    </Button>
+                  </div>
+                ) : null}
+                {booking.status === 'cancelled' && replacementOpen.has(booking.id) ? (
+                  <div id={`replacement-${booking.id}`} className={styles.remedy}>
+                    <ReplacementOfferPanel api={api} bookingId={booking.id} />
                   </div>
                 ) : null}
 

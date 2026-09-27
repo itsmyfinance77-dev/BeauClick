@@ -22,6 +22,7 @@ import {
   BookingRescheduleOutcomeHook,
 } from '@beauclick/booking';
 import { evaluateBookingOutcome } from '@beauclick/commercial-policy';
+import { ReplacementOfferService } from './replacement-offer.service';
 import {
   BookingOutcomeEvaluationV1,
   bookingCancellationRefundKey,
@@ -99,6 +100,8 @@ export class BookingOutcomeOrchestrator implements BookingRescheduleOutcomeHook 
     private readonly orders: OrderService,
     // V3.3 #161 (`#42d`), ADR-051 §8.
     private readonly remedyChoices: CustomerRemedyChoiceService,
+    // DEMO BRANCH ONLY (DEMO-DEC-001 B).
+    private readonly replacementOffers: ReplacementOfferService,
   ) {}
 
   // ---------------------------------------------------------------------
@@ -152,6 +155,9 @@ export class BookingOutcomeOrchestrator implements BookingRescheduleOutcomeHook 
        */
       if (decision.cause === 'seller' || decision.cause === 'platform' || decision.cause === 'provider') {
         await this.remedyChoices.offerDefault(m, order.orderId, bookingId);
+        // DEMO BRANCH ONLY (DEMO-DEC-001 B): a durable replacement offer, independent of
+        // the refund above (which continues). Idempotent on the original booking.
+        await this.replacementOffers.offerOnCancellation(m, order.orderId, bookingId);
       }
 
       this.auditLog.log({
