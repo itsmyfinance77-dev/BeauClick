@@ -198,7 +198,11 @@ function securityHeaders(res) {
     `default-src 'none'; style-src '${STYLE_HASH}'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'`,
   );
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('Referrer-Policy', 'no-referrer');
+  // Not `no-referrer`: under it a browser sends `Origin: null` even on this page's own
+  // same-origin form POST, and sameOriginPost (rightly) refuses `null` — login broke in a
+  // real browser. `same-origin` keeps the real Origin for our own POSTs and still sends
+  // nothing cross-origin.
+  res.setHeader('Referrer-Policy', 'same-origin');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Strict-Transport-Security', 'max-age=600');
 }

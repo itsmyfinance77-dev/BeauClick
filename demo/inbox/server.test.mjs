@@ -199,6 +199,16 @@ test('a cross-origin POST is refused', async () => {
   assert.equal(res.res.status, 403);
 });
 
+test("a browser's own same-origin login works; an opaque `Origin: null` is still refused", async () => {
+  // A browser sends the page's real Origin only if the referrer policy allows it; under
+  // `no-referrer` it sends `null` and the login form could never work in a browser.
+  assert.equal((await request(viewerPort, { path: '/' })).headers['referrer-policy'], 'same-origin');
+  const own = await login('alice', 'alice-password-1', { origin: `https://127.0.0.1:${viewerPort}` });
+  assert.equal(own.res.status, 303);
+  const opaque = await login('alice', 'alice-password-1', { origin: 'null' });
+  assert.equal(opaque.res.status, 403);
+});
+
 test('logout ends the session server-side', async () => {
   const alice = await login('alice', 'alice-password-1');
   await request(viewerPort, { method: 'POST', path: '/logout', headers: { cookie: alice.cookie } });
