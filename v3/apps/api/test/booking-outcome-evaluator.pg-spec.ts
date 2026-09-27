@@ -600,7 +600,9 @@ describePg('booking outcome evaluator, decision and execution (real PostgreSQL)'
       await cancelAsCustomer(booked);
       jest.spyOn(payments, 'refund').mockRejectedValueOnce(new Error('suite crash before the refund'));
       await expect(deliver(booked)).rejects.toThrow('suite crash');
-      expect((await decisionsFor(booked.bookingId))[0]).toMatchObject({ execution_status: 'pending' });
+      // DEMO F-10: the execution claim (`executing`) is committed BEFORE the refund call,
+      // so a crash leaves the decision claimed (blocking a #212 remedy); the retry resumes it.
+      expect((await decisionsFor(booked.bookingId))[0]).toMatchObject({ execution_status: 'executing' });
       expect(await refundsFor(booked.orderId)).toEqual([]);
 
       jest.restoreAllMocks();
@@ -905,20 +907,21 @@ describePg('booking outcome evaluator, decision and execution (real PostgreSQL)'
     it('freezes amounts and instants; lets execution move once forward; refuses DELETE', async () => {
       await expect(dataSource.query(`UPDATE ${DECISIONS} SET refund_toman = 1 WHERE id = $1`, [live.id])).rejects.toThrow(/is immutable/);
       await expect(dataSource.query(`UPDATE ${DECISIONS} SET event_instant = now() WHERE id = $1`, [live.id])).rejects.toThrow(/is immutable/);
-      await expect(dataSource.query(`UPDATE ${DECISIONS} SET execution_status = 'pending' WHERE id = $1`, [live.id])).rejects.toThrow(/moves once, forward from pending/);
+      await expect(dataSource.query(`UPDATE ${DECISIONS} SET execution_status = 'pending' WHERE id = $1`, [live.id])).rejects.toThrow(/is not permitted/); // DEMO F-10: the forward-only rule now names the refused move
       await expect(dataSource.query(`DELETE FROM ${DECISIONS} WHERE id = $1`, [live.id])).rejects.toThrow(/permanent/);
       await expect(dataSource.query(`UPDATE ${DECISIONS} SET superseded_by_id = $2 WHERE id = $1`, [live.id, uuidv7()])).rejects.toThrow();
     });
 
-    it('control: pending → executed is the one permitted execution move', async () => {
+    it('control: executing → executed is permitted, and nothing moves after executed', async () => {
       const pendingBooked = await confirmedBooking(await legacySeller());
       await cancelAsCustomer(pendingBooked);
       jest.spyOn(payments, 'refund').mockRejectedValueOnce(new Error('suite: stop before execution'));
       await expect(deliver(pendingBooked)).rejects.toThrow('suite: stop');
       const [row] = await decisionsFor(pendingBooked.bookingId);
-      expect(row.execution_status).toBe('pending');
+      // DEMO F-10: claimed before the (failed) refund call.
+      expect(row.execution_status).toBe('executing');
       await dataSource.query(`UPDATE ${DECISIONS} SET execution_status = 'executed' WHERE id = $1`, [row.id]);
-      await expect(dataSource.query(`UPDATE ${DECISIONS} SET execution_status = 'failed' WHERE id = $1`, [row.id])).rejects.toThrow(/moves once/);
+      await expect(dataSource.query(`UPDATE ${DECISIONS} SET execution_status = 'failed' WHERE id = $1`, [row.id])).rejects.toThrow(/is not permitted/);
     });
   });
 
