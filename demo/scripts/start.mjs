@@ -4,8 +4,10 @@
 //   node demo/scripts/start.mjs --profile L
 //   node demo/scripts/start.mjs --profile W --activate-wireguard   (ONLY after the owner's go-ahead)
 //
-// Order: preflight (fail-closed) -> artifact integrity -> infra -> inbox -> API ->
-// web -> ingress. Everything binds 127.0.0.1; only with profile W AND
+// Order: infra -> preflight (fail-closed) -> artifact integrity -> inbox -> API ->
+// web -> ingress. Infra comes first because the preflight's writer-role check needs the
+// database (a cold start otherwise fails); it is only the loopback-bound bcdemo-*
+// containers, and no application process starts unless the preflight passes. Everything binds 127.0.0.1; only with profile W AND
 // --activate-wireguard do the ingress and the inbox viewer also bind 10.20.30.6.
 import fs from 'node:fs';
 import https from 'node:https';
@@ -37,7 +39,10 @@ const state = readState();
 const running = Object.entries(state.processes ?? {}).filter(([, e]) => isOurs(e));
 if (running.length) throw new Error(`Demo already running (${running.map(([n]) => n).join(', ')}); run stop.mjs first.`);
 
-// 1. Preflight.
+// 1. Infra (own containers only, loopback).
+await import('./infra-up.mjs');
+
+// 2. Preflight.
 const pf = await preflight(key);
 if (!pf.ok) {
   console.error(`preflight FAILED:\n  - ${pf.problems.join('\n  - ')}`);
@@ -45,7 +50,7 @@ if (!pf.ok) {
 }
 console.log(`preflight OK (${key}) at ${pf.sha}`);
 
-// 2. Artifact integrity: the running bytes are the recorded bytes.
+// 3. Artifact integrity: the running bytes are the recorded bytes.
 const artifact = path.join(ARTIFACTS_DIR, key);
 const manifest = JSON.parse(fs.readFileSync(path.join(artifact, 'manifest.json'), 'utf8'));
 const webNextDir = path.join(V3_ROOT, 'apps', 'web', '.next');
@@ -62,9 +67,6 @@ if (distNow !== manifest.apiDist.sha256) {
 }
 if (hashTree(webNextDir, { exclude: ['cache', 'trace'] }).sha256 !== manifest.webNext.sha256) throw new Error('web artifact restore failed integrity check');
 console.log(`artifact OK: web BUILD_ID ${manifest.webBuildId}, api dist ${manifest.apiDist.sha256.slice(0, 12)}`);
-
-// 3. Infra.
-await import('./infra-up.mjs');
 
 const secrets = loadSecrets();
 const procs = {};
