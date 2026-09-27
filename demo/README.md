@@ -69,6 +69,35 @@ root is each viewer's own manual choice (guide in `E:\BeauClick-demo\CA-INSTALL.
 installed automatically, no browser warning is bypassed, and TLS validation is never disabled. The root and
 intermediate private keys were destroyed after issuance.
 
+## Owner-approved demo extensions (DEMO-DEC-001; demo branch only)
+
+- **A — acceptance in web checkout.** The provider page loads the server's disclosure for the chosen time; a governed
+  seller's terms are shown with an unchecked box and payment stays closed until it is ticked; the exact disclosed
+  versions are sent; changed versions require renewed acceptance; booking details show the accepted terms.
+- **B — replacement offer after a provider cancellation.** The refund always continues; the offer lets the customer
+  book the same service with the same provider as a NEW booking (own terms, current price, own payment — nothing is
+  transferred), at most once, or dismiss it. See `decisions/DEMO-DEC-001-…md` for the state machine and lock order.
+
+## Backups used by the pre-show reset
+
+`restore.mjs --backup latest-golden` picks the newest folder labelled `golden` / `golden-<suffix>`. Take the
+presentation backup after the final seed with `node demo/scripts/backup.mjs --label golden-final`.
+
+## Known limitations (say them, do not hide them)
+
+- Settlement / settlement series (#255) screens are live but hold no settled data: fund release (#174 / `#43c`) is not
+  built, so collected money stays "pending" and nothing is settleable. No settlement is faked.
+- #212's "reschedule instead of refund" works only while the refund decision is still pending/manual; the sandbox
+  executes refunds immediately, so it is not demonstrable. B is separate and independent of the refund.
+- Backend features without a web screen at the baseline (API-ONLY in `FEATURE-MATRIX.md`): seller subscriptions and
+  credit purchases, collection-policy assignment, business locations/resources, seller review replies, loyalty
+  membership, the customer's order and review lists, settlement schedules / risk classes.
+- All commercial values and policy texts are synthetic and not approved; no legal evidence is recorded; the AI
+  assistant uses the deterministic sandbox provider and its disclosure copy is pending legal review.
+- Throttling is per client IP and every request reaches the API from the ingress: the `refresh` limit (20/min) is
+  shared by the whole team behind it — measured in rehearsal before any change.
+- TLS: private demo PKI v3; browsers trust it only after a viewer's own manual import (`CA-INSTALL.md`).
+
 ## Hard boundaries
 
 No public exposure; no router or firewall change by tooling; no dev-login; no real providers (preflight refuses
