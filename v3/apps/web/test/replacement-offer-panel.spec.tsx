@@ -70,10 +70,11 @@ const api = new ApiClient({ baseUrl: 'http://api.test/api', getAccessToken: () =
 const renderPanel = () => render(<ReplacementOfferPanel api={api} bookingId="b-old" />);
 
 describe('replacement offer panel (DEMO-DEC-001 B)', () => {
-  it('renders nothing when there is no offer', async () => {
+  it('says plainly when a cancelled booking has no offer (the toggle shows on every cancelled row)', async () => {
     mock({ offer: 'none' });
-    const { container } = renderPanel();
-    await waitFor(() => expect(container).toBeEmptyDOMElement());
+    renderPanel();
+    expect(await screen.findByTestId('replacement-none')).toHaveTextContent('فقط وقتی ساخته می‌شود که متخصص نوبت را لغو کند');
+    expect(screen.queryByTestId('replacement-pay')).toBeNull();
   });
 
   it('states the promise honestly: refund continues, no slot or price guarantee, current price shown', async () => {

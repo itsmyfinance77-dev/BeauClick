@@ -73,7 +73,8 @@ export function ReplacementOfferPanel({ api, bookingId }: { api: ApiClient; book
   const days = useMemo(() => groupSlotsByDay(slots ?? []).slice(0, 5), [slots]);
 
   if (offer === null) return <p className={styles.note}>در حال دریافت پیشنهاد جایگزینی…</p>;
-  if (offer === 'none') return null;
+  if (offer === 'none')
+    return <p className={styles.note} data-testid="replacement-none">برای این رزرو پیشنهاد جایگزینی وجود ندارد؛ این پیشنهاد فقط وقتی ساخته می‌شود که متخصص نوبت را لغو کند.</p>;
   if (offer === 'error') return <p className={`${styles.note} ${styles.error}`}>پیشنهاد جایگزینی دریافت نشد.</p>;
 
   const refundLine = offer.originalRefund ? (
