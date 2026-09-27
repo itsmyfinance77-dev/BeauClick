@@ -31,6 +31,9 @@ const only = arg('--only')?.split(',');
 // Minimum gap between full page loads; each full load makes one refresh call (per-IP 20/min).
 const paceMs = Number(arg('--pace-ms') ?? 3200);
 const onlyPaths = arg('--paths')?.split(',');
+// Diagnosis only: a CSS rule injected into the page after load (never into the app), to test a
+// proposed fix before anyone decides on it. Recorded in the report; screenshots are then NOT fallback material.
+const experimentCss = arg('--experiment-css');
 const state = JSON.parse(fs.readFileSync(path.join(STATE_DIR, 'seed-state.json'), 'utf8'));
 const { pro1 } = state.ids;
 const tourBooking = state.ids.replacementTour?.original;
@@ -216,7 +219,8 @@ const snapshot = `(() => ({ path: location.pathname, dir: document.documentEleme
   banner: document.body.innerText.includes('نسخهٔ نمایشی'), h1: document.querySelector('h1')?.innerText ?? null,
   text: (document.querySelector('main') ?? document.body).innerText.replace(/\\s+/g, ' ').slice(0, 220) }))()`;
 
-const report = { origin, startedAt: new Date().toISOString(), edge: EDGE, flags: 'headless=new, fresh profile, NO certificate-error flags', personas: [] };
+const report = { origin, startedAt: new Date().toISOString(), edge: EDGE, flags: 'headless=new, fresh profile, NO certificate-error flags', experimentCss, personas: [] };
+if (experimentCss) fs.writeFileSync(path.join(OUT, 'README.txt'), `EXPERIMENT (diagnosis only) — CSS injected in the browser, not in the app:\n${experimentCss}\nNOT fallback material.\n`);
 const slug = (p) => p.replace(/^\//, '').replace(/[/?=&]/g, '_') || 'home';
 
 for (const who of P) {
@@ -236,7 +240,22 @@ for (const who of P) {
   const since = Date.now();
   await page.type('input[autocomplete=tel]', `0${phone.slice(3)}`);
   await page.evaluate(`[...document.querySelectorAll('button[type=submit]')][0].click()`);
-  const code = await inbox.waitForCode(phone, since);
+  let code;
+  try {
+    code = await inbox.waitForCode(phone, since);
+  } catch {
+    // Refused by the app (e.g. the per-number hourly OTP limit): record what the user sees, never retry.
+    await page.idle();
+    r.signIn = {
+      ok: false,
+      at: new Date().toISOString(),
+      requestOtp: page.log.failed.filter((f) => f.url?.includes('/auth/request-otp')),
+      shown: await page.evaluate(`[...document.querySelectorAll('[role=alert]')].map((e) => e.innerText).join(' | ') || (document.querySelector('main') ?? document.body).innerText.slice(0, 300)`),
+    };
+    console.log(`${who.key.padEnd(13)} SIGN-IN REFUSED ${JSON.stringify(r.signIn)}`);
+    await page.close();
+    continue;
+  }
   for (let n = 0; n < 40 && !(await page.evaluate(`Boolean(document.querySelector('input[autocomplete=one-time-code]'))`)); n++) await sleep(250);
   await page.type('input[autocomplete=one-time-code]', code);
   await page.evaluate(`[...document.querySelectorAll('button[type=submit]')].find((b) => b.textContent.includes('تأیید'))?.click()`);
@@ -258,6 +277,7 @@ for (const who of P) {
       r.pages.push(entry);
       continue;
     }
+    if (experimentCss) entry.experimentCss = await page.evaluate(`(() => { const s = document.createElement('style'); s.textContent = ${JSON.stringify(experimentCss)}; document.head.append(s); return s.textContent; })()`);
     if (action) entry.action = await page.evaluate(action);
     await page.idle();
     Object.assign(entry, await page.evaluate(snapshot));
