@@ -137,11 +137,11 @@ export class Session {
   url(p) {
     return `${this.origin}/api${p}`;
   }
-  async call(method, p, body, { expect } = {}) {
+  async call(method, p, body, { expect, headers = {} } = {}) {
     const res = await request(this.url(p), {
       method,
       body,
-      headers: this.accessToken ? { authorization: `Bearer ${this.accessToken}` } : {},
+      headers: { ...(this.accessToken ? { authorization: `Bearer ${this.accessToken}` } : {}), ...headers },
     });
     const ok = expect ? [].concat(expect).includes(res.status) : res.status >= 200 && res.status < 300;
     if (!ok) throw new ApiError(method, p, res);
@@ -162,6 +162,11 @@ export class Session {
   del(p, o) {
     return this.call('DELETE', p, undefined, o);
   }
+}
+
+/** A browser-like request to an absolute URL on the demo origin (no redirects followed). */
+export function rawRequest(url, opts) {
+  return request(url, opts);
 }
 
 /** Real OTP sign-in through the ingress. */
