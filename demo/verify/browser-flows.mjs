@@ -1154,7 +1154,7 @@ async function referralGroup() {
     await f.click('ثبت کد');
     await sleep(1500);
     const n1 = (await q(`select count(*) n from referral.referrals where referee_user_id = $1`, [ids['user:financeReader']]))[0].n;
-    r('denied', 'a second claim through the UI is refused by the server (no second attribution)', n1 === n0 && !(await f.has('کد دعوت ثبت شد')), { attributions: n1, shown: (await f.text()).match(/[^\n]*(نامعتبر|پذیرفته نشد|امکان|مجاز|نشد)[^\n]*/)?.[0] ?? null });
+    r('rule', 'business rule (not authorization): a second claim through the UI is refused (no second attribution)', n1 === n0 && !(await f.has('کد دعوت ثبت شد')), { attributions: n1, shown: (await f.text()).match(/[^\n]*(نامعتبر|پذیرفته نشد|امکان|مجاز|نشد)[^\n]*/)?.[0] ?? null });
     const c1 = await as('cust1');
     await c1.goto('/referral');
     const c1Before = await q(`select 1 from referral.referrals where referee_user_id = $1`, [ids['user:cust1']]);
@@ -1237,15 +1237,39 @@ async function outcomeGroup() {
     await sleep(1500);
     const panel = await c.evaluate(`({ box: document.querySelector('input[type=checkbox]')?.checked ?? null, pay: [...document.querySelectorAll('button')].find((b) => b.textContent.includes('ادامه به پرداخت'))?.disabled ?? null, text: document.body.innerText.includes('۲۴ ساعت پیش از نوبت') })`);
     r('other', "the customer now gets pro2's terms (24 h) with an unticked box and payment closed", panel.box === false && panel.pay === true && panel.text, panel);
-    // pro2's own workspace reference, as its page requested it; pro1 then tries it.
+  });
+
+  // Cross-owner test as a CONTROLLED comparison. The surface answers every cause (foreign/malformed/stale
+  // reference, invalid selection, inactive key, lost race…) with ONE generic 409
+  // OUTCOME_POLICY_ASSIGNMENT_UNAVAILABLE (V33-DEC-031 R4), so a 409 alone proves nothing. Attribution:
+  // the identical, valid request succeeds for the owner; the requester is authenticated (not 401/429) and
+  // its own reference works; only the workspace reference differs; the target row is byte-identical after.
+  await flow('seller: cross-owner outcome assignment — controlled comparison', async (r) => {
+    const live = (await q(`select policy_key, cutoff_hours, late_retention_kind, grace_minutes, no_show_retention_kind from commercial.seller_outcome_policy_assignments where seller_party_id = $1 and superseded_at is null`, [ids.pro2.providerId]))[0];
+    if (!live || live.late_retention_kind !== 'none' || live.no_show_retention_kind !== 'none') throw new Error('needs pro2 governed with the none/none selection from the flow above');
+    const p = await as('pro2');
+    await p.goto('/pro/outcome-policy');
+    await p.click('انتخاب این فضا', { within: await markRow(p, 'section, article, li, div', ['سارا کریمی — ناخن (دمو)', 'انتخاب این فضا']) });
+    await sleep(1500);
     const ref = await p.evaluate(`(performance.getEntriesByType('resource').map((e) => e.name).find((u) => u.includes('/v1/me/outcome-policy-assignments/')) ?? '').split('/v1/me/outcome-policy-assignments/')[1]?.split('?')[0] ?? null`);
-    // Foreign references get the same generic refusal as malformed ones (no enumeration): any 4xx, and the
-    // assignment must be untouched.
-    const before = JSON.stringify(await q(`select * from commercial.seller_outcome_policy_assignments where seller_party_id = $1 order by assigned_at`, [ids.pro2.providerId]));
-    const foreign = ref ? await (await apiAs('pro1')).get(`/v1/me/outcome-policy-assignments/${ref}`, { expect: [200, 403, 404, 409] }) : null;
-    const put = ref ? await (await apiAs('pro1')).put(`/v1/me/outcome-policy-assignments/${ref}`, { policyKey: 'x', reason: 'x' }, { expect: [200, 400, 403, 404, 409, 422] }) : null;
-    const after = JSON.stringify(await q(`select * from commercial.seller_outcome_policy_assignments where seller_party_id = $1 order by assigned_at`, [ids.pro2.providerId]));
-    r('denied', "pro1 cannot read or change pro2's assignment with pro2's workspace reference (assignment untouched)", foreign && foreign.status >= 400 && put.status >= 400 && before === after, foreign ? `GET ${foreign.status} ${foreign.raw?.json?.error?.code ?? ''}; PUT ${put.status} ${put.raw?.json?.error?.code ?? ''}` : 'reference not captured');
+    if (!ref) throw new Error("pro2's workspace reference not captured");
+    const body = { policyKey: live.policy_key, reason: 'انتخاب آزمایشی مرورگر دمو (داده ساختگی)', cutoffHours: Number(live.cutoff_hours), lateCancellationRetention: { kind: 'none' }, noShowGraceMinutes: Number(live.grace_minutes), noShowRetention: { kind: 'none' } };
+    const rows = async () => JSON.stringify(await q(`select * from commercial.seller_outcome_policy_assignments where seller_party_id = $1 order by assigned_at`, [ids.pro2.providerId]));
+    const s0 = await rows();
+    const owner = await apiAs('pro2');
+    const oGet = await owner.get(`/v1/me/outcome-policy-assignments/${ref}`, { expect: [200, 409] });
+    const oPut = await owner.put(`/v1/me/outcome-policy-assignments/${ref}`, body, { expect: [200, 409, 422] });
+    r('other', 'control: the OWNER with the same reference and the same valid body — GET 200, PUT 200 (idempotent, no new row)', oGet.status === 200 && oPut.status === 200 && (await rows()) === s0, { get: oGet.status, put: oPut.status, putCode: oPut.raw?.json?.error?.code ?? null });
+    const other = await apiAs('pro1');
+    const me = await other.get('/v1/me', { expect: [200] });
+    const own = await other.get(`/v1/me/outcome-policy-assignments/${ids.pro1.workspaceRef}`, { expect: [200, 409] });
+    r('other', 'control: pro1 is authenticated (GET /v1/me 200) and its OWN reference answers 200 on the same route', me.status === 200 && own.status === 200, { me: me.status, ownRef: own.status, ownCode: own.raw?.json?.error?.code ?? null });
+    const fGet = await other.get(`/v1/me/outcome-policy-assignments/${ref}`, { expect: [200, 400, 401, 403, 404, 409, 429] });
+    const fPut = await other.put(`/v1/me/outcome-policy-assignments/${ref}`, body, { expect: [200, 400, 401, 403, 404, 409, 422, 429] });
+    const s1 = await rows();
+    const exact = { get: { status: fGet.status, body: fGet.raw?.json }, put: { status: fPut.status, body: fPut.raw?.json } };
+    const refused = [fGet, fPut].every((x) => x.status === 409 && x.raw?.json?.error?.code === 'outcome_policy_assignment_unavailable');
+    r('denied', "pro1 + pro2's reference + the owner's valid body: refused with the contract's generic 409 (not 401/429), target row byte-identical — cause isolated to the reference (resolve() rejects a reference not derived for the caller)", refused && s1 === s0, exact);
   });
 }
 

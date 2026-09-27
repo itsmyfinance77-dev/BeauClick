@@ -44,7 +44,9 @@ await step('14', async () => {
   const cust = userKey[target.customer_id];
   const other = cust === 'cust2' ? 'cust3' : 'cust2';
   const foreign = await call(other, 'POST', `/v1/bookings/${target.id}/review`, { rating: 4, comment: 'نظر آزمایشی از حساب دیگر' });
-  rec('14', 'denied: another customer cannot review this booking', [403, 404].includes(foreign.status), `HTTP ${foreign.status} ${foreign.code ?? ''}`);
+  // Refused as NOT ELIGIBLE (the review-eligibility row belongs to the booking's customer) — recorded under that
+  // exact code, not as a generic authorization pass; the control is the owner's identical request below (201).
+  rec('14', 'refused for another customer with REVIEW_NOT_ELIGIBLE (eligibility belongs to the booking customer); control: owner 201 below', foreign.status === 409 && foreign.code === 'REVIEW_NOT_ELIGIBLE', `HTTP ${foreign.status} ${foreign.code ?? ''}`);
   const made = await call(cust, 'POST', `/v1/bookings/${target.id}/review`, { rating: 5, comment: 'نظر آزمایشی API دمو (داده ساختگی)' });
   const row = (await q(`select id, status, rating, comment from provider.reviews where booking_id = $1`, [target.id]))[0];
   rec('14', `customer (${cust}) writes a review: 201 and persisted`, made.status === 201 && row?.rating === 5, { status: made.status, row });
