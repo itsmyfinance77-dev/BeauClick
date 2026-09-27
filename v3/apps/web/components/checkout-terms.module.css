@@ -1,0 +1,92 @@
+/* DEMO BRANCH ONLY (DEMO-DEC-001 A): checkout terms and accepted terms. */
+
+.panel {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--bc-color-border);
+  border-radius: 12px;
+  background: var(--bc-color-surface);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.error {
+  border-color: var(--bc-color-error);
+  color: var(--bc-color-error);
+}
+
+.amounts {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 12px;
+}
+
+.heading {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.changed {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--bc-color-warning-soft);
+}
+
+.terms {
+  display: grid;
+  gap: 8px;
+}
+
+.list {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 12px;
+  margin: 0;
+}
+
+.list dt {
+  font-weight: 600;
+}
+
+.list dd {
+  margin: 0;
+}
+
+.copy {
+  max-block-size: 160px;
+  overflow-y: auto;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--bc-color-surface-muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.accept {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  min-block-size: 44px;
+  cursor: pointer;
+}
+
+.accept input {
+  inline-size: 20px;
+  block-size: 20px;
+  margin-block-start: 3px;
+  flex: none;
+}
+
+.note {
+  margin: 0;
+  color: var(--bc-color-text-muted);
+}
+
+@media (max-width: 640px) {
+  .list {
+    grid-template-columns: 1fr;
+  }
+}

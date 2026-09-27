@@ -234,7 +234,8 @@ export const bookingApi = {
    */
   createBooking: (
     api: ApiClient,
-    body: { professionalId: string; slotId: string; serviceId?: string },
+    // DEMO BRANCH ONLY (DEMO-DEC-001 A): the exact disclosed identifiers, only for a governed seller.
+    body: { professionalId: string; slotId: string; serviceId?: string; acceptedPolicy?: import('./checkout-terms').OutcomeAcceptance },
     idempotencyKey: string,
   ) => api.post<CheckoutResponse>('/v1/bookings', body, { 'Idempotency-Key': idempotencyKey }),
 

@@ -8,6 +8,7 @@ import { formatFullJalaliDate } from '@beauclick/persian-utils';
 import { useAuth } from '@/lib/auth-context';
 import { ProtectedRoute } from '@/components/protected-route';
 import { RemedyPanel } from '@/components/remedy-panel';
+import { AcceptedTermsPanel } from '@/components/checkout-terms';
 import { Alert, Button, LoadingState } from '@/components/ui';
 import { ConfirmDialog, EmptyState, PageHeader, SegmentedControl, TextLink } from '@/components/kit';
 import { bookingApi, isUpcomingBooking, slotTimeLabel, type BookingSummary } from '@/lib/booking-api';
@@ -71,6 +72,16 @@ function BookingsContent() {
    * this is a list.
    */
   const [remedyOpen, setRemedyOpen] = useState<ReadonlySet<string>>(new Set());
+  // DEMO BRANCH ONLY (DEMO-DEC-001 A): which rows show the terms they were accepted under.
+  const [termsOpen, setTermsOpen] = useState<ReadonlySet<string>>(new Set());
+  function toggleTerms(id: string) {
+    setTermsOpen((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
   function toggleRemedy(id: string) {
     setRemedyOpen((current) => {
       const next = new Set(current);
@@ -243,6 +254,23 @@ function BookingsContent() {
                     >
                       پیام
                     </Button>
+                  </div>
+                ) : null}
+
+                <div className={styles.actions}>
+                  <Button
+                    variant="ghost"
+                    inline
+                    aria-expanded={termsOpen.has(booking.id)}
+                    aria-controls={`terms-${booking.id}`}
+                    onClick={() => toggleTerms(booking.id)}
+                  >
+                    {termsOpen.has(booking.id) ? 'بستن شرایط پذیرفته‌شده' : 'شرایط پذیرفته‌شده'}
+                  </Button>
+                </div>
+                {termsOpen.has(booking.id) ? (
+                  <div id={`terms-${booking.id}`} className={styles.remedy}>
+                    <AcceptedTermsPanel api={api} bookingId={booking.id} />
                   </div>
                 ) : null}
 

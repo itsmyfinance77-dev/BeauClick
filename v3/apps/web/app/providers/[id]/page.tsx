@@ -25,6 +25,9 @@ import { joinWaitlist } from '@/lib/phase4-api';
 import { removeFromWishlist, saveToWishlist } from '@/lib/phase3-api';
 import { saveFailureMessage } from '@/lib/wishlist-api';
 import { ApiRequestError } from '@/lib/api-client';
+// DEMO BRANCH ONLY (DEMO-DEC-001 A): real customer acceptance of the disclosed terms.
+import { CheckoutTermsPanel, checkoutReady, useCheckoutDisclosure } from '@/components/checkout-terms';
+import { sameAcceptance } from '@/lib/checkout-terms';
 import styles from './provider.module.css';
 
 /**
@@ -105,6 +108,8 @@ export default function ProviderBookingPage() {
   const [savingTarget, setSavingTarget] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [waitlistState, setWaitlistState] = useState<'idle' | 'joining' | 'joined' | 'already'>('idle');
+  const [accepted, setAccepted] = useState(false);
+  const [termsChanged, setTermsChanged] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -172,6 +177,17 @@ export default function ProviderBookingPage() {
   // The first day that actually has times, until the customer picks another.
   const activeDay = days.find((d) => d.dayKey === selectedDayKey) ?? days[0] ?? null;
   const selectedSlot = slots.find((s) => s.id === selectedSlotId) ?? null;
+  const { state: disclosureState, reload: reloadDisclosure } = useCheckoutDisclosure(api, {
+    professionalId,
+    serviceId: selectedServiceId,
+    slotId: selectedSlotId,
+    enabled: status === 'authenticated',
+  });
+  // A new slot or service is a new disclosure: acceptance never carries over.
+  useEffect(() => {
+    setAccepted(false);
+    setTermsChanged(false);
+  }, [selectedSlotId, selectedServiceId]);
   const cityName = provider?.cityId ? (cities.find((c) => c.id === provider.cityId)?.name ?? null) : null;
 
   /** The gallery's pictures: real media first, placeholders for the rest. */
@@ -232,6 +248,10 @@ export default function ProviderBookingPage() {
       return;
     }
 
+    // Payment never starts without a loaded disclosure, nor without acceptance where it is required.
+    if (disclosureState.status !== 'ready' || !checkoutReady(disclosureState, accepted)) return;
+    const disclosed = disclosureState.disclosure;
+
     setSubmitting(true);
     setError(null);
     try {
@@ -245,7 +265,12 @@ export default function ProviderBookingPage() {
 
       const res = await bookingApi.createBooking(
         api,
-        { professionalId, slotId: selectedSlotId, serviceId: selectedServiceId },
+        {
+          professionalId,
+          slotId: selectedSlotId,
+          serviceId: selectedServiceId,
+          ...(disclosed.acceptanceRequired && disclosed.acceptance ? { acceptedPolicy: disclosed.acceptance } : {}),
+        },
         idempotencyKey,
       );
 
@@ -257,6 +282,17 @@ export default function ProviderBookingPage() {
       // A zero-total booking needs no gateway trip.
       router.push(`/checkout/result?status=succeeded&orderId=${res.data?.order.id ?? ''}`);
     } catch (err) {
+      // A refusal may mean the terms changed since they were shown: re-read them,
+      // and if the disclosed versions differ, show the new terms and require a
+      // fresh acceptance. Never re-submit on the customer's behalf.
+      if (err instanceof ApiRequestError && err.status === 409) {
+        const fresh = await reloadDisclosure();
+        if (fresh && (fresh.acceptanceRequired !== disclosed.acceptanceRequired || !sameAcceptance(fresh.acceptance, disclosed.acceptance))) {
+          setAccepted(false);
+          setTermsChanged(true);
+          return;
+        }
+      }
       setError(err instanceof Error ? err.message : 'خطایی رخ داد.');
       // The slot may have gone to somebody else while the customer was
       // deciding. Re-fetching gives them a live list rather than leaving a
@@ -548,12 +584,29 @@ export default function ProviderBookingPage() {
             </div>
           ) : null}
 
+          {selectedSlot && status === 'authenticated' ? (
+            <CheckoutTermsPanel
+              state={disclosureState}
+              accepted={accepted}
+              onAcceptedChange={(next) => {
+                setAccepted(next);
+                if (next) setTermsChanged(false);
+              }}
+              changedNotice={termsChanged}
+            />
+          ) : null}
+
           {days.length > 0 ? (
             <>
               <button
                 type="button"
                 className={styles.confirm}
-                disabled={!selectedSlotId || !selectedServiceId || submitting}
+                disabled={
+                  !selectedSlotId ||
+                  !selectedServiceId ||
+                  submitting ||
+                  (status === 'authenticated' && !checkoutReady(disclosureState, accepted))
+                }
                 onClick={() => void confirm()}
               >
                 {submitting ? 'در حال ثبت…' : 'ادامه به پرداخت'}

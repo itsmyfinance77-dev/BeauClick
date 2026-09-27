@@ -7,6 +7,8 @@ import { PaymentModule } from '@beauclick/payment';
 import { BookingOutcomeOrchestrator } from '../outcome/booking-outcome.orchestrator';
 import { CustomerRemedyResolutionService } from '../outcome/customer-remedy-resolution.service';
 import { BookingRemedyController } from '../outcome/booking-remedy.controller';
+// DEMO BRANCH ONLY (DEMO-DEC-001 A): the accepted-terms read route.
+import { AcceptedTermsController, AcceptedTermsService } from '../checkout/accepted-terms';
 
 /**
  * The booking outcome composition — V3.3 Story #160 (`#42c`), ADR-051 §6.
@@ -35,11 +37,12 @@ import { BookingRemedyController } from '../outcome/booking-remedy.controller';
 @Global()
 @Module({
   imports: [CommerceModule, PaymentModule, BookingModule],
-  controllers: [BookingRemedyController],
+  controllers: [BookingRemedyController, AcceptedTermsController],
   providers: [
     BookingOutcomeOrchestrator,
     { provide: BOOKING_RESCHEDULE_OUTCOME_HOOK, useExisting: BookingOutcomeOrchestrator },
     CustomerRemedyResolutionService,
+    AcceptedTermsService,
   ],
   exports: [BookingOutcomeOrchestrator, BOOKING_RESCHEDULE_OUTCOME_HOOK, CustomerRemedyResolutionService],
 })

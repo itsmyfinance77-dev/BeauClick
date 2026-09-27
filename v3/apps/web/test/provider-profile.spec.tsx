@@ -64,6 +64,37 @@ const SLOTS = [
 
 let requests: Array<{ method: string; url: string; body: unknown; headers: Record<string, string> }>;
 
+// DEMO-DEC-001 A: the server's checkout disclosure, unenrolled and governed.
+const AMOUNTS = { serviceTotalToman: 850_000, platformCollectibleNowToman: 850_000, venueBalanceToman: 0 };
+const UNENROLLED_DISCLOSURE = {
+  sellerParty: { kind: 'professional', displayName: 'آتلیه سارا محمدی' },
+  amounts: AMOUNTS,
+  slotStartsAt: '2099-09-15T06:00:00.000Z',
+  displayTimeZone: 'Asia/Tehran',
+  acceptanceRequired: false,
+  outcome: null,
+  acceptance: null,
+};
+function governedDisclosure(policyVersion: number) {
+  return {
+    ...UNENROLLED_DISCLOSURE,
+    acceptanceRequired: true,
+    outcome: {
+      cutoffHours: 12,
+      cutoffInstant: '2099-09-14T18:00:00.000Z',
+      lateCancellationRetention: { kind: 'percentage_of_collected', basisPoints: 2500 },
+      noShowGraceMinutes: 5,
+      noShowRetention: { kind: 'none' },
+      rescheduleFreeCountBeforeCutoff: 1,
+      disputeWindowHours: 36,
+      bodilyHarmWindowHours: null,
+      appealWindowHours: 48,
+      copy: { locale: 'fa-IR', body: `متن نمونهٔ نسخهٔ ${policyVersion}`, bodySha256: 'x', publishedAt: '2026-09-27T00:00:00.000Z' },
+    },
+    acceptance: { policyKey: 'op', policyVersion, copyKey: 'cc', copyVersion: 1 },
+  };
+}
+
 function mockApi(options: {
   provider?: Record<string, unknown>;
   services?: unknown[];
@@ -73,7 +104,12 @@ function mockApi(options: {
   citiesFail?: boolean;
   /** A refused save with the server's own status, code and Persian message. */
   saveRefusal?: { status: number; code: string; message: string };
+  /** DEMO-DEC-001 A: the checkout disclosure(s) to answer, in order; 'fail' = HTTP 500. */
+  disclosures?: Array<Record<string, unknown> | 'fail'>;
+  /** DEMO-DEC-001 A: refuse the booking once with 409 (stale acceptance / unsellable). */
+  bookingRefusal?: boolean;
 } = {}) {
+  const disclosures = [...(options.disclosures ?? [UNENROLLED_DISCLOSURE])];
   requests = [];
   (global.fetch as jest.Mock).mockImplementation((url: string, init?: RequestInit) => {
     const method = (init?.method ?? 'GET').toUpperCase();
@@ -107,7 +143,22 @@ function mockApi(options: {
     if (url.includes('/availability')) return ok(options.slots ?? SLOTS);
     if (url.includes('/services')) return ok(options.services ?? SERVICES);
     if (url.includes('/v1/providers/prof-1')) return ok({ ...PROVIDER, ...options.provider });
-    if (url.includes('/v1/bookings')) return ok({ order: { id: 'o1' }, payment: { redirectUrl: null } });
+    if (url.includes('/v1/checkout/disclosure')) {
+      const next = disclosures.length > 1 ? disclosures.shift() : disclosures[0];
+      if (next === 'fail') return Promise.resolve({ ok: false, status: 500, json: async () => ({ data: null, meta: null, error: { code: 'X', message: 'x' } }) });
+      return ok(next);
+    }
+    if (url.includes('/v1/bookings')) {
+      if (options.bookingRefusal) {
+        options.bookingRefusal = false;
+        return Promise.resolve({
+          ok: false,
+          status: 409,
+          json: async () => ({ data: null, meta: null, error: { code: 'SERVICE_UNAVAILABLE_FOR_SALE', message: 'این خدمت در حال حاضر قابل رزرو نیست.' } }),
+        });
+      }
+      return ok({ order: { id: 'o1' }, payment: { redirectUrl: null } });
+    }
     return ok([]);
   });
 }
@@ -467,5 +518,105 @@ describe('slot ordering', () => {
 
     const grid = await screen.findByTestId('slot-grid');
     expect([...grid.querySelectorAll('[data-slot]')].map((b) => b.textContent)).toEqual(['۰۹:۳۰', '۱۳:۰۰', '۱۶:۳۰']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// DEMO BRANCH ONLY — DEMO-DEC-001 A: real customer acceptance in checkout.
+// ---------------------------------------------------------------------------
+describe('customer acceptance of the disclosed terms (DEMO-DEC-001 A)', () => {
+  async function pickFirstTime() {
+    const grid = await screen.findByTestId('slot-grid');
+    await userEvent.click(within(grid).getAllByRole('button')[0]);
+  }
+  const bookingRequests = () => requests.filter((r) => r.url.includes('/v1/bookings'));
+
+  it('shows the governed terms with an UNCHECKED box and keeps payment closed until it is checked', async () => {
+    mockApi({ disclosures: [governedDisclosure(3)] });
+    renderProfile();
+    await pickFirstTime();
+
+    const box = (await screen.findByTestId('terms-accept')) as HTMLInputElement;
+    expect(box.checked).toBe(false);
+    expect(screen.getByTestId('terms-copy')).toHaveTextContent('متن نمونهٔ نسخهٔ 3');
+    const pay = screen.getByRole('button', { name: 'ادامه به پرداخت' });
+    expect(pay).toBeDisabled();
+
+    await userEvent.click(box);
+    expect(pay).toBeEnabled();
+    await userEvent.click(pay);
+    const booking = await sentTo('/v1/bookings');
+    expect(booking.body).toEqual({
+      professionalId: 'prof-1',
+      slotId: 'slot-1',
+      serviceId: 'svc-1',
+      acceptedPolicy: { policyKey: 'op', policyVersion: 3, copyKey: 'cc', copyVersion: 1 },
+    });
+  });
+
+  it('sends no acceptance and shows no terms for an unenrolled seller', async () => {
+    mockApi();
+    renderProfile();
+    await pickFirstTime();
+
+    expect(await screen.findByTestId('terms-none')).toBeInTheDocument();
+    expect(screen.queryByTestId('terms-accept')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'ادامه به پرداخت' }));
+    const booking = await sentTo('/v1/bookings');
+    expect(booking.body).not.toHaveProperty('acceptedPolicy');
+  });
+
+  it('does not start payment when the disclosure cannot be loaded', async () => {
+    mockApi({ disclosures: ['fail'] });
+    renderProfile();
+    await pickFirstTime();
+
+    expect(await screen.findByTestId('terms-error')).toBeInTheDocument();
+    const pay = screen.getByRole('button', { name: 'ادامه به پرداخت' });
+    expect(pay).toBeDisabled();
+    await userEvent.click(pay);
+    expect(bookingRequests()).toHaveLength(0);
+  });
+
+  it('treats a malformed disclosure as a failed one', async () => {
+    mockApi({ disclosures: [{ ...governedDisclosure(3), acceptance: null }] });
+    renderProfile();
+    await pickFirstTime();
+
+    expect(await screen.findByTestId('terms-error')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'ادامه به پرداخت' })).toBeDisabled();
+  });
+
+  it('when the terms changed, shows the new version and requires a fresh acceptance — never resubmits', async () => {
+    mockApi({ disclosures: [governedDisclosure(3), governedDisclosure(4)], bookingRefusal: true });
+    renderProfile();
+    await pickFirstTime();
+
+    await userEvent.click(await screen.findByTestId('terms-accept'));
+    await userEvent.click(screen.getByRole('button', { name: 'ادامه به پرداخت' }));
+
+    expect(await screen.findByTestId('terms-changed')).toBeInTheDocument();
+    const box = screen.getByTestId('terms-accept') as HTMLInputElement;
+    expect(box.checked).toBe(false);
+    expect(screen.getByTestId('terms-copy')).toHaveTextContent('متن نمونهٔ نسخهٔ 4');
+    expect(screen.getByRole('button', { name: 'ادامه به پرداخت' })).toBeDisabled();
+    expect(bookingRequests()).toHaveLength(1);
+
+    await userEvent.click(box);
+    await userEvent.click(screen.getByRole('button', { name: 'ادامه به پرداخت' }));
+    await waitFor(() => expect(bookingRequests()).toHaveLength(2));
+    expect(bookingRequests()[1].body).toMatchObject({ acceptedPolicy: { policyVersion: 4 } });
+  });
+
+  it('a refusal with unchanged terms is an ordinary error, not a terms change', async () => {
+    mockApi({ disclosures: [governedDisclosure(3)], bookingRefusal: true });
+    renderProfile();
+    await pickFirstTime();
+
+    await userEvent.click(await screen.findByTestId('terms-accept'));
+    await userEvent.click(screen.getByRole('button', { name: 'ادامه به پرداخت' }));
+
+    expect(await screen.findByText('این خدمت در حال حاضر قابل رزرو نیست.')).toBeInTheDocument();
+    expect(screen.queryByTestId('terms-changed')).not.toBeInTheDocument();
   });
 });
