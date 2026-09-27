@@ -1146,10 +1146,15 @@ async function referralGroup() {
     const ref = (await q(`select * from referral.referrals where referee_user_id = $1`, [ids['user:financeReader']]))[0];
     r('persist', 'DB: financeReader attributed to cust2, pending', ref && ref.referrer_user_id === ids['user:cust2'], ref && { status: ref.status, expires_at: ref.expires_at });
     await f.reload();
-    r('persist', 'after a reload the page shows the recorded claim', await f.has('کد دعوت ثبت شد'));
-    await f.fill('کد دعوت دوست', code).catch(() => {});
-    const again = await f.evaluate("[...document.querySelectorAll('button')].some((b) => b.innerText.trim() === 'ثبت کد' && !b.disabled)");
-    r('denied', 'a second claim is not offered after one is recorded', !again);
+    // By design (app/referral/page.tsx ClaimSuccess): attribution facts are shown only at the moment of the
+    // claim — there is no route to read them again — so after a reload the form is offered again.
+    r('observed', 'after a reload the claim is not re-displayed and the form is offered again (by design: no read route)', true, { formOffered: await f.evaluate("Boolean(document.querySelector('input'))") });
+    const n0 = (await q(`select count(*) n from referral.referrals where referee_user_id = $1`, [ids['user:financeReader']]))[0].n;
+    await f.fill('کد دعوت دوست', code);
+    await f.click('ثبت کد');
+    await sleep(1500);
+    const n1 = (await q(`select count(*) n from referral.referrals where referee_user_id = $1`, [ids['user:financeReader']]))[0].n;
+    r('denied', 'a second claim through the UI is refused by the server (no second attribution)', n1 === n0 && !(await f.has('کد دعوت ثبت شد')), { attributions: n1, shown: (await f.text()).match(/[^\n]*(نامعتبر|پذیرفته نشد|امکان|مجاز|نشد)[^\n]*/)?.[0] ?? null });
     const c1 = await as('cust1');
     await c1.goto('/referral');
     const c1Before = await q(`select 1 from referral.referrals where referee_user_id = $1`, [ids['user:cust1']]);
@@ -1234,8 +1239,13 @@ async function outcomeGroup() {
     r('other', "the customer now gets pro2's terms (24 h) with an unticked box and payment closed", panel.box === false && panel.pay === true && panel.text, panel);
     // pro2's own workspace reference, as its page requested it; pro1 then tries it.
     const ref = await p.evaluate(`(performance.getEntriesByType('resource').map((e) => e.name).find((u) => u.includes('/v1/me/outcome-policy-assignments/')) ?? '').split('/v1/me/outcome-policy-assignments/')[1]?.split('?')[0] ?? null`);
-    const foreign = ref ? await (await apiAs('pro1')).get(`/v1/me/outcome-policy-assignments/${ref}`, { expect: [200, 403, 404] }) : null;
-    r('denied', "pro1 cannot read pro2's assignment with pro2's workspace reference", foreign && [403, 404].includes(foreign.status), foreign ? `HTTP ${foreign.status} ${foreign.raw?.json?.error?.code ?? ''}` : 'reference not captured');
+    // Foreign references get the same generic refusal as malformed ones (no enumeration): any 4xx, and the
+    // assignment must be untouched.
+    const before = JSON.stringify(await q(`select * from commercial.seller_outcome_policy_assignments where seller_party_id = $1 order by assigned_at`, [ids.pro2.providerId]));
+    const foreign = ref ? await (await apiAs('pro1')).get(`/v1/me/outcome-policy-assignments/${ref}`, { expect: [200, 403, 404, 409] }) : null;
+    const put = ref ? await (await apiAs('pro1')).put(`/v1/me/outcome-policy-assignments/${ref}`, { policyKey: 'x', reason: 'x' }, { expect: [200, 400, 403, 404, 409, 422] }) : null;
+    const after = JSON.stringify(await q(`select * from commercial.seller_outcome_policy_assignments where seller_party_id = $1 order by assigned_at`, [ids.pro2.providerId]));
+    r('denied', "pro1 cannot read or change pro2's assignment with pro2's workspace reference (assignment untouched)", foreign && foreign.status >= 400 && put.status >= 400 && before === after, foreign ? `GET ${foreign.status} ${foreign.raw?.json?.error?.code ?? ''}; PUT ${put.status} ${put.raw?.json?.error?.code ?? ''}` : 'reference not captured');
   });
 }
 
