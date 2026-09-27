@@ -12,7 +12,17 @@ import { CERTS_DIR, HANDOUTS_DIR, PORTS, profile as resolveProfile } from '../..
 
 const CA = fs.readFileSync(path.join(CERTS_DIR, 'demo-ca.crt'));
 
-function request(url, { method = 'GET', headers = {}, body } = {}) {
+/** Honours the product's throttling: on 429, waits (Retry-After or 15 s) and retries, up to ~2 minutes. */
+async function request(url, opts = {}) {
+  for (let attempt = 0; ; attempt++) {
+    const res = await requestOnce(url, opts);
+    if (res.status !== 429 || attempt >= 8) return res;
+    const wait = Math.min(60, Number(res.headers['retry-after']) || 15) * 1000;
+    await new Promise((r) => setTimeout(r, wait));
+  }
+}
+
+function requestOnce(url, { method = 'GET', headers = {}, body } = {}) {
   return new Promise((resolve, reject) => {
     const u = new URL(url);
     const payload = body === undefined ? undefined : typeof body === 'string' ? body : JSON.stringify(body);
