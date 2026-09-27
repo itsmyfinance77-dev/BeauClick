@@ -28,7 +28,7 @@ async function openSlot(s, serviceId, startsInMinutes) {
 
 export const elapsed = {
   name: 'elapsed',
-  async run({ as, state, log }) {
+  async run({ as, state, log, save }) {
     const e = (state.ids.elapsed ??= {});
     const { pro1, pro2, practitioner } = state.ids;
     const sPro1 = await as('pro1');
@@ -51,8 +51,10 @@ export const elapsed = {
         const r = await checkout(await as(customerKey), { professionalId: ids.providerId, serviceId, slotId: slot.slotId, governed });
         e[name] = { ...r, customerKey, sellerKey: seller.label, startAt: slot.startAt.toISOString(), endAt: slot.endAt.toISOString() };
         log(`${name}: slot ${slot.startAt.toISOString()} booked, payment -> ${r.resultLocation?.includes('succeeded') ? 'succeeded' : r.resultLocation}`);
+        save();
       }
       e.planned = true;
+      save();
     }
 
     // No-show: permitted at slot_start + grace (5 min, the seller's published selection), on the DB clock.
@@ -67,6 +69,7 @@ export const elapsed = {
       log(`E1 no-show read before declaring: ${JSON.stringify(before.data).slice(0, 180)}`);
       await sPro1.post(`/v1/bookings/${e1.bookingId}/no-show`, { statement: 'مشتری تا پایان مهلت حاضر نشد و پاسخ تماس را نداد (سناریوی دمو).' });
       e1.noShow = true;
+      save();
       log('E1: no-show declared by the professional');
     }
 
@@ -88,12 +91,14 @@ export const elapsed = {
         }
         await sellerSession[b.sellerKey].post(`/v1/bookings/${b.bookingId}/complete`);
         b.completed = true;
+        save();
         log(`${name}: completed by the seller`);
       }
       if (!b.reviewed) {
         const r = await (await as(b.customerKey)).post(`/v1/bookings/${b.bookingId}/review`, review);
         b.reviewed = true;
         b.reviewId = r.data?.id;
+        save();
         log(`${name}: reviewed ${review.rating}★`);
       }
     }

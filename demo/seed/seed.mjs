@@ -97,7 +97,8 @@ function bootstrapPrivileged(phone, role, reason) {
   return out.slice(-1)[0];
 }
 
-const ctx = { profileKey, state, as, refreshed, bootstrapPrivileged, inbox, PERSONAS, log: (...a) => console.log('  ', ...a) };
+// `save` persists progress mid-stage, so a failed long stage resumes instead of re-planning.
+const ctx = { profileKey, state, as, refreshed, bootstrapPrivileged, inbox, PERSONAS, save: saveState, log: (...a) => console.log('  ', ...a) };
 
 for (const stage of STAGES) {
   if (only.length && !only.includes(stage.name)) continue;
