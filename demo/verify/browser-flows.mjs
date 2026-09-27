@@ -1480,11 +1480,103 @@ async function regoldenGroup() {
   }
 }
 
+// ============================================================================ F-10 (owner-approved option B)
+// A seller-cancelled booking paid on the simulated "bank without a refund API" → the default refund is
+// manual_required. Race order A: the customer's #212 reschedule wins → refund superseded; the administrator
+// can no longer claim. Race order B: the administrator claims first → the customer's option disappears and a
+// direct attempt is refused; the administrator records the (synthetic) execution → refund succeeded.
+async function f10Group() {
+  const bookManual = async (custKey, dayIndex) => {
+    const c = await as(custKey);
+    await startCheckout(c, ids.pro1.providerId, 'میکاپ مجلسی', { dayIndex, acceptTerms: true });
+    await c.click('پرداخت موفق — بانک بدون بازپرداخت خودکار (شبیه‌سازی)');
+    await c.waitText('پرداخت انجام شد');
+    return bookingOfOrder(orderIdFrom(await c.url()));
+  };
+  const proCancels = async (bookingId) => {
+    const guard = (await q(`select professional_id, status from booking.bookings where id = $1`, [bookingId]))[0];
+    if (guard?.professional_id !== ids.pro1.providerId || guard.status !== 'confirmed') throw new Error(`guard: ${JSON.stringify(guard)}`);
+    const p = await as('pro1');
+    await p.goto('/pro/bookings');
+    await p.click('لغو نوبت', { within: `li[data-booking="${bookingId}"]` });
+    await p.click('بله، لغو کن');
+    await sleep(4000);
+  };
+  const refundOf = async (bookingId) =>
+    (await q(`select r.id, r.status, r.manual_tracked from payment.refunds r join commerce.orders o on o.id = r.order_id where o.source_id = $1 and r.kind = 'order' order by r.created_at`, [bookingId]))[0];
+  const decisionOf = async (bookingId) =>
+    (await q(`select execution_status from commerce.booking_outcome_decisions where booking_id = $1 and decision_kind = 'cancellation' and superseded_by_id is null`, [bookingId]))[0]?.execution_status;
+  const openRemedy = async (c, bookingId) => {
+    await c.goto('/bookings');
+    await c.click('گذشته');
+    await c.click('بازپرداخت و جبران', { within: `li[data-booking="${bookingId}"]` });
+    await sleep(1500);
+  };
+
+  await flow('F-10 A: the customer\'s reschedule wins → the manual refund is superseded; no claim possible afterwards', async (r) => {
+    const bookingId = await bookManual('cust4', 2);
+    await proCancels(bookingId);
+    const r0 = await refundOf(bookingId);
+    r('persist', 'DB: default refund is manual_required and tracked', r0?.status === 'manual_required' && r0.manual_tracked === true, r0);
+    const a = await as('admin');
+    await a.goto('/admin/refunds');
+    r('other', 'the administrator sees it as «نیازمند اجرای دستی» with «شروع اجرای دستی»', await a.evaluate(`!!document.querySelector('li[data-refund="${r0.id}"]')?.innerText.includes('نیازمند اجرای دستی')`));
+    const c = await as('cust4');
+    await openRemedy(c, bookingId);
+    await c.click('به‌جای بازپرداخت، نوبت تازه می‌خواهم', { within: `li[data-booking="${bookingId}"]` });
+    await sleep(1500);
+    const option = await c.evaluate(`[...document.querySelectorAll('li[data-booking="${bookingId}"] select option')].map((o) => o.text).find((t) => t && t !== 'انتخاب کنید')`);
+    await c.fill('زمان تازه', option, { within: `li[data-booking="${bookingId}"]` });
+    await c.click('ثبت نوبت تازه', { within: `li[data-booking="${bookingId}"]` });
+    await sleep(3000);
+    const b = (await q(`select status from booking.bookings where id = $1`, [bookingId]))[0];
+    const r1 = await refundOf(bookingId);
+    r('persist', 'DB: booking revived (confirmed), refund SUPERSEDED (row kept), decision superseded', b.status === 'confirmed' && r1.status === 'superseded' && (await decisionOf(bookingId)) === 'superseded', { booking: b, refund: r1 });
+    const events = await q(`select count(*)::int n from payment.outbox_events where event_type = 'RefundCompleted' and payload->>'refundId' = $1`, [r0.id]);
+    r('persist', 'DB: no RefundCompleted for the superseded refund', events[0].n === 0);
+    await a.reload();
+    r('other', 'administrator after reload: «جایگزین‌شده با نوبت تازه», no claim control', await a.evaluate(`(() => { const li = document.querySelector('li[data-refund="${r0.id}"]'); return !!li && li.innerText.includes('جایگزین‌شده') && !li.querySelector('[data-testid="manual-claim"]'); })()`));
+    const deny = await (await apiAs('admin')).call('POST', `/v1/admin/refunds/manual/${r0.id}/claim`, {}, { expect: [201, 409] });
+    r('rule', 'a late claim is refused REFUND_NOT_CLAIMABLE (race order A)', deny.status === 409 && deny.raw?.json?.error?.code === 'REFUND_NOT_CLAIMABLE', `HTTP ${deny.status}`);
+  });
+
+  await flow('F-10 B: the administrator claims first → the customer\'s option disappears; synthetic execution recorded', async (r) => {
+    const bookingId = await bookManual('cust3', 3);
+    await proCancels(bookingId);
+    const r0 = await refundOf(bookingId);
+    const a = await as('admin');
+    await a.goto('/admin/refunds');
+    await a.click('شروع اجرای دستی', { within: `li[data-refund="${r0.id}"]` });
+    await a.click('ثبت شروع اجرا');
+    await sleep(2000);
+    const exec = (await q(`select id, state from payment.manual_refund_executions where refund_id = $1`, [r0.id]))[0];
+    r('persist', 'DB: the durable claim exists (state claimed)', exec?.state === 'claimed', exec);
+    const c = await as('cust3');
+    await openRemedy(c, bookingId);
+    r('ui', 'the customer is no longer offered the free reschedule', !(await c.evaluate(`!!document.querySelector('li[data-booking="${bookingId}"]')?.innerText.includes('به‌جای بازپرداخت، نوبت تازه می‌خواهم')`)));
+    const slot = (await q(`select id from booking.availability_slots where professional_id = $1 and status = 'open' and start_at > now() + interval '2 days' order by start_at limit 1`, [ids.pro1.providerId]))[0];
+    const deny = await (await apiAs('cust3')).call('POST', `/v1/bookings/${bookingId}/remedy`, { choice: 'reschedule', newSlotId: slot.id }, { expect: [200, 201, 409] });
+    const still = await refundOf(bookingId);
+    r('rule', 'a direct reschedule attempt is refused REMEDY_REFUND_IN_EXECUTION; refund unchanged (race order B)', deny.status === 409 && deny.raw?.json?.error?.code === 'REMEDY_REFUND_IN_EXECUTION' && still.status === 'manual_required', `HTTP ${deny.status}`);
+    await a.reload();
+    await a.fill('نتیجهٔ اجرا', 'انتقال انجام شد', { within: `li[data-refund="${r0.id}"]` });
+    await a.fill('شناسهٔ پیگیری انتقال', 'SIM-DEMO-001', { within: `li[data-refund="${r0.id}"]` });
+    await a.click('ثبت نتیجه', { within: `li[data-refund="${r0.id}"]` });
+    await sleep(2500);
+    const r1 = await refundOf(bookingId);
+    r('persist', 'DB: refund succeeded, execution executed with the reference, decision executed', r1.status === 'succeeded' && (await decisionOf(bookingId)) === 'executed', r1);
+    await a.reload();
+    r('persist', 'administrator after reload: «اجرا شد — شناسهٔ پیگیری: SIM-DEMO-001»', await a.evaluate(`!!document.querySelector('li[data-refund="${r0.id}"]')?.innerText.includes('SIM-DEMO-001')`));
+    const other = await (await apiAs('operator')).call('GET', '/v1/admin/refunds/manual', undefined, { expect: [200, 403] });
+    r('denied', 'the platform operator (no bc_execute_manual_refunds) gets 403 on the list (administrator control above)', other.status === 403, `HTTP ${other.status}`);
+  });
+}
+
 function userKey(userId) {
   return Object.entries(ids).find(([k, v]) => k.startsWith('user:') && v === userId)?.[0]?.slice(5) ?? null;
 }
 
-const GROUPS = { regolden: regoldenGroup, round4: round4Group, referral: referralGroup, outcome: outcomeGroup, recovery: recoveryGroup, checkout: checkoutGroup, account: accountGroup, pro: proGroup, moderation: moderationGroup, engagement: engagementGroup, waitlist: waitlistGroup, business: businessGroup, admin: adminGroup };
+const GROUPS = { f10: f10Group, regolden: regoldenGroup, round4: round4Group, referral: referralGroup, outcome: outcomeGroup, recovery: recoveryGroup, checkout: checkoutGroup, account: accountGroup, pro: proGroup, moderation: moderationGroup, engagement: engagementGroup, waitlist: waitlistGroup, business: businessGroup, admin: adminGroup };
 for (const g of groups) {
   if (!GROUPS[g]) throw new Error(`unknown group ${g}`);
   await GROUPS[g]();
