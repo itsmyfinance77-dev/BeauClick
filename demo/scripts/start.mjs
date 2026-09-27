@@ -164,5 +164,18 @@ const bound = listening(PORTS.ingress);
 console.log(`ingress: up (pid ${procs.ingress.pid}) bound on ${bound.join(', ')}`);
 const allowed = activateWg ? ['127.0.0.1', WIREGUARD.hostAddress] : ['127.0.0.1'];
 if (bound.some((a) => !allowed.includes(a))) throw new Error(`ingress bound unexpectedly on ${bound.join(', ')}`);
+// Every other demo port must be loopback-only (the inbox viewer may add the WireGuard address).
+const exposure = [];
+for (const [name, port] of Object.entries(PORTS)) {
+  if (name === 'ingress') continue;
+  const ok = name === 'inboxViewer' ? allowed : ['127.0.0.1'];
+  for (const a of listening(port)) if (!ok.includes(a)) exposure.push(`${name}:${port} on ${a}`);
+}
+if (exposure.length) {
+  const { execFileSync } = await import('node:child_process');
+  execFileSync(process.execPath, [path.join(DEMO_ROOT, 'scripts', 'stop.mjs'), '--keep-infra'], { stdio: 'inherit' });
+  throw new Error(`EXPOSURE: ${exposure.join('; ')} — app stopped`);
+}
+console.log('bind check: every demo port is loopback-only' + (activateWg ? ' (ingress and inbox viewer also on WireGuard)' : ''));
 
 console.log(`\nDEMO READY — profile ${key} — ${p.origin}  (source ${pf.sha.slice(0, 12)}; logs in ${LOGS_DIR})`);

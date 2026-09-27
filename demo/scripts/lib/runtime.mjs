@@ -63,6 +63,8 @@ export function apiEnv(secrets, profileKey) {
     // The artifacts are production builds; the API process runs as development.
     NODE_ENV: 'development',
     PORT: String(PORTS.api),
+    // Loopback only (demo seam in main.ts); the ingress is the only way in.
+    BIND_HOST: '127.0.0.1',
     LOG_FORMAT: 'json',
     RELEASE_VERSION: `demo-${readSourceSha().slice(0, 12)}`,
     DATABASE_URL: appUrl(secrets),

@@ -44,6 +44,7 @@ export async function preflight(profileKey, { requireArtifact = true, log = cons
   if (env.AUTH_COOKIE_SECURE !== 'true') problems.push('AUTH_COOKIE_SECURE must be true');
   if (!env.OPENSEARCH_URL) problems.push('OPENSEARCH_URL must be set (no in-memory search)');
   if (env.LOG_FORMAT !== 'json') problems.push('LOG_FORMAT must be json');
+  if (env.BIND_HOST !== '127.0.0.1') problems.push('BIND_HOST must be 127.0.0.1 (the API must not listen on other interfaces)');
 
   // 3. Simulator endpoints: https + loopback.
   for (const k of ['SMS_HTTP_ENDPOINT', 'DEMO_OTP_INBOX_URL']) {

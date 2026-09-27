@@ -117,8 +117,12 @@ async function bootstrap() {
   assertPrivilegedMutationsAreAudited(app);
 
   const port = process.env.PORT ? Number(process.env.PORT) : 3000;
-  await app.listen(port);
-  Logger.log(`BeauClick V3 API listening on :${port}`, 'Bootstrap');
+  // DEMO BRANCH ONLY: optional bind address. Unset = the original behaviour
+  // (all interfaces); the team demo sets 127.0.0.1 so the API is reachable only
+  // through its ingress on a host whose firewall is off.
+  const host = process.env.BIND_HOST?.trim() || undefined;
+  await app.listen(port, ...(host ? [host] : []));
+  Logger.log(`BeauClick V3 API listening on ${host ?? ''}:${port}`, 'Bootstrap');
 }
 
 bootstrap();
