@@ -244,6 +244,91 @@ describe('screen 49 — the customer’s remedy (#212)', () => {
     expect(screen.getByRole('button', { name: 'پیش‌رو' })).toHaveAttribute('aria-pressed', 'true');
   });
 
+  it('never resends a refused slot: a taken slot that leaves the refreshed list is deselected, and only an explicit current choice is sent', async () => {
+    // Codex review of 5fb038e: the select went blank after the refresh but
+    // the component still held slot A, so the next submit re-sent A.
+    let availabilityReads = 0;
+    let chosen = false;
+    mockApi({
+      bookings: () =>
+        chosen
+          ? [booking('c1', { status: 'confirmed', slotId: SLOTS[1].id, startAt: SLOTS[1].startAt, endAt: SLOTS[1].endAt, rescheduleCount: 1 })]
+          : [booking('c1')],
+      remedy: () => ok(chosen ? RESCHEDULED : IN_PROGRESS),
+      availability: () => {
+        availabilityReads += 1;
+        return ok(availabilityReads === 1 ? SLOTS : [SLOTS[1]]);
+      },
+      resolve: (body) => {
+        if ((body as { newSlotId: string }).newSlotId === SLOTS[0].id) {
+          return refused(409, 'SLOT_UNAVAILABLE', 'این زمان دیگر در دسترس نیست. لطفاً زمان دیگری انتخاب کنید.');
+        }
+        chosen = true;
+        return ok({ chosen: 'reschedule', resolvedBy: 'customer' });
+      },
+    });
+    const user = userEvent.setup();
+    renderPage();
+    const row = await openRemedy(user, 'c1');
+    await user.click(await within(row).findByRole('button', { name: 'به‌جای بازپرداخت، نوبت تازه می‌خواهم' }));
+
+    // Choose A; the server refuses it as taken.
+    let picker = await within(row).findByTestId('remedy-slot-picker');
+    await user.selectOptions(within(picker).getByLabelText('زمان تازه'), SLOTS[0].id);
+    await user.click(within(picker).getByRole('button', { name: 'ثبت نوبت تازه' }));
+    expect(await within(row).findByRole('alert')).toHaveTextContent('این زمان دیگر در دسترس نیست');
+    expect(posted).toEqual([{ choice: 'reschedule', newSlotId: SLOTS[0].id }]);
+
+    // The refreshed list no longer offers A, and nothing is selected.
+    await waitFor(() => expect(availabilityReads).toBe(2));
+    picker = await within(row).findByTestId('remedy-slot-picker');
+    const select = within(picker).getByLabelText('زمان تازه') as HTMLSelectElement;
+    await waitFor(() => expect([...select.options].map((o) => o.value)).toEqual(['', SLOTS[1].id]));
+    expect(select.value).toBe('');
+
+    // Submitting now sends nothing: an explicit current choice is required.
+    await user.click(within(picker).getByRole('button', { name: 'ثبت نوبت تازه' }));
+    expect(await within(picker).findByText('زمان تازه را انتخاب کنید.')).toBeInTheDocument();
+    expect(posted).toHaveLength(1);
+
+    // Choosing B, which IS offered, succeeds.
+    await user.selectOptions(select, SLOTS[1].id);
+    await user.click(within(picker).getByRole('button', { name: 'ثبت نوبت تازه' }));
+    expect(await screen.findByTestId('remedy-closed-reschedule')).toBeInTheDocument();
+    expect(posted).toEqual([
+      { choice: 'reschedule', newSlotId: SLOTS[0].id },
+      { choice: 'reschedule', newSlotId: SLOTS[1].id },
+    ]);
+  });
+
+  it('keeps a selection that is still offered after a refresh', async () => {
+    let availabilityReads = 0;
+    let attempts = 0;
+    mockApi({
+      bookings: () => [booking('c1')],
+      availability: () => {
+        availabilityReads += 1;
+        return ok(SLOTS);
+      },
+      resolve: () => {
+        attempts += 1;
+        return attempts === 1 ? refused(409, 'RESCHEDULE_NOT_ALLOWED', 'تغییر زمان ممکن نشد.') : ok({ chosen: 'reschedule', resolvedBy: 'customer' });
+      },
+    });
+    const user = userEvent.setup();
+    renderPage();
+    const row = await openRemedy(user, 'c1');
+    await user.click(await within(row).findByRole('button', { name: 'به‌جای بازپرداخت، نوبت تازه می‌خواهم' }));
+    const picker = await within(row).findByTestId('remedy-slot-picker');
+    await user.selectOptions(within(picker).getByLabelText('زمان تازه'), SLOTS[1].id);
+    await user.click(within(picker).getByRole('button', { name: 'ثبت نوبت تازه' }));
+    await within(row).findByRole('alert');
+    await waitFor(() => expect(availabilityReads).toBe(2));
+
+    const again = await within(row).findByTestId('remedy-slot-picker');
+    expect((within(again).getByLabelText('زمان تازه') as HTMLSelectElement).value).toBe(SLOTS[1].id);
+  });
+
   it('renders the refund-executed second visit with its amount and nothing left to do', async () => {
     mockApi({ bookings: () => [booking('c1')], remedy: () => ok(EXECUTED) });
     const user = userEvent.setup();

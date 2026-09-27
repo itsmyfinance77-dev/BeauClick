@@ -107,7 +107,13 @@ export function RemedyPanel({
       const res = await bookingApi.listAvailability(api, booking.professionalId, booking.serviceId);
       // The current slot is the one that was cancelled; the server re-checks
       // claimability on the POST, this only avoids offering a certain refusal.
-      setSlots((res.data ?? []).filter((slot) => slot.id !== booking.slotId));
+      const fresh = (res.data ?? []).filter((slot) => slot.id !== booking.slotId);
+      setSlots(fresh);
+      // A refreshed list reconciles the selection: a slot that is no longer
+      // offered (typically the one just refused as taken) is no longer
+      // selected, so the next submit needs a fresh, explicit choice. Keeping
+      // the id while the select shows blank would resend the refused slot.
+      setSlotId((current) => (fresh.some((slot) => slot.id === current) ? current : ''));
     } catch (err) {
       setSlotsError(err instanceof Error ? err.message : 'زمان‌های آزاد بارگذاری نشد.');
     }
@@ -122,7 +128,9 @@ export function RemedyPanel({
   }
 
   async function reschedule() {
-    if (!slotId) {
+    // Only a slot in the list on screen may be sent — never a stale id.
+    if (!slotId || !slots?.some((slot) => slot.id === slotId)) {
+      setSlotId('');
       setSlotError('زمان تازه را انتخاب کنید.');
       return;
     }
