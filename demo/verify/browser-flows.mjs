@@ -1362,13 +1362,25 @@ async function round4Group() {
     r('persist', 'DB: the collected amount is refunded by the ordinary rules', refunds.length >= 1, refunds);
     const c = await as(cust);
     await c.goto('/bookings');
-    await c.click('لغو شده', { prefix: true, selector: '[role="tab"]' }).catch(() => {});
+    await c.click('گذشته', { prefix: true, selector: '[role="tab"]' }).catch(() => {}); // cancelled bookings sit on «گذشته»
     await sleep(800);
     r('other', `the customer (${cust}) sees the cancellation with the remedy/replacement controls`, (await c.has('بازپرداخت و جبران')) || (await c.has('پیشنهاد جایگزینی')));
     ids.round4 = { ...(ids.round4 ?? {}), proCancelled: t.id };
   });
 
   await flow('round4 web: customer review + professional reply in the UI', async (r) => {
+    // Golden has every completed booking reviewed already: the professional first completes a PAST confirmed
+    // booking of theirs in the UI (identity-guarded), which makes it review-eligible.
+    const past = (await q(`select b.id, b.professional_id pid from booking.bookings b where b.status = 'confirmed' and b.slot_end < now() and b.professional_id = $1 order by b.slot_start limit 1`, [ids.pro1.providerId]))[0];
+    if (past) {
+      const p1 = await as('pro1');
+      await p1.goto('/pro/bookings');
+      await p1.click('گذشته', { prefix: true, selector: '[role="tab"]' }).catch(() => {});
+      await p1.click('ثبت انجام نوبت', { within: `li[data-booking="${past.id}"]` });
+      await p1.click('بله، انجام شد');
+      await sleep(4000);
+      r('persist', 'setup: pro1 completed its past booking in the UI (DB completed)', (await q(`select status from booking.bookings where id = $1`, [past.id]))[0]?.status === 'completed', past.id);
+    }
     const t = (await q(`select b.id, b.customer_id, b.professional_id pid from booking.bookings b join provider.review_eligibility e on e.booking_id = b.id
       where b.status = 'completed' and not exists (select 1 from provider.reviews x where x.booking_id = b.id) and b.professional_id in ($1, $2) order by b.completed_at limit 1`, [ids.pro1.providerId, ids.pro2.providerId]))[0];
     if (!t || !userKey(t.customer_id)) throw new Error('no reviewable completed booking of a persona');
