@@ -889,11 +889,11 @@ describePg('no-show declaration and customer remedy (real PostgreSQL)', () => {
         const after = await bookingRow(booked.bookingId);
         expect(after).toMatchObject({ slot_id: newSlotId, status: 'confirmed' });
         expect(await remedyFor(booked.orderId)).toMatchObject({ resolved_by: 'customer', chosen: 'reschedule' });
-        // Recorded, not asserted as correct: what happens to the ALREADY-WRITTEN manual_required refund row.
-        // (Pending refunds are simply never executed; a manual_required row already exists.) See F-10 in the report.
-        const refunds = await refundsFor(booked.orderId);
-        // eslint-disable-next-line no-console
-        console.info(`[#212 sim] refund rows after reschedule: ${JSON.stringify(refunds)}`);
+        // F-10 fixed (option B): the tracked manual refund is SUPERSEDED in the same transaction
+        // (row kept for audit), so nothing is owed twice. Full coverage: manual-refund-supersession.pg-spec.
+        expect(await refundsFor(booked.orderId)).toEqual([
+          { request_key: `booking-cancelled:${booked.bookingId}`, amount_toman: String(PRICE), status: 'superseded' },
+        ]);
       });
     });
 

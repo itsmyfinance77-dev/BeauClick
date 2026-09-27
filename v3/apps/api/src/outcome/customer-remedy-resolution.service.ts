@@ -5,6 +5,7 @@ import { AuditLogger } from '@beauclick/events';
 import { DomainException } from '@beauclick/http';
 import { BookingOutcomeDecisionService, CustomerRemedyChoiceOption, CustomerRemedyChoiceService } from '@beauclick/commerce';
 import { BookingService } from '@beauclick/booking';
+import { PaymentService } from '@beauclick/payment';
 
 /**
  * The customer never chose anything for this booking -- either it was never
@@ -28,6 +29,27 @@ export class RemedyNotOfferedException extends DomainException {
 export class RemedyRefundAlreadyExecutedException extends DomainException {
   constructor() {
     super('REMEDY_REFUND_ALREADY_EXECUTED', 'بازگشت وجه این رزرو قبلاً انجام شده و دیگر امکان تغییر زمان رایگان وجود ندارد.', HttpStatus.CONFLICT);
+  }
+}
+
+/**
+ * DEMO F-10: the default refund is being executed by hand (a claim exists, or
+ * its outcome is uncertain), or its automatic execution has started — money
+ * may already be moving, so the reschedule is refused (fail-closed).
+ */
+export class RemedyRefundInExecutionException extends DomainException {
+  constructor() {
+    super('REMEDY_REFUND_IN_EXECUTION', 'بازپرداخت این رزرو در حال اجراست؛ فعلاً نمی‌توان آن را با نوبت تازه جایگزین کرد.', HttpStatus.CONFLICT);
+  }
+}
+
+/**
+ * DEMO F-10: a manual refund whose execution history predates execution
+ * tracking cannot be proven unpaid — never superseded.
+ */
+export class RemedyRefundUnverifiableException extends DomainException {
+  constructor() {
+    super('REMEDY_REFUND_UNVERIFIABLE', 'وضعیت اجرای این بازپرداخت قابل تأیید نیست؛ جایگزینی آن با نوبت تازه ممکن نیست.', HttpStatus.CONFLICT);
   }
 }
 
@@ -86,6 +108,8 @@ export class CustomerRemedyResolutionService {
     private readonly decisions: BookingOutcomeDecisionService,
     private readonly remedyChoices: CustomerRemedyChoiceService,
     private readonly bookings: BookingService,
+    // DEMO F-10: the refund row and its manual-execution claims (demo/F10-DESIGN.md).
+    private readonly payments: PaymentService,
   ) {}
 
   async resolve(
@@ -112,9 +136,28 @@ export class CustomerRemedyResolutionService {
 
       if (!newSlotId) throw new RemedyRescheduleRequiresSlotException();
 
-      const decision = await this.decisions.liveDecision(m, bookingId, 'cancellation');
-      if (!decision || !ESCAPABLE_EXECUTION_STATUSES.has(decision.executionStatus)) {
-        throw new RemedyRefundAlreadyExecutedException();
+      // DEMO F-10 — lock order: remedy (above) -> decision -> refund -> its claims
+      // -> booking/slot (reschedule). Every check below is made under those locks.
+      const decision = await this.decisions.lockLiveDecision(m, bookingId, 'cancellation');
+      if (!decision) throw new RemedyRefundAlreadyExecutedException();
+      if (decision.executionStatus === 'executing') throw new RemedyRefundInExecutionException();
+      if (!ESCAPABLE_EXECUTION_STATUSES.has(decision.executionStatus)) throw new RemedyRefundAlreadyExecutedException();
+
+      // A manual refund is superseded only when it is tracked and nobody has
+      // claimed (or possibly performed) its execution. Linearization point vs. an
+      // operator's claim: this refund row lock.
+      let manualRefundId: string | null = null;
+      if (decision.executionStatus === 'pending' && decision.refundRequestKey) {
+        // A pending decision never has a refund row under its key unless one was
+        // already issued (e.g. adopted) — then money may be moving: refuse.
+        if (await this.payments.lockRefundByKey(m, decision.orderId, decision.refundRequestKey)) throw new RemedyRefundInExecutionException();
+      }
+      if (decision.executionStatus === 'manual_required') {
+        const refund = decision.refundRequestKey ? await this.payments.lockRefundByKey(m, decision.orderId, decision.refundRequestKey) : null;
+        if (!refund || refund.status !== 'manual_required') throw new RemedyRefundInExecutionException();
+        if (!refund.manualTracked) throw new RemedyRefundUnverifiableException();
+        if (await this.payments.activeManualExecution(m, refund.id)) throw new RemedyRefundInExecutionException();
+        manualRefundId = refund.id;
       }
 
       // Bypasses the cutoff and free-count rules (cause is not the
@@ -123,6 +166,11 @@ export class CustomerRemedyResolutionService {
       await this.bookings.reschedule(bookingId, newSlotId, { type: 'customer', id: customerId }, null, m, {
         remedyBypass: true,
       });
+
+      // DEMO F-10: in the SAME transaction — any failure above or below rolls back
+      // the reschedule too. No RefundCompleted is emitted for a supersession.
+      if (manualRefundId) await this.payments.supersedeManualRefund(m, manualRefundId);
+      if (!(await this.decisions.markSupersededByRemedy(m, decision.id))) throw new RemedyRefundInExecutionException();
 
       const applied = await this.remedyChoices.resolveReschedule(m, orderId);
       if (!applied) {
@@ -176,12 +224,17 @@ export class CustomerRemedyResolutionService {
     // read must not assume one is still there: `null` reads as "no refund
     // figure yet", never as a zero the platform never decided.
     const decision = await this.decisions.liveDecision(m, bookingId, 'cancellation');
+    // DEMO F-10: offered exactly when `resolve` would accept it (same rules, unlocked read).
+    let escapable = !!decision && ESCAPABLE_EXECUTION_STATUSES.has(decision.executionStatus);
+    if (escapable && decision!.executionStatus === 'manual_required') {
+      const refund = decision!.refundRequestKey ? await this.payments.findRefundByKey(m, decision!.orderId, decision!.refundRequestKey) : null;
+      escapable = !!refund && refund.status === 'manual_required' && refund.manualTracked && !(await this.payments.activeManualExecution(m, refund.id));
+    }
 
     return {
       chosen: current.chosen,
       resolvedBy: current.resolvedBy,
-      rescheduleStillAvailable:
-        current.resolvedBy === 'default' && !!decision && ESCAPABLE_EXECUTION_STATUSES.has(decision.executionStatus),
+      rescheduleStillAvailable: current.resolvedBy === 'default' && escapable,
       refundToman: decision ? decision.refundToman.toString() : null,
       executionStatus: decision ? decision.executionStatus : null,
     };

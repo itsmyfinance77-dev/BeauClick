@@ -45,7 +45,8 @@ export interface OrderDecisionTerms {
   readonly legalCapState: LegalCapState;
 }
 
-export type BookingOutcomeExecutionStatus = 'pending' | 'executed' | 'manual_required' | 'failed';
+/** `executing` / `superseded`: DEMO BRANCH ONLY (F-10/F-11, demo/F10-DESIGN.md). */
+export type BookingOutcomeExecutionStatus = 'pending' | 'executing' | 'executed' | 'manual_required' | 'failed' | 'superseded';
 
 /** One decision as it is written. Instants are PostgreSQL text, never a JavaScript `Date`. */
 export interface NewBookingOutcomeDecision {
@@ -306,13 +307,71 @@ export class BookingOutcomeDecisionService {
    * from `pending`, in its own short transaction. `false` when the row had
    * already moved (a redelivery recording the same outcome again).
    */
-  async recordExecution(decisionId: string, status: Exclude<BookingOutcomeExecutionStatus, 'pending'>): Promise<boolean> {
+  async recordExecution(decisionId: string, status: 'executed' | 'manual_required' | 'failed'): Promise<boolean> {
+    // DEMO F-10: from `executing` (the claim taken before the gateway call) or,
+    // for callers that never claimed, from `pending` as before.
     const raw: unknown = await this.dataSource.query(
       `UPDATE commerce.booking_outcome_decisions
           SET execution_status = $2
-        WHERE id = $1 AND execution_status = 'pending'
+        WHERE id = $1 AND execution_status IN ('pending', 'executing')
         RETURNING id`,
       [decisionId, status],
+    );
+    return returningRows(raw).length === 1;
+  }
+
+  // ---------------------------------------------------------------------
+  // DEMO BRANCH ONLY — F-10/F-11 (demo/F10-DESIGN.md). Manager-based, so the
+  // composition tier runs them in one transaction with payment and booking.
+  // ---------------------------------------------------------------------
+
+  /** A decision row locked FOR UPDATE (the linearization point vs. execution and the remedy). */
+  async lockDecision(manager: EntityManager, decisionId: string): Promise<BookingOutcomeDecisionRecord | null> {
+    const rows: DecisionRow[] = await manager.query(
+      `SELECT ${DECISION_COLUMNS} FROM commerce.booking_outcome_decisions WHERE id = $1 FOR UPDATE`,
+      [decisionId],
+    );
+    return rows[0] ? toRecord(rows[0]) : null;
+  }
+
+  /** The live decision of this kind, locked FOR UPDATE. */
+  async lockLiveDecision(manager: EntityManager, bookingId: string, kind: BookingOutcomeDecisionKind): Promise<BookingOutcomeDecisionRecord | null> {
+    const rows: DecisionRow[] = await manager.query(
+      `SELECT ${DECISION_COLUMNS}
+         FROM commerce.booking_outcome_decisions
+        WHERE booking_id = $1 AND decision_kind = $2 AND superseded_by_id IS NULL
+        FOR UPDATE`,
+      [bookingId, kind],
+    );
+    return rows[0] ? toRecord(rows[0]) : null;
+  }
+
+  /** pending -> executing: the durable claim taken before a refund is sent. True if THIS call took it. */
+  async claimExecution(manager: EntityManager, decisionId: string): Promise<boolean> {
+    const raw: unknown = await manager.query(
+      `UPDATE commerce.booking_outcome_decisions SET execution_status = 'executing'
+        WHERE id = $1 AND execution_status = 'pending' RETURNING id`,
+      [decisionId],
+    );
+    return returningRows(raw).length === 1;
+  }
+
+  /** pending | manual_required -> superseded: the #212 reschedule won. Must move exactly this row. */
+  async markSupersededByRemedy(manager: EntityManager, decisionId: string): Promise<boolean> {
+    const raw: unknown = await manager.query(
+      `UPDATE commerce.booking_outcome_decisions SET execution_status = 'superseded'
+        WHERE id = $1 AND execution_status IN ('pending', 'manual_required') RETURNING id`,
+      [decisionId],
+    );
+    return returningRows(raw).length === 1;
+  }
+
+  /** manual_required -> executed for the decision whose refund was executed by hand (recorded). */
+  async markManuallyExecuted(manager: EntityManager, orderId: string, refundRequestKey: string): Promise<boolean> {
+    const raw: unknown = await manager.query(
+      `UPDATE commerce.booking_outcome_decisions SET execution_status = 'executed'
+        WHERE order_id = $1 AND refund_request_key = $2 AND execution_status = 'manual_required' RETURNING id`,
+      [orderId, refundRequestKey],
     );
     return returningRows(raw).length === 1;
   }

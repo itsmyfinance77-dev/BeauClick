@@ -1,7 +1,8 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryColumn, UpdateDateColumn } from 'typeorm';
 import { requiredMoneyTransformer } from '@beauclick/money';
 
-export const REFUND_STATUSES = ['pending', 'succeeded', 'failed', 'manual_required'] as const;
+/** `superseded`: DEMO BRANCH ONLY (F-10) — a tracked manual refund replaced by the customer's #212 reschedule. */
+export const REFUND_STATUSES = ['pending', 'succeeded', 'failed', 'manual_required', 'superseded'] as const;
 export type RefundStatus = (typeof REFUND_STATUSES)[number];
 
 /**
@@ -87,6 +88,18 @@ export class RefundEntity {
 
   @Column({ type: 'timestamptz', nullable: true })
   completedAt!: Date | null;
+
+  /**
+   * DEMO BRANCH ONLY (F-10). True only when this code moved the refund to
+   * `manual_required` (execution is then recorded through a claim). Legacy/unknown
+   * manual refunds stay false and are never superseded — not presumed unpaid.
+   */
+  @Column({ type: 'boolean', default: false })
+  manualTracked!: boolean;
+
+  /** DEMO BRANCH ONLY (F-10). Set exactly when status becomes `superseded`. */
+  @Column({ type: 'timestamptz', nullable: true })
+  supersededAt!: Date | null;
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;

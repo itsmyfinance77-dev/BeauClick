@@ -117,6 +117,8 @@ export const CAPABILITIES_BY_ROLE: Record<Role, string[]> = {
     // same reason, that `bc_moderate_chat` above records.
     'bc_manage_commercial_plans',
     'bc_manage_own_profile',
+    // DEMO BRANCH ONLY (F-10): record controlled manual-refund execution.
+    'bc_execute_manual_refunds',
   ],
 };
 

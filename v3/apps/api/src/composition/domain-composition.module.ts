@@ -44,6 +44,8 @@ import { CheckoutService } from '../checkout/checkout.service';
 import { CheckoutController, SandboxGatewayController, PaymentCallbackController } from '../checkout/checkout.controller';
 import { CheckoutDisclosureController, CheckoutDisclosureService } from '../checkout/checkout-disclosure';
 import { ReplacementOfferController } from '../outcome/replacement-offer.controller';
+import { ManualRefundExecutionController } from '../outcome/manual-refund-execution.controller';
+import { ManualRefundExecutionService } from '../outcome/manual-refund-execution.service';
 import { OrderPaymentController } from '../checkout/order-payment.controller';
 import { OutboxSweepScheduler } from '../events/outbox-sweep.scheduler';
 import {
@@ -229,9 +231,12 @@ import {
     MyWorkspacesController,
     // DEMO BRANCH ONLY (DEMO-DEC-001 B): the replacement-offer routes (need checkout).
     ReplacementOfferController,
+    // DEMO BRANCH ONLY (F-10): controlled manual-refund execution (administrator).
+    ManualRefundExecutionController,
   ],
   providers: [
     CheckoutService,
+    ManualRefundExecutionService,
     CheckoutDisclosureService,
     WaitlistAcceptanceService,
     MyWorkspacesService,

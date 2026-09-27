@@ -119,7 +119,10 @@ export class BookingOutcomeOrchestrator implements BookingRescheduleOutcomeHook 
       if (!order) return null;
 
       const live = await this.decisions.liveDecision(m, bookingId, 'cancellation');
-      if (live) return live;
+      // DEMO F-11: a decision consumed by the #212 remedy (`superseded`) belongs to a
+      // cancellation that was replaced by a reschedule; a LATER cancellation of the
+      // revived booking is decided afresh and supersedes it (own request key).
+      if (live && live.executionStatus !== 'superseded') return live;
 
       const terms = await this.decisions.termsFor(m, order.orderId);
       const facts = await readFacts(m, terms?.cutoffHours ?? null);
@@ -128,14 +131,14 @@ export class BookingOutcomeOrchestrator implements BookingRescheduleOutcomeHook 
         return null;
       }
 
-      const requestKey = bookingCancellationRefundKey(bookingId);
+      const requestKey = live ? afterRemedyRefundKey(bookingId, live.id) : bookingCancellationRefundKey(bookingId);
       const commitments = await this.payments.orderRefundCommitments(m, order.orderId, requestKey);
 
       const decision = commitments.keyRefund
         ? this.adoptExistingRefund(bookingId, order, terms, facts, requestKey, commitments.keyRefund)
         : this.evaluateCancellation(bookingId, order, terms, facts, requestKey, commitments.otherCommittedToman);
 
-      const recorded = await this.decisions.recordDecision(m, decision);
+      const recorded = live ? await this.decisions.recordSupersedingDecision(m, decision) : await this.decisions.recordDecision(m, decision);
 
       if (NEVER_COLLECTED_STATUSES.includes(order.status)) {
         // Never collected: nothing to refund; cancel the order so it stops
@@ -200,7 +203,9 @@ export class BookingOutcomeOrchestrator implements BookingRescheduleOutcomeHook 
      */
     if (decision.kind === 'cancellation') {
       const resolution = await this.remedyChoices.resolution(this.dataSource.manager, decision.orderId);
-      if (resolution?.chosen === 'reschedule') {
+      // DEMO F-11: the remedy answers only the FIRST cancellation; a later one
+      // (after-remedy key) is refunded normally.
+      if (resolution?.chosen === 'reschedule' && decision.refundRequestKey === bookingCancellationRefundKey(decision.bookingId)) {
         this.auditLog.log({
           action: 'commerce.booking_outcome_refund_skipped_for_remedy',
           bookingId: decision.bookingId,
@@ -225,7 +230,21 @@ export class BookingOutcomeOrchestrator implements BookingRescheduleOutcomeHook 
    * as failed and is not re-executed here (re-driving a real refund is #47).
    */
   private async executeDecision(decision: BookingOutcomeDecisionRecord, reason: string): Promise<void> {
-    if (decision.executionStatus !== 'pending' || decision.refundToman <= 0n || decision.refundRequestKey === null) return;
+    if (!['pending', 'executing'].includes(decision.executionStatus) || decision.refundToman <= 0n || decision.refundRequestKey === null) return;
+
+    // DEMO F-10: the durable execution claim, BEFORE the gateway call and under
+    // the decision's row lock — the linearization point against the #212 remedy,
+    // which supersedes only a still-`pending` decision under the same lock. A
+    // crash after this commit leaves `executing`: the remedy stays refused and a
+    // redelivery resumes the (idempotent-by-key) refund below.
+    const claimed = await this.dataSource.transaction(async (m) => {
+      const current = await this.decisions.lockDecision(m, decision.id);
+      if (!current) return false;
+      if (current.executionStatus === 'executing') return true;
+      if (current.executionStatus !== 'pending') return false;
+      return this.decisions.claimExecution(m, decision.id);
+    });
+    if (!claimed) return;
 
     const refund = await this.payments.refund({
       orderId: decision.orderId,
@@ -599,7 +618,12 @@ function contextOf(governance: BookingRescheduleGovernance, facts: BookingResche
   return context as GovernedRescheduleContext;
 }
 
-function executionStatusOf(status: RefundStatus): BookingOutcomeExecutionStatus {
+/** DEMO F-11: the refund key of a cancellation decided after a #212 remedy consumed the previous one. */
+export function afterRemedyRefundKey(bookingId: string, consumedDecisionId: string): string {
+  return `${bookingCancellationRefundKey(bookingId)}:after:${consumedDecisionId}`;
+}
+
+function executionStatusOf(status: RefundStatus): Extract<BookingOutcomeExecutionStatus, 'pending' | 'executed' | 'manual_required' | 'failed'> {
   switch (status) {
     case 'succeeded':
       return 'executed';

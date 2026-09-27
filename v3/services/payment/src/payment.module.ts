@@ -7,6 +7,7 @@ import { PaymentAttemptEntity } from './entities/payment-attempt.entity';
 import { RefundEntity } from './entities/refund.entity';
 import { PaymentOutboxEntity } from './entities/payment-outbox.entity';
 import { SandboxTransactionEntity } from './entities/sandbox-transaction.entity';
+import { ManualRefundExecutionEntity } from './entities/manual-refund-execution.entity';
 
 import { PaymentService } from './payment.service';
 import { PaymentProviderRegistry } from './providers/payment-provider.registry';
@@ -20,6 +21,8 @@ export const PAYMENT_ENTITIES = [
   RefundEntity,
   PaymentOutboxEntity,
   SandboxTransactionEntity,
+  // DEMO BRANCH ONLY (F-10).
+  ManualRefundExecutionEntity,
 ];
 
 /**

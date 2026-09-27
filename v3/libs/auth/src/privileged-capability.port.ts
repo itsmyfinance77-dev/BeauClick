@@ -63,4 +63,8 @@ export const PRIVILEGED_CAPABILITIES: readonly string[] = [
   // minutes; and `libs/audit`'s refusal to boot when a mutation gated on it
   // declares no audit record.
   'bc_manage_commercial_plans',
+  // DEMO BRANCH ONLY (F-10). Authority to claim and record the manual execution
+  // of a refund — money leaving the platform — so the live revocation re-check
+  // and the audit boot assertion both apply.
+  'bc_execute_manual_refunds',
 ];

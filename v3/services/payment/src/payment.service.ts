@@ -11,6 +11,7 @@ import { LIVE_INTENT_STATUSES, PaymentIntentEntity, PaymentIntentStatus } from '
 import { PaymentAttemptEntity } from './entities/payment-attempt.entity';
 import { PaymentOutboxEntity } from './entities/payment-outbox.entity';
 import { RefundEntity, RefundKind, RefundStatus } from './entities/refund.entity';
+import { ACTIVE_MANUAL_EXECUTION_STATES, ManualRefundExecutionEntity } from './entities/manual-refund-execution.entity';
 import { PaymentProviderRegistry } from './providers/payment-provider.registry';
 import { VerifyPaymentResult } from './providers/payment-provider.interface';
 import {
@@ -77,6 +78,33 @@ export class PaymentRetryNotAvailableException extends DomainException {
  * 409 like commerce's: the request is well formed; the money state forbids it.
  * `refundableToman` is what is still available under this payment.
  */
+// DEMO BRANCH ONLY — F-10 manual execution refusals (demo/F10-DESIGN.md).
+export class ManualRefundNotFoundException extends DomainException {
+  constructor() {
+    super('NOT_FOUND_OR_NOT_YOURS', 'این بازپرداخت یافت نشد.', HttpStatus.NOT_FOUND);
+  }
+}
+export class ManualRefundNotClaimableException extends DomainException {
+  constructor() {
+    super('REFUND_NOT_CLAIMABLE', 'این بازپرداخت در وضعیتی نیست که بتوان اجرای دستی آن را شروع کرد (یا اجرای دیگری فعال است).', HttpStatus.CONFLICT);
+  }
+}
+export class ManualRefundExecutionTransitionException extends DomainException {
+  constructor() {
+    super('MANUAL_REFUND_TRANSITION_NOT_ALLOWED', 'این تغییر وضعیت برای اجرای دستی بازپرداخت مجاز نیست.', HttpStatus.CONFLICT);
+  }
+}
+export class ManualRefundReferenceRequiredException extends DomainException {
+  constructor() {
+    super('MANUAL_REFUND_REFERENCE_REQUIRED', 'برای ثبت اجرا، شناسهٔ پیگیری انتقال لازم است.', HttpStatus.BAD_REQUEST);
+  }
+}
+export class ManualRefundNotSupersedableException extends DomainException {
+  constructor() {
+    super('REFUND_NOT_SUPERSEDABLE', 'این بازپرداخت دیگر قابل جایگزینی نیست.', HttpStatus.CONFLICT);
+  }
+}
+
 export class RefundExceedsCapturedException extends DomainException {
   constructor(requestedToman: bigint, refundableToman: bigint) {
     super(
@@ -937,7 +965,7 @@ export class PaymentService {
       committed = await m.query(
         `SELECT COALESCE(SUM(amount_toman), 0)::text AS total
            FROM payment.refunds
-          WHERE order_id = $1 AND kind = 'duplicate_charge' AND payment_attempt_id = $2 AND status <> 'failed'`,
+          WHERE order_id = $1 AND kind = 'duplicate_charge' AND payment_attempt_id = $2 AND status NOT IN ('failed', 'superseded')`,
         [orderId, attempt?.id ?? null],
       );
     } else {
@@ -945,7 +973,7 @@ export class PaymentService {
       committed = await m.query(
         `SELECT COALESCE(SUM(amount_toman), 0)::text AS total
            FROM payment.refunds
-          WHERE order_id = $1 AND kind = 'order' AND status <> 'failed'`,
+          WHERE order_id = $1 AND kind = 'order' AND status NOT IN ('failed', 'superseded')`,
         [orderId],
       );
     }
@@ -995,7 +1023,8 @@ export class PaymentService {
     for (const row of rows) {
       if (row.request_key === requestKey) {
         keyRefund = { amountToman: BigInt(row.amount_toman), status: row.status };
-      } else if (row.status !== 'failed') {
+      } else if (row.status !== 'failed' && row.status !== 'superseded') {
+        // DEMO F-10: a superseded refund was replaced by the customer's reschedule — owed no more.
         otherCommittedToman += BigInt(row.amount_toman);
       }
     }
@@ -1012,7 +1041,8 @@ export class PaymentService {
       const claimed = await m
         .createQueryBuilder()
         .update(RefundEntity)
-        .set({ status, providerRefundReference, failureCode, completedAt: new Date() })
+        // DEMO F-10: manual execution of this refund is recorded through a claim from now on.
+        .set({ status, providerRefundReference, failureCode, completedAt: new Date(), manualTracked: status === 'manual_required' })
         .where("id = :refundId AND status = 'pending'", { refundId })
         .execute();
 
@@ -1020,7 +1050,13 @@ export class PaymentService {
 
       const refund = await m.findOneOrFail(RefundEntity, { where: { id: refundId } });
       if (status !== 'succeeded') return;
+      await this.emitRefundCompleted(m, refund, providerRefundReference);
+    });
+  }
 
+  /** The one place `RefundCompleted` is emitted: automatic success, or a recorded manual execution (F-10). Never for superseded. */
+  private async emitRefundCompleted(m: EntityManager, refund: RefundEntity, providerRefundReference: string | null): Promise<void> {
+    {
       await emitEvent(m, PaymentOutboxEntity, {
         aggregateType: 'payment',
         aggregateId: refund.paymentIntentId,
@@ -1037,7 +1073,135 @@ export class PaymentService {
           completedAt: new Date().toISOString(),
         },
       });
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // DEMO BRANCH ONLY — F-10 manual execution + supersession (demo/F10-DESIGN.md)
+  // Every method takes the CALLER's manager: the composition tier runs them in
+  // one transaction with the commerce/booking side. Lock order: refund row
+  // (FOR UPDATE) before its execution rows.
+  // ---------------------------------------------------------------------
+
+  /** The order refund issued under `requestKey`, locked FOR UPDATE (the linearization point vs. a manual claim). */
+  async lockRefundByKey(m: EntityManager, orderId: string, requestKey: string): Promise<RefundEntity | null> {
+    return m.findOne(RefundEntity, { where: { orderId, requestKey, kind: 'order' }, lock: { mode: 'pessimistic_write' } });
+  }
+
+  /** Unlocked read of the same row, for read-only views. */
+  async findRefundByKey(m: EntityManager, orderId: string, requestKey: string): Promise<RefundEntity | null> {
+    return m.findOne(RefundEntity, { where: { orderId, requestKey, kind: 'order' } });
+  }
+
+  async lockRefundById(m: EntityManager, refundId: string): Promise<RefundEntity | null> {
+    return m.findOne(RefundEntity, { where: { id: refundId }, lock: { mode: 'pessimistic_write' } });
+  }
+
+  /** The claimed / uncertain / executed execution of a refund, if any (call with the refund row locked). */
+  async activeManualExecution(m: EntityManager, refundId: string): Promise<ManualRefundExecutionEntity | null> {
+    return m.findOne(ManualRefundExecutionEntity, { where: { refundId, state: In([...ACTIVE_MANUAL_EXECUTION_STATES]) } });
+  }
+
+  /**
+   * Supersedes a TRACKED manual_required refund with no active execution — the
+   * caller holds the refund lock and has checked both. The row is kept (amount,
+   * reason, history); no RefundCompleted; commitments stop counting it.
+   */
+  async supersedeManualRefund(m: EntityManager, refundId: string): Promise<void> {
+    const result = await m
+      .createQueryBuilder()
+      .update(RefundEntity)
+      .set({ status: 'superseded', supersededAt: () => 'now()' })
+      .where("id = :refundId AND status = 'manual_required' AND manual_tracked = true", { refundId })
+      .execute();
+    if (result.affected !== 1) throw new ManualRefundNotSupersedableException();
+    this.auditLog.log({ action: 'payment.refund_superseded_by_remedy', refundId });
+  }
+
+  /**
+   * The durable exclusive claim, taken BEFORE any manual transfer. Refused when
+   * the refund is not `manual_required` (e.g. already superseded) or already has
+   * an active execution.
+   */
+  async claimManualExecution(m: EntityManager, refundId: string, actorUserId: string, note: string | null): Promise<ManualRefundExecutionEntity> {
+    const refund = await this.lockRefundById(m, refundId);
+    if (!refund) throw new ManualRefundNotFoundException();
+    if (refund.status !== 'manual_required' || (await this.activeManualExecution(m, refundId))) {
+      throw new ManualRefundNotClaimableException();
+    }
+    const id = uuidv7();
+    await m.insert(ManualRefundExecutionEntity, {
+      id,
+      refundId,
+      state: 'claimed',
+      claimedByUserId: actorUserId,
+      resolvedByUserId: null,
+      resolvedAt: null,
+      externalReference: null,
+      note,
     });
+    return m.findOneOrFail(ManualRefundExecutionEntity, { where: { id } });
+  }
+
+  /**
+   * How a claimed (or uncertain) execution ended. `executed` completes the
+   * refund (`manual_required -> succeeded`, RefundCompleted — money moved);
+   * `uncertain` keeps blocking; `released` is the operator's statement that NO
+   * transfer was made (the refund becomes claimable/supersedable again).
+   */
+  async resolveManualExecution(
+    m: EntityManager,
+    executionId: string,
+    actorUserId: string,
+    outcome: 'executed' | 'uncertain' | 'released',
+    externalReference: string | null,
+    note: string | null,
+  ): Promise<{ execution: ManualRefundExecutionEntity; refund: RefundEntity }> {
+    const peek = await m.findOne(ManualRefundExecutionEntity, { where: { id: executionId } });
+    if (!peek) throw new ManualRefundNotFoundException();
+    const refund = await this.lockRefundById(m, peek.refundId);
+    const execution = await m.findOne(ManualRefundExecutionEntity, { where: { id: executionId }, lock: { mode: 'pessimistic_write' } });
+    if (!refund || !execution) throw new ManualRefundNotFoundException();
+    const allowed = execution.state === 'claimed' || (execution.state === 'uncertain' && outcome !== 'uncertain');
+    if (!allowed) throw new ManualRefundExecutionTransitionException();
+    if (outcome === 'executed' && !externalReference?.trim()) throw new ManualRefundReferenceRequiredException();
+
+    await m.update(
+      ManualRefundExecutionEntity,
+      { id: executionId },
+      { state: outcome, resolvedByUserId: actorUserId, resolvedAt: new Date(), externalReference: outcome === 'executed' ? externalReference!.trim() : null, note },
+    );
+    if (outcome === 'executed') {
+      const reference = `MANUAL:${externalReference!.trim()}`.slice(0, 128);
+      const moved = await m
+        .createQueryBuilder()
+        .update(RefundEntity)
+        .set({ status: 'succeeded', providerRefundReference: reference, completedAt: () => 'now()' })
+        .where("id = :id AND status = 'manual_required'", { id: refund.id })
+        .execute();
+      if (moved.affected !== 1) throw new ManualRefundExecutionTransitionException();
+      const done = await m.findOneOrFail(RefundEntity, { where: { id: refund.id } });
+      await this.emitRefundCompleted(m, done, reference);
+    }
+    return {
+      execution: await m.findOneOrFail(ManualRefundExecutionEntity, { where: { id: executionId } }),
+      refund: await m.findOneOrFail(RefundEntity, { where: { id: refund.id } }),
+    };
+  }
+
+  /** Operator list: every manual_required or superseded refund, with its executions (newest first). */
+  async listManualRefunds(): Promise<Array<RefundEntity & { executions: ManualRefundExecutionEntity[] }>> {
+    const refunds = await this.dataSource
+      .getRepository(RefundEntity)
+      .createQueryBuilder('r')
+      .where(`r.status IN ('manual_required', 'superseded') OR EXISTS (SELECT 1 FROM payment.manual_refund_executions e WHERE e.refund_id = r.id)`)
+      .orderBy('r.created_at', 'DESC')
+      .limit(200)
+      .getMany();
+    const executions = refunds.length
+      ? await this.dataSource.getRepository(ManualRefundExecutionEntity).find({ where: { refundId: In(refunds.map((r) => r.id)) }, order: { claimedAt: 'DESC' } })
+      : [];
+    return refunds.map((r) => Object.assign(r, { executions: executions.filter((e) => e.refundId === r.id) }));
   }
 
   async findRefund(refundId: string): Promise<RefundEntity | null> {

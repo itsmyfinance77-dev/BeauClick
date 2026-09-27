@@ -1035,7 +1035,10 @@ export class BookingService {
          FROM booking.bookings b
          JOIN booking.booking_history h ON h.booking_id = b.id AND h.event = 'cancelled'
         WHERE b.id = $1 AND b.status = 'cancelled'
-        ORDER BY h.id
+        -- DEMO F-11: the LATEST cancellation. A booking revived by the #212
+        -- remedy and cancelled again has two 'cancelled' rows; the one being
+        -- decided is the newest (uuidv7 ids are time-ordered). One row = same.
+        ORDER BY h.id DESC
         LIMIT 1
           FOR SHARE OF b`,
       [bookingId, cutoffHours],

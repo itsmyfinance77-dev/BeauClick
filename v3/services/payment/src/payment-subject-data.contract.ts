@@ -46,6 +46,12 @@ export class PaymentSubjectDataContract implements SubjectDataContract {
       reason: 'Refund records reconciled against the append-only ledger.',
     },
     {
+      table: 'payment.manual_refund_executions',
+      disposition: 'retained',
+      reason:
+        'DEMO BRANCH ONLY (F-10). The operator claim and outcome of a manual refund execution, reconciled with the refund it concerns. Keyed by refund; the actor ids are staff, not the refunded customer.',
+    },
+    {
       table: 'payment.sandbox_transactions',
       disposition: 'no_subject_data',
       reason:
