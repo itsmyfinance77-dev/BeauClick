@@ -169,3 +169,25 @@ unchanged. Generic-by-design refusals are named as such (`outcome_policy_assignm
 5. #31 payment of a waitlist-accepted booking (F-8).
 6. F-9 behaviour of "sign out other devices"; F-1…F-7 as listed above.
 7. Not exercised at all: #16 staff-location assignment; dev-login (unavailable by design); profile W / team devices.
+
+## Round 4 (2026-09-27 night) — owner-approved remediation ("همه اش را رفع کن")
+
+Status legend: **CODE+TESTS** = implemented, real-PostgreSQL/web tests green on the final source, mutation-proved where
+stated; **BROWSER PENDING** = desktop/390 flows run only after the new artifact is built and golden re-taken.
+
+| Item | Fix (demo branch) | Evidence | Status |
+|---|---|---|---|
+| F-5 | Slot must be ≥ the service's duration: listing (`?serviceId`), claim (→ checkout), reschedule (`409 SLOT_TOO_SHORT_FOR_SERVICE`), waitlist matcher; web end label = start + duration | `service-duration-slot-fit.pg-spec` 12/12 (mutant: 6 fail, 4 controls pass); provider-profile 36/36 | CODE+TESTS; BROWSER PENDING |
+| F-9 | `refresh_tokens.revocation_reason` written in the same UPDATE as `revoked_at`, never overwritten; intentional ends → 401 only; rotated/NULL → unchanged replay cascade | `refresh-revocation-reason.pg-spec` 10/10 incl. injected failure after the claim (documents: rotation is NOT crash-atomic); 2 mutants caught | CODE+TESTS; BROWSER PENDING |
+| F-8 | Waitlist acceptance = checkout (offer CAS as the checkout claim), Idempotency-Key required, `{acceptedPolicy?}`, bank redirect; web panel with amount + terms | `waitlist-checkout.pg-spec` 12/12 (mutant caught); waitlist web 13/13 | CODE+TESTS; BROWSER PENDING |
+| F-7 | Capture on a lapsed, never-collected order classified as a refund (same money path); "refunded" only when the refund row is `succeeded`, else `refund_pending` (new status; `duplicate_refund_pending` likewise) | `late-capture-classification.pg-spec` 5/5 (2 mutants caught); checkout-result 84/84; contract 13/13 | CODE+TESTS; BROWSER PENDING |
+| F-3 | Foreign/nonexistent slot delete → generic `404 NOT_FOUND_OR_NOT_YOURS`; own booked slot keeps `409` | `professional-surface.pg-spec` (owner control + nonexistent identical body) | CODE+TESTS |
+| F-6 | Commission page guard = `bc_manage_commercial_plans` | web 117/117 (operator refused, holder admitted) | CODE+TESTS; BROWSER PENDING |
+| F-2 | Provider page reads per-caller state after the session is known | web 36/36 (mutant caught) | CODE+TESTS; BROWSER PENDING |
+| F-1 | audit-log snapshots `overflow-wrap:anywhere` | CSS only | BROWSER PENDING (390) |
+| #12/#212 | Sandbox decision "paid, bank without automatic refund" per transaction → refund `manual_required` → reschedule offered | `no-show-and-remedy.pg-spec` +3 cases; sandbox page 6/6 | CODE+TESTS; BROWSER PENDING |
+| #14 | Web: customer review form, `/pro/reviews` reply/edit, professional cancel | `demo-web-paths.spec` 9/9 | CODE+TESTS; BROWSER PENDING |
+| #16 staff location | API-only exercise step (bind → slot carries branch → manager refused → restore) | script ready | PENDING (runtime) |
+| #22/#23/#28 | Round-3 "no admin route" was WRONG for collection policy / price schedules / settlement / risk / evidence; blockers are owner/commercial/legal VALUES and #99/#176/#177; membership plans have no creation route | `E:\BeauClick-demo\GAP-INVESTIGATION-ROUND4.md` | OWNER DECISIONS |
+
+Regression on the pre-F-7/F-3 source: 26 booking/waitlist/checkout/auth/outcome/remedy/payment suites, 956/956.

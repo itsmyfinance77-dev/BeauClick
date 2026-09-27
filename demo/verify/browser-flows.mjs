@@ -328,14 +328,19 @@ async function accountGroup() {
     await a.goto('/account/devices');
     r('persist', 'this device stays signed in; after a reload no other device is listed', (await a.path()) === '/account/devices' && (await a.evaluate(`[...document.querySelectorAll('button')].filter((b) => b.innerText.trim() === 'خروج از این دستگاه' && b.getBoundingClientRect().width > 0).length`)) === 0);
     await a.shot('account-devices-after');
-    // F-9 (baseline): a signed-out device that RETURNS after the 10 s replay grace presents a revoked token;
-    // TokenService.handleUnclaimableToken treats it as theft and revokes ALL the user's sessions.
+    // F-9 (fixed in round 4): the signed-out device RETURNS after the 10 s replay grace with its ended token.
+    // Its revocation reason is `session_revoked`, so it is refused and nothing else happens.
+    const reasons = await q(`select revocation_reason r, count(*)::int n from identity.refresh_tokens where user_id = $1 and revoked_at is not null group by 1`, [ids['user:cust2']]);
+    r('persist', 'DB: the ended device tokens carry revocation_reason = session_revoked', reasons.some((x) => x.r === 'session_revoked'), reasons);
     await sleep(12_000);
     await second.goto('/bookings');
     r('denied', 'the other device is signed out (protected page → sign-in)', (await second.path()) === '/auth', await second.path());
     const left = await activeTokens(ids['user:cust2']);
     await a.goto('/account/devices');
-    r('observed', 'F-9: after the signed-out device returned (>10 s), the remaining device is signed out too', true, { activeSessionsAfter: left, remainingDevicePath: await a.path() });
+    await a.reload();
+    r('persist', 'F-9 fixed: after the signed-out device returned (>10 s) the remaining device is STILL signed in (DB: 1 active session; page stays)', left === 1 && (await a.path()) === '/account/devices', { activeSessionsAfter: left, remainingDevicePath: await a.path() });
+    const cascaded = await q(`select count(*)::int n from identity.refresh_tokens where user_id = $1 and revocation_reason = 'replay_response'`, [ids['user:cust2']]);
+    r('persist', 'DB: no replay_response cascade was written', cascaded[0].n === 0, cascaded[0]);
     if ((await a.path()) === '/auth') await signIn(a, 'cust2'); // driver: continue the run signed in
     api.delete('cust2'); // its API session was one of the "other devices"
   });
@@ -858,22 +863,34 @@ async function waitlistGroup() {
     await cancelIt('cust3', b2);
     await sleep(4000);
     await w.goto('/waitlist');
+    // F-8 (fixed in round 4): accepting opens the checkout panel — amount + the seller's terms (this
+    // professional is unenrolled, so no terms box) — then the bank, exactly like any booking.
     await w.click('پذیرفتن و رزرو');
-    await sleep(2500);
+    await w.waitText('پذیرش پیشنهاد و پرداخت');
+    r('ui', 'the acceptance panel states the amount before anything is sent', await w.has('مبلغ این نوبت'));
+    const e0 = (await entry('cust2'))[0];
+    r('persist', 'DB: nothing consumed before confirming (entry still offered, no order)', e0?.status === 'offered');
+    await w.shot('waitlist-accept-panel');
+    await w.click('پرداخت و ثبت رزرو');
+    await w.waitText('پرداخت موفق');
+    await w.click('پرداخت موفق');
+    await w.waitText('پرداخت انجام شد');
     const e = (await entry('cust2'))[0];
     const bk = (await q(`select id, status from booking.bookings where customer_id = $1 and professional_id = $2 order by created_at desc limit 1`, [ids['user:cust2'], newPro]))[0];
-    r('persist', 'DB: entry accepted and a booking for cust2 exists', e?.status === 'accepted' && Boolean(bk), { entry: e, booking: bk });
-    r('ui', 'accepting leads to "رزروهای من"', (await w.path()) === '/bookings', await w.path());
-    // F-8 (baseline): acceptance creates the booking through BookingService.create, not checkout —
-    // no order, no payment intent, so no supported path pays it; it lapses with its hold.
-    const order = await q(`select id from commerce.orders where source_id = $1`, [bk.id]);
-    const hold = (await q(`select status, hold_expires_at from booking.bookings where id = $1`, [bk.id]))[0];
-    r('observed', 'F-8: the accepted booking has NO order (nothing to pay) and a hold deadline', order.length === 0, { orders: order.length, hold });
+    const order = (await q(`select id, status from commerce.orders where source_id = $1`, [bk?.id]))[0];
+    const intents = await q(`select id from payment.payment_intents where order_id = $1`, [order?.id]);
+    r('persist', 'DB: entry accepted and linked; booking CONFIRMED; order PAID; one payment intent', e?.status === 'accepted' && bk?.status === 'confirmed' && order?.status === 'paid' && intents.length === 1, { entry: e, booking: bk, order, intents: intents.length });
+    const linked = (await q(`select resulting_booking_id from waitlist.entries where id = $1`, [e.id]))[0];
+    r('persist', 'DB: the entry points at that booking', linked?.resulting_booking_id === bk?.id);
     await w.goto('/bookings');
-    const card = await w.evaluate(`(() => { const li = document.querySelector('li[data-booking="${bk.id}"]'); return li ? { text: li.innerText.replace(/\\s+/g, ' ').slice(0, 140), buttons: [...li.querySelectorAll('button, a')].map((b) => b.innerText.trim()) } : null; })()`);
-    r('observed', 'F-8: the card says "در انتظار پرداخت" and offers no pay control', true, card);
-    const denied = await (await apiAs('cust3')).post(`/v1/waitlist/${e.id}/accept`, {}, { expect: [200, 201, 400, 403, 404, 409] });
-    r('denied', "another customer cannot act on cust2's entry", [403, 404].includes(denied.status), `HTTP ${denied.status}`);
+    await w.reload();
+    r('ui', 'after reload the booking shows as confirmed in "رزروهای من"', await w.has('تأیید شده'));
+    // Controlled: authenticated cust3, a well-formed request WITH an Idempotency-Key; the owner's identical
+    // request succeeded above (control); exact generic body; the entry unchanged.
+    const before = (await q(`select status, resulting_booking_id from waitlist.entries where id = $1`, [e.id]))[0];
+    const denied = await (await apiAs('cust3')).call('POST', `/v1/waitlist/${e.id}/accept`, {}, { expect: [200, 201, 400, 403, 404, 409], headers: { 'Idempotency-Key': `deny-${Date.now()}` } });
+    const after = (await q(`select status, resulting_booking_id from waitlist.entries where id = $1`, [e.id]))[0];
+    r('denied', "another customer: 404 NOT_FOUND_OR_NOT_YOURS on cust2's entry, entry unchanged (owner control above)", denied.status === 404 && denied.raw?.json?.error?.code === 'NOT_FOUND_OR_NOT_YOURS' && JSON.stringify(before) === JSON.stringify(after), { status: denied.status, body: denied.raw?.json?.error });
   });
 }
 
@@ -1273,7 +1290,125 @@ async function outcomeGroup() {
   });
 }
 
-const GROUPS = { referral: referralGroup, outcome: outcomeGroup, recovery: recoveryGroup, checkout: checkoutGroup, account: accountGroup, pro: proGroup, moderation: moderationGroup, engagement: engagementGroup, waitlist: waitlistGroup, business: businessGroup, admin: adminGroup };
+// ============================================================================ round 4 (fixes)
+// Every mutation targets a row whose identity is asserted from the DB first (F-4 rule).
+async function round4Group() {
+  const future = `b.slot_start > now() + interval '30 hours'`;
+
+  await flow('round4 F-5: a long service lists only covering times; the summary ends when the SERVICE ends', async (r) => {
+    const svc = (await q(`select s.id, s.name, s.duration_minutes d, s.professional_id pid from provider.services s where s.duration_minutes > 60 and s.deleted_at is null order by s.duration_minutes desc limit 1`))[0];
+    if (!svc) throw new Error('no service longer than 60 minutes');
+    const listed = await (await apiAs('cust4')).call('GET', `/v1/providers/${svc.pid}/availability?serviceId=${svc.id}`, undefined, { expect: [200] });
+    const tooShort = (listed.data ?? []).filter((x) => new Date(x.endAt) - new Date(x.startAt) < svc.d * 60_000);
+    r('rule', `API: every time offered for "${svc.name}" (${svc.d} min) is at least that long`, tooShort.length === 0, { offered: (listed.data ?? []).length, tooShort: tooShort.length });
+    const c = await as('cust4');
+    await c.goto(`/providers/${svc.pid}`);
+    await c.click(svc.name, { prefix: true });
+    await sleep(1500);
+    const days = await dayButtons(c);
+    if (!days.length) {
+      r('observed', 'no covering time is published for this service (honest empty state)', await c.has('زمان آزادی'));
+      return;
+    }
+    await c.click(days[0]);
+    const times = await timeButtons(c);
+    await c.click(times[0]);
+    await sleep(800);
+    const summary = await c.evaluate(`document.querySelector('[data-testid="booking-summary"]')?.innerText ?? ''`);
+    const first = (listed.data ?? []).map((x) => x.startAt).sort()[0];
+    const end = tehran(new Date(first).getTime() + svc.d * 60_000).time;
+    r('ui', `the summary's end is start + ${svc.d} min (${end}), not the slot end`, summary.includes(fa(end)), summary.replace(/\s+/g, ' '));
+  });
+
+  await flow('round4 F-2: full page load while signed in shows the real save control', async (r) => {
+    const c = await as('cust1');
+    const pid = ids.pro1.providerId;
+    await c.goto(`/providers/${pid}`);
+    await c.reload();
+    await sleep(1500);
+    const save = await c.evaluate(`[...document.querySelectorAll('button')].some((b) => /علاقه‌مندی/.test(b.innerText) && b.getBoundingClientRect().width > 0)`);
+    const signInLink = await c.evaluate(`[...document.querySelectorAll('a[href="/auth"]')].some((a) => /ذخیره/.test(a.innerText))`);
+    r('ui', 'a save BUTTON is shown, not the anonymous "sign in to save" link', save && !signInLink, { save, signInLink });
+  });
+
+  await flow('round4 F-6: commission page follows the API capability', async (r) => {
+    const o = await as('operator');
+    await o.goto('/admin/commercial/commission-policies');
+    await sleep(1200);
+    r('denied', 'operator (no bc_manage_commercial_plans) gets the no-access state, and no commission API call is made', await o.has('دسترسی لازم برای این بخش را ندارد'));
+    const a = await as('admin');
+    await a.goto('/admin/commercial/commission-policies');
+    await a.waitText('کارمزد');
+    r('ui', 'administrator (holds it) sees the commission components (control)', await a.has('کارمزد'));
+  });
+
+  await flow('round4 web: the professional cancels a live booking in the UI', async (r) => {
+    const t = (await q(`select b.id, b.customer_id from booking.bookings b where b.professional_id = $1 and b.status = 'confirmed' and ${future} order by b.slot_start desc limit 1`, [ids.pro1.providerId]))[0];
+    if (!t || !userKey(t.customer_id)) throw new Error('no confirmed future booking of pro1 for a persona');
+    const cust = userKey(t.customer_id);
+    const other = cust === 'cust2' ? 'cust3' : 'cust2';
+    const deny = await (await apiAs(other)).call('POST', `/v1/bookings/${t.id}/cancel`, { reason: 'x' }, { expect: [200, 201, 403, 404, 409] });
+    const still = (await q(`select status from booking.bookings where id = $1`, [t.id]))[0];
+    r('denied', 'another customer: 404 NOT_FOUND_OR_NOT_YOURS, booking unchanged (owner control follows)', deny.status === 404 && deny.raw?.json?.error?.code === 'NOT_FOUND_OR_NOT_YOURS' && still.status === 'confirmed', `HTTP ${deny.status}`);
+    const p = await as('pro1');
+    await p.goto('/pro/bookings');
+    await p.click('لغو نوبت', { within: `li[data-booking="${t.id}"]` });
+    await p.waitText('این عملیات');
+    await p.click('بله، لغو کن');
+    await sleep(3000);
+    const row = (await q(`select status, cancelled_by_actor_type a from booking.bookings where id = $1`, [t.id]))[0];
+    r('persist', 'DB: cancelled by the professional', row.status === 'cancelled' && row.a === 'professional', row);
+    const refunds = await q(`select r.status from payment.refunds r join commerce.orders o on o.id = r.order_id where o.source_id = $1`, [t.id]);
+    r('persist', 'DB: the collected amount is refunded by the ordinary rules', refunds.length >= 1, refunds);
+    const c = await as(cust);
+    await c.goto('/bookings');
+    await c.click('لغو شده', { prefix: true, selector: '[role="tab"]' }).catch(() => {});
+    await sleep(800);
+    r('other', `the customer (${cust}) sees the cancellation with the remedy/replacement controls`, (await c.has('بازپرداخت و جبران')) || (await c.has('پیشنهاد جایگزینی')));
+    ids.round4 = { ...(ids.round4 ?? {}), proCancelled: t.id };
+  });
+
+  await flow('round4 web: customer review + professional reply in the UI', async (r) => {
+    const t = (await q(`select b.id, b.customer_id, b.professional_id pid from booking.bookings b join provider.review_eligibility e on e.booking_id = b.id
+      where b.status = 'completed' and not exists (select 1 from provider.reviews x where x.booking_id = b.id) and b.professional_id in ($1, $2) order by b.completed_at limit 1`, [ids.pro1.providerId, ids.pro2.providerId]))[0];
+    if (!t || !userKey(t.customer_id)) throw new Error('no reviewable completed booking of a persona');
+    const cust = userKey(t.customer_id);
+    const seller = t.pid === ids.pro1.providerId ? 'pro1' : 'pro2';
+    const c = await as(cust);
+    await c.goto('/bookings');
+    await c.click('گذشته', { prefix: true, selector: '[role="tab"]' }).catch(() => {});
+    await c.click('ثبت نظر', { within: `li[data-booking="${t.id}"]` });
+    await c.click('۵', { within: `li[data-booking="${t.id}"]`, selector: 'label' });
+    await c.fill('توضیح (اختیاری)', 'نظر آزمایشی مرورگر (دمو)');
+    await c.click('ثبت نظر', { within: `li[data-booking="${t.id}"]`, selector: 'button[data-testid="review-submit"]' });
+    await sleep(2000);
+    const rv = (await q(`select id, rating, status from provider.reviews where booking_id = $1`, [t.id]))[0];
+    r('persist', 'DB: the review exists (rating 5, published)', rv?.rating === 5 && rv.status === 'published', rv);
+    await c.reload();
+    await c.click('گذشته', { prefix: true, selector: '[role="tab"]' }).catch(() => {});
+    r('persist', 'after reload the booking offers «نظر شما», not a second form', await c.has('نظر شما'));
+    const p = await as(seller);
+    await p.goto('/pro/reviews');
+    await p.click('پاسخ دادن', { within: `li[data-review="${rv.id}"]` });
+    await p.fill('پاسخ شما', 'پاسخ آزمایشی مرورگر (دمو)');
+    await p.click('ثبت پاسخ');
+    await sleep(1500);
+    const after = (await q(`select response_text from provider.reviews where id = $1`, [rv.id]))[0];
+    r('persist', 'DB: the reply is stored', after?.response_text === 'پاسخ آزمایشی مرورگر (دمو)');
+    await p.reload();
+    r('persist', 'after reload the reply is shown', await p.has('پاسخ آزمایشی مرورگر (دمو)'));
+    const wrong = seller === 'pro1' ? 'pro2' : 'pro1';
+    const deny = await (await apiAs(wrong)).call('POST', `/v1/providers/${t.pid}/reviews/${rv.id}/respond`, { text: 'x' }, { expect: [200, 201, 403, 404] });
+    const unchanged = (await q(`select response_text from provider.reviews where id = $1`, [rv.id]))[0];
+    r('denied', 'another professional: generic 404, reply unchanged (owner control above)', deny.status === 404 && unchanged.response_text === 'پاسخ آزمایشی مرورگر (دمو)', `HTTP ${deny.status}`);
+  });
+}
+
+function userKey(userId) {
+  return Object.entries(ids).find(([k, v]) => k.startsWith('user:') && v === userId)?.[0]?.slice(5) ?? null;
+}
+
+const GROUPS = { round4: round4Group, referral: referralGroup, outcome: outcomeGroup, recovery: recoveryGroup, checkout: checkoutGroup, account: accountGroup, pro: proGroup, moderation: moderationGroup, engagement: engagementGroup, waitlist: waitlistGroup, business: businessGroup, admin: adminGroup };
 for (const g of groups) {
   if (!GROUPS[g]) throw new Error(`unknown group ${g}`);
   await GROUPS[g]();

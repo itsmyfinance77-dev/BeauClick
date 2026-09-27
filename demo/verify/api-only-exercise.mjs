@@ -122,6 +122,43 @@ await step('16', async () => {
   rec('16', 'owner clears the requirement (null)', clear.status < 300, `HTTP ${clear.status}`);
 });
 
+// --- #16 staff location (API-only; round 4) --------------------------------------------------------
+// Owner binds the practitioner's membership to a branch → read-back → EFFECT: a slot the practitioner
+// creates afterwards carries that branch (#127a delivery-location snapshot) → a non-owner is refused with
+// the binding unchanged (owner control = the owner's identical PUT) → the original binding is restored.
+await step('16-staff-location', async () => {
+  const biz = ids.businessId;
+  const membership = ids.staffIds.bizPractitioner;
+  const m0 = (await q(`select user_id, location_id, status from business.business_staff where id = $1 and business_id = $2`, [membership, biz]))[0];
+  rec('16', 'identity: the membership is the practitioner’s, active, in the salon', m0?.user_id === ids['user:bizPractitioner'] && m0?.status === 'active', m0);
+  const original = (await call('bizOwner', 'GET', `/v1/businesses/${biz}/staff/${membership}/location`)).data;
+  const target = original?.locationRef === ids.locations.second ? ids.locations.main : ids.locations.second;
+
+  const denied = await call('bizManager', 'PUT', `/v1/businesses/${biz}/staff/${membership}/location`, { locationRef: target });
+  const afterDenied = (await q(`select location_id from business.business_staff where id = $1`, [membership]))[0];
+  rec('16', 'denied: the manager (authenticated, not the owner) cannot bind; binding unchanged', [403, 404].includes(denied.status) && afterDenied.location_id === m0.location_id, `HTTP ${denied.status} ${denied.code ?? ''}`);
+
+  const set = await call('bizOwner', 'PUT', `/v1/businesses/${biz}/staff/${membership}/location`, { locationRef: target });
+  const read = (await call('bizOwner', 'GET', `/v1/businesses/${biz}/staff/${membership}/location`)).data;
+  const m1 = (await q(`select location_id from business.business_staff where id = $1`, [membership]))[0];
+  rec('16', 'owner binds the practitioner to the other branch (control 2xx); read-back shows it; DB changed', set.status < 300 && read?.locationRef === target && m1.location_id !== m0.location_id, { status: set.status, read });
+
+  // Effect: a new slot of the practitioner is stamped with the bound branch.
+  const start = new Date(Date.now() + 9 * 86_400_000);
+  start.setUTCHours(5, 0, 0, 0);
+  const slot = await call('bizPractitioner', 'POST', '/v1/me/availability/slots', { startAt: start.toISOString(), endAt: new Date(start.getTime() + 120 * 60_000).toISOString() });
+  const slotRow = slot.data?.id ? (await q(`select delivery_location_id from booking.availability_slots where id = $1`, [slot.data.id]))[0] : null;
+  rec('16', 'effect: a slot the practitioner creates now carries the bound branch', slot.status === 201 && slotRow?.delivery_location_id === m1.location_id, { status: slot.status, slotRow });
+  if (slot.data?.id) {
+    const del = await call('bizPractitioner', 'DELETE', `/v1/me/availability/slots/${slot.data.id}`);
+    rec('16', 'cleanup: the practitioner deletes that open slot', del.status < 300, `HTTP ${del.status}`);
+  }
+
+  const restore = await call('bizOwner', 'PUT', `/v1/businesses/${biz}/staff/${membership}/location`, { locationRef: original?.locationRef ?? null });
+  const m2 = (await q(`select location_id from business.business_staff where id = $1`, [membership]))[0];
+  rec('16', 'restored: the original binding is back', restore.status < 300 && m2.location_id === m0.location_id, { status: restore.status });
+});
+
 // --- #22 subscription plan selection / cancellation ------------------------------------------------
 await step('22', async () => {
   const ws = ids.pro1.workspaceRef;
