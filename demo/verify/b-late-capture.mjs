@@ -7,27 +7,16 @@ import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { SECRETS_DIR, STATE_DIR, profile } from '../scripts/lib/demo-config.mjs';
+import { STATE_DIR, profile } from '../scripts/lib/demo-config.mjs';
 import { checkout, publicSlots, tehranDate, tehranDay, tehranHour } from '../seed/lib/booking-flow.mjs';
-import { Session, rawRequest } from '../seed/lib/client.mjs';
+import { rawRequest } from '../seed/lib/client.mjs';
+import { personaSession } from './lib/persona-session.mjs';
 
 const i = process.argv.indexOf('--profile');
-const origin = profile(i > 0 ? process.argv[i + 1] : 'L').origin;
+const profileKey = i > 0 ? process.argv[i + 1] : 'L';
+const origin = profile(profileKey).origin;
 const state = JSON.parse(fs.readFileSync(path.join(STATE_DIR, 'seed-state.json'), 'utf8'));
-const tokensFile = path.join(SECRETS_DIR, 'seed-sessions.json');
-async function as(key) {
-  const tokens = JSON.parse(fs.readFileSync(tokensFile, 'utf8'));
-  const s = new Session(origin, key);
-  s.refreshToken = tokens[key];
-  await s.refresh();
-  s.onRotate = (t) => {
-    const cur = JSON.parse(fs.readFileSync(tokensFile, 'utf8'));
-    cur[key] = t;
-    fs.writeFileSync(tokensFile, JSON.stringify(cur));
-  };
-  s.onRotate(s.refreshToken);
-  return s;
-}
+const as = (key) => personaSession(profileKey, key);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const { pro1 } = state.ids;
 const cust4 = await as('cust4');
@@ -71,9 +60,9 @@ const reference = u.searchParams.get('reference');
 const callback = u.searchParams.get('callback');
 await rawRequest(`${origin}/api/v1/sandbox-gateway/${encodeURIComponent(reference)}/decide`, { method: 'POST', body: { decision: 'success' } });
 const back = await rawRequest(`${callback}${callback.includes('?') ? '&' : '?'}reference=${encodeURIComponent(reference)}`);
-// The existing checkout refunds a capture it cannot confirm; after the hold lapsed the
-// order is already cancelled, so it takes the duplicate-charge path (`duplicate_refunded`).
-// Either refund outcome is correct; a confirmation is not.
+// The existing checkout refunds a capture it cannot confirm. Which refund path it reports
+// depends on the order's state when the callback lands (observed: `duplicate_refunded` in
+// one run, `refunded` in another). Either refund outcome is correct; a confirmation is not.
 check('a capture after the lapse is refunded automatically, not confirmed', /status=(refunded|duplicate_refunded)/.test(back.headers.location ?? ''), back.headers.location);
 const view2 = (await cust4.get(`/v1/bookings/${original.bookingId}/replacement-offer`)).data;
 check('the late capture did NOT use the offer', view2.status === 'open' && view2.replacementBookingId === null);

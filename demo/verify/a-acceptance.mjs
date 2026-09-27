@@ -5,27 +5,14 @@ import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { SECRETS_DIR, STATE_DIR, profile } from '../scripts/lib/demo-config.mjs';
+import { STATE_DIR } from '../scripts/lib/demo-config.mjs';
 import { checkout, publicSlots, tehranDate, tehranDay } from '../seed/lib/booking-flow.mjs';
-import { Session } from '../seed/lib/client.mjs';
+import { personaSession } from './lib/persona-session.mjs';
 
 const i = process.argv.indexOf('--profile');
-const origin = profile(i > 0 ? process.argv[i + 1] : 'L').origin;
+const profileKey = i > 0 ? process.argv[i + 1] : 'L';
 const state = JSON.parse(fs.readFileSync(path.join(STATE_DIR, 'seed-state.json'), 'utf8'));
-const tokensFile = path.join(SECRETS_DIR, 'seed-sessions.json');
-const tokens = JSON.parse(fs.readFileSync(tokensFile, 'utf8'));
-async function as(key) {
-  const s = new Session(origin, key);
-  s.refreshToken = tokens[key];
-  await s.refresh();
-  s.onRotate = (t) => {
-    tokens[key] = t;
-    fs.writeFileSync(tokensFile, JSON.stringify(tokens));
-  };
-  tokens[key] = s.refreshToken;
-  fs.writeFileSync(tokensFile, JSON.stringify(tokens));
-  return s;
-}
+const as = (key) => personaSession(profileKey, key);
 const results = [];
 const check = (name, pass, detail = '') => {
   results.push(pass);

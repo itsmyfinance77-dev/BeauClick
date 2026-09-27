@@ -5,30 +5,20 @@ import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { SECRETS_DIR, STATE_DIR, profile } from '../scripts/lib/demo-config.mjs';
+import { STATE_DIR, profile } from '../scripts/lib/demo-config.mjs';
 import { checkout, publicSlots, tehranDate, tehranDay, tehranHour } from '../seed/lib/booking-flow.mjs';
-import { Session, rawRequest } from '../seed/lib/client.mjs';
+import { rawRequest } from '../seed/lib/client.mjs';
+import { personaSession } from './lib/persona-session.mjs';
 
 const i = process.argv.indexOf('--profile');
-const origin = profile(i > 0 ? process.argv[i + 1] : 'L').origin;
+const profileKey = i > 0 ? process.argv[i + 1] : 'L';
+const origin = profile(profileKey).origin;
 const statePath = path.join(STATE_DIR, 'seed-state.json');
 const state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
-const tokensFile = path.join(SECRETS_DIR, 'seed-sessions.json');
-const tokens = JSON.parse(fs.readFileSync(tokensFile, 'utf8'));
 const cache = new Map();
 async function as(key) {
-  if (cache.has(key)) return cache.get(key);
-  const s = new Session(origin, key);
-  s.refreshToken = tokens[key];
-  await s.refresh();
-  s.onRotate = (t) => {
-    tokens[key] = t;
-    fs.writeFileSync(tokensFile, JSON.stringify(tokens));
-  };
-  tokens[key] = s.refreshToken;
-  fs.writeFileSync(tokensFile, JSON.stringify(tokens));
-  cache.set(key, s);
-  return s;
+  if (!cache.has(key)) cache.set(key, await personaSession(profileKey, key));
+  return cache.get(key);
 }
 const results = [];
 const check = (name, pass, detail = '') => {
@@ -38,7 +28,9 @@ const check = (name, pass, detail = '') => {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const key = () => ({ headers: { 'Idempotency-Key': randomUUID() } });
 const { pro1, pro2 } = state.ids;
-const b = (state.ids.replacementChecks ??= {});
+// A fresh scenario every run: a restored golden backup carries the previous run's ids,
+// whose offers are already used/dismissed. The ids are recorded only for inspection.
+const b = (state.ids.replacementChecks = {});
 const save = () => fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
 
 async function freeSlot(s, ids, serviceKey, day, fromHour, taken = new Set()) {
