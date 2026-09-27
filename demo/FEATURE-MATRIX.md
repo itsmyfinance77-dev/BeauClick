@@ -185,9 +185,15 @@ stated; **BROWSER PENDING** = desktop/390 flows run only after the new artifact 
 | F-6 | Commission page guard = `bc_manage_commercial_plans` | web 117/117 (operator refused, holder admitted) | CODE+TESTS; BROWSER PENDING |
 | F-2 | Provider page reads per-caller state after the session is known | web 36/36 (mutant caught) | CODE+TESTS; BROWSER PENDING |
 | F-1 | audit-log snapshots `overflow-wrap:anywhere` | CSS only | BROWSER PENDING (390) |
-| #12/#212 | Sandbox decision "paid, bank without automatic refund" per transaction → refund `manual_required` → reschedule offered | `no-show-and-remedy.pg-spec` +3 cases; sandbox page 6/6 | CODE+TESTS; BROWSER PENDING |
+| #12/#212 | Sandbox decision "paid, bank without automatic refund" per transaction → refund `manual_required` → reschedule offered | `no-show-and-remedy.pg-spec` +3 cases (synthetic repro); sandbox page 6/6 | **BLOCKED by F-10** (unresolved correctness blocker: after the reschedule the `manual_required` refund row remains — see `E:\BeauClick-demo\F10-DECISION-PROPOSAL.md`); simulator itself works; not a passing scenario |
 | #14 | Web: customer review form, `/pro/reviews` reply/edit, professional cancel | `demo-web-paths.spec` 9/9 | CODE+TESTS; BROWSER PENDING |
 | #16 staff location | API-only exercise step (bind → slot carries branch → manager refused → restore) | script ready | PENDING (runtime) |
 | #22/#23/#28 | Round-3 "no admin route" was WRONG for collection policy / price schedules / settlement / risk / evidence; blockers are owner/commercial/legal VALUES and #99/#176/#177; membership plans have no creation route | `E:\BeauClick-demo\GAP-INVESTIGATION-ROUND4.md` | OWNER DECISIONS |
 
 Regression on the pre-F-7/F-3 source: 26 booking/waitlist/checkout/auth/outcome/remedy/payment suites, 956/956.
+
+**Unresolved test evidence (not claimed pre-existing):** `services/booking/src/availability/delivery-location-boundary.spec.ts`
+fails to run (`Cannot find module 'reflect-metadata'` at its line 1). Evidence gathered: `reflect-metadata` does not
+resolve from `v3/services/booking/src` (MODULE_NOT_FOUND); the spec file, `services/booking/package.json`,
+`services/booking/jest.config.js` and `pnpm-lock.yaml` are byte-identical to baseline `b2477a3`. A baseline run has NOT
+been performed, so it stays UNRESOLVED until one confirms or refutes it.
