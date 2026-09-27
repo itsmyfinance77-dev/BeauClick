@@ -9,14 +9,15 @@
 //  - no value is printed to stdout/stderr, only file paths and counts;
 //  - existing secrets are never overwritten (a rotation of DB role passwords would
 //    strand the running cluster -- roles are cluster-global);
-//  - the CA is name-constrained to the demo IPs, so even a viewer who chooses to
-//    trust it cannot be served a certificate for any other name by it;
+//  - the demo PKI is v2 (ca-v2.mjs): every name form constrained at a non-anchor
+//    intermediate and at the root, and both CA keys destroyed after issuance;
 //  - nothing here installs trust anywhere. Importing the CA root is each viewer's
 //    own manual decision (demo/README.md).
 import { execFileSync } from 'node:child_process';
 import { randomBytes, scryptSync } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import {
   CERTS_DIR,
@@ -72,77 +73,24 @@ if (fs.existsSync(SECRETS_FILE)) {
 }
 
 // ---------------------------------------------------------------------------
-// 2. Private demo CA (name-constrained) and the TLS leaf for ingress + inbox
+// 2. Demo PKI (v2): constrained root + constrained intermediate + leaf, root and
+//    intermediate keys destroyed after issuance. See ca-v2.mjs. (v1 — a single CA
+//    constraining only iPAddress — was withdrawn after review; never regenerated.)
 // ---------------------------------------------------------------------------
 fs.mkdirSync(CERTS_DIR, { recursive: true });
-const caKey = path.join(CERTS_DIR, 'demo-ca.key');
 const caCrt = path.join(CERTS_DIR, 'demo-ca.crt');
-const leafKey = path.join(CERTS_DIR, 'demo-leaf.key');
-const leafCrt = path.join(CERTS_DIR, 'demo-leaf.crt');
-const leafChain = path.join(CERTS_DIR, 'demo-leaf-chain.crt');
-
-const openssl = (args) => execFileSync('openssl', args, { stdio: ['ignore', 'pipe', 'pipe'] });
-
-if (fs.existsSync(caCrt) && fs.existsSync(leafCrt)) {
-  console.log(`certs: kept existing CA and leaf in ${CERTS_DIR}`);
+const fingerprintsFile = path.join(CERTS_DIR, 'fingerprints.json');
+if (fs.existsSync(caCrt) && fs.existsSync(fingerprintsFile)) {
+  console.log(`certs: kept existing v2 PKI in ${CERTS_DIR}`);
 } else {
-  const caConf = path.join(CERTS_DIR, 'ca.cnf');
-  fs.writeFileSync(
-    caConf,
-    [
-      '[req]',
-      'distinguished_name = dn',
-      'prompt = no',
-      'x509_extensions = v3_ca',
-      '[dn]',
-      'CN = BeauClick DEMO ONLY private CA (2026-09-28, not for production)',
-      'O = BeauClick demo (synthetic)',
-      '[v3_ca]',
-      'basicConstraints = critical, CA:TRUE, pathlen:0',
-      'keyUsage = critical, keyCertSign, cRLSign',
-      'subjectKeyIdentifier = hash',
-      // Name constraints: the CA can only ever vouch for the two demo addresses.
-      `nameConstraints = critical, permitted;IP:${WIREGUARD.hostAddress}/255.255.255.255, permitted;IP:127.0.0.1/255.255.255.255`,
-      '',
-    ].join('\n'),
-  );
-  openssl(['genpkey', '-algorithm', 'EC', '-pkeyopt', 'ec_paramgen_curve:P-256', '-out', caKey]);
-  openssl(['req', '-new', '-x509', '-key', caKey, '-out', caCrt, '-days', '21', '-config', caConf, '-sha256']);
-
-  const leafConf = path.join(CERTS_DIR, 'leaf.cnf');
-  fs.writeFileSync(
-    leafConf,
-    [
-      '[req]',
-      'distinguished_name = dn',
-      'prompt = no',
-      '[dn]',
-      'CN = BeauClick demo (synthetic data)',
-      '[v3_leaf]',
-      'basicConstraints = critical, CA:FALSE',
-      'keyUsage = critical, digitalSignature',
-      'extendedKeyUsage = serverAuth',
-      `subjectAltName = IP:127.0.0.1, IP:${WIREGUARD.hostAddress}`,
-      'subjectKeyIdentifier = hash',
-      'authorityKeyIdentifier = keyid',
-      '',
-    ].join('\n'),
-  );
-  const csr = path.join(CERTS_DIR, 'demo-leaf.csr');
-  openssl(['genpkey', '-algorithm', 'EC', '-pkeyopt', 'ec_paramgen_curve:P-256', '-out', leafKey]);
-  openssl(['req', '-new', '-key', leafKey, '-out', csr, '-config', leafConf]);
-  openssl([
-    'x509', '-req', '-in', csr, '-CA', caCrt, '-CAkey', caKey, '-CAcreateserial',
-    '-out', leafCrt, '-days', '14', '-sha256', '-extfile', leafConf, '-extensions', 'v3_leaf',
-  ]);
-  fs.writeFileSync(leafChain, fs.readFileSync(leafCrt, 'utf8') + fs.readFileSync(caCrt, 'utf8'));
-  fs.rmSync(csr, { force: true });
-  console.log(`certs: created name-constrained demo CA and leaf in ${CERTS_DIR}`);
+  if (fs.existsSync(caCrt)) throw new Error(`${CERTS_DIR} holds a pre-v2 CA; retire it first (see DEMO_PROGRESS.md), never reuse it.`);
+  execFileSync(process.execPath, [path.join(path.dirname(fileURLToPath(import.meta.url)), 'ca-v2.mjs')], { stdio: 'inherit' });
+  const staging = path.join(path.dirname(CERTS_DIR), 'certs-v2-staging');
+  fs.rmSync(CERTS_DIR, { recursive: true, force: true });
+  fs.renameSync(staging, CERTS_DIR);
+  console.log(`certs: v2 PKI promoted into ${CERTS_DIR}`);
 }
-const caFingerprint = openssl(['x509', '-in', caCrt, '-noout', '-fingerprint', '-sha256'])
-  .toString()
-  .trim()
-  .replace(/^.*=/, '');
+const caFingerprint = JSON.parse(fs.readFileSync(fingerprintsFile, 'utf8')).rootSha256;
 
 // ---------------------------------------------------------------------------
 // 3. Inbox members (scrypt hashes) and per-member handouts

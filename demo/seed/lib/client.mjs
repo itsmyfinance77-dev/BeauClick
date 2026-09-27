@@ -25,7 +25,8 @@ async function request(url, opts = {}) {
 function requestOnce(url, { method = 'GET', headers = {}, body } = {}) {
   return new Promise((resolve, reject) => {
     const u = new URL(url);
-    const payload = body === undefined ? undefined : typeof body === 'string' ? body : JSON.stringify(body);
+    const raw = typeof body === 'string' || Buffer.isBuffer(body);
+    const payload = body === undefined ? undefined : raw ? body : JSON.stringify(body);
     const req = https.request(
       {
         host: u.hostname,
@@ -36,7 +37,7 @@ function requestOnce(url, { method = 'GET', headers = {}, body } = {}) {
         agent: false,
         headers: {
           accept: 'application/json',
-          ...(payload !== undefined && typeof body !== 'string' ? { 'content-type': 'application/json' } : {}),
+          ...(payload !== undefined && !raw ? { 'content-type': 'application/json' } : {}),
           ...(payload !== undefined ? { 'content-length': Buffer.byteLength(payload) } : {}),
           ...headers,
         },
