@@ -26,7 +26,7 @@ async function row(matrix, feature, persona, route, dbSql = null, params = []) {
   if (!route) status = 'no read route exercised (DB count only)';
   else try {
     const res = await (await as(persona)).get(route, { expect: [200, 201, 204, 400, 403, 404, 409] });
-    status = res.status;
+    status = res.status >= 400 ? `${res.status} ${res.raw.json?.error?.code ?? ''}`.trim() : res.status;
     shape = { items: size(res.data), keys: res.data && typeof res.data === 'object' && !Array.isArray(res.data) ? Object.keys(res.data).slice(0, 8) : undefined };
   } catch (e) {
     status = `error: ${e.message.slice(0, 120)}`;
@@ -41,10 +41,12 @@ const loc = ids.locations?.main;
 await row(16, 'business locations', 'bizOwner', `/v1/businesses/${biz}/locations`, `select count(*) n from business.locations where business_id = $1`, [biz]);
 await row(16, 'location resources', 'bizOwner', `/v1/businesses/${biz}/locations/${loc}/resources`, `select count(*) n from business.location_resources`);
 await row(16, 'service resource requirements (seed via API)', 'bizOwner', null, `select count(*) n from business.service_resource_requirements`);
-await row(22, 'seller subscription (workspace)', 'pro1', `/v1/me/subscriptions/${ids.pro1.workspaceRef}`);
+await row(22, 'seller subscriptions (list)', 'pro1', `/v1/me/subscriptions`);
+await row(22, 'commercial plans offered to the seller', 'pro1', `/v1/me/commercial-plans`);
+await row(22, 'subscription history (workspace)', 'pro1', `/v1/me/subscriptions/${ids.pro1.workspaceRef}/history`);
 await row(22, 'credit purchases', 'pro1', `/v1/me/subscriptions/${ids.pro1.workspaceRef}/credit-purchases`, `select count(*) n from commercial.credit_purchases`);
 await row(22, 'collection policies (seller view)', 'pro1', `/v1/me/collection-policies`, `select count(*) n from commercial.booking_collection_policies`);
-await row(22, 'collection-policy assignments', 'pro1', `/v1/me/collection-policy-assignments`);
+await row(22, 'collection-policy assignment (workspace)', 'pro1', `/v1/me/collection-policy-assignments/${ids.pro1.workspaceRef}`);
 await row(23, 'settlement schedules (admin)', 'admin', `/v1/admin/commercial/settlement-schedules`);
 await row(23, 'seller risk classes (admin)', 'admin', `/v1/admin/commercial/seller-risk-classes`);
 await row(23, 'legal evidence registry (admin)', 'admin', `/v1/admin/commercial/legal-evidence`);

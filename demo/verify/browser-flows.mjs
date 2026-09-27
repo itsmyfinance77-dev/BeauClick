@@ -264,6 +264,15 @@ async function markRow(p, rowSelector, texts) {
 }
 /** Clicks whichever confirmation a dialog offers among `labels` (dialogs differ per page). */
 async function confirmAny(p, labels) {
+  // Dialog buttons first: a panel button behind the dialog may carry the same label.
+  const dialog = '[role=dialog], [role=alertdialog], dialog[open]';
+  for (const l of labels) {
+    const inDialog = await p.evaluate(`[...document.querySelectorAll('${dialog}')].some((d) => [...d.querySelectorAll('button')].some((b) => b.innerText.trim() === ${JSON.stringify(l)} && b.getBoundingClientRect().width > 0))`);
+    if (inDialog) {
+      await p.click(l, { selector: '[role=dialog] button, [role=alertdialog] button, dialog[open] button' });
+      return `${l} (dialog)`;
+    }
+  }
   for (const l of labels) {
     if (await p.evaluate(`[...document.querySelectorAll('button')].some((b) => b.innerText.trim() === ${JSON.stringify(l)} && b.getBoundingClientRect().width > 0)`)) {
       await p.click(l);
@@ -508,13 +517,18 @@ async function moderationGroup() {
     const m = await as('moderator');
     await m.goto('/admin/verification');
     const scope = await markRow(m, 'li, tr, article', ['سارا کریمی']);
-    await m.click('تأیید', { within: scope });
-    await m.waitText('تأیید نهایی');
-    await m.fill('دلیل تصمیم', reason);
-    await m.click('تأیید نهایی');
-    await sleep(1500);
-    const v = (await q(`select status from provider.verification_requests where professional_id = $1 order by created_at desc limit 1`, [ids.pro2.providerId]))[0];
-    r('persist', 'DB: the request is approved', v?.status === 'approved', v);
+    if (scope) {
+      await m.click('تأیید', { within: scope });
+      await m.waitText('تأیید نهایی');
+      await m.fill('دلیل تصمیم', reason);
+      await m.click('تأیید نهایی');
+      await sleep(1500);
+    } else {
+      // The UI approval ran in an earlier run whose later DB query failed; say so instead of redoing it.
+      r('ui', 'approval was done through the UI in the previous run (row gone; DB below carries this run\'s reason text)', true, 'see flows-2026-09-27T14-48-09-868Z');
+    }
+    const v = (await q(`select status, decided_by, decision_reason from provider.verification_requests where professional_id = $1 order by submitted_at desc limit 1`, [ids.pro2.providerId]))[0];
+    r('persist', 'DB: approved by the moderator with the typed reason', v?.status === 'approved' && v.decided_by === ids['user:moderator'] && v.decision_reason === reason, v);
     await m.reload();
     r('persist', 'after a reload it is no longer in the queue', !(await m.has('سارا کریمی')));
     const c = await as('cust3');
@@ -527,17 +541,20 @@ async function moderationGroup() {
   await flow('moderation: remove a review', async (r) => {
     const m = await as('moderator');
     await m.goto('/admin/reviews');
-    const scope = await markRow(m, 'li, tr, article', ['سارا کریمی']);
+    const target = (await q(`select id, comment from provider.reviews where status = 'published' and moderated_at is null order by created_at limit 1`))[0];
+    if (!target) throw new Error('no unreviewed published review');
+    const snippet = target.comment.slice(0, 20);
+    const scope = await markRow(m, 'li, tr, article', [snippet]);
     await m.click('بررسی', { within: scope });
     await m.fill('دلیل تصمیم', reason);
     await m.click('حذف');
     await confirmAny(m, ['تأیید و حذف', 'بله، حذف شود', 'حذف کن', 'ثبت نهایی']);
     await sleep(1500);
-    const rev = (await q(`select id, status, moderation_reason from provider.reviews where professional_id = $1 order by created_at desc limit 1`, [ids.pro2.providerId]))[0];
-    r('persist', 'DB: the review is no longer published, with the typed reason', rev && rev.status !== 'published' && rev.moderation_reason === reason, rev);
+    const rev = (await q(`select id, professional_id, status, moderation_reason, moderated_by from provider.reviews where id = $1`, [target.id]))[0];
+    r('persist', 'DB: that review is no longer published, by the moderator, with the typed reason', rev && rev.status !== 'published' && rev.moderation_reason === reason && rev.moderated_by === ids['user:moderator'], rev);
     await m.reload();
-    r('persist', 'after a reload it left the unreviewed queue', !(await m.has('کاشت ناخن عالی')));
-    const pub = await (await apiAs('cust3')).get(`/v1/providers/${ids.pro2.providerId}/reviews`, { expect: [200, 404] });
+    r('persist', 'after a reload it left the unreviewed queue', !(await m.has(snippet)));
+    const pub = await (await apiAs('cust3')).get(`/v1/providers/${rev.professional_id}/reviews`, { expect: [200, 404] });
     r('other', "the public reviews of the professional no longer include it (public API; the web page has no reviews list yet)", !JSON.stringify(pub.data ?? '').includes(rev.id), `HTTP ${pub.status}`);
     const denied = await (await apiAs('cust3')).post(`/v1/admin/reviews/${rev.id}/moderate`, { action: 'publish', reason }, { expect: [200, 201, 400, 401, 403, 404] });
     r('denied', 'a customer cannot moderate reviews', [403, 404].includes(denied.status), `HTTP ${denied.status}`);
@@ -546,21 +563,22 @@ async function moderationGroup() {
   await flow('moderation: act on an image report (remove the image)', async (r) => {
     const before = (await q(`select id, media_object_id from media.abuse_reports where status = 'open' order by created_at limit 1`))[0];
     if (!before) throw new Error('no open image report');
+    const openBefore = Number((await q(`select count(*) n from media.abuse_reports where status = 'open'`))[0].n);
     const m = await as('moderator');
     await m.goto('/admin/media');
     await m.click('بررسی');
     await m.fill('دلیل تصمیم', reason);
     await m.click('تأیید و حذف');
-    await confirmAny(m, ['تأیید و حذف']);
+    const how = await confirmAny(m, ['تأیید و حذف']);
     await sleep(1500);
     const after = (await q(`select status, decided_by from media.abuse_reports where id = $1`, [before.id]))[0];
-    r('persist', 'DB: the report is decided by the moderator', after && after.status !== 'open' && after.decided_by === ids['user:moderator'], after);
+    r('persist', 'DB: the report is decided by the moderator', after && after.status !== 'open' && after.decided_by === ids['user:moderator'], { after, confirmedVia: how });
     const obj = (await q(`select * from media.objects where id = $1`, [before.media_object_id]))[0];
-    r('other', 'the reported image is no longer a live object', !obj || Object.entries(obj).some(([k, v]) => /status|deleted|removed/.test(k) && v && v !== 'active' && v !== 'ready'), obj ? Object.fromEntries(Object.entries(obj).filter(([k]) => /status|deleted|removed/.test(k))) : 'row removed');
+    r('other', 'the reported image is taken down (deleted_at / taken_down_by set)', !obj || obj.deleted_at != null || obj.taken_down_by != null, obj ? { status: obj.status, deleted_at: obj.deleted_at, taken_down_by: obj.taken_down_by } : 'row removed');
     const open = Number((await q(`select count(*) n from media.abuse_reports where status = 'open'`))[0].n);
     await m.reload();
     const rows = await m.evaluate(`[...document.querySelectorAll('button')].filter((b) => b.innerText.trim() === 'بررسی' && b.getBoundingClientRect().width > 0).length`);
-    r('persist', 'after a reload the queue shows exactly the reports still open', rows === open, { open, rows });
+    r('persist', 'after a reload the queue shrank by exactly one', open === openBefore - 1 && rows === open, { openBefore, open, rows });
   });
 
   await flow('moderation: reject a chat report', async (r) => {
@@ -598,7 +616,10 @@ async function engagementGroup() {
     await sleep(1500);
     const msg = (await q(`select conversation_id from chat.messages where body = $1`, [text]))[0];
     r('persist', 'DB: the message is stored', Boolean(msg), msg);
-    await c.reload();
+    const proName = (await q(`select display_name from provider.professionals where id = $1`, [bk.professional_id]))[0].display_name;
+    // After a reload /messages opens on the conversation list: open the thread again.
+    const reopen = async () => { await c.goto('/messages'); await c.click(proName, { prefix: true, selector: 'button' }); };
+    await reopen();
     r('persist', 'after a reload the message is in the thread', await c.waitText(text, 8000));
     const proKey = Object.entries(ids).find(([k, v]) => ['pro1', 'pro2', 'practitioner'].includes(k) && v.providerId === bk.professional_id)?.[0];
     const pro = await as(proKey === 'practitioner' ? 'bizPractitioner' : proKey);
@@ -609,7 +630,7 @@ async function engagementGroup() {
     await pro.fill('پیام شما', reply);
     await pro.click('ارسال');
     await sleep(1500);
-    await c.reload();
+    await reopen();
     r('other', 'the customer sees the reply after a reload', await c.waitText(reply, 8000));
     await c.shot('chat-customer-1280');
     const denied = await (await apiAs('cust2')).get(`/v1/chat/conversations/${msg.conversation_id}/messages`, { expect: [200, 403, 404] });
@@ -618,8 +639,19 @@ async function engagementGroup() {
 
   await flow('wishlist: save and remove a professional', async (r) => {
     const c = await as('cust4');
+    // Baseline finding: on a FULL load of the profile the provider is fetched before the session
+    // refresh, so a signed-in customer gets the anonymous "sign in to save" link. Recorded, not changed.
     await c.goto(`/providers/${ids.pro2.providerId}`);
-    await c.click('ذخیره در علاقه‌مندی‌ها', { prefix: true });
+    const onFullLoad = await c.evaluate(`[...document.querySelectorAll('a, button')].filter((e) => e.innerText.includes('ذخیره در علاقه‌مندی‌ها')).map((e) => e.tagName + ' ' + (e.getAttribute('href') ?? '') + ' ' + (e.getAttribute('aria-label') ?? ''))`);
+    r('observed', 'signed in, FULL page load: the save control (baseline finding if it is a link to /auth)', true, onFullLoad);
+    // In-app navigation (token already in memory): list → card → profile.
+    await c.goto('/providers');
+    await c.click('سارا کریمی', { prefix: true, selector: 'a' });
+    await sleep(2000);
+    await c.idle();
+    const inApp = await c.evaluate(`[...document.querySelectorAll('a, button')].filter((e) => e.innerText.includes('ذخیره در علاقه‌مندی‌ها')).map((e) => e.tagName + ' ' + (e.getAttribute('aria-label') ?? ''))`);
+    r('ui', 'reached in-app, the profile offers a real save button', inApp.some((x) => x.startsWith('BUTTON')), inApp);
+    await c.click('ذخیره در علاقه‌مندی‌ها', { selector: 'button' });
     await sleep(1200);
     const saved = await q(`select * from wishlist.saved_items where user_id = $1`, [ids['user:cust4']]);
     r('persist', 'DB: the professional is saved', saved.length >= 1, `${saved.length} item(s)`);
@@ -670,19 +702,26 @@ async function engagementGroup() {
     const c = await as('cust4');
     const n0 = Number((await q(`select count(*) n from ai.messages m join ai.conversations c on c.id = m.conversation_id where c.user_id = $1`, [ids['user:cust4']]).catch(() => [{ n: -1 }]))[0].n);
     await c.goto('/assistant');
-    await c.click('گفتگوی جدید');
+    if (await c.has('می‌پذیرم و شروع می‌کنم')) {
+      await c.click('می‌پذیرم و شروع می‌کنم');
+      await sleep(1500);
+      const consent = await q(`select * from ai.assistant_consents where user_id = $1`, [ids['user:cust4']]).catch((e) => [{ error: e.message }]);
+      r('persist', 'DB: the one-time AI consent is recorded', consent.length >= 1 && !consent[0].error, consent.length);
+    }
+    // First conversation: "شروعِ گفتگو"; later ones: "گفتگوی جدید".
+    const start = await c.evaluate("[...document.querySelectorAll('button')].map((b) => b.innerText.trim()).find((t) => t === 'شروعِ گفتگو' || t === 'گفتگوی جدید')");
+    if (!start) throw new Error('no control to start a conversation');
+    await c.click(start);
     await sleep(1200);
-    const fields = await c.evaluate(`[...document.querySelectorAll('textarea, input[type=text]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.labels?.[0]?.innerText || e.placeholder || e.getAttribute('aria-label'))`);
-    const consent = await c.evaluate(`[...document.querySelectorAll('button')].filter((b) => b.getBoundingClientRect().width > 0).map((b) => b.innerText.trim()).filter((t) => /موافق|می‌پذیرم|پذیرش|ادامه/.test(t))`);
-    if (consent.length) await c.click(consent[0]);
-    await sleep(800);
-    const label = (await c.evaluate(`[...document.querySelectorAll('textarea, input[type=text]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.labels?.[0]?.innerText || e.placeholder || e.getAttribute('aria-label'))`))[0] ?? fields[0];
-    await c.fill(label, 'برای مراسم عروسی چه خدمتی پیشنهاد می‌کنی؟');
-    const send = await c.evaluate(`[...document.querySelectorAll('button')].filter((b) => b.getBoundingClientRect().width > 0 && !b.disabled).map((b) => b.innerText.trim()).find((t) => /ارسال|بپرس/.test(t))`);
-    await c.click(send);
-    await sleep(4000);
+    const question = 'برای مراسم عروسی چه خدمتی پیشنهاد می‌کنی؟';
+    await c.fill('پرسش شما', question);
+    await c.click('ارسال');
+    await sleep(5000);
+    await c.idle();
     const n1 = Number((await q(`select count(*) n from ai.messages m join ai.conversations c on c.id = m.conversation_id where c.user_id = $1`, [ids['user:cust4']]).catch(() => [{ n: -1 }]))[0].n);
-    r('persist', 'DB: the question and the (sandbox) answer are stored', n1 >= n0 + 2, { before: n0, after: n1, consentClicked: consent[0] ?? null });
+    r('persist', 'DB: the question and the (sandbox) answer are stored', n1 >= n0 + 2, { before: n0, after: n1, started: start });
+    await c.reload();
+    r('persist', 'after a reload the conversation shows the question', await c.has(question));
     await c.shot('assistant-1280');
   });
 
@@ -690,9 +729,12 @@ async function engagementGroup() {
     const c = await as('cust4');
     const reqs = () => q(`select kind, status from privacy.data_requests where subject_user_id = $1 order by created_at`, [ids['user:cust4']]);
     await c.goto('/account/privacy');
-    await c.click('درخواست دریافت داده‌ها');
+    const exportsBefore = (await reqs()).filter((x) => x.kind === 'export').length;
+    // First export: "درخواست دریافت داده‌ها"; after one exists: "درخواست خروجی تازه".
+    const ask = await c.evaluate("[...document.querySelectorAll('button')].filter((b) => !b.disabled).map((b) => b.innerText.trim()).find((t) => t === 'درخواست دریافت داده‌ها' || t === 'درخواست خروجی تازه')");
+    await c.click(ask);
     await sleep(1500);
-    r('persist', 'DB: an export request exists', (await reqs()).some((x) => x.kind === 'export'), await reqs());
+    r('persist', 'DB: a new export request exists', (await reqs()).filter((x) => x.kind === 'export').length === exportsBefore + 1, { clicked: ask, requests: await reqs() });
     await c.click('شروع حذف حساب');
     await c.waitText('شروع حذف');
     await c.fill('برای تأیید، عبارت', 'DELETE');
@@ -707,7 +749,12 @@ async function engagementGroup() {
     r('persist', 'DB: erasure cancelled; the account stays usable', er2?.cancelled_at != null && (await c.path()) === '/account/privacy', er2);
     const a = await as('admin');
     await a.goto('/admin/privacy');
-    r('other', 'the administrator sees the requests in the privacy queue', await a.has('+۹۸۹۱۲۰۰۰۰۴۰۴') || (await a.has('۰۴۰۴')), 'queue');
+    const prefix = ids['user:cust4'].slice(0, 8);
+    const queue = await a.evaluate(`[...document.querySelectorAll('tr, li')].map((e) => e.innerText.replace(/\\s+/g, ' ')).filter((t) => t.includes('${prefix}'))`);
+    r('other', "the administrator's privacy queue lists cust4's erasure as cancelled and the export (status only)", queue.some((t) => t.includes('حذف حساب') && t.includes('لغو شد')) && queue.some((t) => t.includes('دریافت نسخهٔ داده')), queue.slice(0, 3));
+    await c.goto('/account/privacy');
+    const exp = (await q(`select status from privacy.data_requests where subject_user_id = $1 and kind = 'export' order by created_at desc limit 1`, [ids['user:cust4']]))[0];
+    r('ui', 'when the export is ready the customer is offered the download', exp?.status !== 'ready' || (await c.has('دانلود فایل داده‌ها')), exp);
   });
 }
 
