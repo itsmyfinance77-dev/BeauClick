@@ -71,7 +71,10 @@ const reference = u.searchParams.get('reference');
 const callback = u.searchParams.get('callback');
 await rawRequest(`${origin}/api/v1/sandbox-gateway/${encodeURIComponent(reference)}/decide`, { method: 'POST', body: { decision: 'success' } });
 const back = await rawRequest(`${callback}${callback.includes('?') ? '&' : '?'}reference=${encodeURIComponent(reference)}`);
-check('a capture after the lapse is refunded automatically, not confirmed', /status=refunded/.test(back.headers.location ?? ''), back.headers.location);
+// The existing checkout refunds a capture it cannot confirm; after the hold lapsed the
+// order is already cancelled, so it takes the duplicate-charge path (`duplicate_refunded`).
+// Either refund outcome is correct; a confirmation is not.
+check('a capture after the lapse is refunded automatically, not confirmed', /status=(refunded|duplicate_refunded)/.test(back.headers.location ?? ''), back.headers.location);
 const view2 = (await cust4.get(`/v1/bookings/${original.bookingId}/replacement-offer`)).data;
 check('the late capture did NOT use the offer', view2.status === 'open' && view2.replacementBookingId === null);
 const bk2 = (await cust4.get(`/v1/bookings/${attempt.data.booking.id}`)).data;
