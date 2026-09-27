@@ -1362,7 +1362,7 @@ async function round4Group() {
     r('persist', 'DB: the collected amount is refunded by the ordinary rules', refunds.length >= 1, refunds);
     const c = await as(cust);
     await c.goto('/bookings');
-    await c.click('گذشته', { prefix: true, selector: '[role="tab"]' }).catch(() => {}); // cancelled bookings sit on «گذشته»
+    await c.click('گذشته'); // cancelled bookings sit on «گذشته»
     await sleep(800);
     r('other', `the customer (${cust}) sees the cancellation with the remedy/replacement controls`, (await c.has('بازپرداخت و جبران')) || (await c.has('پیشنهاد جایگزینی')));
     ids.round4 = { ...(ids.round4 ?? {}), proCancelled: t.id };
@@ -1375,7 +1375,7 @@ async function round4Group() {
     if (past) {
       const p1 = await as('pro1');
       await p1.goto('/pro/bookings');
-      await p1.click('گذشته', { prefix: true, selector: '[role="tab"]' }).catch(() => {});
+      await p1.click('گذشته');
       await p1.click('ثبت انجام نوبت', { within: `li[data-booking="${past.id}"]` });
       await p1.click('بله، انجام شد');
       await sleep(4000);
@@ -1388,7 +1388,7 @@ async function round4Group() {
     const seller = t.pid === ids.pro1.providerId ? 'pro1' : 'pro2';
     const c = await as(cust);
     await c.goto('/bookings');
-    await c.click('گذشته', { prefix: true, selector: '[role="tab"]' }).catch(() => {});
+    await c.click('گذشته');
     await c.click('ثبت نظر', { within: `li[data-booking="${t.id}"]` });
     await c.click('۵', { within: `li[data-booking="${t.id}"]`, selector: 'label' });
     await c.fill('توضیح (اختیاری)', 'نظر آزمایشی مرورگر (دمو)');
@@ -1397,7 +1397,7 @@ async function round4Group() {
     const rv = (await q(`select id, rating, status from provider.reviews where booking_id = $1`, [t.id]))[0];
     r('persist', 'DB: the review exists (rating 5, published)', rv?.rating === 5 && rv.status === 'published', rv);
     await c.reload();
-    await c.click('گذشته', { prefix: true, selector: '[role="tab"]' }).catch(() => {});
+    await c.click('گذشته');
     r('persist', 'after reload the booking offers «نظر شما», not a second form', await c.has('نظر شما'));
     const p = await as(seller);
     await p.goto('/pro/reviews');
