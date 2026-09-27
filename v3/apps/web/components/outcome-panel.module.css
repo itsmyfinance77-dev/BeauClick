@@ -1,0 +1,164 @@
+/*
+ * Screen 49 — the seller's no-show panel and the customer's remedy panel
+ * (V3.3 #212, `Prototype - No-show and Remedy` §C1–C6). One file because the
+ * two panels share one vocabulary: an open state with at most one action, a
+ * closed state with nothing left to do, and a sentence where a control is not.
+ *
+ * Breakpoints are the design's 640 (`breakpoints.spec.ts`).
+ */
+
+.panel {
+  display: grid;
+  gap: 12px;
+  padding-block-start: 12px;
+  border-block-start: 1px solid var(--bc-color-border);
+}
+
+.open,
+.closed {
+  display: grid;
+  gap: 8px;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--bc-text-card-title-size);
+  font-weight: var(--bc-text-card-title-weight);
+  line-height: var(--bc-text-card-title-leading);
+}
+
+.subtitle {
+  margin: 0;
+  font-size: var(--bc-text-label-size);
+  font-weight: 700;
+}
+
+.text {
+  margin: 0;
+  font-size: var(--bc-text-compact-size);
+  line-height: 1.9;
+  color: var(--bc-color-text-muted);
+}
+
+.notice {
+  margin: 0;
+  font-size: var(--bc-text-compact-size);
+  line-height: 1.9;
+  color: var(--bc-color-text-muted);
+  padding: 10px 12px;
+  border-radius: var(--bc-radius-control);
+  background: var(--bc-color-surface-muted);
+}
+
+.done {
+  margin: 0;
+  font-size: var(--bc-text-compact-size);
+  font-weight: 600;
+  color: var(--bc-color-text);
+}
+
+.amount {
+  margin: 0;
+  font-size: var(--bc-text-card-title-size);
+  font-weight: 700;
+}
+
+.figure {
+  font-variant-numeric: tabular-nums;
+}
+
+/* A time of day stays left-to-right inside a right-to-left line. */
+.clock {
+  direction: ltr;
+  unicode-bidi: isolate;
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+}
+
+.statement {
+  display: grid;
+  gap: 4px;
+}
+
+.label {
+  margin: 0;
+  font-size: var(--bc-text-small-size);
+  color: var(--bc-color-text-faint);
+}
+
+.quote {
+  margin: 0;
+  font-size: var(--bc-text-compact-size);
+  line-height: 1.9;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 8px 12px;
+  border-inline-start: 3px solid var(--bc-color-border-strong);
+}
+
+/* Full-width buttons on a phone, inline from 640 up — the row's own rule. */
+.actions {
+  display: grid;
+  gap: 8px;
+}
+
+@media (min-width: 640px) {
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+  }
+}
+
+.override,
+.picker {
+  display: grid;
+  gap: 8px;
+}
+
+.override {
+  padding-block-start: 12px;
+  border-block-start: 1px dashed var(--bc-color-border);
+}
+
+.failure {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+
+/* ------------------------------------------------ declaration dialog */
+
+/* Does / does not: stacked on a phone, side by side from 640. */
+.columns {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr);
+  margin-block-end: 12px;
+}
+
+@media (min-width: 640px) {
+  .columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.column {
+  padding: 10px 12px;
+  border-radius: var(--bc-radius-control);
+  background: var(--bc-color-surface-muted);
+}
+
+.columnTitle {
+  margin: 0 0 6px;
+  font-size: var(--bc-text-label-size);
+  font-weight: 700;
+}
+
+.points {
+  margin: 0;
+  padding-inline-start: 18px;
+  display: grid;
+  gap: 4px;
+  font-size: var(--bc-text-compact-size);
+  line-height: 1.8;
+}

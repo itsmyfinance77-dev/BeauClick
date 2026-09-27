@@ -210,8 +210,54 @@ export function completeBooking(api: ApiClient, bookingId: string) {
   return api.post<BookingSummary>(`/v1/bookings/${bookingId}/complete`);
 }
 
-export function markNoShow(api: ApiClient, bookingId: string) {
-  return api.post<BookingSummary>(`/v1/bookings/${bookingId}/no-show`);
+/**
+ * What a declaration left behind — V3.3 `#42d-read` (#201). The customer's
+ * objection window and the evaluation state are carried by the route, and
+ * deliberately not rendered here: both belong to `#42e` (#162), which does not
+ * exist yet.
+ */
+export interface NoShowDeclarationView {
+  declaredAt: string;
+  statement: string | null;
+  objectionWindowEndsAt: string | null;
+  evaluationState: string;
+}
+
+/**
+ * `GET /v1/bookings/:id/no-show` — the seller's side of screen 49, #212.
+ *
+ * Every field here is the SERVER's answer and the screen renders it as given:
+ * `statementRequired` decides whether the statement field is required (spec 49
+ * reviewer correction C2), and `declarationPermitted` decides whether the
+ * control exists at all. There is no permitted INSTANT on the wire, on purpose
+ * (#201) — nothing here can be counted down to, and nothing tries.
+ *
+ * `graceMinutes` is the value the booking's own terms carry, or `null` for an
+ * ungoverned booking. It may be SAID, never added to a clock.
+ */
+export interface NoShowState {
+  governed: boolean;
+  graceMinutes: number | null;
+  statementRequired: boolean;
+  declarationPermitted: boolean;
+  declaration: NoShowDeclarationView | null;
+}
+
+export function noShowState(api: ApiClient, bookingId: string) {
+  return api.get<NoShowState>(`/v1/bookings/${bookingId}/no-show`);
+}
+
+/** `MarkNoShowDto.statement` is `@Length(1, 2000)` when present. */
+export const NO_SHOW_STATEMENT_MAX_LENGTH = 2000;
+
+/**
+ * The declaration itself. A statement is sent only when there is one: the DTO
+ * refuses an empty string, and an ungoverned booking keeps sending exactly
+ * the request it sent before #212 (`{}`).
+ */
+export function markNoShow(api: ApiClient, bookingId: string, statement?: string) {
+  const trimmed = statement?.trim();
+  return api.post<BookingSummary>(`/v1/bookings/${bookingId}/no-show`, trimmed ? { statement: trimmed } : undefined);
 }
 
 export function rescheduleBooking(api: ApiClient, bookingId: string, newSlotId: string, reason?: string) {

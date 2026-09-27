@@ -269,7 +269,46 @@ export const bookingApi = {
    */
   retryOrderPayment: (api: ApiClient, orderId: string) =>
     api.post<{ redirectUrl: string }>(`/v1/orders/${orderId}/payment/retry`, {}),
+
+  /**
+   * The customer's remedy after a cancellation that was not theirs — screen
+   * 49, #212, over `#42d-read` (#201). Refuses with `REMEDY_NOT_OFFERED` (404)
+   * for every booking that has no remedy, which on a list is the common,
+   * unremarkable answer.
+   */
+  remedyState: (api: ApiClient, bookingId: string) => api.get<CustomerRemedyView>(`/v1/bookings/${bookingId}/remedy`),
+
+  /**
+   * `choice` is required on the wire (spec 49 reviewer correction R3). Only
+   * `reschedule` writes anything; a repeat of either choice is answered from
+   * the recorded resolution without writing, so it is safe to send twice.
+   */
+  resolveRemedy: (api: ApiClient, bookingId: string, body: { choice: 'refund' } | { choice: 'reschedule'; newSlotId: string }) =>
+    api.post<{ chosen: 'refund' | 'reschedule' | null; resolvedBy: 'customer' | 'default' }>(`/v1/bookings/${bookingId}/remedy`, body),
 };
+
+/**
+ * `GET /v1/bookings/:id/remedy` — `CustomerRemedyView` (#201).
+ *
+ * The default is ALREADY applied: `resolvedBy: 'default'` with `chosen: null`
+ * means the full refund is under way and doing nothing costs the customer
+ * nothing. `rescheduleStillAvailable` is the server's own answer to "may I
+ * still swap it for a free reschedule", derived from the refund's execution
+ * status; it is a boolean, not a deadline, and the screen shows the control
+ * exactly while it is `true`.
+ *
+ * `refundToman` is a decimal STRING (a BIGINT on the server) or `null` when no
+ * refund figure has been decided — never a zero the platform did not decide.
+ * `executionStatus` is `pending` | `executed` | `manual_required` | `failed`,
+ * or `null` alongside a null amount.
+ */
+export interface CustomerRemedyView {
+  chosen: 'refund' | 'reschedule' | null;
+  resolvedBy: 'customer' | 'default';
+  rescheduleStillAvailable: boolean;
+  refundToman: string | null;
+  executionStatus: string | null;
+}
 
 /**
  * Groups slots by their Tehran-local calendar day.

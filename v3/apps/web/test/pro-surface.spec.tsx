@@ -334,27 +334,22 @@ describe('bookings', () => {
     createdAt: new Date().toISOString(),
   };
 
-  it('does not offer "no-show" before the slot has ended, and explains the rule', async () => {
+  /*
+   * Screen 49 (#212) replaced the two cases that stood here. They pinned a
+   * CLIENT rule — "no-show only once `endAt` has passed" — that was wrong for
+   * every governed booking (the server's rule is slot start plus the booking's
+   * own grace, and it refuses an empty statement). Whether a declaration is
+   * permitted is now the server's answer, read when the row's panel opens;
+   * `no-show-declaration.spec.tsx` owns those cases.
+   */
+  it('no longer decides no-show from the clock: the row offers the panel, not the action, and reads nothing yet', async () => {
     mockApi({ '/v1/me/professional-bookings': () => ok([confirmedFuture]) });
     renderPro(<ProBookingsPage />);
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'ثبت انجام نوبت' })).toBeInTheDocument());
-    expect(screen.queryByRole('button', { name: 'عدم حضور مشتری' })).not.toBeInTheDocument();
-    expect(screen.getByText('ثبت عدم حضور تنها پس از پایان زمان نوبت ممکن است.')).toBeInTheDocument();
-  });
-
-  it('offers "no-show" once the slot has ended', async () => {
-    const ended = {
-      ...confirmedFuture,
-      startAt: new Date(Date.now() - 3 * 3_600_000).toISOString(),
-      endAt: new Date(Date.now() - 2 * 3_600_000).toISOString(),
-    };
-    mockApi({ '/v1/me/professional-bookings': () => ok([ended]) });
-    const user = userEvent.setup();
-    renderPro(<ProBookingsPage />);
-
-    await user.click(await screen.findByRole('tab', { name: /گذشته/ }));
-    expect(await screen.findByRole('button', { name: 'عدم حضور مشتری' })).toBeInTheDocument();
+    const toggle = await screen.findByRole('button', { name: 'عدم حضور مشتری' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('ثبت عدم حضور تنها پس از پایان زمان نوبت ممکن است.')).not.toBeInTheDocument();
+    expect((global.fetch as jest.Mock).mock.calls.filter((c) => String(c[0]).includes('/no-show'))).toHaveLength(0);
   });
 
   it('confirms completion before sending it, naming the downstream consequences', async () => {
