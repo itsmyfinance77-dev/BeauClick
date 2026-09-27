@@ -145,6 +145,18 @@ export class Session {
       headers: { ...(this.accessToken ? { authorization: `Bearer ${this.accessToken}` } : {}), ...headers },
     });
     const ok = expect ? [].concat(expect).includes(res.status) : res.status >= 200 && res.status < 300;
+    // An expired ACCESS token (short-lived by design) is renewed through the real
+    // refresh-token rotation, once, exactly as the web client does.
+    if (!ok && res.status === 401 && this.refreshToken && !this.retrying) {
+      this.retrying = true;
+      try {
+        await this.refresh();
+        this.onRotate?.(this.refreshToken);
+        return await this.call(method, p, body, { expect, headers });
+      } finally {
+        this.retrying = false;
+      }
+    }
     if (!ok) throw new ApiError(method, p, res);
     return { status: res.status, data: dataOf(res), raw: res };
   }

@@ -60,6 +60,10 @@ async function as(key) {
     }
   }
   if (!s) s = await signIn(profileKey, p.phone, inbox, key);
+  s.onRotate = (t) => {
+    tokens[key] = t;
+    fs.writeFileSync(SESSIONS_FILE, JSON.stringify(tokens));
+  };
   const me = await s.get('/v1/me');
   s.userId = me.data.id ?? me.data.user?.id;
   s.roles = me.data.roles ?? me.data.user?.roles ?? [];
