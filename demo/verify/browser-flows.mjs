@@ -1380,7 +1380,7 @@ async function round4Group() {
     if (past) {
       const p1 = await as('pro1');
       await p1.goto('/pro/bookings');
-      await p1.click('گذشته');
+      await p1.click('گذشته', { prefix: true }); // the professional tabs carry a count: «گذشته (۶)»
       await p1.click('ثبت انجام نوبت', { within: `li[data-booking="${past.id}"]` });
       await p1.click('بله، انجام شد');
       await sleep(4000);
