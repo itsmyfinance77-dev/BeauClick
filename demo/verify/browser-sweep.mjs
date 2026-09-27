@@ -53,8 +53,12 @@ const openBookingPanels = (id) => `(async () => {
   if (!card) return 'tour booking not listed';
   for (const t of ['شرایط پذیرفته‌شده', 'بازپرداخت و جبران', 'پیشنهاد جایگزینی']) ${click('t', 'card').replace('"t"', 't')};
   await new Promise((r) => setTimeout(r, 2500));
+  // A customer-cancelled booking has no offer: its panel must say so, not open empty.
+  const none = document.querySelector('li[data-booking="${state.ids.bookings?.['F7-governed-paid-customer-cancels']?.bookingId}"]');
+  if (none) ${click('پیشنهاد جایگزینی', 'none')};
+  await new Promise((r) => setTimeout(r, 2000));
   card.scrollIntoView({ block: 'start' });
-  return card.innerText.slice(0, 160);
+  return JSON.stringify({ tour: card.innerText.slice(0, 160), customerCancelled: none?.querySelector('[data-testid=replacement-none]')?.innerText ?? 'NO MESSAGE' });
 })()`;
 const pickSlot = `(async () => {
   const b = (t) => [...document.querySelectorAll('button')].find((x) => x.innerText.trim().startsWith(t));
@@ -201,7 +205,10 @@ async function newPage() {
 const inbox = new DemoInbox();
 // Reports the DEEPEST offending elements (no offending child) — the ones that force the width.
 const overflow = `(() => { const W = document.documentElement.clientWidth;
-  const bad = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && (r.right > W + 1 || r.left < -1) && !e.closest('.bc-visually-hidden'); };
+  const wide = (e) => e.getBoundingClientRect().width > W + 1 && !e.closest('.bc-visually-hidden');
+  const out = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && (r.right > W + 1 || r.left < -1) && !e.closest('.bc-visually-hidden'); };
+  // Prefer the deepest element WIDER than the screen (the cause); else the deepest one pushed out of it.
+  const bad = [...document.querySelectorAll('body *')].some(wide) ? wide : out;
   const off = [...document.querySelectorAll('body *')].filter((e) => bad(e) && ![...e.children].some(bad))
     .slice(0, 5).map((e) => e.tagName + '.' + String(e.className?.baseVal ?? e.className ?? '').slice(0, 40) + ' w=' + Math.round(e.getBoundingClientRect().width) + ' "' + (e.innerText ?? '').slice(0, 60) + '"');
   return { scrollW: document.documentElement.scrollWidth, W, off }; })()`;
