@@ -112,7 +112,17 @@ export class Session {
     this.origin = origin;
     this.label = label;
     this.accessToken = null;
+    this.refreshToken = null;
     this.user = null;
+  }
+  /** Real token rotation (body path, as a non-browser client). New roles/capabilities take effect here. */
+  async refresh() {
+    const res = await request(this.url('/v1/auth/refresh'), { method: 'POST', body: { refreshToken: this.refreshToken } });
+    if (res.status !== 200) throw new ApiError('POST', '/v1/auth/refresh', res);
+    const d = dataOf(res);
+    this.accessToken = d.accessToken;
+    this.refreshToken = d.refreshToken;
+    return this;
   }
   url(p) {
     return `${this.origin}/api${p}`;
@@ -156,6 +166,7 @@ export async function signIn(profileKey, phone, inbox, label = phone) {
   if (ver.status !== 200) throw new ApiError('POST', '/v1/auth/verify-otp', ver);
   const d = dataOf(ver);
   s.accessToken = d.accessToken;
+  s.refreshToken = d.refreshToken;
   s.user = d.user;
   return s;
 }
