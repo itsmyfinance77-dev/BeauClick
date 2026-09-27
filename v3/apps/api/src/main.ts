@@ -121,7 +121,8 @@ async function bootstrap() {
   // (all interfaces); the team demo sets 127.0.0.1 so the API is reachable only
   // through its ingress on a host whose firewall is off.
   const host = process.env.BIND_HOST?.trim() || undefined;
-  await app.listen(port, ...(host ? [host] : []));
+  if (host) await app.listen(port, host);
+  else await app.listen(port);
   Logger.log(`BeauClick V3 API listening on ${host ?? ''}:${port}`, 'Bootstrap');
 }
 
