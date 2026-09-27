@@ -50,6 +50,8 @@ export const PRO_NAV: ProNavItem[] = [
   { href: '/pro/services', label: 'خدمات' },
   { href: '/pro/finance', label: 'مالی' },
   { href: '/pro/analytics', label: 'آمار' },
+  // Demo: customers' reviews and the professional's replies (existing API, no screen before).
+  { href: '/pro/reviews', label: 'نظرات مشتریان' },
   // V3.3 `#42b` / #159. Beside «مالی» rather than inside it: the terms
   // decide what a cancellation COSTS, which is an operating decision the
   // seller makes once, not a figure they read.

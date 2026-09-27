@@ -104,6 +104,7 @@ describe('the professional column', () => {
       '/pro/services',
       '/pro/finance',
       '/pro/analytics',
+      '/pro/reviews',
       '/pro/outcome-policy',
       '/pro/messages',
       '/pro/profile',

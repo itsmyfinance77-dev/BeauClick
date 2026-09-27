@@ -10,6 +10,7 @@ import { TabList, TabPanel } from '@/components/tab-list';
 import { ProGuard } from '@/components/pro-guard';
 import { useAuth } from '@/lib/auth-context';
 import { useProProfile } from '@/lib/pro-context';
+import { bookingApi } from '@/lib/booking-api';
 import {
   bookingHistory,
   completeBooking,
@@ -230,6 +231,31 @@ function ProBookings({ profile }: { profile: MyProviderProfile }) {
     }
   }
 
+  /*
+    Demo: the professional's cancellation -- `POST /v1/bookings/:id/cancel`, the
+    same route the customer uses; the server resolves the caller's role and
+    decides every consequence (refund of what was collected, the customer's
+    remedy and replacement offer). Not optimistic: the list shows the server's
+    answer, and a refusal (e.g. the customer cancelled first) reloads.
+  */
+  const [cancelling, setCancelling] = useState<ProfessionalBookingSummary | null>(null);
+  async function runCancel(booking: ProfessionalBookingSummary) {
+    setBusyId(booking.id);
+    setActionError(null);
+    try {
+      const res = await bookingApi.cancelBooking(api, booking.id, 'لغو توسط متخصص');
+      if (res.data) applyServerState(res.data);
+      setCancelling(null);
+      setActionNotice('نوبت لغو شد.');
+    } catch (err) {
+      setCancelling(null);
+      setActionError(err instanceof Error ? err.message : 'لغو این نوبت ممکن نشد.');
+      await load();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function runComplete(booking: ProfessionalBookingSummary) {
     setBusyId(booking.id);
     setActionError(null);
@@ -396,6 +422,7 @@ function ProBookings({ profile }: { profile: MyProviderProfile }) {
                     busy={busyId === booking.id}
                     onComplete={() => setConfirming(booking)}
                     onReschedule={() => void openReschedule(booking)}
+                    onCancel={() => setCancelling(booking)}
                     noShowOpen={noShowOpen.has(booking.id)}
                     onToggleNoShow={() => toggleNoShow(booking.id)}
                     noShowPanel={
@@ -447,6 +474,30 @@ function ProBookings({ profile }: { profile: MyProviderProfile }) {
             <p className={styles.dialogText}>این نوبت به‌عنوان «انجام‌شده» ثبت می‌شود.</p>
             <p className={styles.dialogLast}>
               پس از ثبت، امتیاز باشگاه مشتری، مسیر زیبایی او و آمار شما به‌روزرسانی می‌شود. این عملیات برگشت‌پذیر نیست.
+            </p>
+          </div>
+        }
+      />
+
+      <ConfirmDialog
+        open={cancelling !== null}
+        title="لغو نوبت"
+        tone="danger"
+        confirmLabel="بله، لغو کن"
+        busy={busyId !== null}
+        onConfirm={() => cancelling && void runCancel(cancelling)}
+        onCancel={() => setCancelling(null)}
+        describedById="pro-bookings-cancel-consequence"
+        body={
+          <div id="pro-bookings-cancel-consequence">
+            {cancelling ? (
+              <p className={styles.dialogText}>
+                نوبت {formatZonedFullDate(new Date(cancelling.startAt))} ساعت {formatZonedTime(new Date(cancelling.startAt))} لغو می‌شود.
+              </p>
+            ) : null}
+            <p className={styles.dialogLast}>
+              مبلغی که مشتری پرداخت کرده طبق قواعد پلتفرم به او بازگردانده می‌شود و مشتری می‌تواند زمان دیگری رزرو کند. این عملیات
+              برگشت‌پذیر نیست.
             </p>
           </div>
         }

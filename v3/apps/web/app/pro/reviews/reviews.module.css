@@ -1,0 +1,45 @@
+/* DEMO BRANCH ONLY — the professional's reviews (tokens only, no new values). */
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.card {
+  background: var(--bc-color-surface);
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-card);
+  padding: 16px;
+  min-width: 0;
+}
+
+.meta {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--bc-color-ink-soft);
+}
+
+.comment {
+  margin: 0 0 8px;
+  overflow-wrap: anywhere;
+}
+
+.reply {
+  margin: 0 0 8px;
+  padding-inline-start: 12px;
+  border-inline-start: 2px solid var(--bc-color-border);
+  overflow-wrap: anywhere;
+}
+
+.form {
+  display: grid;
+  gap: 8px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--bc-spacing-chip-gap);
+}

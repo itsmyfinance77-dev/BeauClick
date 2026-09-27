@@ -101,13 +101,21 @@
   gap: 4px;
 }
 
+/*
+  Demo remediation F-1: a before/after snapshot is one unbroken JSON-like string
+  (ids, keys); without a break opportunity it widened the page to 473 px at 390.
+*/
 .before {
   margin: 0;
   color: var(--bc-color-ink-soft);
+  overflow-wrap: anywhere;
+  min-width: 0;
 }
 
 .after {
   margin: 0;
+  overflow-wrap: anywhere;
+  min-width: 0;
 }
 
 .pager {

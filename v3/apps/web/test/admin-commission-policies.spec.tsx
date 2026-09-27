@@ -81,7 +81,7 @@ function mockApi(options: {
   (global.fetch as jest.Mock).mockImplementation((url: string) => {
     if (url.includes('/v1/auth/refresh')) return ok({ accessToken: 'a', csrfToken: 'c' });
     if (/\/v1\/me(\?|$)/.test(url)) {
-      // #264: the page now carries its own `bc_manage_platform` guard (the gate the
+      // #264 + demo F-6: the page carries its own `bc_manage_commercial_plans` guard (the gate the
       // `/admin` layout used to supply), so the caller is an administrator,
       // who holds both -- the only role holding the commercial capability.
       return ok({ id: 'u1', phone: '+989123456789', displayName: null, roles: ['admin'], capabilities: ['bc_manage_platform', 'bc_manage_commercial_plans'] });
@@ -120,6 +120,31 @@ beforeEach(() => {
   global.fetch = jest.fn() as unknown as typeof fetch;
   tokenStorage.clear();
   tokenStorage.set({ accessToken: 'test-access-token', csrfToken: 'test-csrf-token' });
+});
+
+describe('demo F-6 — the page is gated by the API’s own capability', () => {
+  function mockMe(capabilities: string[]) {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes('/v1/auth/refresh')) return ok({ accessToken: 'a', csrfToken: 'c' });
+      if (/\/v1\/me(\?|$)/.test(url)) return ok({ id: 'u1', phone: '+989123456789', displayName: null, roles: [], capabilities });
+      if (url.includes('/v1/admin/commercial/commission-policies')) return ok({ items: [] });
+      return ok([]);
+    });
+  }
+
+  it('refuses an operator holding only bc_manage_platform, and requests nothing from the commission API', async () => {
+    mockMe(['bc_manage_platform']);
+    renderPage();
+    expect(await screen.findByText(/دسترسی لازم برای این بخش را ندارد/)).toBeInTheDocument();
+    const calls = (global.fetch as jest.Mock).mock.calls.map(([u]) => String(u));
+    expect(calls.some((u) => u.includes('/v1/admin/commercial/commission-policies'))).toBe(false);
+  });
+
+  it('admits a holder of bc_manage_commercial_plans (control)', async () => {
+    mockMe(['bc_manage_commercial_plans']);
+    renderPage();
+    expect(await screen.findByTestId('commission-components')).toBeInTheDocument();
+  });
 });
 
 describe('screen 50a — the admin commission policy read surface', () => {

@@ -10,6 +10,8 @@ import { ProtectedRoute } from '@/components/protected-route';
 import { RemedyPanel } from '@/components/remedy-panel';
 import { AcceptedTermsPanel } from '@/components/checkout-terms';
 import { ReplacementOfferPanel } from '@/components/replacement-offer-panel';
+import { BookingReviewPanel } from '@/components/booking-review-panel';
+import { reviewApi, type MyReview } from '@/lib/review-api';
 import { Alert, Button, LoadingState } from '@/components/ui';
 import { ConfirmDialog, EmptyState, PageHeader, SegmentedControl, TextLink } from '@/components/kit';
 import { bookingApi, isUpcomingBooking, slotTimeLabel, type BookingSummary } from '@/lib/booking-api';
@@ -77,6 +79,29 @@ function BookingsContent() {
   const [termsOpen, setTermsOpen] = useState<ReadonlySet<string>>(new Set());
   // DEMO BRANCH ONLY (DEMO-DEC-001 B): which cancelled rows show their replacement offer.
   const [replacementOpen, setReplacementOpen] = useState<ReadonlySet<string>>(new Set());
+  // Demo: the customer's own reviews by booking, so a reviewed booking shows its review.
+  const [myReviews, setMyReviews] = useState<ReadonlyMap<string, MyReview>>(new Map());
+  const [reviewOpen, setReviewOpen] = useState<ReadonlySet<string>>(new Set());
+  const loadReviews = useCallback(async () => {
+    try {
+      const res = await reviewApi.mine(api);
+      setMyReviews(new Map((res.data ?? []).map((r) => [r.bookingId, r])));
+    } catch {
+      // Not knowing is not "none": keep what was shown before.
+    }
+  }, [api]);
+  useEffect(() => {
+    void loadReviews();
+  }, [loadReviews]);
+  function toggleReview(id: string) {
+    setReviewOpen((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
   function toggleReplacement(id: string) {
     setReplacementOpen((current) => {
       const next = new Set(current);
@@ -302,6 +327,30 @@ function BookingsContent() {
                 {remedyRelevant && remedyIsOpen ? (
                   <div id={`remedy-${booking.id}`} className={styles.remedy}>
                     <RemedyPanel booking={booking} onRescheduled={() => void afterRemedyReschedule()} />
+                  </div>
+                ) : null}
+
+                {booking.status === 'completed' ? (
+                  <div className={styles.actions}>
+                    <Button
+                      variant="ghost"
+                      inline
+                      aria-expanded={reviewOpen.has(booking.id)}
+                      aria-controls={`review-${booking.id}`}
+                      onClick={() => toggleReview(booking.id)}
+                    >
+                      {reviewOpen.has(booking.id) ? 'بستن نظر' : myReviews.has(booking.id) ? 'نظر شما' : 'ثبت نظر'}
+                    </Button>
+                  </div>
+                ) : null}
+                {booking.status === 'completed' && reviewOpen.has(booking.id) ? (
+                  <div id={`review-${booking.id}`} className={styles.remedy}>
+                    <BookingReviewPanel
+                      api={api}
+                      bookingId={booking.id}
+                      existing={myReviews.get(booking.id) ?? null}
+                      onSaved={() => void loadReviews()}
+                    />
                   </div>
                 ) : null}
 

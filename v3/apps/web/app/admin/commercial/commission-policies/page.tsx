@@ -406,10 +406,16 @@ function AdminCommissionPoliciesContent() {
  * same capability that gated it before, so nothing changes for an operator or
  * administrator — and a moderator's typed URL is refused here as well as by
  * `AdminRouteGate`. The API's `CapabilityGuard` remains the control.
+ *
+ * Demo remediation F-6: the guard is the API's own capability,
+ * `bc_manage_commercial_plans` (as on the plans, control-plane and outcome
+ * pages and in the admin nav). `bc_manage_platform` let an operator open a
+ * page whose every call is then refused 403, and would refuse a holder of the
+ * commercial capability the API itself admits.
  */
 export default function AdminCommissionPoliciesPage() {
   return (
-    <AdminGuard capability="bc_manage_platform">
+    <AdminGuard capability="bc_manage_commercial_plans">
       <AdminCommissionPoliciesContent />
     </AdminGuard>
   );

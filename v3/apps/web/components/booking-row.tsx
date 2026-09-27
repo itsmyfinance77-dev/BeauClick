@@ -31,6 +31,7 @@ export function BookingRow({
   busy,
   onComplete,
   onReschedule,
+  onCancel,
   noShowOpen,
   onToggleNoShow,
   noShowPanel,
@@ -47,6 +48,8 @@ export function BookingRow({
   busy: boolean;
   onComplete: () => void;
   onReschedule: () => void;
+  /** Demo: the professional cancels (`POST /v1/bookings/:id/cancel`, the server decides the consequences). */
+  onCancel?: () => void;
   /** Screen 49 (#212): whether this row's no-show panel is open. */
   noShowOpen: boolean;
   onToggleNoShow: () => void;
@@ -76,6 +79,9 @@ export function BookingRow({
     (booking.status === 'confirmed' || booking.status === 'pending') &&
     booking.rescheduleCount < MAX_RESCHEDULES &&
     hoursUntil >= RESCHEDULE_MIN_HOURS;
+
+  // Demo: a live booking still ahead can be cancelled by the professional.
+  const canCancel = Boolean(onCancel) && (booking.status === 'confirmed' || booking.status === 'pending') && hoursUntil > 0;
 
   const rescheduleNote = (booking.status === 'confirmed' || booking.status === 'pending') && !canReschedule;
 
@@ -121,6 +127,11 @@ export function BookingRow({
         {canReschedule ? (
           <Button type="button" variant="ghost" inline onClick={onReschedule}>
             تغییر زمان
+          </Button>
+        ) : null}
+        {canCancel ? (
+          <Button type="button" variant="danger" inline disabled={busy} onClick={onCancel}>
+            لغو نوبت
           </Button>
         ) : null}
         <Button type="button" variant="ghost" inline onClick={onToggleHistory}>
