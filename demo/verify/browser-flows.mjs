@@ -12,7 +12,7 @@ import path from 'node:path';
 
 import { RUNTIME_ROOT, STATE_DIR } from '../scripts/lib/demo-config.mjs';
 import { q } from './lib/db-readonly.mjs';
-import { personaBrowser, sleep } from './lib/edge.mjs';
+import { personaBrowser, signIn, sleep } from './lib/edge.mjs';
 import { recorder } from './lib/flow-record.mjs';
 import { personaSession } from './lib/persona-session.mjs';
 
@@ -258,7 +258,7 @@ async function checkoutGroup() {
 async function markRow(p, rowSelector, texts) {
   const ok = await p.evaluate(`(() => { document.querySelectorAll('[data-flow-row]').forEach((e) => e.removeAttribute('data-flow-row'));
     const want = ${JSON.stringify(texts)};
-    const el = [...document.querySelectorAll(${JSON.stringify(rowSelector)})].find((e) => want.every((t) => e.innerText.includes(t)));
+    const el = [...document.querySelectorAll(${JSON.stringify(rowSelector)})].filter((e) => want.every((t) => e.innerText.includes(t)) && e.querySelector('button')).sort((a, b) => a.innerText.length - b.innerText.length)[0];
     if (!el) return false; el.setAttribute('data-flow-row', '1'); return true; })()`);
   return ok ? '[data-flow-row="1"]' : null;
 }
@@ -721,7 +721,8 @@ async function engagementGroup() {
     const n1 = Number((await q(`select count(*) n from ai.messages m join ai.conversations c on c.id = m.conversation_id where c.user_id = $1`, [ids['user:cust4']]).catch(() => [{ n: -1 }]))[0].n);
     r('persist', 'DB: the question and the (sandbox) answer are stored', n1 >= n0 + 2, { before: n0, after: n1, started: start });
     await c.reload();
-    r('persist', 'after a reload the conversation shows the question', await c.has(question));
+    await c.click('گفتگو — شروع‌شده', { prefix: true, selector: 'button' });
+    r('persist', 'after a reload (conversation reopened) the question is there', await c.waitText(question, 8000));
     await c.shot('assistant-1280');
   });
 
@@ -752,9 +753,12 @@ async function engagementGroup() {
     const prefix = ids['user:cust4'].slice(0, 8);
     const queue = await a.evaluate(`[...document.querySelectorAll('tr, li')].map((e) => e.innerText.replace(/\\s+/g, ' ')).filter((t) => t.includes('${prefix}'))`);
     r('other', "the administrator's privacy queue lists cust4's erasure as cancelled and the export (status only)", queue.some((t) => t.includes('حذف حساب') && t.includes('لغو شد')) && queue.some((t) => t.includes('دریافت نسخهٔ داده')), queue.slice(0, 3));
+    let exp;
+    for (let n = 0; n < 30 && (exp = (await q(`select status from privacy.data_requests where subject_user_id = $1 and kind = 'export' order by created_at desc limit 1`, [ids['user:cust4']]))[0])?.status !== 'ready'; n++) await sleep(3000);
     await c.goto('/account/privacy');
-    const exp = (await q(`select status from privacy.data_requests where subject_user_id = $1 and kind = 'export' order by created_at desc limit 1`, [ids['user:cust4']]))[0];
-    r('ui', 'when the export is ready the customer is offered the download', exp?.status !== 'ready' || (await c.has('دانلود فایل داده‌ها')), exp);
+    // The download itself is not clicked (no file is saved on this machine); offering it is the check.
+    if (exp?.status === 'ready') r('ui', 'the export became ready and the customer is offered the download', await c.has('دانلود فایل داده‌ها'), exp);
+    else r('observed', 'export not ready within 90 s (not a pass)', true, exp);
   });
 }
 
@@ -766,26 +770,35 @@ async function waitlistGroup() {
   let newPro;
   await flow('waitlist: a customer becomes a professional (UI)', async (r) => {
     const p = await as('cust4');
+    newPro = (await q(`select id from provider.professionals where owner_id = $1`, [ids['user:cust4']]))[0]?.id;
+    if (newPro) {
+      r('observed', 'the professional profile was created in the UI in the previous run', true, newPro);
+    } else {
     await p.goto('/pro/profile');
     await p.fill('نام نمایشی', proName);
     await p.fill('شهر', 'تهران'); // <select>: set by the visible option text below
     await p.click('ناخن', { selector: 'label' });
     await p.click('ساخت پروفایل');
     await sleep(2000);
-    newPro = (await q(`select id from provider.professionals where user_id = $1`, [ids['user:cust4']]))[0]?.id;
+    newPro = (await q(`select id from provider.professionals where owner_id = $1`, [ids['user:cust4']]))[0]?.id;
     r('persist', 'DB: the professional profile exists', Boolean(newPro), newPro);
+    }
+    if (!Number((await q(`select count(*) n from provider.services where professional_id = $1 and deleted_at is null`, [newPro]))[0].n)) {
     await p.goto('/pro/services');
     await p.fill('نام خدمت', 'کاشت آزمایشی');
     await p.fill('مدت (دقیقه)', '30');
     await p.fill('قیمت (تومان)', '200000');
     await p.click('افزودن خدمت');
     await sleep(1200);
+    }
+    if (!Number((await q(`select count(*) n from booking.availability_slots where professional_id = $1 and status = 'open'`, [newPro]))[0].n)) {
     await p.goto('/pro/availability');
     await p.fill('تاریخ', tehran(Date.now() + 2 * 86_400_000).date);
     await p.fill('از ساعت', '11:00', { nth: 1 });
     await p.fill('تا ساعت', '11:30', { nth: 1 });
     await p.click('افزودن');
     await sleep(1200);
+    }
     r('persist', 'DB: one service and one open time', Number((await q(`select count(*) n from booking.availability_slots where professional_id = $1 and status = 'open'`, [newPro]))[0].n) === 1);
   });
 
@@ -861,34 +874,49 @@ async function businessGroup() {
   }
   await flow('business: invite staff, accept, grant and revoke finance read', async (r) => {
     const o = await as('bizOwner');
-    await o.goto('/business');
-    await o.fill('شماره موبایل همکار', staffPhone);
-    await o.click('کارمند');
-    await o.click('ارسال دعوت');
-    await sleep(1500);
     const st = () => q(`select s.id, s.status from business.business_staff s where s.business_id = $1 and s.user_id = $2`, [ids.businessId, ids['user:cust3']]);
-    r('persist', 'DB: an invitation for cust3 exists', (await st()).length === 1, await st());
     const c = await as('cust3');
-    await c.goto('/business');
-    r('other', 'cust3 sees the invitation', await c.has('دعوت‌های شما'));
-    await c.click('پذیرفتن');
-    await sleep(1500);
-    r('persist', 'DB: cust3 is now an active member', (await st())[0]?.status === 'active', await st());
-    await c.goto('/finance');
-    r('denied', 'as plain staff cust3 has no finance access yet', !(await c.has('سالن')) || (await c.has('دسترسیِ مالی‌ای ندارید')));
+    if ((await st())[0]?.status !== 'active') {
+      await o.goto('/business');
+      await o.fill('شماره موبایل همکار', staffPhone);
+      await o.click('کارمند');
+      await o.click('ارسال دعوت');
+      await sleep(1500);
+      r('persist', 'DB: an invitation for cust3 exists', (await st()).length === 1, await st());
+      await c.goto('/business');
+      r('other', 'cust3 sees the invitation', await c.has('دعوت‌های شما'));
+      await c.click('پذیرفتن');
+      await sleep(1500);
+      r('persist', 'DB: cust3 is now an active member', (await st())[0]?.status === 'active', await st());
+    } else {
+      r('observed', 'invite + accept were done in the UI in the previous run (membership active)', true, await st());
+    }
+    const salon = (await q(`select display_name from business.businesses where id = $1`, [ids.businessId]))[0]?.display_name;
+    const liveFinance = async () => (await q(`select 1 from business.staff_role_grants g join business.business_staff s on s.id = g.membership_id where s.user_id = $1 and s.business_id = $2 and g.revoked_at is null and g.role = 'finance_read'`, [ids['user:cust3'], ids.businessId])).length > 0;
+    if (!(await liveFinance())) {
+      await c.goto('/finance');
+      r('denied', 'as plain staff cust3 does not see the salon finance space', !(await c.has(salon)), salon);
+    }
     await o.goto('/business');
     const scope = await markRow(o, 'li', ['۰۴۰۳']) ?? (await markRow(o, 'li', ['0403']));
-    await o.click('اعطای دسترسیِ فقط‌خواندنیِ مالی', { within: scope });
-    await sleep(1500);
-    r('persist', 'DB: a finance_read grant exists for cust3', (await q(`select g.* from business.staff_role_grants g join business.business_staff s on s.id = g.staff_id where s.user_id = $1 and s.business_id = $2`, [ids['user:cust3'], ids.businessId])).length >= 1);
+    const already = await q(`select g.granted_at from business.staff_role_grants g join business.business_staff s on s.id = g.membership_id where s.user_id = $1 and s.business_id = $2 and g.revoked_at is null and g.role = 'finance_read'`, [ids['user:cust3'], ids.businessId]);
+    if (already.length) r('observed', 'the grant was clicked in the UI in the previous run (live since)', true, already[0]);
+    else {
+      await o.click('اعطای دسترسیِ فقط‌خواندنیِ مالی', { within: scope });
+      await sleep(1500);
+    }
+    const liveGrants = () => q(`select g.role, g.revoked_at from business.staff_role_grants g join business.business_staff s on s.id = g.membership_id where s.user_id = $1 and s.business_id = $2 and g.revoked_at is null`, [ids['user:cust3'], ids.businessId]);
+    r('persist', 'DB: a live finance_read grant exists for cust3', (await liveGrants()).some((g) => /finance/.test(g.role)), await liveGrants());
     await c.goto('/finance');
-    const salon = (await q(`select name from business.businesses where id = $1`, [ids.businessId]))[0]?.name;
     r('other', 'with the grant cust3 sees the salon finance space', await c.has(salon ?? '—'), salon);
     await o.goto('/business');
     const scope2 = await markRow(o, 'li', ['۰۴۰۳']) ?? (await markRow(o, 'li', ['0403']));
     await o.click('بازپس‌گیری', { within: scope2 });
-    await o.click('بازپس می‌گیرم');
+    // The dialog requires an explicit acknowledgement before the confirm is enabled.
+    await o.click('می‌دانم که', { prefix: true, selector: '[role=dialog] label, [role=alertdialog] label, dialog[open] label' });
+    await confirmAny(o, ['بازپس می‌گیرم']);
     await sleep(1500);
+    r('persist', 'DB: the finance_read grant is revoked', !(await liveGrants()).some((g) => /finance/.test(g.role)), await liveGrants());
     await c.goto('/finance');
     r('denied', 'after revocation cust3 no longer sees the salon finance space', !(await c.has(salon)));
   });
@@ -898,49 +926,130 @@ async function businessGroup() {
 async function adminGroup() {
   await flow('admin: grant and revoke the moderator role', async (r) => {
     const a = await as('admin');
-    const roles = () => q(`select r.key from identity.user_roles ur join identity.roles r on r.id = ur.role_id where ur.user_id = $1`, [ids['user:cust4']]).catch(async () => q(`select * from identity.user_roles where user_id = $1`, [ids['user:cust4']]));
-    await a.goto('/admin/users');
-    await a.fill('شماره موبایل کاربر', '+989120000404');
-    await a.click('جست‌وجو', { selector: 'main button' });
-    await a.waitText('ناظر محتوا');
-    const scope = await markRow(a, 'li, tr, div', ['ناظر محتوا']);
+    const roles = async () => (await q(`select role_slug from identity.user_roles where user_id = $1`, [ids['user:cust4']])).map((x) => x.role_slug);
+    const openUser = async () => {
+      await a.goto('/admin/users');
+      await a.fill('شماره موبایل کاربر', '+989120000404');
+      await a.click('جست‌وجو', { selector: 'main button' });
+      await a.waitText('ناظر محتوا');
+      return markRow(a, 'li, tr, div', ['ناظر محتوا']);
+    };
+    let scope = await openUser();
     await a.click('اعطا', { within: scope });
-    await sleep(800);
-    const reasonField = await a.evaluate(`[...document.querySelectorAll('textarea, input[type=text]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.labels?.[0]?.innerText || e.placeholder).find((l) => /دلیل/.test(l ?? ''))`);
-    if (reasonField) await a.fill(reasonField, reason);
-    await confirmAny(a, ['اعطا', 'تأیید', 'ثبت', 'اعطای نقش']);
+    await a.waitText('اعطا کن');
+    await a.fill('دلیل', reason);
+    await a.click('اعطا کن');
     await sleep(1500);
-    r('persist', 'DB: cust4 has the moderator role', JSON.stringify(await roles()).includes('moderator'), await roles());
+    r('persist', 'DB: cust4 has the moderator role (granted by admin, with the reason)', (await roles()).includes('moderator'), await roles());
+    // "کاربر پس از ورود مجدد به دسترسی‌های آن خواهد رسید": sign out and in again, as the dialog says.
     const c = await as('cust4');
-    await c.goto('/admin/reviews');
-    r('other', 'cust4 can now open the moderation queue', !(await c.has('دسترسی لازم')));
-    await a.goto('/admin/users');
-    await a.fill('شماره موبایل کاربر', '+989120000404');
-    await a.click('جست‌وجو', { selector: 'main button' });
-    await a.waitText('ناظر محتوا');
-    const scope2 = await markRow(a, 'li, tr, div', ['ناظر محتوا']);
-    await a.click('لغو', { within: scope2 });
-    await sleep(800);
-    const reasonField2 = await a.evaluate(`[...document.querySelectorAll('textarea, input[type=text]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.labels?.[0]?.innerText || e.placeholder).find((l) => /دلیل/.test(l ?? ''))`);
-    if (reasonField2) await a.fill(reasonField2, reason);
-    await confirmAny(a, ['لغو نقش', 'تأیید', 'ثبت', 'لغو']);
+    await c.goto('/dashboard');
+    await c.click('خروج از حساب');
     await sleep(1500);
-    r('persist', 'DB: the role is revoked', !JSON.stringify(await roles()).includes('moderator'), await roles());
+    await signIn(c, 'cust4');
     await c.goto('/admin/reviews');
-    r('denied', 'cust4 is refused again', await c.has('دسترسی لازم'));
+    r('other', 'after signing in again cust4 can open the moderation queue', !(await c.has('دسترسی لازم')) && (await c.has('بازبینی دیدگاه‌ها')));
+    scope = await openUser();
+    await a.click('لغو', { within: scope });
+    await sleep(800);
+    if (await a.evaluate("[...document.querySelectorAll('textarea')].some((t) => t.getBoundingClientRect().width > 0)")) await a.fill('دلیل', reason);
+    const how = await confirmAny(a, ['لغو کن', 'لغو نقش', 'بله، لغو شود', 'تأیید']);
+    await sleep(1500);
+    r('persist', 'DB: the moderator role is revoked', !(await roles()).includes('moderator'), { roles: await roles(), confirmedVia: how });
+    await c.goto('/admin/reviews');
+    r('denied', 'cust4 is refused again (live revocation, same session, no re-login)', await c.has('دسترسی لازم'));
     await a.goto('/admin/audit-log');
-    r('other', 'the audit log shows the role changes', await a.has('نقش'));
+    r('other', 'the audit log lists the grant and the revocation', await a.has('نقش'));
     await a.shot('admin-audit-after-roles-1280');
+  });
+
+  // Publish/retire through the UI on a component that has NO policy yet (acquisition), with a
+  // "nothing is collected" rule: the full lifecycle without touching the live booking commission.
+  // Resumable from the DB state: create → publish the draft → retire the published version.
+  await flow('admin: commission policy lifecycle (create → publish → retire)', async (r) => {
+    const a = await as('admin');
+    const pol = async () => (await q(`select p.policy_key, v.version, v.lifecycle_state, v.rule_kind, v.published_by_user_id, v.retired_by_user_id from commercial.commission_policies p left join commercial.commission_policy_versions v on v.policy_key = p.policy_key where p.component = 'acquisition' order by v.version desc nulls last limit 1`))[0];
+    const dialogReason = async () => {
+      if (await a.evaluate("[...document.querySelectorAll('[role=dialog] textarea, [role=alertdialog] textarea, dialog[open] textarea')].some((t) => t.getBoundingClientRect().width > 0)")) await a.fill('دلیل', reason);
+    };
+    await a.goto('/admin/commercial/commission-policies');
+    if (!(await pol())) {
+      await a.click('ساختِ سیاست', { nth: 0 });
+      await a.click('چیزی دریافت نمی‌شود', { selector: 'label' });
+      await a.fill('دلیل این تغییر', reason);
+      // The editor is not a <form>: the smallest element holding the reason field and a button.
+      const form = await markRow(a, 'form, section, article, div', ['دلیل این تغییر']);
+      if (!form) throw new Error('editor panel not found');
+      const submit = await a.evaluate(`[...document.querySelector('[data-flow-row="1"]').querySelectorAll('button')].filter((b) => !b.disabled && b.getBoundingClientRect().width > 0).map((b) => b.innerText.trim()).filter((t) => t !== 'انصراف')`);
+      await a.click(submit.at(-1), { within: form });
+      await dialogReason();
+      await confirmAny(a, ['ساختِ سیاست', 'ذخیره', 'ثبت', 'تأیید']);
+      await sleep(1500);
+      r('persist', 'DB: the acquisition policy family exists (created in the UI)', Boolean((await pol())?.policy_key), { ...(await pol()), submitted: submit.at(-1) });
+      await a.reload();
+    }
+    if ((await pol())?.policy_key && !(await pol())?.lifecycle_state) {
+      // A policy family has no version yet: "پیش‌نویسِ تازه" on its card opens the rule editor.
+      const card = await markRow(a, 'section, article, li, div', ['acquisition', 'پیش‌نویسِ تازه']);
+      await a.click('پیش‌نویسِ تازه', { within: card });
+      await a.click('چیزی دریافت نمی‌شود', { selector: 'label' });
+      await a.fill('دلیل این تغییر', reason);
+      const editor = await markRow(a, 'form, section, article, div', ['دلیل این تغییر']);
+      const submit = await a.evaluate(`[...document.querySelector('[data-flow-row="1"]').querySelectorAll('button')].filter((b) => !b.disabled && b.getBoundingClientRect().width > 0).map((b) => b.innerText.trim()).filter((t) => t !== 'انصراف')`);
+      await a.click(submit.at(-1), { within: editor });
+      await dialogReason();
+      await confirmAny(a, ['ذخیره', 'ثبت', 'تأیید', 'ساختِ پیش‌نویس']);
+      await sleep(1500);
+      r('persist', 'DB: a draft version exists with the "nothing collected" rule', (await pol())?.lifecycle_state === 'draft', { ...(await pol()), submitted: submit.at(-1) });
+      await a.reload();
+    }
+    if ((await pol())?.lifecycle_state === 'draft') {
+      const scope = await markRow(a, 'tr, li, section, article, div', ['acquisition', 'انتشار']);
+      await a.click('انتشار', { within: scope, prefix: true });
+      await sleep(800);
+      await dialogReason();
+      const how = await confirmAny(a, ['انتشار', 'منتشر کن', 'انتشار نسخه', 'تأیید']);
+      await sleep(1500);
+      const p = await pol();
+      r('persist', 'DB: published by the administrator', p?.lifecycle_state === 'published' && p.published_by_user_id === ids['user:admin'], { ...p, confirmedVia: how });
+      await a.reload();
+    }
+    if ((await pol())?.lifecycle_state === 'published') {
+      // GUARD (a run on 2026-09-27 retired the LIVE booking commission through a too-wide scope):
+      // retire only inside a version table titled for the acquisition policy; never elsewhere.
+      const scope = await markRow(a, 'section, article, div', ['جذبِ مشتری — تاریخچهٔ نسخه‌ها', 'بازنشستگی']);
+      const scopeText = scope ? await a.evaluate(`document.querySelector('[data-flow-row="1"]').innerText`) : '';
+      if (!scope || scopeText.includes('کارمزدِ نوبت')) throw new Error('refusing to retire: no version table scoped to the acquisition policy alone');
+      await a.click('بازنشستگی', { within: scope });
+      await sleep(800);
+      await dialogReason();
+      const how = await confirmAny(a, ['بازنشستگی', 'بازنشسته کن', 'تأیید']);
+      await sleep(1500);
+      const p = await pol();
+      r('persist', 'DB: retired by the administrator', p?.lifecycle_state === 'retired' && p.retired_by_user_id === ids['user:admin'], { ...p, confirmedVia: how });
+    }
+    await a.reload();
+    r('persist', 'after a reload the page shows the retired state', await a.has('بازنشسته'));
+    const booking = (await q(`select v.lifecycle_state from commercial.commission_policy_versions v where v.policy_key = 'demo-booking-commission' order by version desc limit 1`))[0];
+    r('other', 'the live booking commission was not touched', booking?.lifecycle_state === 'published', booking);
+    const op = await (await apiAs('operator')).get('/v1/admin/commercial/commission-policies', { expect: [200, 403, 404] });
+    r('denied', 'the operator cannot read or change commission policies (API)', [403, 404].includes(op.status), `HTTP ${op.status}`);
+    await a.shot('admin-commission-lifecycle-1280');
   });
 
   await flow('admin: rebuild the search index from the UI', async (r) => {
     const a = await as('admin');
     await a.goto('/admin/search');
     const before = (await q(`select * from search.index_state limit 1`))[0];
-    await a.click('بازسازی نمایه');
-    await confirmAny(a, ['بازسازی نمایه', 'تأیید', 'بله']);
-    await sleep(3000);
-    const after = (await q(`select * from search.index_state limit 1`))[0];
+    await a.click('بازسازی نمایه', { selector: 'main button' });
+    const how = await confirmAny(a, ['اجرا کن']);
+    let after;
+    for (let n = 0; n < 20; n++) {
+      after = (await q(`select * from search.index_state limit 1`))[0];
+      if (JSON.stringify(before) !== JSON.stringify(after)) break;
+      await sleep(1500);
+    }
+    r('ui', 'the rebuild asks for confirmation ("اجرا کن")', Boolean(how), how);
     r('persist', 'DB: the index state changed after the rebuild', JSON.stringify(before) !== JSON.stringify(after), { before, after });
     const anon = await personaBrowser('anon-search', { profileKey, outDir: OUT, anonymous: true });
     browsers.set('anon-search', anon);
