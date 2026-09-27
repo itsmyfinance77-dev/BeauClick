@@ -14,7 +14,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { BACKUPS_DIR, CONTAINERS, DB_NAME, MEDIA_DIR, PG_ROLES, PORTS, SECRETS_DIR, STATE_DIR, V3_ROOT, DEMO_ROOT } from './lib/demo-config.mjs';
+import { BACKUPS_DIR, CONTAINERS, DB_NAME, MEDIA_DIR, PG_ROLES, PORTS, SECRETS_DIR, STATE_DIR, V3_ROOT, DEMO_ROOT, pgUrl } from './lib/demo-config.mjs';
 import { appUrl, baseProcessEnv, loadSecrets, superuserUrl } from './lib/runtime.mjs';
 
 const arg = (n) => {
@@ -99,6 +99,19 @@ if (fs.existsSync(path.join(dir, 'media'))) fs.cpSync(path.join(dir, 'media'), M
 if (fs.existsSync(path.join(dir, 'seed-state.json'))) fs.copyFileSync(path.join(dir, 'seed-state.json'), path.join(STATE_DIR, 'seed-state.json'));
 // Refresh tokens rotated after the backup do not exist in the restored database.
 fs.rmSync(path.join(SECRETS_DIR, 'seed-sessions.json'), { force: true });
+
+// 3b. Bring a golden taken BEFORE newer migrations up to the source (round 4 added two). Same roles and env
+//     as provision-db; idempotent ("Applied: 0" when the backup is already current).
+const migrateEnv = {
+  ...baseProcessEnv(),
+  DATABASE_URL: pgUrl(PG_ROLES.app, s.appPassword),
+  MIGRATION_URL_FINANCIAL: pgUrl(PG_ROLES.financialOwner, s.financialOwnerPassword),
+  MIGRATION_URL_ADMIN: pgUrl(PG_ROLES.auditOwner, s.auditOwnerPassword),
+};
+const mig = spawnSync(process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm', ['--silent', 'migrate'], { cwd: V3_ROOT, env: migrateEnv, encoding: 'utf8', shell: true });
+const migOut = `${mig.stdout ?? ''}${mig.stderr ?? ''}`;
+console.log(`migrate: ${migOut.split('\n').filter((l) => /Applied:|APPLY|rror/.test(l)).join(' | ')}`);
+if (mig.status !== 0) throw new Error('migrate failed on the restored database');
 
 // 4. Start, verify, rebuild derived search data.
 const roles = spawnSync('pnpm', ['--silent', 'verify:roles'], { cwd: V3_ROOT, env: { ...baseProcessEnv(), DATABASE_URL: appUrl(s) }, encoding: 'utf8', shell: true });
