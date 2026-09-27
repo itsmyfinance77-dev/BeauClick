@@ -4,6 +4,7 @@ import { AuthProvider } from '@/lib/auth-context';
 import { UnreadProvider } from '@/lib/unread-context';
 import { SITE_DESCRIPTION, SITE_NAME, openGraphFor, safeMetadataBase } from '@/lib/seo';
 import { AppShell } from '@/components/app-shell';
+import { DEMO_LABEL_ENABLED, DemoBanner } from '@/components/demo-banner';
 import { anjoman, peyda, vazir } from './fonts';
 import './globals.css';
 
@@ -19,6 +20,8 @@ export const metadata: Metadata = {
   description: SITE_DESCRIPTION,
   openGraph: openGraphFor({ title: SITE_NAME, description: SITE_DESCRIPTION }),
   twitter: { card: 'summary_large_image', title: SITE_NAME, description: SITE_DESCRIPTION },
+  // DEMO BRANCH ONLY: the internal team demo is never indexable.
+  ...(DEMO_LABEL_ENABLED ? { robots: { index: false, follow: false } } : {}),
 };
 
 /**
@@ -41,6 +44,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <a className="bc-visually-hidden bc-skip-link" href="#main">
           پرش به محتوای اصلی
         </a>
+        <DemoBanner />
         <AuthProvider>
           {/* Inside AuthProvider: the unread count is session-scoped and
               resets when the session does. */}

@@ -14,7 +14,8 @@ import { TokenService } from './token/token.service';
 import { AuthService } from './auth/auth.service';
 import { AuthController } from './auth/auth.controller';
 import { MeController } from './me/me.controller';
-import { NoopOtpDebugObserver, OTP_DEBUG_OBSERVER } from './otp/otp-debug-observer';
+import { OTP_DEBUG_OBSERVER } from './otp/otp-debug-observer';
+import { otpObserverFromEnv } from './otp/demo-otp-inbox.observer';
 import { RoleService } from './rbac/role.service';
 import { AdminRolesController } from './admin/admin-roles.controller';
 import { AdminAuditController } from './admin/admin-audit.controller';
@@ -52,7 +53,9 @@ export const IDENTITY_ENTITIES = [
     AuthService,
     RoleService,
     PhoneConflictService,
-    { provide: OTP_DEBUG_OBSERVER, useClass: NoopOtpDebugObserver },
+    // DEMO BRANCH ONLY: the no-op observer unless DEMO_OTP_INBOX=1 (fail-closed;
+    // refused under NODE_ENV=production). See demo-otp-inbox.observer.ts.
+    { provide: OTP_DEBUG_OBSERVER, useFactory: () => otpObserverFromEnv(process.env) },
   ],
   exports: [
     IdentitySubjectDataContract,TokenService, AuthService, RoleService, BeauClickJwtModule, TypeOrmModule, OTP_DEBUG_OBSERVER],
