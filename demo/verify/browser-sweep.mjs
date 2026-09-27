@@ -34,6 +34,16 @@ const onlyPaths = arg('--paths')?.split(',');
 // Diagnosis only: a CSS rule injected into the page after load (never into the app), to test a
 // proposed fix before anyone decides on it. Recorded in the report; screenshots are then NOT fallback material.
 const experimentCss = arg('--experiment-css');
+// Records every visible control (buttons, links, fields with their labels) per page — used to author
+// the interaction flows from what the UI really shows, not from guesses.
+const discover = process.argv.includes('--discover');
+const controls = `(() => { const vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+  const lab = (e) => (e.labels?.[0]?.innerText || e.getAttribute('aria-label') || e.placeholder || e.name || '').trim().slice(0, 60);
+  return {
+    buttons: [...document.querySelectorAll('main button, main [role=tab]')].filter(vis).map((b) => (b.innerText || b.getAttribute('aria-label') || '').trim().replace(/\\s+/g, ' ').slice(0, 60) + (b.disabled ? ' [disabled]' : '')),
+    links: [...document.querySelectorAll('main a[href]')].filter(vis).map((a) => a.innerText.trim().replace(/\\s+/g, ' ').slice(0, 40) + ' -> ' + a.getAttribute('href')).slice(0, 40),
+    fields: [...document.querySelectorAll('main input, main textarea, main select')].filter(vis).map((f) => f.tagName.toLowerCase() + '[' + (f.type || '') + '] ' + lab(f)),
+  }; })()`;
 const state = JSON.parse(fs.readFileSync(path.join(STATE_DIR, 'seed-state.json'), 'utf8'));
 const { pro1 } = state.ids;
 const tourBooking = state.ids.replacementTour?.original;
@@ -99,6 +109,7 @@ const P = [
       ['/assistant'],
       ['/account/privacy'],
       ['/waitlist'],
+      ['/account/devices'],
     ],
     forbidden: ['/admin', '/admin/users', '/pro/bookings', '/business', '/finance'],
   },
@@ -292,6 +303,7 @@ for (const who of P) {
     if (action) entry.action = await page.evaluate(action);
     await page.idle();
     Object.assign(entry, await page.evaluate(snapshot));
+    if (discover) entry.controls = await page.evaluate(controls);
     await page.shot(path.join(OUT, `${who.key}-${slug(p)}-1280.png`));
     await page.viewport(390, 844);
     await sleep(900);

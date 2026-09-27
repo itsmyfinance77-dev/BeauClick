@@ -29,7 +29,16 @@ export async function personaSession(profileKey, key) {
       s = null;
     }
   }
-  if (!s) s = await signIn(profileKey, persona(key).phone, (inbox ??= new DemoInbox()), key);
+  if (!s) {
+    try {
+      s = await signIn(profileKey, persona(key).phone, (inbox ??= new DemoInbox()), key);
+    } catch (e) {
+      // 429 = the 60 s resend cooldown (a browser just signed the same number in): wait it out once.
+      if (e?.status !== 429) throw e;
+      await new Promise((r) => setTimeout(r, 65_000));
+      s = await signIn(profileKey, persona(key).phone, inbox, key);
+    }
+  }
   s.onRotate = (t) => store(key, t);
   store(key, s.refreshToken);
   return s;
