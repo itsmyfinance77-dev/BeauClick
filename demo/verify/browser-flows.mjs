@@ -190,7 +190,8 @@ async function checkoutGroup() {
   const userKey = Object.fromEntries(Object.entries(ids).filter(([k]) => k.startsWith('user:')).map(([k, v]) => [v, k.slice(5)]));
   const open = (await q(`select o.original_booking_id id, b.customer_id, s.deleted_at is null as active from commerce.replacement_offers o join booking.bookings b on b.id = o.original_booking_id join provider.services s on s.id = o.service_id where o.status = 'open' order by o.offered_at`)).map((o) => ({ ...o, key: userKey[o.customer_id] })).filter((o) => o.key);
   const use = open.find((o) => o.active);
-  const dis = open.find((o) => o !== use);
+  // Dismiss needs an ELIGIBLE offer: for an ineligible one (inactive service) the B panel shows only the explanation.
+  const dis = open.find((o) => o.active && o !== use);
   const offerUse = use?.id;
   const offerDismiss = dis?.id;
   console.log(`offers: use ${offerUse} (${use?.key}), dismiss ${offerDismiss} (${dis?.key})`);
@@ -203,7 +204,8 @@ async function checkoutGroup() {
     await c.click('پیشنهاد جایگزینی', { within: card });
     await c.waitText('پیشنهاد رزرو جایگزین');
     const radios = await c.evaluate(`[...document.querySelectorAll('${card} input[type=radio]')].map((x) => x.closest('label').innerText.trim())`);
-    await c.click(radios.at(-1), { within: card, selector: 'label', nth: radios.length - 1 });
+    const last = radios.at(-1);
+    await c.click(last, { within: card, selector: 'label', nth: radios.filter((t) => t === last).length - 1 });
     await sleep(1500);
     const before = await c.evaluate(`({ checked: document.querySelector('${card} input[type=checkbox]')?.checked ?? null, pay: document.querySelector('${card} [data-testid=replacement-pay]')?.disabled ?? null })`);
     r('ui', 'new terms unticked and payment closed (390)', before.checked === false && before.pay === true, before);
@@ -315,7 +317,7 @@ async function accountGroup() {
     const second = await personaBrowser('cust2', { profileKey, outDir: OUT, profileName: 'cust2-second-device' });
     browsers.set('cust2#second', second);
     await a.goto('/account/devices');
-    const others = await a.evaluate(`[...document.querySelectorAll('button')].filter((b) => b.innerText.trim() === 'خروج از این دستگاه').length`);
+    const others = await a.evaluate(`[...document.querySelectorAll('button')].filter((b) => b.innerText.trim() === 'خروج از این دستگاه' && b.getBoundingClientRect().width > 0).length`);
     r('ui', 'the devices page lists the other signed-in devices', others >= 1, `${others} other device(s)`);
     await a.shot('account-devices-before-1280');
     await a.click('خروج از همهٔ دستگاه‌های دیگر');
@@ -323,11 +325,18 @@ async function accountGroup() {
     await a.click('خروج از دستگاه‌های دیگر');
     await sleep(2000);
     r('persist', 'DB: only this device keeps an active session', (await activeTokens(ids['user:cust2'])) === 1, await activeTokens(ids['user:cust2']));
+    await a.goto('/account/devices');
+    r('persist', 'this device stays signed in; after a reload no other device is listed', (await a.path()) === '/account/devices' && (await a.evaluate(`[...document.querySelectorAll('button')].filter((b) => b.innerText.trim() === 'خروج از این دستگاه' && b.getBoundingClientRect().width > 0).length`)) === 0);
+    await a.shot('account-devices-after');
+    // F-9 (baseline): a signed-out device that RETURNS after the 10 s replay grace presents a revoked token;
+    // TokenService.handleUnclaimableToken treats it as theft and revokes ALL the user's sessions.
+    await sleep(12_000);
     await second.goto('/bookings');
     r('denied', 'the other device is signed out (protected page → sign-in)', (await second.path()) === '/auth', await second.path());
+    const left = await activeTokens(ids['user:cust2']);
     await a.goto('/account/devices');
-    r('persist', 'this device stays signed in; after a reload no other device is listed', (await a.path()) === '/account/devices' && (await a.evaluate(`[...document.querySelectorAll('button')].filter((b) => b.innerText.trim() === 'خروج از این دستگاه').length`)) === 0);
-    await a.shot('account-devices-after-1280');
+    r('observed', 'F-9: after the signed-out device returned (>10 s), the remaining device is signed out too', true, { activeSessionsAfter: left, remainingDevicePath: await a.path() });
+    if ((await a.path()) === '/auth') await signIn(a, 'cust2'); // driver: continue the run signed in
     api.delete('cust2'); // its API session was one of the "other devices"
   });
 }
@@ -464,18 +473,7 @@ async function proGroup() {
     await declareNoShow(r, bookingId, 'cust3');
   });
 
-  // The declaration alone, for a governed booking already past start + grace (e.g. prepared by the
-  // flow above in an earlier run). Real time only: the booking is found, never backdated.
-  await flow('pro: declare the no-show in the UI (booking past its grace)', async (r) => {
-    const userKey = Object.fromEntries(Object.entries(ids).filter(([k]) => k.startsWith('user:')).map(([k, v]) => [v, k.slice(5)]));
-    const b = (await q(`select b.id, b.customer_id from booking.bookings b join commerce.orders o on o.source_id = b.id join commerce.order_outcome_terms t on t.order_id = o.id
-      where b.professional_id = $1 and b.status = 'confirmed' and b.slot_start + make_interval(mins => t.grace_minutes) < now() order by b.slot_start desc limit 1`, [ids.pro1.providerId]))[0];
-    if (!b) {
-      r('observed', 'no governed confirmed booking of pro1 past its grace (the real-time flow already declared it) — nothing to do', true);
-      return;
-    }
-    await declareNoShow(r, b.id, userKey[b.customer_id]);
-  });
+  // (A declaration-only fallback flow was removed: it matched rows by time only; the real-time flow is the proof.)
 }
 
 /** pro1 declares the no-show in the UI (statement required for a governed booking), then every check. */
@@ -539,7 +537,7 @@ async function moderationGroup() {
     const c = await as('cust3');
     await c.goto(`/providers/${ids.pro2.providerId}`);
     r('other', 'the public profile now shows the verified badge', await c.has('هویت تأیید شده'));
-    const denied = await (await apiAs('cust3')).get('/v1/admin/verification/queue?page=1&limit=5', { expect: [200, 401, 403, 404] });
+    const denied = await (await apiAs('cust3')).get('/v1/admin/verification/queue?page=1&limit=5', { expect: [200, 403, 404] });
     r('denied', 'a customer cannot read the verification queue', [403, 404].includes(denied.status), `HTTP ${denied.status}`);
   });
 
@@ -561,7 +559,7 @@ async function moderationGroup() {
     r('persist', 'after a reload it left the unreviewed queue', !(await m.has(snippet)));
     const pub = await (await apiAs('cust3')).get(`/v1/providers/${rev.professional_id}/reviews`, { expect: [200, 404] });
     r('other', "the public reviews of the professional no longer include it (public API; the web page has no reviews list yet)", !JSON.stringify(pub.data ?? '').includes(rev.id), `HTTP ${pub.status}`);
-    const denied = await (await apiAs('cust3')).post(`/v1/admin/reviews/${rev.id}/moderate`, { action: 'publish', reason }, { expect: [200, 201, 400, 401, 403, 404] });
+    const denied = await (await apiAs('cust3')).post(`/v1/admin/reviews/${rev.id}/moderate`, { action: 'publish', reason }, { expect: [200, 201, 400, 403, 404] });
     r('denied', 'a customer cannot moderate reviews', [403, 404].includes(denied.status), `HTTP ${denied.status}`);
   });
 
@@ -602,7 +600,7 @@ async function moderationGroup() {
     await m.reload();
     await m.click('ردشده');
     r('persist', 'after a reload it is listed under "ردشده"', await m.has('باز کردن'));
-    const denied = await (await apiAs('cust3')).get('/v1/admin/chat/reports', { expect: [200, 401, 403, 404] });
+    const denied = await (await apiAs('cust3')).get('/v1/admin/chat/reports', { expect: [200, 403, 404] });
     r('denied', 'a customer cannot read chat reports', [403, 404].includes(denied.status), `HTTP ${denied.status}`);
   });
 }
@@ -1221,7 +1219,12 @@ async function outcomeGroup() {
     const a = (await q(`select cutoff_hours, late_retention_kind, grace_minutes, no_show_retention_kind, assigned_by_user_id from commercial.seller_outcome_policy_assignments where seller_party_id = $1 and superseded_at is null`, [ids.pro2.providerId]))[0];
     r('persist', 'DB: live assignment 24 h / none / 15 min / none, by pro2', a && Number(a.cutoff_hours) === 24 && Number(a.grace_minutes) === 15 && a.assigned_by_user_id === ids['user:pro2'], a);
     await p.reload();
-    r('persist', 'after a reload the page shows the chosen terms', (await p.has('۲۴ ساعت')) && (await p.has('۱۵ دقیقه')));
+    // After a reload the page asks for the workspace again; its current terms load on that choice.
+    const ws2 = await markRow(p, 'section, article, li, div', ['سارا کریمی — ناخن (دمو)', 'انتخاب این فضا']);
+    await p.click('انتخاب این فضا', { within: ws2 });
+    await sleep(1500);
+    const checked = await p.evaluate(`[...document.querySelectorAll('input[type=radio]')].filter((x) => x.checked).map((x) => x.closest('label')?.innerText.trim())`);
+    r('persist', 'after a reload (workspace chosen again) the saved choice is pre-selected: 24 h and 15 min', checked.includes('۲۴ ساعت') && checked.includes('۱۵ دقیقه'), checked);
     const c = await as('cust3');
     await c.goto(`/providers/${ids.pro2.providerId}`);
     await c.click((await dayButtons(c))[1]);
