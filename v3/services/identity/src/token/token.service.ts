@@ -6,7 +6,7 @@ import { IsNull, Repository } from 'typeorm';
 import { createHash, randomBytes } from 'crypto';
 import { returningRows } from '@beauclick/events';
 import { uuidv7 } from 'uuidv7';
-import { RefreshTokenEntity } from '../entities/refresh-token.entity';
+import { INTENTIONAL_REVOCATION_REASONS, RefreshTokenEntity, RefreshTokenRevocationReason } from '../entities/refresh-token.entity';
 import { UserEntity } from '../entities/user.entity';
 import { RoleService } from '../rbac/role.service';
 
@@ -138,7 +138,7 @@ export class TokenService {
      */
     const raw = await this.refreshRepo.query(
         `UPDATE identity.refresh_tokens
-            SET revoked_at = now(), last_used_at = now()
+            SET revoked_at = now(), last_used_at = now(), revocation_reason = 'rotated'
           WHERE token_hash = $1 AND revoked_at IS NULL AND expires_at > now()
       RETURNING id, user_id, device_label, user_agent, session_started_at`,
       [tokenHash],
@@ -200,8 +200,20 @@ export class TokenService {
    *     log showing `refresh -> 200` immediately followed by `refresh -> 401`
    *     and the user bounced to the sign-in page.
    *
-   *   * **Rotated long ago, or explicitly revoked** -- a genuine replay. The
-   *     token is presumed compromised and the WHOLE session chain goes.
+   *   * **Rotated long ago** (reason `rotated`, or NULL for a row revoked
+   *     before reasons were recorded) -- a genuine replay. The token is
+   *     presumed compromised and the WHOLE session chain goes.
+   *
+   *   * **Deliberately ended** (`logout`, `session_revoked`, `logout_all`,
+   *     `replay_response`) -- demo remediation F-9. A device signed out from
+   *     another device, or a browser that logged out, coming back with its old
+   *     cookie is not evidence of theft: the session was already ended on
+   *     purpose, so the request is denied and nothing else happens. Treating it
+   *     as a replay signed the user's REMAINING device out (measured). This
+   *     does not weaken theft detection: a stolen token that its legitimate
+   *     holder has since ROTATED is still `rotated`, and a reason is never
+   *     overwritten (every writer requires `revoked_at IS NULL`), so a thief
+   *     cannot relabel a rotated token by "logging it out".
    *
    * Either way the request is denied. The window only decides whether the
    * rest of the session survives, and it is deliberately tiny: a client race
@@ -214,18 +226,37 @@ export class TokenService {
     const existing = await this.refreshRepo.findOne({ where: { tokenHash } });
     if (!existing) return;
 
+    // Unexpired and never revoked cannot reach here except by expiry; an
+    // expired token is refused like any other and escalates nothing new.
+    if (existing.revocationReason && INTENTIONAL_REVOCATION_REASONS.includes(existing.revocationReason)) return;
+
     const rotatedRecently =
       existing.revokedAt !== null &&
       Date.now() - existing.revokedAt.getTime() < TokenService.REPLAY_GRACE_MS;
 
     if (!rotatedRecently) {
-      await this.revokeAllForUser(existing.userId);
+      await this.revokeAllForUser(existing.userId, 'replay_response');
     }
   }
 
+  /**
+   * One live token, ended with `reason` in the same statement. `revoked_at IS
+   * NULL` is what makes a reason permanent: an already-rotated token cannot be
+   * relabelled as intentionally ended (which would exempt it from replay
+   * detection), and an already-ended one keeps its original time and reason.
+   */
+  private async revokeLive(where: { tokenHash: string } | { id: string }, reason: RefreshTokenRevocationReason): Promise<void> {
+    await this.refreshRepo
+      .createQueryBuilder()
+      .update(RefreshTokenEntity)
+      .set({ revokedAt: () => 'now()', revocationReason: reason })
+      .where('tokenHash' in where ? 'token_hash = :value' : 'id = :value', { value: 'tokenHash' in where ? where.tokenHash : where.id })
+      .andWhere('revoked_at IS NULL')
+      .execute();
+  }
+
   async revoke(rawRefreshToken: string): Promise<void> {
-    const tokenHash = this.hashToken(rawRefreshToken);
-    await this.refreshRepo.update({ tokenHash }, { revokedAt: new Date() });
+    await this.revokeLive({ tokenHash: this.hashToken(rawRefreshToken) }, 'logout');
   }
 
   /**
@@ -246,19 +277,24 @@ export class TokenService {
     const tokenHash = this.hashToken(rawRefreshToken);
     const existing = await this.refreshRepo.findOne({ where: { tokenHash }, select: { id: true, userId: true } });
     if (!existing) return null;
-    await this.refreshRepo.update({ id: existing.id }, { revokedAt: new Date() });
+    await this.revokeLive({ id: existing.id }, 'logout');
     return existing.userId;
   }
 
+  /** "Sign out that device" (`DELETE /v1/auth/sessions/:id`). */
   async revokeById(id: string): Promise<void> {
-    await this.refreshRepo.update({ id }, { revokedAt: new Date() });
+    await this.revokeLive({ id }, 'session_revoked');
   }
 
-  async revokeAllForUser(userId: string): Promise<void> {
+  /**
+   * Every live token of the user. `logout_all` for the user's own "sign out
+   * everywhere"; `replay_response` when replay detection ends the sessions.
+   */
+  async revokeAllForUser(userId: string, reason: Extract<RefreshTokenRevocationReason, 'logout_all' | 'replay_response'>): Promise<void> {
     await this.refreshRepo
       .createQueryBuilder()
       .update(RefreshTokenEntity)
-      .set({ revokedAt: new Date() })
+      .set({ revokedAt: new Date(), revocationReason: reason })
       // Real snake_case columns (user_id, revoked_at per SnakeNamingStrategy)
       // -- same class of bug as OtpService's consumed_at fix, same fix.
       .where('user_id = :userId AND revoked_at IS NULL', { userId })

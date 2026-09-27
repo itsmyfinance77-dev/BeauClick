@@ -160,7 +160,7 @@ export class AuthService {
   }
 
   async logoutAllDevices(userId: string): Promise<void> {
-    await this.tokens.revokeAllForUser(userId);
+    await this.tokens.revokeAllForUser(userId, 'logout_all');
     this.auditLog.log({ action: 'auth.logout_all_devices', userId });
   }
 }
