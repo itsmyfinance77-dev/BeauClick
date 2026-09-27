@@ -1,0 +1,58 @@
+# BeauClick team demo — DEMO-ONLY backing services. Never used by development, CI
+# or any shared environment.
+#
+# Every port is bound to 127.0.0.1. Windows Firewall is disabled on this host's
+# Private/Public profiles, so a 0.0.0.0 bind would be reachable from every network
+# the host touches (WireGuard peers, LAN, and anything a router forwards). Only the
+# ingress (started separately by demo/scripts/start.mjs) may bind a WireGuard
+# address, and only after the owner activates remote access.
+#
+# Media uses the API's development-only local driver (uploads and public reads
+# both go through the API), so no object-storage endpoint exists on any network.
+#
+# Secrets are passed in the ENVIRONMENT of the process that runs `docker compose`
+# (demo/scripts/start.mjs reads them from the runtime root); no .env file exists.
+
+name: bcdemo
+
+services:
+  pg:
+    image: postgres:16
+    container_name: bcdemo-pg
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${BCDEMO_PG_SUPERUSER_PASSWORD:?run via demo/scripts/start.mjs}
+      POSTGRES_DB: beauclick_demo
+    ports: ['127.0.0.1:55432:5432']
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d beauclick_demo']
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+
+  os:
+    image: opensearchproject/opensearch:2.19.1
+    container_name: bcdemo-os
+    environment:
+      discovery.type: single-node
+      # Loopback-only, synthetic data, own cluster. The shared beauclick-opensearch
+      # is never touched.
+      DISABLE_SECURITY_PLUGIN: 'true'
+      DISABLE_INSTALL_DEMO_CONFIG: 'true'
+      OPENSEARCH_JAVA_OPTS: '-Xms1g -Xmx1g'
+    ports: ['127.0.0.1:59200:9200']
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -sf http://localhost:9200 || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    volumes:
+      - os-data:/usr/share/opensearch/data
+
+volumes:
+  pg-data:
+    name: bcdemo-pg-data
+  os-data:
+    name: bcdemo-os-data
