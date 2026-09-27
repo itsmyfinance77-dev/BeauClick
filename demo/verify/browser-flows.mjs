@@ -1500,7 +1500,8 @@ async function f10Group() {
     await p.goto('/pro/bookings');
     await p.click('لغو نوبت', { within: `li[data-booking="${bookingId}"]` });
     await p.click('بله، لغو کن');
-    await sleep(4000);
+    // The refund is written by the BookingCancelled consumer (outbox, asynchronous): wait for it.
+    for (let i = 0; i < 30 && !(await refundOf(bookingId)); i++) await sleep(1000);
   };
   const refundOf = async (bookingId) =>
     (await q(`select r.id, r.status, r.manual_tracked from payment.refunds r join commerce.orders o on o.id = r.order_id where o.source_id = $1 and r.kind = 'order' order by r.created_at`, [bookingId]))[0];
