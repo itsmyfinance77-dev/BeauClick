@@ -58,52 +58,82 @@ check; "browser" = real-browser verification after the owner installed root v3 (
 
 ## Browser verification (2026-09-27, after the owner's manual install of root v3)
 
-Two browsers, neither bypassing TLS: the Claude desktop in-app pane (Chromium, owner's user trust store) and a
-separate headless Microsoft Edge driven by `verify/browser-sweep.mjs` (throw-away profile, no certificate flags).
-Every sign-in was the real OTP flow. Widths: 1280 and 390. **A page that rendered is not a feature that was
-exercised** — the three classes below are kept apart on purpose.
+Real browsers only, no TLS bypass: the Claude desktop in-app pane and separate headless Microsoft Edge instances
+(`verify/browser-sweep.mjs`, `verify/browser-flows.mjs`; per-persona throw-away profiles; no certificate flags).
+Every sign-in is the real OTP flow. **A rendered page is not an exercised feature** — the classes below are kept
+apart. A flow check has four kinds: `ui` (action + on-screen effect), `persist` (survives a reload and/or is in the
+DB, read-only query), `other` (the counterpart role sees it), `denied` (a role that must not, cannot — API attempt
+by a foreign persona, never to perform the feature itself).
 
-### 1. Exercised in the browser — an action taken and its effect checked
+### 1. Exercised through the UI (flows; evidence `E:\BeauClick-demo\evidence\flows-*`)
 
-| # | What was done in the UI | Width |
+| # | Flow (width) | ui | persist | other | denied |
+|---|---|---|---|---|---|
+| 1 | sign-out (1280) | leaves account area | DB: session revoked server-side; protected page → `/auth` | — | — |
+| 1 | `/account/devices`: sign out all other devices (1280) | other devices listed | DB: one active session left; this device stays signed in after reload | — | the second device → `/auth` |
+| 1 | real OTP sign-in of 11 personas; refused request (cooldown) shows "تعداد درخواست‌ها بیش از حد مجاز است…" | ✓ | — | — | — |
+| 5 | anonymous visitor types a search query (1280) | results incl. نگار رحیمی | — | after an admin index rebuild | — |
+| 5 | admin: rebuild the index (confirm "اجرا کن") | ✓ | DB: index state changed | search answers | — |
+| 6 | pro2 adds / deletes a single free time (1280) | ✓ | DB row created / deleted | customer sees ۰۶:۰۰ / no longer | pro1 refused (**409** SLOT_NOT_RELEASABLE; slot untouched) |
+| 6 | pro2 adds / removes a service | ✓ | DB with typed values / soft-deleted | customer sees / no longer | pro1 **404** |
+| 7 | payment **declined** → "تلاش دوباره" → success (1280) | result pages | DB: attempts failed→succeeded, order paid; listed after reload | pro2 sees it | — |
+| 7 | payment **cancelled** at the bank | result `reason=cancelled_by_user` | DB: order not paid | — | — |
+| 8 A | full A **at 390** (terms unticked → pay closed → tick → pay → accepted terms after reload; no overflow) | ✓ | DB snapshot | pro1 sees booking | other customer **404** |
+| 10 | customer cancels (1280), dialog "بله، لغو کن" | ✓ | DB cancelled + full refund; "لغو شده" after reload | pro2's cancelled tab (weekday + time) | other customer **404** |
+| 11 | real-time no-show: slot → booking → "not yet" notice → after start + 5 min grace, declared with the required statement | ✓ | DB `no_show` + 1 declaration; row status after reload | customer sees "عدم مراجعه" | other customer **404** |
+| 13 B | **use at 390** (unticked terms, pay closed, fresh payment, no overflow) | ✓ | DB: one confirmed linked attempt; offer row settled `used` on the next read (DEMO-DEC-001 derivation) | — | other customer **404** |
+| 13 B | **dismiss** (1280), confirmation says the refund continues | ✓ | DB `dismissed`, refund untouched; no booking control after reload | — | — |
+| 14 | practitioner marks a past booking done | ✓ | DB completed | customer: "انجام شده"; loyalty 15 → 25 on `/loyalty` | customer **404** |
+| 14 | moderator removes a review with a reason | ✓ | DB hidden, by moderator, with reason; left the queue | public reviews API no longer lists it | customer **403** |
+| 15/17 | owner invites cust3 → cust3 accepts → grants finance-read → revokes (acknowledgement required) | ✓ | DB invited → active; grant live → revoked | cust3 sees the invitation; sees the salon finance space while granted | cust3 without / after the grant does not see it |
+| 24 | moderator approves a pending verification with a reason | ✓ | DB approved, by moderator, with reason; left the queue | public profile shows "هویت تأیید شده" | customer **403** |
+| 25 | moderator upholds an image report ("تأیید و حذف") | ✓ | DB report upheld; queue shrank by one | the image object is deleted (`deleted_at`, `taken_down_by`) | — |
+| 26 | chat: customer writes, professional replies | ✓ | DB message; in the thread after reload | pro sees it; customer sees the reply | other customer **404** |
+| 26 | moderator rejects a chat report with a reason | ✓ | DB rejected + reason; under "ردشده" after reload | — | customer **403** |
+| 27 | AI assistant: one-time consent, new conversation, question → sandbox answer | ✓ | DB consent; question + answer stored; in the conversation after reload | — | — |
+| 3 | admin grants "ناظر محتوا" to cust4 with a reason → cust4 signs in again → can moderate → admin revokes | ✓ | DB role added / removed | cust4 opens the moderation queue; audit log lists both | cust4 refused **immediately** after revoke (same session) |
+| 21 | admin creates a commission policy for an unused component (acquisition), drafts a "nothing collected" v1, publishes it | ✓ | DB draft → published by admin | — | operator **403** |
+| 21 | **retire** — see finding F-4: the retire click hit the live booking commission (driver scoping bug); guard added; reset by the guarded restore | ✓ (wrong target) | DB retired by admin | — | — |
+| 30 | wishlist save (reached in-app) → listed → remove | ✓ | DB saved; gone after reload | — | — |
+| 31 | waitlist end-to-end: cust4 registers as a professional **in the UI**, adds a service + one time; cust3 books it; cust2 sees "no free time" and joins; cust3 cancels → offer to cust2 → **decline**; second round → **accept** → booking (pending payment) | ✓ | DB waiting → offered → declined; waiting → accepted + booking | the offer appears on `/waitlist` | cust3 acting on cust2's entry **404** |
+| 32 | journey: budget saved, goal added, marked achieved | ✓ | DB goal achieved, budget stored; goal after reload | — | — |
+| 33 | notifications: read one, then all | ✓ | DB unread −1, then 0; persists after reload | — | — |
+| 34 | privacy: export request (becomes ready; download offered — not clicked, no file saved), erasure scheduled (7-day window) then cancelled | ✓ | DB export ready; erasure pending → cancelled | admin privacy queue lists both (status only) | — |
+
+### 2. Rendered only — seeded state displayed, no UI action (1280 and 390, 0 app console errors)
+
+4 (`/providers` list, profiles, portfolio) · 9 (`/admin/commercial/outcome-policy`, `/pro/outcome-policy` — no
+selection change made) · 19/20 (`/pro/finance`, `/finance`, `/admin/settlements` — empty by design) · 21 plans /
+control-plane pages · 28 `/admin/loyalty` · 29 `/referral` (no code claimed in the UI) · 33 `/admin/notifications` ·
+35 (`/pro/analytics`, `/admin`, `/admin/audit-log` — overflows at 390, F-1) · 36 (`/terms`, `/privacy-policy`,
+`/contact`, `/support`) · `/admin/phone-conflicts` · `/pro/profile` edit (not saved) · `/account/devices` list only in
+the device flow.
+
+### 3. Not exercised in a browser — with the reason
+
+| # | What | Why / evidence instead |
 |---|---|---|
-| 1 | OTP sign-in (request → code from the inbox → verify) for cust1, pro1, bizOwner, bizManager, bizPractitioner, financeReader, moderator, operator, admin; the session then carried every page. A refused request (per-number limit / cooldown → 429) shows "تعداد درخواست‌ها بیش از حد مجاز است…" | 1280 |
-| 1 | Demo inbox: member login in the browser; the member's scope is one number and only its code is shown | 1280 |
-| 7 | Booking + sandbox bank **success** → result page → booking confirmed | 1280 |
-| 8 A | Terms shown for the chosen time; box unchecked and pay disabled → tick → enabled → pay → accepted terms visible in "رزروهای من" (versions + instant + text) | 1280 (390: states checked, not paid) |
-| 13 B | Open offer → honest copy + live capacity → pick a time → new terms unticked/pay disabled → tick → fresh payment → offer "used", original cancelled, refund executed. A booking without an offer says so (fix `a889dae`) | 1280 (390: panels open, not paid) |
-| 3, 15, 18, 21, 24… | Typed-URL refusals: every non-admin on `/admin` → "دسترسی لازم … ندارد"; moderator on users/plans/audit-log; operator on plans; anonymous on `/bookings`, `/admin`, `/pro/bookings`, `/finance` → `/auth`. Operator on commission policies: the page frame renders (page gate `bc_manage_platform`) but the API answers **403** (`bc_manage_commercial_plans`) and no data is shown — baseline #264 design, the API is the control | 1280 |
+| 2 | dev-login | unavailable by design; curl 404 at ingress |
+| 10 | seller cancellation | **no web control** at the baseline (API-ONLY; exercised via API by seed and verify:b-replacement) |
+| 12 | #212 "reschedule instead of refund" | only while a refund is pending/manual; the sandbox executes refunds at once |
+| 14 | customer review writing; seller reply | **no web form** at the baseline (API-ONLY). Seller reply: no reply exists in the data (api-only-evidence) |
+| 16, 22, 23, 37 | business locations/resources, seller subscriptions/credits/collection policy, settlement schedules/risk classes/legal evidence, my orders/reviews | API-ONLY (no screen). Evidence: `evidence/api-only-*.json` — real GETs + DB counts; credit purchases refused **404 SUBSCRIPTION_SELLER_NOT_ELIGIBLE**; resource requirements **0 rows**; #23 all **empty** |
+| 29 | claiming a referral code in the UI | not run |
+| 9 | seller outcome-policy selection change | not run (would change the terms A depends on during the check window) |
+| 38 | roadmap items | not built |
 
-### 2. Rendered only — seeded state displayed, no UI action taken (1280 and 390, 0 app console errors)
+### Browser findings (baseline, not changed; each a proposal at most)
 
-4 (`/`, `/providers`, `/providers/[id]`) · 5 (`/search` without a query; `/admin/search`) · 6 (`/pro/availability`) ·
-9 (`/admin/commercial/outcome-policy`, `/pro/outcome-policy`) · 10 (`/bookings`, `/pro/bookings` lists) · 11 (no-show
-bookings and the remedy panel, opened read-only) · 14 (`/pro/bookings`, `/admin/reviews`) · 15/17 (`/business`) ·
-18 (own-workspace scoping observed: practitioner sees only their own professional workspace; customer "no finance
-access") · 19/20 (`/pro/finance`, `/finance`, `/admin/settlements` — empty by design) · 21 (`/admin/commercial/*`) ·
-24 (`/pro/profile`, `/admin/verification`) · 25 (`/admin/media`) · 26 (`/messages`, `/pro/messages`,
-`/business/messages`, `/admin/chat-reports`) · 27 (`/assistant`) · 28 (`/loyalty`, `/admin/loyalty`) · 29 · 30 · 31 ·
-32 · 33 (`/notifications`, `/admin/notifications`) · 34 (`/account/privacy`, `/admin/privacy`) · 35 (`/pro/analytics`,
-`/admin`, `/admin/audit-log` — **overflows at 390**, see below) · 36 (`/terms`, `/privacy-policy`, `/contact`,
-`/support`) · `/admin/users`, `/admin/phone-conflicts`, `/dashboard`.
-
-The write paths behind these rows were performed through the **API** by the seed (see each row's evidence), not in
-the browser.
-
-### 3. Not verified in a browser
-
-1 logout and `/account/devices` · 2 (checked with curl only) · 7 declined / cancelled / "pay again" in the UI (seeded
-via API only) · 12 (not demonstrable in the sandbox) · 16, 22, 23, 37 (API-ONLY, no screen) · 38 (not built) · every
-other UI write: search typing/autocomplete, availability editing, completing a booking, writing a review, declaring a
-no-show, moderation decisions, sending a chat message, waitlist accept/decline, privacy export request, admin
-publish/retire, staff invitation, B dismiss (API-verified only).
-
-### Browser findings (baseline, not changed)
-
-- `/admin/audit-log` at 390 px: document 473 px wide. Cause: `.before` / `.after` snapshot lines
-  (`app/admin/audit-log/audit-log.module.css:104-111`) have no wrap rule, so a 64-hex `bodySha256` cannot break
-  (`.id` in the same file already has `overflow-wrap: anywhere`). Proposed minimal fix — **not applied** (outside A/B):
-  add `overflow-wrap: anywhere;` to `.before` and `.after`. Tested only by injecting that rule in the browser: the page
-  then measures exactly 390 (`evidence/browser-2026-09-27T11-44-41-787Z`, labelled EXPERIMENT).
-- Provider page "پایان تقریبی" is the server slot end: 60-min slots are offered for the 120-min service.
-- Commission-policy page gate broader than its API gate (above); data refused by the API.
+- **F-1** `/admin/audit-log` at 390: 473 px wide — `.before`/`.after` lack `overflow-wrap: anywhere` (proposal tested
+  by injection only).
+- **F-2** Provider page, FULL load while signed in: the provider is fetched before the session refresh, so a signed-in
+  customer gets the anonymous "برای ذخیرهٔ … وارد شوید" link to `/auth`; in-app navigation shows the real save button.
+- **F-3** Deleting another professional's free time is refused with **409 SLOT_NOT_RELEASABLE** ("assigned to an active
+  booking") — correct refusal (owner-scoped delete), misleading reason.
+- **F-4 (driver, not app)** the lifecycle flow's first retire click retired the LIVE booking commission (too-wide
+  row scope). Real UI action by the administrator; reset by the guarded restore; guard added so it cannot recur.
+- **F-5** 60-min slots offered for the 120-min service ("پایان تقریبی" = slot end).
+- **F-6** Commission page frame visible to the operator; the API refuses the data (403).
+- **F-7** Late capture after a hold lapse is labelled "duplicate" on the result page in one path.
+- Customer's no-show card offers only "پیام" and "شرایط پذیرفته‌شده" (the #212 remedy panel appears on seller-cancelled
+  bookings) — observation.
