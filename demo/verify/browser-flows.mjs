@@ -382,7 +382,8 @@ async function proGroup() {
     await p.goto('/pro/availability');
     await p.fill('تاریخ', tomorrow);
     await p.fill('از ساعت', '06:00', { nth: 1 });
-    await p.fill('تا ساعت', '06:30', { nth: 1 });
+    // F-5: 90 minutes covers every pro2 service (the page preselects the first, «کاشت ژل», 90 min).
+    await p.fill('تا ساعت', '07:30', { nth: 1 });
     await p.click('افزودن');
     await sleep(1500);
     const slot = (await q(`select id, status from booking.availability_slots where professional_id = $1 and start_at = ($2::date + time '06:00') at time zone 'Asia/Tehran'`, [ids.pro2.providerId, tomorrow]).catch(async () => q(`select id, status from booking.availability_slots where professional_id = $1 order by created_at desc limit 1`, [ids.pro2.providerId])))[0];
@@ -456,7 +457,8 @@ async function proGroup() {
     r('persist', 'DB: the near-term free time exists', Boolean(slot), { wanted: s, slot });
     const c = await as('cust3');
     await c.goto(`/providers/${ids.pro1.providerId}`);
-    await c.click('میکاپ مجلسی', { prefix: true });
+    // F-5: the 30-minute time is offered only for a service it covers — the 30-min «اصلاح و فرم ابرو».
+    await c.click('اصلاح و فرم ابرو', { prefix: true });
     await c.click((await dayButtons(c))[0]);
     await c.click(fa(s.time));
     await sleep(1500);
