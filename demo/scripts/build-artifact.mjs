@@ -26,6 +26,35 @@ function run(cmd, args, opts) {
   const r = spawnSync(cmd, args, { stdio: 'inherit', shell: process.platform === 'win32', ...opts });
   if (r.status !== 0) throw new Error(`${cmd} ${args.join(' ')} failed (exit ${r.status})`);
 }
+/**
+ * Mirrors Dockerfile.api's runtime step: each workspace package's node_modules is
+ * linked into the matching position under dist/, so Node resolves every compiled
+ * package's dependencies exactly as it does from the source tree (pnpm does not
+ * hoist them to the workspace root). Junctions on Windows; excluded from hashing
+ * and from the artifact copy.
+ */
+export function linkDistNodeModules() {
+  const groups = [['apps', ['api']], ['libs'], ['services'], ['packages']];
+  let linked = 0;
+  for (const [top, only] of groups) {
+    const names = only ?? fs.readdirSync(path.join(V3_ROOT, top));
+    for (const name of names) {
+      const src = path.join(V3_ROOT, top, name, 'node_modules');
+      if (!fs.existsSync(src)) continue;
+      const dstDir = path.join(DIST, top, name);
+      fs.mkdirSync(dstDir, { recursive: true });
+      const dst = path.join(dstDir, 'node_modules');
+      fs.rmSync(dst, { recursive: true, force: true });
+      fs.symlinkSync(src, dst, 'junction');
+      linked++;
+    }
+  }
+  if (!fs.existsSync(path.join(DIST, 'apps', 'api', 'node_modules', 'reflect-metadata'))) {
+    throw new Error('dist node_modules links did not resolve reflect-metadata');
+  }
+  console.log(`linked ${linked} package node_modules into dist/`);
+}
+
 export function hashTree(root, { exclude = [] } = {}) {
   const h = createHash('sha256');
   let files = 0;
@@ -33,6 +62,7 @@ export function hashTree(root, { exclude = [] } = {}) {
     for (const name of fs.readdirSync(dir).sort()) {
       const full = path.join(dir, name);
       const rel = path.relative(root, full).replace(/\\/g, '/');
+      if (name === 'node_modules') continue;
       if (exclude.some((x) => rel === x || rel.startsWith(`${x}/`))) continue;
       const st = fs.statSync(full);
       if (st.isDirectory()) walk(full);
@@ -66,6 +96,7 @@ console.log(`building profile ${key} (${p.origin}) from ${sha}`);
 // --- API (profile-independent compiled output) ---------------------------------
 fs.rmSync(DIST, { recursive: true, force: true });
 run('npx', ['nx', 'run', 'api:build', '--skip-nx-cache'], { cwd: V3_ROOT });
+linkDistNodeModules();
 
 // --- Web (production build; origin baked in) ----------------------------------
 fs.rmSync(path.join(WEB, '.next'), { recursive: true, force: true });
@@ -79,7 +110,7 @@ if (fs.existsSync(outDir)) {
 }
 fs.mkdirSync(outDir, { recursive: true });
 fs.cpSync(path.join(WEB, '.next'), path.join(outDir, 'web-next'), { recursive: true });
-fs.cpSync(DIST, path.join(outDir, 'api-dist'), { recursive: true });
+fs.cpSync(DIST, path.join(outDir, 'api-dist'), { recursive: true, filter: (src) => path.basename(src) !== 'node_modules' });
 
 const manifest = {
   profile: key,
