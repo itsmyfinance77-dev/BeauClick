@@ -394,9 +394,9 @@ async function proGroup() {
     r('other', 'a customer sees ۰۶:۰۰ on the first day', (await timeButtons(c)).includes('۰۶:۰۰'), days[0]);
     const foreign = await (await apiAs('pro1')).call('DELETE', `/v1/me/availability/slots/${slot.id}`, undefined, { expect: [200, 204, 403, 404, 409] });
     const still = (await q(`select status from booking.availability_slots where id = $1`, [slot.id]))[0];
-    // The delete is scoped by owner in its WHERE clause; a foreign id gets 409 SLOT_NOT_RELEASABLE (misleading
-    // wording: 'assigned to an active booking') — still a refusal, and the slot must be untouched.
-    r('denied', 'another professional cannot delete it (refused; slot untouched)', foreign.status >= 400 && still?.status === 'open', `HTTP ${foreign.status} ${foreign.raw?.json?.error?.code ?? ''}; slot ${still?.status}`);
+    // F-3 (fixed in round 4): a foreign slot id gets the generic 404 NOT_FOUND_OR_NOT_YOURS (no longer the misleading
+    // 409 "assigned to an active booking"); the owner's delete below is the control; the slot must be untouched.
+    r('denied', 'another professional: 404 NOT_FOUND_OR_NOT_YOURS; slot untouched (owner control below)', foreign.status === 404 && foreign.raw?.json?.error?.code === 'NOT_FOUND_OR_NOT_YOURS' && still?.status === 'open', `HTTP ${foreign.status} ${foreign.raw?.json?.error?.code ?? ''}; slot ${still?.status}`);
     await p.goto('/pro/availability');
     await p.click('حذف', { within: `li[data-slot="${slot.id}"]` });
     await p.click('حذف کن');
@@ -1404,11 +1404,70 @@ async function round4Group() {
   });
 }
 
+// ============================================================================ re-golden (round 4)
+// The data the F-5 fix needs, made by the OWNING professional in the real UI:
+//  1. the open time lying inside each legacy long booking (bookable before F-5 → overlap) is deleted;
+//  2. a free time long enough for each 90/120-min service is published.
+// Identity guards: every deleted slot is re-proved (owner, open, inside that booking) right before the click.
+async function regoldenGroup() {
+  const legacy = await q(`select b.id booking, b.professional_id pid, a.id slot, a.start_at from booking.bookings b join provider.services s on s.id = b.service_id
+      join booking.availability_slots a on a.professional_id = b.professional_id and a.status = 'open'
+       and a.start_at < b.slot_start + make_interval(mins => s.duration_minutes) and a.end_at > b.slot_start
+     where b.status in ('pending','confirmed') and s.duration_minutes * 60 > extract(epoch from (b.slot_end - b.slot_start))`);
+  const personaOf = (pid) => ['pro1', 'pro2', 'practitioner'].find((k) => ids[k].providerId === pid);
+  const keyOf = (k) => (k === 'practitioner' ? 'bizPractitioner' : k);
+
+  for (const row of legacy) {
+    await flow(`regolden: ${personaOf(row.pid)} deletes the open time inside a legacy long booking`, async (r) => {
+      const who = keyOf(personaOf(row.pid));
+      const p = await as(who);
+      await p.goto('/pro/availability');
+      const guard = (await q(`select professional_id, status from booking.availability_slots where id = $1`, [row.slot]))[0];
+      r('rule', 'identity: the slot is the owner\'s and open, inside the legacy booking', guard?.professional_id === row.pid && guard.status === 'open', { slot: row.slot, booking: row.booking });
+      if (!(guard?.professional_id === row.pid && guard.status === 'open')) throw new Error('guard failed');
+      await p.click('حذف', { within: `li[data-slot="${row.slot}"]` });
+      await p.click('حذف کن');
+      await sleep(1500);
+      const after = (await q(`select status from booking.availability_slots where id = $1`, [row.slot]))[0];
+      r('persist', 'DB: the open time is gone', !after, after ?? 'row deleted');
+    });
+  }
+
+  const long = await q(`select s.id, s.name, s.duration_minutes d, s.professional_id pid from provider.services s where s.deleted_at is null and s.duration_minutes > 60 order by s.name`);
+  for (const svc of long) {
+    await flow(`regolden: ${personaOf(svc.pid)} publishes a free time long enough for «${svc.name}» (${svc.d} min)`, async (r) => {
+      const p = await as(keyOf(personaOf(svc.pid)));
+      // First day from +3 whose 07:00–(07:00+d) Tehran window is free for this professional.
+      let day = null;
+      for (let k = 3; k < 10 && !day; k++) {
+        const d = tehran(Date.now() + k * 86_400_000).date;
+        const clash = await q(`select 1 from booking.availability_slots where professional_id = $1
+            and start_at < (($2::date + time '07:00') at time zone 'Asia/Tehran') + make_interval(mins => $3)
+            and end_at > (($2::date + time '07:00') at time zone 'Asia/Tehran')`, [svc.pid, d, svc.d]);
+        if (!clash.length) day = d;
+      }
+      if (!day) throw new Error('no free morning window');
+      const endMin = 7 * 60 + svc.d;
+      const end = `${String(Math.floor(endMin / 60)).padStart(2, '0')}:${String(endMin % 60).padStart(2, '0')}`;
+      await p.goto('/pro/availability');
+      await p.fill('تاریخ', day);
+      await p.fill('از ساعت', '07:00', { nth: 1 });
+      await p.fill('تا ساعت', end, { nth: 1 });
+      await p.click('افزودن');
+      await sleep(1500);
+      const slot = (await q(`select id, end_at - start_at len from booking.availability_slots where professional_id = $1 and start_at = ($2::date + time '07:00') at time zone 'Asia/Tehran'`, [svc.pid, day]))[0];
+      r('persist', `DB: a ${svc.d}-minute open time exists on ${day} 07:00–${end}`, Boolean(slot), slot);
+      const listed = await (await apiAs('cust4')).call('GET', `/v1/providers/${svc.pid}/availability?serviceId=${svc.id}`, undefined, { expect: [200] });
+      r('other', 'the customer listing for that service now offers it', (listed.data ?? []).some((x) => x.id === slot?.id), (listed.data ?? []).length);
+    });
+  }
+}
+
 function userKey(userId) {
   return Object.entries(ids).find(([k, v]) => k.startsWith('user:') && v === userId)?.[0]?.slice(5) ?? null;
 }
 
-const GROUPS = { round4: round4Group, referral: referralGroup, outcome: outcomeGroup, recovery: recoveryGroup, checkout: checkoutGroup, account: accountGroup, pro: proGroup, moderation: moderationGroup, engagement: engagementGroup, waitlist: waitlistGroup, business: businessGroup, admin: adminGroup };
+const GROUPS = { regolden: regoldenGroup, round4: round4Group, referral: referralGroup, outcome: outcomeGroup, recovery: recoveryGroup, checkout: checkoutGroup, account: accountGroup, pro: proGroup, moderation: moderationGroup, engagement: engagementGroup, waitlist: waitlistGroup, business: businessGroup, admin: adminGroup };
 for (const g of groups) {
   if (!GROUPS[g]) throw new Error(`unknown group ${g}`);
   await GROUPS[g]();
