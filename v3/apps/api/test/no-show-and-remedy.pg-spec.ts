@@ -854,6 +854,49 @@ describePg('no-show declaration and customer remedy (real PostgreSQL)', () => {
       expect(bookingAfterSecond.slot_id).toBe(slotA);
     });
 
+    describe('#212 simulator (DEMO BRANCH): a bank without a refund API → manual_required', () => {
+      async function manualCancelled(): Promise<Booked & { seller: Seller }> {
+        const seller = await governedSeller();
+        const booked = await book(seller);
+        await sandbox.decide(booked.reference, 'success_manual_refund');
+        const result = await checkout.handleCallback('sandbox', booked.reference, { reference: booked.reference });
+        expect(result.outcome.status).toBe('succeeded');
+        await bookings.cancel(booked.bookingId, { type: 'professional', id: seller.owner.id }, 'مشکل پیش‌بینی‌نشده');
+        await deliver(booked); // decide + execute
+        return { ...booked, seller };
+      }
+
+      it('the default refund executes as manual_required; the decision is manual_required; reschedule is still offered', async () => {
+        const booked = await manualCancelled();
+        expect(await refundsFor(booked.orderId)).toEqual([
+          { request_key: `booking-cancelled:${booked.bookingId}`, amount_toman: String(PRICE), status: 'manual_required' },
+        ]);
+        expect((await decisionsFor(booked.bookingId))[0]).toMatchObject({ execution_status: 'manual_required' });
+        expect((await remedyResolution.read(booked.bookingId)).rescheduleStillAvailable).toBe(true);
+      });
+
+      it('control: an ordinary "success" transaction still refunds automatically (succeeded) — the mode is per transaction', async () => {
+        const booked = await sellerCancelled();
+        await deliver(booked);
+        expect((await refundsFor(booked.orderId))[0].status).toBe('succeeded');
+      });
+
+      it('the customer switches to a free reschedule: booking revived on the new slot, remedy resolved by the customer', async () => {
+        const booked = await manualCancelled();
+        const newSlotId = await seedSlot(dataSource, booked.seller.professionalId, booked.seller.serviceId, futureSlotTime(500));
+        const resolution = await remedyResolution.resolve(booked.bookingId, booked.customer.id, 'reschedule', newSlotId);
+        expect(resolution).toEqual({ chosen: 'reschedule', resolvedBy: 'customer' });
+        const after = await bookingRow(booked.bookingId);
+        expect(after).toMatchObject({ slot_id: newSlotId, status: 'confirmed' });
+        expect(await remedyFor(booked.orderId)).toMatchObject({ resolved_by: 'customer', chosen: 'reschedule' });
+        // Recorded, not asserted as correct: what happens to the ALREADY-WRITTEN manual_required refund row.
+        // (Pending refunds are simply never executed; a manual_required row already exists.) See F-10 in the report.
+        const refunds = await refundsFor(booked.orderId);
+        // eslint-disable-next-line no-console
+        console.info(`[#212 sim] refund rows after reschedule: ${JSON.stringify(refunds)}`);
+      });
+    });
+
     it('refuses reschedule once the refund has already executed — money is gone', async () => {
       const booked = await sellerCancelled();
       await deliver(booked); // decide + execute -> succeeded

@@ -7,8 +7,8 @@ import { useAuth } from '@/lib/auth-context';
 import { ProtectedRoute } from '@/components/protected-route';
 import { Alert, Button, ErrorState, LoadingState } from '@/components/ui';
 import { Badge, EmptyState, PageHeader, type BadgeTone } from '@/components/kit';
+import { WaitlistAcceptPanel } from '@/components/waitlist-accept-panel';
 import {
-  acceptWaitlistOffer,
   declineWaitlistOffer,
   myWaitlistEntries,
   removeWaitlistEntry,
@@ -59,6 +59,8 @@ function Waitlist() {
   // claim the user is on no waitlists.
   const [loaded, setLoaded] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  // Demo F-8: the offer whose checkout panel (terms + pay) is open.
+  const [acceptingId, setAcceptingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -78,21 +80,16 @@ function Waitlist() {
     void load();
   }, [load]);
 
-  async function accept(entry: WaitlistEntry) {
-    setBusyId(entry.id);
-    setError(null);
-    try {
-      await acceptWaitlistOffer(api, entry.id);
+  // Demo F-8: accepting is a checkout (terms, order, bank) inside WaitlistAcceptPanel.
+  // A refusal -- e.g. the slot just went to a faster direct customer (GAP-26) --
+  // reloads so the entry's real status ('missed') replaces the stale row; the
+  // panel itself shows the server's message.
+  async function acceptDone(outcome: 'refused' | 'bookings') {
+    if (outcome === 'bookings') {
       router.push('/bookings');
-    } catch (err) {
-      // The slot may have just gone to a faster direct customer -- an
-      // honest, expected outcome (GAP-26), not a bug. Refresh so the entry's
-      // real status ('missed') replaces the stale 'offered' row on screen.
-      setError(err instanceof Error ? err.message : 'این نوبت دیگر در دسترس نیست.');
-      await load();
-    } finally {
-      setBusyId(null);
+      return;
     }
+    await load();
   }
 
   async function decline(entry: WaitlistEntry) {
@@ -160,9 +157,13 @@ function Waitlist() {
                   </p>
                 ) : null}
 
-                {offered ? (
+                {offered && acceptingId === entry.id ? (
+                  <WaitlistAcceptPanel api={api} entry={entry} onDone={(o) => void acceptDone(o)} onCancel={() => setAcceptingId(null)} />
+                ) : null}
+
+                {offered && acceptingId !== entry.id ? (
                   <div className={styles.actions}>
-                    <Button inline onClick={() => void accept(entry)} loading={busyId === entry.id}>
+                    <Button inline onClick={() => setAcceptingId(entry.id)} disabled={busyId === entry.id}>
                       پذیرفتن و رزرو
                     </Button>
                     <Button inline variant="ghost" onClick={() => void decline(entry)} disabled={busyId === entry.id}>

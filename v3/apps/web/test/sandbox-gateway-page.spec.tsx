@@ -127,6 +127,19 @@ describe('sandbox gateway decision → return leg (R31-20)', () => {
     expect(assigned).toBe('');
   });
 
+  it('#212 simulator: "paid, bank without automatic refund" sends that exact decision and the same return leg', async () => {
+    respondWith({ accepted: true });
+    render(<SandboxGatewayPage />);
+    await userEvent.click(await screen.findByTestId('sandbox-success-manual-refund'));
+
+    await waitFor(() => expect(assigned).not.toBe(''));
+    const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
+    expect(String(url)).toContain(`/v1/sandbox-gateway/${REFERENCE}/decide`);
+    expect(JSON.parse(String((init as RequestInit).body))).toEqual({ decision: 'success_manual_refund' });
+    expect(new URL(assigned).searchParams.get('reference')).toBe(REFERENCE);
+    expect(new URL(assigned).searchParams.get('decision')).toBeNull();
+  });
+
   it('carries the same return leg for the failure and cancel decisions', async () => {
     for (const label of ['پرداخت ناموفق (رد شده توسط بانک)', 'انصراف از پرداخت']) {
       assigned = '';

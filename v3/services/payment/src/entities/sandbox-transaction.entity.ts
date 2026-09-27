@@ -65,6 +65,14 @@ export class SandboxTransactionEntity {
   @Column({ type: 'varchar', length: 128, nullable: true })
   refundReference!: string | null;
 
+  /**
+   * DEMO BRANCH ONLY (#212 simulator). `manual`: the simulated bank of THIS
+   * transaction has no refund API, so a refund becomes `manual_required`.
+   * Set only by the `success_manual_refund` decision; default `automatic`.
+   */
+  @Column({ type: 'varchar', length: 10, default: 'automatic' })
+  refundMode!: 'automatic' | 'manual';
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 

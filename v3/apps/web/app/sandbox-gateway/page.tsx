@@ -7,7 +7,14 @@ import { isAllowedCallback } from '@/lib/sandbox-callback';
 import { Alert, Button, Card, LoadingState } from '@/components/ui';
 import styles from './sandbox-gateway.module.css';
 
-type Decision = 'success' | 'failure' | 'cancel';
+/**
+ * `success_manual_refund` (DEMO BRANCH ONLY, #212 simulator): a successful
+ * payment on a simulated bank WITHOUT a refund API, so any later refund of this
+ * transaction becomes `manual_required` — the one state in which the customer's
+ * remedy may still switch to a free reschedule (ADR-051 §8). Chosen per
+ * transaction; nothing else in the sandbox changes.
+ */
+type Decision = 'success' | 'success_manual_refund' | 'failure' | 'cancel';
 
 /**
  * The sandbox gateway's checkout page -- a stand-in for the page a real
@@ -134,6 +141,15 @@ function SandboxGatewayContent() {
       <div className={styles.actions}>
         <Button onClick={() => void decide('success')} loading={busy === 'success'} disabled={busy !== null}>
           پرداخت موفق
+        </Button>
+        <Button
+          variant="ghost"
+          onClick={() => void decide('success_manual_refund')}
+          loading={busy === 'success_manual_refund'}
+          disabled={busy !== null}
+          data-testid="sandbox-success-manual-refund"
+        >
+          پرداخت موفق — بانک بدون بازپرداخت خودکار (شبیه‌سازی)
         </Button>
         <Button variant="ghost" onClick={() => void decide('failure')} disabled={busy !== null}>
           پرداخت ناموفق (رد شده توسط بانک)

@@ -849,7 +849,14 @@ export class PaymentService {
 
     const provider = this.providers.get(intent.providerKey);
 
-    if (!provider.supportsAutomaticRefund) {
+    // DEMO BRANCH ONLY (#212 simulator): a sandbox transaction decided as
+    // "bank without a refund API" refines the provider's answer -- it can only
+    // make a refund manual, never automatic.
+    const automaticForThis =
+      provider.supportsAutomaticRefund &&
+      (provider.supportsAutomaticRefundFor ? await provider.supportsAutomaticRefundFor(attempt?.providerReference ?? '') : true);
+
+    if (!automaticForThis) {
       // Honest outcome, not a failure: the money still has to move, just via
       // the manual settlement path rather than an API this gateway lacks.
       await this.completeRefund(refundId, 'manual_required', null, 'gateway_has_no_refund_api');

@@ -189,10 +189,17 @@ export class PaymentCallbackController {
     const reference = params.reference ?? params.Authority ?? params.authority ?? params.token ?? '';
 
     const result = await this.checkout.handleCallback(provider, reference, params);
+    // Demo remediation F-7: "refunded" only when the refund row really is
+    // `succeeded`; a pending / manual / failed refund is stated as not done yet.
+    const refundDone = result.refundStatus === 'succeeded';
     const status = result.duplicateChargeRefunded
-      ? 'duplicate_refunded'
+      ? refundDone
+        ? 'duplicate_refunded'
+        : 'duplicate_refund_pending'
       : result.refundIssued
-        ? 'refunded'
+        ? refundDone
+          ? 'refunded'
+          : 'refund_pending'
         : result.outcome.status;
 
     // The reason is attached only to the states where it MEANS something.

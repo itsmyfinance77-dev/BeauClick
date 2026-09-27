@@ -51,6 +51,15 @@ describeIfPg('Waitlist concurrency on real PostgreSQL', () => {
     await resetDatabase(dataSource);
   });
 
+  /**
+   * Demo F-8: acceptance is a checkout now (booking + order + intent). The
+   * cases here are about the slot race, so they read back the booking it made.
+   */
+  async function acceptOffer(entryId: string, customerId: string): Promise<BookingEntity> {
+    const result = await acceptance.accept({ entryId, customerId, idempotencyKey: uuidv7(), acceptedPolicy: null, callbackBaseUrl: 'http://x/cb' });
+    return dataSource.getRepository(BookingEntity).findOneOrFail({ where: { id: result.bookingId } });
+  }
+
   async function scenario() {
     const owner = await seedUser(app, dataSource, `+9891201${String(Date.now()).slice(-5)}`, ['professional']);
     const professional = await seedProfessional(dataSource, owner.id, 'آرایشگاه سارا');
@@ -106,7 +115,7 @@ describeIfPg('Waitlist concurrency on real PostgreSQL', () => {
     await bookings.cancel(holdingBooking.id, { type: 'customer', id: holder.id }, null);
     await relay.drain();
 
-    const booking = await acceptance.accept(entry.id, firstCustomer.id);
+    const booking = await acceptOffer(entry.id, firstCustomer.id);
     expect(booking.slotId).toBe(slotId);
     expect(booking.customerId).toBe(firstCustomer.id);
 
@@ -138,7 +147,7 @@ describeIfPg('Waitlist concurrency on real PostgreSQL', () => {
       // Genuinely simultaneous: the waitlist candidate's accept() and a
       // direct competitor's create() fired with no await between them.
       const [acceptResult, directResult] = await Promise.allSettled([
-        acceptance.accept(entry.id, firstCustomer.id),
+        acceptOffer(entry.id, firstCustomer.id),
         bookings.create({ customerId: racer.id, professionalId: professional.id, slotId }),
       ]);
 
@@ -175,7 +184,7 @@ describeIfPg('Waitlist concurrency on real PostgreSQL', () => {
       offerExpiresAt: new Date(Date.now() - 1000),
     });
 
-    await expect(acceptance.accept(entry.id, firstCustomer.id)).rejects.toBeInstanceOf(OfferNotAvailableException);
+    await expect(acceptOffer(entry.id, firstCustomer.id)).rejects.toBeInstanceOf(OfferNotAvailableException);
   });
 
   it('decline re-offers the still-open slot to the next candidate', async () => {

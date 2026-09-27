@@ -123,6 +123,8 @@ describe('the six result statuses', () => {
     ['failed', 'پرداخت انجام نشد'],
     ['refunded', 'پرداخت برگشت داده شد'],
     ['duplicate_refunded', 'رزرو شما تأیید شد'],
+    ['refund_pending', 'بازگشت وجه هنوز انجام نشده است'],
+    ['duplicate_refund_pending', 'رزرو شما تأیید شد'],
     ['unresolved', 'وضعیت پرداخت هنوز مشخص نیست'],
   ])('%s renders its own heading', async (status, heading) => {
     await renderResult({ status, orderId: 'o1' });
@@ -181,6 +183,15 @@ describe('the corrected copy — the contradiction the design found', () => {
     expect(text).toContain('پشتیبانی');
   });
 
+  it('demo F-7: a refund not yet done never says the money came back, and never says "confirmed"', async () => {
+    await renderResult({ status: 'refund_pending', orderId: 'o1' });
+    const main = screen.getAllByRole('heading', { level: 1 }).at(-1)!.closest('section, main, div')!;
+    const text = document.body.textContent ?? '';
+    expect(text).toContain('هنوز انجام نشده است');
+    expect(text).not.toMatch(/بازگردانده شد|برگشت داده شد|تأیید شد/);
+    expect(main).toBeTruthy();
+  });
+
   it('renders a refunded outcome in the WARNING tone, not the error tone', async () => {
     // The customer did nothing wrong: their slot expired and the money came
     // back. The error colour presents a correction the platform made FOR them
@@ -210,6 +221,8 @@ describe('the corrected copy — the contradiction the design found', () => {
       ['replayed', '✓'],
       ['duplicate_refunded', '✓'],
       ['refunded', '⚠'],
+      ['refund_pending', '⚠'],
+      ['duplicate_refund_pending', '✓'],
       ['unresolved', '⚠'],
       ['failed', '✕'],
     ] as const) {

@@ -92,7 +92,7 @@ export class ReplacementOfferController {
             copyVersion: dto.acceptedPolicy.copyVersion,
           }
         : null,
-      replacement: hooks,
+      claim: hooks,
     });
     this.audit.log({ action: 'commerce.replacement_booking_attempted', bookingId: id, replacementBookingId: result.bookingId });
 

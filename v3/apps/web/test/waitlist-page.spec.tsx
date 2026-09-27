@@ -138,12 +138,93 @@ describe('waitlist page', () => {
     expect(screen.getByRole('status')).toBeEmptyDOMElement();
   });
 
-  it('sends the customer to their bookings after accepting', async () => {
-    mockApi([OFFERED], { '/accept': () => ok({}) });
-    const user = userEvent.setup();
-    renderPage();
-    await user.click(await screen.findByRole('button', { name: 'پذیرفتن و رزرو' }));
-    await waitFor(() => expect(push).toHaveBeenCalledWith('/bookings'));
+  describe('accepting is a checkout (demo F-8)', () => {
+    const WITH_SERVICE = { ...OFFERED, serviceId: 'svc-1' };
+    const DISCLOSURE = {
+      sellerParty: { kind: 'professional', displayName: 'نگار' },
+      amounts: { serviceTotalToman: 450_000, platformCollectibleNowToman: 450_000, venueBalanceToman: 0 },
+      slotStartsAt: '2099-01-01T08:30:00.000Z',
+      displayTimeZone: 'Asia/Tehran',
+      acceptanceRequired: true,
+      outcome: {
+        cutoffHours: 12,
+        cutoffInstant: '2098-12-31T20:30:00.000Z',
+        lateCancellationRetention: { kind: 'none' },
+        noShowGraceMinutes: 5,
+        noShowRetention: { kind: 'none' },
+        rescheduleFreeCountBeforeCutoff: 1,
+        disputeWindowHours: 36,
+        bodilyHarmWindowHours: null,
+        appealWindowHours: 48,
+        copy: { locale: 'fa-IR', body: 'متن نمونه', bodySha256: 'x', publishedAt: '2026-09-27T00:00:00.000Z' },
+      },
+      acceptance: { policyKey: 'op', policyVersion: 1, copyKey: 'cc', copyVersion: 1 },
+    };
+    const fail = (status: number, code: string, message: string) =>
+      Promise.resolve({ ok: false, status, json: async () => ({ data: null, meta: null, error: { code, message } }) });
+
+    let sent: Array<{ url: string; body: unknown; headers: Record<string, string> }>;
+    function mockCheckout(accept: () => Promise<unknown>, entries: unknown[] = [WITH_SERVICE]) {
+      sent = [];
+      (global.fetch as jest.Mock).mockImplementation((url: string, init?: RequestInit) => {
+        const method = (init?.method ?? 'GET').toUpperCase();
+        if (method === 'POST' && url.includes('/accept')) {
+          sent.push({ url, body: init?.body ? JSON.parse(String(init.body)) : null, headers: (init?.headers ?? {}) as Record<string, string> });
+          return accept();
+        }
+        if (url.includes('/v1/checkout/disclosure')) return ok(DISCLOSURE);
+        if (url.includes('/v1/auth/refresh')) return ok({ accessToken: 'a', csrfToken: 'c' });
+        if (/\/v1\/me(\?|$)/.test(url)) return ok({ id: 'u1', phone: '+989123456789', displayName: null, roles: [], capabilities: [] });
+        if (url.includes('/v1/me/waitlist')) return ok(entries);
+        return ok([]);
+      });
+    }
+
+    it('shows the amount and the terms with an unticked box; pay only after ticking; sends acceptance + one key', async () => {
+      mockCheckout(() => ok({ booking: { id: 'b1' }, order: { id: 'o1' }, payment: { intentId: null, redirectUrl: null } }));
+      const user = userEvent.setup();
+      renderPage();
+      await user.click(await screen.findByRole('button', { name: 'پذیرفتن و رزرو' }));
+
+      expect(await screen.findByTestId('waitlist-amount')).toHaveTextContent('۴۵۰٬۰۰۰');
+      const pay = screen.getByTestId('waitlist-pay');
+      const box = (await screen.findByTestId('terms-accept')) as HTMLInputElement;
+      expect(box.checked).toBe(false);
+      expect(pay).toBeDisabled();
+      expect(sent).toHaveLength(0);
+
+      await user.click(box);
+      expect(pay).toBeEnabled();
+      await user.click(pay);
+      await waitFor(() => expect(sent).toHaveLength(1));
+      expect(sent[0].url).toContain('/v1/waitlist/w2/accept');
+      expect(sent[0].body).toEqual({ acceptedPolicy: { policyKey: 'op', policyVersion: 1, copyKey: 'cc', copyVersion: 1 } });
+      expect(String(sent[0].headers['Idempotency-Key']).length).toBeGreaterThan(8);
+      // Nothing to collect online: the booking is confirmed and the customer goes to it.
+      await waitFor(() => expect(push).toHaveBeenCalledWith('/bookings'));
+    });
+
+    it('a refusal (the slot went to someone faster) shows the server’s message and reloads the list', async () => {
+      mockCheckout(() => fail(409, 'SLOT_UNAVAILABLE', 'این زمان دیگر در دسترس نیست. لطفاً زمان دیگری انتخاب کنید.'));
+      const user = userEvent.setup();
+      renderPage();
+      await user.click(await screen.findByRole('button', { name: 'پذیرفتن و رزرو' }));
+      await user.click(await screen.findByTestId('terms-accept'));
+      await user.click(screen.getByTestId('waitlist-pay'));
+      expect(await screen.findByRole('alert')).toHaveTextContent('این زمان دیگر در دسترس نیست');
+      expect(push).not.toHaveBeenCalled();
+    });
+
+    it('«بازگشت» closes the panel without sending anything', async () => {
+      mockCheckout(() => ok({}));
+      const user = userEvent.setup();
+      renderPage();
+      await user.click(await screen.findByRole('button', { name: 'پذیرفتن و رزرو' }));
+      await screen.findByTestId('waitlist-accept');
+      await user.click(screen.getByRole('button', { name: 'بازگشت' }));
+      await waitFor(() => expect(screen.queryByTestId('waitlist-accept')).toBeNull());
+      expect(sent).toHaveLength(0);
+    });
   });
 
   it('says plainly that there is nothing when the list is empty', async () => {

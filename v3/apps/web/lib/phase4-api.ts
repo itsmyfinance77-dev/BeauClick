@@ -1,4 +1,6 @@
 import type { ApiClient } from './api-client';
+import type { CheckoutResponse } from './booking-api';
+import type { OutcomeAcceptance } from './checkout-terms';
 
 /**
  * Typed wrappers for Phase 4's surfaces (Business/Seller, Waitlist).
@@ -211,8 +213,18 @@ export function myWaitlistEntries(api: ApiClient) {
   return api.get<WaitlistEntry[]>('/v1/me/waitlist');
 }
 
-export function acceptWaitlistOffer(api: ApiClient, entryId: string) {
-  return api.post<{ id: string; status: string }>(`/v1/waitlist/${entryId}/accept`);
+/**
+ * Demo remediation F-8: accepting an offer is a checkout -- the same `{ booking, order, payment }`
+ * as `POST /v1/bookings`. `Idempotency-Key` is required; `acceptedPolicy` is exactly the four
+ * identifiers the disclosure returned, or absent.
+ */
+export function acceptWaitlistOffer(
+  api: ApiClient,
+  entryId: string,
+  body: { acceptedPolicy?: OutcomeAcceptance },
+  idempotencyKey: string,
+) {
+  return api.post<CheckoutResponse>(`/v1/waitlist/${entryId}/accept`, body, { 'Idempotency-Key': idempotencyKey });
 }
 
 export function declineWaitlistOffer(api: ApiClient, entryId: string) {

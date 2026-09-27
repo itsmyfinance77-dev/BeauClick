@@ -19,11 +19,11 @@ import {
  */
 describe('payment result contract', () => {
   describe('statuses', () => {
-    it('covers exactly the six the redirect can produce', () => {
+    it('covers exactly the eight the redirect can produce (demo F-7 adds the two not-yet-refunded states)', () => {
       // Sourced from `PaymentCallbackController.handle`: three verification
       // outcomes plus the two post-success corrections plus `unresolved`.
       expect([...PAYMENT_RESULT_STATUSES].sort()).toEqual(
-        ['duplicate_refunded', 'failed', 'refunded', 'replayed', 'succeeded', 'unresolved'].sort(),
+        ['duplicate_refunded', 'duplicate_refund_pending', 'failed', 'refund_pending', 'refunded', 'replayed', 'succeeded', 'unresolved'].sort(),
       );
     });
 

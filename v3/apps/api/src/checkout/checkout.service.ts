@@ -13,6 +13,7 @@ import {
   PaymentIntentNotFoundException,
   PaymentRetryNotAvailableException,
   PaymentService,
+  RefundStatus,
   VerificationOutcome,
 } from '@beauclick/payment';
 import { OutboxRelay } from '@beauclick/events';
@@ -131,6 +132,13 @@ export interface CallbackResult {
   refundIssued: boolean;
   /** True when this callback was a genuine SECOND charge that had to be given back. */
   duplicateChargeRefunded: boolean;
+  /**
+   * Demo remediation F-7: the PERSISTED status of the refund this callback
+   * issued (`succeeded` / `pending` / `manual_required` / `failed`), or null
+   * when none was issued. "Refunded" may only be said when it is `succeeded`;
+   * a requested or manual refund is not money returned.
+   */
+  refundStatus: RefundStatus | null;
 }
 
 /**
@@ -211,13 +219,19 @@ export class CheckoutService {
     input: CreateBookingInput & {
       callbackBaseUrl: string;
       acceptedPolicy?: BookingOutcomeAcceptanceV1 | null;
-      /** DEMO BRANCH ONLY (DEMO-DEC-001 B): replacement-offer lock (first) and link (after the booking). */
-      replacement?: { lock(m: EntityManager): Promise<void>; link(m: EntityManager, bookingId: string): Promise<void> };
+      /**
+       * DEMO BRANCH ONLY: the claim that ENTITLES this checkout, in the same
+       * transaction -- `lock` first (before the slot), `link` after the
+       * booking exists. Used by the replacement offer (DEMO-DEC-001 B) and by
+       * waitlist acceptance (demo remediation F-8). A throw from either rolls
+       * the whole checkout back.
+       */
+      claim?: { lock(m: EntityManager): Promise<void>; link(m: EntityManager, bookingId: string): Promise<void> };
     },
   ): Promise<CheckoutResult> {
     const { bookingId, order } = await this.dataSource.transaction(async (manager) => {
-      // Lock order for a replacement: the offer row first, then slot/booking/order below.
-      if (input.replacement) await input.replacement.lock(manager);
+      // Lock order for a claim: the entitling row first, then slot/booking/order below.
+      if (input.claim) await input.claim.lock(manager);
       const booking = await this.bookings.create(
         {
           customerId: input.customerId,
@@ -243,7 +257,7 @@ export class CheckoutService {
         manager,
       );
 
-      if (input.replacement) await input.replacement.link(manager, booking.id);
+      if (input.claim) await input.claim.link(manager, booking.id);
 
       return { bookingId: booking.id, order: created };
     });
@@ -449,11 +463,14 @@ export class CheckoutService {
       bookingUnavailable,
       duplicateCharge,
       cancelledBookingId = null,
+      captureOnLapsedOrder = false,
     }: {
       outcome: VerificationOutcome;
       bookingUnavailable: boolean;
       duplicateCharge: boolean;
       cancelledBookingId?: string | null;
+      /** Demo remediation F-7: see the `!marked` branch. */
+      captureOnLapsedOrder?: boolean;
     } = await this.dataSource.transaction(async (manager) => {
       const verification = await this.payments.applyVerification(prepared, manager);
       if (verification.status !== 'succeeded') {
@@ -497,10 +514,21 @@ export class CheckoutService {
         // index forbids a second one -- but a customer who kept an old
         // redirect URL open could still get here, so the money is given back
         // rather than silently absorbed.
+        //
+        // Demo remediation F-7. The same branch is ALSO reached when the order
+        // is no longer payable and NOTHING was ever collected on it -- the hold
+        // lapsed, the order closed, and the customer's payment landed after.
+        // That is not a second charge, and telling the customer "رزرو شما تأیید
+        // شد ... پرداخت تکراری" was false twice over. The money handling stays
+        // exactly this path's (the attempt-keyed refund of a capture the order
+        // never recorded); only the classification the customer and the
+        // metrics see is corrected.
+        const lapsed = captured.outcome === 'already' && captured.collectedToman === 0;
         return {
           outcome: { ...verification, status: 'replayed' as const },
           bookingUnavailable: false,
           duplicateCharge: true,
+          captureOnLapsedOrder: lapsed,
         };
       }
 
@@ -553,15 +581,20 @@ export class CheckoutService {
 
     let refundIssued = false;
     let duplicateChargeRefunded = false;
+    let refundStatus: RefundStatus | null = null;
 
     if (duplicateCharge) {
       this.logger.error(
-        `DUPLICATE CHARGE detected on order ${outcome.orderId} (attempt ${outcome.attemptId}). Refunding the second charge.`,
+        captureOnLapsedOrder
+          ? `Capture on order ${outcome.orderId} (attempt ${outcome.attemptId}) arrived after the order lapsed with nothing collected. Refunding it.`
+          : `DUPLICATE CHARGE detected on order ${outcome.orderId} (attempt ${outcome.attemptId}). Refunding the second charge.`,
       );
-      await this.payments.refund({
+      const duplicateRefund = await this.payments.refund({
         orderId: outcome.orderId,
         amountToman: outcome.amountToman,
-        reason: 'پرداخت تکراری برای همین سفارش — بازگشت خودکار وجه.',
+        reason: captureOnLapsedOrder
+          ? 'پرداخت پس از پایان مهلت رزرو انجام شد — بازگشت خودکار وجه.'
+          : 'پرداخت تکراری برای همین سفارش — بازگشت خودکار وجه.',
         // Keyed by the ATTEMPT, not the order: the order legitimately has one
         // real payment, and only this extra attempt is being corrected.
         requestKey: `duplicate-charge:${outcome.attemptId}`,
@@ -570,14 +603,16 @@ export class CheckoutService {
         kind: 'duplicate_charge',
         paymentAttemptId: outcome.attemptId,
       });
-      duplicateChargeRefunded = true;
+      refundStatus = duplicateRefund.status;
+      if (captureOnLapsedOrder) refundIssued = true;
+      else duplicateChargeRefunded = true;
     }
 
     if (bookingUnavailable) {
       this.logger.error(
         `Payment ${outcome.intentId} succeeded but its booking could not be confirmed (order ${outcome.orderId}). Auto-refunding.`,
       );
-      await this.payments.refund({
+      const unconfirmableRefund = await this.payments.refund({
         orderId: outcome.orderId,
         amountToman: outcome.amountToman,
         // V3.3 #160 (`#42c`). A booking the customer cancelled is refunded under
@@ -594,6 +629,7 @@ export class CheckoutService {
         actorType: 'system',
         actorId: null,
       });
+      refundStatus = unconfirmableRefund.status;
       refundIssued = true;
     }
 
@@ -617,7 +653,7 @@ export class CheckoutService {
     });
 
     await this.drainQuietly();
-    return { outcome, refundIssued, duplicateChargeRefunded };
+    return { outcome, refundIssued, duplicateChargeRefunded, refundStatus };
   }
 
   /**

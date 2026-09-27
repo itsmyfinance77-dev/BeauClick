@@ -149,6 +149,12 @@ export interface PaymentProvider {
    * silently reporting a refund that never happened.
    */
   readonly supportsAutomaticRefund: boolean;
+  /**
+   * DEMO BRANCH ONLY (#212 simulator). Optional per-transaction refinement of
+   * `supportsAutomaticRefund`; only the sandbox implements it. It can only
+   * turn an automatic refund into `manual_required`, never the reverse.
+   */
+  supportsAutomaticRefundFor?(providerReference: string): Promise<boolean>;
 
   initiate(request: InitiatePaymentRequest): Promise<InitiatePaymentResult>;
 

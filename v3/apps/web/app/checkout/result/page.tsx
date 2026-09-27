@@ -85,6 +85,22 @@ const OUTCOME_COPY: Record<string, { tone: Tone; title: string; body: string }> 
     body: 'به دلیل یک پرداخت تکراری، مبلغ دوم به‌صورت خودکار به حساب شما بازگردانده شد. بازگشت وجه معمولاً طی ۷۲ ساعت در صورت‌حساب بانکی شما ثبت می‌شود.',
   },
   /**
+   * Demo remediation F-7. The server says `refunded` / `duplicate_refunded` only
+   * when the refund row is `succeeded`. When the refund is requested but not
+   * done — pending, awaiting a manual transfer (a gateway without a refund API),
+   * or failed — these two say exactly that and promise no timing.
+   */
+  refund_pending: {
+    tone: 'warning',
+    title: 'رزرو تأیید نشد؛ بازگشت وجه هنوز انجام نشده است',
+    body: 'پرداخت شما دریافت شد اما رزرو قابل تأیید نبود. بازگشت این مبلغ ثبت شده ولی هنوز انجام نشده است. لطفاً دوباره پرداخت نکنید؛ وضعیت را در «رزروهای من» ببینید و اگر مبلغ بازنگشت با پشتیبانی تماس بگیرید.',
+  },
+  duplicate_refund_pending: {
+    tone: 'success',
+    title: 'رزرو شما تأیید شد',
+    body: 'یک پرداخت تکراری برای این سفارش ثبت شد. بازگشت مبلغ دوم ثبت شده ولی هنوز انجام نشده است. اگر مبلغ بازنگشت با پشتیبانی تماس بگیرید.',
+  },
+  /**
    * The gateway could not be reached, or did not answer definitively
    * (`VerifyOutcome = 'unknown'`). The server wrote NOTHING, so the payment is
    * genuinely undecided.

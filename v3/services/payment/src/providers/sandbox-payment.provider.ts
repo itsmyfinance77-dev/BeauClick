@@ -18,11 +18,17 @@ import { SandboxOutcome, SandboxTransactionEntity } from '../entities/sandbox-tr
 export const SANDBOX_PROVIDER_KEY = 'sandbox';
 
 /** The decisions a QA engineer can drive from the sandbox checkout page. */
-export const SANDBOX_DECISIONS = ['success', 'failure', 'cancel'] as const;
+/**
+ * `success_manual_refund` (DEMO BRANCH ONLY, #212 simulator): paid, on a
+ * simulated bank without a refund API -- a later refund of THIS transaction is
+ * `manual_required`, exactly what a real gateway lacking the API produces.
+ */
+export const SANDBOX_DECISIONS = ['success', 'success_manual_refund', 'failure', 'cancel'] as const;
 export type SandboxDecision = (typeof SANDBOX_DECISIONS)[number];
 
 const DECISION_TO_OUTCOME: Record<SandboxDecision, Exclude<SandboxOutcome, 'pending'>> = {
   success: 'paid',
+  success_manual_refund: 'paid',
   failure: 'declined',
   cancel: 'cancelled',
 };
@@ -138,6 +144,8 @@ export class SandboxPaymentProvider implements PaymentProvider {
         // paid path and NOWHERE else -- a declined or cancelled transaction
         // that carried one would let a forged verify look legitimate.
         settlementReference: outcome === 'paid' ? `SBXTX-${randomBytes(8).toString('hex').toUpperCase()}` : null,
+        // Decided once, with the outcome, by the same compare-and-swap.
+        refundMode: decision === 'success_manual_refund' ? 'manual' : 'automatic',
       })
       .where("reference = :reference AND outcome = 'pending'", { reference })
       .execute();
@@ -210,6 +218,16 @@ export class SandboxPaymentProvider implements PaymentProvider {
     }
 
     return { outcome: 'succeeded', providerRefundReference: refundReference, failureCode: null };
+  }
+
+  /**
+   * DEMO BRANCH ONLY (#212 simulator): whether THIS transaction's simulated bank
+   * refunds automatically. Unknown reference -> true (today's behaviour; the
+   * refund itself then fails honestly as `not_refundable`).
+   */
+  async supportsAutomaticRefundFor(providerReference: string): Promise<boolean> {
+    const transaction = await this.transactions.findOne({ where: { reference: providerReference } });
+    return transaction?.refundMode !== 'manual';
   }
 
   /** QA/diagnostic read of the simulated bank's own books. Never used by the payment lifecycle itself. */

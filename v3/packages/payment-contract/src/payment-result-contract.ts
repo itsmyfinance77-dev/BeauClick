@@ -44,6 +44,10 @@ export const PAYMENT_RESULT_STATUSES = [
   'failed',
   'refunded',
   'duplicate_refunded',
+  // Demo remediation F-7: a refund was REQUESTED but its row is not `succeeded`
+  // (pending, manual_required on a gateway without a refund API, or failed).
+  'refund_pending',
+  'duplicate_refund_pending',
   'unresolved',
 ] as const;
 
