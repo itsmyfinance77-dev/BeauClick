@@ -444,7 +444,10 @@ async function proGroup() {
     // pro1 publishes a time starting in ~4 minutes; cust3 books it with the terms; after the start +
     // the policy's grace, pro1 declares the no-show in the UI. Real time only; nothing backdated.
     const p = await as('pro1');
-    const start = Date.now() + 4 * 60_000 + (60_000 - (Date.now() % 60_000));
+    let start = Date.now() + 4 * 60_000 + (60_000 - (Date.now() % 60_000));
+    // Never overlap a time pro1 already has in that window (e.g. one left by an aborted earlier run).
+    const busy = (await q(`select max(end_at) e from booking.availability_slots where professional_id = $1 and end_at > $2 and start_at < $3`, [ids.pro1.providerId, new Date(start).toISOString(), new Date(start + 30 * 60_000).toISOString()]))[0]?.e;
+    if (busy) start = new Date(busy).getTime();
     const s = tehran(start);
     const e = tehran(start + 30 * 60_000);
     await p.goto('/pro/availability');
