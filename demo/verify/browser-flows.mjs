@@ -34,10 +34,12 @@ const onlyFlows = arg('--flows')?.split(',');
 const flow = (name, fn) => (!onlyFlows || onlyFlows.some((f) => name.includes(f)) ? rec.flow(name, fn) : Promise.resolve());
 
 const browsers = new Map();
+// --width 390: every flow runs at that width (actions, not just page measurement).
+const forcedWidth = arg('--width') ? Number(arg('--width')) : null;
 async function as(key, width = 1280) {
   if (!browsers.has(key)) browsers.set(key, await personaBrowser(key, { profileKey, outDir: OUT }));
   const p = browsers.get(key);
-  await p.viewport(width);
+  await p.viewport(forcedWidth ?? width);
   return p;
 }
 const api = new Map();
@@ -468,7 +470,10 @@ async function proGroup() {
     const userKey = Object.fromEntries(Object.entries(ids).filter(([k]) => k.startsWith('user:')).map(([k, v]) => [v, k.slice(5)]));
     const b = (await q(`select b.id, b.customer_id from booking.bookings b join commerce.orders o on o.source_id = b.id join commerce.order_outcome_terms t on t.order_id = o.id
       where b.professional_id = $1 and b.status = 'confirmed' and b.slot_start + make_interval(mins => t.grace_minutes) < now() order by b.slot_start desc limit 1`, [ids.pro1.providerId]))[0];
-    if (!b) throw new Error('no governed confirmed booking of pro1 past its grace');
+    if (!b) {
+      r('observed', 'no governed confirmed booking of pro1 past its grace (the real-time flow already declared it) — nothing to do', true);
+      return;
+    }
     await declareNoShow(r, b.id, userKey[b.customer_id]);
   });
 }
@@ -861,6 +866,14 @@ async function waitlistGroup() {
     const bk = (await q(`select id, status from booking.bookings where customer_id = $1 and professional_id = $2 order by created_at desc limit 1`, [ids['user:cust2'], newPro]))[0];
     r('persist', 'DB: entry accepted and a booking for cust2 exists', e?.status === 'accepted' && Boolean(bk), { entry: e, booking: bk });
     r('ui', 'accepting leads to "رزروهای من"', (await w.path()) === '/bookings', await w.path());
+    // F-8 (baseline): acceptance creates the booking through BookingService.create, not checkout —
+    // no order, no payment intent, so no supported path pays it; it lapses with its hold.
+    const order = await q(`select id from commerce.orders where source_id = $1`, [bk.id]);
+    const hold = (await q(`select status, hold_expires_at from booking.bookings where id = $1`, [bk.id]))[0];
+    r('observed', 'F-8: the accepted booking has NO order (nothing to pay) and a hold deadline', order.length === 0, { orders: order.length, hold });
+    await w.goto('/bookings');
+    const card = await w.evaluate(`(() => { const li = document.querySelector('li[data-booking="${bk.id}"]'); return li ? { text: li.innerText.replace(/\\s+/g, ' ').slice(0, 140), buttons: [...li.querySelectorAll('button, a')].map((b) => b.innerText.trim()) } : null; })()`);
+    r('observed', 'F-8: the card says "در انتظار پرداخت" and offers no pay control', true, card);
     const denied = await (await apiAs('cust3')).post(`/v1/waitlist/${e.id}/accept`, {}, { expect: [200, 201, 400, 403, 404, 409] });
     r('denied', "another customer cannot act on cust2's entry", [403, 404].includes(denied.status), `HTTP ${denied.status}`);
   });
@@ -963,79 +976,7 @@ async function adminGroup() {
     await a.shot('admin-audit-after-roles-1280');
   });
 
-  // Publish/retire through the UI on a component that has NO policy yet (acquisition), with a
-  // "nothing is collected" rule: the full lifecycle without touching the live booking commission.
-  // Resumable from the DB state: create → publish the draft → retire the published version.
-  await flow('admin: commission policy lifecycle (create → publish → retire)', async (r) => {
-    const a = await as('admin');
-    const pol = async () => (await q(`select p.policy_key, v.version, v.lifecycle_state, v.rule_kind, v.published_by_user_id, v.retired_by_user_id from commercial.commission_policies p left join commercial.commission_policy_versions v on v.policy_key = p.policy_key where p.component = 'acquisition' order by v.version desc nulls last limit 1`))[0];
-    const dialogReason = async () => {
-      if (await a.evaluate("[...document.querySelectorAll('[role=dialog] textarea, [role=alertdialog] textarea, dialog[open] textarea')].some((t) => t.getBoundingClientRect().width > 0)")) await a.fill('دلیل', reason);
-    };
-    await a.goto('/admin/commercial/commission-policies');
-    if (!(await pol())) {
-      await a.click('ساختِ سیاست', { nth: 0 });
-      await a.click('چیزی دریافت نمی‌شود', { selector: 'label' });
-      await a.fill('دلیل این تغییر', reason);
-      // The editor is not a <form>: the smallest element holding the reason field and a button.
-      const form = await markRow(a, 'form, section, article, div', ['دلیل این تغییر']);
-      if (!form) throw new Error('editor panel not found');
-      const submit = await a.evaluate(`[...document.querySelector('[data-flow-row="1"]').querySelectorAll('button')].filter((b) => !b.disabled && b.getBoundingClientRect().width > 0).map((b) => b.innerText.trim()).filter((t) => t !== 'انصراف')`);
-      await a.click(submit.at(-1), { within: form });
-      await dialogReason();
-      await confirmAny(a, ['ساختِ سیاست', 'ذخیره', 'ثبت', 'تأیید']);
-      await sleep(1500);
-      r('persist', 'DB: the acquisition policy family exists (created in the UI)', Boolean((await pol())?.policy_key), { ...(await pol()), submitted: submit.at(-1) });
-      await a.reload();
-    }
-    if ((await pol())?.policy_key && !(await pol())?.lifecycle_state) {
-      // A policy family has no version yet: "پیش‌نویسِ تازه" on its card opens the rule editor.
-      const card = await markRow(a, 'section, article, li, div', ['acquisition', 'پیش‌نویسِ تازه']);
-      await a.click('پیش‌نویسِ تازه', { within: card });
-      await a.click('چیزی دریافت نمی‌شود', { selector: 'label' });
-      await a.fill('دلیل این تغییر', reason);
-      const editor = await markRow(a, 'form, section, article, div', ['دلیل این تغییر']);
-      const submit = await a.evaluate(`[...document.querySelector('[data-flow-row="1"]').querySelectorAll('button')].filter((b) => !b.disabled && b.getBoundingClientRect().width > 0).map((b) => b.innerText.trim()).filter((t) => t !== 'انصراف')`);
-      await a.click(submit.at(-1), { within: editor });
-      await dialogReason();
-      await confirmAny(a, ['ذخیره', 'ثبت', 'تأیید', 'ساختِ پیش‌نویس']);
-      await sleep(1500);
-      r('persist', 'DB: a draft version exists with the "nothing collected" rule', (await pol())?.lifecycle_state === 'draft', { ...(await pol()), submitted: submit.at(-1) });
-      await a.reload();
-    }
-    if ((await pol())?.lifecycle_state === 'draft') {
-      const scope = await markRow(a, 'tr, li, section, article, div', ['acquisition', 'انتشار']);
-      await a.click('انتشار', { within: scope, prefix: true });
-      await sleep(800);
-      await dialogReason();
-      const how = await confirmAny(a, ['انتشار', 'منتشر کن', 'انتشار نسخه', 'تأیید']);
-      await sleep(1500);
-      const p = await pol();
-      r('persist', 'DB: published by the administrator', p?.lifecycle_state === 'published' && p.published_by_user_id === ids['user:admin'], { ...p, confirmedVia: how });
-      await a.reload();
-    }
-    if ((await pol())?.lifecycle_state === 'published') {
-      // GUARD (a run on 2026-09-27 retired the LIVE booking commission through a too-wide scope):
-      // retire only inside a version table titled for the acquisition policy; never elsewhere.
-      const scope = await markRow(a, 'section, article, div', ['جذبِ مشتری — تاریخچهٔ نسخه‌ها', 'بازنشستگی']);
-      const scopeText = scope ? await a.evaluate(`document.querySelector('[data-flow-row="1"]').innerText`) : '';
-      if (!scope || scopeText.includes('کارمزدِ نوبت')) throw new Error('refusing to retire: no version table scoped to the acquisition policy alone');
-      await a.click('بازنشستگی', { within: scope });
-      await sleep(800);
-      await dialogReason();
-      const how = await confirmAny(a, ['بازنشستگی', 'بازنشسته کن', 'تأیید']);
-      await sleep(1500);
-      const p = await pol();
-      r('persist', 'DB: retired by the administrator', p?.lifecycle_state === 'retired' && p.retired_by_user_id === ids['user:admin'], { ...p, confirmedVia: how });
-    }
-    await a.reload();
-    r('persist', 'after a reload the page shows the retired state', await a.has('بازنشسته'));
-    const booking = (await q(`select v.lifecycle_state from commercial.commission_policy_versions v where v.policy_key = 'demo-booking-commission' order by version desc limit 1`))[0];
-    r('other', 'the live booking commission was not touched', booking?.lifecycle_state === 'published', booking);
-    const op = await (await apiAs('operator')).get('/v1/admin/commercial/commission-policies', { expect: [200, 403, 404] });
-    r('denied', 'the operator cannot read or change commission policies (API)', [403, 404].includes(op.status), `HTTP ${op.status}`);
-    await a.shot('admin-commission-lifecycle-1280');
-  });
+  // The first (unguarded) lifecycle flow was removed after incident F-4; the strict version is in the recovery group.
 
   await flow('admin: rebuild the search index from the UI', async (r) => {
     const a = await as('admin');
@@ -1187,7 +1128,115 @@ async function recoveryGroup() {
   });
 }
 
-const GROUPS = { recovery: recoveryGroup, checkout: checkoutGroup, account: accountGroup, pro: proGroup, moderation: moderationGroup, engagement: engagementGroup, waitlist: waitlistGroup, business: businessGroup, admin: adminGroup };
+// ============================================================================ referral (claim → qualification)
+async function referralGroup() {
+  await flow('referral: claim a code in the UI, refusals, qualification on the first completed booking', async (r) => {
+    // Eligibility (services/referral): not own code, not already attributed, young account, NO completed
+    // booking. financeReader is the one synthetic account that qualifies; cust1 (has a completed booking) must be refused.
+    const owner = await as('cust2');
+    await owner.goto('/referral');
+    const code = (await q(`select code from referral.referral_codes where owner_user_id = $1`, [ids['user:cust2']]))[0]?.code;
+    r('persist', "DB: cust2's own code exists after opening /referral", Boolean(code) && (await owner.has(code)), code);
+    const pre = await q(`select * from referral.referrals where referee_user_id = $1`, [ids['user:financeReader']]);
+    if (pre.length) throw new Error('financeReader is already attributed — identity check failed; not claiming');
+    const f = await as('financeReader');
+    await f.goto('/referral');
+    await f.fill('کد دعوت دوست', code);
+    await f.click('ثبت کد');
+    await sleep(1500);
+    r('ui', 'the claim is confirmed on screen', await f.has('کد دعوت ثبت شد'));
+    const ref = (await q(`select * from referral.referrals where referee_user_id = $1`, [ids['user:financeReader']]))[0];
+    r('persist', 'DB: financeReader attributed to cust2, pending', ref && ref.referrer_user_id === ids['user:cust2'], ref && { status: ref.status, expires_at: ref.expires_at });
+    await f.reload();
+    r('persist', 'after a reload the page shows the recorded claim', await f.has('کد دعوت ثبت شد'));
+    await f.fill('کد دعوت دوست', code).catch(() => {});
+    const again = await f.evaluate("[...document.querySelectorAll('button')].some((b) => b.innerText.trim() === 'ثبت کد' && !b.disabled)");
+    r('denied', 'a second claim is not offered after one is recorded', !again);
+    const c1 = await as('cust1');
+    await c1.goto('/referral');
+    const c1Before = await q(`select 1 from referral.referrals where referee_user_id = $1`, [ids['user:cust1']]);
+    if (await c1.evaluate("Boolean(document.querySelector('input'))")) {
+      await c1.fill('کد دعوت دوست', code);
+      await c1.click('ثبت کد').catch(() => {});
+      await sleep(1500);
+    }
+    const c1After = await q(`select 1 from referral.referrals where referee_user_id = $1`, [ids['user:cust1']]);
+    r('denied', 'a customer with a completed booking is refused (no attribution written)', c1After.length === c1Before.length, (await c1.text()).match(/[^\n]*(نامعتبر|پذیرفته نشد|امکان|مجاز)[^\n]*/)?.[0] ?? 'no attribution');
+
+    // Qualification: financeReader's FIRST completed booking. pro2 publishes a near-term time, financeReader
+    // books and pays it, after its start pro2 marks it done. Real time; nothing backdated.
+    const p = await as('pro2');
+    const start = Date.now() + 3 * 60_000 + (60_000 - (Date.now() % 60_000));
+    const s = tehran(start);
+    await p.goto('/pro/availability');
+    await p.fill('تاریخ', s.date);
+    await p.fill('از ساعت', s.time, { nth: 1 });
+    await p.fill('تا ساعت', tehran(start + 20 * 60_000).time, { nth: 1 });
+    await p.click('افزودن');
+    await sleep(1500);
+    await f.goto(`/providers/${ids.pro2.providerId}`);
+    await f.click((await dayButtons(f))[0]);
+    await f.click(fa(s.time));
+    await sleep(1200);
+    if (await f.has('این شرایط را خواندم و می‌پذیرم.')) await f.click('این شرایط را خواندم و می‌پذیرم.');
+    await f.click('ادامه به پرداخت');
+    await f.waitText('پرداخت موفق');
+    await f.click('پرداخت موفق');
+    await f.waitText('پرداخت انجام شد');
+    const bookingId = await bookingOfOrder(orderIdFrom(await f.url()));
+    r('ui', 'financeReader booked and paid the near-term time', Boolean(bookingId), bookingId);
+    await sleep(Math.max(0, start + 60_000 - Date.now()));
+    await p.goto('/pro/bookings');
+    const scope = await markRow(p, 'section[data-day] li', [fa(s.time)]);
+    await p.click('ثبت انجام نوبت', { within: scope });
+    await p.click('بله، انجام شد');
+    await sleep(4000);
+    const done = (await q(`select status from booking.bookings where id = $1`, [bookingId]))[0];
+    const q2 = (await q(`select * from referral.referrals where referee_user_id = $1`, [ids['user:financeReader']]))[0];
+    const grants = await q(`select * from referral.reward_grants where referral_id = $1`, [q2?.id]).catch((e) => [{ error: e.message }]);
+    r('persist', 'DB: the booking is completed and the referral qualified', done?.status === 'completed' && /qualif/.test(q2?.status ?? ''), { booking: done?.status, referral: q2?.status });
+    r('observed', 'reward grants (points are 0 by configuration: LOYALTY_POINTS_REFERRAL_* unset; referee 0 by owner decision)', true, grants);
+  });
+}
+
+// ============================================================================ seller outcome policy selection
+async function outcomeGroup() {
+  await flow('seller: choose an outcome policy in the UI (pro2), customer then sees terms to accept', async (r) => {
+    const current = await q(`select * from commercial.seller_outcome_policy_assignments where seller_party_id = $1 and superseded_at is null`, [ids.pro2.providerId]);
+    r('persist', 'before: pro2 has no live outcome-policy assignment (identity)', current.length === 0, current.length);
+    if (current.length) throw new Error('pro2 already governed; not mutating');
+    const p = await as('pro2');
+    await p.goto('/pro/outcome-policy');
+    const ws = await markRow(p, 'section, article, li, div', ['سارا کریمی — ناخن (دمو)', 'انتخاب این فضا']);
+    if (!ws) throw new Error('workspace control not provable');
+    await p.click('انتخاب این فضا', { within: ws });
+    await p.waitText('ثبت انتخاب');
+    await p.click('۲۴ ساعت', { selector: 'label' });
+    await p.click('هیچ مبلغی نگه داشته نمی‌شود', { selector: 'label', nth: 0 });
+    await p.click('۱۵ دقیقه', { selector: 'label' });
+    await p.click('هیچ مبلغی نگه داشته نمی‌شود', { selector: 'label', nth: 1 });
+    await p.fill('دلیل این انتخاب', 'انتخاب آزمایشی مرورگر دمو (داده ساختگی)');
+    await p.click('ثبت انتخاب');
+    await sleep(2000);
+    const a = (await q(`select cutoff_hours, late_retention_kind, grace_minutes, no_show_retention_kind, assigned_by_user_id from commercial.seller_outcome_policy_assignments where seller_party_id = $1 and superseded_at is null`, [ids.pro2.providerId]))[0];
+    r('persist', 'DB: live assignment 24 h / none / 15 min / none, by pro2', a && Number(a.cutoff_hours) === 24 && Number(a.grace_minutes) === 15 && a.assigned_by_user_id === ids['user:pro2'], a);
+    await p.reload();
+    r('persist', 'after a reload the page shows the chosen terms', (await p.has('۲۴ ساعت')) && (await p.has('۱۵ دقیقه')));
+    const c = await as('cust3');
+    await c.goto(`/providers/${ids.pro2.providerId}`);
+    await c.click((await dayButtons(c))[1]);
+    await c.click((await timeButtons(c)).at(-1));
+    await sleep(1500);
+    const panel = await c.evaluate(`({ box: document.querySelector('input[type=checkbox]')?.checked ?? null, pay: [...document.querySelectorAll('button')].find((b) => b.textContent.includes('ادامه به پرداخت'))?.disabled ?? null, text: document.body.innerText.includes('۲۴ ساعت پیش از نوبت') })`);
+    r('other', "the customer now gets pro2's terms (24 h) with an unticked box and payment closed", panel.box === false && panel.pay === true && panel.text, panel);
+    // pro2's own workspace reference, as its page requested it; pro1 then tries it.
+    const ref = await p.evaluate(`(performance.getEntriesByType('resource').map((e) => e.name).find((u) => u.includes('/v1/me/outcome-policy-assignments/')) ?? '').split('/v1/me/outcome-policy-assignments/')[1]?.split('?')[0] ?? null`);
+    const foreign = ref ? await (await apiAs('pro1')).get(`/v1/me/outcome-policy-assignments/${ref}`, { expect: [200, 403, 404] }) : null;
+    r('denied', "pro1 cannot read pro2's assignment with pro2's workspace reference", foreign && [403, 404].includes(foreign.status), foreign ? `HTTP ${foreign.status} ${foreign.raw?.json?.error?.code ?? ''}` : 'reference not captured');
+  });
+}
+
+const GROUPS = { referral: referralGroup, outcome: outcomeGroup, recovery: recoveryGroup, checkout: checkoutGroup, account: accountGroup, pro: proGroup, moderation: moderationGroup, engagement: engagementGroup, waitlist: waitlistGroup, business: businessGroup, admin: adminGroup };
 for (const g of groups) {
   if (!GROUPS[g]) throw new Error(`unknown group ${g}`);
   await GROUPS[g]();
