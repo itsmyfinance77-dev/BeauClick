@@ -76,6 +76,14 @@ const pickSlot = `(async () => {
 
 const P = [
   {
+    key: 'anon',
+    anonymous: true,
+    pages: [['/'], ['/providers'], ['/search'], ['/terms'], ['/privacy-policy'], ['/contact'], ['/support']],
+    forbidden: ['/bookings', '/admin', '/pro/bookings', '/finance'],
+  },
+  { key: 'operator', pages: [['/admin'], ['/admin/users']], forbidden: ['/admin/commercial/plans', '/admin/commercial/commission-policies'] },
+  { key: 'bizPractitioner', pages: [['/business'], ['/business/messages']], forbidden: ['/admin', '/finance'] },
+  {
     key: 'cust1',
     pages: [
       ['/dashboard'],
@@ -229,7 +237,7 @@ for (const who of P) {
   report.personas.push(r);
   await page.viewport(1280, 800);
   // Real sign-in.
-  const phone = persona(who.key).phone;
+  const phone = who.anonymous ? null : persona(who.key).phone;
   const nav = await page.goto(`${origin}/auth`);
   if (nav.errorText) {
     r.signIn = { ok: false, error: nav.errorText };
@@ -237,7 +245,9 @@ for (const who of P) {
     continue;
   }
   r.tls = page.log.docSecurity;
+  if (who.anonymous) r.signIn = { ok: true, anonymous: true };
   const since = Date.now();
+  if (!who.anonymous) {
   await page.type('input[autocomplete=tel]', `0${phone.slice(3)}`);
   await page.evaluate(`[...document.querySelectorAll('button[type=submit]')][0].click()`);
   let code;
@@ -265,6 +275,7 @@ for (const who of P) {
   if (!r.signIn.ok) {
     await page.close();
     continue;
+  }
   }
 
   for (const [p, action] of who.pages.filter(([x]) => !onlyPaths || onlyPaths.includes(x))) {
@@ -295,10 +306,14 @@ for (const who of P) {
   }
   await page.viewport(1280, 800);
   for (const p of who.forbidden.filter((x) => !onlyPaths || onlyPaths.includes(x))) {
+    const mark = page.log.failed.length;
     const g = await page.goto(`${origin}${p}`);
     const snap = g.errorText ? { navError: g.errorText } : await page.evaluate(snapshot);
-    r.forbidden.push({ tried: p, ...snap });
-    console.log(`${who.key.padEnd(13)} FORBIDDEN ${p.padEnd(30)} -> ${snap.path}  ${snap.text?.slice(0, 90)}`);
+    // The API's own answer matters more than the page frame: a shell can render while the data call is refused.
+    const api = page.log.failed.slice(mark).filter((f) => !f.url?.includes('/auth/refresh'));
+    const refusal = g.errorText ? null : await page.evaluate(`(document.body.innerText.match(/[^\\n]*دسترسی لازم[^\\n]*/) ?? [null])[0]`);
+    r.forbidden.push({ tried: p, ...snap, api, refusal });
+    console.log(`${who.key.padEnd(13)} FORBIDDEN ${p.padEnd(30)} -> ${snap.path}  refusal:${refusal ? 'shown' : 'NONE'}  api>=400:${JSON.stringify(api)}`);
   }
   r.throttled429 = page.log.throttled;
   await page.close();
