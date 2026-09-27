@@ -6,5 +6,6 @@ import { elapsed } from './elapsed.mjs';
 import { engagement } from './engagement.mjs';
 import { identities } from './identities.mjs';
 import { sellers } from './sellers.mjs';
+import { verification } from './verification.mjs';
 
-export const STAGES = [identities, sellers, commercial, governance, availability, futureBookings, elapsed, engagement];
+export const STAGES = [identities, sellers, commercial, governance, availability, futureBookings, elapsed, engagement, verification];
