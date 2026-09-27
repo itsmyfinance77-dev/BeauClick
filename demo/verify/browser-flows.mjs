@@ -1061,7 +1061,133 @@ async function adminGroup() {
   });
 }
 
-const GROUPS = { checkout: checkoutGroup, account: accountGroup, pro: proGroup, moderation: moderationGroup, engagement: engagementGroup, waitlist: waitlistGroup, business: businessGroup, admin: adminGroup };
+// ============================================================================ recovery (after incident F-4)
+const bookingCommission = async () => (await q(`select v.* from commercial.commission_policy_versions v where v.policy_key = 'demo-booking-commission' order by v.version`)).map((x) => JSON.stringify(x));
+async function recoveryGroup() {
+  await flow('recovery: browser checkout after restore snapshots booking commission v1', async (r) => {
+    const bk0 = await bookingCommission();
+    const v1 = JSON.parse(bk0[0] ?? 'null');
+    r('persist', 'before: exactly one booking-commission version, v1 published 1000 bp on service_total', bk0.length === 1 && v1?.lifecycle_state === 'published' && v1.bp === 1000 && v1.base === 'service_total', v1 && { version: v1.version, state: v1.lifecycle_state, bp: v1.bp, base: v1.base });
+    const c = await as('cust2');
+    await startCheckout(c, ids.pro2.providerId, null, { dayIndex: 1 });
+    await c.click('پرداخت موفق');
+    await c.waitText('پرداخت انجام شد');
+    const orderId = orderIdFrom(await c.url());
+    r('ui', 'paid through the local sandbox bank; booking confirmed', await c.has('رزرو شما تأیید شد'), orderId);
+    const order = (await q(`select status, total_toman, paid_at is not null paid from commerce.orders where id = $1`, [orderId]))[0];
+    const pay = await q(`select i.status intent, a.status attempt, a.provider_key from payment.payment_intents i join payment.payment_attempts a on a.payment_intent_id = i.id where i.order_id = $1`, [orderId]);
+    const com = await q(`select component, state, policy_key, policy_version, rule_kind, bp, base from commerce.order_commission_terms where order_id = $1`, [orderId]);
+    r('persist', 'DB: order paid; intent + attempt succeeded at the sandbox provider', order?.status === 'paid' && order.paid && pay.length === 1 && pay[0].intent === 'succeeded' && pay[0].attempt === 'succeeded', { order, pay });
+    r('persist', 'DB: the order snapshots booking commission demo-booking-commission@1 (1000 bp, service_total)', com.some((x) => x.component === 'booking_commission' && x.policy_key === 'demo-booking-commission' && Number(x.policy_version) === 1 && Number(x.bp) === 1000 && x.base === 'service_total'), com);
+    r('persist', 'after: the booking-commission rows are byte-identical', JSON.stringify(await bookingCommission()) === JSON.stringify(bk0));
+  });
+
+  // Strict re-run of the lifecycle: identity asserted BEFORE every mutation; after every mutation the
+  // booking commission must be byte-identical. A mutation whose target cannot be proven is not clicked.
+  await flow('admin: acquisition lifecycle — strict identity (create → draft → publish → retire)', async (r) => {
+    const a = await as('admin');
+    const bk0 = await bookingCommission();
+    const acq = async () => q(`select p.policy_key, p.component, v.version, v.lifecycle_state, v.rule_kind, v.published_by_user_id, v.retired_by_user_id from commercial.commission_policies p left join commercial.commission_policy_versions v on v.policy_key = p.policy_key where p.component = 'acquisition' order by v.version nulls first`);
+    const unchanged = async (step) => r('persist', `after ${step}: booking commission byte-identical`, JSON.stringify(await bookingCommission()) === JSON.stringify(bk0));
+    /** Marks the smallest element holding `button` whose text has every `must` and none of `mustNot`; null if none. */
+    const strictScope = async (button, must, mustNot = ['booking_commission', 'کارمزدِ نوبت', 'demo-booking-commission']) => {
+      const ok = await a.evaluate(`(() => { document.querySelectorAll('[data-flow-row]').forEach((e) => e.removeAttribute('data-flow-row'));
+        const must = ${JSON.stringify(must)}, not = ${JSON.stringify(mustNot)}, btn = ${JSON.stringify(button)};
+        const cands = [...document.querySelectorAll('section, article, li, div, tr, form')].filter((e) =>
+          must.every((t) => e.innerText.includes(t)) && !not.some((t) => e.innerText.includes(t)) &&
+          [...e.querySelectorAll('button')].some((b) => b.innerText.trim().startsWith(btn) && b.getBoundingClientRect().width > 0));
+        const el = cands.sort((x, y) => x.innerText.length - y.innerText.length)[0];
+        if (!el) return false; el.setAttribute('data-flow-row', '1'); return true; })()`);
+      return ok ? '[data-flow-row="1"]' : null;
+    };
+    const dialogReason = async () => {
+      if (await a.evaluate("[...document.querySelectorAll('[role=dialog] textarea, [role=alertdialog] textarea, dialog[open] textarea')].some((t) => t.getBoundingClientRect().width > 0)")) await a.fill('دلیل', reason);
+    };
+    await a.goto('/admin/commercial/commission-policies');
+
+    // create
+    if (!(await acq()).length) {
+      const scope = await strictScope('ساختِ سیاست', ['acquisition']);
+      r('ui', 'identity before CREATE: the control sits in the acquisition card only', Boolean(scope));
+      if (!scope) throw new Error('create target not provable; not clicked');
+      await a.click('ساختِ سیاست', { within: scope });
+      await a.click('چیزی دریافت نمی‌شود', { selector: 'label' });
+      await a.fill('دلیل این تغییر', reason);
+      const editor = await strictScope('ساختِ سیاست', ['دلیل این تغییر']);
+      if (!editor) throw new Error('create editor not provable; not submitted');
+      await a.click('ساختِ سیاست', { within: editor });
+      await dialogReason();
+      await sleep(1500);
+      const rows = await acq();
+      r('persist', 'DB: exactly one acquisition policy family, no version yet', rows.length === 1 && rows[0].version == null, rows);
+      await unchanged('CREATE');
+      await a.reload();
+    }
+    // draft
+    if ((await acq()).length === 1 && (await acq())[0].version == null) {
+      const scope = await strictScope('پیش‌نویسِ تازه', ['acquisition']);
+      r('ui', 'identity before DRAFT: the control sits in the acquisition card only', Boolean(scope));
+      if (!scope) throw new Error('draft target not provable; not clicked');
+      await a.click('پیش‌نویسِ تازه', { within: scope });
+      await a.click('چیزی دریافت نمی‌شود', { selector: 'label' });
+      await a.fill('دلیل این تغییر', reason);
+      const editor = await markRow(a, 'form, section, article, div', ['دلیل این تغییر']);
+      const submit = await a.evaluate(`[...document.querySelector('[data-flow-row="1"]').querySelectorAll('button')].filter((b) => !b.disabled && b.getBoundingClientRect().width > 0).map((b) => b.innerText.trim()).filter((t) => t !== 'انصراف')`);
+      await a.click(submit.at(-1), { within: editor });
+      await dialogReason();
+      await sleep(1500);
+      const rows = await acq();
+      r('persist', 'DB: acquisition-standard@1 is a draft with the zero rule', rows.length === 1 && rows[0].version === 1 && rows[0].lifecycle_state === 'draft' && rows[0].rule_kind === 'zero', rows);
+      await unchanged('DRAFT');
+      await a.reload();
+    }
+    // publish
+    if ((await acq())[0]?.lifecycle_state === 'draft') {
+      // Each policy has its own section titled '<name> — تاریخچهٔ نسخه‌ها'; acquisition = 'جذبِ مشتری'.
+      const scope = await strictScope('انتشار', ['جذبِ مشتری — تاریخچهٔ نسخه‌ها']);
+      r('ui', 'identity before PUBLISH: the control is scoped to acquisition, not the booking commission', Boolean(scope));
+      if (!scope) throw new Error('publish target not provable; not clicked');
+      await a.click('انتشار', { within: scope, prefix: true });
+      await sleep(800);
+      await dialogReason();
+      await confirmAny(a, ['انتشار', 'منتشر کن', 'انتشار نسخه', 'تأیید']);
+      await sleep(1500);
+      const rows = await acq();
+      r('persist', 'DB: acquisition-standard@1 published by the administrator', rows[0]?.lifecycle_state === 'published' && rows[0].published_by_user_id === ids['user:admin'], rows);
+      await unchanged('PUBLISH');
+      await a.reload();
+    }
+    // retire
+    if ((await acq())[0]?.lifecycle_state === 'published') {
+      let scope = await strictScope('بازنشستگی', ['جذبِ مشتری — تاریخچهٔ نسخه‌ها']);
+      if (!scope) {
+        // Its version history may need to be opened from its own card first.
+        const opener = await a.evaluate(`[...document.querySelectorAll('button, a')].filter((b) => b.closest('section, article, li, div')?.innerText.includes('acquisition') && !b.closest('section, article, li, div')?.innerText.includes('booking_commission')).map((b) => b.innerText.trim()).filter((t) => /تاریخچه|نسخه|مشاهده/.test(t))`);
+        if (opener.length) {
+          const sc = await strictScope(opener[0], ['acquisition']);
+          if (sc) await a.click(opener[0], { within: sc });
+          await sleep(1200);
+          scope = await strictScope('بازنشستگی', ['acquisition']);
+        }
+      }
+      r('ui', 'identity before RETIRE: the retire control is scoped to acquisition only', Boolean(scope));
+      if (!scope) throw new Error('retire target not provable in the UI; NOT clicked (lifecycle retire unverified)');
+      await a.click('بازنشستگی', { within: scope });
+      await sleep(800);
+      await dialogReason();
+      await confirmAny(a, ['بازنشستگی', 'بازنشسته کن', 'تأیید']);
+      await sleep(1500);
+      const rows = await acq();
+      r('persist', 'DB: acquisition-standard@1 retired by the administrator', rows[0]?.lifecycle_state === 'retired' && rows[0].retired_by_user_id === ids['user:admin'], rows);
+      await unchanged('RETIRE');
+    }
+    const op = await (await apiAs('operator')).get('/v1/admin/commercial/commission-policies', { expect: [200, 403, 404] });
+    r('denied', 'the operator cannot read or change commission policies (API)', [403, 404].includes(op.status), `HTTP ${op.status}`);
+    await a.shot('admin-acquisition-lifecycle-strict-1280');
+  });
+}
+
+const GROUPS = { recovery: recoveryGroup, checkout: checkoutGroup, account: accountGroup, pro: proGroup, moderation: moderationGroup, engagement: engagementGroup, waitlist: waitlistGroup, business: businessGroup, admin: adminGroup };
 for (const g of groups) {
   if (!GROUPS[g]) throw new Error(`unknown group ${g}`);
   await GROUPS[g]();

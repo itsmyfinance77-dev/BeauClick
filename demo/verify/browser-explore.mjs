@@ -27,6 +27,11 @@ try {
     await p.click(text, { nth: Number(nth ?? 0), selector: css ?? null });
     await sleep(1200);
   }
+  // --eval '<expression>': print a read-only page expression instead of the control summary
+  if (arg('--eval')) {
+    console.log(JSON.stringify(await p.evaluate(arg('--eval')), null, 1));
+    process.exit(0);
+  }
   const out = await p.evaluate(`(() => { const vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
     const norm = (s) => (s ?? '').replace(/\\s+/g, ' ').trim();
     const lab = (e) => norm(e.labels?.[0]?.innerText || e.getAttribute('aria-label') || e.placeholder || e.name).slice(0, 60);

@@ -92,8 +92,8 @@ by a foreign persona, never to perform the feature itself).
 | 26 | moderator rejects a chat report with a reason | ✓ | DB rejected + reason; under "ردشده" after reload | — | customer **403** |
 | 27 | AI assistant: one-time consent, new conversation, question → sandbox answer | ✓ | DB consent; question + answer stored; in the conversation after reload | — | — |
 | 3 | admin grants "ناظر محتوا" to cust4 with a reason → cust4 signs in again → can moderate → admin revokes | ✓ | DB role added / removed | cust4 opens the moderation queue; audit log lists both | cust4 refused **immediately** after revoke (same session) |
-| 21 | admin creates a commission policy for an unused component (acquisition), drafts a "nothing collected" v1, publishes it | ✓ | DB draft → published by admin | — | operator **403** |
-| 21 | **retire** — see finding F-4: the retire click hit the live booking commission (driver scoping bug); guard added; reset by the guarded restore | ✓ (wrong target) | DB retired by admin | — | — |
+| 21 | **INCIDENT (test driver, NOT coverage)** 15:11–15:12: create/draft/publish of acquisition, then the retire click hit the LIVE `demo-booking-commission@1` (too-wide row scope) | — | preserved evidence from `beauclick_demo_prev_1790522067919`: audit `commission_version_retired demo-booking-commission@1` 15:12:18; 0 orders after it | — | — |
+| 21 | **strict rerun after the guarded restore**: acquisition create → draft ("nothing collected") → publish → retire, with the target's identity asserted before EVERY mutation (its own section "جذبِ مشتری — تاریخچهٔ نسخه‌ها", no booking-commission text) | ✓ | DB: `acquisition-standard@1` draft → published → retired by admin; **booking commission byte-identical after each step**; audit shows only acquisition actions | recovery checkout: browser order snapshots `demo-booking-commission@1` (1000 bp) | operator **403** |
 | 30 | wishlist save (reached in-app) → listed → remove | ✓ | DB saved; gone after reload | — | — |
 | 31 | waitlist end-to-end: cust4 registers as a professional **in the UI**, adds a service + one time; cust3 books it; cust2 sees "no free time" and joins; cust3 cancels → offer to cust2 → **decline**; second round → **accept** → booking (pending payment) | ✓ | DB waiting → offered → declined; waiting → accepted + booking | the offer appears on `/waitlist` | cust3 acting on cust2's entry **404** |
 | 32 | journey: budget saved, goal added, marked achieved | ✓ | DB goal achieved, budget stored; goal after reload | — | — |
@@ -130,7 +130,7 @@ the device flow.
   customer gets the anonymous "برای ذخیرهٔ … وارد شوید" link to `/auth`; in-app navigation shows the real save button.
 - **F-3** Deleting another professional's free time is refused with **409 SLOT_NOT_RELEASABLE** ("assigned to an active
   booking") — correct refusal (owner-scoped delete), misleading reason.
-- **F-4 (driver, not app)** the lifecycle flow's first retire click retired the LIVE booking commission (too-wide
+- **F-4 (test-driver incident, not app)** the lifecycle flow's first retire click retired the LIVE booking commission (too-wide
   row scope). Real UI action by the administrator; reset by the guarded restore; guard added so it cannot recur.
 - **F-5** 60-min slots offered for the 120-min service ("پایان تقریبی" = slot end).
 - **F-6** Commission page frame visible to the operator; the API refuses the data (403).
