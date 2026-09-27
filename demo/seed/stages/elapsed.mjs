@@ -95,7 +95,16 @@ export const elapsed = {
         log(`${name}: completed by the seller`);
       }
       if (!b.reviewed) {
-        const r = await (await as(b.customerKey)).post(`/v1/bookings/${b.bookingId}/review`, review);
+        // Eligibility is written by the BookingCompleted consumer (outbox), a few
+        // seconds after completion — wait for it rather than going around it.
+        const customer = await as(b.customerKey);
+        let r;
+        for (let attempt = 0; ; attempt++) {
+          r = await customer.post(`/v1/bookings/${b.bookingId}/review`, review, { expect: [200, 201, 409] });
+          if (r.status !== 409) break;
+          if (attempt >= 24) throw new Error(`${name}: review still not eligible after 2 minutes`);
+          await sleep(5000);
+        }
         b.reviewed = true;
         b.reviewId = r.data?.id;
         save();
