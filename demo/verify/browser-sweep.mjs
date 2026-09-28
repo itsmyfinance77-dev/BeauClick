@@ -91,7 +91,7 @@ const P = [
     pages: [['/'], ['/providers'], ['/search'], ['/terms'], ['/privacy-policy'], ['/contact'], ['/support']],
     forbidden: ['/bookings', '/admin', '/pro/bookings', '/finance'],
   },
-  { key: 'operator', pages: [['/admin'], ['/admin/users']], forbidden: ['/admin/commercial/plans', '/admin/commercial/commission-policies'] },
+  { key: 'operator', pages: [['/admin'], ['/admin/users']], forbidden: ['/admin/commercial/plans', '/admin/commercial/commission-policies', '/admin/refunds'] },
   { key: 'bizPractitioner', pages: [['/business'], ['/business/messages']], forbidden: ['/admin', '/finance'] },
   {
     key: 'cust1',
@@ -115,7 +115,7 @@ const P = [
   },
   {
     key: 'pro1',
-    pages: [['/pro'], ['/pro/bookings'], ['/pro/availability'], ['/pro/services'], ['/pro/profile'], ['/pro/outcome-policy'], ['/pro/finance'], ['/pro/analytics'], ['/pro/messages']],
+    pages: [['/pro'], ['/pro/bookings'], ['/pro/availability'], ['/pro/services'], ['/pro/profile'], ['/pro/outcome-policy'], ['/pro/finance'], ['/pro/analytics'], ['/pro/messages'], ['/pro/reviews']],
     forbidden: ['/admin', '/business'],
   },
   { key: 'bizOwner', pages: [['/business'], ['/business/messages'], ['/finance']], forbidden: ['/admin', '/pro/bookings'] },
@@ -138,6 +138,7 @@ const P = [
       ['/admin/notifications'],
       ['/admin/phone-conflicts'],
       ['/admin/privacy'],
+      ['/admin/refunds'],
     ],
     forbidden: [],
   },
