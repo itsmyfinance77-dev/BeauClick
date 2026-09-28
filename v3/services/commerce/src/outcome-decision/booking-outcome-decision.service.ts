@@ -367,13 +367,28 @@ export class BookingOutcomeDecisionService {
   }
 
   /** manual_required -> executed for the decision whose refund was executed by hand (recorded). */
-  async markManuallyExecuted(manager: EntityManager, orderId: string, refundRequestKey: string): Promise<boolean> {
+  /**
+   * The decision behind a refund whose manual execution was recorded, moved to
+   * \`executed\` in the caller's transaction. Accepts \`executing\` too: the refund
+   * can be committed \`manual_required\` while the automatic execution has not yet
+   * recorded its outcome (review finding) — the recorded execution wins and the
+   * late \`recordExecution\` (from \`pending\`/\`executing\` only) becomes a no-op.
+   * \`no_decision\`: the refund belongs to no outcome decision (legacy/unrelated) —
+   * nothing to move. \`conflict\`: a decision exists in any other state — the caller
+   * must fail closed (roll back).
+   */
+  async markManuallyExecuted(manager: EntityManager, orderId: string, refundRequestKey: string): Promise<'moved' | 'no_decision' | 'conflict'> {
     const raw: unknown = await manager.query(
       `UPDATE commerce.booking_outcome_decisions SET execution_status = 'executed'
-        WHERE order_id = $1 AND refund_request_key = $2 AND execution_status = 'manual_required' RETURNING id`,
+        WHERE order_id = $1 AND refund_request_key = $2 AND execution_status IN ('executing', 'manual_required') RETURNING id`,
       [orderId, refundRequestKey],
     );
-    return returningRows(raw).length === 1;
+    if (returningRows(raw).length === 1) return 'moved';
+    const existing: unknown[] = await manager.query(
+      `SELECT 1 FROM commerce.booking_outcome_decisions WHERE order_id = $1 AND refund_request_key = $2`,
+      [orderId, refundRequestKey],
+    );
+    return existing.length === 0 ? 'no_decision' : 'conflict';
   }
 }
 

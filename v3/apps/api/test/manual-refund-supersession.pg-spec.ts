@@ -3,6 +3,7 @@ import request from 'supertest';
 import { DataSource } from 'typeorm';
 
 import { BookingService, SlotUnavailableException } from '@beauclick/booking';
+import { BookingOutcomeDecisionService } from '@beauclick/commerce';
 import { OutboxRelay } from '@beauclick/events';
 import { PaymentService, SandboxPaymentProvider } from '@beauclick/payment';
 
@@ -89,7 +90,7 @@ describePg('Manual refund execution + #212 supersession (demo F-10/F-11, real Po
   }
 
   /** Booked, paid (manual-refund bank or automatic), then cancelled by the professional. `deliver` decides (+ executes). */
-  async function sellerCancelled(opts: { manual?: boolean; deliver?: 'decide+execute' | 'decide-only' } = {}): Promise<Case> {
+  async function sellerCancelled(opts: { manual?: boolean; deliver?: 'decide+execute' | 'decide-only' | 'none' } = {}): Promise<Case> {
     const owner = await seedUser(app, dataSource, phone(), ['customer', 'professional']);
     const pro = await seedProfessional(dataSource, owner.id, 'متخصص', PRICE);
     const customer = await seedUser(app, dataSource, phone(), ['customer']);
@@ -101,7 +102,7 @@ describePg('Manual refund execution + #212 supersession (demo F-10/F-11, real Po
     await bookings.cancel(result.bookingId, { type: 'professional', id: owner.id }, 'مشکل پیش‌بینی‌نشده');
     if ((opts.deliver ?? 'decide+execute') === 'decide+execute') {
       await handler.handle({ payload: { bookingId: result.bookingId } } as never);
-    } else {
+    } else if (opts.deliver === 'decide-only') {
       await orchestrator.decideCancellation(result.bookingId, (m, h) => bookings.cancellationFacts(m, result.bookingId, h));
     }
     return { owner, customer, professionalId: pro.id, serviceId: pro.serviceId, bookingId: result.bookingId, orderId: result.order.order.id };
@@ -264,6 +265,82 @@ describePg('Manual refund execution + #212 supersession (demo F-10/F-11, real Po
       const [r] = await refunds(c.orderId);
       await claim(r.id).expect(201);
       await expect(dataSource.query(`UPDATE payment.refunds SET status = 'superseded', superseded_at = now() WHERE id = $1`, [r.id])).rejects.toThrow(/cannot be superseded/);
+    });
+  });
+
+  describe('review finding: manual execution recorded while the automatic execution has not recorded yet', () => {
+    it('deterministic interleaving (paused before recordExecution): the recorded execution moves the decision atomically; the late recordExecution changes nothing', async () => {
+      // The ORCHESTRATOR's own instance (the provider is instantiated per module; app.get may return another).
+      const decisionsSvc = (orchestrator as unknown as { decisions: BookingOutcomeDecisionService }).decisions;
+      const original = decisionsSvc.recordExecution.bind(decisionsSvc);
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => (release = resolve));
+      let paused = false;
+      const spy = jest.spyOn(decisionsSvc, 'recordExecution').mockImplementationOnce(async (...args) => {
+        paused = true;
+        await gate;
+        return original(...args);
+      });
+      try {
+        const c = await sellerCancelled({ deliver: 'none' });
+        const delivering = handler.handle({ payload: { bookingId: c.bookingId } } as never);
+        for (let i = 0; i < 200 && !paused; i++) await new Promise((x) => setTimeout(x, 25));
+        expect(paused).toBe(true); // deterministic: the execution is parked exactly before recordExecution
+        const [r] = (await refunds(c.orderId)) as Array<{ id: string; status: string }>;
+        // THE WINDOW: refund committed manual_required, decision still `executing`.
+        expect(r!.status).toBe('manual_required');
+        expect((await decisions(c.bookingId))[0].execution_status).toBe('executing');
+        expect((await remedy.read(c.bookingId)).rescheduleStillAvailable).toBe(false);
+        await expect(reschedule(c, await newSlot(c))).rejects.toMatchObject({ response: { code: 'REMEDY_REFUND_IN_EXECUTION' } });
+
+        const exec = (await claim(r!.id).expect(201)).body.data.executionId;
+        // No outbox drain during the resolve: a redelivered BookingCancelled would resume the parked execution
+        // and heal the state by coincidence; the property under test is the resolve's OWN atomicity.
+        const drain = jest.spyOn(relay, 'drain').mockResolvedValue(undefined as never);
+        try {
+          await resolveExec(exec, 'executed', 'SIM-RACE-1').expect(201);
+        } finally {
+          drain.mockRestore();
+        }
+        expect((await refunds(c.orderId))[0].status).toBe('succeeded');
+        expect((await decisions(c.bookingId))[0].execution_status).toBe('executed'); // atomic with the refund
+        expect(await refundCompletedEvents(r!.id)).toBe(1);
+
+        release();
+        await delivering;
+        expect((await decisions(c.bookingId))[0].execution_status).toBe('executed'); // not rolled back to manual_required
+        expect((await refunds(c.orderId))[0].status).toBe('succeeded');
+        expect(await refundCompletedEvents(r!.id)).toBe(1);
+      } finally {
+        release();
+        spy.mockRestore();
+      }
+    });
+
+    it('fail-closed: a refund whose decision is in any other state (inconsistent) cannot be recorded as executed; nothing changes', async () => {
+      const c = await sellerCancelled();
+      const [r] = await refunds(c.orderId);
+      const [d] = await decisions(c.bookingId);
+      // An inconsistent pairing forced for the test: decision already executed, refund still manual_required.
+      await dataSource.query(`UPDATE commerce.booking_outcome_decisions SET execution_status = 'executed' WHERE id = $1`, [d.id]);
+      const exec = (await claim(r.id).expect(201)).body.data.executionId;
+      const res = await resolveExec(exec, 'executed', 'SIM-CONFLICT');
+      expect(res.status).toBe(409);
+      expect(res.body.error.code).toBe('MANUAL_REFUND_TRANSITION_NOT_ALLOWED');
+      expect((await refunds(c.orderId))[0].status).toBe('manual_required');
+      expect(await refundCompletedEvents(r.id)).toBe(0);
+      const [e] = await dataSource.query(`SELECT state FROM payment.manual_refund_executions WHERE id = $1`, [exec]);
+      expect(e.state).toBe('claimed');
+    });
+
+    it('a manual refund with NO outcome decision (legacy/unrelated) can still be executed', async () => {
+      const c = await sellerCancelled({ deliver: 'none' });
+      // The booking stays cancelled but undecided; an unrelated manual refund on the same (manual-bank) payment.
+      const refund = await payments.refund({ orderId: c.orderId, amountToman: 1000, reason: 'suite: unrelated manual refund', requestKey: 'suite-no-decision', actorType: 'admin', actorId: admin.id });
+      expect(refund.status).toBe('manual_required');
+      const exec = (await claim(refund.id).expect(201)).body.data.executionId;
+      const done = await resolveExec(exec, 'executed', 'SIM-LEGACY').expect(201);
+      expect(done.body.data.refundStatus).toBe('succeeded');
     });
   });
 

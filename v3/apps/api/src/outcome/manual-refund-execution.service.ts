@@ -4,7 +4,7 @@ import { DataSource } from 'typeorm';
 import { AdminAuditService } from '@beauclick/audit';
 import { BookingOutcomeDecisionService } from '@beauclick/commerce';
 import { OutboxRelay } from '@beauclick/events';
-import { ManualRefundExecutionEntity, PaymentService, RefundEntity } from '@beauclick/payment';
+import { ManualRefundExecutionEntity, ManualRefundExecutionTransitionException, PaymentService, RefundEntity } from '@beauclick/payment';
 
 export const MANUAL_REFUND_AUDIT_ACTIONS = {
   claimed: 'payment.manual_refund_claimed',
@@ -63,8 +63,14 @@ export class ManualRefundExecutionService {
   ): Promise<{ execution: ManualRefundExecutionEntity; refund: RefundEntity }> {
     const result = await this.dataSource.transaction(async (m) => {
       const resolved = await this.payments.resolveManualExecution(m, executionId, actorUserId, outcome, externalReference, note);
-      // Commerce's decision follows the money: executed by hand -> executed.
-      if (outcome === 'executed') await this.decisions.markManuallyExecuted(m, resolved.refund.orderId, resolved.refund.requestKey);
+      // Commerce's decision follows the money, in THIS transaction: executed by hand ->
+      // executed (also from `executing`: the automatic execution may not have recorded
+      // its outcome yet). A decision in any other state is inconsistent with a
+      // manual_required refund — fail closed: roll back the refund and the execution.
+      if (outcome === 'executed') {
+        const decision = await this.decisions.markManuallyExecuted(m, resolved.refund.orderId, resolved.refund.requestKey);
+        if (decision === 'conflict') throw new ManualRefundExecutionTransitionException();
+      }
       await this.audit.record(m, {
         actorUserId,
         action: MANUAL_REFUND_AUDIT_ACTIONS.resolved,
