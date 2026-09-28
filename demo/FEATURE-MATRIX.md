@@ -10,9 +10,10 @@ Source: demo branch `codex/demo-2026-09-28` on top of `b2477a3`. Status legend:
 - **UNAVAILABLE** — not built at the baseline, or blocked by an external/legal gate; nothing pretends otherwise.
 - **DEMO-EXT** — owner-approved demo-only extension (DEMO-DEC-001), not production-approved.
 
-**This file describes the CURRENT artifact** — HEAD `codex/demo-2026-09-28`, running artifact built from `50ce6ce` (v3 tree
-`4bdc22022636478a971b602ca83542d853c2f25c`), reset baseline `backups/2026-09-27T19-08-01-550Z-golden-r4` (+ the three
-F-10 migrations applied by restore). Where the pinned baseline `b2477a3` behaved differently, the row says so in a
+**This file describes the CURRENT demo branch** — `codex/demo-2026-09-28` and reset baseline
+`backups/2026-09-27T19-08-01-550Z-golden-r4` (+ the three F-10 migrations applied by restore). The active W/L artifact
+manifests under `E:/BeauClick-demo` are authoritative for their exact source commit, v3 tree, lockfile and build hashes;
+do not infer those identities from a historical matrix revision. Where the pinned baseline `b2477a3` behaved differently, the row says so in a
 _Baseline note_. The round-by-round sections at the end are HISTORY (what was measured when), not current status.
 
 Roles: C customer · P professional · B business owner · S staff (manager/practitioner) · FR finance-read grantee ·

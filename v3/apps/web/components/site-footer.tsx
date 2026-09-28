@@ -48,7 +48,7 @@ export function SiteFooter() {
         <div className={styles.columns}>
           <div>
             <div className={styles.brandRow}>
-              <span className={styles.brandDot} aria-hidden="true" />
+              <img src="/brand/demo-mark-inverse.svg" alt="" width={24} height={24} className={styles.brandMark} />
               <span className={styles.brandName}>BeauClick</span>
             </div>
             <p className={styles.blurb}>

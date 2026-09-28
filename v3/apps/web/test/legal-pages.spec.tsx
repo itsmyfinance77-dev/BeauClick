@@ -5,7 +5,7 @@ import ContactPage, { metadata as contactMetadata } from '@/app/contact/page';
 import PrivacyPolicyPage, { metadata as privacyMetadata } from '@/app/privacy-policy/page';
 import SupportPage, { metadata as supportMetadata } from '@/app/support/page';
 import TermsPage, { metadata as termsMetadata } from '@/app/terms/page';
-import { COMPANY_LINKS } from '@/components/site-footer';
+import { COMPANY_LINKS, SiteFooter } from '@/components/site-footer';
 import { LEGAL_PLACEHOLDER, LegalPage } from '@/components/legal-page';
 
 /**
@@ -81,6 +81,11 @@ describe.each(PAGES)('%s', (_route, title, Page, metadata, hasContactBlock) => {
 });
 
 describe('the footer links resolve to real pages', () => {
+  it('uses the inverse demo mark on the dark footer', () => {
+    const { container } = render(<SiteFooter />);
+    expect(container.querySelector('img[src="/brand/demo-mark-inverse.svg"]')).not.toBeNull();
+  });
+
   it('names the four routes with the spec labels', () => {
     expect(COMPANY_LINKS).toEqual([
       { href: '/terms', label: 'قوانین و مقررات' },

@@ -55,11 +55,10 @@
   margin-block-end: 12px;
 }
 
-.brandDot {
+.brandMark {
   width: 24px;
   height: 24px;
-  border-radius: var(--bc-radius-chip);
-  background: var(--bc-color-accent);
+  flex: none;
 }
 
 .brandName {
