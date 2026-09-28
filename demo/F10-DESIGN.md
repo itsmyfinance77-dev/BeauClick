@@ -80,3 +80,19 @@ claim refused `REFUND_NOT_CLAIMABLE`.
   detect an unrecorded out-of-band transfer. Operators must claim before transferring.
 - The demo's "execution" is a synthetic record (no bank, no transfer).
 - Replacement offer B is unchanged (independent new booking/payment).
+
+## Review finding (independent review at `2ccb051`) — closed in `50ce6ce`
+
+`PaymentService.completeRefund` commits the refund `manual_required` BEFORE the orchestrator records the decision's
+outcome (`executing -> manual_required`). In that window an administrator could claim and record `executed`: the refund
+became `succeeded` (RefundCompleted emitted) while `markManuallyExecuted` (CAS from `manual_required` only) silently
+moved nothing, and the delayed `recordExecution` then set the decision to `manual_required` — stale.
+
+Fix: the recorded execution moves the decision `executing | manual_required -> executed` in the SAME transaction as the
+refund; no decision (legacy/unrelated refund) -> proceeds; a decision in any other state ->
+`MANUAL_REFUND_TRANSITION_NOT_ALLOWED` and the whole transaction (refund, execution, audit) rolls back. The late
+`recordExecution` (from `pending|executing` only) is then a no-op. The remedy stays refused throughout the window
+(decision `executing`). Deterministic test: the automatic execution is parked exactly before `recordExecution` on the
+orchestrator's own service instance, with the outbox drain disabled during the resolve (a redelivered BookingCancelled
+would otherwise resume the parked execution and heal the state by coincidence — the first version of the test passed
+only for that reason). Mutant (CAS `manual_required` only) caught.
