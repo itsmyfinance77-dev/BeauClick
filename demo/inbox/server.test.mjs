@@ -126,6 +126,18 @@ test('TLS verification stays on: a client that does not trust the certificate is
   );
 });
 
+test('the demo inbox shows the new mark and serves only a static branded favicon', async () => {
+  const page = await request(viewerPort);
+  assert.equal(page.status, 200);
+  assert.match(page.body, /<header class="brand">/);
+  assert.match(page.body, /#A8447E/);
+  assert.match(page.body, /href="\/favicon\.svg"/);
+  const favicon = await request(viewerPort, { path: '/favicon.svg' });
+  assert.equal(favicon.status, 200);
+  assert.match(favicon.headers['content-type'], /^image\/svg\+xml/);
+  assert.match(favicon.body, /#A8447E/);
+});
+
 test('ingest refuses a missing or wrong bearer token', async () => {
   assert.equal((await ingest(PHONE_A, 'x', null)).status, 401);
   assert.equal((await ingest(PHONE_A, 'x', 'w'.repeat(TOKEN.length))).status, 401);

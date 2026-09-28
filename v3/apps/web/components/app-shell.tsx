@@ -205,7 +205,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <Link href="/" className={styles.brand}>
             {/* A static brand mark from `public/`. `next/image` does not
                 optimise SVG, so it would add a wrapper and no benefit. */}
-            <img src="/brand/icon-circle.svg" alt="" width={26} height={26} className={styles.brandMark} />
+            <img src="/brand/demo-mark.svg" alt="" width={26} height={26} className={styles.brandMark} />
             <span className={styles.brandName}>BeauClick</span>
           </Link>
 

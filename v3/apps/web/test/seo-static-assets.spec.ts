@@ -22,7 +22,7 @@ function dimensions(file: string): { width: number; height: number } {
   return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
 }
 
-describe('the placeholder brand imagery', () => {
+describe('the demo brand imagery', () => {
   it.each([
     ['opengraph-image.png', 1200, 630],
     ['twitter-image.png', 1200, 630],

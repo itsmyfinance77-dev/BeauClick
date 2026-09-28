@@ -67,7 +67,7 @@ export function ProShell({ children }: { children: ReactNode }) {
         <div className={styles.identity}>
           <Link href="/pro" className={styles.brand}>
             {/* The static brand mark from `public/`. */}
-            <img src="/brand/icon-circle.svg" alt="" width={24} height={24} className={styles.brandMark} />
+            <img src="/brand/demo-mark.svg" alt="" width={24} height={24} className={styles.brandMark} />
             <span className={styles.brandName}>BeauClick</span>
           </Link>
           {ready ? (

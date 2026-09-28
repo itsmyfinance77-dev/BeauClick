@@ -147,7 +147,7 @@ function AuthContent() {
     <div className={styles.wrap}>
       <div className={styles.card}>
         {/* The brand mark from `public/`, decorative beside the heading. */}
-        <img src="/brand/icon-circle.svg" alt="" width={30} height={30} className={styles.mark} />
+        <img src="/brand/demo-mark.svg" alt="" width={40} height={40} className={styles.mark} />
 
         {step === 'phone' ? (
           <>

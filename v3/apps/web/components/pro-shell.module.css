@@ -139,9 +139,9 @@
   flex-shrink: 0;
 }
 
-/* The static brand mark from `public/` -- round, matching the customer header's own. #219. */
+/* Demo brand mark; the artwork itself has no circular background. */
 .brandMark {
-  border-radius: 999px;
+  display: block;
 }
 
 .whoMain {

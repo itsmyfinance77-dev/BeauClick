@@ -182,20 +182,24 @@ const esc = (s) =>
 
 const STYLE = `body{font-family:Tahoma,Arial,sans-serif;margin:0;background:#f6f4f1;color:#222}
 main{max-width:720px;margin:0 auto;padding:16px}
-.banner{background:#7a1f3d;color:#fff;padding:10px 16px;font-size:14px}
+.brand{display:flex;align-items:center;justify-content:center;gap:8px;background:#fbf7f3;color:#1a1f33;padding:10px 16px;font:700 20px Arial,sans-serif}
+.brand svg{width:36px;height:36px;flex:none}
+.banner{background:#a8447e;color:#fff;padding:10px 16px;font-size:14px}
 .card{background:#fff;border-radius:10px;padding:14px 16px;margin:12px 0;box-shadow:0 1px 3px rgba(0,0,0,.12)}
 .meta{color:#666;font-size:12px}.text{font-size:18px;margin-top:6px;white-space:pre-wrap;word-break:break-word}
 label{display:block;margin:10px 0 4px}input{width:100%;box-sizing:border-box;padding:10px;font-size:16px}
-button{margin-top:14px;padding:10px 18px;font-size:16px;border:0;border-radius:8px;background:#7a1f3d;color:#fff;cursor:pointer}
+button{margin-top:14px;padding:10px 18px;font-size:16px;border:0;border-radius:8px;background:#a8447e;color:#fff;cursor:pointer}
 .err{color:#b00020}.row{display:flex;justify-content:space-between;align-items:center;gap:8px}`;
 const STYLE_HASH = `sha256-${createHash('sha256').update(STYLE).digest('base64')}`;
+const BRAND_MARK = '<svg viewBox="0 0 72 72" aria-hidden="true"><path d="M27 18v37M14 53c0-13 10-19 23-19 12 0 20 6 23 18" fill="none" stroke="#A8447E" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="50" cy="21" r="3.7" fill="#A8447E"/></svg>';
+const FAVICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72"><rect width="72" height="72" rx="16" fill="#A8447E"/><path d="M27 18v37M14 53c0-13 10-19 23-19 12 0 20 6 23 18" fill="none" stroke="#FBF7F3" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="50" cy="21" r="3.7" fill="#FBF7F3"/></svg>';
 
 function securityHeaders(res) {
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader(
     'Content-Security-Policy',
-    `default-src 'none'; style-src '${STYLE_HASH}'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'`,
+    `default-src 'none'; style-src '${STYLE_HASH}'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'`,
   );
   res.setHeader('X-Content-Type-Options', 'nosniff');
   // Not `no-referrer`: under it a browser sends `Origin: null` even on this page's own
@@ -211,7 +215,8 @@ function page(res, status, title, body, { refresh = false } = {}) {
   res.writeHead(status, { 'Content-Type': 'text/html; charset=utf-8' });
   res.end(`<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">${refresh ? '<meta http-equiv="refresh" content="5">' : ''}
-<title>${esc(title)}</title><style>${STYLE}</style></head><body>
+<title>${esc(title)}</title><link rel="icon" type="image/svg+xml" href="/favicon.svg"><style>${STYLE}</style></head><body>
+<header class="brand">${BRAND_MARK}<strong>BeauClick</strong></header>
 <div class="banner">صندوق پیامک آزمایشی دمو — شبیه‌سازی؛ هیچ پیامکی واقعاً ارسال نمی‌شود.</div>
 <main>${body}</main></body></html>`);
 }
@@ -282,6 +287,12 @@ export function createInbox({ members, allowedPhones, ingestToken, tls, clock, r
       const url = new URL(req.url, 'https://inbox.invalid');
       const sid = cookieValue(req, COOKIE);
       const member = auth.session(sid);
+
+      if (req.method === 'GET' && url.pathname === '/favicon.svg') {
+        securityHeaders(res);
+        res.writeHead(200, { 'Content-Type': 'image/svg+xml; charset=utf-8' });
+        return res.end(FAVICON);
+      }
 
       if (req.method === 'POST' && !sameOriginPost(req)) return page(res, 403, 'ممنوع', '<p class="err">درخواست نامعتبر.</p>');
 
