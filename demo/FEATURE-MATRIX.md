@@ -197,3 +197,13 @@ fails to run (`Cannot find module 'reflect-metadata'` at its line 1). Evidence g
 resolve from `v3/services/booking/src` (MODULE_NOT_FOUND); the spec file, `services/booking/package.json`,
 `services/booking/jest.config.js` and `pnpm-lock.yaml` are byte-identical to baseline `b2477a3`. A baseline run has NOT
 been performed, so it stays UNRESOLVED until one confirms or refutes it.
+
+### Round 4 — final verification on artifact `3ddf7fb` (v3 `f10e1af`)
+- F-10/F-11 browser (real UI, both race orders) desktop + 390 PASS; round4 flows desktop + 390 PASS; checkout group
+  (A/B at 390) PASS; a-acceptance 9/9; b-replacement 25/25; b-late-capture 4/4 (result `status=refunded`, F-7).
+- Earlier artifact `2821f9c`: account (F-9) desktop + 390, waitlist (F-8) desktop + 390, pro (F-3), regolden,
+  API-only incl. staff location — PASS (application paths unchanged by F-10 except refunds/decisions, re-verified above).
+- Restore (golden-r4 → +3 migrations) PASS; cold start (containers stopped/started) PASS; OTP smoke 4/4.
+- pg regression 44 suites / 1257; unit + web suites green; typecheck/eslint 0.
+- Status updates: rows F-1…F-10, #14 web paths, #16 staff location, #31 waitlist payment — **LIVE** on this artifact.
+  Still owner decisions: #22/#23/#28 values (GAP-INVESTIGATION-ROUND4.md). Unresolved: reflect-metadata booking suite.
