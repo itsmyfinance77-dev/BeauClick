@@ -231,4 +231,7 @@ been performed, so it stays UNRESOLVED until one confirms or refutes it.
 4. **Unresolved test:** `services/booking/src/availability/delivery-location-boundary.spec.ts` cannot resolve
    `reflect-metadata` (details above); no baseline run performed.
 5. **By design / gated:** dev-login unavailable; settlements hold no settled data (#174); roadmap items (row 38);
-   AI assistant disclosure copy pending legal review; WireGuard/team devices not activated (separate approval).
+   AI assistant disclosure copy pending legal review. Profile W is enabled only on the existing WireGuard interface
+   (`10.20.30.6`) and loopback for the internal team after the owner's approval to test peer `10.20.30.10` and
+   subsequent confirmation of sign-in from that peer on 2026-09-28. This does not approve public ingress, new
+   peers, client configuration, router or firewall changes; the product API, database and simulators remain private.
