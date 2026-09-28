@@ -1,8 +1,12 @@
 # BeauClick internal team demo — runbook
 
 **Demo branch only (`codex/demo-2026-09-28`). Never merged to master.** Pinned application source: the
-#212 merge `b2477a30de93ccec22233f5c117db653f2b9ece1`; demo-only additions live under `demo/` plus three small,
-opt-in, fail-closed demo seams in `v3/` (OTP inbox observer, identity module binding, web demo label).
+#212 merge `b2477a30de93ccec22233f5c117db653f2b9ece1`; demo-only additions live under `demo/` and in `v3/` on this branch:
+the original opt-in demo seams (OTP inbox observer, identity module binding, web demo label), the owner-approved
+extensions A and B (DEMO-DEC-001), and the round-4 owner-approved remediation (F-1…F-11, the web review/reply/
+professional-cancel paths, the #212 sandbox "bank without a refund API" mode, and the F-10 controlled manual-refund
+execution) — commit list and evidence in `FEATURE-MATRIX.md` and `E:\BeauClick-demo\HANDOFF-ROUND4.md`. None of it is
+merged to master; extraction into product PRs is deferred until after the demo.
 
 Audience: **internal team only**, each member with their own synthetic account. Everything is synthetic;
 payment, SMS, email and the AI provider are simulated; no money or message leaves this machine.
@@ -85,18 +89,27 @@ Edge, own profile, no certificate flags) and writes FALLBACK screenshots under `
 
 ## Backups used by the pre-show reset
 
-`restore.mjs --backup latest-golden` picks the newest folder labelled `golden` / `golden-<suffix>`. Take the
-presentation backup after the final seed with `node demo/scripts/backup.mjs --label golden-final`.
+`restore.mjs --backup latest-golden` picks the newest folder labelled `golden` / `golden-<suffix>`. The current reset
+baseline is `golden-r4` (round 4: long services have covering times; legacy overlaps removed by their owners); restore
+then applies any newer migrations (F-10's three) before starting — "Applied: 0" once the backup is current.
+(`golden-final` is the round-3 baseline kept for the `a889dae` fallback.)
 
 ## Known limitations (say them, do not hide them)
 
 - Settlement / settlement series (#255) screens are live but hold no settled data: fund release (#174 / `#43c`) is not
   built, so collected money stays "pending" and nothing is settleable. No settlement is faked.
-- #212's "reschedule instead of refund" works only while the refund decision is still pending/manual; the sandbox
-  executes refunds immediately, so it is not demonstrable. B is separate and independent of the refund.
-- Backend features without a web screen at the baseline (API-ONLY in `FEATURE-MATRIX.md`): seller subscriptions and
-  credit purchases, collection-policy assignment, business locations/resources, seller review replies, loyalty
-  membership, the customer's order and review lists, settlement schedules / risk classes.
+- #212's "reschedule instead of refund" is shown with the sandbox decision «پرداخت موفق — بانک بدون بازپرداخت خودکار
+  (شبیه‌سازی)»: that payment's refund becomes `manual_required`, and the customer may swap it for a free reschedule
+  until an administrator claims its manual execution on `/admin/refunds` (F-10). The execution recorded there is
+  synthetic; a transfer made outside the system without the claim cannot be detected or prevented by the database.
+  B (replacement offer) is separate and independent of the refund.
+- Still without a web screen (API-only): seller subscriptions, business locations/resources/staff location, the
+  customer's order list, settlement schedules / risk classes. Credit purchases, non-default collection policy,
+  settlement/risk/legal values and loyalty membership plans need owner/commercial/legal decisions (routes exist
+  except for membership plans; nothing invented) — see `E:\BeauClick-demo\GAP-INVESTIGATION-ROUND4.md`.
+- One booking test suite (`delivery-location-boundary.spec.ts`) cannot resolve `reflect-metadata`; unresolved (no
+  baseline run).
+- Refresh-token rotation is not crash-atomic (F-9 changed only the revocation reason).
 - All commercial values and policy texts are synthetic and not approved; no legal evidence is recorded; the AI
   assistant uses the deterministic sandbox provider and its disclosure copy is pending legal review.
 - Throttling is per client IP and every request reaches the API from the ingress: the `refresh` limit (20/min) is
